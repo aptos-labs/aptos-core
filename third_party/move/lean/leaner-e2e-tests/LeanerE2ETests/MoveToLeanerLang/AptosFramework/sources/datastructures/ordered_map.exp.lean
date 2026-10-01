@@ -33,24 +33,24 @@ That's why all functions returning iterators are prefixed with "internal_", to c
 sure usage is correct.
 A set of inline utility methods is provided instead, to provide guaranteed valid usage to iterators.
 -/
-leaner module 0x1::ordered_map where
-  use 0x1::std::cmp::Ordering
-  use 0x1::std::cmp::compare
-  use 0x1::std::cmp::is_eq
-  use 0x1::std::cmp::is_gt
-  use 0x1::std::cmp::is_lt
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::option
-  use 0x1::std::option::Option
-  use 0x1::std::option::is_none
-  use 0x1::std::option::is_some
-  use 0x1::std::option::none
-  use 0x1::std::option::some
-  use 0x1::std::option::spec_borrow
-  use 0x1::std::option::spec_is_none
-  use 0x1::std::option::spec_is_some
-  use 0x1::std::vector
-  use 0x1::std::vector::spec_contains
+leaner module aptos_framework::ordered_map where
+  use std::cmp::Ordering
+  use std::cmp::compare
+  use std::cmp::is_eq
+  use std::cmp::is_gt
+  use std::cmp::is_lt
+  use std::error::invalid_argument
+  use std::option
+  use std::option::Option
+  use std::option::is_none
+  use std::option::is_some
+  use std::option::none
+  use std::option::some
+  use std::option::spec_borrow
+  use std::option::spec_is_none
+  use std::option::spec_is_some
+  use std::vector
+  use std::vector::spec_contains
 
   friend aptos_framework::big_ordered_map;
 
@@ -198,7 +198,12 @@ leaner module 0x1::ordered_map where
     let index := binary_search(key, &self.entries, 0, len)
     assert!(index < len, invalid_argument(EKEY_NOT_FOUND))
     let Entry<K, V> { key := old_key, value := value } :=
-      self.entries.remove(index)
+      do
+        let _t0 := &mut self.entries
+        assert!(_t0.length > index, 131072)
+        let (_t1, _t2) := core.prim.removeVector(*_t0, index)
+        *_t0 := _t2
+        _t1
     assert!(key == &old_key, invalid_argument(EKEY_NOT_FOUND))
     value
 
@@ -216,7 +221,13 @@ leaner module 0x1::ordered_map where
     let len := self.entries.length
     let index := binary_search(key, &self.entries, 0, len)
     if index < len && key == &self.entries[index].key then
-      let Entry<K, V> { key := _, value := value } := self.entries.remove(index)
+      let Entry<K, V> { key := _, value := value } :=
+        do
+          let _t27 := &mut self.entries
+          assert!(_t27.length > index, 131072)
+          let (_t28, _t29) := core.prim.removeVector(*_t27, index)
+          *_t27 := _t29
+          _t28
       some(value)
     else none::<V>()
 
@@ -304,27 +315,39 @@ leaner module 0x1::ordered_map where
     self'.reverse()
     v2.reverse()
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(25)
+    spec assume folds_capture_anchor!(79)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
-      let (e1, e2) := (self'.pop_back(), v2.pop_back())
+      let (e1, e2) :=
+        (do
+            let _t6 := &mut self'
+            if _t6.length == 0 then moveVectorError(2)
+            let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
+            *_t6 := _t8
+            _t7,
+          do
+            let _t9 := &mut v2
+            if _t9.length == 0 then moveVectorError(2)
+            let (_t10, _t11) := core.prim.removeVector(*_t9, _t9.length - 1)
+            *_t9 := _t11
+            _t10)
       let (key, value) := (e1, e2)
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(25, old(self')).length >= len
+      invariant with_state_anchor!(79, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(25, old(self')).length
-        == with_state_anchor!(25, old(v2)).length
+      invariant with_state_anchor!(79, old(self')).length
+        == with_state_anchor!(79, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(25, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(25, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(25, old(self')).length), true
+        self'[j] == with_state_anchor!(79, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(79, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(79, old(self')).length), true
       invariant true
-    self'.destroy_empty()
-    v2.destroy_empty()
+    core.prim.destroyEmptyVector(self')
+    core.prim.destroyEmptyVector(v2)
 
   spec add_all where
     pragma intrinsic
@@ -342,27 +365,39 @@ leaner module 0x1::ordered_map where
     self'.reverse()
     v2.reverse()
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(43)
+    spec assume folds_capture_anchor!(97)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
-      let (e1, e2) := (self'.pop_back(), v2.pop_back())
+      let (e1, e2) :=
+        (do
+            let _t33 := &mut self'
+            if _t33.length == 0 then moveVectorError(2)
+            let (_t34, _t35) := core.prim.removeVector(*_t33, _t33.length - 1)
+            *_t33 := _t35
+            _t34,
+          do
+            let _t36 := &mut v2
+            if _t36.length == 0 then moveVectorError(2)
+            let (_t37, _t38) := core.prim.removeVector(*_t36, _t36.length - 1)
+            *_t36 := _t38
+            _t37)
       let (key, value) := (e1, e2)
       self.upsert(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(43, old(self')).length >= len
+      invariant with_state_anchor!(97, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(43, old(self')).length
-        == with_state_anchor!(43, old(v2)).length
+      invariant with_state_anchor!(97, old(self')).length
+        == with_state_anchor!(97, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(43, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(43, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(43, old(self')).length), true
+        self'[j] == with_state_anchor!(97, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(97, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(97, old(self')).length), true
       invariant true
-    self'.destroy_empty()
-    v2.destroy_empty()
+    core.prim.destroyEmptyVector(self')
+    core.prim.destroyEmptyVector(v2)
 
   spec upsert_all where
     pragma intrinsic
@@ -391,7 +426,7 @@ leaner module 0x1::ordered_map where
   ) -> Unit := do
     let overwritten := self.append_impl(other)
     assert!(overwritten.length == 0, invalid_argument(EKEY_ALREADY_EXISTS))
-    overwritten.destroy_empty()
+    core.prim.destroyEmptyVector(overwritten)
 
   spec append_disjoint where
     pragma intrinsic
@@ -406,16 +441,17 @@ leaner module 0x1::ordered_map where
       other
     let mut overwritten := vector<Entry<K, V> >[]
     if other_entries.is_empty() then
-      other_entries.destroy_empty()
+      core.prim.destroyEmptyVector(other_entries)
       return overwritten;
     if self.entries.is_empty() then
       self.entries.append(other_entries)
       return overwritten;
     if is_lt(
       &compare(
-        &self.entries[self.entries.length
-          - 1].key, &other_entries[0].key
-      )
+        &self.entries[self.entries.length - 1].key,
+        &(do
+          let _ := core.prim.checkVectorIndex[moveVectorError](other_entries, 0)
+          core.borrowPlace(immutable, other_entries[0])).key)
     ) then
       self.entries.append(other_entries)
       return overwritten;
@@ -423,11 +459,24 @@ leaner module 0x1::ordered_map where
     let cur_i := self.entries.length - 1
     let other_i := other_entries.length - 1
     loop do
-      let ord := compare(&self.entries[cur_i].key, &other_entries[other_i].key)
+      let ord :=
+        compare(
+          &self.entries[cur_i].key,
+          &(do
+            let _ :=
+              core.prim.checkVectorIndex[moveVectorError](
+                other_entries, other_i
+              )
+            core.borrowPlace(immutable, other_entries[other_i])).key)
       if is_gt(&ord) then
         reverse_result := core.prim.pushVector(
-          reverse_result, self.entries.pop_back()
-        )
+          reverse_result,
+          do
+            let _t12 := &mut self.entries
+            if _t12.length == 0 then moveVectorError(2)
+            let (_t13, _t14) := core.prim.removeVector(*_t12, _t12.length - 1)
+            *_t12 := _t14
+            _t13)
         if cur_i == 0 then
           self.entries.append(other_entries)
           break
@@ -435,17 +484,27 @@ leaner module 0x1::ordered_map where
       else
         if is_eq(&ord) then
           overwritten := core.prim.pushVector(
-            overwritten, self.entries.pop_back()
-          )
+            overwritten,
+            do
+              let _t15 := &mut self.entries
+              if _t15.length == 0 then moveVectorError(2)
+              let (_t16, _t17) := core.prim.removeVector(*_t15, _t15.length - 1)
+              *_t15 := _t17
+              _t16)
           if cur_i == 0 then
             self.entries.append(other_entries)
             break
           else cur_i := cur_i - 1
         reverse_result := core.prim.pushVector(
-          reverse_result, other_entries.pop_back()
-        )
+          reverse_result,
+          do
+            let _t18 := &mut other_entries
+            if _t18.length == 0 then moveVectorError(2)
+            let (_t19, _t20) := core.prim.removeVector(*_t18, _t18.length - 1)
+            *_t18 := _t20
+            _t19)
         if other_i == 0 then
-          other_entries.destroy_empty()
+          core.prim.destroyEmptyVector(other_entries)
           break
         else other_i := other_i - 1
     self.entries.reverse_append(reverse_result)
@@ -499,7 +558,13 @@ leaner module 0x1::ordered_map where
 
   @[map_pop_front (OrderedMap)]
   public fun pop_front {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
-    let Entry<K, V> { key := key, value := value } := self.entries.remove(0)
+    let Entry<K, V> { key := key, value := value } :=
+      do
+        let _t24 := &mut self.entries
+        assert!(_t24.length > 0, 131072)
+        let (_t25, _t26) := core.prim.removeVector(*_t24, 0)
+        *_t24 := _t26
+        _t25
     (key, value)
 
   spec pop_front where
@@ -507,7 +572,13 @@ leaner module 0x1::ordered_map where
 
   @[map_pop_back (OrderedMap)]
   public fun pop_back {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
-    let Entry<K, V> { key := key, value := value } := self.entries.pop_back()
+    let Entry<K, V> { key := key, value := value } :=
+      do
+        let _t3 := &mut self.entries
+        if _t3.length == 0 then moveVectorError(2)
+        let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+        *_t3 := _t5
+        _t4
     (key, value)
 
   spec pop_back where
@@ -781,7 +852,12 @@ leaner module 0x1::ordered_map where
   ) -> V := do
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
     let Entry<K, V> { key := _, value := value } :=
-      map.entries.remove(self.index)
+      do
+        let _t21 := &mut map.entries
+        assert!(_t21.length > self.index, 131072)
+        let (_t22, _t23) := core.prim.removeVector(*_t21, self.index)
+        *_t21 := _t23
+        _t22
     value
 
   spec iter_remove where
@@ -883,7 +959,7 @@ leaner module 0x1::ordered_map where
   @[map_destroy_empty (OrderedMap)]
   public fun destroy_empty {K} {V}(self : OrderedMap<K, V>) -> Unit := do
     let OrderedMap<K, V>::SortedVectorMap { entries := entries } := self
-    entries.destroy_empty()
+    core.prim.destroyEmptyVector(entries)
 
   spec destroy_empty where
     pragma intrinsic
@@ -900,7 +976,7 @@ leaner module 0x1::ordered_map where
       «spec_map_ref$lambda$0»(self, self.length),
       «spec_map_ref_aborts$lambda$1»(self, self.length)
     )
-    let _inline_summary_result_33 :=
+    let _inline_summary_result_87 :=
       do
         let mut result := vector<K>[]
         let i := 0
@@ -921,9 +997,9 @@ leaner module 0x1::ordered_map where
           invariant ∀ (j in 0 .. i), result[j] == self[j].key
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_33
+    spec assert _inline_summary_result_87
       == «spec_map_ref$lambda$0»(self, self.length)
-    _inline_summary_result_33
+    _inline_summary_result_87
 
   spec keys where
     pragma intrinsic
@@ -940,7 +1016,7 @@ leaner module 0x1::ordered_map where
       «spec_map_ref$lambda$2»(self, self.length),
       «spec_map_ref_aborts$lambda$3»(self, self.length)
     )
-    let _inline_summary_result_38 :=
+    let _inline_summary_result_92 :=
       do
         let mut result := vector<V>[]
         let i := 0
@@ -961,9 +1037,9 @@ leaner module 0x1::ordered_map where
           invariant ∀ (j in 0 .. i), result[j] == self[j].value
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_38
+    spec assert _inline_summary_result_92
       == «spec_map_ref$lambda$2»(self, self.length)
-    _inline_summary_result_38
+    _inline_summary_result_92
 
   spec values where
     pragma intrinsic
@@ -982,23 +1058,29 @@ leaner module 0x1::ordered_map where
     let mut self := entries
     self.reverse()
     let mut self := self
-    spec assume folds_capture_anchor!(39)
+    spec assume folds_capture_anchor!(93)
     let len := self.length
     while len > 0 do
-      let e := self.pop_back()
+      let e :=
+        do
+          let _t30 := &mut self
+          if _t30.length == 0 then moveVectorError(2)
+          let (_t31, _t32) := core.prim.removeVector(*_t30, _t30.length - 1)
+          *_t30 := _t32
+          _t31
       let e := e
       let Entry<K, V> { key := key, value := value } := e
       keys := core.prim.pushVector(keys, key)
       values := core.prim.pushVector(values, value)
       len := len - 1
     where
-      invariant with_state_anchor!(39, old(self)).length >= len
+      invariant with_state_anchor!(93, old(self)).length >= len
       invariant len == self.length
       invariant ∀ (j in 0 .. len),
-        self[j] == with_state_anchor!(39, old(self))[j]
-      invariant ∀ (j in len .. with_state_anchor!(39, old(self)).length), true
+        self[j] == with_state_anchor!(93, old(self))[j]
+      invariant ∀ (j in len .. with_state_anchor!(93, old(self)).length), true
       invariant true
-    self.destroy_empty()
+    core.prim.destroyEmptyVector(self)
     (keys, values)
 
   spec to_vec_pair where
@@ -1072,7 +1154,7 @@ leaner module 0x1::ordered_map where
       assert spec_contains_key(map, 4)
       assert spec_get(map, 4) == 6
       assert is_some(result_2)
-      assert 0x1::std::option::borrow(result_2) == 5
+      assert std::option::borrow(result_2) == 5
     spec do
       assert keys[0] == 1
       assert spec_contains_key(map, 1)
@@ -1103,7 +1185,7 @@ leaner module 0x1::ordered_map where
       assert keys[1] == 2
       assert spec_contains_key(map, 2)
       assert is_some(result_2)
-      assert 0x1::std::option::borrow(result_2) == 2
+      assert std::option::borrow(result_2) == 2
 
   fun test_verify_prev_key() -> Unit := do
     let keys := vector<u64>[1, 2, 3]
@@ -1747,23 +1829,35 @@ leaner module 0x1::ordered_map where
   -- =================================================================
   -- Module Specification
   -- Switch to module documentation context
+  /--
+  The result of mapping `f` over the prefix `v[0..end]`.
+  -/
   spec fun «spec_map_ref$lambda$0» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Vector<T0> :=
     if end == 0 then vec::<T0>()
     else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
 
+  /--
+  The result of mapping `f` over the prefix `v[0..end]`.
+  -/
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Vector<T1> :=
     if end == 0 then vec::<T1>()
     else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
 
+  /--
+  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  -/
   spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
 
+  /--
+  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  -/
   spec fun «spec_map_ref_aborts$lambda$3» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Bool :=

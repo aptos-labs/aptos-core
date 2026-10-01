@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-11:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LEANER-CALL-NAME: unknown function `ordinaryHelper`
+  ┌─ TEMPFILE:8:37
+  │
+8 │   fun caller(value : u64) -> u64 := ordinaryHelper(value)
+  │                                     ^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

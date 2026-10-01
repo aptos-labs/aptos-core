@@ -88,15 +88,17 @@ jobs:
           source "$HOME/.profile"
           lake test
 
-      - name: Build the Lean-authored Move library for compiler-v2
-        # compiler-v2 elaborates `.lean` sources against this package; its
-        # tests also compile two of its fixtures.
-        working-directory: third_party/move/lean/v0/move
+      - name: Build the verification benchmark
+        # Run nightly by leaner-bench.yaml; built here so a change breaking
+        # it shows on the pull request.
+        working-directory: third_party/move/lean/leaner-e2e-tests
         run: |
           source "$HOME/.profile"
-          lake build Move Move.Tests.Verification.Account Move.Tests.Compiler.MultipleModules
+          lake build leaner-bench
 
       - name: Test compiler-v2 Lean integration
+        # compiler-v2 elaborates `.lean` sources in leaner-move, which the
+        # Leaner Move step above has built.
         run: |
           cargo test --locked -p move-compiler-v2 leaner::tests
           cargo test --locked -p move-compiler-v2-transactional-tests \

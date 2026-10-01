@@ -313,7 +313,7 @@ fn elaborate_source(
     let xir_path = xir_dir.path().join("module.xir.json");
     let leaner_root = std::env::var_os("LEANER_ROOT")
         .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move"));
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/leaner-move"));
     let _elaboration_permit = LeanElaborationPermit::acquire();
     let output = Command::new("lake")
         .args(["env", "lean", "--json"])
@@ -350,7 +350,7 @@ fn elaborate_source(
     }
     let json = fs::read_to_string(&xir_path).with_context(|| {
         format!(
-            "`{}` did not emit XIR; add a `move_module` declaration or `#emit_leaner_xir`",
+            "`{}` did not emit XIR; declare its Move module with `leaner module`",
             source_path.display()
         )
     });
@@ -385,6 +385,11 @@ mod tests {
     use super::*;
     use move_binary_format::access::ModuleAccess;
     use std::collections::BTreeSet;
+
+    /// Leaner sources compiler-v2 compiles in these tests.
+    fn fixtures() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/leaner-move/Tests/CompilerV2")
+    }
 
     fn lake_available() -> bool {
         Command::new("lake")
@@ -471,12 +476,9 @@ mod tests {
 
     #[test]
     fn extracts_lean_file() {
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
+        let fixtures = fixtures();
         let mut options = Options {
-            sources: vec![lean_root
-                .join("Move/Tests/Verification/Account.lean")
-                .to_string_lossy()
-                .into_owned()],
+            sources: vec![fixtures.join("Account.lean").to_string_lossy().into_owned()],
             ..Default::default()
         };
         let sources = extract_sources(&mut options).unwrap();
@@ -487,14 +489,11 @@ mod tests {
 
     #[test]
     fn deduplicates_equivalent_lean_paths() {
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
+        let fixtures = fixtures();
         let mut options = Options {
-            sources: vec![lean_root
-                .join("Move/Tests/Verification/Account.lean")
-                .to_string_lossy()
-                .into_owned()],
-            sources_deps: vec![lean_root
-                .join("Move/Tests/Verification/../Verification/Account.lean")
+            sources: vec![fixtures.join("Account.lean").to_string_lossy().into_owned()],
+            sources_deps: vec![fixtures
+                .join("../CompilerV2/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -510,12 +509,9 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
+        let fixtures = fixtures();
         let options = Options {
-            sources: vec![lean_root
-                .join("Move/Tests/Verification/Account.lean")
-                .to_string_lossy()
-                .into_owned()],
+            sources: vec![fixtures.join("Account.lean").to_string_lossy().into_owned()],
             ..Default::default()
         };
         let (env, units) = crate::run_move_compiler_to_stderr(options).unwrap();
@@ -537,16 +533,13 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
+        let fixtures = fixtures();
         // Intentionally put the client first: XIR loading must use declared
         // Move dependencies, not filesystem or command-line order.
         let options = Options {
-            sources: [
-                lean_root.join("Move/Tests/Compiler/MultipleModules.lean"),
-                lean_root.join("Move/Tests/Compiler/Fixtures/Modules/Math.lean"),
-            ]
-            .map(|path| path.to_string_lossy().into_owned())
-            .to_vec(),
+            sources: [fixtures.join("Client.lean"), fixtures.join("Math.lean")]
+                .map(|path| path.to_string_lossy().into_owned())
+                .to_vec(),
             ..Default::default()
         };
         let (env, units) = crate::run_move_compiler_to_stderr(options).unwrap();
@@ -595,16 +588,10 @@ mod tests {
             eprintln!("skipping Leaner integration test: `lake` is unavailable");
             return;
         }
-        let lean_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/v0/move");
+        let fixtures = fixtures();
         let options = Options {
-            sources: vec![lean_root
-                .join("Move/Tests/Compiler/MultipleModules.lean")
-                .to_string_lossy()
-                .into_owned()],
-            sources_deps: vec![lean_root
-                .join("Move/Tests/Compiler/Fixtures/Modules/Math.lean")
-                .to_string_lossy()
-                .into_owned()],
+            sources: vec![fixtures.join("Client.lean").to_string_lossy().into_owned()],
+            sources_deps: vec![fixtures.join("Math.lean").to_string_lossy().into_owned()],
             ..Default::default()
         };
         let (env, units) = crate::run_move_compiler_to_stderr(options).unwrap();

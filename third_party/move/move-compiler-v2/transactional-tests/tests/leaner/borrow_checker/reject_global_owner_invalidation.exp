@@ -1,11 +1,11 @@
 processed 1 task
-task 0 lines 1-20:  publish [import Move]
+task 0 lines 3-15:  publish [import LeanerMove]
 Error: compilation errors:
- error: borrow safety error: cannot move or overwrite an owner while a reference into it is live (conflicts with `observation`)
-   ┌─ TEMPFILE:10:19
+ error: LIR-SEMANTIC-BORROW-CONFLICT: global owner write conflicts with an active shared loan
+   ┌─ TEMPFILE:10:41
    │
-10 │     let removed ← moveFrom Counter address
-   │                   ^^^^^^^^^^^^^^^^^^^^^^^^
+10 │     let Counter { value := removed } := move_from<Counter>(addr)
+   │                                         ^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 exiting with Leaner elaboration errors

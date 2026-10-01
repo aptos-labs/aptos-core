@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerLang.Contract
+import LeanerLang.Modules
 import LeanerIR.Proofs.Denote.Close
 
 /-!
@@ -53,10 +54,15 @@ deriving instance ToExpr for FunctionHandle
 deriving instance ToExpr for LeanerIR.TypeId
 deriving instance ToExpr for LeanerIR.LocId
 deriving instance ToExpr for LeanerIR.TypeUse
+deriving instance ToExpr for LeanerIR.Validation.Witness
+deriving instance ToExpr for LeanerIR.Validation.KeyMap
+deriving instance ToExpr for LeanerIR.Validation.IndexedArena
+deriving instance ToExpr for LeanerIR.LifetimeKind
 deriving instance ToExpr for LeanerIR.StructHandle
 deriving instance ToExpr for Family
 
 attribute [lir_denote_norm] LeanerLang.Contract.lengthVector_vector
+  LeanerLang.Contract.elementsVector_vector
   LeanerLang.Contract.containsVector_vector
 
 /-- A variant test of an encoded enum value tests the variant it holds. -/
@@ -82,40 +88,6 @@ attribute [lir_denote_norm] LeanerLang.Contract.testVariants_encode_enum
   LeanerIR.SemanticOperations.resolveReturnedBorrows_integer
 
 /-! ## Quotation of compiled functions -/
-
-mutual
-/-- The literal of a native type.  An enum's distinctness witness is decided. -/
-partial def quoteNTy : NTy → MetaM Lean.Expr
-  | .unit => return mkConst ``NTy.unit
-  | .bool => return mkConst ``NTy.bool
-  | .int width signed => return mkAppN (mkConst ``NTy.int) #[toExpr width, toExpr signed]
-  | .address => return mkConst ``NTy.address
-  | .signer => return mkConst ``NTy.signer
-  | .string => return mkConst ``NTy.string
-  | .bytes => return mkConst ``NTy.bytes
-  | .tuple elements => return mkApp (mkConst ``NTy.tuple) (← quoteRow elements)
-  | .struct source fields =>
-      return mkAppN (mkConst ``NTy.struct) #[toExpr source, ← quoteRow fields]
-  | .enum source names rows _ => do
-      let namesExpr := toExpr names
-      let distinct ← mkDecideProof (← mkAppM ``List.Nodup #[namesExpr])
-      return mkAppN (mkConst ``NTy.enum) #[toExpr source, namesExpr, ← quoteRows rows, distinct]
-  | .vector element => return mkApp (mkConst ``NTy.vector) (← quoteNTy element)
-  | .ref referent => return mkApp (mkConst ``NTy.ref) (← quoteNTy referent)
-  | .param index => return mkApp (mkConst ``NTy.param) (toExpr index)
-
-partial def quoteRow : NRow → MetaM Lean.Expr
-  | .nil => return mkConst ``NRow.nil
-  | .cons τ rest => return mkAppN (mkConst ``NRow.cons) #[← quoteNTy τ, ← quoteRow rest]
-
-partial def quoteRows : NRows → MetaM Lean.Expr
-  | .nil => return mkConst ``NRows.nil
-  | .cons fields rest => return mkAppN (mkConst ``NRows.cons) #[← quoteRow fields, ← quoteRows rest]
-end
-
-def quoteShape : ResultShape → MetaM Lean.Expr
-  | .none => return mkConst ``ResultShape.none
-  | .one τ => return mkApp (mkConst ``ResultShape.one) (← quoteNTy τ)
 
 mutual
 /-- The literal of a native value. -/
@@ -585,6 +557,17 @@ private partial def twinFields (twins : Array SpecTypes.TwinInfo) (info : SpecTy
               mkAppM (if bounded then ``LeanerIR.SpecVector.map else ``Array.map)
                 #[element, projection]
           | none => pure projection
+      | .vector (.nominal twin _) bounded, .vector (.enum ..) =>
+          -- A non-generic enum twin's elements, through its native view.
+          match twins.find? (·.twin == twin) with
+          | some inner =>
+              if inner.typeParameterCount != 0 then pure projection else do
+              let elementType := (← whnfR (← inferType projection)).appArg!
+              let element ← withLocalDeclD `element elementType fun element => do
+                mkLambdaFVars #[element] (← mkAppM (twin ++ `native) #[element])
+              mkAppM (if bounded then ``LeanerIR.SpecVector.map else ``Array.map)
+                #[element, projection]
+          | none => pure projection
       | _, _ => pure projection
     components := components.push (τ, component)
   let mut tuple := mkConst ``Unit.unit
@@ -708,7 +691,8 @@ private def ensureDecodeBridge (twins : Array SpecTypes.TwinInfo) (info : SpecTy
     let binderSyntax ← shape.binderList.mapM fun (binder, type) =>
       `(bracketedBinder| ($binder:ident : $type))
     let lemmas ← shape.decoderNames.mapM fun decoder => `(Lean.Parser.Tactic.simpLemma| $decoder:ident)
-    elabCommand (← `(@[lir_denote_norm] theorem $(rootIdent name):ident $binderSyntax* :
+    elabCommand (← `(set_option Elab.async false in
+      @[lir_denote_norm] theorem $(rootIdent name):ident $binderSyntax* :
         $(rootIdent (info.twin ++ `decode?)) $literal = $rhs := by
       simp only [$lemmas,*, LeanerIR.decodeInt?]
       repeat' (first | rfl | (split <;> simp_all))))
@@ -792,111 +776,204 @@ private partial def ensureEnumNative (unit : ValidatedUnit) (twins : Array SpecT
   Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
   let proof ← instantiateMVars proof
   addDecl (.thmDecl { name := eraseName, levelParams := [], type := statement, value := proof })
+  -- The same bridge between the codecs, for the element maps of vectors.
+  let codecName := info.twin ++ `codec_encode_eq
+  let (statement, proof) ← withSkolems fun skolems => do
+    let lhs ← mkAppM ``LeanerIR.Proofs.Codec.encode #[mkConst (info.twin ++ `codec)]
+    let rhs ← mkAppM ``Function.comp
+      #[← mkAppM ``LeanerIR.Proofs.Codec.encode #[← mkAppM ``NTy.codec #[τE]],
+        mkApp (mkConst nativeName) skolems]
+    let pointwise ← withLocalDeclD `value twinType fun value => do
+      let erased := mkApp2 (mkConst eraseName) skolems value
+      let encoded ← mkAppM ``NTy.codec_encode #[τE, mkApp2 (mkConst nativeName) skolems value]
+      mkLambdaFVars #[value] (← mkEqTrans erased (← mkEqSymm encoded))
+    pure (← mkForallFVars #[skolems] (← mkEq lhs rhs),
+      ← mkLambdaFVars #[skolems] (← mkAppM ``funext #[pointwise]))
+  addDecl (.thmDecl { name := codecName, levelParams := [], type := statement, value := proof })
 
-/-- Whether a twin views a field element by element: a vector of nested
-twins, whose bridge needs the composition of the two maps. -/
-private def mapsField (info : SpecTypes.TwinInfo) : Bool :=
-  info.fields.any fun (_, rep) => rep matches .vector (.nominal ..) _
+/-- Close an equation whose sides the kernel identifies: the elaborator's
+defeq check does not unfold the codecs a twin's encoding goes through, and
+the declaration's kernel check decides it. -/
+elab "leaner_twin_kernel_rfl" : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  let target ← instantiateMVars (← goal.getType)
+  let some (_, lhs, _) := target.eq? | throwError "the bridge goal is not an equation"
+  goal.assign (← mkEqRefl lhs)
+  Lean.Elab.Tactic.replaceMainGoal []
 
-/-- The proof of a bridge whose twin maps a field: both sides unfold to the
-same element-wise images once the two maps compose. -/
-private def mappedBridgeProof (statement : Lean.Expr) (erase : Name) : TermElabM Lean.Expr := do
-  let proofSyntax ← `(term| by
-    intros
-    simp only [$(mkIdent erase):ident, LeanerIR.Proofs.Codec.boundedVector_encode,
-      LeanerIR.Proofs.Denote.NTy.encode_struct, LeanerIR.Proofs.Denote.NTy.encode_vector,
-      LeanerIR.Proofs.Denote.HList.encode_cons, LeanerIR.Proofs.Denote.HList.encode_nil,
-      LeanerIR.SpecVector.map_values]
-    repeat erw [Array.map_map]
-    rfl)
-  let proof ← Lean.Elab.Term.elabTermEnsuringType proofSyntax (some statement)
-  Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
-  instantiateMVars proof
+/-- A twin at the arguments one use applies: a non-generic twin at none, a
+generic one at its own parameters (the skolem family) or at represented
+types without parameters. -/
+private structure Spelling where
+  info : SpecTypes.TwinInfo
+  arguments : Array SpecTypes.FieldRep := #[]
 
-/-- The bridge between a struct twin and its native type: the twin's
-erasure is the native encoding, and the twin decodes the literal a native
-encoding unfolds to.  With both, a clause's typed view of a stored
-resource and the denotation's native view of the same runtime value meet.
-An enum-typed field is bridged through the enum twin's native view. -/
+/-- A generic twin at its own parameters, in order. -/
+private def Spelling.isSkolem (spelling : Spelling) : Bool :=
+  spelling.info.typeParameterCount != 0 &&
+    spelling.arguments == (Array.range spelling.info.typeParameterCount).map .parameter
+
+/-- A spelling a bridge is stated at: non-generic, the skolem family, or
+concrete arguments. -/
+private def Spelling.bridged (spelling : Spelling) : Bool :=
+  spelling.info.typeParameterCount == 0 || spelling.isSkolem ||
+    spelling.arguments.all (·.parameterCount == 0)
+
+/-- The root of a spelling's bridge lemmas: the twin's own, or at concrete
+arguments the storage family's accessor, else a name keyed by the
+arguments. -/
+private def Spelling.root (spelling : Spelling) (families : Array SpecTypes.FamilyInfo) : Name :=
+  if spelling.info.typeParameterCount == 0 || spelling.isSkolem then spelling.info.twin
+  else match families.find? (fun family => family.info.twin == spelling.info.twin &&
+      family.arguments == spelling.arguments) with
+    | some family => family.accessor
+    | none => spelling.info.twin ++ Name.mkSimple s!"at_{hash (reprStr spelling.arguments)}"
+
+/-- The native type a represented field denotes. -/
+private partial def fieldNTy? (unit : ValidatedUnit) (twins : Array SpecTypes.TwinInfo) :
+    SpecTypes.FieldRep → Option NTy
+  | .int (.bits width) signed => some (.int width signed)
+  | .int .. => none
+  | .bool => some .bool
+  | .string => some .string
+  | .address => some .address
+  | .signer => some .signer
+  | .bytes => some .bytes
+  | .unit => some .unit
+  | .vector element _ => (fieldNTy? unit twins element).map .vector
+  | .parameter index => some (.param index)
+  | .nominal twin arguments => do
+      let info ← twins.find? (·.twin == twin)
+      let τ ← structNTy unit ⟨⟨info.namespaceIndex⟩, info.structIndex⟩
+      let arguments ← arguments.mapM (fieldNTy? unit twins)
+      return τ.subst (NRow.ofList arguments.toList)
+
+/-- The nested spellings of a spelling's fields: a nominal field's, and a
+vector's elements'. -/
+private def Spelling.nested (spelling : Spelling) (twins : Array SpecTypes.TwinInfo) :
+    Array (Spelling × Bool) :=
+  spelling.info.fields.filterMap fun (_, rep) =>
+    match rep.instantiate spelling.arguments with
+    | .nominal twin arguments =>
+        (twins.find? (·.twin == twin)).map fun inner => (⟨inner, arguments⟩, false)
+    | .vector (.nominal twin arguments) _ =>
+        (twins.find? (·.twin == twin)).map fun inner => (⟨inner, arguments⟩, true)
+    | _ => none
+
+/-- Whether a spelling's bridge rewrites: an enum is bridged through its
+native view, a vector of nested twins through the composition of two maps,
+and a struct through the bridges of the fields that rewrite. -/
+private partial def Spelling.rewrites (spelling : Spelling) (twins : Array SpecTypes.TwinInfo) :
+    Bool :=
+  !spelling.info.variants.isEmpty ||
+    (spelling.nested twins).any fun (nested, vector) => vector || nested.rewrites twins
+
+/-- The bridge between a struct twin at one spelling and its native type:
+the twin's erasure is the native encoding of the field view
+(`erase_eq_encode`), and so is its codec's encoding (`codec_encode_eq`),
+which a vector of it maps. Nested spellings are bridged first; a bridge
+that rewrites uses theirs. -/
+private partial def ensureSpellingBridge (unit : ValidatedUnit) (twins : Array SpecTypes.TwinInfo)
+    (families : Array SpecTypes.FamilyInfo) (spelling : Spelling) : TermElabM Unit := do
+  let info := spelling.info
+  unless info.variants.isEmpty do
+    if info.typeParameterCount == 0 then ensureEnumNative unit twins info
+    return
+  unless spelling.bridged do return
+  let root := spelling.root families
+  let eraseName := root ++ `erase_eq_encode
+  if (← getEnv).contains eraseName then return
+  let handle : LeanerIR.StructHandle := ⟨⟨info.namespaceIndex⟩, info.structIndex⟩
+  let some generic := structNTy unit handle | return
+  let some argumentTypes := spelling.arguments.mapM (fieldNTy? unit twins) | return
+  let τ := if info.typeParameterCount == 0 || spelling.isSkolem then generic
+    else generic.subst (NRow.ofList argumentTypes.toList)
+  let .struct _ row := τ | return
+  let mut lemmas : Array Name := #[]
+  for (nested, vector) in spelling.nested twins do
+    unless nested.bridged do continue
+    ensureSpellingBridge unit twins families nested
+    let nestedRoot := if nested.info.variants.isEmpty then nested.root families else nested.info.twin
+    if vector then lemmas := lemmas.push (nestedRoot ++ `codec_encode_eq)
+    else if nested.rewrites twins then lemmas := lemmas.push (nestedRoot ++ `erase_eq_encode)
+  let τE ← quoteNTy τ
+  let applied (suffix : Name) (skolems : Lean.Expr) : MetaM Lean.Expr := do
+    if info.typeParameterCount == 0 then return mkConst (info.twin ++ suffix)
+    let codecs ← if spelling.isSkolem then
+        pure ((Array.range info.typeParameterCount).map fun index =>
+          mkApp2 (mkConst ``Skolems.codec) skolems (toExpr index))
+      else spelling.arguments.mapM (·.codec none)
+    mkAppM (info.twin ++ suffix) codecs
+  -- The erasure at the family, its argument type, and the field view.
+  let viewAt (skolems : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr × Lean.Expr) := do
+    let eraseFn ← applied `erase skolems
+    let twinType := (← whnfD (← inferType eraseFn)).bindingDomain!
+    let view ← withLocalDeclD `value twinType fun value => do
+      mkLambdaFVars #[value] (← twinFields twins info row value)
+    return (eraseFn, twinType, view)
+  let (statement, reflexive, codecStatement) ← withSkolems fun skolems => do
+    let (eraseFn, twinType, view) ← viewAt skolems
+    let (statement, reflexive) ← withLocalDeclD `value twinType fun value => do
+      let lhs := mkApp eraseFn value
+      let rhs ← mkAppM ``NTy.encode #[τE, view.beta #[value]]
+      pure (← mkForallFVars #[skolems, value] (← mkEq lhs rhs),
+        ← mkLambdaFVars #[skolems, value] (← mkEqRefl lhs))
+    let codecStatement ← mkForallFVars #[skolems] (← mkEq
+      (← mkAppM ``LeanerIR.Proofs.Codec.encode #[← applied `codec skolems])
+      (← mkAppM ``Function.comp
+        #[← mkAppM ``LeanerIR.Proofs.Codec.encode #[← mkAppM ``NTy.codec #[τE]], view]))
+    pure (statement, reflexive, codecStatement)
+  -- Outside the skolem context, where no second family shadows the
+  -- statement's.
+  let proof ← if spelling.rewrites twins then do
+      let rules ← (lemmas.push (info.twin ++ `erase)).mapM fun name =>
+        `(Lean.Parser.Tactic.simpLemma| $(mkIdent name):ident)
+      let proofSyntax ← `(term| by
+        intros
+        simp only [$rules,*, LeanerIR.Proofs.Codec.boundedVector_encode,
+          LeanerIR.Proofs.Denote.NTy.encode_struct, LeanerIR.Proofs.Denote.NTy.encode_vector,
+          LeanerIR.Proofs.Denote.HList.encode_cons, LeanerIR.Proofs.Denote.HList.encode_nil,
+          LeanerIR.SpecVector.map_values]
+        all_goals repeat erw [Array.map_map]
+        all_goals leaner_twin_kernel_rfl)
+      let proof ← Lean.Elab.Term.elabTermEnsuringType proofSyntax (some statement)
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      instantiateMVars proof
+    else pure reflexive
+  addDecl (.thmDecl { name := eraseName, levelParams := [], type := statement, value := proof })
+  let attr ← `(attr| lir_denote_norm)
+  Lean.Elab.Term.applyAttributes eraseName #[{ name := `lir_denote_norm, stx := attr, kind := .global }]
+  -- The codec's encoding, pointwise the erasure's.
+  let codecProof ← withSkolems fun skolems => do
+    let (_, twinType, view) ← viewAt skolems
+    let pointwise ← withLocalDeclD `value twinType fun value => do
+      let erased := mkApp2 (mkConst eraseName) skolems value
+      let encoded ← mkAppM ``NTy.codec_encode #[τE, view.beta #[value]]
+      mkLambdaFVars #[value] (← mkEqTrans erased (← mkEqSymm encoded))
+    mkLambdaFVars #[skolems] (← mkAppM ``funext #[pointwise])
+  let codecName := root ++ `codec_encode_eq
+  addDecl (.thmDecl
+    { name := codecName, levelParams := [], type := codecStatement, value := codecProof })
+
+/-- The bridges of the unit's twins: every non-generic twin, every generic
+one at the skolem family, where its type parameters are the family's
+carriers, and at each concrete spelling a storage family uses, whose decoder
+unfolds on the literal an encoding reduces to. -/
 private def ensureTwinBridges (unit : ValidatedUnit) (twins : Array SpecTypes.TwinInfo)
     (families : Array SpecTypes.FamilyInfo) :
     TermElabM Unit := do
   for info in twins do
-    if !info.variants.isEmpty && info.typeParameterCount == 0 then
-      ensureEnumNative unit twins info
-  for info in twins do
-    unless info.variants.isEmpty && info.typeParameterCount == 0 do continue
-    let eraseName := info.twin ++ `erase_eq_encode
-    if (← getEnv).contains eraseName then continue
-    let handle : LeanerIR.StructHandle := ⟨⟨info.namespaceIndex⟩, info.structIndex⟩
-    let some τ := structNTy unit handle | continue
-    let τE ← quoteNTy τ
-    let twinType := mkConst info.twin
-    let .struct _ row := τ | continue
-    let statement ← withSkolems fun skolems => withLocalDeclD `value twinType fun value => do
-      let lhs ← mkAppM (info.twin ++ `erase) #[value]
-      let rhs ← mkAppM ``NTy.encode #[τE, ← twinFields twins info row value]
-      mkForallFVars #[skolems, value] (← mkEq lhs rhs)
-    let enumFields := info.fields.filterMap fun (_, rep) => match rep with
-      | .nominal twin _ => (twins.find? (·.twin == twin)).bind fun inner =>
-          if inner.variants.isEmpty then none else some (inner.twin ++ `erase_eq_encode)
-      | _ => none
-    let proof ← if mapsField info then mappedBridgeProof statement (info.twin ++ `erase)
-      else if enumFields.isEmpty then
-        withSkolems fun skolems => withLocalDeclD `value twinType fun value => do
-          mkLambdaFVars #[skolems, value] (← mkEqRefl (← mkAppM (info.twin ++ `erase) #[value]))
-      else do
-        let value := mkIdent `value
-        let lemmas ← enumFields.mapM fun name => `(Lean.Parser.Tactic.simpLemma| $(mkIdent name):ident)
-        let proofSyntax ← `(term| fun [Skolems] ($value:ident : $(mkIdent info.twin)) => by
-          simp only [$(mkIdent (info.twin ++ `erase)):ident, $lemmas,*]
-          rfl)
-        let proof ← Lean.Elab.Term.elabTermEnsuringType proofSyntax (some statement)
-        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
-        instantiateMVars proof
-    addDecl (.thmDecl { name := eraseName, levelParams := [], type := statement, value := proof })
-    let attr ← `(attr| lir_denote_norm)
-    Lean.Elab.Term.applyAttributes eraseName #[{ name := `lir_denote_norm, stx := attr, kind := .global }]
-  -- A generic struct twin bridges at the skolem family, where its type
-  -- parameters are the family's carriers, and at each concrete spelling a
-  -- storage family uses; its decoder unfolds on the literal an encoding
-  -- reduces to.
-  let bridge (name : Name) (eraseFn : Lean.Expr) (row : NRow) (τ : NTy) (info : SpecTypes.TwinInfo)
-      (binders : Array Lean.Expr) : TermElabM Unit := do
-    let twinType := (← whnfD (← inferType eraseFn)).bindingDomain!
-    let (statement, proof) ← withLocalDeclD `value twinType fun value => do
-      let lhs := mkApp eraseFn value
-      let rhs ← mkAppM ``NTy.encode #[← quoteNTy τ, ← twinFields twins info row value]
-      pure (← mkForallFVars (binders.push value) (← mkEq lhs rhs),
-        ← mkLambdaFVars (binders.push value) (← mkEqRefl lhs))
-    let proof ← if mapsField info then mappedBridgeProof statement (info.twin ++ `erase)
-      else pure proof
-    addDecl (.thmDecl { name, levelParams := [], type := statement, value := proof })
-    let attr ← `(attr| lir_denote_norm)
-    Lean.Elab.Term.applyAttributes name #[{ name := `lir_denote_norm, stx := attr, kind := .global }]
-  for info in twins do
-    unless info.variants.isEmpty && info.typeParameterCount != 0 do continue
-    let eraseName := info.twin ++ `erase_eq_encode
-    if (← getEnv).contains eraseName then continue
-    let handle : LeanerIR.StructHandle := ⟨⟨info.namespaceIndex⟩, info.structIndex⟩
-    let some τ := structNTy unit handle | continue
-    let .struct _ row := τ | continue
-    withSkolems fun skolems => do
-      let codecs := (Array.range info.typeParameterCount).map fun index =>
-        mkApp2 (mkConst ``Skolems.codec) skolems (toExpr index)
-      bridge eraseName (← mkAppM (info.twin ++ `erase) codecs) row τ info #[skolems]
-    let decodeAttr ← `(attr| lir_denote_norm)
-    Lean.Elab.Term.applyAttributes (info.twin ++ `decode?)
-      #[{ name := `lir_denote_norm, stx := decodeAttr, kind := .global }]
+    let arguments := (Array.range info.typeParameterCount).map .parameter
+    let bridged := (← getEnv).contains (info.twin ++ `erase_eq_encode)
+    ensureSpellingBridge unit twins families ⟨info, arguments⟩
+    if !bridged && info.variants.isEmpty && info.typeParameterCount != 0 then
+      let decodeAttr ← `(attr| lir_denote_norm)
+      Lean.Elab.Term.applyAttributes (info.twin ++ `decode?)
+        #[{ name := `lir_denote_norm, stx := decodeAttr, kind := .global }]
   for family in families do
-    unless family.info.variants.isEmpty && family.info.typeParameterCount != 0 &&
+    unless family.info.typeParameterCount != 0 &&
         family.arguments.all (·.parameterCount == 0) do continue
-    let eraseName := family.accessor ++ `erase_eq_encode
-    if (← getEnv).contains eraseName then continue
-    let some τ := ntyOf unit ⟨family.info.namespaceIndex⟩ ⟨family.typeIndex⟩ | continue
-    let .struct _ row := τ | continue
-    withSkolems fun skolems => do
-      bridge eraseName (← family.erase none) row τ family.info #[skolems]
+    ensureSpellingBridge unit twins families ⟨family.info, family.arguments⟩
 
 /-- The quoted native signature of a function, which its contract is
 stated over. -/
@@ -928,7 +1005,84 @@ def contractStandsFor (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId
     (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
   !(nativeSignature? unit namespaceId declaration).any (·.2.returnsReference) ||
-    hasFinalContract ns declaration
+    hasFinalContract ns declaration || (Contract.mapRoleOf? unit namespaceId ns declaration).isSome
+
+/-- The heartbeat budget a function sets for its own verification, in the
+units of `leaner.verifyHeartbeats`: `pragma heartbeats = N` counts thousands
+of them. -/
+def heartbeatBudget? (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Option Nat :=
+  declaration.pragmas.findSome? fun
+    | .assign "heartbeats" (.constant (.integer value)) _ =>
+        if 0 < value then some (value.toNat * 1000) else none
+    | _ => none
+
+/-- Whether a function's specification or its module sets `pragma verify =
+manual`: an authored proof, `verify f by …`, establishes it. -/
+def requiresAuthoredProof (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Bool :=
+  declaration.pragmas.any fun
+    | .assign "verify" (.name none "manual") _ => true
+    | _ => false
+
+/-- Whether a function is specified `pragma opaque`. -/
+def isOpaque (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
+  declaration.pragmas.any fun
+    | .assign "opaque" (.constant (.bool true)) _ => true
+    | _ => false
+
+/-- Whether a function selects bit-vector decisions, `pragma bv`: the
+decision applies to every unsigned value of a leaf, not only the
+parameters or results the pragma names. -/
+def selectsBitVectors (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
+  declaration.pragmas.any fun
+    | .assign name _ _ => name == "bv" || name == "bv_ret"
+    | _ => false
+
+/-- The functions an expression calls directly. -/
+private partial def expressionCallees (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (id : LeanerIR.ExprId) (found : Array FunctionHandle) : Array FunctionHandle :=
+  match unit.namespaces[namespaceId.index]?.bind (·.expressions[id.index]?) with
+  | none => found
+  | some expression =>
+      let found := match expression.kind with
+        | .operation (.call (.function reference)) _ _ _ =>
+            match LeanerIR.SemanticOperations.resolveFunction? unit namespaceId reference with
+            | some callee => if found.contains callee then found else found.push callee
+            | none => found
+        | _ => found
+      (LeanerIR.Validation.expressionChildren expression.kind).foldl
+        (fun found child => expressionCallees unit namespaceId child found) found
+
+/-- The functions a function's body calls directly. -/
+private def bodyCallees (unit : ValidatedUnit) (handle : FunctionHandle) : Array FunctionHandle :=
+  match unit.namespaces[handle.namespaceId.index]?.bind (·.functions[handle.functionId.index]?) with
+  | some { body := .structured root, .. } => expressionCallees unit handle.namespaceId root #[]
+  | _ => #[]
+
+/-- Whether a function is on a cycle of calls: a call of it reaches it again. -/
+private def onCallCycle (unit : ValidatedUnit) (handle : FunctionHandle) : Bool := Id.run do
+  let mut reached : Array FunctionHandle := #[]
+  let mut worklist := bodyCallees unit handle
+  while let some next := worklist.back? do
+    worklist := worklist.pop
+    if next == handle then return true
+    if reached.contains next then continue
+    reached := reached.push next
+    worklist := worklist ++ bodyCallees unit next
+  return false
+
+/-- Whether a call is reasoned about through the callee's contract rather
+than its body, as the Move Prover does: a native's always, a function's only
+when it is `opaque`, or on a cycle of calls, whose body no inlining can
+exhaust. Every other callee is inlined, specified or not. A contract stands
+for a callee only when it states a returned mutable reference's final value. -/
+def usedThroughContract (unit : ValidatedUnit) (callee : FunctionHandle) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
+  -- An intrinsic map role stands for the map model, as a native does.
+  (Contract.mapRoleOf? unit callee.namespaceId ns declaration).isSome ||
+  declaration.contract.loc.isSome && contractStandsFor unit callee.namespaceId ns declaration &&
+    (declaration.body == .absent || isOpaque declaration || onCallCycle unit callee)
 
 /-- Whether a function has type parameters: it is proved over every skolem
 family and type instantiation. -/
@@ -941,13 +1095,16 @@ that keys its generic families. -/
 def typedContractOf (unit : ValidatedUnit) (namespaceIndex : Nat) (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
     (params : NRow) (result : ResultShape) (twins : Array SpecTypes.TwinInfo)
-    (families : Array SpecTypes.FamilyInfo) : MetaM Lean.Expr :=
+    (families : Array SpecTypes.FamilyInfo) (nativeModel : Option NativeModel := none) :
+    MetaM Lean.Expr :=
   withSkolems fun skolems => do
     let signature ← quoteNativeSignature skolems params result
     let build (typeInstantiation : Option Lean.Expr) :=
       buildContract unit ⟨namespaceIndex⟩ ns declaration signature twins families
         (carrier := mkApp (mkConst ``Skolems.carrier) skolems)
-        (codecs := mkApp (mkConst ``Skolems.codec) skolems) (typeInstantiation := typeInstantiation)
+        (codecs := mkApp (mkConst ``Skolems.codec) skolems)
+        (types := mkApp (mkConst ``Skolems.type) skolems) (typeInstantiation := typeInstantiation)
+        (nativeModel := nativeModel)
     if isGeneric declaration then
       let instantiationType ← mkAppM ``Array
         #[← mkAppM ``Prod #[mkConst ``LeanerIR.TypeId, mkConst ``LeanerIR.TypeId]]
@@ -972,7 +1129,8 @@ over its native arguments, and its runtime form. -/
 def ensureContracts (segments : Array String) (function : String) (unit : ValidatedUnit)
     (namespaceIndex : Nat) (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
-    (params : NRow) (result : ResultShape) : CommandElabM Unit := do
+    (params : NRow) (result : ResultShape) (nativeModel : Option NativeModel := none) :
+    CommandElabM Unit := do
   let typedName := typedContractName segments function
   let publicName := contractName segments function
   if (← getEnv).contains publicName then
@@ -986,10 +1144,68 @@ def ensureContracts (segments : Array String) (function : String) (unit : Valida
     if info.variants.isEmpty && info.typeParameterCount == 0 then ensureDecodeBridge twins info
   liftTermElabM do
     ensureTwinBridges unit twins families
-    addAbbrev typedName
-      (← typedContractOf unit namespaceIndex ns declaration params result twins families)
+    -- A body is proved against its implementation; a native, which has
+    -- none, is only ever seen by its callers.
+    let view := if declaration.body == .absent then ContractView.interface
+      else .implementation
+    addAbbrev typedName (← typedContractOf unit namespaceIndex ns (view.of declaration)
+      params result twins families nativeModel)
     addAbbrev publicName
       (← publicContractOf params result (isGeneric declaration) (mkConst typedName))
+
+private def countErrors (log : MessageLog) : Nat :=
+  log.reportedPlusUnreported.toList.filter (·.severity == .error) |>.length
+
+/-- The proof file a namespace's `proof_file` pragma names: where the
+authored proofs of its functions live. -/
+private def proofFile? (ns : ValidatedNamespace) : Option String :=
+  ns.pragmas.findSome? fun
+    | .assign "proof_file" (.constant (.string path)) _ => some path
+    | _ => none
+
+/-- Where a function's proof goes: `verify f by …` in the module's proof file
+when it has one. -/
+private def proofRequest (ns : ValidatedNamespace) (function : String) : MessageData :=
+  let place := match proofFile? ns with
+    | some path => m!"in `{path}`"
+    | none => m!"in the module"
+  m!"provide a proof: `verify {function} by …` {place} (`verify {function} by skip` shows the \
+    obligations it leaves)"
+
+/-- What a failed verification asks for: an authored proof did not close
+its obligations; an automatic one asks for a proof, or for a larger budget
+when the attempt ran out. -/
+private def failureMessage (ns : ValidatedNamespace) (function : String) (authored : Bool)
+    (overBudget : Bool) (budget : Nat) : MessageData :=
+  if authored then
+    m!"leaner verification failed: the proof of `{function}` does not establish its \
+      specification"
+  else
+    let attempt := if overBudget then
+        m!"the automatic verification of `{function}` exceeded its budget of {budget} \
+          maxHeartbeats"
+      else m!"the automatic verification of `{function}` failed"
+    let raise := if overBudget then
+        m!", or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats"
+      else m!""
+    m!"leaner verification failed: {attempt}; {proofRequest ns function}{raise}"
+
+/-- Generate the contract a function's callers see of it, where that
+differs from the one its body is proved against: they assume it. -/
+def ensureInterfaceContract (segments : Array String) (function : String) (unit : ValidatedUnit)
+    (namespaceIndex : Nat) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
+    (params : NRow) (result : ResultShape) : CommandElabM Unit := do
+  let name := typedInterfaceContractName segments function
+  if (← getEnv).contains name then return
+  let (twins, families) ← SpecTypes.ensureSpecTypes segments unit
+  for info in twins do
+    if info.variants.isEmpty && info.typeParameterCount == 0 then ensureDecodeBridge twins info
+  liftTermElabM do
+    ensureTwinBridges unit twins families
+    let contract ← typedContractOf unit namespaceIndex ns
+      (ContractView.interface.of declaration) params result twins families
+    addAbbrev name contract
 
 /-! ## Loop invariants
 
@@ -1128,7 +1344,7 @@ private partial def mayTouchStore (unit : ValidatedUnit) (namespaceId : Namespac
       direct || (LeanerIR.Validation.expressionChildren expression.kind).any
         fun child => mayTouchStore unit namespaceId child visiting
 
-/-- Whether a call may change the global store. A callee proved at its
+/-- Whether a call may change the global store. A callee used through its
 contract changes it only where its frame permits; every other callee is
 inlined, so its body decides. A callee already on the path adds nothing its
 body has not. -/
@@ -1139,8 +1355,7 @@ private partial def calleeMayTouchStore (unit : ValidatedUnit) (callee : Functio
       (ns, ·) <$> ns.functions[callee.functionId.index]? with
   | none => true
   | some (ns, declaration) =>
-      if declaration.contract.loc.isSome &&
-          contractStandsFor unit callee.namespaceId ns declaration then
+      if usedThroughContract unit callee ns declaration then
         declaration.contract.modifiesAll || !declaration.contract.modifies.isEmpty
       else match declaration.body with
         | .structured root => mayTouchStore unit callee.namespaceId root (visiting.push callee)
@@ -1152,7 +1367,7 @@ over the function's starting locals and state (what `old` reads), the loop's
 entry locals and state, and the current locals and state. -/
 def loopInvariants (unit : ValidatedUnit) (namespaceId : NamespaceId) (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
-    (params : NRow) (row : NRow) (codecs : Option Lean.Expr)
+    (params : NRow) (row : NRow) (codecs types : Option Lean.Expr)
     (twins : Array SpecTypes.TwinInfo) (families : Array SpecTypes.FamilyInfo) :
     TermElabM (Array (Nat × Lean.Expr)) := do
   let .structured root := declaration.body | return #[]
@@ -1196,46 +1411,71 @@ def loopInvariants (unit : ValidatedUnit) (namespaceId : NamespaceId) (ns : Vali
                 frame := frame.push
                   (← mkEq (← prophecyOf slots[index]!) (← prophecyOf entrySlots[index]!))
             | _, _ => pure ()
+        -- A local the body modifies whose type declares data invariants
+        -- keeps them across the iterations, as a clause would state.
+        let header := (loopHeaderLocals ns root site
+          ((Array.range parameterTypes.length).map (⟨·⟩))).getD #[]
+        let dataInvariantSlots := changed.filterMap fun (slot, _) =>
+          if header.any (·.index == slot) && slot < row.length &&
+              localTypes[slot]?.any (Contract.hasDataInvariant unit ·) then some slot
+          else none
         let referenced := block.conditions.foldl (fun found condition =>
           if condition.kind == .loopInvariant then referencedLocals ns condition.expression found
-          else found) #[]
+          else found) dataInvariantSlots
         let oldReferenced := block.conditions.foldl (fun found condition =>
           if condition.kind == .loopInvariant then oldReferencedLocals ns condition.expression found
           else found) #[]
-        -- A parameter read under `old` is its argument at the function's
-        -- start.
-        let mut oldLocals : Array (Option Lean.Expr) := #[]
-        for index in [0:row.length] do
-          if oldReferenced.contains index then
-            let some τ := parameterTypes[index]?
-              | throwError "`old` in a loop invariant reads a parameter"
-            oldLocals := oldLocals.push (← logicalValue τ startSlots[index]!)
-          else oldLocals := oldLocals.push none
-        let rec authoredOver (index : Nat) (binders : Array (Option Lean.Expr)) :
+        let rec authoredOver (index : Nat) (binders entryBinders : Array (Option Lean.Expr)) :
             TermElabM Lean.Expr := do
           if h : index < row.length then
             let τ := row[index]
+            let name := match declaration.locals[index]? with
+              | some localDecl => Name.mkSimple localDecl.name
+              | none => Name.mkSimple s!"slot{index}"
+            let carrier ← mkAppM ``NTy.carrier #[← quoteNTy τ]
+            -- A slot a clause reads under `old` is asserted defined at the
+            -- loop's entry, where its value is read.
+            let withEntry (binders : Array (Option Lean.Expr)) : TermElabM Lean.Expr := do
+              if oldReferenced.contains index then
+                withLocalDeclD (name.appendAfter "_entry") carrier fun entryBinder => do
+                  let inner ← authoredOver (index + 1) binders (entryBinders.push (some entryBinder))
+                  mkAppM ``Option.elim
+                    #[entrySlots[index]!, mkConst ``False, ← mkLambdaFVars #[entryBinder] inner]
+              else authoredOver (index + 1) binders (entryBinders.push none)
             if referenced.contains index then
               -- A slot a clause reads is asserted defined, so that an
               -- iteration knows its value before the body reads it; the
               -- binder carries the local's name into an authored proof.
-              let name := match declaration.locals[index]? with
-                | some localDecl => Name.mkSimple localDecl.name
-                | none => Name.mkSimple s!"slot{index}"
-              withLocalDeclD name (← mkAppM ``NTy.carrier #[← quoteNTy τ]) fun binder => do
-                let inner ← authoredOver (index + 1) (binders.push (some binder))
+              withLocalDeclD name carrier fun binder => do
+                let inner ← withEntry (binders.push (some binder))
                 mkAppM ``Option.elim
                   #[slots[index]!, mkConst ``False, ← mkLambdaFVars #[binder] inner]
-            else authoredOver (index + 1) (binders.push none)
+            else withEntry (binders.push none)
           else
             let mut locals : Array (Option Lean.Expr) := #[]
             for (τ, binder) in row.toArray.zip binders do
               locals := locals.push (← match binder with
                 | some binder => logicalValue τ binder
                 | none => pure none)
-            translateLoopInvariants unit namespaceId ns block locals localTypes codecs
+            let mut entryLocals : Array (Option Lean.Expr) := #[]
+            for (τ, binder) in row.toArray.zip entryBinders do
+              entryLocals := entryLocals.push (← match binder with
+                | some binder => logicalValue τ binder
+                | none => pure none)
+            -- A parameter read under `old` is its argument at the function's
+            -- start; a local has no such value and is read at the loop's
+            -- entry.
+            let mut oldLocals : Array (Option Lean.Expr) := #[]
+            for index in [0:row.length] do
+              if oldReferenced.contains index then
+                match parameterTypes[index]? with
+                | some τ => oldLocals := oldLocals.push (← logicalValue τ startSlots[index]!)
+                | none => oldLocals := oldLocals.push entryLocals[index]!
+              else oldLocals := oldLocals.push none
+            translateLoopInvariants unit namespaceId ns block locals localTypes codecs types
               (declaration.locals.map (·.name)) oldLocals startState twins families
-        let authored ← authoredOver 0 #[]
+              dataInvariantSlots entryLocals (some initial)
+        let authored ← authoredOver 0 #[] #[]
         -- The store the body leaves alone keeps its entry value.
         let mut stateFrame : Array Lean.Expr := #[]
         unless storeTouched do
@@ -1244,13 +1484,10 @@ def loopInvariants (unit : ValidatedUnit) (namespaceId : NamespaceId) (ns : Vali
         let conjunction ← ((frame.push authored) ++ stateFrame).foldrM (init := mkConst ``True)
           fun clause rest => mkAppM ``And #[clause, rest]
         mkLambdaFVars #[start, startState, entry, initial, env, state] conjunction
-    invariants := invariants.push (site.index, invariant)
+    invariants := invariants.push (loopSite namespaceId.index site.index, invariant)
   return invariants
 
 /-! ## Verification -/
-
-private def countErrors (log : MessageLog) : Nat :=
-  log.reportedPlusUnreported.toList.filter (·.severity == .error) |>.length
 
 /-- The declared field names of a constructor, or positions when unnamed. -/
 private def fieldNames (unit : ValidatedUnit) (source : LeanerIR.StructHandle)
@@ -1275,9 +1512,9 @@ private partial def carrierPattern (unit : ValidatedUnit) (base : String) : NTy 
         rowPattern (fields.toList.zip
           ((fieldNames unit source (some name) fields.length).map (s!"{base}_{name}_{·}")))
       "(" ++ " | ".intercalate (alternatives ++ ["(⟨⟩ : Empty)"]) ++ ")"
-  | .ref referent =>
-      s!"⟨{carrierPattern unit base referent}, {carrierPattern unit s!"{base}_final" referent}⟩"
-  | _ => base
+  | .ref referent => s!"⟨{carrierPattern unit base referent}, «{base}_final»⟩"
+  -- A binder is written escaped, as a source name may be a Lean keyword.
+  | _ => s!"«{base}»"
 where
   rowPattern (parts : List (NTy × String)) : String :=
     if parts.isEmpty then "_"
@@ -1307,8 +1544,10 @@ def certificateTypesMatch (actual expected : Lean.Expr) : MetaM Bool := do
   isDefEq actual expected
 
 /-- The statement a caller assumes of a native, rebuilt from its declaration:
-its meaning satisfies its typed contract, at every family and instantiation
-for a generic native, at the runtime family otherwise. -/
+its meaning satisfies its typed contract at every family, and at every
+instantiation for a generic native. A non-generic native's types mention no
+type parameter, so the statement is the same at every family; stated at each,
+it serves a generic caller as well as the runtime family. -/
 private def nativeHypothesisType (unit : ValidatedUnit) (twins : Array SpecTypes.TwinInfo)
     (families : Array SpecTypes.FamilyInfo) (executable : Lean.Expr)
     (handle : FunctionHandle) : MetaM Lean.Expr := do
@@ -1318,8 +1557,11 @@ private def nativeHypothesisType (unit : ValidatedUnit) (twins : Array SpecTypes
     | throwError "a native is out of range"
   let some (params, result) := nativeSignature? unit handle.namespaceId declaration
     | throwError "a native has no native signature"
-  let typed ← typedContractOf unit handle.namespaceId.index nativeNs declaration params result
-    twins families
+  -- A caller assumes what callers see: the interface; of a native without
+  -- a specification, its prelude model.
+  let nativeModel := nativeModelOf? unit handle nativeNs declaration
+  let typed ← typedContractOf unit handle.namespaceId.index nativeNs
+    (ContractView.interface.of declaration) params result twins families nativeModel
   let row ← quoteRow params
   let shape ← quoteShape result
   let meaningAt (skolems instantiation : Lean.Expr) :=
@@ -1332,15 +1574,71 @@ private def nativeHypothesisType (unit : ValidatedUnit) (twins : Array SpecTypes
           #[meaningAt skolems instantiation, (mkApp2 typed skolems instantiation).headBeta]
         mkForallFVars #[skolems, instantiation] statement
   else
-    let runtime := mkConst ``Skolems.runtime
-    mkAppM ``LeanerIR.Proofs.Satisfies
-      #[meaningAt runtime (toExpr (#[] : Array (LeanerIR.TypeId × LeanerIR.TypeId))),
-        (mkApp typed runtime).headBeta]
+    withLocalDecl `Θ .instImplicit (mkConst ``Skolems) fun skolems => do
+      let statement ← mkAppM ``LeanerIR.Proofs.Satisfies
+        #[meaningAt skolems (toExpr (#[] : Array (LeanerIR.TypeId × LeanerIR.TypeId))),
+          (mkApp typed skolems).headBeta]
+      mkForallFVars #[skolems] statement
+
+/-- The axiom dependencies of this file's own constants, kept across the
+audits of one file: each audit walks only what an earlier audit has not. An
+environment extension, so that a rolled-back verification forgets its
+entries with its declarations. -/
+private initialize localAxiomsExt : EnvExtension (NameMap (Array Name)) ←
+  registerEnvExtension (pure {})
+
+/-- The axioms a constant depends on, and whether the walk met a constant
+still being walked. An imported constant's are those its module recorded; a
+constant of this file is walked once and kept, unless it lies on a cycle
+(an inductive and its constructors), whose members are walked again. -/
+private partial def axiomsOf (active : NameSet) (name : Name) :
+    CommandElabM (NameSet × Bool) := do
+  let env ← getEnv
+  if (env.getModuleIdxFor? name).isSome then
+    return ((← collectAxioms name).foldl (·.insert ·) {}, false)
+  if let some known := (localAxiomsExt.getState env).find? name then
+    return (known.foldl (·.insert ·) {}, false)
+  if active.contains name then return ({}, true)
+  let some info := env.find? name | return ({}, false)
+  let active := active.insert name
+  let mut axioms : NameSet := if info matches .axiomInfo _ then ({} : NameSet).insert name else {}
+  let mut cyclic := false
+  let constructors := match info with
+    | .inductInfo declaration => declaration.ctors.toArray
+    | _ => #[]
+  let used := info.type.getUsedConstants ++
+    ((info.value? (allowOpaque := true)).map (·.getUsedConstants)).getD #[] ++ constructors
+  for dependency in used do
+    let (found, onCycle) ← axiomsOf active dependency
+    axioms := found.foldl (·.insert ·) axioms
+    cyclic := cyclic || onCycle
+  unless cyclic do
+    modifyEnv fun env => localAxiomsExt.modifyState env (·.insert name axioms.toArray)
+  return (axioms, cyclic)
+
+/-- Whether an axiom is a `bv_decide` certificate: that its checker of an
+UNSAT proof, evaluated natively, returns `true`. The checker is evaluated
+again, as `bv_decide` evaluated it: a name and a shape alone admit nothing. -/
+private def isBitVectorCertificate (name : Name) : CommandElabM Bool := do
+  unless name.components.contains `_native && name.components.contains `bv_decide do
+    return false
+  let some (.axiomInfo info) := (← getEnv).find? name | return false
+  let_expr Eq _ checked expected := info.type | return false
+  unless checked.isAppOf ``Std.Tactic.BVDecide.Reflect.verifyBVExpr &&
+      expected.isConstOf ``Bool.true && info.levelParams.isEmpty do
+    return false
+  liftTermElabM <| withoutModifyingEnv do
+    try
+      match ← Lean.Meta.nativeEqTrue `leaner_audit checked with
+      | .success _ => pure true
+      | .notTrue => pure false
+    catch _ => pure false
 
 /-- The no-fallback audit of one verified function, including the transitive
 axiom closure. The agreement axiom is the sole project-specific exception,
-explicitly deferred to D4 in `designs/denotation.md`. -/
-def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
+explicitly deferred to D4 in `designs/denotation.md`; a function selecting
+`pragma bv` may also rest on `bv_decide`'s natively checked certificates. -/
+def requireNativeArtifacts (base : Name) (bitVectors : Bool) : CommandElabM Unit := do
   let function := base.getString!
   let artifacts := base.replacePrefix (← getCurrNamespace) .anonymous
   let env ← getEnv
@@ -1351,13 +1649,15 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
   unless env.contains (artifacts ++ `compiled_eq) do
     throwError m!"missing compilation certificate for `{function}`"
   let roots := #[base ++ `typedVerified, artifacts ++ `compiled_eq, artifacts ++ `compiled]
-  -- Lean caches axiom closures of imported declarations; this also follows
-  -- helpers outside the artifact namespace without walking imported bodies.
+  let mut certificates : NameSet := {}
   for root in roots ++ #[base ++ `verified] do
-    for axiomName in ← collectAxioms root do
+    for axiomName in (← axiomsOf {} root).1.toArray do
+      if bitVectors && certificates.contains axiomName then continue
+      if bitVectors && (← isBitVectorCertificate axiomName) then
+        certificates := certificates.insert axiomName
+        continue
       unless #[``propext, ``Classical.choice, ``Quot.sound,
-          ``compileFunction_agrees, ``compileFunction_least_cycle,
-          ``compileFunction_least_generic].contains axiomName do
+          ``compileFunction_agrees, ``compileFunction_least_cycle].contains axiomName do
         throwError m!"artifact `{root}` depends on unapproved axiom `{axiomName}`"
   let mut pending := roots
   let mut visited : NameSet := {}
@@ -1397,7 +1697,8 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
   let segments := namespaceName.components.toArray.map (·.getString!)
   let (twins, families) ← SpecTypes.ensureSpecTypes segments unit
   let valid ← liftTermElabM do
-    let typed ← typedContractOf unit namespaceIndex ns declaration params result twins families
+    let typed ← typedContractOf unit namespaceIndex ns (ContractView.implementation.of declaration)
+      params result twins families
     let publicContract ← publicContractOf params result (isGeneric declaration) typed
     let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
     let expected ← withLocalDecl `registry .implicit
@@ -1427,30 +1728,69 @@ def requireNativeArtifacts (base : Name) : CommandElabM Unit := do
   unless valid do
     throwError m!"`{function}` has an invalid public verification certificate"
 
+/-- Publish the compilation view of a namespace as a literal, with the kernel
+certificate that it is the view the unit's namespace has: functions'
+certificates then read its arenas instead of rebuilding them. -/
+private def publishCompileView (segments : Array String) (unit : ValidatedUnit)
+    (namespaceId : NamespaceId) : TermElabM Name := do
+  let viewName := Name.str (semanticsName segments) s!"compileView_{namespaceId.index}"
+  let viewEqName := viewName ++ `eq
+  if (← getEnv).contains viewEqName then return viewEqName
+  let some view := compileNamespaceAt? unit namespaceId
+    | throwError "namespace {namespaceId.index} is out of range"
+  let semantics := mkConst (semanticsName segments)
+  let source ← mkAppM ``Option.get!
+    #[← mkAppM ``getElem? #[mkApp (mkConst ``ValidatedUnit.namespaces) semantics,
+      toExpr namespaceId.index]]
+  let value := mkAppN (mkConst ``CompileNamespace.mk) #[source, toExpr view.namespaceId,
+    toExpr view.expressions, toExpr view.places, toExpr view.patterns, toExpr view.types,
+    toExpr view.typeFuel, toExpr view.fuel]
+  addDecl (.defnDecl {
+    name := viewName, levelParams := []
+    type := mkConst ``CompileNamespace
+    value, hints := .abbrev, safety := .safe })
+  let some' := mkApp (mkConst ``Option.some [Level.zero]) (mkConst ``CompileNamespace)
+  addDecl (.thmDecl {
+    name := viewEqName, levelParams := []
+    type := ← mkEq (mkAppN (mkConst ``compileNamespaceAt?) #[semantics, toExpr namespaceId])
+      (mkApp some' (mkConst viewName))
+    value := ← mkEqRefl (mkApp some' (mkConst viewName)) })
+  return viewEqName
+
 /-- Publish the compiled function of a target: its rows, shape, body,
 mutable parameters, the function itself, and the kernel certificate of its
-compilation.  Nothing is republished. -/
-private def publishCompiled (segments : Array String) (function : String)
-    (handle : FunctionHandle) (compiled : Function) : TermElabM Unit := do
+compilation, read through its namespace's view.  Nothing is republished. -/
+private def publishCompiled (segments : Array String) (unit : ValidatedUnit)
+    (function : String) (handle : FunctionHandle) (compiled : Function) : TermElabM Unit := do
   let artifacts := Name.str (pathName segments) function
   if (← getEnv).contains (artifacts ++ `compiled_eq) then return
   addAbbrev (artifacts ++ `row) (← quoteRow (compiled.params ++ compiled.locals))
-  addAbbrev (artifacts ++ `params) (← quoteRow compiled.params)
+  -- The signature a caller assuming the function's interface published.
+  unless (← getEnv).contains (artifacts ++ `params) do
+    addAbbrev (artifacts ++ `params) (← quoteRow compiled.params)
   addAbbrev (artifacts ++ `locals) (← quoteRow compiled.locals)
-  addAbbrev (artifacts ++ `shape) (← quoteShape compiled.result)
+  unless (← getEnv).contains (artifacts ++ `shape) do
+    addAbbrev (artifacts ++ `shape) (← quoteShape compiled.result)
   addAbbrev (artifacts ++ `body) (← quoteTerm compiled.body)
   addAbbrev (artifacts ++ `mutables) (← quoteMutables compiled.mutables)
   addAbbrev (artifacts ++ `compiled)
     (← quoteFunction compiled (mkConst (artifacts ++ `body)) (mkConst (artifacts ++ `mutables)))
-  let lhs := mkAppN (mkConst ``compileFunction)
-    #[mkConst (semanticsName segments), toExpr handle]
-  let rhs := mkAppN (mkConst ``Except.ok [levelZero, levelZero])
+  let viewEq ← publishCompileView segments unit handle.namespaceId
+  let semantics := mkConst (semanticsName segments)
+  let lhs := mkAppN (mkConst ``compileFunction) #[semantics, toExpr handle]
+  let rhs := mkAppN (mkConst ``Except.ok [Level.zero, Level.zero])
     #[mkConst ``String, mkConst ``Function, mkConst (artifacts ++ `compiled)]
+  let view := (Name.str (semanticsName segments) s!"compileView_{handle.namespaceId.index}")
+  let throughView ← mkEq
+    (mkAppN (mkConst ``compileFunctionIn) #[semantics, mkConst view, toExpr handle]) rhs
   addDecl (.thmDecl {
     name := artifacts ++ `compiled_eq
     levelParams := []
     type := ← mkEq lhs rhs
-    value := ← mkEqRefl rhs })
+    value := ← mkEqTrans
+      (mkAppN (mkConst ``compileFunction_of_view)
+        #[semantics, toExpr handle, mkConst view, mkConst viewEq])
+      (← mkExpectedTypeHint (← mkEqRefl rhs) throughView) })
 
 /-- The signature artifacts of a native: it has no compiled body, so its
 parameter row and result shape come from its declaration. -/
@@ -1467,18 +1807,20 @@ private def handleSyntax (handle : FunctionHandle) : CommandElabM Term :=
   `(term| (⟨⟨$(Syntax.mkNatLit handle.namespaceId.index)⟩,
     ⟨$(Syntax.mkNatLit handle.functionId.index)⟩⟩ : LeanerIR.FunctionHandle))
 
-/-- The hypothesis a caller's theorems take for a native: the statement a
-verified callee's theorem makes, that the native's meaning satisfies its
-contract. A generic native's holds at every family and instantiation; any
-other's at the runtime family. -/
+/-- The hypothesis a caller's theorems take for a native, or for a function
+seen through its interface: the statement a verified callee's theorem
+makes, that its meaning satisfies its contract, at every family; a generic
+one's at every instantiation as well. -/
 private def nativeBinder (segments : Array String) (entry : FunctionHandle × String)
-    (generic : Bool) : CommandElabM (TSyntax ``Lean.Parser.Term.bracketedBinder) := do
+    (generic : Bool) (interface : Bool) :
+    CommandElabM (TSyntax ``Lean.Parser.Term.bracketedBinder) := do
   let (handle, name) := entry
   let artifacts := Name.str (pathName segments) name
   let handleTerm ← handleSyntax handle
   let params := rootIdent (artifacts ++ `params)
   let shape := rootIdent (artifacts ++ `shape)
-  let contract := rootIdent (typedContractName segments name)
+  let contract := rootIdent <| if interface then typedInterfaceContractName segments name
+    else typedContractName segments name
   let binder := mkIdent (Name.mkSimple s!"native_{name}")
   if generic then
     `(bracketedBinder| ($binder : ∀ {Θ : LeanerIR.Proofs.Denote.Skolems}
@@ -1488,24 +1830,79 @@ private def nativeBinder (segments : Array String) (entry : FunctionHandle × St
             $params $shape)
           ($contract typeInstantiation)))
   else
-    `(bracketedBinder| ($binder : LeanerIR.Proofs.Satisfies
-        (@LeanerIR.Proofs.Denote.propheticMeaning LeanerIR.Proofs.Denote.Skolems.runtime
-          executable #[] $handleTerm $params $shape)
-        (@$contract LeanerIR.Proofs.Denote.Skolems.runtime)))
+    `(bracketedBinder| ($binder : ∀ {Θ : LeanerIR.Proofs.Denote.Skolems},
+        LeanerIR.Proofs.Satisfies
+          (@LeanerIR.Proofs.Denote.propheticMeaning Θ executable #[] $handleTerm $params $shape)
+          (@$contract Θ)))
+
+/-- The standard-library modules whose intrinsic functions the Move Prover's
+prelude implements. -/
+private def preludeIntrinsicModules : List String :=
+  ["vector", "event", "aggregator", "aggregator_v2"]
+
+/-- Whether a function is intrinsic, as the Move Prover reads the pragma: it
+declares `pragma intrinsic` and has a meaning other than its body (it is
+native, a map role, or in a module the prelude implements), or it is opaque,
+so that callers rely on its contract by the author's choice. Elsewhere the
+pragma leaves the body its meaning, verified as any other. -/
+private def isIntrinsic (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
+  let declared := declaration.pragmas.any fun
+    | .assign "intrinsic" (.constant (.bool false)) _ => false
+    | .assign "intrinsic" _ _ => true
+    | _ => false
+  let prelude := match (unit.tables.namespaces[namespaceId.index]?).map (·.segments) with
+    | some #["0x1", name] => preludeIntrinsicModules.contains name
+    | _ => false
+  declared && (declaration.body == .absent || prelude || isOpaque declaration ||
+    (Contract.mapRoleOf? unit namespaceId ns declaration).isSome)
 
 /-- Whether a function's specification or its module sets
-`pragma verify = false`: the function's pragmas merge both. -/
-private def automaticVerificationDisabled
+`pragma verify = false`, or the function is intrinsic: the function's
+pragmas merge both. -/
+private def automaticVerificationDisabled (unit : ValidatedUnit)
+    (namespaceId : LeanerIR.NamespaceId) (ns : ValidatedNamespace)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
-  declaration.pragmas.any fun
+  isIntrinsic unit namespaceId ns declaration || declaration.pragmas.any fun
     | .assign "verify" (.constant (.bool false)) _ => true
     | _ => false
 
-/-- A member of a cycle of calls standing for its own calls, and its
-contract. -/
+/-- A member of a cycle of calls standing for the calls to it, and its
+contract of them. -/
 private def cycleSelf (name : String) : Ident := mkIdent (Name.mkSimple s!"self_{name}")
 private def cycleSelfVerified (name : String) : Ident :=
   mkIdent (Name.mkSimple s!"selfVerified_{name}")
+
+/-- The position of the `index`th member of a cycle. -/
+private def cycleIndexSyntax : Nat → CommandElabM Term
+  | 0 => `(term| LeanerIR.Proofs.Denote.CycleIndex.here)
+  | index + 1 => do `(term| LeanerIR.Proofs.Denote.CycleIndex.there $(← cycleIndexSyntax index))
+
+/-- The meanings of a cycle's members at every slot. -/
+private def cycleSelves : Ident := mkIdent `leanerSelves
+
+/-- The members of a cycle, each a handle with its compiled function. -/
+private def cycleMembersSyntax (segments : Array String) (cycle : Array (FunctionHandle × String)) :
+    CommandElabM Term := do
+  let pairs ← cycle.mapM fun (member, name) => do
+    `(term| ($(← handleSyntax member), $(rootIdent (compiledName segments name))))
+  `(term| [$pairs,*])
+
+/-- The declaration a handle names. -/
+private def declarationOf? (unit : ValidatedUnit) (handle : FunctionHandle) :
+    Option (LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) := do
+  let ns ← unit.namespaces[handle.namespaceId.index]?
+  ns.functions[handle.functionId.index]?
+
+/-- The hypothesis a native assumes: its contract at every family and
+instantiation when it is generic, at the runtime family otherwise. -/
+private def nativeBinderOf (unit : ValidatedUnit) (segments : Array String)
+    (entry : FunctionHandle × String) :
+    CommandElabM (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
+  let declaration? := declarationOf? unit entry.1
+  nativeBinder segments entry (declaration?.any isGeneric)
+    (declaration?.any fun declaration => declaration.body != .absent)
 
 /-- A function reached again along calls that are inlined, if any: such a
 cycle has no finite inlining. -/
@@ -1516,14 +1913,43 @@ private partial def inliningCycle? (edges : Array (FunctionHandle × Array Funct
     let next := ((edges.find? (·.1 == node)).map (·.2)).getD #[]
     next.findSome? (inliningCycle? edges (path.push node))
 
+/-- A kernel-decided theorem: the statement's `Decidable` instance evaluates
+to `true`. -/
+private def decidedByKernel (declName : Name) (statement : Term) : TermElabM Unit := do
+  let statement ← Lean.Elab.Term.elabType statement
+  Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+  let statement ← instantiateMVars statement
+  let decision ← synthInstance (mkApp (mkConst ``Decidable) statement)
+  addDecl (.thmDecl {
+    name := declName, levelParams := []
+    type := statement
+    value := mkApp3 (mkConst ``of_decide_eq_true) statement decision
+      (mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true)) })
+
+/-- A kernel-checked equation, proved by `Eq.refl` of its right side. -/
+private def reflexiveTheorem (declName : Name) (statement : Term) : TermElabM Unit := do
+  let statement ← Lean.Elab.Term.elabType statement
+  Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+  let statement ← instantiateMVars statement
+  addDecl (.thmDecl {
+    name := declName, levelParams := []
+    type := statement
+    value := ← mkEqRefl statement.appArg! })
+
+/-- A reducible definition of a literal value. -/
+private def literalDefinition (declName : Name) (type value : Lean.Expr) : TermElabM Unit :=
+  addDecl (.defnDecl {
+    name := declName, levelParams := [], type, value, hints := .abbrev, safety := .safe })
+
 /-- Verify one function through its denotation.  A member of a cycle of
-calls is proved over a meaning for each member of `cycle` satisfying its
-contract, standing for the calls to them; its typed theorem alone is
-elaborated, and the natives it assumes returned, for `verifyCycle` to
-conclude. -/
+calls is proved over a meaning for each member satisfying its contract,
+standing for the calls to them: at the runtime family, or, when `family`
+holds, at every skolem family and type instantiation.  Its typed theorem
+alone is elaborated, and the natives it assumes returned, for `verifyCycle`
+to conclude. -/
 private def verifyMember (reference : Syntax) (segments : Array String) (function : String)
     (prepared : ValidatedUnit) (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq))
-    (cycle : Array (FunctionHandle × String)) :
+    (cycle : Array (FunctionHandle × String)) (family : Bool := false) :
     CommandElabM (Array (FunctionHandle × String)) := do
   let namespaceName := pathName segments
   let some unit := LeanerLang.registeredUnit? (← getEnv) namespaceName
@@ -1532,6 +1958,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
   let unitDefinition ← ensureUnitDefinition segments unit
   let (semanticsEq, _) ← ensureSemanticsDefinitions segments unit
+  stageLog s!"{function}: semantics"
   let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
   let compiled ← match compileFunction prepared handle with
     | .ok compiled => pure compiled
@@ -1539,13 +1966,17 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let some (params, result) := nativeSignature? unit ⟨namespaceIndex⟩ declaration
     | throwErrorAt reference m!"no denotation for `{function}`: its signature is not native"
   ensureContracts segments function unit namespaceIndex ns declaration params result
+  stageLog s!"{function}: compiled and contracts"
   let artifacts := Name.str namespaceName function
   let base := (← getCurrNamespace) ++ artifacts
   let typedVerified := typedVerifiedName segments function
   if (← getEnv).contains (base ++ `typedVerified) then
     -- A colliding name alone is not evidence of a denotation proof.
-    withRef reference <| requireNativeArtifacts base
+    withRef reference <| requireNativeArtifacts base (selectsBitVectors declaration)
     return #[]
+  if script?.isNone && requiresAuthoredProof declaration then
+    throwErrorAt reference m!"leaner verification failed: `{function}` sets \
+      `pragma verify = manual`; {proofRequest ns function}"
   let compiledIdent := rootIdent (compiledName segments function)
   let bodyIdent := rootIdent (Name.str (Name.str namespaceName function) "body")
   let row := rootIdent (Name.str (Name.str namespaceName function) "row")
@@ -1558,14 +1989,31 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let publicContract := rootIdent (contractName segments function)
   let handleTerm ← handleSyntax ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
   let mut calleePairs : Array Term := #[]
+  -- The inlined callees, whose loops the proof meets with their invariants.
+  let mut inlined : Array (FunctionHandle × ValidatedNamespace ×
+    LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody × Function) := #[]
   -- The natives the theorems assume: those called here or by an inlined
   -- callee, and those a verified callee assumes.
   let mut natives : Array (FunctionHandle × String) := #[]
-  -- A call to itself, and to any member of its cycle, is assumed at its
-  -- contract, by fixed-point induction.  A generic function calls only
-  -- itself.
-  let recursive := isGeneric declaration && (compiled.body.callees #[]).contains handle
+  -- A call to any member of its cycle, itself included, is assumed at its
+  -- contract, by fixed-point induction.
   let members := cycle.map (·.1)
+  -- A generic function, and every member of a cycle through one, is proved
+  -- over every skolem family and type instantiation; any other at the
+  -- runtime family, a closed term the normalizer's caches keep, and the
+  -- empty instantiation.
+  let generic := isGeneric declaration || family
+  -- A generic function outside a cycle is proved for the frames it runs in
+  -- (`FrameOf`); a call passing its own type parameters runs in its frame.
+  let framed := isGeneric declaration && cycle.isEmpty
+  let arity := (declaration.signature.generics.filter (·.kind == .typeArg)).size
+  let ownCalls : Array (FunctionHandle × Array LeanerIR.TypeUse) := if !framed then #[] else
+    compiled.body.foldCalls (fun callee typeArgs found =>
+      if !typeArgs.isEmpty && typeArgs.size == arity &&
+          callee.namespaceId == handle.namespaceId &&
+          LeanerIR.SemanticOperations.ownParametersIn prepared handle typeArgs &&
+          !found.contains (callee, typeArgs)
+        then found.push (callee, typeArgs) else found) #[]
   let mut edges : Array (FunctionHandle × Array FunctionHandle) :=
     #[(handle, (compiled.body.callees #[]).filter fun callee =>
       callee != handle && !members.contains callee)]
@@ -1581,7 +2029,10 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     if typeArgs.isEmpty || found.contains (callee, typeArgs) then found
     else found.push (callee, typeArgs)
   let mut instantiated : Array (FunctionHandle × Array LeanerIR.TypeUse) :=
-    if isGeneric declaration then #[] else compiled.body.foldCalls recordGeneric #[]
+    if generic then ownCalls else compiled.body.foldCalls recordGeneric #[]
+  -- Every certificate and theorem from here on is elaborated synchronously,
+  -- so a failure is counted at the target.
+  let errorsBefore := countErrors (← get).messages
   while let some callee := worklist.back? do
     worklist := worklist.pop
     if visited.contains callee then continue
@@ -1590,66 +2041,95 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
       | throwErrorAt reference "a callee's namespace is out of range"
     let some calleeDeclaration := calleeNs.functions[callee.functionId.index]?
       | throwErrorAt reference "a callee is out of range"
-    let some calleeName := calleeNs.tables.names[calleeDeclaration.name.index]?
-      | throwErrorAt reference "a callee has no name"
-    let theoremName := (← getCurrNamespace) ++ typedSemanticsVerifiedName segments calleeName.name
+    let calleeKey := functionKey unit callee
+    let theoremName := (← getCurrNamespace) ++ typedSemanticsVerifiedName segments calleeKey
     let handleTerm ← handleSyntax callee
     let usesContract := contractStandsFor unit callee.namespaceId calleeNs calleeDeclaration
+    let throughContract := usedThroughContract unit callee calleeNs calleeDeclaration
     if calleeDeclaration.body == .absent then
-      -- A native has no body: its contract is assumed, as a hypothesis.
-      unless calleeDeclaration.contract.loc.isSome do
-        throwErrorAt reference m!"`{function}` calls the native `{calleeName.name}`, which has no \
-          contract; specify it"
+      -- A native has no body: its contract is assumed, as a hypothesis. One
+      -- without a specification is assumed by the model the Move Prover's
+      -- prelude gives it (`NativeModel`), and rejected without one, as the
+      -- Prover rejects it.
+      let nativeModel := nativeModelOf? unit callee calleeNs calleeDeclaration
+      if readsNativeModel calleeDeclaration && nativeModel.isNone then
+        throwErrorAt reference m!"`{function}` calls the native `{calleeKey}`, which has \
+          neither a specification nor a prelude model; specify it"
       unless usesContract do
-        throwErrorAt reference m!"`{function}` calls the native `{calleeName.name}`, which returns \
+        throwErrorAt reference m!"`{function}` calls the native `{calleeKey}`, which returns \
           a mutable reference without stating its `final` value: a caller reasons over such a \
           callee through its body, and a native has none"
       let some (nativeParams, nativeResult) :=
           nativeSignature? unit callee.namespaceId calleeDeclaration
-        | throwErrorAt reference m!"the native `{calleeName.name}` has no native signature"
-      ensureContracts segments calleeName.name unit callee.namespaceId.index calleeNs
-        calleeDeclaration nativeParams nativeResult
-      liftTermElabM (publishNativeSignature segments calleeName.name nativeParams nativeResult)
-      unless natives.any (·.1 == callee) do natives := natives.push (callee, calleeName.name)
+        | throwErrorAt reference m!"the native `{calleeKey}` has no native signature"
+      ensureContracts segments calleeKey unit callee.namespaceId.index calleeNs
+        calleeDeclaration nativeParams nativeResult nativeModel
+      liftTermElabM (publishNativeSignature segments calleeKey nativeParams nativeResult)
+      unless natives.any (·.1 == callee) do natives := natives.push (callee, calleeKey)
+      -- Unapplied, so a generic native's family and instantiation are found
+      -- at each call, not fixed at the first.
       calleePairs := calleePairs.push
-        (← `(term| PProd.mk $handleTerm (PProd.mk $(Syntax.mkStrLit calleeName.name)
-          $(mkIdent (Name.mkSimple s!"native_{calleeName.name}")))))
-    else if (← getEnv).contains theoremName && usesContract then
+        (← `(term| PProd.mk $handleTerm (PProd.mk $(Syntax.mkStrLit calleeKey)
+          @$(mkIdent (Name.mkSimple s!"native_{calleeKey}")))))
+    else if throughContract &&
+        (hasInterfaceView calleeDeclaration || automaticVerificationDisabled unit callee.namespaceId calleeNs calleeDeclaration ||
+          (Contract.mapRoleOf? unit callee.namespaceId calleeNs calleeDeclaration).isSome) then
+      -- Callers see such a callee through the interface its body is not
+      -- proved against, or through the contract of a function whose
+      -- verification is disabled: they assume it, as they assume a
+      -- native's contract.
+      let some (nativeParams, nativeResult) :=
+          nativeSignature? unit callee.namespaceId calleeDeclaration
+        | throwErrorAt reference m!"`{calleeKey}` has no native signature"
+      ensureInterfaceContract segments calleeKey unit callee.namespaceId.index calleeNs
+        calleeDeclaration nativeParams nativeResult
+      liftTermElabM (publishNativeSignature segments calleeKey nativeParams nativeResult)
+      unless natives.any (·.1 == callee) do natives := natives.push (callee, calleeKey)
+      -- Unapplied, so a generic native's family and instantiation are found
+      -- at each call, not fixed at the first.
+      calleePairs := calleePairs.push
+        (← `(term| PProd.mk $handleTerm (PProd.mk $(Syntax.mkStrLit calleeKey)
+          @$(mkIdent (Name.mkSimple s!"native_{calleeKey}")))))
+    else if (← getEnv).contains theoremName && throughContract then
       for entry in ((nativeDependencies.getState (← getEnv)).find? theoremName.getPrefix).getD #[] do
         unless natives.any (·.1 == entry.1) do natives := natives.push entry
       calleePairs := calleePairs.push
         (← `(term| PProd.mk $handleTerm
-          (PProd.mk $(Syntax.mkStrLit calleeName.name) (@$(mkIdent theoremName) _ _ prepared))))
-    else if calleeDeclaration.contract.loc.isSome && usesContract then
-      throwErrorAt reference m!"`{function}` calls `{calleeName.name}`, which is not verified; \
+          (PProd.mk $(Syntax.mkStrLit calleeKey) (@$(mkIdent theoremName) _ _ prepared))))
+    else if throughContract then
+      throwErrorAt reference m!"`{function}` calls `{calleeKey}`, which is not verified; \
         verify the callee first"
     else
-      -- An unspecified callee, and one returning a reference, is inlined:
-      -- its compiled body stands for its meaning through the agreement
-      -- theorem.
+      -- Any other callee is inlined: its compiled body stands for its
+      -- meaning through the agreement theorem.
       let calleeCompiled ← match compileFunction prepared callee with
         | .ok compiled => pure compiled
         | .error reason =>
-            throwErrorAt reference m!"no denotation for the callee `{calleeName.name}`: {reason}"
-      liftTermElabM (publishCompiled segments calleeName.name callee calleeCompiled)
+            throwErrorAt reference m!"no denotation for the callee `{calleeKey}`: {reason}"
+      liftTermElabM (publishCompiled segments prepared calleeKey callee calleeCompiled)
+      inlined := inlined.push (callee, calleeNs, calleeDeclaration, calleeCompiled)
       worklist := calleeCompiled.body.callees worklist
-      instantiated := calleeCompiled.body.foldCalls recordGeneric instantiated
+      -- As the target's own: a generic target's calls are proved over every
+      -- family and instantiation, with no empty-instantiation frames.
+      unless generic do
+        instantiated := calleeCompiled.body.foldCalls recordGeneric instantiated
       edges := edges.push (callee, calleeCompiled.body.callees #[])
-      let certificate := Name.str (Name.str namespaceName calleeName.name) "compiledSemantics"
+      let certificate := Name.str (Name.str namespaceName calleeKey) "compiledSemantics"
       unless (← getEnv).contains certificate do
         elabCommand (← `(command|
+          set_option Elab.async false in
           theorem $(rootIdent certificate)
               {registry : LeanerIR.Validation.SemanticsRegistry}
               {executable : LeanerIR.Validation.ExecutableUnit}
               (prepared : LeanerIR.Validation.prepareExecution registry
                 $(mkIdent unitDefinition) = .ok executable) :
               LeanerIR.Proofs.Denote.compileFunction executable.unit $handleTerm =
-                .ok $(rootIdent (compiledName segments calleeName.name)) := by
+                .ok $(rootIdent (compiledName segments calleeKey)) := by
             rw [(LeanerIR.Validation.prepareExecution_unit prepared).trans $(mkIdent semanticsEq)]
-            exact $(rootIdent (compiledEqName segments calleeName.name))))
+            exact $(rootIdent (compiledEqName segments calleeKey))))
       calleePairs := calleePairs.push
         (← `(term| PProd.mk $handleTerm
-          (PProd.mk $(Syntax.mkStrLit calleeName.name) ($(rootIdent certificate) prepared))))
+          (PProd.mk $(Syntax.mkStrLit calleeKey) ($(rootIdent certificate) prepared))))
   -- Each generic call at the empty instantiation instantiates its callee's
   -- frame as the runtime computes it: a kernel-checked literal, so the
   -- callee's families key as the caller's.
@@ -1662,24 +2142,165 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
       let calleeTerm ← handleSyntax callee
       let typeIdTerm (typeId : LeanerIR.TypeId) : CommandElabM Term :=
         `(term| (⟨$(Syntax.mkNatLit typeId.index)⟩ : LeanerIR.TypeId))
-      let typeUses ← typeArgs.mapM fun (typeUse : LeanerIR.TypeUse) => do
-        `(term| (⟨$(← typeIdTerm typeUse.typeId), ⟨$(Syntax.mkNatLit typeUse.loc.index)⟩⟩ :
-          LeanerIR.TypeUse))
-      let typeArgsTerm ← `(term| (#[$typeUses,*] : Array LeanerIR.TypeUse))
+      let typeArgsSyntax (typeArgs : Array LeanerIR.TypeUse) : CommandElabM Term := do
+        let typeUses ← typeArgs.mapM fun (typeUse : LeanerIR.TypeUse) => do
+          `(term| (⟨$(← typeIdTerm typeUse.typeId), ⟨$(Syntax.mkNatLit typeUse.loc.index)⟩⟩ :
+            LeanerIR.TypeUse))
+        `(term| (#[$typeUses,*] : Array LeanerIR.TypeUse))
+      let typeArgsTerm ← typeArgsSyntax typeArgs
+      -- The frame reads which types the arguments name, not where they
+      -- occur (`frameInstantiation_congr`): it is certified once for those
+      -- types, at location 0, and shared by every call naming them.
+      let frameArgs := typeArgs.map fun typeUse => { typeUse with loc := ⟨0⟩ }
+      let frameArgsTerm ← typeArgsSyntax frameArgs
       let entries ← value.mapM fun (symbolic, concrete) => do
         `(term| ($(← typeIdTerm symbolic), $(← typeIdTerm concrete)))
       let valueTerm ← `(term| (#[$entries,*] : Array (LeanerIR.TypeId × LeanerIR.TypeId)))
+      -- The runtime's computation over the prepared unit is certified by
+      -- witness: the callee namespace's key map, decided by the kernel once,
+      -- and this instantiation's witnesses, which the kernel checks in one
+      -- pass over the table with logarithmic reads — never by replaying its
+      -- searches.
+      -- Every proof is a kernel decision (`Eq.refl`), stated from syntax and
+      -- built as a term, so the elaborator evaluates nothing.
+      let namespaceIndex := callee.namespaceId.index
+      let some calleeNs := prepared.namespaces[namespaceIndex]?
+        | throwErrorAt reference m!"the callee's namespace is out of range"
+      let viewEq ← liftTermElabM (publishCompileView segments prepared callee.namespaceId)
+      let view := rootIdent (Name.str (semanticsName segments) s!"compileView_{namespaceIndex}")
+      let mapName := Name.str (semanticsName segments) s!"keyMap_{namespaceIndex}"
+      let mapCorrect := mapName ++ `correct
+      let map := rootIdent mapName
+      let instantiations :=
+        LeanerIR.SemanticOperations.instantiateGenericArguments #[] (frameArgs.map .typeArg)
+      let witnessValue := LeanerIR.Validation.computeWitnesses calleeNs instantiations
+      -- Once per unit for a namespace and type arguments: every call at them
+      -- shares the instantiation.
+      let frameKey := "_".intercalate (frameArgs.toList.map fun (typeUse : LeanerIR.TypeUse) =>
+        s!"{typeUse.typeId.index}")
+      let frameName := Name.str (semanticsName segments) s!"frame_{namespaceIndex}_{frameKey}"
+      let witnessesName := frameName ++ `witnesses
+      let witnesses := rootIdent witnessesName
+      let treeName := frameName ++ `witnessTree
+      let tree := rootIdent treeName
+      let tableName := Name.str (semanticsName segments) s!"typesTable_{namespaceIndex}"
+      let tableEq := tableName ++ `eq
+      let table := rootIdent tableName
+      let kindsName := Name.str (semanticsName segments) s!"lifetimeKinds_{namespaceIndex}"
+      let kindsEq := kindsName ++ `eq
+      let kinds := rootIdent kindsName
+      if !(← getEnv).contains frameName then liftTermElabM do
+        unless (← getEnv).contains mapName do
+          -- Once per namespace: the types as a literal, so the kernel reads
+          -- them without deriving them from the unit (`Array.mk` of the list
+          -- literal: its `toList` is a projection), and the key map over
+          -- their fingerprints, answering every search by one lookup.
+          literalDefinition tableName (mkApp (mkConst ``Array [0]) (mkConst ``LeanerIR.Ty))
+            (mkApp2 (mkConst ``Array.mk [0]) (mkConst ``LeanerIR.Ty)
+              (toExpr calleeNs.tables.types.toList))
+          reflexiveTheorem tableEq (← `(term| ($view).source.tables.types = $table))
+          literalDefinition mapName (mkConst ``LeanerIR.Validation.KeyMap)
+            (toExpr (LeanerIR.Validation.computeKeyMap calleeNs.tables.types))
+          decidedByKernel mapCorrect (← `(term| LeanerIR.Validation.Correct ($view).types
+            ($table).size $map))
+          -- The lifetimes' kinds, indexed: a reference type's instantiation
+          -- reads its lifetime's.
+          literalDefinition kindsName
+            (mkApp (mkConst ``LeanerIR.Validation.IndexedArena) (mkConst ``LeanerIR.LifetimeKind))
+            (toExpr (LeanerIR.Validation.IndexedArena.ofArray
+              (LeanerIR.Validation.lifetimeKinds calleeNs)))
+          reflexiveTheorem kindsEq (← `(term| LeanerIR.Validation.IndexedArena.ofArray
+            (LeanerIR.Validation.lifetimeKinds ($view).source) = $kinds))
+        -- The witnesses, as the array the theorem folds and as the index the
+        -- checker reads them through.
+        literalDefinition witnessesName
+          (mkApp (mkConst ``Array [0]) (mkConst ``LeanerIR.Validation.Witness))
+          (toExpr witnessValue)
+        literalDefinition treeName
+          (mkApp (mkConst ``LeanerIR.Validation.IndexedArena) (mkConst ``LeanerIR.Validation.Witness))
+          (toExpr (LeanerIR.Validation.IndexedArena.ofArray witnessValue))
+        reflexiveTheorem (frameName ++ `treeEq)
+          (← `(term| LeanerIR.Validation.IndexedArena.ofArray $witnesses = $tree))
+        reflexiveTheorem (frameName ++ `checked) (← `(term|
+          LeanerIR.Validation.checkAll $kinds ($view).types $map
+          (LeanerIR.SemanticOperations.instantiateGenericArguments #[]
+            (($frameArgsTerm).map LeanerIR.GenericArgument.typeArg))
+          $tree ($table).size = true))
+        reflexiveTheorem (frameName ++ `sizes) (← `(term| ($witnesses).size = ($table).size))
+        reflexiveTheorem (frameName ++ `depths) (← `(term| ($witnesses).toList.all
+          (fun witness => decide (witness.depth ≤ ($table).size)) = true))
+        reflexiveTheorem (frameName ++ `value)
+          (← `(term| LeanerIR.Validation.foldWitnesses $tree ($table).size = $valueTerm))
+        let statement ← Lean.Elab.Term.elabType (← `(term|
+          LeanerIR.Proofs.Denote.frameInstantiationIn $view #[] $frameArgsTerm = $valueTerm))
+        let proof ← Lean.Elab.Term.elabTermEnsuringType (← `(term|
+          (LeanerIR.Proofs.Denote.frameInstantiationIn_eq_of_check $frameArgsTerm rfl
+            (LeanerIR.Proofs.Denote.types_of_view $(rootIdent viewEq)) $(rootIdent tableEq)
+            $(rootIdent kindsEq) $(rootIdent mapCorrect) $(rootIdent (frameName ++ `treeEq))
+            $(rootIdent (frameName ++ `checked)) $(rootIdent (frameName ++ `sizes))
+            $(rootIdent (frameName ++ `depths))).trans $(rootIdent (frameName ++ `value))))
+          statement
+        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+        let proof ← instantiateMVars proof
+        addDecl (.thmDecl
+          { name := frameName, levelParams := [], type := ← instantiateMVars statement, value := proof })
       elabCommand (← `(command|
+        set_option Elab.async false in
         theorem $certificate {registry : LeanerIR.Validation.SemanticsRegistry}
             {executable : LeanerIR.Validation.ExecutableUnit}
             (prepared : LeanerIR.Validation.prepareExecution registry
               $(mkIdent unitDefinition) = .ok executable) :
             LeanerIR.Proofs.Denote.frameInstantiation executable.unit $calleeTerm #[] $typeArgsTerm =
               $valueTerm := by
-          rw [(LeanerIR.Validation.prepareExecution_unit prepared).trans $(mkIdent semanticsEq)]
-          with_unfolding_all rfl))
+          rw [LeanerIR.Proofs.Denote.frameInstantiation_congr (left := $typeArgsTerm)
+              (right := $frameArgsTerm) rfl,
+            (LeanerIR.Validation.prepareExecution_unit prepared).trans $(mkIdent semanticsEq),
+            LeanerIR.Proofs.Denote.frameInstantiation_of_view $(rootIdent viewEq)]
+          exact $(rootIdent frameName)))
     instantiationCertificates := instantiationCertificates.push
       (← `(term| $certificate prepared))
+  -- A call passing the target's own type parameters runs in its frame: at
+  -- the empty frame as the kernel computes the call's, otherwise by
+  -- `frameInstantiation_own`.
+  for (callee, typeArgs) in ownCalls, index in [0:ownCalls.size] do
+    let name := artifacts ++ Name.mkSimple s!"ownFrame_{index}"
+    unless (← getEnv).contains name do
+      unless (frameInstantiation prepared callee #[] typeArgs).isEmpty do
+        throwErrorAt reference m!"`{function}` calls a function of its namespace with its own \
+          type parameters, whose frame outside any call is not the empty instantiation"
+      let some emptyIndex := instantiated.idxOf? (callee, typeArgs)
+        | throwErrorAt reference "an own call has no frame certificate"
+      let empty := rootIdent (artifacts ++ Name.mkSimple s!"frameInstantiation_{emptyIndex}")
+      let calleeTerm ← handleSyntax callee
+      let typeUses ← typeArgs.mapM fun (typeUse : LeanerIR.TypeUse) =>
+        `(term| (⟨⟨$(Syntax.mkNatLit typeUse.typeId.index)⟩, ⟨$(Syntax.mkNatLit typeUse.loc.index)⟩⟩ :
+          LeanerIR.TypeUse))
+      let typeArgsTerm ← `(term| (#[$typeUses,*] : Array LeanerIR.TypeUse))
+      let parametersName := name ++ `parameters
+      let semanticsUnit := semanticsName segments
+      -- Decided by the kernel on the prepared unit.
+      liftTermElabM <| reflexiveTheorem parametersName (← `(term|
+        LeanerIR.SemanticOperations.ownParametersIn $(rootIdent semanticsUnit) $handleTerm
+          $typeArgsTerm = true))
+      elabCommand (← `(command|
+        set_option Elab.async false in
+        theorem $(rootIdent name) {registry : LeanerIR.Validation.SemanticsRegistry}
+            {executable : LeanerIR.Validation.ExecutableUnit}
+            (prepared : LeanerIR.Validation.prepareExecution registry
+              $(mkIdent unitDefinition) = .ok executable)
+            {typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId)}
+            (frame : LeanerIR.Proofs.Denote.FrameOf executable.unit $handleTerm
+              $(Syntax.mkNatLit arity) typeInstantiation) :
+            LeanerIR.Proofs.Denote.frameInstantiation executable.unit $calleeTerm typeInstantiation
+              $typeArgsTerm = typeInstantiation :=
+          LeanerIR.Proofs.Denote.frameInstantiation_own rfl rfl
+            (by rw [(LeanerIR.Validation.prepareExecution_unit prepared).trans
+                  $(mkIdent semanticsEq)]
+                exact $(rootIdent parametersName))
+            ($empty prepared) frame))
+    instantiationCertificates := instantiationCertificates.push
+      (← `(term| $(rootIdent name) prepared frame))
+  stageLog s!"{function}: callees and certificates"
   if let some cycle := inliningCycle? edges #[] handle then
     let name := (do
       let calleeNs ← unit.namespaces[cycle.namespaceId.index]?
@@ -1689,9 +2310,6 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     throwErrorAt reference m!"`{function}` reaches `{name}` again through callees that are \
       inlined; only a function calling itself directly is verified by induction, so specify \
       and verify the callees on the cycle"
-  if recursive then
-    calleePairs := calleePairs.push
-      (← `(term| PProd.mk self (PProd.mk $(Syntax.mkStrLit function) selfVerified)))
   for (_, name) in cycle do
     calleePairs := calleePairs.push
       (← `(term| PProd.mk $(cycleSelf name) (PProd.mk $(Syntax.mkStrLit name)
@@ -1699,79 +2317,106 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   let saved ← get
   try
     let (twins, families) ← SpecTypes.ensureSpecTypes segments unit
+    -- The invariants of the loops the proof meets: the function's own and
+    -- those of its inlined callees, each keyed by its function.
+    let owners := #[(handle, ns, declaration, compiled)] ++ inlined
     let invariants ← liftTermElabM <| withSkolems fun skolems => do
-      let invariants ← loopInvariants unit ⟨namespaceIndex⟩ ns declaration compiled.params
-        (compiled.params ++ compiled.locals) (mkApp (mkConst ``Skolems.codec) skolems)
-        twins families
-      invariants.mapM fun (site, invariant) => return (site, ← mkLambdaFVars #[skolems] invariant)
+      owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
+        let invariants ← loopInvariants unit owner.namespaceId ownerNs ownerDeclaration
+          ownerCompiled.params (ownerCompiled.params ++ ownerCompiled.locals)
+          (mkApp (mkConst ``Skolems.codec) skolems) (mkApp (mkConst ``Skolems.type) skolems)
+          twins families
+        invariants.mapM fun (site, invariant) =>
+          return (site, owner, ← mkLambdaFVars #[skolems] invariant)
     let mut loopPairs : Array Term := #[]
-    for (site, invariant) in invariants do
+    for (site, owner, invariant) in invariants do
       let name := artifacts ++ Name.mkSimple s!"loopInvariant_{site}"
       liftTermElabM (addAbbrev name invariant)
+      -- The invariant's skolem instance is the loop's own: an inlined generic
+      -- callee runs under its frame's, so the closer applies it, not the
+      -- ambient instance an elaborated constant would take.
       loopPairs := loopPairs.push
-        (← `(term| ($(Syntax.mkNumLit (toString site)), $(rootIdent name))))
-    liftTermElabM (publishCompiled segments function handle compiled)
+        (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner),
+          @$(rootIdent name))))
+    liftTermElabM (publishCompiled segments prepared function handle compiled)
     let pattern ← argumentPattern unit declaration compiled.params
-    let budget := Syntax.mkNumLit (toString (leaner.verifyHeartbeats.get (← getOptions)))
-    -- A generic function is proved over every skolem family and type
-    -- instantiation; any other at the runtime family, a closed term the
-    -- normalizer's caches keep, and the empty instantiation.
-    let generic := isGeneric declaration
+    let budgetValue := (heartbeatBudget? declaration).getD (leaner.verifyHeartbeats.get (← getOptions))
+    let budget := Syntax.mkNumLit (toString budgetValue)
     let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
         pure #[← `(bracketedBinder| {Θ : LeanerIR.Proofs.Denote.Skolems}),
           ← `(bracketedBinder| {typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId)})]
       else pure #[]
+    let frameBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if framed then
+        pure #[← `(bracketedBinder| (frame : LeanerIR.Proofs.Denote.FrameOf executable.unit
+          $handleTerm $(Syntax.mkNatLit arity) typeInstantiation))]
+      else pure #[]
+    let familyBinders := familyBinders ++ frameBinders
+    let frameArgs : Array Term ← if framed then pure #[← `(term| frame)] else pure #[]
+    let emptyFrameArgs : Array Term ← if framed then
+        pure #[← `(term| LeanerIR.Proofs.Denote.FrameOf.empty)]
+      else pure #[]
     let instantiation ← if generic then `(term| typeInstantiation) else `(term| #[])
-    let contract ← if generic then `(term| ($typedContract $instantiation)) else pure typedContract
-    -- A generic function calling itself is verified over `self` at every
-    -- family and instantiation, as its calls to itself with type arguments
-    -- induce.  A member of a cycle is verified over a meaning for each
-    -- member satisfying its contract, standing for the calls to it.
-    let selfBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if recursive then
-        pure #[← `(bracketedBinder| (self : LeanerIR.Proofs.Denote.SelfFamily $paramsTerm
-            $shapeTerm)),
-          ← `(bracketedBinder| (selfVerified : ∀ (family : LeanerIR.Proofs.Denote.Skolems)
-            (instantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId)),
-            LeanerIR.Proofs.Satisfies (self family instantiation)
-              (@$typedContract family instantiation)))]
-      else cycle.flatMapM fun (_, name) => do
+    let contract ← if isGeneric declaration then `(term| ($typedContract $instantiation))
+      else pure typedContract
+    -- A member of a cycle is verified over a meaning per member satisfying
+    -- its contract: at the runtime family, or at every family and
+    -- instantiation.
+    let selfBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+      cycle.flatMapM fun (member, name) => do
         let memberArtifacts := Name.str namespaceName name
         let memberParams := rootIdent (memberArtifacts ++ `params)
         let memberShape := rootIdent (memberArtifacts ++ `shape)
         let memberContract := rootIdent (typedContractName segments name)
-        pure #[← `(bracketedBinder| ($(cycleSelf name) : LeanerIR.Proofs.Denote.HList $memberParams →
-              LeanerIR.Proofs.Denote.Comp
-                (LeanerIR.Proofs.Denote.ResultShape.carrier $memberShape))),
-          ← `(bracketedBinder| ($(cycleSelfVerified name) :
-              LeanerIR.Proofs.Satisfies $(cycleSelf name) $memberContract))]
-    let nativeBinders ← natives.mapM fun entry => do
-      let generic := (do
-        let nativeNs ← unit.namespaces[entry.1.namespaceId.index]?
-        nativeNs.functions[entry.1.functionId.index]?).any isGeneric
-      nativeBinder segments entry generic
+        if family then
+          let atFamily ← if (declarationOf? unit member).any isGeneric then
+              `(term| (@$memberContract family instantiation))
+            else `(term| (@$memberContract family))
+          pure #[← `(bracketedBinder| ($(cycleSelf name) :
+                LeanerIR.Proofs.Denote.SelfFamily $memberParams $memberShape)),
+            ← `(bracketedBinder| ($(cycleSelfVerified name) :
+                ∀ (family : LeanerIR.Proofs.Denote.Skolems)
+                  (instantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId)),
+                LeanerIR.Proofs.Satisfies ($(cycleSelf name) family instantiation) $atFamily))]
+        else
+          pure #[← `(bracketedBinder| ($(cycleSelf name) : LeanerIR.Proofs.Denote.HList $memberParams →
+                LeanerIR.Proofs.Denote.Comp
+                  (LeanerIR.Proofs.Denote.ResultShape.carrier $memberShape))),
+            ← `(bracketedBinder| ($(cycleSelfVerified name) :
+                LeanerIR.Proofs.Satisfies $(cycleSelf name) $memberContract))]
+    let nativeBinders ← natives.mapM (nativeBinderOf unit segments)
     let nativeArgs : Array Term := natives.map fun entry =>
       ⟨mkIdent (Name.mkSimple s!"native_{entry.2}")⟩
     let atFamily (command : TSyntax `command) : CommandElabM (TSyntax `command) :=
       if generic then pure command
       else `(command| attribute [local instance] LeanerIR.Proofs.Denote.Skolems.runtime in
           $command:command)
-    let meanings ← if recursive then
-        `(term| (⟨LeanerIR.Proofs.Denote.recursiveMeaning executable $handleTerm $paramsTerm
-          $shapeTerm (self Θ typeInstantiation),
-          LeanerIR.Proofs.Denote.recursiveGeneric executable $handleTerm $paramsTerm $shapeTerm
-            self typeInstantiation,
-          typeInstantiation⟩ : LeanerIR.Proofs.Denote.Meanings))
-      else if !cycle.isEmpty then do
+    -- A cycle's meanings route each member, spelled out as `cycleMeanings`
+    -- unfolds at the member's slot, so that the normalizer meets the routes
+    -- directly.  At the runtime family, calls with type arguments stay
+    -- closed.
+    let meanings ← if cycle.isEmpty then
+        `(term| LeanerIR.Proofs.Denote.closedMeanings executable $instantiation)
+      else do
         let routes ← cycle.foldrM (init := ← `(term|
             LeanerIR.Proofs.Denote.propheticMeaning executable #[]))
           fun (member, name) rest => do
             let memberArtifacts := Name.str namespaceName name
+            let self ← if family then `(term| ($(cycleSelf name) Θ typeInstantiation))
+              else `(term| $(cycleSelf name))
             `(term| LeanerIR.Proofs.Denote.routeMeaning $(← handleSyntax member)
               $(rootIdent (memberArtifacts ++ `params)) $(rootIdent (memberArtifacts ++ `shape))
-              $(cycleSelf name) $rest)
-        `(term| (⟨$routes, LeanerIR.Proofs.Denote.closedGeneric executable #[], #[]⟩ :
-          LeanerIR.Proofs.Denote.Meanings))
-      else `(term| LeanerIR.Proofs.Denote.closedMeanings executable $instantiation)
+              $self $rest)
+        let closed ← `(term| LeanerIR.Proofs.Denote.closedGeneric executable $instantiation)
+        let generics ← if !family then pure closed
+          else cycle.foldrM (init := closed) fun (member, name) rest => do
+            let memberArtifacts := Name.str namespaceName name
+            `(term| LeanerIR.Proofs.Denote.routeGeneric $(← handleSyntax member)
+              $(rootIdent (memberArtifacts ++ `params)) $(rootIdent (memberArtifacts ++ `shape))
+              $(cycleSelf name)
+              (fun callee typeArgs => LeanerIR.Proofs.Denote.frameInstantiation executable.unit
+                callee $instantiation typeArgs)
+              $rest)
+        `(term| (⟨$routes, $generics, $instantiation⟩ : LeanerIR.Proofs.Denote.Meanings))
     -- An authored script proves the obligations the closer leaves.
     let closeTactic ← if script?.isSome then
         `(tactic| leaner_denote_close residual [$loopPairs,*] with [$calleePairs,*]
@@ -1792,7 +2437,8 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     let permitted := mkIdent `permitted
     let introduction ← if readsStart then
         `(tactic| (intro leanerArguments initialState $permitted:ident
-                   have := LeanerIR.Proofs.Denote.FunctionStart.intro leanerArguments initialState
+                   have := LeanerIR.Proofs.Denote.FunctionStart.intro $handleTerm leanerArguments
+                     initialState
                    rcases leanerArguments with $pattern:rcasesPat))
       else `(tactic| rintro $pattern:rcasesPat initialState $permitted:ident)
     let scriptTactic ← match script? with
@@ -1806,7 +2452,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
           ← `(Lean.Parser.Tactic.simpLemma| $(rootIdent (memberArtifacts ++ `shape)):ident)]
     -- A function without type parameters is proved at the runtime family,
     -- a closed term the normalizer's caches keep.
-    let typedCommand ← atFamily (← `(command|
+    -- A scripted theorem's messages land on the script: an unsolved
+    -- obligation is reported at the authored proof.
+    let typedCommand ← withRef (script?.map (·.raw) |>.getD reference) do atFamily (← `(command|
       set_option Elab.async false in
       set_option maxHeartbeats $budget:num in
       theorem $(mkIdent typedVerified)
@@ -1831,11 +2479,20 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
          all_goals leaner_denote_normalize at $permitted:ident ⊢
          all_goals $closeTactic:tactic)
         $scriptTactic:tactic))
-    let errorsBefore := countErrors (← get).messages
-    Perf.measure s!"{namespaceName}::{function} typed" (base ++ `typedVerified)
-      (elabCommand typedCommand)
+    let typedCommand ← if selectsBitVectors declaration then
+        `(command| set_option leaner.bitVectors true in $typedCommand)
+      else pure typedCommand
+    let loggedBefore := (← get).messages.reportedPlusUnreported.size
+    stageLog s!"{function}: theorem start"
+    Perf.withPhase .verification <|
+      Perf.measure s!"{namespaceName}::{function} typed" (base ++ `typedVerified)
+        (elabCommand typedCommand)
+    stageLog s!"{function}: theorem done"
     if countErrors (← get).messages > errorsBefore then
-      throwErrorAt reference "leaner verification failed"
+      let logged := (← get).messages.reportedPlusUnreported.toList.drop loggedBefore
+      let overBudget := logged.any fun message =>
+        message.data.hasTag (· == `runtime.maxHeartbeats)
+      throwErrorAt reference (failureMessage ns function script?.isSome overBudget budgetValue)
     -- A member of a cycle concludes with the whole cycle.
     unless cycle.isEmpty do return natives
     -- Elaborated synchronously, as the typed theorem is, so that an error
@@ -1857,18 +2514,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
             .ok $compiledIdent := by
           rw [unitEq]
           exact $compiledEqIdent
-        $(← if recursive then
-            `(tactic| exact LeanerIR.Proofs.Denote.satisfies_recursive_generic executable
-              $handleTerm $compiledIdent compiledAt
-              (fun family instantiation => @$typedContract family instantiation)
-              (fun self selfVerified family instantiation =>
-                @$(mkIdent typedVerified) _ _ prepared family instantiation $nativeArgs* self
-                  selfVerified)
-              typeInstantiation)
-          else
-            `(tactic| exact LeanerIR.Proofs.Denote.satisfies_propheticMeaning executable
-              $instantiation $handleTerm $compiledIdent compiledAt $contract
-              ($(mkIdent typedVerified) prepared $nativeArgs*)))))
+        exact LeanerIR.Proofs.Denote.satisfies_propheticMeaning executable
+          $instantiation $handleTerm $compiledIdent compiledAt $contract
+          ($(mkIdent typedVerified) prepared $frameArgs* $nativeArgs*)))
     let publicTyped ← if generic then `(term| ($typedContract #[])) else pure typedContract
     let verifiedCommand ← `(command|
       attribute [local instance] LeanerIR.Proofs.Denote.Skolems.runtime in
@@ -1881,26 +2529,23 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
           LeanerIR.Proofs.SatisfiesFunction executable $handleTerm $publicContract :=
         LeanerIR.Proofs.Denote.satisfies_prophetic executable $handleTerm $paramsTerm $shapeTerm
           $publicTyped
-          ($(mkIdent (typedSemanticsVerifiedName segments function)) prepared $nativeArgs*))
-    Perf.measure s!"{namespaceName}::{function} transport" (base ++ `verified) do
-      elabCommand semanticsCommand
-      elabCommand verifiedCommand
+          ($(mkIdent (typedSemanticsVerifiedName segments function)) prepared $emptyFrameArgs*
+            $nativeArgs*))
+    Perf.withPhase .verification <|
+      Perf.measure s!"{namespaceName}::{function} transport" (base ++ `verified) do
+        elabCommand semanticsCommand
+        elabCommand verifiedCommand
     if countErrors (← get).messages > errorsBefore then
       throwErrorAt reference "leaner verification failed"
     modifyEnv fun env => completedDenotations.tag env (base ++ `typedVerified)
     modifyEnv fun env => nativeDependencies.addEntry env (base, natives)
     -- Audit fresh proofs as well as cached ones. On failure the existing
     -- rollback removes both the artifacts and the completion tag.
-    withRef reference <| requireNativeArtifacts base
+    withRef reference <| requireNativeArtifacts base (selectsBitVectors declaration)
     return natives
   catch failure =>
     modify fun state => { saved with messages := state.messages }
     throw failure
-
-/-- The position of the `index`th member of a cycle. -/
-private def cycleIndexSyntax : Nat → CommandElabM Term
-  | 0 => `(term| LeanerIR.Proofs.Denote.CycleIndex.here)
-  | index + 1 => do `(term| LeanerIR.Proofs.Denote.CycleIndex.there $(← cycleIndexSyntax index))
 
 /-- The functions of the cycle of calls through `handle`, `handle` first:
 those it calls, directly or not, that call it again.  Empty when no call of
@@ -1929,9 +2574,12 @@ private def callCycle (prepared : ValidatedUnit) (handle : FunctionHandle) :
         grown := true
   return members
 
-/-- Verify the members of a cycle of calls together: each over a meaning
-for every member satisfying its contract, then all of them by fixed-point
-induction over the cycle. -/
+/-- Verify the members of a cycle of calls together, a function calling
+itself being a cycle of one: each over the members' meanings at every slot,
+then all of them by fixed-point induction over the slots.  Without a generic
+member every member is proved at the runtime family, the other slots
+standing vacuous; with one, every member at every skolem family and type
+instantiation, the runtime slots standing vacuous. -/
 private def verifyCycle (reference : Syntax) (segments : Array String)
     (prepared : ValidatedUnit) (members : Array (FunctionHandle × String))
     (scripts : String → Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) :
@@ -1941,6 +2589,8 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
     | throwErrorAt reference s!"unknown Leaner namespace `{namespaceName}`"
   let unitDefinition ← ensureUnitDefinition segments unit
   let (semanticsEq, _) ← ensureSemanticsDefinitions segments unit
+  let isGenericMember (member : FunctionHandle) := (declarationOf? unit member).any isGeneric
+  let family := members.any (isGenericMember ·.1)
   let saved ← get
   try
     -- Each member's typed theorem speaks of every member's signature and
@@ -1954,22 +2604,21 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
       let compiled ← match compileFunction prepared member with
         | .ok compiled => pure compiled
         | .error reason => throwErrorAt reference m!"no denotation for `{name}`: {reason}"
-      liftTermElabM (publishCompiled segments name member compiled)
+      liftTermElabM (publishCompiled segments prepared name member compiled)
     let mut assumed : Array (Array (FunctionHandle × String)) := #[]
     for (_, name) in members do
       assumed := assumed.push
-        (← verifyMember reference segments name prepared (scripts name) members)
+        (← verifyMember reference segments name prepared (scripts name) members family)
     let mut natives : Array (FunctionHandle × String) := #[]
     for memberNatives in assumed do
       for entry in memberNatives do
         unless natives.any (·.1 == entry.1) do natives := natives.push entry
-    let nativeBinders ← natives.mapM fun entry => nativeBinder segments entry false
+    let nativeBinders ← natives.mapM (nativeBinderOf unit segments)
     let nativeArgs (entries : Array (FunctionHandle × String)) : Array Term :=
       entries.map fun entry => ⟨mkIdent (Name.mkSimple s!"native_{entry.2}")⟩
     let artifactsOf (name : String) := Name.str namespaceName name
     let compiledAt (name : String) := mkIdent (Name.mkSimple s!"compiledAt_{name}")
-    let pairs ← members.mapM fun (member, name) => do
-      `(term| ($(← handleSyntax member), $(rootIdent (compiledName segments name))))
+    let membersTerm ← cycleMembersSyntax segments members
     let indices ← (List.range members.size).toArray.mapM cycleIndexSyntax
     let compiledHaves ← members.mapM fun (member, name) => do
       `(tactic| have $(compiledAt name) : LeanerIR.Proofs.Denote.compileFunction executable.unit
@@ -1978,43 +2627,80 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
           exact $(rootIdent (compiledEqName segments name)))
     let compiledAlternatives ← (members.zip indices).mapM fun ((_, name), index) =>
       `(Lean.Parser.Term.matchAltExpr| | $index => $(compiledAt name))
-    let contractAlternatives ← (members.zip indices).mapM fun ((_, name), index) =>
-      `(Lean.Parser.Term.matchAltExpr| | $index => $(rootIdent (typedContractName segments name)))
-    let selves := mkIdent `self
+    let contractAlternatives ← (members.zip indices).mapM fun ((member, name), index) => do
+      let typedContract := rootIdent (typedContractName segments name)
+      let contract : Term ← if !family then pure typedContract
+        else if isGenericMember member then
+          `(term| fun family instantiation => @$typedContract family instantiation)
+        else `(term| fun family _ => @$typedContract family)
+      `(Lean.Parser.Term.matchAltExpr| | $index => $contract)
     let selvesVerified := mkIdent `selvesVerified
     let mut selfArguments : Array Term := #[]
     for index in indices do
-      selfArguments := selfArguments.push (← `(term| ($selves $index)))
+      if family then
+        selfArguments := selfArguments.push
+          (← `(term| (fun family instantiation => $cycleSelves ⟨$index, some (family, instantiation)⟩)))
+      else
+        selfArguments := selfArguments.push (← `(term| ($cycleSelves ⟨$index, none⟩)))
       selfArguments := selfArguments.push (← `(term| ($selvesVerified $index)))
     let verifiedAlternatives ← ((members.zip indices).zip assumed).mapM
-      fun (((_, name), index), memberNatives) =>
-        `(Lean.Parser.Term.matchAltExpr| | $index =>
-            $(mkIdent (typedVerifiedName segments name)) prepared $(nativeArgs memberNatives)*
-              $selfArguments*)
+      fun (((_, name), index), memberNatives) => do
+        let typedVerified := mkIdent (typedVerifiedName segments name)
+        let proof ← if family then
+            `(term| fun family instantiation => @$typedVerified _ _ prepared family instantiation
+              $(nativeArgs memberNatives)* $selfArguments*)
+          else `(term| $typedVerified prepared $(nativeArgs memberNatives)* $selfArguments*)
+        `(Lean.Parser.Term.matchAltExpr| | $index => $proof)
     for ((member, name), index) in members.zip indices do
       let handleTerm ← handleSyntax member
       let params := rootIdent (artifactsOf name ++ `params)
       let shape := rootIdent (artifactsOf name ++ `shape)
       let typedContract := rootIdent (typedContractName segments name)
-      let semanticsCommand ← `(command|
-        attribute [local instance] LeanerIR.Proofs.Denote.Skolems.runtime in
+      let generic := isGenericMember member
+      -- A generic member's theorem holds at every family and instantiation;
+      -- any other at the runtime family.
+      let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
+          pure #[← `(bracketedBinder| {Θ : LeanerIR.Proofs.Denote.Skolems}),
+            ← `(bracketedBinder| {typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId)})]
+        else pure #[]
+      let instantiation ← if generic then `(term| typeInstantiation) else `(term| #[])
+      let contract ← if generic then `(term| ($typedContract typeInstantiation))
+        else pure typedContract
+      let cycleProof ← if !family then
+          `(term| LeanerIR.Proofs.Denote.satisfies_cycle_runtime executable #[] $membersTerm
+            (fun $compiledAlternatives:matchAlt*)
+            (fun $contractAlternatives:matchAlt*)
+            (fun $cycleSelves $selvesVerified index => match index with
+              $verifiedAlternatives:matchAlt*)
+            $index)
+        else
+          `(term| @LeanerIR.Proofs.Denote.satisfies_cycle_family
+            LeanerIR.Proofs.Denote.Skolems.runtime executable #[] $membersTerm
+            (fun $compiledAlternatives:matchAlt*)
+            (fun $contractAlternatives:matchAlt*)
+            (fun $cycleSelves $selvesVerified index => match index with
+              $verifiedAlternatives:matchAlt*)
+            $index $(← if generic then `(term| Θ) else `(term| LeanerIR.Proofs.Denote.Skolems.runtime))
+            $(← if generic then `(term| typeInstantiation) else `(term| #[])))
+      let semanticsTheorem ← `(command|
         set_option Elab.async false in
         theorem $(mkIdent (typedSemanticsVerifiedName segments name))
             {registry : LeanerIR.Validation.SemanticsRegistry}
             {executable : LeanerIR.Validation.ExecutableUnit}
             (prepared : LeanerIR.Validation.prepareExecution registry
-              $(mkIdent unitDefinition) = .ok executable) $nativeBinders* :
+              $(mkIdent unitDefinition) = .ok executable) $familyBinders* $nativeBinders* :
             LeanerIR.Proofs.Satisfies
-              (LeanerIR.Proofs.Denote.propheticMeaning executable #[] $handleTerm $params $shape)
-              $typedContract := by
+              (LeanerIR.Proofs.Denote.propheticMeaning executable $instantiation $handleTerm $params
+                $shape)
+              $contract := by
           have unitEq := (LeanerIR.Validation.prepareExecution_unit prepared).trans
             $(mkIdent semanticsEq)
           $[$compiledHaves]*
-          exact LeanerIR.Proofs.Denote.satisfies_cycle executable #[] [$pairs,*]
-            (fun $compiledAlternatives:matchAlt*)
-            (fun $contractAlternatives:matchAlt*)
-            (fun $selves $selvesVerified index => match index with $verifiedAlternatives:matchAlt*)
-            $index)
+          exact $cycleProof)
+      let semanticsCommand ← if generic then pure semanticsTheorem
+        else `(command| attribute [local instance] LeanerIR.Proofs.Denote.Skolems.runtime in
+            $semanticsTheorem:command)
+      let publicTyped ← if generic then `(term| ($typedContract #[])) else pure typedContract
       let verifiedCommand ← `(command|
         attribute [local instance] LeanerIR.Proofs.Denote.Skolems.runtime in
         set_option Elab.async false in
@@ -2026,21 +2712,23 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
             LeanerIR.Proofs.SatisfiesFunction executable $handleTerm
               $(rootIdent (contractName segments name)) :=
           LeanerIR.Proofs.Denote.satisfies_prophetic executable $handleTerm $params $shape
-            $typedContract
+            $publicTyped
             ($(mkIdent (typedSemanticsVerifiedName segments name)) prepared $(nativeArgs natives)*))
       let base := (← getCurrNamespace) ++ artifactsOf name
       let errorsBefore := countErrors (← get).messages
-      Perf.measure s!"{namespaceName}::{name} transport" (base ++ `verified) do
-        elabCommand semanticsCommand
-        elabCommand verifiedCommand
+      Perf.withPhase .verification <|
+        Perf.measure s!"{namespaceName}::{name} transport" (base ++ `verified) do
+          elabCommand semanticsCommand
+          elabCommand verifiedCommand
       if countErrors (← get).messages > errorsBefore then
         throwErrorAt reference "leaner verification failed"
     for (_, name) in members do
       let base := (← getCurrNamespace) ++ artifactsOf name
       modifyEnv fun env => completedDenotations.tag env (base ++ `typedVerified)
       modifyEnv fun env => nativeDependencies.addEntry env (base, natives)
-    for (_, name) in members do
+    for (member, name) in members do
       withRef reference <| requireNativeArtifacts ((← getCurrNamespace) ++ artifactsOf name)
+        ((declarationOf? unit member).any selectsBitVectors)
   catch failure =>
     modify fun state => { saved with messages := state.messages }
     throw failure
@@ -2061,15 +2749,13 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
   let prepared := match prepared? with
     | some prepared => prepared
     | none => (LeanerIR.Validation.prepareSemantics unit).1
-  let some (namespaceIndex, ns, functionIndex, declaration) := findFunction? unit function
+  let some (namespaceIndex, _, functionIndex, _) := findFunction? unit function
     | throwErrorAt reference s!"unknown function `{function}` in `{namespaceName}`"
   let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
   let base := (← getCurrNamespace) ++ Name.str namespaceName function
   let cycle := if (← getEnv).contains (base ++ `typedVerified) then #[]
     else callCycle prepared handle
-  -- A generic function calling only itself is verified by induction over
-  -- every family and instantiation.
-  if cycle.isEmpty || (isGeneric declaration && cycle.size == 1) then
+  if cycle.isEmpty then
     discard <| verifyMember reference segments function prepared script? #[]
     return
   let mut members : Array (FunctionHandle × String) := #[]
@@ -2088,12 +2774,9 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
         throwErrorAt reference m!"`{function}` reaches itself through `{name.name}`, which is \
           unspecified; a function on a cycle of calls is used through its contract, so specify \
           `{name.name}`"
-      if automaticVerificationDisabled memberDeclaration then
+      if automaticVerificationDisabled unit member.namespaceId memberNs memberDeclaration then
         throwErrorAt reference m!"`{function}` reaches itself through `{name.name}`, which sets \
           `pragma verify = false`; the members of a cycle of calls are verified together"
-    if isGeneric memberDeclaration then
-      throwErrorAt reference m!"`{function}` reaches itself through `{name.name}`; a cycle of \
-        calls through a generic function is not verified"
     members := members.push (member, name.name)
   covering (members.map (·.2))
   verifyCycle reference segments prepared members fun name =>
@@ -2122,9 +2805,17 @@ syntax (name := leanerVerifyCommand)
   "verify" leanerPath ("by" Lean.Parser.Tactic.tacticSeq)? : command
 
 @[command_elab leanerVerifyCommand]
-def elabLeanerVerify : CommandElab := fun stx => do
+def elabLeanerVerify : CommandElab := fun stx => Perf.withPhase .certification do
   let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
   let segments := pathSegments pathSyntax
+  -- A module path may lead with a Move address alias; a namespace
+  -- registered at the path as written takes precedence.
+  let canonical := LeanerLang.canonicalMovePath (← getEnv) segments.pop
+  let segments := if segments.size > 1 &&
+      (LeanerLang.registeredUnit? (← getEnv) (pathName segments.pop)).isNone &&
+      (LeanerLang.registeredUnit? (← getEnv) (pathName canonical)).isSome then
+    canonical.push segments.back!
+  else segments
   let script := scriptOfOptional (stx[2]?.getD .missing)
   let function := segments.back!
   if segments.size > 1 then
@@ -2170,9 +2861,9 @@ private def verifiedCallees (unit : ValidatedUnit) (prepared : ValidatedUnit)
     let some ns := unit.namespaces[callee.namespaceId.index]? | continue
     let some declaration := ns.functions[callee.functionId.index]? | continue
     if declaration.body == .absent then continue
-    if declaration.contract.loc.isSome &&
-        contractStandsFor unit callee.namespaceId ns declaration then
-      found := found.push callee
+    if usedThroughContract unit callee ns declaration then
+      -- A callee seen through its interface is assumed, not used by its theorem.
+      unless hasInterfaceView declaration do found := found.push callee
     else worklist := worklist ++ callees callee
   return found
 
@@ -2185,13 +2876,19 @@ private partial def verifyInOrder (unit prepared : ValidatedUnit) (segments : Ar
     (target : VerificationTarget) : CommandElabM Unit := do
   if (← visited.get).contains target.function then return
   visited.modify (·.push target.function)
-  if let some (namespaceIndex, ns, functionIndex, _) := findFunction? unit target.function then
+  if let some (namespaceIndex, _, functionIndex, _) := findFunction? unit target.function then
     for callee in verifiedCallees unit prepared ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ do
-      unless callee.namespaceId.index == namespaceIndex do continue
-      let some declaration := ns.functions[callee.functionId.index]? | continue
-      let some name := ns.tables.names[declaration.name.index]? | continue
-      if let some calleeTarget := targets.find? (·.function == name.name) then
-        verifyInOrder unit prepared segments targets visited covered calleeTarget
+      let key := functionKey unit callee
+      if callee.namespaceId.index == namespaceIndex then
+        if let some calleeTarget := targets.find? (·.function == key) then
+          verifyInOrder unit prepared segments targets visited covered calleeTarget
+      else
+        -- A callee of another module used through its contract is verified
+        -- in this unit too: a theorem about its own unit does not carry over.
+        let some (_, ns, _, declaration) := findFunction? unit key | continue
+        unless automaticVerificationDisabled unit callee.namespaceId ns declaration do
+          verifyInOrder unit prepared segments targets visited covered
+            ⟨key, target.reference, none⟩
   -- An authored proof sees the module's theorems by their short names.
   let moduleNamespace := pathName segments
   let openModule (scope : Scope) := { scope with
@@ -2229,8 +2926,14 @@ functions without one, in source order. This registration shadows
 the plain namespace elaborator. -/
 @[command_elab leanerNamespaceCommand, command_elab leanerMoveModuleCommand,
   command_elab leanerRustNamespaceCommand]
-def elaborateNamespaceWithVerification : CommandElab := fun stx => do
+def elaborateNamespaceWithVerification : CommandElab := fun stx =>
+    Perf.withPhase .certification do
   LeanerLang.elaborateNamespace stx
+  stageLog "module elaborated"
+  -- Its module is registered at its canonical path.
+  let stx ← match LeanerLang.canonicalMoveCommand (← getEnv) stx with
+    | .ok (canonical, _) => pure canonical
+    | .error (location, message) => throwErrorAt location message
   let some pathSyntax := stx.getArgs.find? (·.isOfKind ``leanerPathSyntax)
     | throwErrorAt stx "a Leaner namespace requires a path"
   -- A recursive specification function is a definition of the module.
@@ -2242,7 +2945,7 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx => do
   let moduleNamespace := pathName segments
   let theorems := LeanerLang.theoremItems stx
   unless theorems.isEmpty do
-    withModuleNamespace moduleNamespace do
+    withModuleNamespace moduleNamespace <| Perf.withPhase .verification do
       for theoremCommand in theorems do elabCommand theoremCommand
   let some unit := LeanerLang.registeredUnit? (← getEnv) (pathName segments) | return
   let items := LeanerLang.verificationItems stx
@@ -2261,13 +2964,16 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx => do
       let identifier ← item.getArgs.find? (·.isIdent)
       let function := identifier.getId.toString (escape := false)
       if explicit.contains function then none
-      let (_, _, _, declaration) ← findFunction? unit function
-      if declaration.body == .absent || automaticVerificationDisabled declaration then none
+      let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
+      if declaration.body == .absent ||
+          automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration then none
       some ⟨function, identifier, none⟩
   if targets.isEmpty then return
   let prepared := (LeanerIR.Validation.prepareSemantics unit).1
   let visited ← IO.mkRef (#[] : Array String)
   let covered ← IO.mkRef (#[] : Array String)
+  stageLog s!"module {pathName segments}: verification start"
   for target in targets do verifyInOrder unit prepared segments targets visited covered target
+  stageLog s!"module {pathName segments}: verification done"
 
 end LeanerLang.Verify

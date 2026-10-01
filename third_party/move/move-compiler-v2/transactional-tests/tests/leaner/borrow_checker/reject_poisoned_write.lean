@@ -1,18 +1,13 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectPoisonedWrite where
-
-  fun run : Action Unit := do
-    let owner : U64 := 0
-    let selected ← &mut owner
-    let poisoned ← &mut owner
-    selected := 1
-    poisoned := 2
-
-  spec run where
-    ensures True
+leaner module 0x0::LeanerBorrowRejectPoisonedWrite where
+  fun run() -> Unit := do
+    let mut owner : u64 := 0
+    let selected := &mut owner
+    let poisoned := &mut owner
+    *selected := 1
+    *poisoned := 2

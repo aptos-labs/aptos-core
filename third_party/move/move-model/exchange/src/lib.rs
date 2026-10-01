@@ -72,6 +72,12 @@
 //! type is always carried.
 
 pub mod ast;
+/// The producer of the typed-AST format from a move-model `GlobalEnv`.
+pub mod dump;
+pub use dump::dump_ast_module;
+/// Selection of the modules an export carries.
+pub mod select;
+pub use select::{module_closure, select_modules};
 pub mod check;
 
 use serde::{Deserialize, Serialize};

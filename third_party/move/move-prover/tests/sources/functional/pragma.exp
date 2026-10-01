@@ -15,3 +15,21 @@ error: abort not covered by any of the `aborts_if` clauses
    =         _c = <redacted>
    =     at tests/sources/functional/pragma.move:11: always_aborts_with_verify_incorrect
    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/pragma.move:21:5
+   │
+19 │           abort(1)
+   │           -------- abort happened here with code 0x1
+20 │       }
+21 │ ╭     spec always_aborts_with_verify_manual_incorrect {
+22 │ │         // `manual` is verified like `true`.
+23 │ │         pragma verify=manual;
+24 │ │         aborts_if _c; // error: abort not covered by any of the `aborts_if` clauses
+25 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/pragma.move:18: always_aborts_with_verify_manual_incorrect
+   =         _c = <redacted>
+   =     at tests/sources/functional/pragma.move:19: always_aborts_with_verify_manual_incorrect
+   =         ABORTED

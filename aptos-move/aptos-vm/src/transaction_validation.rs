@@ -18,14 +18,16 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
-    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
+    transaction::{
+        validation::{transaction_limits_module_id, transaction_validation_module_id},
+        MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef,
+    },
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     identifier::Identifier,
     language_storage::ModuleId,
     value::{serialize_values, MoveValue},
@@ -96,19 +98,11 @@ impl TransactionValidation {
 
     pub fn is_account_module_abort(&self, location: &AbortLocation) -> bool {
         location == &AbortLocation::Module(self.module_id())
-            || location
-                == &AbortLocation::Module(ModuleId::new(
-                    CORE_CODE_ADDRESS,
-                    ident_str!("transaction_validation").to_owned(),
-                ))
+            || location == &AbortLocation::Module(transaction_validation_module_id())
     }
 
     pub fn is_transaction_limits_module_abort(&self, location: &AbortLocation) -> bool {
-        location
-            == &AbortLocation::Module(ModuleId::new(
-                CORE_CODE_ADDRESS,
-                ident_str!("transaction_limits").to_owned(),
-            ))
+        location == &AbortLocation::Module(transaction_limits_module_id())
     }
 }
 

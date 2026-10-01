@@ -4,8 +4,8 @@
 import LeanerLang
 
 /-! Provides the `Result<T, E>` type, which allows to represent a success value `T` or an error value `E`. -/
-leaner module 0x1::result where
-  use 0x1::std::error::invalid_argument
+leaner module std::result where
+  use std::error::invalid_argument
 
   /--
   Attempt to unwrap value but found error

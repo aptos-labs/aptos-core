@@ -35,7 +35,7 @@ ZONE = "us-central1-a"
 
 DEFAULT_PVC_ACCESS_MODE = "ReadOnlyMany"  # Default access mode for PVCs
 TESTNET_SNAPSHOT_DISK_SIZE = "28Ti"  # Must be >= the testnet PFN disk size (26Ti as of 2026-09)
-MAINNET_SNAPSHOT_DISK_SIZE = "25Ti"  # Must be >= the mainnet PFN disk size (25Ti as of 2026-08)
+MAINNET_SNAPSHOT_DISK_SIZE = "35Ti"  # Must be >= the mainnet PFN disk size (35Ti as of 2026-09)
 
 def get_disk_size_for_snapshot(snapshot_name: str) -> str:
     if TESTNET_SNAPSHOT_NAME in snapshot_name:
@@ -186,7 +186,8 @@ def create_snapshot_with_gcloud(
     # Poll until the snapshot is READY
     logger.info(f"Waiting for snapshot '{snapshot_name}' to be ready...")
     start_time = time.time()
-    timeout = 5400  # 1.5 hour timeout
+    # 4 hours timeout
+    timeout = 14400
     while True:
         if time.time() - start_time > timeout:
             raise TimeoutError(

@@ -132,6 +132,22 @@ pub struct ProverOptions {
     /// don't interfere. Set automatically by test harnesses.
     #[clap(long, hide = true)]
     pub for_test: bool,
+
+    /// Verify with the Lean-based Leaner verifier instead of the Boogie
+    /// backend: the package is exported in the typed-AST exchange format and
+    /// every specified function is verified against its `spec` blocks in
+    /// Lean, with each message reported at its Move source position. A
+    /// function or module raises its heartbeat budget with `pragma heartbeats`.
+    /// The verifier is `third_party/move/lean/leaner-move`, located through
+    /// `LEANER_MOVE_EXE`, `LEANER_MOVE_HOME`, or the enclosing checkout.
+    #[clap(long)]
+    pub lean: bool,
+
+    /// The default heartbeat budget of a function's verification with `--lean`,
+    /// in thousands of Lean `maxHeartbeats` units; `pragma heartbeats`
+    /// overrides it. Ignored by the Boogie backend.
+    #[clap(long)]
+    pub heartbeats: Option<u64>,
 }
 
 impl ProverOptions {
@@ -180,27 +196,40 @@ impl ProverOptions {
         let now = Instant::now();
         let for_test = self.for_test;
         let benchmark = self.benchmark;
+        let lean = self.lean;
         let mut experiments_vec = experiments.to_vec();
         // If `filter` is `some` then only the files filtered for are primary targets.
         // This interferes with the package visibility check in the function checker.
         if self.filter.is_some() {
             experiments_vec.push(Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string());
         };
+        if lean {
+            // The Leaner verifier reads the typed AST, which stops after the
+            // checker and rewriters so that it keeps its source shape; the
+            // specification rewriter resolves Move functions called in
+            // specifications and is asked for explicitly. The Boogie
+            // backend's options have no effect on it.
+            experiments_vec.push(format!("{}=on", Experiment::SPEC_REWRITE));
+        }
+        // The Leaner verifier inlines dependency code, which only the full
+        // pipeline of a compilation target provides: every module is a
+        // target of the compilation, and the verifier itself narrows the
+        // verification targets to the package and the filter.
         let mut model = build_model(
             dev_mode,
             false, // test_mode
             true,  // verify_mode: prover needs #[verify_only] code
             package_path,
             named_addresses,
-            self.filter.clone(),
+            if lean { None } else { self.filter.clone() },
             bytecode_version,
             compiler_version,
             language_version,
             skip_attribute_checks,
             known_attributes.clone(),
             experiments_vec,
-            true,  // with_bytecode: prover needs FileFormat bytecode
-            false, // all_files_as_targets
+            !lean, // with_bytecode: the Boogie prover needs FileFormat bytecode
+            lean,  // all_files_as_targets
         )?;
         // Render stored diagnostics before bailing, otherwise model-building errors
         // are counted but never shown to the user.
@@ -208,7 +237,26 @@ impl ProverOptions {
             model.report_diag(writer, Severity::Error);
         }
         model.check_errors("in compilation")?;
+        let filter = self.filter.clone();
+        let heartbeats = self.heartbeats;
         let mut options = self.convert_options(package_path)?;
+        if for_test {
+            options.setup_logging_for_test();
+        } else {
+            options.setup_logging()
+        }
+        if lean {
+            let output = package_path.join("build").join("leaner-verify.lean");
+            return crate::leaner::verify(
+                &model,
+                package_path,
+                filter.as_deref(),
+                heartbeats,
+                &output,
+                writer,
+                now,
+            );
+        }
         options.language_version = language_version;
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes
@@ -304,11 +352,6 @@ impl ProverOptions {
             },
             ..base_opts
         };
-        if self.for_test {
-            opts.setup_logging_for_test();
-        } else {
-            opts.setup_logging()
-        }
         Ok(opts)
     }
 

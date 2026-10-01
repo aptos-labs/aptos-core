@@ -1,19 +1,16 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectVectorSwap where
-
-  fun run : Action U64 := do
-    let values : Vector U64 := vector![1, 2]
-    let vectorRef ← &mut values
-    let observation ← &vectorRef[0]
-    vectorRef.swap 0 1
-    let result ← *observation
-    pure result
-
-  spec run where
-    ensures True
+leaner module 0x0::LeanerBorrowRejectVectorSwap where
+  -- The write through `vectorRef` conflicts with the element borrow
+  -- `observation`, which is still used.
+  fun run() -> u64 := do
+    let mut values := vector<u64>[1, 2]
+    let vectorRef := &mut values
+    let observation := &vectorRef[0]
+    *vectorRef := core.prim.swapVector(*vectorRef, 0, 1)
+    let result := *observation
+    result

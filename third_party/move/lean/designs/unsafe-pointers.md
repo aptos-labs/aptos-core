@@ -1,6 +1,7 @@
 # Unsafe pointers over the prophetic ownership model
 
-Status: proposed 2026-08-28, not yet scheduled. Designs the first
+Status: proposed 2026-08-28, scheduled as Rust milestone M5
+([`roadmap.md`](roadmap.md), section 7). Designs the first
 unsafe-pointer profile for validated LIR on top of
 [`prophetic-references.md`](prophetic-references.md), refining the U-stage
 roadmap of

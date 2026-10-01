@@ -1,24 +1,18 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerArithmetic where
-
-  /-! ## Functions -/
-
-  fun calculate (left right : U64) : U64 :=
+leaner module 0x0::LeanerArithmetic where
+  fun calculate(left : u64, right : u64) -> u64 :=
     ((left + right) * 3 - right) / 2 % 100
 
-  fun add_overflow (value : U64) : U64 :=
-    value + 1
+  fun add_overflow(value : u64) -> u64 := value + 1
 
-  fun subtract_underflow (value : U64) : U64 :=
-    value - 1
+  fun subtract_underflow(value : u64) -> u64 := value - 1
 
-  fun divide_by_zero (value : U64) : U64 :=
-    value / 0
-
-/-! ## Tests -/
+  fun divide_by_zero(value : u64) -> u64 := value / 0
 
 --# run 0x0::LeanerArithmetic::calculate --args 8u64 2u64
 

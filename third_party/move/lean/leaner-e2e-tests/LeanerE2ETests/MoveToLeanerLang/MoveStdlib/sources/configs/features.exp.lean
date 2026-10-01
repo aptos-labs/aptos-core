@@ -29,11 +29,11 @@ Note that removing a feature flag still requires the function which tests for th
 is a public function. However, once the feature flag is disabled, those functions can constantly
 return true.
 -/
-leaner module 0x1::features where
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::error::invalid_state
-  use 0x1::std::error::permission_denied
-  use 0x1::std::vector
+leaner module std::features where
+  use std::error::invalid_argument
+  use std::error::invalid_state
+  use std::error::permission_denied
+  use std::vector
 
   const EINVALID_FEATURE : u64 := 1
 
@@ -1087,6 +1087,7 @@ leaner module 0x1::features where
     requires @0x1 == framework.address
     ensures exists<PendingFeatures>(@0x1) ==> features_std == features_pending
     aborts_if false
+    modifies *
 
   /--
   Check whether the feature is enabled.
@@ -1145,7 +1146,13 @@ leaner module 0x1::features where
     spec assume folds_capture_anchor!(34)
     let len := self.length
     while len > 0 do
-      let e := self.pop_back()
+      let e :=
+        do
+          let _t0 := &mut self
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1
       let feature := e
       set(features, feature, true)
       len := len - 1
@@ -1156,14 +1163,20 @@ leaner module 0x1::features where
         self[j] == with_state_anchor!(34, old(self))[j]
       invariant ∀ (j in len .. with_state_anchor!(34, old(self)).length), true
       invariant true
-    self.destroy_empty()
+    core.prim.destroyEmptyVector(self)
     let mut self := disable
     self.reverse()
     let mut self := self
     spec assume folds_capture_anchor!(39)
     let len := self.length
     while len > 0 do
-      let e := self.pop_back()
+      let e :=
+        do
+          let _t3 := &mut self
+          if _t3.length == 0 then moveVectorError(2)
+          let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+          *_t3 := _t5
+          _t4
       let feature := e
       set(features, feature, false)
       len := len - 1
@@ -1174,15 +1187,14 @@ leaner module 0x1::features where
         self[j] == with_state_anchor!(39, old(self))[j]
       invariant ∀ (j in len .. with_state_anchor!(39, old(self)).length), true
       invariant true
-    self.destroy_empty()
+    core.prim.destroyEmptyVector(self)
 
   spec apply_diff where
     pragma opaque
     aborts_if [abstract] false
     ensures [abstract] ∀ (i in disable), !spec_contains(features, i)
     ensures [abstract] ∀ (i in enable),
-        !0x1::std::vector::spec_contains(disable, i)
-          ==> spec_contains(features, i)
+        !std::vector::spec_contains(disable, i) ==> spec_contains(features, i)
 
   fun ensure_framework_signer(account : &Signer) -> Unit := do
     let addr := account.address
@@ -1197,7 +1209,7 @@ leaner module 0x1::features where
   -- TODO(tengzhang): add functional spec
   -- TODO(#12526): undo declaring opaque once fixed
   spec fun spec_contains(features : Vector<u8>, feature : Int) : Bool :=
-    1 << feature % 8 & features[feature / 8] > 0
+    (1 << feature % 8) % 256 & features[feature / 8] > 0
       && features.length > feature / 8
 
   opaque spec fun spec_is_enabled(feature : Int) : Bool

@@ -1,49 +1,34 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowCalls where
-
+leaner module 0x0::LeanerBorrowCalls where
   struct Pair has Copy, Drop, Store where
-    left : U64
-    right : U64
+    left : u64
+    right : u64
 
-  fun replace (_slot : &mut U64) (value : U64) : Action Unit := do
-    _slot := value
+  fun replace(slot : &mut u64, value : u64) -> Unit := *slot := value
 
-  spec replace (_slot : &mut U64) (_value : U64) where
-    ensures True
+  fun write_and_read(writer : &mut u64, reader : &mut u64) -> u64 := do
+    *writer := 11
+    let result := *reader
+    result
 
-  fun write_and_read (_writer : &mut U64) (reader : &mut U64) : Action U64 := do
-    _writer := 11
-    let result ← *reader
-    pure result
+  fun write_capable_call() -> u64 := do
+    let mut owner : u64 := 1
+    let writer := &mut owner
+    replace(writer, 9)
+    let result := *writer
+    result
 
-  spec write_and_read (_writer : &mut U64) (_reader : &mut U64) where
-    ensures True
-
-  fun write_capable_call : Action U64 := do
-    let owner : U64 := 1
-    let writer ← &mut owner
-    replace writer 9
-    let result ← *writer
-    pure result
-
-  spec write_capable_call where
-    ensures True
-
-  fun separated_call : Action U64 := do
-    let pair : Pair := { left := 1, right := 7 }
-    let pairRef ← &mut pair
-    let writer ← &mut pairRef.left
-    let reader ← &mut pairRef.right
-    write_and_read writer reader
-
-  spec separated_call where
-    ensures True
+  fun separated_call() -> u64 := do
+    let mut pair := new Pair { left := 1, right := 7 }
+    let pairRef := &mut pair
+    let writer := &mut pairRef.left
+    let reader := &mut pairRef.right
+    write_and_read(writer, reader)
 
 --# run 0x0::LeanerBorrowCalls::write_capable_call
 

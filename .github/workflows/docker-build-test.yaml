@@ -262,7 +262,7 @@ jobs:
       SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'cli-e2e') }}
 
   faucet-tests-main:
-    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
+    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
     if: |
       !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
         github.event_name == 'push' ||
@@ -275,9 +275,8 @@ jobs:
     uses: ./.github/workflows/faucet-tests-main.yaml
     secrets: inherit
     with:
-      SELECTION_RESULT: ${{ needs.e2e-test-determinator.result }}
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      SKIP_JOB: ${{ (needs.e2e-test-determinator.outputs.mode != 'subsystem' && !contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'faucet-integration') }}
+      SKIP_JOB: ${{ (!contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) }}
 
   # This is a PR required job.
   forge-e2e-test:

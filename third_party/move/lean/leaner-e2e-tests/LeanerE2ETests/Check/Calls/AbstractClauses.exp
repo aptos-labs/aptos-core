@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Calls/AbstractClauses.lean:50:4: error: the specification clause `ensures result == 65543` is not established
+LeanerE2ETests/Check/Calls/AbstractClauses.lean:49:7: error: leaner verification failed: the automatic verification of `code` failed; provide a proof: `verify code by …` in the module (`verify code by skip` shows the obligations it leaves)

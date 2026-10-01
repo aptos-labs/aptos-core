@@ -4,10 +4,10 @@
 import LeanerLang
 
 /-! Standard math utilities missing in the Move Language. -/
-leaner module 0x1::math64 where
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::fixed_point32::FixedPoint32
-  use 0x1::std::fixed_point32::create_from_raw_value
+leaner module aptos_std::math64 where
+  use std::error::invalid_argument
+  use std::fixed_point32::FixedPoint32
+  use std::fixed_point32::create_from_raw_value
 
   /--
   Cannot log2 the value 0

@@ -37,53 +37,56 @@ That's why all functions returning iterators are prefixed with "internal_", to c
 sure usage is correct.
 A set of inline utility methods is provided instead, to provide guaranteed valid usage to iterators.
 -/
-leaner module 0x1::big_ordered_map where
-  use 0x1::aptos_framework::ordered_map
-  use 0x1::aptos_framework::ordered_map::OrderedMap
-  use 0x1::aptos_framework::ordered_map::append_disjoint
-  use 0x1::aptos_framework::ordered_map::iter_add
-  use 0x1::aptos_framework::ordered_map::iter_is_begin_from_non_empty
-  use 0x1::aptos_framework::ordered_map::iter_replace
-  use 0x1::aptos_framework::ordered_map::length
-  use 0x1::aptos_framework::ordered_map::replace_key_inplace
-  use 0x1::aptos_framework::ordered_map::trim
-  use 0x1::aptos_std::math64::max
-  use 0x1::aptos_std::math64::min
-  use 0x1::aptos_std::storage_slots_allocator
-  use 0x1::aptos_std::storage_slots_allocator::ReservedSlot
-  use 0x1::aptos_std::storage_slots_allocator::StorageSlotsAllocator
-  use 0x1::aptos_std::storage_slots_allocator::StoredSlot
-  use 0x1::aptos_std::storage_slots_allocator::fill_reserved_slot
-  use 0x1::aptos_std::storage_slots_allocator::free_reserved_slot
-  use 0x1::aptos_std::storage_slots_allocator::is_null_index
-  use 0x1::aptos_std::storage_slots_allocator::is_special_unused_index
-  use 0x1::aptos_std::storage_slots_allocator::remove_and_reserve
-  use 0x1::aptos_std::storage_slots_allocator::reserve_slot
-  use 0x1::aptos_std::storage_slots_allocator::reserved_to_index
-  use 0x1::aptos_std::storage_slots_allocator::stored_to_index
-  use 0x1::std::bcs::constant_serialized_size
-  use 0x1::std::bcs::serialized_size
-  use 0x1::std::cmp::Ordering
-  use 0x1::std::cmp::compare
-  use 0x1::std::cmp::is_lt
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::error::invalid_state
-  use 0x1::std::option
-  use 0x1::std::option::Option
-  use 0x1::std::option::destroy_none
-  use 0x1::std::option::destroy_some
-  use 0x1::std::option::is_none
-  use 0x1::std::option::is_some
-  use 0x1::std::option::none
-  use 0x1::std::option::some
-  use 0x1::std::option::spec_borrow
-  use 0x1::std::option::spec_is_none
-  use 0x1::std::option::spec_is_some
-  use 0x1::std::vector
-  use 0x1::std::vector::spec_contains
+leaner module aptos_framework::big_ordered_map where
+  use aptos_framework::ordered_map
+  use aptos_framework::ordered_map::OrderedMap
+  use aptos_framework::ordered_map::append_disjoint
+  use aptos_framework::ordered_map::iter_add
+  use aptos_framework::ordered_map::iter_is_begin_from_non_empty
+  use aptos_framework::ordered_map::iter_replace
+  use aptos_framework::ordered_map::length
+  use aptos_framework::ordered_map::replace_key_inplace
+  use aptos_framework::ordered_map::trim
+  use aptos_std::math64::max
+  use aptos_std::math64::min
+  use aptos_std::storage_slots_allocator
+  use aptos_std::storage_slots_allocator::ReservedSlot
+  use aptos_std::storage_slots_allocator::StorageSlotsAllocator
+  use aptos_std::storage_slots_allocator::StoredSlot
+  use aptos_std::storage_slots_allocator::fill_reserved_slot
+  use aptos_std::storage_slots_allocator::free_reserved_slot
+  use aptos_std::storage_slots_allocator::is_null_index
+  use aptos_std::storage_slots_allocator::is_special_unused_index
+  use aptos_std::storage_slots_allocator::remove_and_reserve
+  use aptos_std::storage_slots_allocator::reserve_slot
+  use aptos_std::storage_slots_allocator::reserved_to_index
+  use aptos_std::storage_slots_allocator::stored_to_index
+  use std::bcs::constant_serialized_size
+  use std::bcs::serialized_size
+  use std::cmp::Ordering
+  use std::cmp::compare
+  use std::cmp::is_lt
+  use std::error::invalid_argument
+  use std::error::invalid_state
+  use std::option
+  use std::option::Option
+  use std::option::destroy_none
+  use std::option::destroy_some
+  use std::option::is_none
+  use std::option::is_some
+  use std::option::none
+  use std::option::some
+  use std::option::spec_borrow
+  use std::option::spec_is_none
+  use std::option::spec_is_some
+  use std::vector
+  use std::vector::spec_contains
 
   pragma verify = false
 
+  -- unsupported Move declaration `test_verify_iter_modify`: in function `big_ordered_map::test_verify_iter_modify`: closures are not supported by XAST (function values are out of scope)
+  -- unsupported Move declaration `test_verify_iter_modify_ranks_symbolic`: in function `big_ordered_map::test_verify_iter_modify_ranks_symbolic`: closures are not supported by XAST (function values are out of scope)
+  -- unsupported Move declaration `test_verify_modify`: in function `big_ordered_map::test_verify_modify`: closures are not supported by XAST (function values are out of scope)
   -- Error constants shared with ordered_map (so try using same values)
   /--
   Map key already exists
@@ -599,7 +602,7 @@ leaner module 0x1::big_ordered_map where
         some(
           do
             let child := destroy_some(self)
-            spec assume save_state_anchor!(54)
+            spec assume save_state_anchor!(108)
             let Child<V>::Leaf { value := value } := child
             value)
       else
@@ -645,27 +648,39 @@ leaner module 0x1::big_ordered_map where
     self'.reverse()
     v2.reverse()
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(50)
+    spec assume folds_capture_anchor!(104)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
-      let (e1, e2) := (self'.pop_back(), v2.pop_back())
+      let (e1, e2) :=
+        (do
+            let _t0 := &mut self'
+            if _t0.length == 0 then moveVectorError(2)
+            let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+            *_t0 := _t2
+            _t1,
+          do
+            let _t3 := &mut v2
+            if _t3.length == 0 then moveVectorError(2)
+            let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+            *_t3 := _t5
+            _t4)
       let (key, value) := (e1, e2)
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(50, old(self')).length >= len
+      invariant with_state_anchor!(104, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(50, old(self')).length
-        == with_state_anchor!(50, old(v2)).length
+      invariant with_state_anchor!(104, old(self')).length
+        == with_state_anchor!(104, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(50, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(50, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(50, old(self')).length), true
+        self'[j] == with_state_anchor!(104, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(104, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(104, old(self')).length), true
       invariant true
-    self'.destroy_empty()
-    v2.destroy_empty()
+    core.prim.destroyEmptyVector(self')
+    core.prim.destroyEmptyVector(v2)
 
   spec add_all where
     pragma intrinsic
@@ -1222,6 +1237,7 @@ leaner module 0x1::big_ordered_map where
     ensures ∀ (k : K),
         spec_contains_key(old(map), k)
           ==> spec_rank(map, k) == spec_rank(old(map), k)
+    modifies *
 
   -- validate that after modifications size invariants hold
   /--
@@ -1443,37 +1459,37 @@ leaner module 0x1::big_ordered_map where
     aborts_if self.internal_leaf_iter_is_end()
     ensures spec_leaf_iter_valid(spec.result[1], map)
     ensures ∀ (k : K),
-        0x1::aptos_framework::ordered_map::spec_contains_key(result, k)
+        aptos_framework::ordered_map::spec_contains_key(result, k)
           ==> spec_contains_key(map, k)
     ensures ∀ (k : K),
-        0x1::aptos_framework::ordered_map::spec_contains_key(result, k)
-          ==> 0x1::aptos_framework::ordered_map::spec_get(result, k) is Leaf
-            && 0x1::aptos_framework::ordered_map::spec_get(result, k).value
+        aptos_framework::ordered_map::spec_contains_key(result, k)
+          ==> aptos_framework::ordered_map::spec_get(result, k) is Leaf
+            && aptos_framework::ordered_map::spec_get(result, k).value
               == spec_get(map, k)
     ensures spec_len(map) > 0
-        ==> 0x1::aptos_framework::ordered_map::spec_len(result) > 0
+        ==> aptos_framework::ordered_map::spec_len(result) > 0
     ensures spec_leaf_offset(self, map)
-        + 0x1::aptos_framework::ordered_map::spec_len(result)
+        + aptos_framework::ordered_map::spec_len(result)
         <= spec_len(map)
-    ensures ∀ (j in 0 .. 0x1::aptos_framework::ordered_map::spec_len(result)),
+    ensures ∀ (j in 0 .. aptos_framework::ordered_map::spec_len(result)),
         spec_key_at(map, spec_leaf_offset(self, map) + j)
-          == 0x1::aptos_framework::ordered_map::spec_key_at(result, j)
-    ensures ∀ (j in 0 .. 0x1::aptos_framework::ordered_map::spec_len(result)),
-        0x1::aptos_framework::ordered_map::spec_get(
-          result, 0x1::aptos_framework::ordered_map::spec_key_at(
+          == aptos_framework::ordered_map::spec_key_at(result, j)
+    ensures ∀ (j in 0 .. aptos_framework::ordered_map::spec_len(result)),
+        aptos_framework::ordered_map::spec_get(
+          result, aptos_framework::ordered_map::spec_key_at(
             result, j
           )
         ) is Leaf
-    ensures ∀ (j in 0 .. 0x1::aptos_framework::ordered_map::spec_len(result)),
-        0x1::aptos_framework::ordered_map::spec_get(
-          result, 0x1::aptos_framework::ordered_map::spec_key_at(
+    ensures ∀ (j in 0 .. aptos_framework::ordered_map::spec_len(result)),
+        aptos_framework::ordered_map::spec_get(
+          result, aptos_framework::ordered_map::spec_key_at(
             result, j
           )
         ).value
           == spec_get(map, spec_key_at(map, spec_leaf_offset(self, map) + j))
     ensures spec_leaf_offset(spec.result[1], map)
         == spec_leaf_offset(self, map)
-          + 0x1::aptos_framework::ordered_map::spec_len(result)
+          + aptos_framework::ordered_map::spec_len(result)
     ensures spec_leaf_offset(spec.result[1], map) >= 0
     ensures spec.result[1].internal_leaf_iter_is_end()
         ==> spec_leaf_offset(spec.result[1], map) == spec_len(map)
@@ -1745,7 +1761,13 @@ leaner module 0x1::big_ordered_map where
     self : &mut BigOrderedMap<K, V>, mut path_to_node : Vector<u64>, key : K,
     child : Child<V>, allow_overwrite : Bool
   ) -> Option<Child<V> > := do
-    let node_index := path_to_node.pop_back()
+    let node_index :=
+      do
+        let _t6 := &mut path_to_node
+        if _t6.length == 0 then moveVectorError(2)
+        let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
+        *_t6 := _t8
+        _t7
     let node :=
       do
         let (self, node_index) := (self, node_index)
@@ -1929,7 +1951,13 @@ leaner module 0x1::big_ordered_map where
     old_key : &K, new_key : K
   ) -> Unit :=
     while !path_to_node.is_empty() do
-      let node_index := path_to_node.pop_back()
+      let node_index :=
+        do
+          let _t14 := &mut path_to_node
+          if _t14.length == 0 then moveVectorError(2)
+          let (_t15, _t16) := core.prim.removeVector(*_t14, _t14.length - 1)
+          *_t14 := _t16
+          _t15
       let node :=
         do
           let (self, node_index) := (self, node_index)
@@ -1951,7 +1979,13 @@ leaner module 0x1::big_ordered_map where
     self : &mut BigOrderedMap<K, V>, mut path_to_node : Vector<u64>,
     key : &K, iter_hint : Option<ordered_map::IteratorPtr>
   ) -> Option<Child<V> > := do
-    let node_index := path_to_node.pop_back()
+    let node_index :=
+      do
+        let _t11 := &mut path_to_node
+        if _t11.length == 0 then moveVectorError(2)
+        let (_t12, _t13) := core.prim.removeVector(*_t11, _t11.length - 1)
+        *_t11 := _t13
+        _t12
     let old_child :=
       do
         let node :=
@@ -2303,7 +2337,7 @@ leaner module 0x1::big_ordered_map where
       assert spec_contains_key(map, 4)
       assert spec_get(map, 4) == 6
       assert is_some(result_2)
-      assert 0x1::std::option::borrow(result_2) == 5
+      assert std::option::borrow(result_2) == 5
       assert !spec_contains_key(map, 10)
     spec do
       assert keys[0] == 1
@@ -2356,7 +2390,7 @@ leaner module 0x1::big_ordered_map where
       assert keys[1] == 2
       assert spec_contains_key(map, 2)
       assert is_some(result_2)
-      assert 0x1::std::option::borrow(result_2) == 2
+      assert std::option::borrow(result_2) == 2
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -3244,12 +3278,12 @@ leaner module 0x1::big_ordered_map where
         oit := ordered_map::iter_next(oit, entries)
       where
         invariant !(oit is End)
-          ==> oit.index < 0x1::aptos_framework::ordered_map::spec_len(entries)
+          ==> oit.index < aptos_framework::ordered_map::spec_len(entries)
         invariant sum
           == spec_test_sum_upto(
             m,
             spec_leaf_offset(it, m)
-              + (if oit is End then 0x1::aptos_framework::ordered_map::spec_len(
+              + (if oit is End then aptos_framework::ordered_map::spec_len(
                 entries
               )
               else oit.index)

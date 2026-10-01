@@ -22,18 +22,18 @@ for example:
 * inlining some nodes
 * having a fee-payer for any storage creation operations
 -/
-leaner module 0x1::storage_slots_allocator where
-  use 0x1::aptos_std::table_with_length
-  use 0x1::aptos_std::table_with_length::TableWithLength
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::option
-  use 0x1::std::option::Option
-  use 0x1::std::option::destroy_none
-  use 0x1::std::option::destroy_some
-  use 0x1::std::option::fill
-  use 0x1::std::option::is_none
-  use 0x1::std::option::is_some
-  use 0x1::std::option::none
+leaner module aptos_std::storage_slots_allocator where
+  use aptos_std::table_with_length
+  use aptos_std::table_with_length::TableWithLength
+  use std::error::invalid_argument
+  use std::option
+  use std::option::Option
+  use std::option::destroy_none
+  use std::option::destroy_some
+  use std::option::fill
+  use std::option::is_none
+  use std::option::is_some
+  use std::option::none
 
   const EINVALID_ARGUMENT : u64 := 1
 

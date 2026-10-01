@@ -53,6 +53,30 @@ def invocationTypeInstantiation (ns : ValidatedNamespace)
         if concrete == symbolic then result else result.push (symbolic, concrete)
     | none => result
 
+/-- `invocationTypeInstantiation` reading the types through an index and
+iterating them as a list, with their count taken once: the form a kernel
+certificate evaluates. -/
+def invocationTypeInstantiationIn (ns : ValidatedNamespace) (types : Validation.IndexedArena Ty)
+    (typeList : List Ty) (outer : Array (TypeId × TypeId))
+    (arguments : Array GenericArgument) : Array (TypeId × TypeId) :=
+  let arguments := instantiateGenericArguments outer arguments
+  let fuel := typeList.length + 1
+  (List.range typeList.length).foldl (init := #[]) fun result index =>
+    let symbolic : TypeId := ⟨index⟩
+    match Validation.instantiatePlaceFieldTypeFuelIn? ns types typeList arguments fuel symbolic with
+    | some concrete =>
+        if concrete == symbolic then result else result.push (symbolic, concrete)
+    | none => result
+
+theorem invocationTypeInstantiationIn_eq (ns : ValidatedNamespace)
+    (outer : Array (TypeId × TypeId)) (arguments : Array GenericArgument) :
+    invocationTypeInstantiationIn ns (.ofArray ns.tables.types) ns.tables.types.toList outer
+        arguments =
+      invocationTypeInstantiation ns outer arguments := by
+  simp only [invocationTypeInstantiationIn, invocationTypeInstantiation,
+    Validation.instantiatePlaceFieldType?, Validation.instantiatePlaceFieldTypeFuelIn?_eq,
+    Array.length_toList, ← Array.foldl_toList, Array.toList_range]
+
 /-- Resolve the target namespace and build its invocation substitution. A
 validated direct-call handle always selects a namespace; the empty fallback
 keeps this helper total for defensive consumers. Monomorphic callees do not
@@ -64,6 +88,25 @@ def callTypeInstantiation (unit : ValidatedUnit) (handle : FunctionHandle)
     match unit.namespaces[handle.namespaceId.index]? with
     | some ns => invocationTypeInstantiation ns outer arguments
     | none => #[]
+
+theorem instantiateGenericArguments_eraseLoc (outer : Array (TypeId × TypeId))
+    (arguments : Array GenericArgument) :
+    instantiateGenericArguments outer (arguments.map GenericArgument.eraseLoc) =
+      (instantiateGenericArguments outer arguments).map GenericArgument.eraseLoc := by
+  simp only [instantiateGenericArguments, Array.map_map]
+  congr 1
+  funext argument
+  cases argument <;> rfl
+
+/-- A call's frame reads its type arguments' identities, not where they
+occur. -/
+theorem callTypeInstantiation_eraseLoc (unit : ValidatedUnit) (handle : FunctionHandle)
+    (outer : Array (TypeId × TypeId)) (arguments : Array GenericArgument) :
+    callTypeInstantiation unit handle outer (arguments.map GenericArgument.eraseLoc) =
+      callTypeInstantiation unit handle outer arguments := by
+  simp only [callTypeInstantiation, invocationTypeInstantiation, Array.isEmpty_iff,
+    Array.map_eq_empty_iff, instantiateGenericArguments_eraseLoc,
+    Validation.instantiatePlaceFieldType?, Validation.instantiatePlaceFieldTypeFuel?_eraseLoc]
 
 def referencedName? (ns : ValidatedNamespace) (reference : QualifiedRef) :
     Option (NamespaceRef × String) := do

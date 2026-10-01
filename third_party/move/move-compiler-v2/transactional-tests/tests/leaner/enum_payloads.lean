@@ -1,93 +1,79 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
+leaner module 0x0::LeanerEnumPayloads where
+  enum Choice has Copy, Drop, Store where
+    | Left (value : u64)
+    | Right (value : u64)
 
-module LeanerEnumPayloads where
+  enum Batch has Copy, Drop, Store where
+    | Empty
+    | Items (values : Vector<u64>)
 
-  @[move_enum]
-  inductive Choice where
-    | left (value : U64)
-    | right (value : U64)
-    deriving Copy, Drop, Store
+  enum Positional has Copy, Drop, Store where
+    | Pair (_0 : u64, _1 : u64)
 
-  @[move_enum]
-  inductive Batch where
-    | empty
-    | items (values : Move.Vector U64)
-    deriving Copy, Drop, Store
+  enum Wrapper has Copy, Drop, Store where
+    | Wrap (value : u64)
 
-  @[move_enum]
-  inductive Positional where
-    | pair : U64 → U64 → Positional
-    deriving Copy, Drop, Store
+  fun choose(right : Bool, value : u64) -> Choice :=
+    if right then new Choice::Right { value } else new Choice::Left { value }
 
-  @[move_enum]
-  inductive Wrapper where
-    | wrap (value : U64)
-    deriving Copy, Drop, Store
-
-  /-! ## Functions -/
-
-  fun choose (right : Bool) (value : U64) : Choice :=
-    if right then .right value else .left value
-
-  fun score (choice : Choice) : U64 :=
+  fun score(choice : Choice) -> u64 :=
     match choice with
-    | .left value => value + 1
-    | .right value => value + 2
+      | Choice::Left { value := value } => value + 1
+      | Choice::Right { value := value } => value + 2
 
-  fun choose_and_score (right : Bool) (value : U64) : U64 :=
-    score (choose right value)
+  fun choose_and_score(right : Bool, value : u64) -> u64 := score(choose(right, value))
 
-  fun is_right (choice : Choice) : U64 :=
+  fun is_right(choice : Choice) -> u64 :=
     match choice with
-    | .right _ => 1
-    | _ => 0
+      | Choice::Right { value := _ } => 1
+      | _ => 0
 
-  fun batch_length (batch : Batch) : U64 :=
+  fun batch_length(batch : Batch) -> u64 :=
     match batch with
-    | .empty => 0
-    | .items values => Move.Vector.length values
+      | Batch::Empty {} => 0
+      | Batch::Items { values := values } => values.length
 
-  fun populated_batch : U64 :=
-    batch_length (.items vector![4, 5, 6, 7])
+  fun populated_batch() -> u64 :=
+    batch_length(new Batch::Items { values := vector<u64>[4, 5, 6, 7] })
 
-  fun empty_batch : U64 := batch_length .empty
+  fun empty_batch() -> u64 := batch_length(new Batch::Empty {})
 
-  fun positional_total (value : Positional) : U64 :=
+  fun positional_total(value : Positional) -> u64 :=
     match value with
-    | .pair left right => left + right
+      | Positional::Pair { _0 := left, _1 := right } => left + right
 
-  fun wrapped_value (value : Wrapper) : U64 :=
+  fun wrapped_value(value : Wrapper) -> u64 :=
     match value with
-    | .wrap inner => inner
+      | Wrapper::Wrap { value := inner } => inner
 
-  fun left_score (value : U64) : U64 := score (.left value)
+  fun left_score(value : u64) -> u64 := score(new Choice::Left { value })
 
-  fun right_score (value : U64) : U64 := score (.right value)
+  fun right_score(value : u64) -> u64 := score(new Choice::Right { value })
 
-  fun left_is_right (value : U64) : U64 := is_right (.left value)
+  fun left_is_right(value : u64) -> u64 := is_right(new Choice::Left { value })
 
-  fun right_is_right (value : U64) : U64 := is_right (.right value)
+  fun right_is_right(value : u64) -> u64 := is_right(new Choice::Right { value })
 
-  fun make_positional (left right : U64) : U64 :=
-    positional_total (.pair left right)
+  fun make_positional(left : u64, right : u64) -> u64 :=
+    positional_total(new Positional::Pair { _0 := left, _1 := right })
 
-  fun make_wrapper (value : U64) : U64 :=
-    wrapped_value (.wrap value)
+  fun make_wrapper(value : u64) -> u64 := wrapped_value(new Wrapper::Wrap { value })
 
-  fun vector_of_enums : U64 :=
-    let values : Move.Vector Choice := vector![.left 4, .right 5]
-    score (Move.Vector.get values 1)
+  fun vector_of_enums() -> u64 := do
+    let values := vector<Choice>[new Choice::Left { value := 4 }, new Choice::Right { value := 5 }]
+    score(values[1])
 
-  fun replace_enum_element : U64 :=
-    let values : Move.Vector Choice := vector![.left 1]
-    let values := Move.Vector.set values 0 (.right 7)
-    score (Move.Vector.get values 0)
-
-/-! ## Tests -/
+  fun replace_enum_element() -> u64 := do
+    let mut values := vector<Choice>[new Choice::Left { value := 1 }]
+    let selected := &mut values[0]
+    *selected := new Choice::Right { value := 7 }
+    score(values[0])
 
 --# run 0x0::LeanerEnumPayloads::choose_and_score --args false 10u64
 

@@ -810,7 +810,7 @@ impl SpecTranslator<'_> {
                     // Dual params for &mut references in old-aware spec funs
                     let inner_ty = boogie_type(self.env, &self.inst(ty.skip_reference()), bv_flag);
                     vec![
-                        format!("old_{}: {}", name_str, inner_ty),
+                        format!("$old_{}: {}", name_str, inner_ty),
                         format!("{}: {}", name_str, inner_ty),
                     ]
                 } else {
@@ -1787,7 +1787,7 @@ impl SpecTranslator<'_> {
 
     fn translate_local_var(&self, _node_id: NodeId, name: Symbol) {
         if *self.in_old_context.borrow() && self.fun_mut_params.contains(&name) {
-            emit!(self.writer, "old_{}", name.display(self.env.symbol_pool()));
+            emit!(self.writer, "$old_{}", name.display(self.env.symbol_pool()));
         } else {
             emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
         }
@@ -4305,6 +4305,36 @@ impl SpecTranslator<'_> {
         body: &Exp,
     ) {
         assert!(!kind.is_choice());
+        // A range that mentions an earlier binder is translated inside that binder's scope:
+        // `Q x in r1, y in r2(x): P` is `Q x in r1: Q y in r2(x): P`.
+        if let Some(k) = (1..ranges.len()).find(|&k| {
+            let earlier: BTreeSet<Symbol> = ranges[..k]
+                .iter()
+                .filter(|(_, range)| {
+                    !matches!(self.get_node_type(range.node_id()), Type::StateDomain)
+                })
+                .flat_map(|(pat, _)| pat.vars())
+                .map(|(_, sym)| sym)
+                .collect();
+            ranges[k]
+                .1
+                .free_vars()
+                .iter()
+                .any(|sym| earlier.contains(sym))
+        }) {
+            let inner_id = self.env.clone_node(node_id);
+            let inner = ExpData::Quant(
+                inner_id,
+                kind,
+                ranges[k..].to_vec(),
+                triggers.to_vec(),
+                condition.clone(),
+                body.clone(),
+            )
+            .into_exp();
+            self.translate_quant(node_id, kind, &ranges[..k], &[], &None, &inner);
+            return;
+        }
         // Translate range expressions. While doing, check for currently unsupported
         // type quantification
         let mut range_tmps = HashMap::new();
@@ -4392,6 +4422,7 @@ impl SpecTranslator<'_> {
                 .all(|(_, range)| matches!(self.get_node_type(range.node_id()), Type::StateDomain));
         let mut state_patterns = vec![];
         let mut state_patterns_complete = true;
+        let mut state_values: Vec<(String, Type)> = vec![];
         let mut comma = "";
         for (var, range) in ranges {
             let (_, var_name) = self.require_range_var(var);
@@ -4452,11 +4483,8 @@ impl SpecTranslator<'_> {
                         let bv_flag = false;
                         let mut entries: Vec<(String, Type)> = Vec::with_capacity(val_tys.len());
                         for (i, val_ty) in val_tys.iter().enumerate() {
-                            let boogie_var = if val_tys.len() == 1 {
-                                format!("{}_val", var_name_str)
-                            } else {
-                                format!("{}_val_{}", var_name_str, i)
-                            };
+                            let boogie_var =
+                                self.fresh_var_name(&format!("{}_val_{}", var_name_str, i));
                             if expand_value_states {
                                 if let Type::Struct(mid, sid, inst) = val_ty.skip_reference() {
                                     let struct_env = self.env.get_struct(mid.qualified(*sid));
@@ -4512,6 +4540,7 @@ impl SpecTranslator<'_> {
                             comma = ", ";
                             entries.push((boogie_var, val_ty.clone()));
                         }
+                        state_values.extend(entries.iter().cloned());
                         self.value_state_vars.borrow_mut().insert(label, entries);
                     }
                     continue;
@@ -4596,10 +4625,8 @@ impl SpecTranslator<'_> {
                     }
                     emit!(self.writer, "{}{}", separator, type_check);
                 },
-                Type::ResourceDomain(..) | Type::StateDomain => {
-                    // No range constraint needed.
-                    continue;
-                },
+                // State values are constrained after this loop.
+                Type::ResourceDomain(..) | Type::StateDomain => continue,
                 Type::Vector(..) => {
                     let range_tmp = range_tmps.get(&var_name).unwrap();
                     let quant_var = quant_vars.get(&var_name).unwrap();
@@ -4661,6 +4688,14 @@ impl SpecTranslator<'_> {
                 | Type::Var(_) => panic!("unexpected type"),
             }
             separator = connective;
+        }
+        // Every value a state quantifier picks satisfies its Move type.
+        for (value, ty) in &state_values {
+            let type_check = boogie_well_formed_expr(self.env, value, ty, false);
+            if !type_check.is_empty() {
+                emit!(self.writer, "{}{}", separator, type_check);
+                separator = connective;
+            }
         }
         emit!(self.writer, "{}", separator);
         self.with_range_selector_assignments(

@@ -7,22 +7,6 @@
       "cli-e2e"
     ]
   },
-  "execution-performance": {
-    "description": "Single-node execution and Move performance regressions",
-    "workflow": ".github/workflows/execution-performance.yaml",
-    "job": "execution-performance",
-    "nightly_jobs": [
-      "execution-performance"
-    ]
-  },
-  "faucet-integration": {
-    "description": "Faucet integration with the current node image",
-    "workflow": ".github/workflows/faucet-tests-main.yaml",
-    "job": "run-tests-main",
-    "nightly_jobs": [
-      "faucet-current"
-    ]
-  },
   "forge-compatibility": {
     "description": "Deployed Forge release compatibility",
     "workflow": ".github/workflows/docker-build-test.yaml",

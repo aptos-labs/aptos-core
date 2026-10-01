@@ -1,6 +1,7 @@
 # Prophetic reference semantics for validated LIR
 
-Status: P1–P7 implemented. This document is the master
+Status: P1–P7 implemented; the verifier carries the model as D5 of
+[`denotation.md`](denotation.md). This document is the master
 plan for replacing the concrete heap/generation reference model of validated
 LIR with a prophecy-based ownership model, run uniformly by the interpreter,
 the big-step relational semantics, and the verifier. Its milestone register

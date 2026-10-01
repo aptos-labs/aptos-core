@@ -4,7 +4,7 @@
 import LeanerE2ETests.CheckSupport
 import LeanerRust.Profile
 
-/-! Source-level lifetime and lexical-shadowing
+/-! Source-level lifetime, lexical-shadowing, and reborrow
 regressions. Invalid aliases are checked at execution preparation, not merely
 when their source unit is materialized. -/
 
@@ -76,6 +76,19 @@ leaner module 0x42::borrow_diagnostics where
     ensures result == 5
     aborts_if false
 
+  struct Box has Copy, Drop where
+    value : u64
+
+  -- A shared reborrow through a mutable reference ends at its last use; the
+  -- reference may be written through afterward.
+  fun write_after_observed() -> u64 := do
+    let mut boxed := new Box { value := 1 }
+    let writer := &mut boxed
+    let observation := &writer.value
+    let seen := *observation
+    *writer := new Box { value := 2 }
+    seen + boxed.value
+
 leaner module 0x42::borrow_conflict where
   fun poisoned_use() -> u64 := do
     let mut owner : u64 := 0
@@ -86,6 +99,19 @@ leaner module 0x42::borrow_conflict where
     result
   spec poisoned_use where
     ensures true
+
+-- Writing through a mutable reference while a shared reborrow through it is
+-- still used conflicts with the reborrow.
+leaner module 0x42::reborrow_conflict where
+  struct Box has Copy, Drop where
+    value : u64
+
+  fun write_while_observed() -> u64 := do
+    let mut boxed := new Box { value := 1 }
+    let writer := &mut boxed
+    let observation := &writer.value
+    *writer := new Box { value := 2 }
+    *observation
 
 leaner namespace borrow_conflict::rust using rust where
   fun unused_competing_handle() -> u64 := do
@@ -107,7 +133,7 @@ run_cmd do
   | .error diagnostics =>
     unless diagnostics.size == 1 && diagnostics.all (fun diagnostic =>
         diagnostic.code == "LIR-SEMANTIC-BORROW-CONFLICT" &&
-          diagnostic.message == "borrow conflicts with an active LeanerIR.ReferenceKind.mutable loan" &&
+          diagnostic.message == "borrow conflicts with an active mutable loan" &&
           diagnostic.primary.isSome && diagnostic.related.size == 1) do
       throwError "wrong alias rejection: {repr diagnostics}"
   let some rustUnit := LeanerLang.registeredUnit? (← getEnv) `borrow_conflict.rust
@@ -120,6 +146,22 @@ run_cmd do
           diagnostic.primary.isSome) do
       throwError "wrong Rust alias rejection: {repr diagnostics}"
 
+-- A write through a mutable reference whose shared reborrow is still used
+-- is rejected by execution preparation.
+open Lean Elab Command LeanerIR in
+set_option maxHeartbeats 1000 in
+run_cmd do
+  let some reborrowUnit := LeanerLang.registeredUnit? (← getEnv) `«0x42».reborrow_conflict
+    | throwError "missing reborrow fixture"
+  match Validation.prepareExecution #[Move.semantics] reborrowUnit with
+  | .ok _ => throwError "a write through a reborrowed mutable reference was accepted"
+  | .error diagnostics =>
+    unless diagnostics.size == 1 && diagnostics.all (fun diagnostic =>
+        diagnostic.code == "LIR-SEMANTIC-BORROW-CONFLICT" &&
+          diagnostic.message == "mutable reference use conflicts with an active shared loan" &&
+          diagnostic.primary.isSome && diagnostic.related.size == 1) do
+      throwError "wrong reborrow rejection: {repr diagnostics}"
+
 -- Run the functions on concrete inputs in the interpreter and compare the
 -- outcomes: discarding a competing mutable handle is accepted, and `nextLoan`
 -- pins how many loans each run takes.
@@ -128,6 +170,7 @@ run_cmd do
   assertRuns `«0x42».borrow_diagnostics #[
     ⟨"discard_competing_handle", #[], .returned #[.integer 1], {}⟩,
     ⟨"discard_and_restore_owner", #[], .returned #[.integer 9], {}⟩,
+    ⟨"write_after_observed", #[], .returned #[.integer 3], {}⟩,
     ⟨"shadowed_mutable_reference", #[], .returned #[.integer 2], {}⟩,
     ⟨"shadowed_reference_initializer", #[], .returned #[.integer 0], {}⟩,
     ⟨"nested_shadowed_reference", #[.bool false], .returned #[.integer 1], {}⟩,
