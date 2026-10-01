@@ -347,9 +347,6 @@ name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/call_
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/events.move"
 
 [[test]]
-name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/reflect.move"
-
-[[test]]
 name = "aptos-transactional-test-harness::tests$runner::aptos_test_harness/reflect_typaram_reference.masm"
 
 [[test]]

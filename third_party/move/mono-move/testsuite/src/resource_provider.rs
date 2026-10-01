@@ -9,6 +9,7 @@
 //! because a type's layout and GC descriptor are only published once the
 //! function that accesses it has been lowered.
 
+use aptos_types::on_chain_config::{Features, OnChainConfig};
 use mono_move_core::{
     nominal_tag,
     storage::resource_provider::{
@@ -19,6 +20,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap, SharedArena, DEFAULT_HEAP_SIZE};
+use move_core_types::account_address::AccountAddress;
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::resolver::ResourceResolver;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
@@ -121,6 +123,22 @@ impl ResourceProvider for InMemoryResourceProvider<'_, '_> {
             InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist),
         }
     }
+}
+
+/// Returns storage with default features for testing enabled.
+pub(crate) fn storage_with_default_features_for_test() -> InMemoryStorage {
+    let mut storage = InMemoryStorage::new();
+    storage.publish_or_overwrite_resource(
+        AccountAddress::ONE,
+        Features::struct_tag(),
+        features_blob(),
+    );
+    storage
+}
+
+/// BCS bytes of the `Features` resource the test harnesses seed at `0x1`.
+pub(crate) fn features_blob() -> Vec<u8> {
+    bcs::to_bytes(&Features::default_for_tests()).expect("Features serializes")
 }
 
 fn materialize_one(

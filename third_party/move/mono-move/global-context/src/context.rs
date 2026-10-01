@@ -675,6 +675,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
             })
     }
 
+    /// The enum-object descriptor already published for `enum_ty`, if any.
+    pub fn enum_descriptor(&self, enum_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .enum_by_type
+            .get(&enum_ty)
+            .map(|id| *id)
+    }
+
     /// Materializes an enum-object descriptor for `enum_ty` into the shared
     /// arena and returns its assigned [`DescriptorId`]. Idempotent on
     /// `enum_ty`. `variant_pointer_offsets[v]` are the heap-pointer byte

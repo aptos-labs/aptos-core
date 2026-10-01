@@ -3,13 +3,11 @@
 
 //! Helpers for working with the Move `Result` type.
 
+use aptos_types::move_stdlib::result::{ERR_TAG as ERR_VARIANT, OK_TAG as OK_VARIANT};
 use move_vm_types::{
     natives::function::{PartialVMError, PartialVMResult},
     values::{Struct, StructRef, Value},
 };
-
-const OK_VARIANT: u16 = 0;
-const ERR_VARIANT: u16 = 1;
 
 pub fn ok_result(val: Value) -> Value {
     Value::struct_(Struct::pack_variant(OK_VARIANT, vec![val]))

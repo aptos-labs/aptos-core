@@ -27,7 +27,7 @@ pub use memory::{
 };
 pub use mono_move_core::{ObjectDescriptor, ObjectDescriptorTable};
 pub use native_context::{
-    ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
+    LoaderAccess, ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
     ProductionNativeRegistry,
 };
 pub use types::{DEFAULT_HEAP_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};

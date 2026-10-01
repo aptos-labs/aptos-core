@@ -11,7 +11,9 @@ use crate::{
     interner::InternedModuleId, types::InternedType, DescriptorId, FormatOptions, VMResult,
 };
 use core::{cell::RefMut, cmp::Ordering};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress, function::FunctionResolutionError, identifier::IdentStr,
+};
 
 /// Trait that native functions are written generic over.
 ///
@@ -294,6 +296,21 @@ pub trait NativeContext {
 
     /// Type of the native's `i`-th return value.
     fn return_type(&self, i: usize) -> VMResult<InternedType>;
+
+    /// The GC descriptor published for the enum type `ty`, if any.
+    fn enum_descriptor(&self, ty: InternedType) -> Option<DescriptorId>;
+
+    /// Resolves `address::module_name::func_name`, returning a function value
+    /// that can be called back into. The returned value is guaranteed to have
+    /// the expected type. If the type turns out to be different, resolution
+    /// fails.
+    fn resolve_function<'a>(
+        &'a self,
+        address: AccountAddress,
+        module_name: &IdentStr,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<Boxed<'a, Opaque>, FunctionResolutionError>>;
 
     /// Boxes the by-value argument `value_arg` into a fresh heap object built
     /// from `descriptor`, returning an owned handle that stays live for the

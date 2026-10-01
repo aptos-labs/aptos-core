@@ -23,24 +23,32 @@ use crate::{
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
+    abilities::{AbilityCalculator, AbilityError},
     interner::{
-        script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
+        script_module_id, view_module_id, InternedFunctionRef, InternedIdentifier,
+        InternedModuleId, SCRIPT_MAIN,
     },
-    native::NativeResolver,
-    types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, ErrorLocation, FrameOffset, Function, FunctionPtr, GasMeter, Interner, LayoutId,
-    LayoutProvider, ModuleId, ModuleProvider, NominalFields, VMInternalError, VMResult,
-    ValueLayout,
+    native::{FunctionResolutionError, NativeResolver},
+    types::{
+        infer_function_type_args, view_name, view_type, view_type_list, FunctionTypeMismatch,
+        InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST,
+    },
+    DescriptorId, ErrorLocation, ExecutionErrorKind, FrameOffset, Function, FunctionPtr, GasMeter,
+    Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, NominalFields, PreparedModule,
+    VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
     ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
 };
 use move_binary_format::{
-    access::ScriptAccess, errors::VMError, file_format::CompiledScript,
+    access::{ModuleAccess, ScriptAccess},
+    errors::VMError,
+    file_format::{CompiledScript, Visibility},
     module_script_conversion::script_into_module,
 };
-use shared_dsa::UnorderedSet;
+use move_core_types::{ability::AbilitySet, identifier::IdentStr};
+use shared_dsa::{UnorderedMap, UnorderedSet};
 use specializer::{
     lower::context::{
         publish_resource_type, try_discover_types_for_lowering_in_function,
@@ -198,6 +206,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             // or genuinely absent: report which.
             let slot = module.get_function_slot(func_name).ok_or_else(|| {
                 match module.get_function_ir(func_name) {
+                    // TODO(completeness): a closure over a native is packable
+                    // but not callable, where the legacy VM calls it. A call
+                    // site has no `NativeABI`, so the fix is to synthesize one
+                    // per instantiation at load time.
                     FunctionIrLookup::Native => LoaderError::NativeFunctionNotLoadable {
                         address: *id.address(),
                         module: id.name().to_string(),
@@ -287,6 +299,120 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             ));
         }
         Ok(())
+    }
+
+    /// Resolves `module_id::func_name` and checks its type matches the
+    /// expected type. If the type turns out to be different, resolution fails.
+    pub fn resolve_function(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
+        use FunctionResolutionError::*;
+
+        // Every load that succeeds leaves the entry loaded, so a pending entry
+        // means an earlier load of this module failed and left it behind.
+        // Resolution is the one caller that survives a failed load, so it has
+        // to fail the same way again instead of tripping over the leftover.
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        if matches!(read_set.get(id), Some(ModuleRead::Pending)) {
+            return Ok(Err(FunctionNotFound));
+        }
+
+        let module = match self.get_or_load_module(read_set, gas_meter, module_id) {
+            Ok(module) => module,
+            Err(err) if err.kind() == ExecutionErrorKind::LinkingError => {
+                return Ok(Err(FunctionNotFound))
+            },
+            Err(err) => return Err(err),
+        };
+        // TODO(security): a caller-supplied name that names nothing still ends
+        // up in the process-global interner. Same class as the `TODO(metering)`
+        // on `ExecutionGuard::intern_identifier_internal`.
+        let func_name = self
+            .guard
+            .intern_identifier(func_name)
+            .into_global_arena_ptr();
+        let Some(def_idx) = module.function_def_idx(func_name) else {
+            return Ok(Err(FunctionNotFound));
+        };
+
+        let prepared = &module.ir().module;
+        let def = prepared.function_def_at(def_idx);
+        if !matches!(def.visibility, Visibility::Public) {
+            return Ok(Err(FunctionNotAccessible));
+        }
+
+        let Type::Function { abilities, .. } = view_type(expected_ty) else {
+            return Ok(Err(FunctionIncompatibleType));
+        };
+        // A resolved function is public and captures nothing, so the closure
+        // built from it has exactly the abilities of a public function value.
+        // Anything stronger has no inhabitant.
+        if !abilities.is_subset(AbilitySet::PUBLIC_FUNCTIONS) {
+            return Ok(Err(FunctionIncompatibleType));
+        }
+
+        let constraints = &prepared.function_handle_at(def.function).type_parameters;
+        let declared = prepared.function_signature_at(def.function);
+        let ty_args = match infer_function_type_args(declared, expected_ty, constraints.len()) {
+            Ok(ty_args) => ty_args,
+            Err(FunctionTypeMismatch::NotAFunction | FunctionTypeMismatch::Incompatible) => {
+                return Ok(Err(FunctionIncompatibleType))
+            },
+            Err(FunctionTypeMismatch::NotInstantiated) => return Ok(Err(FunctionNotInstantiated)),
+        };
+
+        if !self.ty_args_satisfy_constraints(read_set, gas_meter, constraints, &ty_args)? {
+            return Ok(Err(FunctionIncompatibleType));
+        }
+        let ty_args = self.guard.type_list_of(&ty_args);
+        Ok(Ok(self
+            .guard
+            .function_ref_of(module_id, func_name, ty_args)))
+    }
+
+    /// Whether every type argument satisfies the constraint declared for it.
+    ///
+    /// A [`Type::Nominal`] carries no abilities, so each module an argument
+    /// names has to be loaded to reach the declaration that does.
+    fn ty_args_satisfy_constraints(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        constraints: &[AbilitySet],
+        ty_args: &[InternedType],
+    ) -> VMResult<bool> {
+        if constraints.iter().all(|c| *c == AbilitySet::EMPTY) {
+            return Ok(true);
+        }
+
+        let mut nominal_modules = vec![];
+        for &ty in ty_args {
+            collect_nominal_modules(ty, &mut nominal_modules);
+        }
+        let mut modules = UnorderedMap::with_capacity(nominal_modules.len());
+        for nominal_module in nominal_modules {
+            let module = self.get_or_load_module(read_set, gas_meter, nominal_module)?;
+            modules.insert(nominal_module, &module.ir().module);
+        }
+
+        let lookup = |module_id, name| {
+            modules
+                .get(&module_id)
+                .and_then(|module: &&PreparedModule| module.nominal_handle(module_id, name))
+                .ok_or(AbilityError::UnknownNominal)
+        };
+        let mut calculator = AbilityCalculator::new(lookup, &[]);
+        for (constraint, &ty) in constraints.iter().zip(ty_args) {
+            if !constraint.is_subset(calculator.abilities_of(ty)?) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Loads a script from its bytes and returns its `main` instantiated with
@@ -849,6 +975,47 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // SAFETY: Loader owns guard, which means that the slot pointer stays
         // throughout loader's lifetime.
         unsafe { slot.as_ref_unchecked() }
+    }
+}
+
+/// Records the defining module of every nominal type occurring in `ty`. The
+/// result may repeat a module; loading one twice is a read-set hit.
+///
+/// TODO(metering): unbounded recursion, same family as the `TODO(metering)` on
+/// `mono_move_core::types::is_closed_type`.
+fn collect_nominal_modules(ty: InternedType, out: &mut Vec<InternedModuleId>) {
+    match view_type(ty) {
+        Type::Nominal {
+            module_id, ty_args, ..
+        } => {
+            out.push(*module_id);
+            for &ty_arg in view_type_list(*ty_args) {
+                collect_nominal_modules(ty_arg, out);
+            }
+        },
+        Type::Vector { elem } => collect_nominal_modules(*elem, out),
+        Type::ImmutRef { inner } | Type::MutRef { inner } => collect_nominal_modules(*inner, out),
+        Type::Function { args, results, .. } => {
+            for &ty in view_type_list(*args).iter().chain(view_type_list(*results)) {
+                collect_nominal_modules(ty, out);
+            }
+        },
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer
+        | Type::TypeParam { .. } => {},
     }
 }
 
