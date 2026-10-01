@@ -10,6 +10,7 @@ use aptos_types::{
     transaction::{
         authenticator::AuthenticationProof,
         user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+        validation::{MAX_MULTIPLIER_PERCENT, MIN_MULTIPLIER_PERCENT},
         AuxiliaryInfo, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector,
         SessionId, SignedTransaction, TransactionExecutable, TransactionExecutableRef,
         TransactionExtraConfig, TransactionPayload, TransactionPayloadInner, TxnLimitsRequest,
@@ -68,12 +69,7 @@ impl TransactionMetadata {
             && ApprovedExecutionHashes::fetch_config(resolver)
                 .ok()
                 .flatten()
-                .is_some_and(|approved| {
-                    approved
-                        .entries
-                        .iter()
-                        .any(|(_, hash)| hash == &script_hash)
-                });
+                .is_some_and(|approved| approved.contains_script_hash(&script_hash));
 
         let extra_config = txn.extra_config();
         let txn_limits_request = extra_config.txn_limits_request();
@@ -100,12 +96,6 @@ impl TransactionMetadata {
             // meter from operating with a 0, nonsensical, or overflowing limit. The
             // Move prologue additionally validates that the multiplier exists in the
             // on-chain config.
-            //
-            // INVARIANT: these bounds must match Move constants defined in
-            // transaction_limits.move.
-            const MIN_MULTIPLIER_PERCENT: u64 = 100; // 1x
-            const MAX_MULTIPLIER_PERCENT: u64 = 10000; // 100x
-
             let m = request.multipliers();
             if m.execution_multiplier_percent() <= MIN_MULTIPLIER_PERCENT
                 || MAX_MULTIPLIER_PERCENT < m.execution_multiplier_percent()

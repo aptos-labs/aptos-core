@@ -1,8 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_types::on_chain_config::{ApprovedExecutionHashes, OnChainConfig};
 use mono_move_core::{
+    intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
+    types::InternedType,
     Interner,
 };
 use move_core_types::{account_address::AccountAddress, ident_str};
@@ -22,6 +25,9 @@ pub(crate) struct FrameworkSymbols {
     pub transaction_validation: InternedModuleId,
     pub versioned_prologue: InternedIdentifier,
     pub versioned_epilogue: InternedIdentifier,
+
+    /// The on-chain configs the executor reads (see `providers::read_config`).
+    pub approved_execution_hashes: InternedType,
 }
 
 impl FrameworkSymbols {
@@ -40,6 +46,14 @@ impl FrameworkSymbols {
             transaction_validation: module(ident_str!("transaction_validation")),
             versioned_prologue: function(ident_str!("versioned_prologue")),
             versioned_epilogue: function(ident_str!("versioned_epilogue")),
+
+            approved_execution_hashes: config_type::<ApprovedExecutionHashes>(interner),
         }
     }
+}
+
+/// Interns the type of the on-chain config `T`.
+fn config_type<T: OnChainConfig>(interner: &impl Interner) -> InternedType {
+    intern_struct_tag(&T::struct_tag(), interner)
+        .expect("a config's struct tag is a valid, non-generic framework type")
 }

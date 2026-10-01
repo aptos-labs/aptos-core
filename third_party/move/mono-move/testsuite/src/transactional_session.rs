@@ -142,9 +142,10 @@ impl From<VMInternalError> for RunError {
             Some(LoaderError::LoweringSkipped { reason }) => {
                 RunError::VmUnsupported(reason.to_string())
             },
-            Some(native @ LoaderError::NativeFunctionNotLoadable { .. }) => {
-                RunError::VmUnsupported(native.to_string())
-            },
+            Some(
+                gap @ (LoaderError::NativeFunctionNotLoadable { .. }
+                | LoaderError::ResourceLayoutNotDerivable),
+            ) => RunError::VmUnsupported(gap.to_string()),
             Some(
                 LoaderError::ModuleNotFound { .. }
                 | LoaderError::FunctionNotFound { .. }

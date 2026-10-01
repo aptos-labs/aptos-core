@@ -4,6 +4,7 @@
 use crate::{
     errors::{DiscardReason, ExecutorCreationError, NoEffectsReason},
     outcome::TxnOutcome,
+    providers::AptosDataProvider,
     symbols::FrameworkSymbols,
 };
 use aptos_types::{
@@ -11,7 +12,7 @@ use aptos_types::{
     transaction::{AuxiliaryInfo, Transaction},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use mono_move_core::{storage::module_provider::ModuleProvider, ResourceProvider};
+use mono_move_core::storage::module_provider::ModuleProvider;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::ProductionNativeRegistry;
 
@@ -28,7 +29,7 @@ pub struct AptosTransactionExecutor<'a> {
     /// All native functions available for this executor.
     pub(crate) natives: &'a ProductionNativeRegistry,
     pub(crate) module_provider: &'a dyn ModuleProvider,
-    pub(crate) data_provider: &'a dyn ResourceProvider,
+    pub(crate) data_provider: &'a dyn AptosDataProvider,
     /// The on-chain configs (features, gas schedule) at the current state.
     //
     // TODO(cleanup): reusing the legacy VM's environment type is transitional;
@@ -50,7 +51,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         guard: &'a ExecutionGuard<'a>,
         natives: &'a ProductionNativeRegistry,
         module_provider: &'a dyn ModuleProvider,
-        data_provider: &'a dyn ResourceProvider,
+        data_provider: &'a dyn AptosDataProvider,
         env: &'a AptosEnvironment,
         usage: StateStorageUsage,
     ) -> Result<Self, ExecutorCreationError> {
