@@ -237,6 +237,7 @@ def cpu_model():
             if line.startswith("model name"):
                 return line.split(":", 1)[1].strip()
     except OSError:
+        # No /proc/cpuinfo outside Linux: the platform's own description follows.
         pass
     return platform.processor() or platform.machine()
 
@@ -563,9 +564,9 @@ def markdown(points, threshold, page_url=None):
         f"vs median of {len(suite) - 1} runs); "
         + ", ".join(f"{count} {status}" for status, count in counts.items() if count)
         + f". Runner `{latest.get('runner')}`, {latest.get('threads')} threads.")
-    lines += ["", "| Problem | Status | Elaboration s | Verification s | Overall s | "
-              "Δ previous | Δ median | Δ heartbeats | Overall, window |",
-              "|---|---|---:|---:|---:|---:|---:|---:|---|"]
+    header = ("| Problem | Status | Elaboration s | Verification s | Overall s | "
+              "Δ previous | Δ median | Δ heartbeats | Overall, window |")
+    lines += ["", header, "|---|---|---:|---:|---:|---:|---:|---:|---|"]
     for name in names:
         changes = latest_changes(points, name)
         result = changes["latest"]
@@ -930,10 +931,11 @@ def local_comparison(base, local):
 
 
 def local_text(base, rows):
-    lines = [f"Local run against CI run {base['run']['id']} ({base['commit'][:10]}, "
-             f"{base['date'][:10]})", "",
-             f"{'problem':<24} {'heartbeats CI':>14} {'local':>10} {'change':>9}"
-             f" {'time share CI':>14} {'local':>7}"]
+    title = (f"Local run against CI run {base['run']['id']} ({base['commit'][:10]}, "
+             f"{base['date'][:10]})")
+    header = (f"{'problem':<24} {'heartbeats CI':>14} {'local':>10} {'change':>9}"
+              f" {'time share CI':>14} {'local':>7}")
+    lines = [title, "", header]
     for name, beats_before, beats_after, share_before, share_after in rows:
         lines.append(f"{name:<24} {millions(beats_before):>14} {millions(beats_after):>10} "
                      f"{percent(change(beats_after, beats_before)):>9} "
