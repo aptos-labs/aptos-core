@@ -1,44 +1,25 @@
+-- Copyright © Aptos Foundation
+
 --# publish --print-bytecode
 
-import Move
+import LeanerMove
 
-namespace LeanerTxnReferences
+leaner module 0x0::LeanerReferences where
+  struct BalanceValue has Copy, Drop, Store where
+    value : u64
 
-open Move
-open scoped Move Move.Compiler
+  struct Balance has Key where
+    balance : BalanceValue
 
-@[move_struct]
-structure BalanceValue where
-  value : U64
-  deriving Copy, Drop, Store
+  fun read_balance(addr : Address) -> u64 := do
+    let value := &Balance[addr].balance.value
+    *value
 
-@[move_struct]
-structure Balance where
-  balance : BalanceValue
-  deriving Key
+  fun add_to_balance(addr : Address, amount : u64) -> Unit := do
+    let value := &mut Balance[addr].balance.value
+    *value := *value + amount
 
-/-! ## Functions -/
-
-@[move_fun]
-def read_balance (addr : Address) : Action U64 := do
-  let value ← &Balance[addr].balance.value
-  (*value)
-
-@[move_fun]
-def add_to_balance (addr : Address) (amount : U64) : Action Unit := do
-  let value ← &mut Balance[addr].balance.value
-  value := *value + amount
-
-@[move_fun]
-def deposit (addr : Address) (amount : U64) : Action Unit := do
-  add_to_balance addr amount
-
-#export_leaner "LeanerReferences" structs [BalanceValue, Balance]
-  functions [read_balance, add_to_balance, deposit]
-
-end LeanerTxnReferences
-
-/-! ## Tests -/
+  fun deposit(addr : Address, amount : u64) -> Unit := add_to_balance(addr, amount)
 
 --# run 0x0::LeanerReferences::deposit --args @0x42 5u64
 

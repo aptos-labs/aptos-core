@@ -53,6 +53,11 @@ initialize recorded : IO.Ref (Array Sample) ← IO.mkRef #[]
 ordinary `verify` pays nothing beyond the flag read. -/
 initialize measuring : IO.Ref Bool ← IO.mkRef false
 
+/-- Whether a sample counts the objects of its proof. The verification
+benchmark turns it off: it compares time and heartbeats, and the count
+walks every proof term. -/
+initialize countingObjects : IO.Ref Bool ← IO.mkRef true
+
 /-- Measure all artifacts produced by one stage. Stages sharing a target
 are accumulated, so moving proof work into generated declarations cannot
 make it disappear from the existing verification-cost gate. -/
@@ -69,9 +74,10 @@ def measureArtifacts [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv
   /- A theorem hands out its proof only to a caller that asks for opaque
   values; the proof term is exactly what this measures. -/
   let mut objects := 0
-  for name in names do
-    if let some value := (← getEnv).find? name |>.bind (·.value? (allowOpaque := true)) then
-      objects := objects + (← (value.numObjs : IO Nat))
+  if ← (countingObjects.get : IO Bool) then
+    for name in names do
+      if let some value := (← getEnv).find? name |>.bind (·.value? (allowOpaque := true)) then
+        objects := objects + (← (value.numObjs : IO Nat))
   let sample : Sample := {
       target
       heartbeats := stopHeartbeats - startHeartbeats
@@ -90,6 +96,116 @@ def measureArtifacts [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv
 def measure [Monad m] [MonadLiftT BaseIO m] [MonadLiftT IO m] [MonadEnv m]
     (target : String) (theoremName : Name) (elaborate : m Unit) : m Unit :=
   measureArtifacts target #[theoremName] elaborate
+
+/-! ## Phases
+
+A verification run reports the wall time it spends in each phase, as the
+Move Prover reports its build, transformation, and solving times. Phases
+nest, and each moment is charged to the innermost phase running, so the
+phases add up to at most the run's total. -/
+
+/-- A phase of a verification run. -/
+inductive Phase where
+  /-- Importing the Lean environment the rendering elaborates in. -/
+  | load
+  /-- From the Move or Rust sources to their validated unit. -/
+  | frontend
+  /-- Rendering the unit as LeanerLang. -/
+  | render
+  /-- Lowering the rendered modules to validated, linked units. -/
+  | lowering
+  /-- The definitions and kernel-checked certificates the proofs use: the
+  unit, its semantics, compiled bodies, and contracts. -/
+  | certification
+  /-- The proofs, automatic and authored. -/
+  | verification
+  deriving BEq, Inhabited
+
+def Phase.all : Array Phase :=
+  #[.load, .frontend, .render, .lowering, .certification, .verification]
+
+def Phase.name : Phase → String
+  | .load => "load"
+  | .frontend => "frontend"
+  | .render => "render"
+  | .lowering => "lowering"
+  | .certification => "certification"
+  | .verification => "verification"
+
+private def Phase.index : Phase → Nat
+  | .load => 0
+  | .frontend => 1
+  | .render => 2
+  | .lowering => 3
+  | .certification => 4
+  | .verification => 5
+
+/-- The nanoseconds and heartbeats charged to each phase, the phases
+running, innermost first, and the clock, heartbeat count, and thread when
+the innermost was last charged. Heartbeats count per thread, and Lean
+elaborates commands on threads of its own, so an interval that ends on
+another thread than it began is charged its time only. -/
+structure PhaseClock where
+  totals : Array Nat := Phase.all.map fun _ => 0
+  heartbeats : Array Nat := Phase.all.map fun _ => 0
+  running : List Phase := []
+  since : Nat := 0
+  sinceHeartbeats : Nat := 0
+  sinceThread : UInt64 := 0
+  deriving Inhabited
+
+initialize phaseClock : IO.Ref PhaseClock ← IO.mkRef {}
+
+/-- Charge the time and heartbeats since the last charge to the innermost
+running phase. -/
+private def PhaseClock.charge (clock : PhaseClock) (now beats : Nat) (thread : UInt64) :
+    PhaseClock :=
+  let clock := match clock.running with
+    | phase :: _ =>
+        let spent := if thread == clock.sinceThread then beats - clock.sinceHeartbeats else 0
+        { clock with
+          totals := clock.totals.modify phase.index (· + (now - clock.since))
+          heartbeats := clock.heartbeats.modify phase.index (· + spent) }
+    | [] => clock
+  { clock with since := now, sinceHeartbeats := beats, sinceThread := thread }
+
+/-- Run `action` in `phase`. -/
+def withPhase [Monad m] [MonadLiftT BaseIO m] [MonadFinally m] (phase : Phase)
+    (action : m α) : m α := do
+  let entered ← (IO.monoNanosNow : BaseIO Nat)
+  let enteredBeats ← (IO.getNumHeartbeats : BaseIO Nat)
+  let enteredThread ← (IO.getTID : BaseIO UInt64)
+  (phaseClock.modify fun clock =>
+    let clock := clock.charge entered enteredBeats enteredThread
+    { clock with running := phase :: clock.running } : BaseIO Unit)
+  try action
+  finally
+    let left ← (IO.monoNanosNow : BaseIO Nat)
+    let leftBeats ← (IO.getNumHeartbeats : BaseIO Nat)
+    let leftThread ← (IO.getTID : BaseIO UInt64)
+    (phaseClock.modify fun clock =>
+      let clock := clock.charge left leftBeats leftThread
+      { clock with running := clock.running.drop 1 } : BaseIO Unit)
+
+/-- The nanoseconds and heartbeats charged to each phase. -/
+def phaseTotals : BaseIO (Array (Phase × Nat × Nat)) := do
+  let clock ← phaseClock.get
+  return Phase.all.map fun phase =>
+    (phase, clock.totals[phase.index]!, clock.heartbeats[phase.index]!)
+
+/-- Seconds, to two decimals. -/
+private def seconds (nanos : Nat) : String :=
+  let centis := (nanos + 5000000) / 10000000
+  let fraction := toString (centis % 100)
+  s!"{centis / 100}.{if fraction.length < 2 then "0" ++ fraction else fraction}s"
+
+/-- The time charged to each phase and a run's `total` nanoseconds, as the
+Move Prover reports its own: `0.81s load, …, 5.30s verification, total
+9.71s`. -/
+def phaseSummary (total : Nat) : BaseIO String := do
+  let clock ← phaseClock.get
+  let phases := Phase.all.map fun phase => s!"{seconds clock.totals[phase.index]!} {phase.name}"
+  return ", ".intercalate (phases.push s!"total {seconds total}").toList
 
 /-- Render the recorded samples as the baseline text: one target per line,
 sorted, carrying only the reproducible numbers. -/

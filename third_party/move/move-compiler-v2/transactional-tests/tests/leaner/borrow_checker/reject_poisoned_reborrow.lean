@@ -1,23 +1,18 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectPoisonedReborrow where
-
+leaner module 0x0::LeanerBorrowRejectPoisonedReborrow where
   struct Box has Copy, Drop, Store where
-    value : U64
+    value : u64
 
-  fun run : Action U64 := do
-    let owner : Box := { value := 0 }
-    let selected ← &mut owner
-    let poisoned ← &mut owner
-    selected := { value := 1 }
-    let child ← &mut poisoned.value
-    let result ← *child
-    pure result
-
-  spec run where
-    ensures True
+  fun run() -> u64 := do
+    let mut owner := new Box { value := 0 }
+    let selected := &mut owner
+    let poisoned := &mut owner
+    *selected := new Box { value := 1 }
+    let child := &mut poisoned.value
+    let result := *child
+    result

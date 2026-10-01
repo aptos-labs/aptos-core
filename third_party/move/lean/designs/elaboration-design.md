@@ -25,10 +25,12 @@ at validate with certificates on `ValidatedUnit`) landed 2026-08-27;
 statements below that place authoritative typing in semantic preparation
 describe the superseded arrangement — `validate` now owns typing and the
 initialization/borrow analyses, and preparation filters capability.
-The verification half of M4–M5 is carried since 2026-09-01 by
-[`certifying-execution.md`](historical/certifying-execution.md) (the frame-free row
-route); this document stays authoritative for the runtime model, the
-big-step semantics, the interpreter, and the correctness obligations.
+The verification half of M4–M5 is carried by
+[`denotation.md`](denotation.md) (since 2026-09-08; the earlier routes are
+in [`historical/`](historical/)); this document stays authoritative for the
+runtime model, the big-step semantics, the interpreter, and the
+correctness obligations. Its migration plan below (M0–M7) is kept for
+rationale; open work is listed in [`roadmap.md`](roadmap.md), section 5.
 
 **Implementation status:** M0 and M1 are implemented. The neutral package has an
 exhaustive core semantic inventory, versioned profile-semantic registries,

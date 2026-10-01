@@ -28,6 +28,7 @@ leaner module 0x42::basic_coin where
     aborts_if !exists<Coin>(addr)
     aborts_if global<Coin>(addr).value < amount with E_INSUFFICIENT
     ensures global<Coin>(addr).value == old(global<Coin>(addr).value) - amount
+    modifies *
 
   -- block comment
   public fun balance_of(addr : Address) -> u64 := Coin[addr].value

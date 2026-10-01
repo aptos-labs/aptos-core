@@ -783,6 +783,12 @@ pub struct ExchangePackage {
     #[clap(long, conflicts_with = "single_file")]
     include_deps: bool,
 
+    /// In package mode, export only these modules (`module`,
+    /// `address::module`, or `alias::module`, comma-separated) and the
+    /// modules verifying them reads, dependencies included
+    #[clap(long, value_delimiter = ',', conflicts_with = "single_file")]
+    modules: Vec<String>,
+
     /// A single masm file to export (instead of a package)
     #[clap(long, value_parser)]
     masm_file: Option<PathBuf>,
@@ -837,6 +843,121 @@ mod exchange_flag_tests {
     }
 }
 
+/// Exports the modules of a package in the given exchange format into
+/// `out_dir`, one JSON file per module; the number exported. With `modules`,
+/// exports those and the modules verifying them reads instead.
+fn export_package(
+    move_options: &MovePackageOptions,
+    out_dir: &Path,
+    format: ExchangeFormat,
+    include_deps: bool,
+    modules: &[String],
+) -> CliTypedResult<usize> {
+    let package_path = move_options.get_package_path()?;
+    let compiler_version = move_options
+        .compiler_version
+        .or_else(|| Some(CompilerVersion::latest_stable()));
+    let language_version = move_options
+        .language_version
+        .or_else(|| Some(LanguageVersion::latest_stable()));
+    // The XIR export needs the full pipeline (it lifts bytecode to
+    // stackless form); the AST export stops after the checker and
+    // rewriters, before AST optimization, so the exported AST keeps
+    // its source shape.
+    let with_bytecode = format == ExchangeFormat::Xir;
+    // The specification rewriter resolves Move functions called in
+    // specifications to their derived spec-function companions; the
+    // full pipeline runs it anyway, the AST export needs it asked for.
+    let experiments = vec![format!("{}=on", Experiment::SPEC_REWRITE)];
+    let model = build_model(
+        move_options.dev,
+        false, // test_mode
+        true,  // verify_mode
+        package_path.as_path(),
+        move_options.named_addresses(),
+        None,
+        fix_bytecode_version(move_options.bytecode_version, language_version),
+        compiler_version,
+        language_version,
+        move_options.skip_attribute_checks,
+        extended_checks::get_all_attribute_names().clone(),
+        experiments,
+        with_bytecode,
+        // A dependency exported with its source goes through the full
+        // pipeline a target gets, so its inlined and rewritten form is what
+        // the export carries.
+        include_deps || !modules.is_empty(),
+    )
+    .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+    model
+        .check_errors("in compilation")
+        .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+    let selection = if modules.is_empty() {
+        None
+    } else {
+        let selected = exchange::select_modules(&model, modules)
+            .map_err(|e| CliError::CommandArgumentError(format!("{:#}", e)))?;
+        Some(exchange::module_closure(&model, &selected))
+    };
+    std::fs::create_dir_all(out_dir).map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
+    let suffix = match format {
+        ExchangeFormat::Xir => ".exchange.json",
+        ExchangeFormat::Ast => ".xast.json",
+    };
+    // Remove the artifacts of previous runs, so that renamed or
+    // removed modules do not leave stale exports behind.
+    for entry in
+        std::fs::read_dir(out_dir).map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
+    {
+        let path = entry
+            .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
+            .path();
+        if path.to_string_lossy().ends_with(suffix) {
+            std::fs::remove_file(&path).map_err(|e| CliError::IO(path.display().to_string(), e))?;
+        }
+    }
+    let mut exported = 0usize;
+    for module in model.get_modules() {
+        // Dependencies are exported on request, and only when their
+        // source is available (a bytecode-only dependency has no AST).
+        let wanted = match &selection {
+            Some(selection) => {
+                selection.contains(&module.get_id()) && !module.get_source_path().is_empty()
+            },
+            None => module.is_target() || include_deps && !module.get_source_path().is_empty(),
+        };
+        if !wanted {
+            continue;
+        }
+        let name = module.get_full_name_str().replace("::", "_");
+        let dumped = match format {
+            ExchangeFormat::Xir => exchange::dump_module_from_model(&model, module.get_id())
+                .map(|m| m.to_pretty_json()),
+            ExchangeFormat::Ast => {
+                exchange::dump_ast_module(&model, module.get_id()).map(|m| m.to_pretty_json())
+            },
+        };
+        match dumped {
+            Ok(text) => {
+                let path = out_dir.join(format!("{}{}", name, suffix));
+                let mut tmp = tempfile::NamedTempFile::new_in(out_dir)
+                    .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
+                tmp.write_all((text + "\n").as_bytes())
+                    .map_err(|e| CliError::IO(path.display().to_string(), e))?;
+                tmp.persist_noclobber(&path)
+                    .map_err(|e| CliError::IO(path.display().to_string(), e.error))?;
+                exported += 1;
+            },
+            Err(e) => eprintln!(
+                "warning: skipping module `{}`: {:#}",
+                module.get_full_name_str(),
+                e
+            ),
+        }
+    }
+    Ok(exported)
+}
+
 #[async_trait]
 impl CliCommand<&'static str> for ExchangePackage {
     fn command_name(&self) -> &'static str {
@@ -849,6 +970,7 @@ impl CliCommand<&'static str> for ExchangePackage {
             export_dir,
             format,
             include_deps,
+            modules,
             masm_file,
             move_file,
             out_file,
@@ -892,98 +1014,10 @@ impl CliCommand<&'static str> for ExchangePackage {
             .await
             .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
         }
-        let compiler_version = move_options
-            .compiler_version
-            .or_else(|| Some(CompilerVersion::latest_stable()));
-        let language_version = move_options
-            .language_version
-            .or_else(|| Some(LanguageVersion::latest_stable()));
         task::spawn_blocking(move || {
             let package_path = move_options.get_package_path()?;
             let out_dir = export_dir.unwrap_or_else(|| package_path.join("exchange-json"));
-            // The XIR export needs the full pipeline (it lifts bytecode to
-            // stackless form); the AST export stops after the checker and
-            // rewriters, before AST optimization, so the exported AST keeps
-            // its source shape.
-            let with_bytecode = format == ExchangeFormat::Xir;
-            // The specification rewriter resolves Move functions called in
-            // specifications to their derived spec-function companions; the
-            // full pipeline runs it anyway, the AST export needs it asked for.
-            let experiments = vec![format!("{}=on", Experiment::SPEC_REWRITE)];
-            let model = build_model(
-                move_options.dev,
-                false, // test_mode
-                true,  // verify_mode
-                package_path.as_path(),
-                move_options.named_addresses(),
-                None,
-                fix_bytecode_version(move_options.bytecode_version, language_version),
-                compiler_version,
-                language_version,
-                move_options.skip_attribute_checks,
-                extended_checks::get_all_attribute_names().clone(),
-                experiments,
-                with_bytecode,
-                false, // all_files_as_targets
-            )
-            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
-            model
-                .check_errors("in compilation")
-                .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
-            std::fs::create_dir_all(&out_dir)
-                .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
-            let suffix = match format {
-                ExchangeFormat::Xir => ".exchange.json",
-                ExchangeFormat::Ast => ".xast.json",
-            };
-            // Remove the artifacts of previous runs, so that renamed or
-            // removed modules do not leave stale exports behind.
-            for entry in std::fs::read_dir(&out_dir)
-                .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
-            {
-                let path = entry
-                    .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?
-                    .path();
-                if path.to_string_lossy().ends_with(suffix) {
-                    std::fs::remove_file(&path)
-                        .map_err(|e| CliError::IO(path.display().to_string(), e))?;
-                }
-            }
-            let mut exported = 0usize;
-            for module in model.get_modules() {
-                // Dependencies are exported on request, and only when their
-                // source is available (a bytecode-only dependency has no AST).
-                let exported_dependency = include_deps && !module.get_source_path().is_empty();
-                if !module.is_target() && !exported_dependency {
-                    continue;
-                }
-                let name = module.get_full_name_str().replace("::", "_");
-                let dumped = match format {
-                    ExchangeFormat::Xir => {
-                        exchange::dump_module_from_model(&model, module.get_id())
-                            .map(|m| m.to_pretty_json())
-                    },
-                    ExchangeFormat::Ast => exchange::dump_ast_module(&model, module.get_id())
-                        .map(|m| m.to_pretty_json()),
-                };
-                match dumped {
-                    Ok(text) => {
-                        let path = out_dir.join(format!("{}{}", name, suffix));
-                        let mut tmp = tempfile::NamedTempFile::new_in(&out_dir)
-                            .map_err(|e| CliError::IO(out_dir.display().to_string(), e))?;
-                        tmp.write_all((text + "\n").as_bytes())
-                            .map_err(|e| CliError::IO(path.display().to_string(), e))?;
-                        tmp.persist_noclobber(&path)
-                            .map_err(|e| CliError::IO(path.display().to_string(), e.error))?;
-                        exported += 1;
-                    },
-                    Err(e) => eprintln!(
-                        "warning: skipping module `{}`: {:#}",
-                        module.get_full_name_str(),
-                        e
-                    ),
-                }
-            }
+            let exported = export_package(&move_options, &out_dir, format, include_deps, &modules)?;
             println!("Exported {} module(s) to {}", exported, out_dir.display());
             Ok("Success")
         })

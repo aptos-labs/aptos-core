@@ -1,0 +1,1 @@
+LeanerE2ETests/SourceVerify/closure_errors.move:6:1: error: unsupported Move declaration `add_one`: in function `closure_errors::add_one`: closures are not supported by XAST (function values are out of scope)

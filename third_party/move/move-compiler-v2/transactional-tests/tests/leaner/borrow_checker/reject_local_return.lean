@@ -1,16 +1,11 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectReturn where
-
-  fun run : Action (&U64) := do
-    let owner : U64 := 7
-    let result ← &owner
-    pure result
-
-  spec run where
-    ensures True
+leaner module 0x0::LeanerBorrowRejectReturn where
+  fun run() -> &u64 := do
+    let owner : u64 := 7
+    let result := &owner
+    result

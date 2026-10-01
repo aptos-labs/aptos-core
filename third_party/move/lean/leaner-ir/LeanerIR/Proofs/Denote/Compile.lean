@@ -2,6 +2,8 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR.Proofs.Denote.Term
+import LeanerIR.Validation.IndexedArena
+import LeanerIR.Validation.InstantiationCertificate
 
 /-!
 # Compilation of validated LIR to typed terms
@@ -21,16 +23,24 @@ namespace LeanerIR.Proofs.Denote
 
 open LeanerIR.Validation LeanerIR.SemanticOperations
 
+/-- A lookup of the type table entry a type identifier names, per namespace. -/
+abbrev TypeLookup := NamespaceId → TypeId → Option Ty
+
+/-- The type tables of a unit, read directly. -/
+def unitTypes (unit : ValidatedUnit) : TypeLookup := fun namespaceId typeId =>
+  (unit.namespaces[namespaceId.index]?).bind (·.tables.types[typeId.index]?)
+
 mutual
 /-- The native type an LIR type denotes.  A shared reference denotes its
 referent: certified exclusivity erases it at run time.  A nominal type
 denotes its declaration's rows, resolved in the declaring namespace; the
 fuel bounds the nesting of declarations. -/
-def ntyOfFuel (unit : ValidatedUnit) : Nat → NamespaceId → TypeId → Option NTy
+def ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
+    Nat → NamespaceId → TypeId → Option NTy
   | 0, _, _ => none
   | fuel + 1, namespaceId, typeId => do
       let ns ← unit.namespaces[namespaceId.index]?
-      let ty ← ns.tables.types[typeId.index]?
+      let ty ← types namespaceId typeId
       match ty with
       | .unit => some .unit
       | .bool => some .bool
@@ -41,17 +51,17 @@ def ntyOfFuel (unit : ValidatedUnit) : Nat → NamespaceId → TypeId → Option
       | .bytes => some .bytes
       | .reference reference =>
           match reference.kind with
-          | .shared => ntyOfFuel unit fuel namespaceId reference.referent
-          | .mutable => .ref <$> ntyOfFuel unit fuel namespaceId reference.referent
+          | .shared => ntyOfFuel types unit fuel namespaceId reference.referent
+          | .mutable => .ref <$> ntyOfFuel types unit fuel namespaceId reference.referent
       | .tuple elements =>
-          (.tuple ∘ NRow.ofList) <$> elements.toList.mapM (ntyOfFuel unit fuel namespaceId)
-      | .vector element none => .vector <$> ntyOfFuel unit fuel namespaceId element
+          (.tuple ∘ NRow.ofList) <$> elements.toList.mapM (ntyOfFuel types unit fuel namespaceId)
+      | .vector element none => .vector <$> ntyOfFuel types unit fuel namespaceId element
       | .nominal name arguments => do
           let handle ← resolveNominal? unit ns name
-          let generic ← structNTyFuel unit fuel handle
+          let generic ← structNTyFuel types unit fuel handle
           if arguments.isEmpty then some generic else
             let θ ← arguments.toList.mapM fun argument => match argument with
-              | .typeArg value => ntyOfFuel unit fuel namespaceId value.typeId
+              | .typeArg value => ntyOfFuel types unit fuel namespaceId value.typeId
               | _ => none
             some (generic.subst (NRow.ofList θ))
       | .typeParameter index => some (.param index)
@@ -59,14 +69,14 @@ def ntyOfFuel (unit : ValidatedUnit) : Nat → NamespaceId → TypeId → Option
 
 /-- The native type of a nominal declaration: its field row, or its named
 variant rows. -/
-def structNTyFuel (unit : ValidatedUnit) : Nat → StructHandle → Option NTy
+def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) : Nat → StructHandle → Option NTy
   | 0, _ => none
   | fuel + 1, handle => do
       let targetNs ← unit.namespaces[handle.namespaceId.index]?
       let declaration ← targetNs.structs[handle.structId]?
       let row := fun (fields : Array FieldDecl) =>
         NRow.ofList <$> fields.toList.mapM fun field =>
-          ntyOfFuel unit fuel handle.namespaceId field.type.typeId
+          ntyOfFuel types unit fuel handle.namespaceId field.type.typeId
       if declaration.variants.isEmpty then .struct handle <$> row declaration.fields
       else
         let names ← declaration.variants.toList.mapM fun variant =>
@@ -82,12 +92,18 @@ type costs a step of its own. -/
 def typeFuel (unit : ValidatedUnit) : Nat :=
   2 * unit.namespaces.foldl (fun total ns => total + ns.tables.types.size) 0 + 2
 
+/-- The fuel that bounds every body in a unit.  A term visits each node at
+most once and each node costs at most three steps of the mutual recursion,
+so three times the expression count suffices. -/
+def unitFuel (unit : ValidatedUnit) : Nat :=
+  3 * unit.namespaces.foldl (fun total ns => total + ns.expressions.size) 0 + 3
+
 def ntyOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
-  ntyOfFuel unit (typeFuel unit) namespaceId typeId
+  ntyOfFuel (unitTypes unit) unit (typeFuel unit) namespaceId typeId
 
 /-- The native type of a nominal declaration. -/
 def structNTy (unit : ValidatedUnit) (handle : StructHandle) : Option NTy :=
-  structNTyFuel unit (typeFuel unit) handle
+  structNTyFuel (unitTypes unit) unit (typeFuel unit) handle
 
 /-- The construct a node uses, for a rejection message. -/
 private def describeKind : ExprKind → String
@@ -126,17 +142,52 @@ private def describeKind : ExprKind → String
   | .quantifier .. => "quantifier"
   | .spec _ => "specification block"
 
+/-- The site naming a loop: its expression paired injectively with its
+namespace, so that the loops of callees from several namespaces inlined
+into one proof keep distinct sites. -/
+def loopSite (namespaceIndex expressionIndex : Nat) : Nat :=
+  (namespaceIndex + expressionIndex) * (namespaceIndex + expressionIndex + 1) / 2 +
+    expressionIndex
+
 /-- The rejection of a construct. -/
 def notCarried (what : String) : Except String α :=
   .error s!"{what} is not carried by the denotation"
 
+/-- A namespace as a compilation reads it. The kernel evaluates a
+compilation and reads a plain array in time linear in the index, so the
+arenas and the type table are viewed as balanced trees, built once per
+compiled function, and each lookup is logarithmic. -/
+structure CompileNamespace where
+  source : ValidatedNamespace
+  namespaceId : NamespaceId
+  expressions : IndexedArena Expr
+  places : IndexedArena Place
+  patterns : IndexedArena Pattern
+  types : IndexedArena Ty
+  /-- The unit's type and expression fuels, counted once. -/
+  typeFuel : Nat
+  fuel : Nat
+
+def CompileNamespace.of (unit : ValidatedUnit) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace) : CompileNamespace :=
+  ⟨ns, namespaceId, .ofArray ns.expressions, .ofArray ns.places, .ofArray ns.patterns,
+    .ofArray ns.tables.types, LeanerIR.Proofs.Denote.typeFuel unit, unitFuel unit⟩
+
+/-- The native type a type identifier denotes, read through the view's type
+table for its own namespace. -/
+def CompileNamespace.nty (ns : CompileNamespace) (unit : ValidatedUnit)
+    (namespaceId : NamespaceId) (typeId : TypeId) : Option NTy :=
+  ntyOfFuel (fun owner typeId => if owner == ns.namespaceId then ns.types.get? typeId.index
+      else unitTypes unit owner typeId)
+    unit ns.typeFuel namespaceId typeId
+
 /-- The native type of a node, `none` for the `never` type of a node that
 transfers control. -/
-private def typeOf? (unit : ValidatedUnit) (ns : ValidatedNamespace) (namespaceId : NamespaceId)
+private def typeOf? (unit : ValidatedUnit) (ns : CompileNamespace) (namespaceId : NamespaceId)
     (typeId : TypeId) : Except String (Option NTy) :=
-  match ns.tables.types[typeId.index]? with
+  match ns.types.get? typeId.index with
   | some .never => .ok none
-  | _ => match ntyOf unit namespaceId typeId with
+  | _ => match ns.nty unit namespaceId typeId with
     | some τ => .ok (some τ)
     | none => notCarried "the type of an expression"
 
@@ -240,11 +291,11 @@ def Proj.append : {τ σ υ : NTy} → Proj τ σ → Proj σ υ → Proj τ υ
   | _, _, _, .variant choices path, rest => .variant choices (path.append rest)
 
 /-- The typed place a place names. -/
-def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : ValidatedNamespace) :
+def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) :
     Nat → PlaceId → Except String (TypedPlace Γ)
   | 0, _ => .error "the compiler ran out of fuel"
   | fuel + 1, placeId => do
-      let some place := ns.places[placeId.index]? | .error "a place is out of range"
+      let some place := ns.places.get? placeId.index | .error "a place is out of range"
       match place with
       | .localVar localId =>
           let some ⟨τ, x⟩ := Var.ofIndex Γ localId.index | .error "a local is out of range"
@@ -258,20 +309,20 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : ValidatedNamespace) :
           let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
           match component, path with
           | .struct source fields, path =>
-              let some handle := resolveStruct? unit ns.identity owner
+              let some handle := resolveStruct? unit ns.source.identity owner
                 | .error "a field place does not resolve"
               unless handle = source do .error "a field place's declaration differs from its type"
-              let some name := sourceFieldName? ns field | .error "a field place has no name"
+              let some name := sourceFieldName? ns.source field | .error "a field place has no name"
               let some index := handleFieldIndex? unit handle none name
                 | .error "a field place names an unknown field"
               let some ⟨σ, position⟩ := Var.ofIndex fields index
                 | .error "a field place is out of range"
               .ok ⟨root, σ, x, path.append (.field position .nil)⟩
           | .enum source names rows _, path =>
-              let some handle := resolveStruct? unit ns.identity owner
+              let some handle := resolveStruct? unit ns.source.identity owner
                 | .error "a variant field place does not resolve"
               unless handle = source do .error "a variant field place's declaration differs from its type"
-              let some name := sourceFieldName? ns field | .error "a variant field place has no name"
+              let some name := sourceFieldName? ns.source field | .error "a variant field place has no name"
               let some choices := variantFieldChoices? unit handle #[name]
                 | .error "a variant field place has no choices"
               let (firstVariant, firstIndex) :: _ := choices.toList
@@ -285,7 +336,7 @@ def compilePlace (unit : ValidatedUnit) (Γ : NRow) (ns : ValidatedNamespace) :
           | _, _ => notCarried "a field place on a non-struct"
       | .index base indexExpr =>
           let ⟨root, component, x, path⟩ ← compilePlace unit Γ ns fuel base
-          let some form := placeIndexForm? ns indexExpr
+          let some form := placeIndexForm? ns.source indexExpr
             | notCarried "an element place with this index form"
           let position ← match form with
             | .literal value =>
@@ -318,14 +369,15 @@ def ResultShape.lendable : ResultShape → Bool
   | .none => true
   | .one τ => τ.lendable
 
-/-- The locals the borrow analysis found holding a function's lexical
-loan's reference. -/
-def loanHolders? (unit : ValidatedUnit) (handle : FunctionHandle) (loan : LoanId) :
-    Option (Array LocalId) := do
-  let certificate ← unit.borrowCertificates.find? fun certificate =>
-    certificate.namespaceId == handle.namespaceId && certificate.functionId == handle.functionId
-  let fact ← certificate.loans[loan.index]?
-  some fact.holders
+/-- The loan facts of a function's borrow certificate, looked up once per
+compiled function: the kernel evaluates the compilation, so a death marker
+reads its loan from these rather than searching every certificate. -/
+def loanFactsOf (unit : ValidatedUnit) (handle : FunctionHandle) : Array CheckedLoanFact :=
+  -- A list search: the kernel searches an array by reading each element
+  -- through the array's list.
+  ((unit.borrowCertificates.toList.find? fun certificate =>
+    certificate.namespaceId == handle.namespaceId &&
+      certificate.functionId == handle.functionId).map (·.loans)).getD #[]
 
 /-- The literal of a constant at its declared type. -/
 def compileLiteral {ρ : ResultShape} {Γ : NRow} (τ : NTy) (literal : ConstValue) :
@@ -333,31 +385,31 @@ def compileLiteral {ρ : ResultShape} {Γ : NRow} (τ : NTy) (literal : ConstVal
   (.lit ·) <$> literalValue τ literal
 
 /-- The local a place names, when it is a bare local. -/
-def placeLocal? (ns : ValidatedNamespace) (place : PlaceId) : Except String LocalId :=
-  match ns.places[place.index]? with
+def placeLocal? (ns : CompileNamespace) (place : PlaceId) : Except String LocalId :=
+  match ns.places.get? place.index with
   | some (.localVar localId) => .ok localId
   | _ => notCarried "a place other than a local"
 
 /-- The local an operand reads a reference from: the local itself, or a
 copy or move of it. -/
-def heldLocal? (ns : ValidatedNamespace) (operand : ExprId) : Option LocalId :=
-  match ns.expressions[operand.index]? with
+def heldLocal? (ns : CompileNamespace) (operand : ExprId) : Option LocalId :=
+  match ns.expressions.get? operand.index with
   | some { kind := .localVar localId, .. } => some localId
   | some { kind := .operation (.move place) _ #[] _, .. }
   | some { kind := .operation (.copy place) _ #[] _, .. } =>
-      match ns.places[place.index]? with
+      match ns.places.get? place.index with
       | some (.localVar localId) => some localId
       | _ => none
   | _ => none
 
 mutual
   /-- The term of one expression. -/
-  def compileExpr (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileExpr (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → ExprId → Except String (Compiled ρ Γ)
     | 0, _ => .error "the compiler ran out of fuel"
     | fuel + 1, id => do
-        let some expression := ns.expressions[id.index]?
+        let some expression := ns.expressions.get? id.index
           | .error "an expression is out of range"
         let τ? ← typeOf? unit ns namespaceId expression.typeId
         match expression.kind with
@@ -380,7 +432,11 @@ mutual
               | .error "a constant's namespace is out of range"
             let some declaration := targetNs.constants[handle.constantId]?
               | .error "a constant is out of range"
-            let value ← compileExpr unit function ρ .nil targetNs handle.namespaceId fuel declaration.value
+            -- A constant of this namespace reads the view already built.
+            let targetView := if handle.namespaceId == namespaceId then ns
+              else CompileNamespace.of unit handle.namespaceId targetNs
+            let value ← compileExpr unit loanFacts ρ .nil targetView handle.namespaceId fuel
+              declaration.value
             let value ← value.at? τ
             .ok (.at τ (.const value))
         | .operation (.call (.function reference)) instantiations arguments _ =>
@@ -391,19 +447,19 @@ mutual
             let some callee := calleeNs.functions[handle.functionId.index]?
               | .error "a callee is out of range"
             let some parameters := callee.signature.parameters.toList.mapM fun parameter =>
-                ntyOf unit handle.namespaceId parameter.typeUse.typeId
+                ns.nty unit handle.namespaceId parameter.typeUse.typeId
               | notCarried "the type of a callee parameter"
             unless parameters.all NTy.lendable do notCarried "a reference inside an aggregate"
             let parameters := NRow.ofList parameters
             let shape ← match callee.signature.results.toList with
               | [] => .ok ResultShape.none
-              | [result] => match ntyOf unit handle.namespaceId result.typeId with
+              | [result] => match ns.nty unit handle.namespaceId result.typeId with
                   | some τ => .ok (ResultShape.one τ)
                   | none => notCarried "the type of a callee result"
               | _ => notCarried "a callee with several results"
             unless shape.lendable do notCarried "a reference inside an aggregate"
             if instantiations.isEmpty then
-              let arguments ← compileArgs unit function ρ Γ ns namespaceId fuel arguments.toList
+              let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 parameters
               let value : Term ρ Γ shape.bodyType := .call handle shape arguments
               match τ? with
@@ -414,14 +470,14 @@ mutual
                   | .typeArg value => some value
                   | _ => none
                 | notCarried "a generic argument that is not a type"
-              let some θ := typeArgs.mapM fun value => ntyOf unit namespaceId value.typeId
+              let some θ := typeArgs.mapM fun value => ns.nty unit namespaceId value.typeId
                 | notCarried "the type of a type argument"
               let θ := NRow.ofList θ
               unless θ.refFree do notCarried "a reference type argument"
               let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
                   some ⟨θ, inhabitable⟩ else none
                 | notCarried "a type argument without values"
-              let arguments ← compileArgs unit function ρ Γ ns namespaceId fuel arguments.toList
+              let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 (NRow.subst θ.1 parameters)
               let value : Term ρ Γ (shape.subst θ.1).bodyType :=
                 .callGeneric handle typeArgs.toArray θ shape arguments
@@ -432,7 +488,7 @@ mutual
             let some τ := τ? | notCarried "a borrow of type never"
             match expression.kind with
             | .operation operation _ arguments _ =>
-                compileOperation unit function ρ Γ ns namespaceId fuel τ operation arguments.toList
+                compileOperation unit loanFacts ρ Γ ns namespaceId fuel τ operation arguments.toList
             | _ => .error "internal: a borrow is not an operation"
         | .operation (.global kind) instantiations arguments _ =>
             let some τ := τ? | notCarried "a storage operation of type never"
@@ -441,22 +497,22 @@ mutual
             let family : Family := ⟨namespaceId, resource.typeId⟩
             match kind, arguments.toList with
             | .contains, [key] => do
-                let ⟨_, key⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel key).some
+                let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 .ok (.at .bool (.globalContains family key))
             | .borrow .immutable, [key] => do
-                let ⟨_, key⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel key).some
+                let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 .ok (.at τ (.globalRead family key))
             | .borrow .mutable, [key] => do
-                let ⟨_, key⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel key).some
+                let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 match τ with
                 | .ref referent => .ok (.at (.ref referent) (.globalBorrow (τ := referent) family key))
                 | _ => .error "a mutable global borrow has a non-reference type"
             | .take, [key] => do
-                let ⟨_, key⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel key).some
+                let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
                 .ok (.at τ (.globalTake family key))
             | .publish, [key, value] => do
-                let ⟨_, key⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel key).some
-                let ⟨_, value⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel value).some
+                let ⟨_, key⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel key).some
+                let ⟨_, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
                 .ok (.at .unit (.globalPublish family key value))
             | _, _ => notCarried "a storage operation of this kind or arity"
         | .operation (.call (.constructor reference variant)) _ arguments _ =>
@@ -466,29 +522,29 @@ mutual
             match τ, variant with
             | .struct source σs, none =>
                 unless handle = source do .error "a constructor's declaration differs from its type"
-                let fields ← compileArgs unit function ρ Γ ns namespaceId fuel arguments.toList σs
+                let fields ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList σs
                 .ok (.at (.struct source σs) (.pack source fields))
             | .enum source names rows distinct, some name =>
                 unless handle = source do .error "a constructor's declaration differs from its type"
                 let some ⟨σs, choice⟩ := Which.ofName names rows name
                   | .error "a constructor names an unknown variant"
-                let fields ← compileArgs unit function ρ Γ ns namespaceId fuel arguments.toList σs
+                let fields ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList σs
                 .ok (.at (.enum source names rows distinct) (.variant source distinct choice fields))
             | _, _ => .error "a constructor's type is not its declaration's"
         | .operation operation _ arguments _ =>
             let some τ := τ? | notCarried "an operation of type never"
-            compileOperation unit function ρ Γ ns namespaceId fuel τ operation arguments.toList
+            compileOperation unit loanFacts ρ Γ ns namespaceId fuel τ operation arguments.toList
         | .block statements result =>
-            compileBlock unit function ρ Γ ns namespaceId fuel statements.toList result
+            compileBlock unit loanFacts ρ Γ ns namespaceId fuel statements.toList result
         | .letDecl _ none body =>
-            compileExpr unit function ρ Γ ns namespaceId fuel body
+            compileExpr unit loanFacts ρ Γ ns namespaceId fuel body
         | .letDecl pattern (some value) body => do
-            let compiledValue ← compileExpr unit function ρ Γ ns namespaceId fuel value
+            let compiledValue ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value
             -- A value that never completes never binds: the body is unreachable.
             if let .never term := compiledValue then return .never term
             let ⟨σ, value⟩ := compiledValue.some
-            let body ← compileExpr unit function ρ Γ ns namespaceId fuel body
-            let some pattern := ns.patterns[pattern.index]? | .error "a pattern is out of range"
+            let body ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel body
+            let some pattern := ns.patterns.get? pattern.index | .error "a pattern is out of range"
             match pattern.kind with
             | .variable localId => do
                 let x ← Var.at? Γ localId.index σ
@@ -508,10 +564,10 @@ mutual
                 | _, _ => .error "a struct pattern binds a non-struct"
             | _ => notCarried "a destructuring let over this pattern"
         | .ifElse condition thenBranch elseBranch => do
-            let condition ← (← compileExpr unit function ρ Γ ns namespaceId fuel condition).at? .bool
-            let thenBranch ← compileExpr unit function ρ Γ ns namespaceId fuel thenBranch
+            let condition ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel condition).at? .bool
+            let thenBranch ← compileExpr unit loanFacts ρ Γ ns namespaceId fuel thenBranch
             let elseBranch ← match elseBranch with
-              | some elseBranch => compileExpr unit function ρ Γ ns namespaceId fuel elseBranch
+              | some elseBranch => compileExpr unit loanFacts ρ Γ ns namespaceId fuel elseBranch
               | none => .ok (.at .unit (.lit ()))
             match τ? with
             | some τ => do
@@ -532,7 +588,7 @@ mutual
             match arguments.toList with
             | [] => .ok (.never fun _ => .throw0 kind)
             | [code] => do
-                let ⟨_, code⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel code).some
+                let ⟨_, code⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel code).some
                 .ok (.never fun _ => .throw1 kind code)
             | _ => notCarried "a throw with several arguments"
         | .return_ values =>
@@ -541,22 +597,22 @@ mutual
                 let value ← Compiled.at? ρ.bodyType (Compiled.at (ρ := ρ) (Γ := Γ) .unit (.lit ()))
                 .ok (.never fun _ => .return_ value)
             | [value] => do
-                let value ← (← compileExpr unit function ρ Γ ns namespaceId fuel value).at? ρ.bodyType
+                let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? ρ.bodyType
                 .ok (.never fun _ => .return_ value)
             | _ => notCarried "a return of several values"
         | .assign place value =>
-            match ns.places[place.index]? with
+            match ns.places.get? place.index with
             | some (.localVar localId) => do
                 let some ⟨σ, x⟩ := Var.ofIndex Γ localId.index | .error "a local is out of range"
-                let value ← (← compileExpr unit function ρ Γ ns namespaceId fuel value).at? σ
+                let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? σ
                 .ok (.at .unit (.assign x value))
             | _ => do
                 let ⟨_, σ, x, path⟩ ← compilePlace unit Γ ns fuel place
-                let value ← (← compileExpr unit function ρ Γ ns namespaceId fuel value).at? σ
+                let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? σ
                 .ok (.at .unit (.writePlace x path value))
         | .loop _ body => do
-            let body ← (← compileExpr unit function ρ Γ ns namespaceId fuel body).at? .unit
-            .ok (.at .unit (.loop id.index body))
+            let body ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel body).at? .unit
+            .ok (.at .unit (.loop (loopSite namespaceId.index id.index) body))
         | .break_ nest none => .ok (.never fun _ => .break_ nest)
         | .continue_ nest => .ok (.never fun _ => .continue_ nest)
         | .spec _ => .ok (.at .unit (.lit ()))
@@ -564,11 +620,11 @@ mutual
 
   /-- A read of a place at its declared type; `consume` moves a mutable
   reference out of its local. -/
-  def compileRead (unit : ValidatedUnit) (Γ : NRow) (ns : ValidatedNamespace) (consume : Bool) :
+  def compileRead (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) (consume : Bool) :
       Nat → NTy → PlaceId → Except String (Compiled ρ Γ)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, τ, place =>
-        match ns.places[place.index]? with
+        match ns.places.get? place.index with
         | some (.localVar localId) => do
             let x ← Var.at? Γ localId.index τ
             match consume, τ with
@@ -580,24 +636,24 @@ mutual
             else .error "a place read has an unexpected type"
 
   /-- An argument row at the expected types. -/
-  def compileArgs (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileArgs (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → List ExprId → (σs : NRow) → Except String (Args ρ Γ σs)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | _ + 1, [], .nil => .ok .nil
     | fuel + 1, argument :: arguments, .cons σ σs => do
-        let head ← (← compileExpr unit function ρ Γ ns namespaceId fuel argument).at? σ
-        let tail ← compileArgs unit function ρ Γ ns namespaceId fuel arguments σs
+        let head ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel argument).at? σ
+        let tail ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments σs
         .ok (.cons head tail)
     | _ + 1, _, _ => .error "an argument row's arity differs from its declaration's"
 
   /-- The slots a row of variable or wildcard patterns binds. -/
-  def compileTargets (Γ : NRow) (ns : ValidatedNamespace) :
+  def compileTargets (Γ : NRow) (ns : CompileNamespace) :
       Nat → List PatternId → (σs : NRow) → Except String (Vars Γ σs)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | _ + 1, [], .nil => .ok .nil
     | fuel + 1, pattern :: patterns, .cons σ σs => do
-        let some pattern := ns.patterns[pattern.index]? | .error "a pattern is out of range"
+        let some pattern := ns.patterns.get? pattern.index | .error "a pattern is out of range"
         let target ← match pattern.kind with
           | .variable localId => some <$> Var.at? Γ localId.index σ
           | .wildcard => .ok none
@@ -607,24 +663,24 @@ mutual
     | _ + 1, _, _ => .error "a pattern's arity differs from its declaration's"
 
   /-- The statements of a block, then its result. -/
-  def compileBlock (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileBlock (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → List ExprId → Option ExprId → Except String (Compiled ρ Γ)
     | 0, _, _ => .error "the compiler ran out of fuel"
     | _ + 1, [], none => .ok (.at .unit (.lit ()))
-    | fuel + 1, [], some result => compileExpr unit function ρ Γ ns namespaceId fuel result
+    | fuel + 1, [], some result => compileExpr unit loanFacts ρ Γ ns namespaceId fuel result
     | fuel + 1, statement :: statements, result => do
-        let ⟨_, statement⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel statement).some
-        let rest ← compileBlock unit function ρ Γ ns namespaceId fuel statements result
+        let ⟨_, statement⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel statement).some
+        let rest ← compileBlock unit loanFacts ρ Γ ns namespaceId fuel statements result
         .ok (rest.map fun _ rest => .drop statement rest)
 
   /-- An operation at its declared result type. -/
-  def compileOperation (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileOperation (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → NTy → Operation → List ExprId → Except String (Compiled ρ Γ)
     | 0, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, τ, .primitive primitive, arguments =>
-        compilePrimitive unit function ρ Γ ns namespaceId fuel τ primitive arguments
+        compilePrimitive unit loanFacts ρ Γ ns namespaceId fuel τ primitive arguments
     | fuel + 1, τ, .copy place, [] => compileRead unit Γ ns false fuel τ place
     | fuel + 1, τ, .move place, [] => compileRead unit Γ ns true fuel τ place
     | fuel + 1, τ, .read place, [] => compileRead unit Γ ns false fuel τ place
@@ -635,15 +691,21 @@ mutual
         else .error "a mutable borrow has an unexpected type"
     | fuel + 1, τ, .reference .dereference, [operand] => do
         -- Reading through a local reference leaves it in place.
-        if let some { kind := .localVar localId, .. } := ns.expressions[operand.index]? then
+        if let some { kind := .localVar localId, .. } := ns.expressions.get? operand.index then
           let x ← Var.at? Γ localId.index (.ref τ)
           return .at τ (.deref (.var x))
-        let ⟨σ, operand⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel operand).some
+        let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
         | .ref referent, operand =>
             if equal : referent = τ then .ok (.at τ (.deref (equal ▸ operand)))
             else .error "a dereference has an unexpected type"
         | _, _ => notCarried "a dereference of a non-reference"
+    | fuel + 1, τ, .reference (.borrow .immutable), [operand] => do
+        -- A shared borrow of a computed value is that value: a shared
+        -- reference denotes its referent, as a shared borrow of a place
+        -- denotes the place's read.
+        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ
+        .ok (.at τ value)
     | _ + 1, τ, .reference (.freeze _), [operand] => do
         -- A freeze is a shared reborrow: the result is the current value,
         -- and the loan's death, not the freeze, resolves its prophecy.
@@ -652,18 +714,18 @@ mutual
         let x ← Var.at? Γ localId.index (.ref τ)
         .ok (.at τ (.deref (.var x)))
     | fuel + 1, .unit, .reference .mutate, [target, value] => do
-        let some { kind := .localVar localId, .. } := ns.expressions[target.index]?
+        let some { kind := .localVar localId, .. } := ns.expressions.get? target.index
           | notCarried "a mutation of a reference that is not a local"
         let some ⟨σ, x⟩ := Var.ofIndex Γ localId.index | .error "a local is out of range"
         match σ, x with
         | .ref referent, x => do
-            let value ← (← compileExpr unit function ρ Γ ns namespaceId fuel value).at? referent
+            let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? referent
             .ok (.at .unit (.mutate x value))
         | _, _ => notCarried "a mutation of a non-reference local"
     | fuel + 1, τ, .reference (.endLoan loans), arguments => do
         let anchor ← match arguments with
           | [] => .ok (Compiled.at (ρ := ρ) (Γ := Γ) .unit (.lit ()))
-          | [anchor] => compileExpr unit function ρ Γ ns namespaceId fuel anchor
+          | [anchor] => compileExpr unit loanFacts ρ Γ ns namespaceId fuel anchor
           | _ => notCarried "a loan death marker with several operands"
         let anchor ← anchor.at? τ
         -- A loan's death resolves the reference wherever it is held; a
@@ -672,7 +734,7 @@ mutual
         -- without references observes the loan through an erased shared
         -- borrow and resolves nothing.
         let deaths ← loans.toList.reverse.mapM fun loan => do
-          let some holders := loanHolders? unit function loan
+          let some holders := (loanFacts[loan.index]?).map (·.holders)
             | .error "a loan death names an unknown loan"
           holders.toList.filterMapM fun holder => do
             let some ⟨σ, x⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
@@ -685,7 +747,7 @@ mutual
         let effect := effects.foldr (fun effect rest => Term.drop effect rest) (.lit ())
         .ok (.at τ (.seqAfter anchor effect))
     | fuel + 1, τ, .data (.select reference field), [operand] => do
-        let ⟨σ, operand⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel operand).some
+        let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
         | .struct _ σs, operand => do
             let some index := referencedFieldIndex? unit namespaceId reference none field
@@ -694,12 +756,12 @@ mutual
             .ok (.at τ (.field x operand))
         | _, _ => notCarried "a field selection on a non-struct"
     | fuel + 1, .bool, .data (.testVariants _ variants), [operand] => do
-        let ⟨σ, operand⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel operand).some
+        let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
         | .enum _ _ _ _, operand => .ok (.at .bool (.isVariant variants.toList operand))
         | _, _ => notCarried "a variant test on a non-enum"
     | fuel + 1, τ, .data (.selectVariants reference fields), [operand] => do
-        let ⟨σ, operand⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel operand).some
+        let ⟨σ, operand⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).some
         match σ, operand with
         | .enum source names rows _, operand => do
             let some handle := resolveStruct? unit namespaceId reference
@@ -713,98 +775,106 @@ mutual
     | _ + 1, _, operation, _ => notCarried (describeKind (.operation operation #[] #[] none))
 
   /-- A pure primitive at its declared result type. -/
-  def compilePrimitive (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compilePrimitive (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → NTy → PrimitiveOperation → List ExprId → Except String (Compiled ρ Γ)
     | 0, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, τ, .copyValue, [operand] => do
-        let operand ← (← compileExpr unit function ρ Γ ns namespaceId fuel operand).at? τ
+        let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ
         .ok (.at τ operand)
     | fuel + 1, τ, .moveValue, [operand] => do
-        let operand ← (← compileExpr unit function ρ Γ ns namespaceId fuel operand).at? τ
+        let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? τ
         .ok (.at τ operand)
     | fuel + 1, .tuple σs, .tuple, elements => do
-        let elements ← compileArgs unit function ρ Γ ns namespaceId fuel elements σs
+        let elements ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel elements σs
         .ok (.at (.tuple σs) (.tuple elements))
     | fuel + 1, τ, .add, [left, right] =>
-        compileModular unit function ρ Γ ns namespaceId fuel τ .add left right
+        compileModular unit loanFacts ρ Γ ns namespaceId fuel τ .add left right
     | fuel + 1, τ, .subtract, [left, right] =>
-        compileModular unit function ρ Γ ns namespaceId fuel τ .subtract left right
+        compileModular unit loanFacts ρ Γ ns namespaceId fuel τ .subtract left right
     | fuel + 1, τ, .multiply, [left, right] =>
-        compileModular unit function ρ Γ ns namespaceId fuel τ .multiply left right
+        compileModular unit loanFacts ρ Γ ns namespaceId fuel τ .multiply left right
     | fuel + 1, τ, .checkedAdd failure, [left, right] =>
-        compileChecked unit function ρ Γ ns namespaceId fuel τ .add failure left right
+        compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .add failure left right
     | fuel + 1, τ, .checkedSubtract failure, [left, right] =>
-        compileChecked unit function ρ Γ ns namespaceId fuel τ .subtract failure left right
+        compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .subtract failure left right
     | fuel + 1, τ, .checkedMultiply failure, [left, right] =>
-        compileChecked unit function ρ Γ ns namespaceId fuel τ .multiply failure left right
+        compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .multiply failure left right
     | fuel + 1, τ, .checkedDivide failure, [left, right] =>
-        compileChecked unit function ρ Γ ns namespaceId fuel τ .divide failure left right
+        compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .divide failure left right
     | fuel + 1, τ, .checkedModulo failure, [left, right] =>
-        compileChecked unit function ρ Γ ns namespaceId fuel τ .modulo failure left right
+        compileChecked unit loanFacts ρ Γ ns namespaceId fuel τ .modulo failure left right
     | fuel + 1, τ, .less, [left, right] =>
-        compileCompare unit function ρ Γ ns namespaceId fuel τ .less left right
+        compileCompare unit loanFacts ρ Γ ns namespaceId fuel τ .less left right
     | fuel + 1, τ, .greater, [left, right] =>
-        compileCompare unit function ρ Γ ns namespaceId fuel τ .greater left right
+        compileCompare unit loanFacts ρ Γ ns namespaceId fuel τ .greater left right
     | fuel + 1, τ, .lessEqual, [left, right] =>
-        compileCompare unit function ρ Γ ns namespaceId fuel τ .lessEqual left right
+        compileCompare unit loanFacts ρ Γ ns namespaceId fuel τ .lessEqual left right
     | fuel + 1, τ, .greaterEqual, [left, right] =>
-        compileCompare unit function ρ Γ ns namespaceId fuel τ .greaterEqual left right
+        compileCompare unit loanFacts ρ Γ ns namespaceId fuel τ .greaterEqual left right
     | fuel + 1, .bool, .equal, [left, right] => do
-        let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         -- `NTy.eqb` is equality only on a ref-free type; at a reference it is
         -- `false` however the executor compares the borrows. Decline rather
         -- than carry an equality the execution does not agree with.
         unless σ.refFree do notCarried "an equality of a value holding a reference"
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? σ
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? σ
         .ok (.at .bool (.equal false left right))
     | fuel + 1, .bool, .notEqual, [left, right] => do
-        let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         unless σ.refFree do notCarried "an inequality of a value holding a reference"
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? σ
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? σ
         .ok (.at .bool (.equal true left right))
     | fuel + 1, .bool, .logicalNot, [operand] => do
-        let operand ← (← compileExpr unit function ρ Γ ns namespaceId fuel operand).at? .bool
+        let operand ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel operand).at? .bool
         .ok (.at .bool (.not operand))
     | fuel + 1, .bool, .logicalAnd, [left, right] => do
-        let left ← (← compileExpr unit function ρ Γ ns namespaceId fuel left).at? .bool
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? .bool
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? .bool
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .bool
         .ok (.at .bool (.logical true left right))
     | fuel + 1, .bool, .logicalOr, [left, right] => do
-        let left ← (← compileExpr unit function ρ Γ ns namespaceId fuel left).at? .bool
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? .bool
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? .bool
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? .bool
         .ok (.at .bool (.logical false left right))
     | fuel + 1, .int width false, .bitwiseAnd, [left, right] => do
-        let left ← (← compileExpr unit function ρ Γ ns namespaceId fuel left).at? (.int width false)
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? (.int width false)
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width false)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width false)
         .ok (.at (.int width false) (.bitwise .and left right))
+    | fuel + 1, .int width false, .bitwiseOr, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width false)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width false)
+        .ok (.at (.int width false) (.bitwise .or left right))
+    | fuel + 1, .int width false, .bitwiseXor, [left, right] => do
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width false)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width false)
+        .ok (.at (.int width false) (.bitwise .xor left right))
     | fuel + 1, τ, .checkedShiftLeft failure, [value, distance] =>
-        compileShift unit function ρ Γ ns namespaceId fuel τ true failure value distance
+        compileShift unit loanFacts ρ Γ ns namespaceId fuel τ true failure value distance
     | fuel + 1, τ, .checkedShiftRight failure, [value, distance] =>
-        compileShift unit function ρ Γ ns namespaceId fuel τ false failure value distance
+        compileShift unit loanFacts ρ Γ ns namespaceId fuel τ false failure value distance
     | fuel + 1, .int width' signed', .checkedCast failure, [value] => do
-        let ⟨σ, value⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel value).some
+        let ⟨σ, value⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).some
         match σ, value with
         | .int _ _, value => .ok (.at (.int width' signed') (.cast failure value))
         | _, _ => notCarried "a cast from a non-integer"
     | fuel + 1, .vector τ, .vector, elements => do
         let count := elements.length
-        let elements ← compileArgs unit function ρ Γ ns namespaceId fuel elements
+        let elements ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel elements
           (NRow.replicate count τ)
         .ok (.at (.vector τ) (.vectorLit count elements))
     | fuel + 1, .address, .signerAddress, [signer] => do
-        let ⟨σ, signer⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel signer).some
+        let ⟨σ, signer⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel signer).some
         match σ, signer with
         | .signer, signer => .ok (.at .address (.signerAddress signer))
         | _, _ => notCarried "a signer's address of a non-signer"
     | fuel + 1, .int 64 false, .length, [vector] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector _, vector => .ok (.at (.int 64 false) (.length vector))
         | _, _ => notCarried "a length of a non-vector"
     | fuel + 1, _, .index, [vector, position] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, position⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel position).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, position⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel position).some
         match σ, vector with
         | .vector τ, vector =>
             match π, position with
@@ -812,8 +882,8 @@ mutual
             | _, _ => notCarried "an element read at a non-integer position"
         | _, _ => notCarried "an element read of a non-vector"
     | fuel + 1, .unit, .checkVectorIndex failure, [vector, position] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, position⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel position).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, position⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel position).some
         match σ, vector with
         | .vector _, vector =>
             match π, position with
@@ -821,26 +891,26 @@ mutual
             | _, _ => notCarried "a bounds check at a non-integer position"
         | _, _ => notCarried "a bounds check of a non-vector"
     | fuel + 1, _, .pushVector, [vector, element] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector τ, vector => do
-            let element ← (← compileExpr unit function ρ Γ ns namespaceId fuel element).at? τ
+            let element ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel element).at? τ
             .ok (.at (.vector τ) (.push vector element))
         | _, _ => notCarried "a push onto a non-vector"
     | fuel + 1, _, .insertVector, [vector, position, element] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, position⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel position).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, position⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel position).some
         match σ, vector with
         | .vector τ, vector =>
             match π, position with
             | .int _ _, position => do
-                let element ← (← compileExpr unit function ρ Γ ns namespaceId fuel element).at? τ
+                let element ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel element).at? τ
                 .ok (.at (.vector τ) (.insert vector position element))
             | _, _ => notCarried "an insertion at a non-integer position"
         | _, _ => notCarried "an insertion into a non-vector"
     | fuel + 1, _, .removeVector, [vector, position] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, position⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel position).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, position⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel position).some
         match σ, vector with
         | .vector τ, vector =>
             match π, position with
@@ -849,133 +919,134 @@ mutual
             | _, _ => notCarried "a removal at a non-integer position"
         | _, _ => notCarried "a removal from a non-vector"
     | fuel + 1, _, .swapVector, [vector, left, right] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         match σ, vector with
         | .vector τ, vector =>
           match π, left with
           | .int width signed, left => do
-              let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at?
+              let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at?
                 (.int width signed)
               .ok (.at (.vector τ) (.swap vector left right))
           | _, _ => notCarried "a swap at non-integer positions"
         | _, _ => notCarried "a swap in a non-vector"
     | fuel + 1, _, .concatVector, [left, right] => do
-        let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         match σ, left with
         | .vector τ, left => do
-            let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? (.vector τ)
+            let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.vector τ)
             .ok (.at (.vector τ) (.concat left right))
         | _, _ => notCarried "a concatenation of non-vectors"
     | fuel + 1, _, .slice, [vector, start, stop] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, start⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel start).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, start⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel start).some
         match σ, vector with
         | .vector τ, vector =>
           match π, start with
           | .int width signed, start => do
-              let stop ← (← compileExpr unit function ρ Γ ns namespaceId fuel stop).at?
+              let stop ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel stop).at?
                 (.int width signed)
               .ok (.at (.vector τ) (.slice vector start stop))
           | _, _ => notCarried "a slice at non-integer positions"
         | _, _ => notCarried "a slice of a non-vector"
     | fuel + 1, _, .reverseSliceVector, [vector, start, stop] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
-        let ⟨π, start⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel start).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
+        let ⟨π, start⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel start).some
         match σ, vector with
         | .vector τ, vector =>
           match π, start with
           | .int width signed, start => do
-              let stop ← (← compileExpr unit function ρ Γ ns namespaceId fuel stop).at?
+              let stop ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel stop).at?
                 (.int width signed)
               .ok (.at (.vector τ) (.reverseSlice vector start stop))
           | _, _ => notCarried "a reversal at non-integer positions"
         | _, _ => notCarried "a reversal of a non-vector"
     | fuel + 1, .unit, .destroyEmptyVector, [vector] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector _, vector => .ok (.at .unit (.destroyEmpty vector))
         | _, _ => notCarried "a destruction of a non-vector"
     | fuel + 1, _, .containsVector, [vector, needle] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector τ, vector => do
             -- Both searches compare elements with `NTy.eqb`, which is `false`
             -- at a reference whatever the executor's value equality reports.
             unless τ.refFree do notCarried "a search for a value holding a reference"
-            let needle ← (← compileExpr unit function ρ Γ ns namespaceId fuel needle).at? τ
+            let needle ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel needle).at? τ
             .ok (.at .bool (.contains vector needle))
         | _, _ => notCarried "a search in a non-vector"
     | fuel + 1, _, .indexOfVector, [vector, needle] => do
-        let ⟨σ, vector⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel vector).some
+        let ⟨σ, vector⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel vector).some
         match σ, vector with
         | .vector τ, vector => do
             unless τ.refFree do notCarried "a search for a value holding a reference"
-            let needle ← (← compileExpr unit function ρ Γ ns namespaceId fuel needle).at? τ
+            let needle ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel needle).at? τ
             .ok (.at (.tuple (.cons .bool (.cons (.int 64 false) .nil))) (.indexOf vector needle))
         | _, _ => notCarried "a search in a non-vector"
     | fuel + 1, .int 8 true, .compare, [left, right] => do
-        let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         -- A reference is carried as its (current, prophecy) pair, so the
         -- denotation would order it by its contents. The executor orders a
         -- borrow by its loan before its contents, which the pair does not
         -- record, so the order of a value holding one is not carried.
         unless σ.refFree do notCarried "a structural order of a value holding a reference"
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? σ
-        .ok (.at (.int 8 true) (.order ns.variantOrders left right))
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? σ
+        .ok (.at (.int 8 true) (.order ns.source.variantOrders left right))
     | _ + 1, _, primitive, _ => notCarried s!"primitive {repr primitive} at this type or arity"
 
-  def compileChecked (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileChecked (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → NTy → CheckedOp → ThrowKind → ExprId → ExprId → Except String (Compiled ρ Γ)
     | 0, _, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .int width signed, op, failure, left, right => do
-        let left ← (← compileExpr unit function ρ Γ ns namespaceId fuel left).at? (.int width signed)
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? (.int width signed)
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
         .ok (.at (.int width signed) (.checked op failure left right))
     | _ + 1, _, _, _, _, _ => notCarried "checked arithmetic at a non-integer type"
 
-  def compileModular (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileModular (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → NTy → ModularOp → ExprId → ExprId → Except String (Compiled ρ Γ)
     | 0, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .int width signed, op, left, right => do
-        let left ← (← compileExpr unit function ρ Γ ns namespaceId fuel left).at? (.int width signed)
-        let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? (.int width signed)
+        let left ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).at? (.int width signed)
+        let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
         .ok (.at (.int width signed) (.modular op left right))
     | _ + 1, _, _, _, _ => notCarried "modular arithmetic at a non-integer type"
 
-  def compileCompare (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileCompare (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → NTy → CompareOp → ExprId → ExprId → Except String (Compiled ρ Γ)
     | 0, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .bool, op, left, right => do
-        let ⟨σ, left⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel left).some
+        let ⟨σ, left⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel left).some
         match σ, left with
         | .int width signed, left => do
-            let right ← (← compileExpr unit function ρ Γ ns namespaceId fuel right).at? (.int width signed)
+            let right ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel right).at? (.int width signed)
             .ok (.at .bool (.compare op left right))
         | _, _ => notCarried "a comparison of non-integers"
     | _ + 1, _, _, _, _ => notCarried "a comparison at a non-Boolean type"
 
-  def compileShift (unit : ValidatedUnit) (function : FunctionHandle)
-      (ρ : ResultShape) (Γ : NRow) (ns : ValidatedNamespace) (namespaceId : NamespaceId) :
+  def compileShift (unit : ValidatedUnit) (loanFacts : Array CheckedLoanFact)
+      (ρ : ResultShape) (Γ : NRow) (ns : CompileNamespace) (namespaceId : NamespaceId) :
       Nat → NTy → Bool → ThrowKind → ExprId → ExprId → Except String (Compiled ρ Γ)
     | 0, _, _, _, _, _ => .error "the compiler ran out of fuel"
     | fuel + 1, .int width false, left, failure, value, distance => do
-        let value ← (← compileExpr unit function ρ Γ ns namespaceId fuel value).at? (.int width false)
-        let ⟨σ, distance⟩ := (← compileExpr unit function ρ Γ ns namespaceId fuel distance).some
+        let value ← (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel value).at? (.int width false)
+        let ⟨σ, distance⟩ := (← compileExpr unit loanFacts ρ Γ ns namespaceId fuel distance).some
         match σ, distance with
         | .int _ false, distance => .ok (.at (.int width false) (.shift left failure value distance))
         | _, _ => notCarried "a shift by a signed or non-integer distance"
     | _ + 1, _, _, _, _, _ => notCarried "a shift of a signed integer"
 end
 
-/-- The fuel that bounds every body in a unit.  A term visits each node at
-most once and each node costs at most three steps of the mutual recursion,
-so three times the expression count suffices. -/
-def unitFuel (unit : ValidatedUnit) : Nat :=
-  3 * unit.namespaces.foldl (fun total ns => total + ns.expressions.size) 0 + 3
+
+/-- The compilation view of a namespace. A certificate states it once per
+namespace, so a function's certificate does not rebuild its arenas. -/
+def compileNamespaceAt? (unit : ValidatedUnit) (namespaceId : NamespaceId) :
+    Option CompileNamespace :=
+  (unit.namespaces[namespaceId.index]?).map (CompileNamespace.of unit namespaceId)
 
 /-- The mutable-reference slots among the first `count` slots from `index`. -/
 def mutableSlots (Γ : NRow) : Nat → Nat → Except String (Mutables Γ)
@@ -995,14 +1066,16 @@ def logicalOnly (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : Typ
   | some (.resourceDomain ..) | some .stateDomain => true
   | _ => false
 
-/-- The compiled function a handle names, or the construct that stops it. -/
-def compileFunction (unit : ValidatedUnit) (handle : FunctionHandle) : Except String Function := do
-  let some ns := unit.namespaces[handle.namespaceId.index]? | .error "a namespace is out of range"
-  let some declaration := ns.functions[handle.functionId.index]? | .error "a function is out of range"
+/-- The compiled function a handle names in its namespace's view, or the
+construct that stops it. -/
+def compileFunctionIn (unit : ValidatedUnit) (view : CompileNamespace) (handle : FunctionHandle) :
+    Except String Function := do
+  let some declaration := view.source.functions[handle.functionId.index]?
+    | .error "a function is out of range"
   let .structured root := declaration.body | notCarried "a function without a body"
   -- A specification local (a quantifier's binder) keeps an empty slot.
   let some allLocals := declaration.locals.toList.mapM fun localDecl =>
-      match ntyOf unit handle.namespaceId localDecl.type.typeId with
+      match view.nty unit handle.namespaceId localDecl.type.typeId with
       | some τ => some τ
       | none => if logicalOnly unit handle.namespaceId localDecl.type.typeId then some .unit else none
     | notCarried "the type of a local"
@@ -1011,21 +1084,89 @@ def compileFunction (unit : ValidatedUnit) (handle : FunctionHandle) : Except St
   let params := NRow.ofList (allLocals.take paramCount)
   let locals := NRow.ofList (allLocals.drop paramCount)
   let some paramTypes := declaration.signature.parameters.toList.mapM fun parameter =>
-      ntyOf unit handle.namespaceId parameter.typeUse.typeId
+      view.nty unit handle.namespaceId parameter.typeUse.typeId
     | notCarried "the type of a parameter"
   if NRow.ofList paramTypes != params then
     .error "parameter types differ from the leading locals" else
   let result ← match declaration.signature.results.toList with
     | [] => .ok ResultShape.none
-    | [result] => match ntyOf unit handle.namespaceId result.typeId with
+    | [result] => match view.nty unit handle.namespaceId result.typeId with
         | some τ => .ok (ResultShape.one τ)
         | none => notCarried "the type of the result"
     | _ => notCarried "several results"
   unless paramTypes.all NTy.lendable && result.lendable do
     notCarried "a reference inside an aggregate"
-  let body ← compileExpr unit handle result (params ++ locals) ns handle.namespaceId (unitFuel unit) root
+  let body ← compileExpr unit (loanFactsOf unit handle) result (params ++ locals)
+    view handle.namespaceId
+    view.fuel root
   let body ← body.at? result.bodyType
   let mutables ← mutableSlots (params ++ locals) 0 paramCount
   .ok { params, locals, result, body, mutables }
+
+/-- The compiled function a handle names, or the construct that stops it. -/
+def compileFunction (unit : ValidatedUnit) (handle : FunctionHandle) : Except String Function :=
+  match compileNamespaceAt? unit handle.namespaceId with
+  | none => .error "a namespace is out of range"
+  | some view => compileFunctionIn unit view handle
+
+theorem compileFunction_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
+    {view : CompileNamespace} (viewed : compileNamespaceAt? unit handle.namespaceId = some view) :
+    compileFunction unit handle = compileFunctionIn unit view handle := by
+  simp [compileFunction, viewed]
+
+/-- `frameInstantiation` read through a namespace's view: its types indexed,
+iterated as the list they are. -/
+def frameInstantiationIn (view : CompileNamespace) (outer : Array (TypeId × TypeId))
+    (typeArgs : Array TypeUse) : Array (TypeId × TypeId) :=
+  if typeArgs.isEmpty then #[] else
+    LeanerIR.SemanticOperations.invocationTypeInstantiationIn view.source view.types
+      view.source.tables.types.toList outer (typeArgs.map .typeArg)
+
+theorem frameInstantiation_of_view {unit : ValidatedUnit} {handle : FunctionHandle}
+    {view : CompileNamespace} (viewed : compileNamespaceAt? unit handle.namespaceId = some view)
+    (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) :
+    frameInstantiation unit handle outer typeArgs = frameInstantiationIn view outer typeArgs := by
+  simp only [compileNamespaceAt?, Option.map_eq_some_iff] at viewed
+  obtain ⟨ns, found, rfl⟩ := viewed
+  simp only [frameInstantiation, LeanerIR.SemanticOperations.callTypeInstantiation,
+    frameInstantiationIn, CompileNamespace.of, found, Array.map_eq_empty_iff, Array.isEmpty_iff,
+    LeanerIR.SemanticOperations.invocationTypeInstantiationIn_eq]
+
+/-- A view's types are its source's, indexed. -/
+theorem types_of_view {unit : ValidatedUnit} {namespaceId : NamespaceId} {view : CompileNamespace}
+    (viewed : compileNamespaceAt? unit namespaceId = some view) :
+    view.types = .ofArray view.source.tables.types := by
+  simp only [compileNamespaceAt?, Option.map_eq_some_iff] at viewed
+  obtain ⟨ns, _, rfl⟩ := viewed
+  rfl
+
+/-- The frame instantiation of a generic call, from a checked certificate: the
+callee namespace's types as a literal table, its lifetimes' kinds indexed,
+its key map, and the witnesses of this instantiation, all verified by the
+kernel by evaluation, never by search. -/
+theorem frameInstantiationIn_eq_of_check {view : CompileNamespace} {table : Array Ty}
+    {kinds : Validation.IndexedArena LifetimeKind}
+    {map : Validation.KeyMap} {witnesses : Array Validation.Witness}
+    {tree : Validation.IndexedArena Validation.Witness}
+    (typeArgs : Array TypeUse) (nonempty : typeArgs.isEmpty = false)
+    (viewTypes : view.types = .ofArray view.source.tables.types)
+    (tableEq : view.source.tables.types = table)
+    (kindsEq : Validation.IndexedArena.ofArray (Validation.lifetimeKinds view.source) = kinds)
+    (correct : Validation.Correct view.types table.size map)
+    (treeEq : Validation.IndexedArena.ofArray witnesses = tree)
+    (checked : Validation.checkAll kinds view.types map
+      (LeanerIR.SemanticOperations.instantiateGenericArguments #[] (typeArgs.map .typeArg))
+      tree table.size = true)
+    (sizes : witnesses.size = table.size)
+    (depths : witnesses.toList.all (fun witness => decide (witness.depth ≤ table.size)) = true) :
+    frameInstantiationIn view #[] typeArgs = Validation.foldWitnesses tree table.size := by
+  unfold frameInstantiationIn
+  rw [nonempty, viewTypes, LeanerIR.SemanticOperations.invocationTypeInstantiationIn_eq]
+  simp only [Bool.false_eq_true, ↓reduceIte]
+  rw [viewTypes, ← kindsEq] at checked
+  rw [viewTypes] at correct
+  rw [← tableEq] at checked correct sizes depths ⊢
+  rw [← sizes] at checked
+  exact Validation.invocationTypeInstantiation_eq_of_check #[] _ treeEq correct checked sizes depths
 
 end LeanerIR.Proofs.Denote

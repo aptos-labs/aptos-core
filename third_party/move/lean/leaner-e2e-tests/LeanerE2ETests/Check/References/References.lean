@@ -128,7 +128,7 @@ example :
     «0x42».verification_references.unit.borrowCertificates[11]!
       |>.loans[0]!.deaths.isEmpty = false := by decide
 example :
-    «0x42».verification_references.unit.borrowDiagnostics.isEmpty = true := by
+    «0x42».verification_references.unit.borrowRejections.isEmpty = true := by
   decide
 
 -- Run the functions on concrete inputs in the interpreter and compare the
@@ -163,7 +163,7 @@ leaner module 0x43::verification_references_negative where
 /--
 error: the specification clause `ensures result == old(slot) && slot == result + 1` is not established
 ---
-error: leaner verification failed
+error: leaner verification failed: the automatic verification of `reborrow_bad` failed; provide a proof: `verify reborrow_bad by …` in the module (`verify reborrow_bad by skip` shows the obligations it leaves)
 -/
 #guard_msgs in
 verify 0x43::verification_references_negative::reborrow_bad

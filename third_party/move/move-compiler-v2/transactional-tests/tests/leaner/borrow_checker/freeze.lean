@@ -1,21 +1,16 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowFreeze where
-
-  fun run : Action U64 := do
-    let owner : U64 := 3
-    let writer ← &mut owner
-    writer := 8
-    let observation ← freeze writer
-    let result ← *observation
-    pure result
-
-  spec run where
-    ensures True
+leaner module 0x0::LeanerBorrowFreeze where
+  fun run() -> u64 := do
+    let mut owner : u64 := 3
+    let writer := &mut owner
+    *writer := 8
+    let observation : &u64 := writer
+    let result := *observation
+    result
 
 --# run 0x0::LeanerBorrowFreeze::run

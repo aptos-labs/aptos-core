@@ -89,6 +89,12 @@ theorem SpecVector.ext {a b : SpecVector α} (h : a.values = b.values) : a = b :
 
 instance : Inhabited (SpecVector α) := ⟨⟨#[], by change 0 < 2 ^ 64; decide⟩⟩
 
+/-- Vectors are equal exactly when their values are: the form a goal about
+vectors is decided in. -/
+theorem SpecVector.eq_iff_values (left right : SpecVector α) :
+    left = right ↔ left.values = right.values :=
+  ⟨fun h => h ▸ rfl, SpecVector.ext⟩
+
 /-- The vector of the images of the elements: a vector of twins viewed
 natively element by element. -/
 def SpecVector.map (f : α → β) (vector : SpecVector α) : SpecVector β :=

@@ -1,47 +1,31 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowReturns where
-
+leaner module 0x0::LeanerBorrowReturns where
   struct Pair has Copy, Drop, Store where
-    left : U64
-    right : U64
+    left : u64
+    right : u64
 
-  fun identity (input : &U64) : Action (&U64) := do
-    pure input
+  fun identity(input : &u64) -> &u64 := input
 
-  spec identity (_input : U64) where
-    ensures True
+  fun borrow_left(input : &Pair) -> &u64 := &input.left
 
-  fun borrow_left (input : &Pair) : Action (&U64) := do
-    &input.left
+  fun direct() -> u64 := do
+    let owner : u64 := 13
+    let observation := &owner
+    let returned := identity(observation)
+    let result := *returned
+    result
 
-  spec borrow_left (_input : Pair) where
-    ensures True
-
-  fun direct : Action U64 := do
-    let owner : U64 := 13
-    let observation ← &owner
-    let returned ← identity observation
-    let result ← *returned
-    pure result
-
-  spec direct where
-    ensures True
-
-  fun nested : Action U64 := do
-    let owner : Pair := { left := 17, right := 19 }
-    let observation ← &owner
-    let returned ← borrow_left observation
-    let result ← *returned
-    pure result
-
-  spec nested where
-    ensures True
+  fun nested() -> u64 := do
+    let owner := new Pair { left := 17, right := 19 }
+    let observation := &owner
+    let returned := borrow_left(observation)
+    let result := *returned
+    result
 
 --# run 0x0::LeanerBorrowReturns::direct
 

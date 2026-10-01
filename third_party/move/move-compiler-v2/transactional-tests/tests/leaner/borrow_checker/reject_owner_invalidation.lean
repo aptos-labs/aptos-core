@@ -1,18 +1,13 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectOwner where
-
-  fun run : Action U64 := do
-    let mut owner : U64 := 0
-    let observation ← &owner
+leaner module 0x0::LeanerBorrowRejectOwner where
+  fun run() -> u64 := do
+    let mut owner : u64 := 0
+    let observation := &owner
     owner := 1
-    let result ← *observation
-    pure result
-
-  spec run where
-    ensures True
+    let result := *observation
+    result

@@ -31,7 +31,6 @@ spec aptos_std::comparator {
     spec fun spec_compare_u8_vector(left: vector<u8>, right: vector<u8>): Result;
 
     spec compare_u8_vector(left: vector<u8>, right: vector<u8>): Result {
-        pragma unroll = 5;
         pragma opaque;
         aborts_if false;
 

@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/intrinsic_errors.move:13:9: error: the specification clause `ensures result == 2` is not established
+LeanerE2ETests/SourceVerify/intrinsic_errors.move:11:5: error: leaner verification failed: the automatic verification of `one` failed; provide a proof: `verify one by …` in `LeanerE2ETests/SourceVerify/intrinsic_errors.proof.lean` (`verify one by skip` shows the obligations it leaves)

@@ -111,20 +111,28 @@ theorem satisfies_summary (contract : Contract σ ε Args Result) :
 
 /-- Range-carrying wrapper on one generated proof obligation: the
 proposition of an authored specification clause, tagged with the half-open
-byte range of that clause in its source file.  Contract generation wraps
+byte range of that clause in the file it names.  Contract generation wraps
 each clause it emits; the verification script keeps the wrapper folded
 through symbolic execution and unfolds it only inside the closing attempt,
 so an obligation that survives the automatic finish still names the clause
 it came from for error reporting. -/
-def Obligation (startByte endByte : Nat) (p : Prop) : Prop := p
+def Obligation (file : String) (startByte endByte : Nat) (p : Prop) : Prop := p
 
-theorem Obligation.intro {startByte endByte : Nat} {p : Prop} (h : p) :
-    Obligation startByte endByte p := h
+theorem Obligation.intro {file : String} {startByte endByte : Nat} {p : Prop} (h : p) :
+    Obligation file startByte endByte p := h
 
 /-- The only way symbolic execution unfolds an obligation marker: the
 closing attempt rewrites with this once the goal is down to arithmetic. -/
-theorem Obligation_iff {startByte endByte : Nat} {p : Prop} :
-    Obligation startByte endByte p ↔ p := .rfl
+theorem Obligation_iff {file : String} {startByte endByte : Nat} {p : Prop} :
+    Obligation file startByte endByte p ↔ p := .rfl
+
+/-- The authored source range an `Obligation` names: a file and a half-open
+byte range in it. -/
+structure ObligationRange where
+  file : String := ""
+  startByte : Nat := 0
+  endByte : Nat := 0
+  deriving BEq, Inhabited, Repr
 
 /- Sealed so ordinary reduction cannot strip the range off an obligation;
 `Obligation_iff` above is the deliberate exit. -/
@@ -290,6 +298,19 @@ theorem satisfies_bottom (contract : Contract σ ε Args Result) :
     Satisfies (fun _ => Spec.bottom) contract := by
   intro args initial _
   simp [Spec.bottom]
+
+/-- The contract no caller can invoke: it requires `False`. A fixed point
+states it at the slots a proof does not cover. -/
+def Contract.vacuous : Contract σ ε Args Result where
+  requires := fun _ _ => False
+  ensures := fun _ _ _ _ => True
+  aborts := fun _ _ _ => True
+  mayAbort := fun _ _ => False
+
+theorem satisfies_vacuous (function : Args → Spec σ ε Result) :
+    Satisfies function Contract.vacuous := by
+  intro _ _ impossible
+  exact impossible.elim
 
 /-- Fixed-point induction for recursive functions.  The premise is exactly
 the proof rule users expect: assuming recursive calls satisfy the contract,

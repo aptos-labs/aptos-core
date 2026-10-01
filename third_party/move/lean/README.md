@@ -35,20 +35,29 @@ Three claims stay separate:
    bytecode.
 3. A compiler-correctness theorem connecting the two is future work.
 
+A Move file, or a Rust file with its specifications in a LeanerLang file
+beside it, is verified by rendering it as LeanerLang, with every message
+reported at its position in the original files
+([`designs/source-verification.md`](designs/source-verification.md)):
+
+```bash
+leaner-move verify vault.move
+leaner-rust verify bounds.rs      # specifications in bounds.spec.lean
+```
+
 ## Packages
 
 | Package | Purpose |
 |---|---|
 | [`leaner-ir`](leaner-ir/) | The shared typed LIR: RawUnit JSON import, validation, semantics, interpreter, proofs, the denotation-based verifier, and LeanerLang. |
-| [`leaner-move`](leaner-move/) | The Move semantic profile and intrinsic registry, plus the Move exchange frontend (`LeanerMove/Frontend`). |
+| [`leaner-move`](leaner-move/) | The Move semantic profile and intrinsic registry, the Move exchange frontend (`LeanerMove/Frontend`), and the XIR backend (`LeanerMove/Xir`) through which compiler-v2 compiles `.lean` sources to Move bytecode. |
 | [`leaner-rust`](leaner-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](leaner-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. |
-| [`leaner-e2e-tests`](leaner-e2e-tests/) | Move-to-LeanerLang and Rust-to-LeanerLang baselines and the verification check ledger ([`designs/test-organization.md`](designs/test-organization.md)). |
+| [`leaner-e2e-tests`](leaner-e2e-tests/) | Move-to-LeanerLang and Rust-to-LeanerLang baselines, verification of Move and Rust sources, and the verification check fixtures (ledger in [`designs/roadmap.md`](designs/roadmap.md#tests)). |
 
 [`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
-and `transpiler`; no leaner package links them, and only compiler-v2's Lean
-integration still builds against `v0/move`. Designs live in [`designs/`](designs/), with
+and `transpiler`; nothing links them. Designs live in [`designs/`](designs/), with
 executed or superseded ones under [`designs/historical/`](designs/historical/);
-[`designs/roadmap.md`](designs/roadmap.md) orders the work.
+[`designs/roadmap.md`](designs/roadmap.md) holds the status: what is open and the test ledger.
 
 ## Build and test
 
@@ -74,3 +83,47 @@ standalone Move exchange CLI itself (`cargo build --locked --profile ci -p
 aptos-move-cli --features binary --bin move`); see [`CLAUDE.md`](CLAUDE.md)
 for the `APTOS_MOVE_CLI` and `APTOS_CLI` contracts and the rest of the
 working rules.
+
+## Verifying sources
+
+The verifiers read Move through the standalone Move CLI, which
+`APTOS_MOVE_CLI` names (see [Build and test](#build-and-test)). Each run
+reports messages at their positions in the source files and ends with the
+wall time per phase:
+
+```bash
+cd leaner-move
+lake exe leaner-move verify <file.move | package>        # every specified function
+lake exe leaner-move verify <package> --filter vector    # modules whose file names contain it
+lake exe leaner-move verify <file.move> --heartbeats 400 # default budget, thousands
+cd ../leaner-rust
+lake exe leaner-rust verify <file.rs>                    # specifications in <file>.spec.lean
+```
+
+From the Move CLI, a package is verified in place:
+
+```bash
+move prove --lean --package-dir <package>                # or: aptos move prove --lean
+```
+
+A function the automatic verification leaves open is proved in a proof
+file beside its Move file; the failure message names the file, and
+`verify f by skip` shows the obligations left:
+
+```move
+spec square_of_sum {
+    pragma verify = manual;     // proved in proofs.proof.lean
+    pragma heartbeats = 400;    // this function's budget, thousands
+    ensures result == a * a + 2 * a * b + b * b;
+}
+```
+
+```lean
+-- proofs.proof.lean, beside proofs.move
+verify square_of_sum by
+  case leaf_1 => …
+  case leaf_2 => …
+```
+
+The Move Prover reads `verify = manual` as true and ignores `heartbeats`.
+Details: [`designs/source-verification.md`](designs/source-verification.md).

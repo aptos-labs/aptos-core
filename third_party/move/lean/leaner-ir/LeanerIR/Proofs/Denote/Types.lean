@@ -122,6 +122,11 @@ class Skolems where
   inhabited : (index : Nat) → Inhabited (carrier index)
   tight : ∀ index, (codec index).Tight
   plain : ∀ index value, LeanerIR.SemanticOperations.Plain ((codec index).encode value)
+  /-- The native type parameter `index` stands for at this family: the
+  parameter itself at an abstract family, the type argument at an
+  instantiated one. It names the type arguments of an opaque specification
+  function, which nothing else identifies. -/
+  type : Nat → NTy
 
 instance [Θ : Skolems] (index : Nat) : Inhabited (Skolems.carrier index) := Θ.inhabited index
 
@@ -134,6 +139,7 @@ instance [Θ : Skolems] (index : Nat) : Inhabited (Skolems.carrier index) := Θ.
   tight := fun _ raw value decoded => by
     cases raw <;> simp [Codec.unit, decodeUnit?] at decoded ⊢
   plain := fun _ _ => .unit
+  type := fun index => .param index
 
 open Classical in
 /-- The family of the public theorem: every type parameter carried as a
@@ -150,6 +156,7 @@ loan-free runtime value. -/
     subst decoded
     rfl
   plain := fun _ value => value.property
+  type := fun index => .param index
 
 section Carriers
 variable [Skolems]
@@ -752,8 +759,11 @@ inductive ResultShape where
   | .none => Unit
   | .one τ => τ.carrier
 
-/-- The type the body of a function must produce. -/
-def ResultShape.bodyType : ResultShape → NTy
+/-- The type the body of a function must produce. Reducible, as
+`ResultShape.carrier` is: a callee's result type reaches instance arguments
+(a lookup's `GetElem?` instance), which simp matches at instance
+transparency only. -/
+@[reducible] def ResultShape.bodyType : ResultShape → NTy
   | .none => .unit
   | .one τ => τ
 
@@ -892,6 +902,105 @@ private theorem findIndex?_eq_none_from {α : Type} (eq : α → α → Bool) (e
         · intro all i h low
           exact all i h (by omega)
 
+/-- A lookup below the size of a pushed array reads the array before the
+push, as a lookup. -/
+theorem getElem?_push_of_lt {α : Type} (xs : Array α) (a : α) (i : Nat) (h : i < xs.size) :
+    (xs.push a)[i]? = xs[i]? := by
+  rw [Array.getElem?_push, if_neg (Nat.ne_of_lt h)]
+
+private theorem findIndex?_eq_some_from {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    ∀ (count index i : Nat), index + count = elements.size →
+      (findIndex? eq elements needle count index = some i ↔
+        index ≤ i ∧ i < elements.size ∧ (∃ x, elements[i]? = some x ∧ eq x needle = true) ∧
+          ∀ j, index ≤ j → j < i → ∀ x, elements[j]? = some x → eq x needle = false) := by
+  intro count
+  induction count with
+  | zero =>
+      intro index i sum
+      simp only [findIndex?, reduceCtorEq, false_iff]
+      rintro ⟨low, high, -, -⟩
+      omega
+  | succ n ih =>
+      intro index i sum
+      have inBounds : index < elements.size := by omega
+      simp only [findIndex?, Array.getElem?_eq_getElem inBounds, Option.any_some]
+      split
+      · rename_i hit
+        simp only [Option.some.injEq]
+        constructor
+        · rintro rfl
+          exact ⟨Nat.le_refl _, inBounds, ⟨elements[index], Array.getElem?_eq_getElem inBounds, hit⟩,
+            fun _ lo hi _ _ => absurd hi (Nat.not_lt.mpr lo)⟩
+        · rintro ⟨low, high, -, first⟩
+          refine Classical.byContradiction fun ne => ?_
+          have := first index (Nat.le_refl _) (by omega) elements[index]
+            (Array.getElem?_eq_getElem inBounds)
+          rw [hit] at this
+          exact absurd this (by decide)
+      · rename_i miss
+        rw [ih (index + 1) i (by omega)]
+        constructor
+        · rintro ⟨low, high, found, first⟩
+          refine ⟨by omega, high, found, fun j lo hi x hx => ?_⟩
+          by_cases same : j = index
+          · subst same
+            rw [Array.getElem?_eq_getElem inBounds, Option.some.injEq] at hx
+            subst hx
+            simpa using miss
+          · exact first j (by omega) hi x hx
+        · rintro ⟨low, high, found, first⟩
+          refine ⟨?_, high, found, fun j lo hi x hx => first j (by omega) hi x hx⟩
+          refine Classical.byContradiction fun lt => ?_
+          have same : i = index := by omega
+          subst same
+          obtain ⟨x, hx, hit⟩ := found
+          rw [Array.getElem?_eq_getElem inBounds, Option.some.injEq] at hx
+          subst hx
+          exact miss hit
+
+/-- A search over the whole vector finds a position exactly when the
+element there is accepted and none before it is, positions before it
+stated as a specification's range quantifier states them. -/
+theorem findIndex?_eq_some_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α)
+    (i : Nat) :
+    findIndex? eq elements needle elements.size 0 = some i ↔
+      i < elements.size ∧ (∃ x, elements[i]? = some x ∧ eq x needle = true) ∧
+        ∀ j : Int, 0 ≤ j → j < ↑i → ∀ x, elements[j.toNat]? = some x → eq x needle = false := by
+  rw [findIndex?_eq_some_from eq elements needle elements.size 0 i (by omega)]
+  constructor
+  · rintro ⟨-, high, found, first⟩
+    exact ⟨high, found, fun j _ hi x hx => first j.toNat (Nat.zero_le _) (by omega) x hx⟩
+  · rintro ⟨high, found, first⟩
+    exact ⟨Nat.zero_le _, high, found,
+      fun j _ hi x hx => first ↑j (by omega) (by omega) x (by simpa using hx)⟩
+
+/-- Lookups after a removal, at integer positions as the denotation states
+them: before the removed position the array is read there, from it on one
+position further. -/
+theorem getElem?_eraseIdx_toNat_of_lt {α : Type} (xs : Array α) (i : Nat) (h : i < xs.size)
+    (k : Int) (h0 : 0 ≤ k) (hk : k < ↑i) : (xs.eraseIdx i h)[k.toNat]? = xs[k.toNat]? :=
+  Array.getElem?_eraseIdx_of_lt h (by omega)
+
+theorem getElem?_eraseIdx_toNat_of_ge {α : Type} (xs : Array α) (i : Nat) (h : i < xs.size)
+    (k : Int) (hk : ↑i ≤ k) : (xs.eraseIdx i h)[k.toNat]? = xs[(k + 1).toNat]? := by
+  rw [Array.getElem?_eraseIdx_of_ge h (by omega)]
+  congr 1
+  omega
+
+/-- Lookups after an insertion, at integer positions: before the inserted
+position the array is read there, past it one position back. -/
+theorem getElem?_insertIdx_toNat_of_lt {α : Type} (xs : Array α) (x : α) (i : Nat)
+    (w : i ≤ xs.size) (k : Int) (h0 : 0 ≤ k) (hk : k < ↑i) :
+    (xs.insertIdx i x w)[k.toNat]? = xs[k.toNat]? :=
+  Array.getElem?_insertIdx_of_lt w (by omega)
+
+theorem getElem?_insertIdx_toNat_of_gt {α : Type} (xs : Array α) (x : α) (i : Nat)
+    (w : i ≤ xs.size) (k : Int) (hk : ↑i < k) (hs : k ≤ ↑xs.size) :
+    (xs.insertIdx i x w)[k.toNat]? = xs[(k - 1).toNat]? := by
+  rw [Array.getElem?_insertIdx_of_ge (by omega : i < k.toNat) (by omega)]
+  congr 1
+  omega
+
 /-- An insertion at a position within the vector (the end included). -/
 theorem insertIdxIfInBounds_of_le {α : Type} (xs : Array α) (i : Nat) (a : α) (h : i ≤ xs.size) :
     xs.insertIdxIfInBounds i a = xs.insertIdx i a h := by
@@ -911,7 +1020,7 @@ theorem getD_map_field {α : Type} (element : Option α) (encode : α → Runtim
   cases element <;> rfl
 
 /-- A search over the whole vector fails exactly when no element is accepted. -/
-theorem findIndex?_eq_none_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+theorem findIndex?_eq_none_mem_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
     findIndex? eq elements needle elements.size 0 = none ↔
       ∀ x ∈ elements, eq x needle = false := by
   rw [findIndex?_eq_none_from eq elements needle elements.size 0 (by omega)]
@@ -924,11 +1033,11 @@ theorem findIndex?_eq_none_iff {α : Type} (eq : α → α → Bool) (elements :
 
 /-- A search over the whole vector succeeds exactly when some element is
 accepted. -/
-theorem findIndex?_isSome_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+theorem findIndex?_isSome_mem_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
     (findIndex? eq elements needle elements.size 0).isSome = true ↔
       ∃ x ∈ elements, eq x needle = true := by
   rw [← Bool.not_eq_false, Option.isSome_eq_false_iff, Option.isNone_iff_eq_none,
-    findIndex?_eq_none_iff]
+    findIndex?_eq_none_mem_iff]
   simp
 
 /-- The found position of a search, as a `u64`: below the vector's size,
@@ -1244,6 +1353,15 @@ theorem zero_fits (width : Nat) (signed : Bool) (nonzero : width ≠ 0) :
   | false => rw [IntegerValueFits_unsigned_succ]; omega
   | true => rw [IntegerValueFits_signed_succ]; omega
 
+/-- A certified integer of a nonzero width defaults to zero. -/
+instance {n : Nat} {signed : Bool} : Inhabited (SpecInt (.bits (n + 1)) signed) :=
+  ⟨⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩⟩
+
+/-- Presence of an optional value in one form: `isSome`, as its absence is
+`= none`. -/
+theorem not_eq_none_iff_isSome {α : Type} (o : Option α) : (¬o = none) ↔ o.isSome = true := by
+  cases o <;> simp
+
 /-- A modular operation on certified integers, wrapped into their width. -/
 def ModularOp.run (op : ModularOp) {width : Nat} {signed : Bool}
     (left right : SpecInt (.bits width) signed) : SpecInt (.bits width) signed :=
@@ -1256,14 +1374,25 @@ def ModularOp.run (op : ModularOp) {width : Nat} {signed : Bool}
 /-- Bitwise operations on unsigned integers. -/
 inductive BitOp where
   | and
+  | or
+  | xor
   deriving DecidableEq, Repr, Inhabited
 
-/-- The mathematical value of a bitwise operation. -/
+/-- The mathematical value of a bitwise operation: on the bit patterns of
+nonnegative operands, as the runtime computes it. -/
 def BitOp.eval : BitOp → Int → Int → Int
   | .and => IntegerArithmetic.bitwiseAnd
+  | .or => fun left right => Int.ofNat (left.toNat ||| right.toNat)
+  | .xor => fun left right => Int.ofNat (left.toNat ^^^ right.toNat)
 
 @[simp] theorem BitOp.eval_and (left right : Int) :
     BitOp.and.eval left right = IntegerArithmetic.bitwiseAnd left right := rfl
+
+@[simp] theorem BitOp.eval_or (left right : Int) :
+    BitOp.or.eval left right = Int.ofNat (left.toNat ||| right.toNat) := rfl
+
+@[simp] theorem BitOp.eval_xor (left right : Int) :
+    BitOp.xor.eval left right = Int.ofNat (left.toNat ^^^ right.toNat) := rfl
 
 theorem BitOp.eval_bounds (op : BitOp) {width : Nat}
     (left right : SpecInt (.bits width) false) :
@@ -1271,11 +1400,23 @@ theorem BitOp.eval_bounds (op : BitOp) {width : Nat}
   obtain ⟨leftLower, leftUpper⟩ := left.unsigned_bounds
   obtain ⟨rightLower, rightUpper⟩ := right.unsigned_bounds
   have pow : ((2 ^ width : Nat) : Int) = (2 : Int) ^ width := Int.natCast_pow 2 width
-  cases op
-  simp only [BitOp.eval, IntegerArithmetic.bitwiseAnd_nonnegative _ _ leftLower rightLower,
-    Int.ofNat_eq_natCast]
-  have := Nat.and_le_left (n := left.val.toNat) (m := right.val.toNat)
-  omega
+  have positive := Nat.two_pow_pos width
+  have leftBelow : left.val.toNat < 2 ^ width := by omega
+  have rightBelow : right.val.toNat < 2 ^ width := by omega
+  cases op with
+  | and =>
+      simp only [BitOp.eval, IntegerArithmetic.bitwiseAnd_nonnegative _ _ leftLower rightLower,
+        Int.ofNat_eq_natCast]
+      have := Nat.and_le_left (n := left.val.toNat) (m := right.val.toNat)
+      omega
+  | or =>
+      simp only [BitOp.eval, Int.ofNat_eq_natCast]
+      have := Nat.or_lt_two_pow leftBelow rightBelow
+      omega
+  | xor =>
+      simp only [BitOp.eval, Int.ofNat_eq_natCast]
+      have := Nat.xor_lt_two_pow leftBelow rightBelow
+      omega
 
 /-- Bitwise operation on certified unsigned integers. -/
 def BitOp.run (op : BitOp) {width : Nat} (left right : SpecInt (.bits width) false) :
@@ -1379,6 +1520,57 @@ def checkedShiftLeft (failure : ThrowKind) {width distanceWidth : Nat}
       (shiftLeft_mod_bounds _ _ value.width_nonzero))
   else Spec.abort (failure, #[.integer distance.val])
 
+/-- A certified unsigned value shifted left stays below a modulus at least
+the power of two its width and the distance reach: the modulus is idle. -/
+theorem shiftLeft_emod_of_fits {width : Nat} (value : SpecInt (.bits width) false)
+    (distance : Nat) (modulus : Int) (fits : (2 : Int) ^ (width + distance) ≤ modulus) :
+    Int.shiftLeft value.val distance % modulus = Int.shiftLeft value.val distance := by
+  obtain ⟨lower, upper⟩ := value.unsigned_bounds
+  have shifted : Int.shiftLeft value.val distance = value.val * 2 ^ distance := by
+    show value.val <<< distance = _
+    rw [Int.shiftLeft_eq]
+  have positive : (0 : Int) < 2 ^ distance := Int.pow_pos (by decide)
+  have below : value.val * 2 ^ distance < 2 ^ (width + distance) := by
+    rw [Int.pow_add]
+    exact Int.mul_lt_mul_of_pos_right (by omega) positive
+  rw [shifted]
+  exact Int.emod_eq_of_lt (Int.mul_nonneg lower (Int.le_of_lt positive)) (by omega)
+
+/-- The truncating form of `shiftLeft_emod_of_fits`: on a nonnegative
+value both remainders agree. -/
+theorem shiftLeft_tmod_of_fits {width : Nat} (value : SpecInt (.bits width) false)
+    (distance : Nat) (modulus : Int) (fits : (2 : Int) ^ (width + distance) ≤ modulus) :
+    (Int.shiftLeft value.val distance).tmod modulus = Int.shiftLeft value.val distance := by
+  have nonnegative : 0 ≤ Int.shiftLeft value.val distance := by
+    show 0 ≤ value.val <<< distance
+    rw [Int.shiftLeft_eq]
+    exact Int.mul_nonneg value.unsigned_bounds.1 (Int.pow_nonneg (by decide))
+  rw [Int.tmod_eq_emod_of_nonneg nonnegative]
+  exact shiftLeft_emod_of_fits value distance modulus fits
+
+/-- A shift left is a multiplication by a power of two, which `omega` reads. -/
+theorem shiftLeft_eq_mul (value : Int) (distance : Nat) :
+    Int.shiftLeft value distance = value * 2 ^ distance := by
+  show value <<< distance = _
+  rw [Int.shiftLeft_eq]
+
+/-- A shift right is a division by a power of two, which `omega` reads. -/
+theorem shiftRight_eq_div (value : Int) (distance : Nat) :
+    Int.shiftRight value distance = value / 2 ^ distance := by
+  rw [← Int.shiftRight_eq, Int.shiftRight_eq_div_pow]
+  simp
+
+/-- The bounds of a product of unsigned certified integers, in the form
+`omega` reads with the product as an atom. -/
+theorem mul_unsigned_bounds {leftWidth rightWidth : Nat} (left : SpecInt (.bits leftWidth) false)
+    (right : SpecInt (.bits rightWidth) false) :
+    0 ≤ left.val * right.val ∧
+      left.val * right.val ≤ (2 ^ leftWidth - 1) * (2 ^ rightWidth - 1) := by
+  obtain ⟨leftLower, leftUpper⟩ := left.unsigned_bounds
+  obtain ⟨rightLower, rightUpper⟩ := right.unsigned_bounds
+  exact ⟨Int.mul_nonneg leftLower rightLower,
+    Int.mul_le_mul leftUpper rightUpper rightLower (Int.le_trans leftLower leftUpper)⟩
+
 theorem shiftRight_bounds {width : Nat} (value : SpecInt (.bits width) false) (distance : Nat) :
     0 ≤ Int.shiftRight value.val distance ∧ Int.shiftRight value.val distance ≤ 2 ^ width - 1 := by
   obtain ⟨lower, upper⟩ := value.unsigned_bounds
@@ -1411,13 +1603,51 @@ theorem wp_bottom (ensures : α → RuntimeState → Prop) (aborts : Failure →
     (state : RuntimeState) : wp (Spec.bottom : Comp α) ensures aborts state := by
   simp [wp, Spec.bottom]
 
+/-- A computed integer is named: the continuation receives a variable and
+the value it is defined by, so a value read several times is one variable in
+the goal, as a temporary is in the Move Prover's translation. -/
+theorem forall_named {width : IntWidth} {signed : Bool} {value : Int}
+    {p : SpecInt width signed → Prop} :
+    (∀ named : SpecInt width signed, named.val = value →
+        IntegerValueFits width signed value → p named) ↔
+      ∀ fits : IntegerValueFits width signed value, p ⟨value, fits⟩ := by
+  constructor
+  · intro h fits
+    exact h ⟨value, fits⟩ rfl fits
+  · intro h certified definition _
+    obtain ⟨v, fits⟩ := certified
+    simp only at definition
+    subst definition
+    exact h fits
+
+/-- `forall_named` for a continuation that discards the value. -/
+theorem forall_named_discard {width : IntWidth} {signed : Bool} {value : Int} {p : Prop} :
+    (∀ named : SpecInt width signed, named.val = value →
+        IntegerValueFits width signed value → p) ↔
+      (IntegerValueFits width signed value → p) :=
+  forall_named (p := fun _ => p)
+
+/-- `forall_named` at a value built from bounds. -/
+theorem forall_named_ofBounds {width : Nat} {witness : SpecInt (.bits width) false} {value : Int}
+    {inRange : 0 ≤ value ∧ value ≤ 2 ^ width - 1} {p : SpecInt (.bits width) false → Prop} :
+    (∀ named : SpecInt (.bits width) false, named.val = value → p named) ↔
+      p (SpecInt.ofBounds witness value inRange) := by
+  constructor
+  · intro h
+    exact h _ rfl
+  · intro h named definition
+    have : named = SpecInt.ofBounds witness value inRange := SpecInt.ext (by simp [definition])
+    subst this
+    exact h
+
 theorem wp_checkedInt (failure : ThrowKind) (width : Nat) (signed : Bool) (value : Int)
     (nonzero : width ≠ 0) (ensures : SpecInt (.bits width) signed → RuntimeState → Prop)
     (aborts : Failure → Prop) (state : RuntimeState) :
     wp (checkedInt failure width signed value) ensures aborts state ↔
-      (∀ fits : IntegerValueFits (.bits width) signed value, ensures ⟨value, fits⟩ state) ∧
+      (∀ named : SpecInt (.bits width) signed, named.val = value →
+        IntegerValueFits (.bits width) signed value → ensures named state) ∧
       (¬IntegerValueFits (.bits width) signed value → aborts (failure, #[.integer value])) := by
-  rw [checkedInt_eq _ _ _ _ nonzero]
+  rw [checkedInt_eq _ _ _ _ nonzero, forall_named]
   by_cases fits : IntegerValueFits (.bits width) signed value <;> simp [fits]
 
 theorem wp_checked_add (failure : ThrowKind) {width : Nat} {signed : Bool}
@@ -1425,8 +1655,8 @@ theorem wp_checked_add (failure : ThrowKind) {width : Nat} {signed : Bool}
     (ensures : SpecInt (.bits width) signed → RuntimeState → Prop)
     (aborts : Failure → Prop) (state : RuntimeState) :
     wp (CheckedOp.add.run failure left right) ensures aborts state ↔
-      (∀ fits : IntegerValueFits (.bits width) signed (left.val + right.val),
-        ensures ⟨left.val + right.val, fits⟩ state) ∧
+      (∀ named : SpecInt (.bits width) signed, named.val = left.val + right.val →
+        IntegerValueFits (.bits width) signed (left.val + right.val) → ensures named state) ∧
       (¬IntegerValueFits (.bits width) signed (left.val + right.val) →
         aborts (failure, #[.integer (left.val + right.val)])) :=
   wp_checkedInt _ _ _ _ left.width_nonzero _ _ _
@@ -1436,8 +1666,8 @@ theorem wp_checked_subtract (failure : ThrowKind) {width : Nat} {signed : Bool}
     (ensures : SpecInt (.bits width) signed → RuntimeState → Prop)
     (aborts : Failure → Prop) (state : RuntimeState) :
     wp (CheckedOp.subtract.run failure left right) ensures aborts state ↔
-      (∀ fits : IntegerValueFits (.bits width) signed (left.val - right.val),
-        ensures ⟨left.val - right.val, fits⟩ state) ∧
+      (∀ named : SpecInt (.bits width) signed, named.val = left.val - right.val →
+        IntegerValueFits (.bits width) signed (left.val - right.val) → ensures named state) ∧
       (¬IntegerValueFits (.bits width) signed (left.val - right.val) →
         aborts (failure, #[.integer (left.val - right.val)])) :=
   wp_checkedInt _ _ _ _ left.width_nonzero _ _ _
@@ -1447,8 +1677,8 @@ theorem wp_checked_multiply (failure : ThrowKind) {width : Nat} {signed : Bool}
     (ensures : SpecInt (.bits width) signed → RuntimeState → Prop)
     (aborts : Failure → Prop) (state : RuntimeState) :
     wp (CheckedOp.multiply.run failure left right) ensures aborts state ↔
-      (∀ fits : IntegerValueFits (.bits width) signed (left.val * right.val),
-        ensures ⟨left.val * right.val, fits⟩ state) ∧
+      (∀ named : SpecInt (.bits width) signed, named.val = left.val * right.val →
+        IntegerValueFits (.bits width) signed (left.val * right.val) → ensures named state) ∧
       (¬IntegerValueFits (.bits width) signed (left.val * right.val) →
         aborts (failure, #[.integer (left.val * right.val)])) :=
   wp_checkedInt _ _ _ _ left.width_nonzero _ _ _
@@ -1460,8 +1690,8 @@ theorem wp_checked_divide (failure : ThrowKind) {width : Nat} {signed : Bool}
     wp (CheckedOp.divide.run failure left right) ensures aborts state ↔
       (right.val = 0 → aborts (failure, #[])) ∧
       (right.val ≠ 0 →
-        (∀ fits : IntegerValueFits (.bits width) signed (left.val.tdiv right.val),
-          ensures ⟨left.val.tdiv right.val, fits⟩ state) ∧
+        (∀ named : SpecInt (.bits width) signed, named.val = left.val.tdiv right.val →
+          IntegerValueFits (.bits width) signed (left.val.tdiv right.val) → ensures named state) ∧
         (¬IntegerValueFits (.bits width) signed (left.val.tdiv right.val) →
           aborts (failure, #[.integer (left.val.tdiv right.val)]))) := by
   simp only [CheckedOp.run, wp_ite, wp_abort, wp_checkedInt _ _ _ _ left.width_nonzero]
@@ -1474,14 +1704,14 @@ theorem wp_checked_modulo (failure : ThrowKind) {width : Nat} {signed : Bool}
       (right.val = 0 → aborts (failure, #[])) ∧
       (right.val ≠ 0 →
         (IntegerValueFits (.bits width) signed (left.val.tdiv right.val) →
-          (∀ fits : IntegerValueFits (.bits width) signed (left.val.tmod right.val),
-            ensures ⟨left.val.tmod right.val, fits⟩ state) ∧
+          (∀ named : SpecInt (.bits width) signed, named.val = left.val.tmod right.val →
+            IntegerValueFits (.bits width) signed (left.val.tmod right.val) → ensures named state) ∧
           (¬IntegerValueFits (.bits width) signed (left.val.tmod right.val) →
             aborts (failure, #[.integer (left.val.tmod right.val)]))) ∧
         (¬IntegerValueFits (.bits width) signed (left.val.tdiv right.val) →
           aborts (failure, #[.integer (left.val.tdiv right.val)]))) := by
   simp only [CheckedOp.run, wp_ite, wp_abort, wp_bind,
-    wp_checkedInt _ _ _ _ left.width_nonzero]
+    wp_checkedInt _ _ _ _ left.width_nonzero, forall_named_discard]
 
 theorem wp_checkedShiftLeft (failure : ThrowKind) {width distanceWidth : Nat}
     (value : SpecInt (.bits width) false) (distance : SpecInt (.bits distanceWidth) false)
@@ -1489,10 +1719,13 @@ theorem wp_checkedShiftLeft (failure : ThrowKind) {width distanceWidth : Nat}
     (aborts : Failure → Prop) (state : RuntimeState) :
     wp (checkedShiftLeft failure value distance) ensures aborts state ↔
       (distance.val < width →
-        ensures (SpecInt.ofBounds value (Int.shiftLeft value.val distance.val.toNat % 2 ^ width)
-          (shiftLeft_mod_bounds _ _ value.width_nonzero)) state) ∧
+        ∀ named : SpecInt (.bits width) false,
+          named.val = Int.shiftLeft value.val distance.val.toNat % 2 ^ width →
+            ensures named state) ∧
       (¬distance.val < width → aborts (failure, #[.integer distance.val])) := by
   simp only [checkedShiftLeft, wp_ite, wp_pure, wp_abort]
+  exact and_congr (imp_congr_right fun _ =>
+    (forall_named_ofBounds (p := fun named => ensures named state)).symm) Iff.rfl
 
 theorem wp_checkedShiftRight (failure : ThrowKind) {width distanceWidth : Nat}
     (value : SpecInt (.bits width) false) (distance : SpecInt (.bits distanceWidth) false)
@@ -1500,10 +1733,12 @@ theorem wp_checkedShiftRight (failure : ThrowKind) {width distanceWidth : Nat}
     (aborts : Failure → Prop) (state : RuntimeState) :
     wp (checkedShiftRight failure value distance) ensures aborts state ↔
       (distance.val < width →
-        ensures (SpecInt.ofBounds value (Int.shiftRight value.val distance.val.toNat)
-          (shiftRight_bounds value _)) state) ∧
+        ∀ named : SpecInt (.bits width) false,
+          named.val = Int.shiftRight value.val distance.val.toNat → ensures named state) ∧
       (¬distance.val < width → aborts (failure, #[.integer distance.val])) := by
   simp only [checkedShiftRight, wp_ite, wp_pure, wp_abort]
+  exact and_congr (imp_congr_right fun _ =>
+    (forall_named_ofBounds (p := fun named => ensures named state)).symm) Iff.rfl
 
 /-- The checked conversion at a literal nonzero width. -/
 theorem wp_checkedInt_succ (failure : ThrowKind) (n : Nat) (signed : Bool) (value : Int)
@@ -1512,7 +1747,7 @@ theorem wp_checkedInt_succ (failure : ThrowKind) (n : Nat) (signed : Bool) (valu
     wp (checkedInt failure (n + 1) signed value) ensures aborts state ↔
       (∀ fits : IntegerValueFits (.bits (n + 1)) signed value, ensures ⟨value, fits⟩ state) ∧
       (¬IntegerValueFits (.bits (n + 1)) signed value → aborts (failure, #[.integer value])) :=
-  wp_checkedInt _ _ _ _ (Nat.succ_ne_zero n) _ _ _
+  (wp_checkedInt _ _ _ _ (Nat.succ_ne_zero n) _ _ _).trans (and_congr forall_named Iff.rfl)
 
 attribute [lir_denote] wp_ite wp_bottom wp_checked_add wp_checked_subtract wp_checked_multiply
   wp_checked_divide wp_checked_modulo wp_checkedShiftLeft wp_checkedShiftRight wp_checkedInt_succ
@@ -1520,7 +1755,7 @@ attribute [lir_denote] wp_ite wp_bottom wp_checked_add wp_checked_subtract wp_ch
   ModularOp.run_val ModularOp.eval_add ModularOp.eval_subtract ModularOp.eval_multiply
   foundIndex_val foundIndexOf reverseRange_zero
   wrapInt_unsigned wrapInt_signed
-  BitOp.eval_and CompareOp.decide_less CompareOp.decide_greater CompareOp.decide_lessEqual
+  BitOp.eval_and BitOp.eval_or BitOp.eval_xor CompareOp.decide_less CompareOp.decide_greater CompareOp.decide_lessEqual
   CompareOp.decide_greaterEqual NTy.eqb_int NTy.eqb_bool NTy.eqb_address NTy.eqb_unit
   NTy.eqb_param
   IntegerValueFits_unsigned_succ IntegerValueFits_signed_succ initialEnv
@@ -1582,11 +1817,10 @@ theorem instantiatedTypeId_cons (entry : TypeId × TypeId) (rest : List (TypeId 
   unfold instantiatedTypeId
   obtain ⟨⟨source⟩, target⟩ := entry
   obtain ⟨index⟩ := typeId
-  have beq : ((⟨source⟩ : TypeId) == ⟨index⟩) = (source == index) := rfl
   by_cases same : source = index
   · subst same
-    simp [List.find?_cons, beq]
-  · simp [List.find?_cons, beq, same]
+    simp [List.find?_cons]
+  · simp [List.find?_cons, TypeId.mk.injEq, same]
 
 theorem instantiatedTypeId_nil (typeId : TypeId) :
     instantiatedTypeId ([] : List (TypeId × TypeId)).toArray typeId = typeId :=
@@ -1718,6 +1952,16 @@ theorem NTy.decode?_of_encode [Skolems] (τ : NTy) {value : τ.carrier} {raw : R
     (encoded : τ.encode value = raw) : τ.codec.decode? raw = some value :=
   encoded ▸ τ.codec.decode_encode value
 
+/-- An integer equated to a runtime value is what the value reads as. -/
+theorem asInt_of_integer_eq {value : Int} {raw : RuntimeValue}
+    (encoded : RuntimeValue.integer value = raw) : raw.asInt = value := by
+  subst encoded; rfl
+
+/-- The same for a boolean. -/
+theorem asBool_of_bool_eq {value : Bool} {raw : RuntimeValue}
+    (encoded : RuntimeValue.bool value = raw) : raw.asBool = value := by
+  subst encoded; rfl
+
 /-- The same, once an encoding of a vector has been split element-wise. -/
 theorem NTy.decode?_vector_of_map [Skolems] (τ : NTy) {value : SpecVector τ.carrier} {raw : Array RuntimeValue}
     (encoded : value.values.map τ.encode = raw) :
@@ -1746,6 +1990,139 @@ def decodeElements? (codec : Codec Native RuntimeValue) : List RuntimeValue → 
       (codec.decode? value).bind fun head =>
         (decodeElements? codec values).map fun tail => head :: tail := rfl
 
+/-- Membership in an array, as the position the element is at: an integer
+in the array's range, as a specification's range quantifier states one. -/
+theorem mem_iff_exists_int_index {α : Type} (a : Array α) (x : α) :
+    x ∈ a ↔ ∃ i : Int, 0 ≤ i ∧ i < ↑a.size ∧ a[i.toNat]? = some x := by
+  constructor
+  · intro mem
+    obtain ⟨i, h, rfl⟩ := Array.getElem_of_mem mem
+    exact ⟨i, by omega, by omega, by simp [h]⟩
+  · rintro ⟨i, _, _, h⟩
+    exact Array.mem_of_getElem? h
+
+/-- A search over the whole vector fails exactly when the element at no
+position is accepted, positions stated as a specification's range
+quantifier states them. -/
+theorem findIndex?_eq_none_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    findIndex? eq elements needle elements.size 0 = none ↔
+      ∀ i : Int, 0 ≤ i → i < ↑elements.size →
+        ∀ x, elements[i.toNat]? = some x → eq x needle = false := by
+  rw [findIndex?_eq_none_mem_iff]
+  constructor
+  · intro all _ _ _ x h
+    exact all x (Array.mem_of_getElem? h)
+  · intro all x mem
+    obtain ⟨i, low, high, h⟩ := (mem_iff_exists_int_index _ _).mp mem
+    exact all i low high x h
+
+/-- A search over the whole vector succeeds exactly when the element at
+some position is accepted. -/
+theorem findIndex?_isSome_iff {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α) :
+    (findIndex? eq elements needle elements.size 0).isSome = true ↔
+      ∃ i : Int, 0 ≤ i ∧ i < ↑elements.size ∧
+        ∃ x, elements[i.toNat]? = some x ∧ eq x needle = true := by
+  rw [findIndex?_isSome_mem_iff]
+  constructor
+  · rintro ⟨x, mem, hx⟩
+    obtain ⟨i, low, high, h⟩ := (mem_iff_exists_int_index _ _).mp mem
+    exact ⟨i, low, high, x, h, hx⟩
+  · rintro ⟨i, _, _, x, h, hx⟩
+    exact ⟨x, Array.mem_of_getElem? h, hx⟩
+
+/-- A search over a literal vector computes: its steps unfold at literal
+counts. -/
+theorem findIndex?_zero {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α)
+    (index : Nat) : findIndex? eq elements needle 0 index = none := rfl
+
+theorem findIndex?_succ {α : Type} (eq : α → α → Bool) (elements : Array α) (needle : α)
+    (count index : Nat) :
+    findIndex? eq elements needle (count + 1) index =
+      if elements[index]?.any (eq · needle) then some index
+      else findIndex? eq elements needle count (index + 1) := rfl
+
+/-- An element a lookup yields whose value is a given integer's: the lookup
+yields that integer, certificates being proof-irrelevant. -/
+theorem exists_some_val_eq_iff {width : IntWidth} {signed : Bool}
+    (o : Option (SpecInt width signed)) (n : SpecInt width signed) :
+    (∃ x, o = some x ∧ x.val = n.val) ↔ o = some n := by
+  constructor
+  · rintro ⟨x, ho, hv⟩
+    rw [ho, SpecInt.ext hv]
+  · intro h
+    exact ⟨n, h, rfl⟩
+
+theorem forall_some_val_ne_iff {width : IntWidth} {signed : Bool}
+    (o : Option (SpecInt width signed)) (n : SpecInt width signed) :
+    (∀ x, o = some x → ¬x.val = n.val) ↔ ¬o = some n := by
+  constructor
+  · intro h ho
+    exact h n ho rfl
+  · intro h x ho hv
+    exact h (ho.trans (congrArg some (SpecInt.ext hv)))
+
+/-- Every element with a property differs from a given one exactly when
+that one lacks the property: an element bound by a lookup and equated to
+a value is the lookup at the value. -/
+theorem forall_imp_ne_iff {α : Type} (q : α → Prop) (a : α) :
+    (∀ x, q x → ¬x = a) ↔ ¬q a :=
+  ⟨fun h qa => h a qa rfl, fun h _ qx xa => h (xa ▸ qx)⟩
+
+theorem forall_imp_ne_iff' {α : Type} (q : α → Prop) (a : α) :
+    (∀ x, q x → ¬a = x) ↔ ¬q a :=
+  ⟨fun h qa => h a qa rfl, fun h _ qx ax => h (ax ▸ qx)⟩
+
+/-- A range quantifier negated, quantified over, or bound: the logical
+connectives are pushed only through the shape a specification's range
+quantifier and a vector's membership take, not through every statement of a
+verification condition. -/
+theorem not_exists_range_iff (n : Int) (P : Int → Prop) :
+    (¬∃ i : Int, 0 ≤ i ∧ i < n ∧ P i) ↔ ∀ i : Int, 0 ≤ i → i < n → ¬P i := by
+  constructor
+  · intro h i low high holds
+    exact h ⟨i, low, high, holds⟩
+  · rintro h ⟨i, low, high, holds⟩
+    exact h i low high holds
+
+theorem not_forall_range_iff (n : Int) (P : Int → Prop) :
+    (¬∀ i : Int, 0 ≤ i → i < n → ¬P i) ↔ ∃ i : Int, 0 ≤ i ∧ i < n ∧ P i := by
+  rw [← not_exists_range_iff, Classical.not_not]
+
+theorem forall_exists_range_iff {α : Type} (n : Int) (P : Int → α → Prop) (Q : α → Prop) :
+    (∀ x, (∃ i : Int, 0 ≤ i ∧ i < n ∧ P i x) → Q x) ↔
+      ∀ i : Int, 0 ≤ i → i < n → ∀ x, P i x → Q x := by
+  constructor
+  · intro h i low high x holds
+    exact h x ⟨i, low, high, holds⟩
+  · rintro h x ⟨i, low, high, holds⟩
+    exact h i low high x holds
+
+theorem exists_range_eq_iff {α : Type} (n : Int) (P : Int → α → Prop) (y : α) :
+    (∃ x, (∃ i : Int, 0 ≤ i ∧ i < n ∧ P i x) ∧ x = y) ↔ ∃ i : Int, 0 ≤ i ∧ i < n ∧ P i y := by
+  constructor
+  · rintro ⟨x, ⟨i, low, high, holds⟩, rfl⟩
+    exact ⟨i, low, high, holds⟩
+  · rintro ⟨i, low, high, holds⟩
+    exact ⟨y, ⟨i, low, high, holds⟩, rfl⟩
+
+/-- An element of a mapped list under an existential: the element it maps. -/
+theorem exists_mem_map_iff {α β : Type} (f : α → β) (l : List α) (P : β → Prop) :
+    (∃ r, r ∈ l.map f ∧ P r) ↔ ∃ x, x ∈ l ∧ P (f x) := by
+  constructor
+  · rintro ⟨r, hr, hP⟩
+    obtain ⟨x, hx, rfl⟩ := List.mem_map.mp hr
+    exact ⟨x, hx, hP⟩
+  · rintro ⟨x, hx, hP⟩
+    exact ⟨f x, List.mem_map.mpr ⟨x, hx, rfl⟩, hP⟩
+
+/-- Decoding the encoding of every element gives the elements back. -/
+@[simp] theorem decodeElements?_map_encode (codec : Codec Native RuntimeValue)
+    (values : List Native) :
+    decodeElements? codec (values.map codec.encode) = some values := by
+  induction values with
+  | nil => rfl
+  | cons value values ih => simp [decodeElements?_cons, ih]
+
 theorem mapM_eq_decodeElements? (codec : Codec Native RuntimeValue) (values : List RuntimeValue) :
     values.mapM codec.decode? = decodeElements? codec values := by
   induction values with
@@ -1765,6 +2142,14 @@ theorem boundedVector_decode?_vector (codec : Codec Native RuntimeValue) (values
   show (values.toList.mapM codec.decode? >>= fun decoded => _) = _
   rw [mapM_eq_decodeElements?]
   rcases decodeElements? codec values.toList with _ | decoded <;> rfl
+
+/-- Decoding a vector's encoding, as the encoding unfolds to the runtime
+vector of encoded elements, gives the vector back in one step. -/
+theorem boundedVector_decode?_map_encode (codec : Codec Native RuntimeValue)
+    (vector : SpecVector Native) :
+    (Codec.boundedVector codec).decode? (.vector (vector.values.map codec.encode)) = some vector := by
+  rw [boundedVector_decode?_vector, Array.toList_map, decodeElements?_map_encode, Option.bind_some,
+    dif_pos (by simpa only [Array.length_toList] using vector.bounded)]
 
 theorem toArray_inj_iff {α : Type} (as bs : List α) : as.toArray = bs.toArray ↔ as = bs :=
   ⟨List.toArray_inj, fun equal => equal ▸ rfl⟩
@@ -2013,6 +2398,113 @@ theorem rowCodecs_tight [Skolems] : (rows : NRows) → RowCodecsTight rows (rowC
   | .cons fields rest => ⟨rowCodec_tight fields, rowCodecs_tight rest⟩
 end
 
+/-! ## Encoded vectors in clauses
+
+A specification function speaks about a vector's encoding: its values
+mapped through the element codec, compared with another such encoding or
+with a runtime literal. Both are equalities of the native values: two
+encodings agree exactly when the vectors do, and an encoding is a literal
+exactly when the literal decodes to the values, which holds for a tight
+codec and lets the normalizer decode the literal element by element. -/
+
+theorem map_encode_eq_map_encode_iff (codec : Codec Native RuntimeValue)
+    (left right : Array Native) :
+    left.map codec.encode = right.map codec.encode ↔ left = right :=
+  Array.map_inj_right fun _ _ h => codec.encode_injective h
+
+/-- What decodes element by element under a tight codec is the encoding of
+what it decodes to. -/
+theorem eq_map_encode_of_decodeElements? {codec : Codec Native RuntimeValue} (tight : codec.Tight) :
+    ∀ (raw : List RuntimeValue) (decoded : List Native),
+      decodeElements? codec raw = some decoded → raw = decoded.map codec.encode
+  | [], decoded, h => by
+      simp only [decodeElements?_nil, Option.some.injEq] at h
+      subst h; rfl
+  | value :: rest, decoded, h => by
+      simp only [decodeElements?_cons, Option.bind_eq_some_iff, Option.map_eq_some_iff] at h
+      obtain ⟨head, decodedHead, tail, decodedTail, rfl⟩ := h
+      rw [List.map_cons, ← eq_map_encode_of_decodeElements? tight rest tail decodedTail,
+        tight value head decodedHead]
+
+theorem map_encode_eq_toArray_iff_of_tight {codec : Codec Native RuntimeValue} (tight : codec.Tight)
+    (values : Array Native) (raw : List RuntimeValue) :
+    values.map codec.encode = raw.toArray ↔
+      ∃ decoded, decodeElements? codec raw = some decoded ∧ values = decoded.toArray := by
+  constructor
+  · intro h
+    refine ⟨values.toList, ?_, by simp⟩
+    have : raw = values.toList.map codec.encode := by
+      rw [← Array.toList_map, h, List.toList_toArray]
+    rw [this, decodeElements?_map_encode]
+  · rintro ⟨decoded, h, rfl⟩
+    rw [eq_map_encode_of_decodeElements? tight raw decoded h, List.map_toArray]
+
+theorem toArray_eq_map_encode_iff_of_tight {codec : Codec Native RuntimeValue} (tight : codec.Tight)
+    (values : Array Native) (raw : List RuntimeValue) :
+    raw.toArray = values.map codec.encode ↔
+      ∃ decoded, decodeElements? codec raw = some decoded ∧ values = decoded.toArray := by
+  rw [eq_comm, map_encode_eq_toArray_iff_of_tight tight]
+
+/-- The literal cases the normalizer meets: the scalar codecs a clause's
+type unfolds to, and the codec of any other type. The conclusion is at the
+values, the form the deciders read vectors in. -/
+theorem map_specInt_encode_eq_toArray_iff (width : IntWidth) (signed : Bool)
+    (values : Array (SpecInt width signed)) (raw : List RuntimeValue) :
+    values.map (Codec.specInt width signed).encode = raw.toArray ↔
+      ∃ decoded, decodeElements? (Codec.specInt width signed) raw = some decoded ∧
+        values = decoded.toArray :=
+  map_encode_eq_toArray_iff_of_tight (specInt_tight width signed) values raw
+
+theorem toArray_eq_map_specInt_encode_iff (width : IntWidth) (signed : Bool)
+    (values : Array (SpecInt width signed)) (raw : List RuntimeValue) :
+    raw.toArray = values.map (Codec.specInt width signed).encode ↔
+      ∃ decoded, decodeElements? (Codec.specInt width signed) raw = some decoded ∧
+        values = decoded.toArray :=
+  toArray_eq_map_encode_iff_of_tight (specInt_tight width signed) values raw
+
+theorem map_bool_encode_eq_toArray_iff (values : Array Bool) (raw : List RuntimeValue) :
+    values.map Codec.bool.encode = raw.toArray ↔
+      ∃ decoded, decodeElements? Codec.bool raw = some decoded ∧ values = decoded.toArray :=
+  map_encode_eq_toArray_iff_of_tight bool_tight values raw
+
+theorem map_address_encode_eq_toArray_iff (values : Array String) (raw : List RuntimeValue) :
+    values.map Codec.address.encode = raw.toArray ↔
+      ∃ decoded, decodeElements? Codec.address raw = some decoded ∧ values = decoded.toArray :=
+  map_encode_eq_toArray_iff_of_tight address_tight values raw
+
+theorem map_codec_encode_eq_toArray_iff [Skolems] (τ : NTy) (values : Array τ.carrier)
+    (raw : List RuntimeValue) :
+    values.map τ.codec.encode = raw.toArray ↔
+      ∃ decoded, decodeElements? τ.codec raw = some decoded ∧ values = decoded.toArray :=
+  map_encode_eq_toArray_iff_of_tight (NTy.codec_tight τ) values raw
+
+theorem toArray_eq_map_codec_encode_iff [Skolems] (τ : NTy) (values : Array τ.carrier)
+    (raw : List RuntimeValue) :
+    raw.toArray = values.map τ.codec.encode ↔
+      ∃ decoded, decodeElements? τ.codec raw = some decoded ∧ values = decoded.toArray :=
+  toArray_eq_map_encode_iff_of_tight (NTy.codec_tight τ) values raw
+
+/-! ## Quantifiers over a literal range
+
+A clause quantifying over a range with literal bounds is its instances,
+one per position, when the range is short: the normalizer splits the first
+position off until the range is empty, deciding the literal comparisons. -/
+
+theorem forall_int_range_split {P : Int → Prop} {low high : Int} (lt : low < high)
+    (short : high ≤ low + 64) :
+    (∀ i, low ≤ i → i < high → P i) ↔ P low ∧ ∀ i, low + 1 ≤ i → i < high → P i := by
+  constructor
+  · intro h
+    exact ⟨h low (Int.le_refl low) lt, fun i above below => h i (by omega) below⟩
+  · rintro ⟨first, rest⟩ i above below
+    by_cases at_low : i = low
+    · subst at_low; exact first
+    · exact rest i (by omega) below
+
+theorem forall_int_range_empty {P : Int → Prop} {low high : Int} (le : high ≤ low) :
+    (∀ i, low ≤ i → i < high → P i) ↔ True :=
+  iff_true_intro fun _ above below => absurd (Int.lt_of_le_of_lt above below) (Int.not_lt.mpr le)
+
 /-- An encoding equation is a decoding equation: the codecs are tight. -/
 theorem NTy.encode_eq_iff [Skolems] (τ : NTy) (value : τ.carrier) (raw : RuntimeValue) :
     τ.encode value = raw ↔ τ.codec.decode? raw = some value :=
@@ -2170,6 +2662,55 @@ mutual
 @[reducible] def NRows.subst (θ : NRow) : NRows → NRows
   | .nil => .nil
   | .cons fields rest => .cons (NRow.subst θ fields) (rest.subst θ)
+end
+
+mutual
+/-- A type with its parameters replaced by what a family says they stand
+for (`Skolems.type`). -/
+def NTy.substWith (types : Nat → NTy) : NTy → NTy
+  | .unit => .unit
+  | .bool => .bool
+  | .int width signed => .int width signed
+  | .address => .address
+  | .signer => .signer
+  | .string => .string
+  | .bytes => .bytes
+  | .tuple elements => .tuple (NRow.substWith types elements)
+  | .struct source fields => .struct source (NRow.substWith types fields)
+  | .enum source names rows distinct => .enum source names (NRows.substWith types rows) distinct
+  | .vector element => .vector (element.substWith types)
+  | .ref referent => .ref (referent.substWith types)
+  | .param index => types index
+
+def NRow.substWith (types : Nat → NTy) : NRow → NRow
+  | .nil => .nil
+  | .cons τ rest => .cons (τ.substWith types) (NRow.substWith types rest)
+
+def NRows.substWith (types : Nat → NTy) : NRows → NRows
+  | .nil => .nil
+  | .cons fields rest => .cons (NRow.substWith types fields) (NRows.substWith types rest)
+end
+
+mutual
+/-- At an abstract family every parameter stands for itself. -/
+theorem NTy.substWith_param : (τ : NTy) → τ.substWith (fun index => .param index) = τ
+  | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .param _ => rfl
+  | .tuple elements => congrArg NTy.tuple (NRow.substWith_param elements)
+  | .struct source fields => congrArg (NTy.struct source) (NRow.substWith_param fields)
+  | .enum source names rows distinct => by
+      simp only [NTy.substWith, NRows.substWith_param rows]
+  | .vector element => congrArg NTy.vector (NTy.substWith_param element)
+  | .ref referent => congrArg NTy.ref (NTy.substWith_param referent)
+
+theorem NRow.substWith_param : (row : NRow) → row.substWith (fun index => .param index) = row
+  | .nil => rfl
+  | .cons τ rest => by
+      simp only [NRow.substWith, NTy.substWith_param τ, NRow.substWith_param rest]
+
+theorem NRows.substWith_param : (rows : NRows) → rows.substWith (fun index => .param index) = rows
+  | .nil => rfl
+  | .cons fields rest => by
+      simp only [NRows.substWith, NRow.substWith_param fields, NRows.substWith_param rest]
 end
 
 mutual
@@ -2331,6 +2872,7 @@ carried as the `i`-th argument at the caller's family. -/
       (NRow.getD_inhabitable θ.1 θ.2 index (.param index) rfl)⟩
   tight := fun index => @NTy.codec_tight outer ((NTy.param index).subst θ.1)
   plain := fun index => @NTy.encode_plain outer ((NTy.param index).subst θ.1)
+  type := fun index => ((NTy.param index).subst θ.1).substWith outer.type
 
 section Transport
 variable [Θ : Skolems]
@@ -2424,11 +2966,305 @@ theorem NTy.encode_param (index : Nat) (value : (NTy.param index).carrier) :
 theorem Skolems.codec_instantiate (θ : TypeArgs) (index : Nat) :
     (Skolems.instantiate θ Θ).codec index = NTy.codec ((NTy.param index).subst θ.1) := rfl
 
+theorem Skolems.type_instantiate (θ : TypeArgs) (index : Nat) :
+    (Skolems.instantiate θ Θ).type index = ((NTy.param index).subst θ.1).substWith Θ.type := rfl
+
+theorem Skolems.type_runtime (index : Nat) : Skolems.runtime.type index = .param index := rfl
+
+/-- At the public family a type argument is itself. -/
+theorem NTy.substWith_type_runtime (τ : NTy) : τ.substWith Skolems.runtime.type = τ :=
+  NTy.substWith_param τ
+
+/-! A callee's value in the caller's view, constructor by constructor: the
+normalizer reduces the transport of a value it knows the shape of, so a
+variant name or a field read through it is the one the callee's contract
+states. -/
+
+theorem NTy.ofSkolem_unit (θ : TypeArgs) (value : @NTy.carrier (Skolems.instantiate θ Θ) .unit) :
+    NTy.ofSkolem θ .unit value = value := rfl
+theorem NTy.ofSkolem_bool (θ : TypeArgs) (value : @NTy.carrier (Skolems.instantiate θ Θ) .bool) :
+    NTy.ofSkolem θ .bool value = value := rfl
+theorem NTy.ofSkolem_int (θ : TypeArgs) (width : Nat) (signed : Bool)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) (.int width signed)) :
+    NTy.ofSkolem θ (.int width signed) value = value := rfl
+theorem NTy.ofSkolem_address (θ : TypeArgs)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) .address) :
+    NTy.ofSkolem θ .address value = value := rfl
+theorem NTy.ofSkolem_signer (θ : TypeArgs)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) .signer) :
+    NTy.ofSkolem θ .signer value = value := rfl
+theorem NTy.ofSkolem_string (θ : TypeArgs)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) .string) :
+    NTy.ofSkolem θ .string value = value := rfl
+theorem NTy.ofSkolem_bytes (θ : TypeArgs) (value : @NTy.carrier (Skolems.instantiate θ Θ) .bytes) :
+    NTy.ofSkolem θ .bytes value = value := rfl
+theorem NTy.ofSkolem_param (θ : TypeArgs) (index : Nat)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) (.param index)) :
+    NTy.ofSkolem θ (.param index) value = value := rfl
+theorem NTy.ofSkolem_tuple (θ : TypeArgs) (elements : NRow)
+    (values : @NTy.carrier (Skolems.instantiate θ Θ) (.tuple elements)) :
+    NTy.ofSkolem θ (.tuple elements) values = HList.ofSkolem θ elements values := rfl
+theorem NTy.ofSkolem_struct (θ : TypeArgs) (source : StructHandle) (fields : NRow)
+    (values : @NTy.carrier (Skolems.instantiate θ Θ) (.struct source fields)) :
+    NTy.ofSkolem θ (.struct source fields) values = HList.ofSkolem θ fields values := rfl
+theorem NTy.ofSkolem_enum (θ : TypeArgs) (source : StructHandle) (names : List String)
+    (rows : NRows) (distinct : names.Nodup)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) (.enum source names rows distinct)) :
+    NTy.ofSkolem θ (.enum source names rows distinct) value =
+      variantCarrier.ofSkolem θ names rows value := rfl
+theorem NTy.ofSkolem_vector (θ : TypeArgs) (element : NTy)
+    (vector : @NTy.carrier (Skolems.instantiate θ Θ) (.vector element)) :
+    NTy.ofSkolem θ (.vector element) vector =
+      ⟨vector.values.map (NTy.ofSkolem θ element), by simpa using vector.bounded⟩ := rfl
+theorem NTy.ofSkolem_ref (θ : TypeArgs) (referent : NTy)
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) (.ref referent)) :
+    NTy.ofSkolem θ (.ref referent) value =
+      (NTy.ofSkolem θ referent value.1, NTy.ofSkolem θ referent value.2) := rfl
+theorem HList.ofSkolem_nil (θ : TypeArgs) (values : @HList (Skolems.instantiate θ Θ) .nil) :
+    HList.ofSkolem θ .nil values = () := rfl
+theorem HList.ofSkolem_cons (θ : TypeArgs) (τ : NTy) (rest : NRow)
+    (values : @HList (Skolems.instantiate θ Θ) (.cons τ rest)) :
+    HList.ofSkolem θ (.cons τ rest) values =
+      (NTy.ofSkolem θ τ values.1, HList.ofSkolem θ rest values.2) := rfl
+theorem variantCarrier.ofSkolem_inl (θ : TypeArgs) (name : String) (names : List String)
+    (fields : NRow) (rest : NRows) (values : @HList (Skolems.instantiate θ Θ) fields) :
+    variantCarrier.ofSkolem θ (name :: names) (.cons fields rest) (.inl values) =
+      .inl (HList.ofSkolem θ fields values) := rfl
+theorem variantCarrier.ofSkolem_inr (θ : TypeArgs) (name : String) (names : List String)
+    (fields : NRow) (rest : NRows) (value : @variantCarrier (Skolems.instantiate θ Θ) names rest) :
+    variantCarrier.ofSkolem θ (name :: names) (.cons fields rest) (.inr value) =
+      .inr (variantCarrier.ofSkolem θ names rest value) := rfl
+theorem ResultShape.ofSkolem_none (θ : TypeArgs)
+    (value : @ResultShape.carrier (Skolems.instantiate θ Θ) .none) :
+    ResultShape.ofSkolem θ .none value = value := rfl
+theorem ResultShape.ofSkolem_one (θ : TypeArgs) (τ : NTy)
+    (value : @ResultShape.carrier (Skolems.instantiate θ Θ) (.one τ)) :
+    ResultShape.ofSkolem θ (.one τ) value = NTy.ofSkolem θ τ value := rfl
+
+/-! Transport to the caller's view keeps a value's runtime encoding: the
+callee and the caller see the same runtime value. -/
+
+mutual
+theorem NTy.encode_ofSkolem (θ : TypeArgs) : (τ : NTy) →
+    (value : @NTy.carrier (Skolems.instantiate θ Θ) τ) →
+    NTy.encode (τ.subst θ.1) (NTy.ofSkolem θ τ value) =
+      @NTy.encode (Skolems.instantiate θ Θ) τ value
+  | .unit, _ => rfl
+  | .bool, _ => rfl
+  | .int _ _, _ => rfl
+  | .address, _ => rfl
+  | .signer, _ => rfl
+  | .string, _ => rfl
+  | .bytes, _ => rfl
+  | .tuple elements, values => by
+      show NTy.encode (.tuple (NRow.subst θ.1 elements)) (HList.ofSkolem θ elements values) = _
+      rw [NTy.encode_tuple, @NTy.encode_tuple (Skolems.instantiate θ Θ), HList.encode_ofSkolem θ elements values]
+  | .struct source fields, values => by
+      show NTy.encode (.struct source (NRow.subst θ.1 fields)) (HList.ofSkolem θ fields values) = _
+      rw [NTy.encode_struct, @NTy.encode_struct (Skolems.instantiate θ Θ), HList.encode_ofSkolem θ fields values]
+  | .enum source names rows distinct, value =>
+      variantCarrier.encode_ofSkolem θ source names rows distinct value
+  | .vector element, vector => by
+      show NTy.encode (.vector (element.subst θ.1)) _ = _
+      rw [NTy.encode_vector, @NTy.encode_vector (Skolems.instantiate θ Θ)]
+      simp only [NTy.ofSkolem, Array.map_map]
+      congr 1
+      apply Array.map_congr_left
+      intro x _
+      exact NTy.encode_ofSkolem θ element x
+  | .ref referent, value => by
+      show NTy.encode (.ref (referent.subst θ.1)) _ = _
+      rw [NTy.encode_ref, @NTy.encode_ref (Skolems.instantiate θ Θ)]
+      simp only [NTy.ofSkolem]
+      rw [NTy.encode_ofSkolem θ referent value.1, NTy.encode_ofSkolem θ referent value.2]
+  | .param _, _ => rfl
+
+theorem HList.encode_ofSkolem (θ : TypeArgs) : (row : NRow) →
+    (values : @HList (Skolems.instantiate θ Θ) row) →
+    HList.encode (HList.ofSkolem θ row values) = @HList.encode (Skolems.instantiate θ Θ) row values
+  | .nil, _ => rfl
+  | .cons τ rest, values => by
+      show HList.encode (Γ := .cons (τ.subst θ.1) (NRow.subst θ.1 rest))
+        (NTy.ofSkolem θ τ values.1, HList.ofSkolem θ rest values.2) = _
+      rw [HList.encode_cons, @HList.encode_cons (Skolems.instantiate θ Θ)]
+      simp only
+      rw [NTy.encode_ofSkolem θ τ values.1, HList.encode_ofSkolem θ rest values.2]
+
+theorem variantCarrier.encode_ofSkolem (θ : TypeArgs) (source : StructHandle) :
+    (names : List String) → (rows : NRows) → (distinct : names.Nodup) →
+    (value : @variantCarrier (Skolems.instantiate θ Θ) names rows) →
+    NTy.encode (.enum source names (rows.subst θ.1) distinct) (variantCarrier.ofSkolem θ names rows value) =
+      @NTy.encode (Skolems.instantiate θ Θ) (.enum source names rows distinct) value
+  | _, .nil, _, value => nomatch value
+  | [], .cons _ _, _, value => nomatch value
+  | name :: names, .cons fields rest, distinct, .inl values => by
+      show NTy.encode (.enum source (name :: names) (.cons (NRow.subst θ.1 fields) (rest.subst θ.1)) distinct)
+        (.inl (HList.ofSkolem θ fields values)) = _
+      rw [NTy.encode_enum_inl, @NTy.encode_enum_inl (Skolems.instantiate θ Θ), HList.encode_ofSkolem θ fields values]
+  | name :: names, .cons fields rest, distinct, .inr value => by
+      show NTy.encode (.enum source (name :: names) (.cons (NRow.subst θ.1 fields) (rest.subst θ.1)) distinct)
+        (.inr (variantCarrier.ofSkolem θ names rest value)) = _
+      rw [NTy.encode_enum_inr, @NTy.encode_enum_inr (Skolems.instantiate θ Θ)]
+      exact variantCarrier.encode_ofSkolem θ source names rest _ value
+end
+
+mutual
+theorem NTy.encode_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst θ.1).carrier) →
+    @NTy.encode (Skolems.instantiate θ Θ) τ (NTy.toSkolem θ τ value) =
+      NTy.encode (τ.subst θ.1) value
+  | .unit, _ => rfl
+  | .bool, _ => rfl
+  | .int _ _, _ => rfl
+  | .address, _ => rfl
+  | .signer, _ => rfl
+  | .string, _ => rfl
+  | .bytes, _ => rfl
+  | .tuple elements, values => by
+      show @NTy.encode (Skolems.instantiate θ Θ) (.tuple elements) (HList.toSkolem θ elements values) =
+        NTy.encode (.tuple (NRow.subst θ.1 elements)) values
+      rw [@NTy.encode_tuple (Skolems.instantiate θ Θ), NTy.encode_tuple,
+        HList.encode_toSkolem θ elements values]
+  | .struct source fields, values => by
+      show @NTy.encode (Skolems.instantiate θ Θ) (.struct source fields)
+          (HList.toSkolem θ fields values) =
+        NTy.encode (.struct source (NRow.subst θ.1 fields)) values
+      rw [@NTy.encode_struct (Skolems.instantiate θ Θ), NTy.encode_struct,
+        HList.encode_toSkolem θ fields values]
+  | .enum source names rows distinct, value =>
+      variantCarrier.encode_toSkolem θ source names rows distinct value
+  | .vector element, vector => by
+      show @NTy.encode (Skolems.instantiate θ Θ) (.vector element)
+          (NTy.toSkolem θ (.vector element) vector) = NTy.encode (.vector (element.subst θ.1)) vector
+      rw [@NTy.encode_vector (Skolems.instantiate θ Θ), NTy.encode_vector]
+      simp only [NTy.toSkolem, Array.map_map]
+      congr 1
+      apply Array.map_congr_left
+      intro x _
+      exact NTy.encode_toSkolem θ element x
+  | .ref referent, value => by
+      show @NTy.encode (Skolems.instantiate θ Θ) (.ref referent)
+          (NTy.toSkolem θ (.ref referent) value) = NTy.encode (.ref (referent.subst θ.1)) value
+      rw [@NTy.encode_ref (Skolems.instantiate θ Θ), NTy.encode_ref]
+      simp only [NTy.toSkolem]
+      rw [NTy.encode_toSkolem θ referent value.1, NTy.encode_toSkolem θ referent value.2]
+  | .param _, _ => rfl
+
+theorem HList.encode_toSkolem (θ : TypeArgs) : (row : NRow) →
+    (values : HList (NRow.subst θ.1 row)) →
+    @HList.encode (Skolems.instantiate θ Θ) row (HList.toSkolem θ row values) =
+      HList.encode values
+  | .nil, _ => rfl
+  | .cons τ rest, values => by
+      show @HList.encode (Skolems.instantiate θ Θ) (.cons τ rest)
+          (NTy.toSkolem θ τ values.1, HList.toSkolem θ rest values.2) =
+        HList.encode (Γ := .cons (τ.subst θ.1) (NRow.subst θ.1 rest)) values
+      rw [@HList.encode_cons (Skolems.instantiate θ Θ), HList.encode_cons]
+      simp only
+      rw [NTy.encode_toSkolem θ τ values.1, HList.encode_toSkolem θ rest values.2]
+
+theorem variantCarrier.encode_toSkolem (θ : TypeArgs) (source : StructHandle) :
+    (names : List String) → (rows : NRows) → (distinct : names.Nodup) →
+    (value : variantCarrier names (rows.subst θ.1)) →
+    @NTy.encode (Skolems.instantiate θ Θ) (.enum source names rows distinct)
+        (variantCarrier.toSkolem θ names rows value) =
+      NTy.encode (.enum source names (rows.subst θ.1) distinct) value
+  | _, .nil, _, value => nomatch value
+  | [], .cons _ _, _, value => nomatch value
+  | name :: names, .cons fields rest, distinct, .inl values => by
+      show @NTy.encode (Skolems.instantiate θ Θ) (.enum source (name :: names) (.cons fields rest) distinct)
+          (.inl (HList.toSkolem θ fields values)) =
+        NTy.encode (.enum source (name :: names) (.cons (NRow.subst θ.1 fields) (rest.subst θ.1))
+          distinct) (.inl values)
+      rw [@NTy.encode_enum_inl (Skolems.instantiate θ Θ), NTy.encode_enum_inl,
+        HList.encode_toSkolem θ fields values]
+  | name :: names, .cons fields rest, distinct, .inr value => by
+      show @NTy.encode (Skolems.instantiate θ Θ) (.enum source (name :: names) (.cons fields rest) distinct)
+          (.inr (variantCarrier.toSkolem θ names rest value)) =
+        NTy.encode (.enum source (name :: names) (.cons (NRow.subst θ.1 fields) (rest.subst θ.1))
+          distinct) (.inr value)
+      rw [@NTy.encode_enum_inr (Skolems.instantiate θ Θ), NTy.encode_enum_inr]
+      exact variantCarrier.encode_toSkolem θ source names rest _ value
+end
+
+attribute [lir_denote, lir_denote_norm] Array.map_id' Array.map_id
+
+/-! A caller's value in the callee's view, as far as the callee looks into
+it: a scalar is itself, and a row, a vector, and a variant are transported
+lazily, component by component as they are projected, so that the encoding
+of a transported value meets the caller's encoding (`NTy.encode_toSkolem`)
+rather than a rebuilt copy of it. -/
+
+section LazyTransport
+variable (θ : TypeArgs)
+
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_unit (value : (NTy.unit.subst θ.1).carrier) :
+    NTy.toSkolem θ .unit value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_bool (value : (NTy.bool.subst θ.1).carrier) :
+    NTy.toSkolem θ .bool value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_int (width : Nat) (signed : Bool)
+    (value : ((NTy.int width signed).subst θ.1).carrier) :
+    NTy.toSkolem θ (.int width signed) value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_address
+    (value : (NTy.address.subst θ.1).carrier) : NTy.toSkolem θ .address value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_signer
+    (value : (NTy.signer.subst θ.1).carrier) : NTy.toSkolem θ .signer value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_string
+    (value : (NTy.string.subst θ.1).carrier) : NTy.toSkolem θ .string value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_bytes
+    (value : (NTy.bytes.subst θ.1).carrier) : NTy.toSkolem θ .bytes value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_param (index : Nat)
+    (value : ((NTy.param index).subst θ.1).carrier) :
+    NTy.toSkolem θ (.param index) value = value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_tuple (elements : NRow)
+    (values : ((NTy.tuple elements).subst θ.1).carrier) :
+    NTy.toSkolem θ (.tuple elements) values = HList.toSkolem θ elements values := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_struct (source : StructHandle) (fields : NRow)
+    (values : ((NTy.struct source fields).subst θ.1).carrier) :
+    NTy.toSkolem θ (.struct source fields) values = HList.toSkolem θ fields values := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_enum (source : StructHandle)
+    (names : List String) (rows : NRows) (distinct : names.Nodup)
+    (value : ((NTy.enum source names rows distinct).subst θ.1).carrier) :
+    NTy.toSkolem θ (.enum source names rows distinct) value =
+      variantCarrier.toSkolem θ names rows value := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_ref (referent : NTy)
+    (value : ((NTy.ref referent).subst θ.1).carrier) :
+    NTy.toSkolem θ (.ref referent) value =
+      (NTy.toSkolem θ referent value.1, NTy.toSkolem θ referent value.2) := rfl
+@[lir_denote, lir_denote_norm] theorem NTy.toSkolem_vector_values (element : NTy)
+    (vector : ((NTy.vector element).subst θ.1).carrier) :
+    (NTy.toSkolem θ (.vector element) vector).values =
+      vector.values.map (NTy.toSkolem θ element) := rfl
+@[lir_denote, lir_denote_norm] theorem HList.toSkolem_nil (values : HList (NRow.subst θ.1 .nil)) :
+    HList.toSkolem θ .nil values = () := rfl
+@[lir_denote, lir_denote_norm] theorem HList.toSkolem_fst (τ : NTy) (rest : NRow)
+    (values : HList (NRow.subst θ.1 (.cons τ rest))) :
+    (HList.toSkolem θ (.cons τ rest) values).1 = NTy.toSkolem θ τ values.1 := rfl
+@[lir_denote, lir_denote_norm] theorem HList.toSkolem_snd (τ : NTy) (rest : NRow)
+    (values : HList (NRow.subst θ.1 (.cons τ rest))) :
+    (HList.toSkolem θ (.cons τ rest) values).2 = HList.toSkolem θ rest values.2 := rfl
+@[lir_denote, lir_denote_norm] theorem HList.toSkolem_mk (τ : NTy) (rest : NRow)
+    (head : (τ.subst θ.1).carrier) (tail : HList (NRow.subst θ.1 rest)) :
+    HList.toSkolem θ (.cons τ rest) ((head, tail) : HList (NRow.subst θ.1 (.cons τ rest))) =
+      (NTy.toSkolem θ τ head, HList.toSkolem θ rest tail) := rfl
+@[lir_denote, lir_denote_norm] theorem variantCarrier.toSkolem_inl (name : String)
+    (names : List String) (fields : NRow) (rest : NRows) (values : HList (NRow.subst θ.1 fields)) :
+    variantCarrier.toSkolem θ (name :: names) (.cons fields rest) (.inl values) =
+      .inl (HList.toSkolem θ fields values) := rfl
+@[lir_denote, lir_denote_norm] theorem variantCarrier.toSkolem_inr (name : String)
+    (names : List String) (fields : NRow) (rest : NRows)
+    (value : variantCarrier names (NRows.subst θ.1 rest)) :
+    variantCarrier.toSkolem θ (name :: names) (.cons fields rest) (.inr value) =
+      .inr (variantCarrier.toSkolem θ names rest value) := rfl
+
+end LazyTransport
+
 end Transport
 
 attribute [lir_denote] NTy.inhabitant HList.inhabitant variantCarrier.inhabitant
   Skolems.default_instantiate
-attribute [lir_denote] NTy.toSkolem HList.toSkolem variantCarrier.toSkolem NTy.ofSkolem
+-- A variant's transport unfolds: an enum value is taken apart by its
+-- variants anyway, and a match reads the variant it holds.
+attribute [lir_denote] variantCarrier.toSkolem NTy.ofSkolem
   HList.ofSkolem variantCarrier.ofSkolem ResultShape.ofSkolem NTy.codec_param NTy.encode_param
   Skolems.codec_instantiate
 

@@ -1,21 +1,9 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-namespace LeanerTxnRejectRecursiveType
-
-open Move
-open scoped Move Move.Compiler
-
-/-! ## Functions -/
-
-@[move_struct]
-structure RecursiveType where
-  next : RecursiveType
-  deriving Copy, Drop, Store
-
-/-! ## Tests -/
-
-#export_leaner "LeanerRejectRecursiveType" structs [RecursiveType] functions []
-
-end LeanerTxnRejectRecursiveType
+leaner module 0x0::LeanerRejectRecursiveType where
+  struct RecursiveType has Copy, Drop, Store where
+    next : RecursiveType

@@ -1,50 +1,36 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowGlobals where
-
+leaner module 0x0::LeanerBorrowGlobals where
   struct Counter has Key where
-    value : U64
+    value : u64
 
-  fun publish (account : &Signer) (value : U64) : Action Unit :=
-    moveTo account ({ value } : Counter)
+  entry fun publish(account : &Signer, value : u64) -> Unit :=
+    move_to<Counter>(account, new Counter { value := value })
 
-  fun read_twice (address : Address) : Action U64 := do
-    let first ← &Counter[address].value
-    let second ← &Counter[address].value
-    let left ← *first
-    let right ← *second
-    pure (left + right)
+  fun read_twice(addr : Address) -> u64 := do
+    let first := &Counter[addr].value
+    let second := &Counter[addr].value
+    let left := *first
+    let right := *second
+    left + right
 
-  spec read_twice (_address : Address) where
-    ensures True
+  fun increment(addr : Address) -> Unit := do
+    let writer := &mut Counter[addr].value
+    *writer := *writer + 1
 
-  fun increment (address : Address) : Action Unit := do
-    let writer ← &mut Counter[address].value
-    writer := *writer + 1
+  fun abort_after_write(addr : Address) -> Unit := do
+    let writer := &mut Counter[addr].value
+    *writer := 99
+    abort(7)
 
-  spec increment (_address : Address) where
-    ensures True
-
-  fun abort_after_write (address : Address) : Action Unit := do
-    let writer ← &mut Counter[address].value
-    writer := 99
-    abort 7
-
-  spec abort_after_write (_address : Address) where
-    ensures True
-
-  fun read (address : Address) : Action U64 := do
-    let observation ← &Counter[address].value
-    let result ← *observation
-    pure result
-
-  spec read (_address : Address) where
-    ensures True
+  fun read(addr : Address) -> u64 := do
+    let observation := &Counter[addr].value
+    let result := *observation
+    result
 
 --# run --args 5u64 --signers 0x42 -- 0x0::LeanerBorrowGlobals::publish
 

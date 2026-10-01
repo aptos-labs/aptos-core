@@ -30,7 +30,7 @@ use crate::{
     pragmas::{
         CONDITION_INJECTED_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA, INTRINSIC_PRAGMA, OPAQUE_PRAGMA,
-        VERIFY_PRAGMA,
+        VERIFY_MANUAL, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -2875,13 +2875,20 @@ impl GlobalEnv {
             .unwrap_or("")
     }
 
-    /// Returns true if the boolean property is true.
+    /// Returns true if the boolean property is true. `pragma verify = manual` is
+    /// true: the function is verified, by an authored proof.
     pub fn is_property_true(&self, properties: &PropertyBag, name: &str) -> Option<bool> {
         let sym = &self.symbol_pool().make(name);
-        if let Some(PropertyValue::Value(Value::Bool(b))) = properties.get(sym) {
-            return Some(*b);
+        match properties.get(sym) {
+            Some(PropertyValue::Value(Value::Bool(b))) => Some(*b),
+            Some(PropertyValue::Symbol(value))
+                if name == VERIFY_PRAGMA
+                    && self.symbol_pool().string(*value).as_str() == VERIFY_MANUAL =>
+            {
+                Some(true)
+            },
+            _ => None,
         }
-        None
     }
 
     /// Returns the value of a number property.

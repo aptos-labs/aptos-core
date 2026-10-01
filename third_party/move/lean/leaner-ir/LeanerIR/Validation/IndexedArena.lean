@@ -56,12 +56,62 @@ theorem get?_ofListFuel (fuel : Nat) (values : List α) (index : Nat)
                 congr 1
                 omega
 
+/-- The index of the first `count` values, and the values after them. The
+tree is `ofListFuel`'s, built in one traversal: splitting the list at every
+level walks each level's values again, which the kernel pays for whenever a
+certificate reduces an index. -/
+def build : Nat → Nat → List α → IndexedArena α × List α
+  | 0, _, values => (.empty, values)
+  | _ + 1, 0, values => (.empty, values)
+  | _ + 1, 1, [] => (.empty, [])
+  | _ + 1, 1, value :: rest => (.leaf value, rest)
+  | fuel + 1, count + 2, values =>
+      let middle := (count + 2) / 2
+      let (left, values) := build fuel middle values
+      let (right, values) := build fuel (count + 2 - middle) values
+      (.branch middle left right, values)
+
+private theorem ofListFuel_long (fuel : Nat) (values : List α) (long : 2 ≤ values.length) :
+    ofListFuel (fuel + 1) values =
+      .branch (values.length / 2) (ofListFuel fuel (values.take (values.length / 2)))
+        (ofListFuel fuel (values.drop (values.length / 2))) := by
+  match values, long with
+  | _ :: _ :: _, _ => rfl
+
+theorem build_eq (fuel count : Nat) (values : List α) (small : count ≤ fuel)
+    (enough : count ≤ values.length) :
+    build fuel count values = (ofListFuel fuel (values.take count), values.drop count) := by
+  induction fuel generalizing count values with
+  | zero =>
+      have : count = 0 := by omega
+      subst this
+      rfl
+  | succ fuel ih =>
+      match count, values, small, enough with
+      | 0, values, _, _ => simp [build, ofListFuel]
+      | 1, [], _, _ => simp [build, ofListFuel]
+      | 1, value :: rest, _, _ => simp [build, ofListFuel]
+      | count + 2, values, small, enough =>
+          have taken : (values.take (count + 2)).length = count + 2 := by
+            rw [List.length_take]; omega
+          have middle_le : (count + 2) / 2 ≤ count + 2 := Nat.div_le_self _ _
+          simp only [build]
+          rw [ih _ _ (by omega) (by omega),
+            ih _ _ (by omega) (by rw [List.length_drop]; omega),
+            ofListFuel_long _ _ (by omega), taken, List.take_take, List.drop_take,
+            List.drop_drop, Nat.min_eq_left middle_le,
+            show (count + 2) / 2 + (count + 2 - (count + 2) / 2) = count + 2 by omega]
+
 def ofArray (values : Array α) : IndexedArena α :=
-  ofListFuel values.size values.toList
+  (build values.size values.size values.toList).1
+
+theorem ofArray_eq (values : Array α) :
+    ofArray values = ofListFuel values.size values.toList := by
+  rw [ofArray, build_eq _ _ _ (Nat.le_refl _) (by simp), List.take_of_length_le (by simp)]
 
 theorem get?_ofArray (values : Array α) (index : Nat) :
     (ofArray values).get? index = values[index]? := by
-  rw [ofArray, get?_ofListFuel _ _ _ (by simp)]
+  rw [ofArray_eq, get?_ofListFuel _ _ _ (by simp)]
   simp
 
 theorem get?_of_index_eq {values : Array α} {tree : IndexedArena α}

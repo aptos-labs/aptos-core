@@ -3,13 +3,13 @@
 
 import LeanerLang
 
-leaner module 0x1::type_info where
-  use 0x1::std::bcs::serialize
-  use 0x1::std::bcs::serialized_size
-  use 0x1::std::error::invalid_state
-  use 0x1::std::features::aptos_stdlib_chain_id_enabled
-  use 0x1::std::features::spec_is_enabled
-  use 0x1::std::«string»::String
+leaner module aptos_std::type_info where
+  use std::bcs::serialize
+  use std::bcs::serialized_size
+  use std::error::invalid_state
+  use std::features::aptos_stdlib_chain_id_enabled
+  use std::features::spec_is_enabled
+  use std::«string»::String
 
   --
   -- Error codes

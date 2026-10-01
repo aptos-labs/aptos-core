@@ -18,10 +18,9 @@ reference for solutions being rebuilt on the leaner codebase. Do not add
 functionality or tests to them, do not include their suites in test runs or
 CI, and do not root new work in them. The Move exchange frontend and LIR
 adapter formerly hosted by the transpiler now live in
-`leaner-move/LeanerMove/Frontend`. No leaner package links the deprecated
-packages; only compiler-v2's Lean integration still elaborates `.lean`
-sources against `v0/move`, so CI builds that library (not its suites) for
-the compiler-v2 tests.
+`leaner-move/LeanerMove/Frontend`. Nothing links the deprecated packages:
+compiler-v2 elaborates `.lean` sources in `leaner-move`, whose XIR backend
+(`LeanerMove/Xir`) lowers a LeanerLang module to the XIR compiler-v2 loads.
 
 Keep these claims separate:
 
@@ -60,15 +59,16 @@ exercises. Avoid introducing reverse dependencies into production packages.
 | [`README.md`](README.md) | Tree-level overview, architecture, setup, and the main build/test path. Start here. |
 | [`designs/`](designs/) | The current cross-package design documents: unified LIR, LIR elaboration/verification, the LeanerLang surface, the Rust MIR frontend, and the MonoVM differential-testing link. |
 | [`leaner-ir/`](leaner-ir/) | Shared typed LIR, versioned RawUnit JSON import, validation, structured semantics, interpreter, proofs, and unit tests. It owns the neutral IR boundary. |
-| [`leaner-move/`](leaner-move/) | Move semantic profile and intrinsic registry over `leaner-ir`, plus the Move exchange frontend (`LeanerMove/Frontend`): CLI invocation, XAST decoding, and LIR encoding. |
+| [`leaner-move/`](leaner-move/) | Move semantic profile and intrinsic registry over `leaner-ir`, the Move exchange frontend (`LeanerMove/Frontend`): CLI invocation, XAST decoding, and LIR encoding, and the XIR backend (`LeanerMove/Xir`) compiler-v2 compiles `.lean` sources through. |
 | [`leaner-rust/`](leaner-rust/) | Rust semantic profile, source backend, registry, Lean-owned import CLI, and Lean integration tests. |
 | [`leaner-rust/rust-exporter/`](leaner-rust/rust-exporter/) | Standalone Rust crate using the pinned Rustc Public API to export borrow-checked optimized MIR as RawUnit JSON. Fixtures and JSON baselines live under `tests/`. |
 | [`v0/move-model/`](v0/move-model/) | **Deprecated, reference only.** Logical model of Move stackless bytecode: IR, execution semantics, checking, interpreter, reference elimination, prover stages, XIR, and source/masm frontends. |
 | [`v0/move/`](v0/move/) | **Deprecated, reference only.** The original Leaner Move surface language, source semantics, contracts, `verify`, compiler lowering, and `Move/Tests` regressions, being rebuilt over the unified LIR. |
 | [`v0/transpiler/`](v0/transpiler/) | **Deprecated, reference only.** `aptos move exchange --format ast` decoder, Move-to-Leaner printer, intrinsic handling, reporting, CLI, and printer/elaboration baselines. Its exchange frontend and LIR adapter were ported to `leaner-move`. |
 | [`leaner-e2e-tests/`](leaner-e2e-tests/) | Discoverable Move-to-LeanerLang and Rust-to-LeanerLang source/result baselines. Assertion-style legacy tests remain with their owning packages. |
-| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`). |
-| [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. No leaner package links them; CI builds only the `v0/move` library, for compiler-v2's Lean integration tests. |
+| [`scripts/`](scripts/) | The Rust pipeline benchmark (`bench-rust-pipeline.sh`), single-target isolation for cost and debugging (`isolate-target.py`), and the baseline error delta after a `UB=1` run (`exp-error-delta.sh`); see `designs/perf-notes.md`. The verification benchmark driver (`leaner-bench.py`); see `designs/verification-benchmarks.md`. |
+| [`bench/`](bench/) | The problems of the verification benchmark (`problems.toml`), read from the tree at the benchmarked commit. |
+| [`v0/`](v0/) | **Deprecated, reference only.** The original stack: `move`, `move-model`, `transpiler`, and their `scripts/` proof-cost tools. Nothing links them and they are not built in CI. |
 
 Within each package, the root `Foo.lean` is the public import, source modules
 live under `Foo/`, and tests are either under `Foo/Tests/` or exposed through a
@@ -86,8 +86,10 @@ The current cross-package designs live in [`designs/`](designs/). The design
 documents kept inside `v0/` (`move/`, `move-model/`, `transpiler/`) describe the
 older source-specific work those packages own.
 
-- [`designs/roadmap.md`](designs/roadmap.md): the priority ordering across the
-  current designs and the items deliberately not scheduled.
+- [`designs/roadmap.md`](designs/roadmap.md): the single status document —
+  what is open across the designs in priority order, and the test ledger
+  (gates, the Check fixtures under `leaner-e2e-tests/LeanerE2ETests/Check/`,
+  and their conventions).
 - [`designs/lir-design.md`](designs/lir-design.md): the master design — unified
   LIR ownership, stages, profiles, validation, serialization, frontend/backend
   contracts, deferred-work register, and phase roadmap.
@@ -96,10 +98,14 @@ older source-specific work those packages own.
 - [`designs/denotation.md`](designs/denotation.md): the current
   verification design — one `denote` of validated LIR into `Spec` and one
   agreement theorem against `BigStep`, replacing per-target generated
-  agreement proofs; milestones D0–D4 with their fixture gates.
-- [`designs/test-organization.md`](designs/test-organization.md): verification
-  checks as baselines under `leaner-e2e-tests/LeanerE2ETests/Check/` and
-  the ledger of v0 tests ported so far.
+  agreement proofs; milestones D0–D6 with their fixture gates.
+- [`designs/perf-notes.md`](designs/perf-notes.md): how to measure
+  performance (stage logs, heartbeat stages, profiler categories, kernel
+  unfold diagnostics), what verification, elaboration, and the kernel pay
+  for, rejected experiments, and the open leads.
+- [`designs/verification-benchmarks.md`](designs/verification-benchmarks.md):
+  the nightly benchmark of standard problems, heartbeats per phase, history
+  from recent CI runs, curves, Slack reports, and local comparison.
 - [`designs/leaner-lang.md`](designs/leaner-lang.md): the profile-aware Leaner
   source language over the shared IR, generalizing the Move-profile surface.
 - [`designs/prophetic-references.md`](designs/prophetic-references.md):
@@ -109,18 +115,27 @@ older source-specific work those packages own.
 - [`designs/rust-mir-design.md`](designs/rust-mir-design.md): Rustc Public
   frontend decision, Rust profile, structured LIR boundary, Rust source
   backend, references, generics, unsafe boundary, and milestones.
+- [`designs/relocatable-namespaces.md`](designs/relocatable-namespaces.md):
+  validated namespaces as relocatable objects, linked into units by
+  relocation without re-validation, and verification across modules;
+  milestones R1–R4.
+- [`designs/source-verification.md`](designs/source-verification.md): the
+  `leaner-move verify` / `leaner-rust verify` commands, Rust `.spec.lean`
+  files, Move frames, and how messages map back to the original sources.
 - [`designs/monovm-link-design.md`](designs/monovm-link-design.md): linking
   MonoVM into Lean test executables for differential execution testing.
 - [`designs/unsafe-pointers.md`](designs/unsafe-pointers.md): proposal for
-  the Rust unsafe profile over the prophetic model, not yet scheduled.
+  the Rust unsafe profile over the prophetic model, scheduled as Rust M5.
 - [`leaner-rust/rust-exporter/README.md`](leaner-rust/rust-exporter/README.md):
   exact exporter scope, supported MIR fixtures, commands, and known boundaries.
 
 Executed or superseded designs move to
 [`designs/historical/`](designs/historical/) (`verification-v2.md`,
 `certifying-execution.md`, `generic-route.md`, and
-`verification-perf-audit.md`, all replaced by `denotation.md`); they are
-reference only and are not updated.
+`verification-perf-audit.md`, all replaced by `denotation.md`;
+`test-organization.md` and `test-organization-history.md`, the earlier
+check ledger, replaced by the roadmap's test ledger); they are reference
+only and are not updated.
 
 ### Leaner Move source and verification (deprecated packages)
 
@@ -202,6 +217,16 @@ unrelated `move` executable on `PATH` is never a substitute.
 cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
 export APTOS_MOVE_CLI="$(git rev-parse --show-toplevel)/target/ci/move"
 ```
+
+The reverse direction verifies a Move package in place from the Move CLI:
+`move prove --lean --package-dir <package>` (or `aptos move prove --lean`)
+exports the package and runs the built `leaner-move` executable through
+`lake env`; see `designs/source-verification.md` ("From the Move CLI").
+A function the automatic verification does not establish within its budget
+is proved in the LeanerLang proof file beside its Move file
+(`foo.proof.lean`: `verify f by …` items and their lemmas), which the
+failure message names; see the design's "Proofs". The commands, flags, and
+pragmas are summarized in [`README.md`](README.md) ("Verifying sources").
 
 ## Build and test
 

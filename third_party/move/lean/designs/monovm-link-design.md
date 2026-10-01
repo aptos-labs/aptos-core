@@ -487,7 +487,8 @@ the register stays a triage record rather than a to-do list.
 ## Implementation plan
 
 Status: planned 2026-08-27; M0–M3 and M4a implemented on 2026-08-27, M4b
-partly delivered 2026-08-28 (see the findings register). The milestones
+partly delivered 2026-08-28 (see the findings register); open work is
+listed in [`roadmap.md`](roadmap.md), section 6. The milestones
 implement the minimum gates above in order; each one is independently
 reviewable and leaves the tree building and testing green. M0–M1 are pure
 Rust, M2 makes the link, M3 makes it differential, and M4–M5 grow semantic

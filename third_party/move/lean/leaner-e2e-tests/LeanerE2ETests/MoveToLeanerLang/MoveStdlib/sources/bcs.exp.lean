@@ -9,8 +9,8 @@ Serialization). BCS is the binary encoding for Move resources and other non-modu
 published on-chain. See https://github.com/aptos-labs/bcs#binary-canonical-serialization-bcs for more
 details on BCS.
 -/
-leaner module 0x1::bcs where
-  use 0x1::std::option::Option
+leaner module std::bcs where
+  use std::option::Option
 
   /--
   Returns the binary representation of `v` in BCS (Binary Canonical Serialization) format.

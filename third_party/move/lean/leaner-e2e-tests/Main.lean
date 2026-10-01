@@ -38,17 +38,25 @@ unsafe def runSuites : IO Unit := do
       -- development convenience, never the default coverage.
       LeanerE2ETests.MoveToLeanerLang.testBaselines environment
       LeanerE2ETests.RustToLeanerLang.testBaselines environment
-      LeanerE2ETests.Check.testBaselines
+      -- The checks elaborate in processes of their own, so they run beside
+      -- the source verification, which elaborates in this one.
+      let checks ← IO.asTask (prio := .dedicated) LeanerE2ETests.Check.testBaselines
+      let verified ← LeanerE2ETests.SourceVerify.testBaselines.toBaseIO
+      match verified, ← IO.wait checks with
+      | .ok (), .ok () => pure ()
+      | .error error, .ok () | .ok (), .error error => throw error
+      | .error first, .error second => throw <| IO.userError s!"{first}\n{second}"
       LeanerE2ETests.MonoVM.testSmoke
       LeanerE2ETests.MonoDifferential.testBaselines environment
   | some "move" => LeanerE2ETests.MoveToLeanerLang.testBaselines environment
   | some "check" => LeanerE2ETests.Check.testBaselines
   | some "rust" => LeanerE2ETests.RustToLeanerLang.testBaselines environment
+  | some "verify" => LeanerE2ETests.SourceVerify.testBaselines
   | some "monovm" => LeanerE2ETests.MonoVM.testSmoke
   | some "monodiff" => LeanerE2ETests.MonoDifferential.testBaselines environment
   | some suite =>
       throw <| IO.userError
-        s!"unknown LEANER_E2E_SUITE `{suite}`; expected `move`, `rust`, `check`, `monovm`, or `monodiff`"
+        s!"unknown LEANER_E2E_SUITE `{suite}`; expected `move`, `rust`, `verify`, `check`, `monovm`, or `monodiff`"
 
 unsafe def main : IO UInt32 := do
   -- Freshness contract: inside a checkout the driver always runs the locked

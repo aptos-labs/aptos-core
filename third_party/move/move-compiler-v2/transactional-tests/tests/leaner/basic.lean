@@ -2,16 +2,9 @@
 
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerTxn where
-
-  /-! ## Functions -/
-
-  @[entry]
-  fun fail (code : U64) : Action Unit := do
-    abort code
-
-/-! ## Tests -/
+leaner module 0x0::LeanerTxn where
+  entry fun fail(code : u64) -> Unit := abort(code)
 
 --# run 0x0::LeanerTxn::fail --args 7u64
