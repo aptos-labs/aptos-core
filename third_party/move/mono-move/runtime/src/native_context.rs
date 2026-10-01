@@ -905,6 +905,16 @@ impl NativeContext for ProductionNativeContext<'_> {
         self.abi.required_descriptor(i)
     }
 
+    fn return_type(&self, i: usize) -> VMResult<InternedType> {
+        self.abi.return_type(i).ok_or_else(|| {
+            native_invariant_violation(format!(
+                "return index {} out of bounds (num_returns={})",
+                i,
+                self.abi.returns().len(),
+            ))
+        })
+    }
+
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>> {
         let size = crate::value_conv::bcs::fixed_serialized_size(self.guard, ty)?;
         Ok(size.map(|n| n as u64))
