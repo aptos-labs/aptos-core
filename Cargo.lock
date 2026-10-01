@@ -2040,6 +2040,7 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
+ "move-model-exchange",
  "move-package",
  "move-prover",
  "move-prover-boogie-backend",
@@ -2983,6 +2984,19 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+]
+
+[[package]]
+name = "aptos-keyless-validation"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "ark-bn254",
+ "ark-groth16",
+ "hex",
+ "move-core-types",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5039,6 +5053,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-proptest-helpers",
  "arbitrary",
+ "ark-bls12-381 0.5.0",
  "ark-bn254",
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -5178,6 +5193,7 @@ dependencies = [
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-keygen",
+ "aptos-keyless-validation",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-memory-usage-tracker",
@@ -5190,8 +5206,6 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "ark-bn254",
- "ark-groth16",
  "bcs 0.1.4",
  "bytes",
  "claims",
@@ -5199,7 +5213,6 @@ dependencies = [
  "derive_more 0.99.17",
  "fail",
  "futures",
- "hex",
  "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
@@ -5526,7 +5539,7 @@ dependencies = [
 [[package]]
 name = "ark-ec"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ahash 0.8.12",
  "ark-ff 0.5.0",
@@ -5567,7 +5580,7 @@ dependencies = [
 [[package]]
 name = "ark-ff"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ark-ff-asm 0.5.0",
  "ark-ff-macros 0.5.0",
@@ -5597,7 +5610,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-asm"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "quote",
  "syn 2.0.87",
@@ -5619,7 +5632,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-macros"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
@@ -5660,7 +5673,7 @@ dependencies = [
 [[package]]
 name = "ark-poly"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ahash 0.8.12",
  "ark-ff 0.5.0",
@@ -5699,7 +5712,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ark-serialize-derive 0.5.0",
  "ark-std 0.5.0",
@@ -5723,7 +5736,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize-derive"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -12965,6 +12978,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
+ "aptos-keyless-validation",
  "aptos-language-e2e-tests",
  "aptos-transaction-simulation",
  "aptos-types",
@@ -12982,6 +12996,7 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-value-view",
+ "serde",
  "thiserror 1.0.69",
 ]
 
@@ -13068,6 +13083,12 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
  "bcs 0.1.4",
  "blake2-rfc",
  "bulletproofs",
@@ -13077,9 +13098,11 @@ dependencies = [
  "merlin",
  "mono-move-core",
  "move-core-types",
+ "num-traits",
  "once_cell",
  "rand_core 0.5.1",
  "ripemd",
+ "sha2 0.10.9",
  "sha2 0.9.9",
  "sha3 0.9.1",
  "siphasher 0.3.11",
@@ -13576,8 +13599,12 @@ dependencies = [
 name = "move-model-exchange"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-move-cli",
  "datatest-stable",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
  "move-prover-test-utils",
  "serde",
  "serde_json",

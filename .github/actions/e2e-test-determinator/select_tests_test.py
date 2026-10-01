@@ -89,7 +89,27 @@ class E2eSelectionTest(unittest.TestCase):
                     self.assertIn("SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') }}", body)
         self.assertTrue({"mono-move-parity", "mono-move-performance",
                          "forge-framework-upgrade", "forge-consensus-only-performance",
-                         "forge-multiregion"}.isdisjoint(REGISTRY))
+                         "forge-multiregion", "faucet-integration",
+                         "execution-performance"}.isdisjoint(REGISTRY))
+        # Execution performance has its own dispatched nightly; PRs opt in by label.
+        performance = (root / ".github/workflows/execution-performance.yaml").read_text()
+        self.assertIn("CICD:run-execution-performance-test", performance)
+        for automatic in ("auto_merge", "CICD:run-e2e-tests", "CICD:run-all-e2e-tests"):
+            self.assertNotIn(automatic, performance)
+        # Manual suites stay manual: the nightly calls none of them.
+        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
+        for manual in (
+            "mono-move-tests-parity.yaml",
+            "mono-move-e2e-perf.yaml",
+            "faucet-tests-prod.yaml",
+            "faucet-tests-main.yaml",
+            "suite: framework_upgrade",
+            "suite: consensus_only_realistic_env_max_tps",
+            "suite: multiregion_benchmark_test",
+            "execution-performance",
+        ):
+            with self.subTest(nightly=manual):
+                self.assertNotIn(manual, nightly)
 
     def test_full_run_label_reaches_compat_prerequisite(self):
         root = Path(__file__).resolve().parents[3]
@@ -109,13 +129,12 @@ class E2eSelectionTest(unittest.TestCase):
         ).read_text()
         faucet_job = self.workflow_job(faucet, "run-tests-main")
         faucet_gate = faucet_job.split("    runs-on:", 1)[0]
-        self.assertIn("inputs.SELECTION_RESULT != 'success'", faucet_gate)
         self.assertIn("!inputs.SKIP_JOB", faucet_gate)
 
         caller = (root / ".github/workflows/docker-build-test.yaml").read_text()
         faucet_call = self.workflow_job(caller, "faucet-tests-main")
+        self.assertNotIn("e2e-test-determinator", faucet_call)
         skip = next(line for line in faucet_call.splitlines() if "SKIP_JOB:" in line)
-        self.assertIn("needs.e2e-test-determinator.outputs.mode != 'subsystem'", skip)
         self.assertIn("CICD:non-required-tests", skip)
         self.assertIn("CICD:run-all-e2e-tests", skip)
 

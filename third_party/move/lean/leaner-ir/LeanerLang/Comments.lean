@@ -13,85 +13,113 @@ and the standalone formatter cross the same comment-preserving AST boundary.
 
 namespace LeanerLang
 
-private partial def commentCharacterRanges (source : String) : Array (Nat × Nat) :=
-  let rec blockLength (remaining : List Char) (depth consumed : Nat) : Nat :=
-    match remaining with
-    | [] => consumed
-    | '/' :: '-' :: rest => blockLength rest (depth + 1) (consumed + 2)
-    | '-' :: '/' :: rest =>
-        if depth == 1 then consumed + 2
-        else blockLength rest (depth - 1) (consumed + 2)
-    | _ :: rest => blockLength rest depth (consumed + 1)
-  -- A prime continues an identifier (`self'`), so an apostrophe opens a
-  -- character literal only where an identifier cannot be running and the
-  -- literal closes in the one-character or one-escape shape. Reading a prime
-  -- as a quote would swallow every comment up to the next apostrophe.
-  let identifierCharacter (character : Char) : Bool :=
-    character.isAlphanum || character == '_' || character == '\'' ||
-      character == '!' || character == '$' || character == '»'
-  let characterLiteralLength (remaining : List Char) : Option Nat :=
-    match remaining with
-    | '\'' :: '\\' :: _ :: '\'' :: _ => some 4
-    | '\'' :: character :: '\'' :: _ => if character == '\'' then none else some 3
-    | _ => none
-  let rec scan (remaining : List Char) (offset : Nat) (quote : Option Char)
-      (escaped : Bool) (previous : Option Char) (found : Array (Nat × Nat)) :
-      Array (Nat × Nat) :=
-    match remaining with
-    | [] => found
-    | '-' :: '-' :: _ =>
-        if quote.isSome then scan remaining.tail offset.succ quote false (some '-') found
-        else
-          let length := (remaining.takeWhile (· != '\n')).length
-          scan (remaining.drop length) (offset + length) none false none
-            (found.push (offset, offset + length))
-    | '/' :: '-' :: rest =>
-        if quote.isSome then scan rest (offset + 2) quote false (some '-') found
-        else
-          let length := blockLength rest 1 2
-          scan (remaining.drop length) (offset + length) none false none
-            (found.push (offset, offset + length))
-    | character :: rest =>
-        if escaped then scan rest offset.succ quote false (some character) found
-        else if quote.isSome && character == '\\' then
-          scan rest offset.succ quote true (some character) found
-        else if quote == some character then
-          scan rest offset.succ none false (some character) found
-        else if quote.isNone && character == '"' then
-          scan rest offset.succ (some character) false (some character) found
-        else if quote.isNone && character == '\'' then
-          match characterLiteralLength remaining with
-          | some length =>
-              if previous.any identifierCharacter then
-                scan rest offset.succ none false (some character) found
-              else scan (remaining.drop length) (offset + length) none false none found
-          | none => scan rest offset.succ none false (some character) found
-        else scan rest offset.succ quote false (some character) found
-  scan source.toList 0 none false none #[]
+/-- A prime continues an identifier (`self'`), so an apostrophe opens a
+character literal only where an identifier cannot be running and the
+literal closes in the one-character or one-escape shape. Reading a prime
+as a quote would swallow every comment up to the next apostrophe. -/
+private def identifierCharacter (character : Char) : Bool :=
+  character.isAlphanum || character == '_' || character == '\'' ||
+    character == '!' || character == '$' || character == '»'
+
+/-- The end of the character literal opening at `pos`, when one does. -/
+private def characterLiteralEnd? (source : String) (pos : String.Pos.Raw) : Option String.Pos.Raw :=
+  let second := String.Pos.Raw.next source pos
+  if String.Pos.Raw.atEnd source second then none
+  else if String.Pos.Raw.get source second == '\\' then
+    let third := String.Pos.Raw.next source second
+    if String.Pos.Raw.atEnd source third then none
+    else
+      let fourth := String.Pos.Raw.next source third
+      if !String.Pos.Raw.atEnd source fourth && String.Pos.Raw.get source fourth == '\'' then some (String.Pos.Raw.next source fourth) else none
+  else if String.Pos.Raw.get source second == '\'' then none
+  else
+    let third := String.Pos.Raw.next source second
+    if !String.Pos.Raw.atEnd source third && String.Pos.Raw.get source third == '\'' then some (String.Pos.Raw.next source third) else none
+
+/-- The end of the line comment opening at `pos`: the newline, or the end. -/
+private partial def lineCommentEnd (source : String) (pos : String.Pos.Raw) : String.Pos.Raw :=
+  if String.Pos.Raw.atEnd source pos || String.Pos.Raw.get source pos == '\n' then pos else lineCommentEnd source (String.Pos.Raw.next source pos)
+
+/-- The end of the nested block comment whose opening slash-dash ends at `pos`. -/
+private partial def blockCommentEnd (source : String) (pos : String.Pos.Raw) (depth : Nat) : String.Pos.Raw :=
+  if String.Pos.Raw.atEnd source pos then pos
+  else
+    let next := String.Pos.Raw.next source pos
+    let character := String.Pos.Raw.get source pos
+    if character == '/' && !String.Pos.Raw.atEnd source next && String.Pos.Raw.get source next == '-' then
+      blockCommentEnd source (String.Pos.Raw.next source next) (depth + 1)
+    else if character == '-' && !String.Pos.Raw.atEnd source next && String.Pos.Raw.get source next == '/' then
+      if depth == 1 then String.Pos.Raw.next source next else blockCommentEnd source (String.Pos.Raw.next source next) (depth - 1)
+    else blockCommentEnd source next depth
 
 /-- Extract every Lean line or nested block comment outside string and
-character literals. Returned spans are half-open UTF-8 byte ranges. -/
+character literals, in one pass over the source at its byte positions.
+Returned spans are half-open UTF-8 byte ranges. -/
 def commentsOfSource (source : String) : Array Comment := Id.run do
-  let mut comments := #[]
-  let characters := source.toList
-  for (startCharacter, endCharacter) in commentCharacterRanges source do
-    let before := characters.take startCharacter
-    let comment := String.ofList <| characters.drop startCharacter |>.take
-      (endCharacter - startCharacter)
-    let linePrefix := before.reverse.takeWhile (· != '\n')
-    comments := comments.push {
-      text := comment
-      isDoc := comment.startsWith "--/" || comment.startsWith "/--" ||
-        comment.startsWith "/-!"
-      ownLine := linePrefix.all Char.isWhitespace
-      span := {
-        startByte := (String.ofList before).utf8ByteSize
-        endByte := (String.ofList (characters.take endCharacter)).utf8ByteSize } }
+  let mut comments : Array Comment := #[]
+  let mut pos : String.Pos.Raw := 0
+  -- Inside a string literal: the quote, and whether the last character escapes.
+  let mut quote : Option Char := none
+  let mut escaped := false
+  -- The character before `pos`, and whether the line so far is blank.
+  let mut previous : Option Char := none
+  let mut lineBlank := true
+  while !String.Pos.Raw.atEnd source pos do
+    let character := String.Pos.Raw.get source pos
+    let next := String.Pos.Raw.next source pos
+    if let some opening := quote then
+      if escaped then escaped := false
+      else if character == '\\' then escaped := true
+      else if character == opening then quote := none
+      previous := some character
+      lineBlank := if character == '\n' then true else lineBlank && character.isWhitespace
+      pos := next
+    else if character == '-' && !String.Pos.Raw.atEnd source next && String.Pos.Raw.get source next == '-' then
+      let stop := lineCommentEnd source next
+      let text := String.Pos.Raw.extract source pos stop
+      comments := comments.push {
+        text, isDoc := text.startsWith "--/", ownLine := lineBlank
+        span := { startByte := pos.byteIdx, endByte := stop.byteIdx } }
+      previous := none
+      lineBlank := false
+      pos := stop
+    else if character == '/' && !String.Pos.Raw.atEnd source next && String.Pos.Raw.get source next == '-' then
+      let stop := blockCommentEnd source (String.Pos.Raw.next source next) 1
+      let text := String.Pos.Raw.extract source pos stop
+      comments := comments.push {
+        text, isDoc := text.startsWith "/--" || text.startsWith "/-!", ownLine := lineBlank
+        span := { startByte := pos.byteIdx, endByte := stop.byteIdx } }
+      previous := none
+      lineBlank := false
+      pos := stop
+    else if character == '"' then
+      quote := some '"'
+      previous := some character
+      lineBlank := false
+      pos := next
+    else if character == '\'' && !previous.any identifierCharacter then
+      match characterLiteralEnd? source pos with
+      | some stop =>
+          previous := none
+          lineBlank := false
+          pos := stop
+      | none =>
+          previous := some character
+          lineBlank := false
+          pos := next
+    else
+      previous := some character
+      lineBlank := if character == '\n' then true else lineBlank && character.isWhitespace
+      pos := next
   return comments
 
-private def whitespaceBytes (source : String) (startByte endByte : Nat) : Bool :=
-  let bytes := source.toUTF8.extract startByte endByte
-  bytes.data.all fun byte => byte == 9 || byte == 10 || byte == 13 || byte == 32
+/-- Whether only whitespace lies between two byte positions. -/
+private partial def whitespaceBytes (source : String) (startByte endByte : Nat) : Bool :=
+  go ⟨startByte⟩
+where
+  go (pos : String.Pos.Raw) : Bool :=
+    if pos.byteIdx >= endByte || String.Pos.Raw.atEnd source pos then true
+    else (String.Pos.Raw.get source pos).isWhitespace && go (String.Pos.Raw.next source pos)
 
 private def documentationBody (comment : Comment) : String :=
   let text := comment.text
@@ -128,12 +156,16 @@ def documentationBefore (source : String) (startByte : Nat) : String :=
 syntax range are retained directly. A trailing comment is also retained when
 only whitespace separates it from the last parsed token; Lean otherwise drops
 such EOF trivia from the command's tail position. -/
-def commentsForCommand (source : String) (span : Span) : Array Comment :=
-  (commentsOfSource source).filter fun comment =>
-    comment.span.startByte >= span.startByte &&
-      (comment.span.endByte <= span.endByte ||
-        (comment.span.startByte >= span.endByte &&
-          whitespaceBytes source span.endByte comment.span.startByte &&
-          whitespaceBytes source comment.span.endByte source.utf8ByteSize))
+def commentsForCommand (source : String) (span : Span) : Array Comment := Id.run do
+  let comments := commentsOfSource source
+  let inside := comments.filter fun comment =>
+    comment.span.startByte >= span.startByte && comment.span.endByte <= span.endByte
+  -- Only the first comment after the command can follow it across whitespace
+  -- alone, and only as the file's last content.
+  let some trailing := comments.find? (·.span.startByte >= span.endByte) | return inside
+  if whitespaceBytes source span.endByte trailing.span.startByte &&
+      whitespaceBytes source trailing.span.endByte source.utf8ByteSize then
+    return inside.push trailing
+  return inside
 
 end LeanerLang

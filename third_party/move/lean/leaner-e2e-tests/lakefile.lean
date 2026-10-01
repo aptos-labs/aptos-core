@@ -86,6 +86,12 @@ target monovm_shim pkg : System.FilePath := Job.async do
       cmd := "leanc", args := #["-c", source.toString, "-o", object.toString] }
   return object
 
+/-- Runs one problem of the verification benchmark natively
+(`designs/verification-benchmarks.md`). -/
+lean_exe «leaner-bench» where
+  root := `LeanerBench
+  supportInterpreter := true
+
 @[default_target]
 lean_exe LeanerE2ETestDriver where
   root := `Main

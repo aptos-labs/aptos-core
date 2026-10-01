@@ -1,21 +1,16 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRepeatedWrites where
-
-  fun run : Action U64 := do
-    let owner : U64 := 1
-    let writer ← &mut owner
-    writer := 2
-    writer := *writer + 3
-    let result ← *writer
-    pure result
-
-  spec run where
-    ensures True
+leaner module 0x0::LeanerBorrowRepeatedWrites where
+  fun run() -> u64 := do
+    let mut owner : u64 := 1
+    let writer := &mut owner
+    *writer := 2
+    *writer := *writer + 3
+    let result := *writer
+    result
 
 --# run 0x0::LeanerBorrowRepeatedWrites::run

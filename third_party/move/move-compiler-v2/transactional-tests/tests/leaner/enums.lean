@@ -1,31 +1,26 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerEnums where
+leaner module 0x0::LeanerEnums where
+  enum Action has Copy, Drop, Store where
+    | Idle
+    | Transfer (amount : u64)
+    | Split (left : u64, right : u64)
 
-  @[move_enum]
-  inductive Action where
-    | idle
-    | transfer (amount : U64)
-    | split (left right : U64)
-    deriving Copy, Drop, Store
-
-  /-! ## Functions -/
-
-  fun total (action : Action) : U64 :=
+  fun total(action : Action) -> u64 :=
     match action with
-    | .idle => 0
-    | .transfer amount => amount
-    | .split left right => left + right
+      | Action::Idle {} => 0
+      | Action::Transfer { amount := amount } => amount
+      | Action::Split { left := left, right := right } => left + right
 
-  fun idle_total : U64 := total .idle
+  fun idle_total() -> u64 := total(new Action::Idle {})
 
-  fun transfer_total (amount : U64) : U64 := total (.transfer amount)
+  fun transfer_total(amount : u64) -> u64 := total(new Action::Transfer { amount })
 
-  fun split_total (left right : U64) : U64 := total (.split left right)
-
-/-! ## Tests -/
+  fun split_total(left : u64, right : u64) -> u64 := total(new Action::Split { left, right })
 
 --# run 0x0::LeanerEnums::idle_total
 

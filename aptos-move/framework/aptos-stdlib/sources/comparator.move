@@ -50,6 +50,9 @@ module aptos_std::comparator {
                 return Result { inner: GREATER }
             };
             idx += 1;
+        } spec {
+            invariant idx <= left_length && idx <= right_length;
+            invariant forall j: u64 where j < idx: left[j] == right[j];
         };
 
         if (left_length < right_length) {

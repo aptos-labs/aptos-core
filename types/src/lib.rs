@@ -11,6 +11,7 @@ pub mod block_metadata;
 pub mod block_metadata_ext;
 pub mod chain_id;
 pub mod contract_event;
+pub mod crypto;
 pub mod decryption;
 pub mod dkg;
 pub mod epoch_change;

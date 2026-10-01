@@ -4,11 +4,11 @@
 import LeanerLang
 
 /-! The `string` module defines the `String` type which represents UTF8 encoded strings. -/
-leaner module 0x1::«string» where
-  use 0x1::std::option::Option
-  use 0x1::std::option::none
-  use 0x1::std::option::some
-  use 0x1::std::vector
+leaner module std::«string» where
+  use std::option::Option
+  use std::option::none
+  use std::option::some
+  use std::vector
 
   /--
   An invalid UTF8 encoding.

@@ -31,6 +31,6 @@ example :
     («0x42».borrow_certificates.unit.borrowCertificates[0]!).loans.isEmpty = true := by
   decide
 example :
-    «0x42».borrow_certificates.unit.borrowDiagnostics.isEmpty = true := by decide
+    «0x42».borrow_certificates.unit.borrowRejections.isEmpty = true := by decide
 
 end LeanerLang.Tests.Check.References.BorrowCertificates

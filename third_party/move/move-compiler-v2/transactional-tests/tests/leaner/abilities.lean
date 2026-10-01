@@ -1,34 +1,22 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
+leaner module 0x0::LeanerAbilities where
+  struct Plain where
+    value : u64
 
-module LeanerAbilities where
+  struct CopyDrop has Copy, Drop where
+    value : u64
 
-  /-! ## Functions -/
-
-  @[move_struct]
-  structure Plain where
-    value : U64
-
-  @[move_struct]
-  structure CopyDrop where
-    value : U64
-    deriving Copy, Drop
-
-  @[move_struct]
-  structure Stored (T : Type) where
+  struct Stored {T has Store} has Store where
     value : T
-    deriving Store
 
-  @[move_struct]
-  structure Resource where
-    value : U64
-    deriving Key
+  struct Resource has Key where
+    value : u64
 
-  @[move_enum]
-  inductive Droppable where
-    | empty
-    | value (inner : U64)
-    deriving Drop
+  enum Droppable has Drop where
+    | Empty
+    | Value (inner : u64)

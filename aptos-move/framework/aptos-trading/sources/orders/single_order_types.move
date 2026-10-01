@@ -256,6 +256,15 @@ module aptos_trading::single_order_types {
         ensures self.order.order_request.is_bid == old(self.order.order_request.is_bid);
         ensures self.order.order_request.client_order_id
             == old(self.order.order_request.client_order_id);
+        ensures self.order.order_request.order_id == old(self.order.order_request.order_id);
+        ensures self.order.order_request.orig_size == old(self.order.order_request.orig_size);
+        ensures self.order.order_request.trigger_condition
+            == old(self.order.order_request.trigger_condition);
+        ensures self.order.order_request.time_in_force
+            == old(self.order.order_request.time_in_force);
+        ensures self.order.order_request.creation_time_micros
+            == old(self.order.order_request.creation_time_micros);
+        ensures self.order.order_request.metadata == old(self.order.order_request.metadata);
     }
 
     public fun set_remaining_size_from_state<M: store + copy + drop>(
@@ -277,6 +286,15 @@ module aptos_trading::single_order_types {
         ensures self.order.order_request.is_bid == old(self.order.order_request.is_bid);
         ensures self.order.order_request.client_order_id
             == old(self.order.order_request.client_order_id);
+        ensures self.order.order_request.order_id == old(self.order.order_request.order_id);
+        ensures self.order.order_request.orig_size == old(self.order.order_request.orig_size);
+        ensures self.order.order_request.trigger_condition
+            == old(self.order.order_request.trigger_condition);
+        ensures self.order.order_request.time_in_force
+            == old(self.order.order_request.time_in_force);
+        ensures self.order.order_request.creation_time_micros
+            == old(self.order.order_request.creation_time_micros);
+        ensures self.order.order_request.metadata == old(self.order.order_request.metadata);
     }
 
     public fun get_remaining_size_from_state<M: store + copy + drop>(

@@ -1,25 +1,20 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowLoop where
-
-  /-- One activated handle remains the unique mutation lineage across every
-  loop iteration.  Leaner's loop fixpoint accepts it. -/
-  fun run : Action U64 := do
-    let owner : U64 := 0
-    let _writer ← &mut owner
-    let mut count : U64 := 0
+leaner module 0x0::LeanerBorrowLoop where
+  -- One mutable handle remains the unique mutation lineage across every loop
+  -- iteration.
+  fun run() -> u64 := do
+    let mut owner : u64 := 0
+    let writer := &mut owner
+    let mut count : u64 := 0
     while count < 3 do
-      _writer := *_writer + 2
+      *writer := *writer + 2
       count := count + 1
-    let result ← *_writer
-    pure result
-
-  spec run where
-    ensures True
+    let result := *writer
+    result
 
 --# run 0x0::LeanerBorrowLoop::run

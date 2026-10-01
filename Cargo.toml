@@ -17,6 +17,7 @@ members = [
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
     "aptos-move/aptos-governance-bundle",
+    "aptos-move/aptos-keyless-validation",
     "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
@@ -413,6 +414,7 @@ aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-keyless-common = { path = "keyless/common" }
 aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
 aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
+aptos-keyless-validation = { path = "aptos-move/aptos-keyless-validation" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
 aptos-localnet = { path = "crates/aptos-localnet" }

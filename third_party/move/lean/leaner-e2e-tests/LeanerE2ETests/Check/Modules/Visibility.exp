@@ -1,0 +1,5 @@
+LeanerE2ETests/Check/Modules/Visibility.lean:36:23: error: LEANER-CALL-VISIBILITY: `0x42::library::secret` is not visible from `0x43::private_call`
+LeanerE2ETests/Check/Modules/Visibility.lean:41:23: error: LEANER-CALL-VISIBILITY: `0x42::library::trusted` is not visible from `0x43::friend_call`
+LeanerE2ETests/Check/Modules/Visibility.lean:46:23: error: LEANER-CALL-VISIBILITY: `0x42::library::shared` is not visible from `0x43::package_call`
+LeanerE2ETests/Check/Modules/Visibility.lean:51:23: error: LEANER-TYPED-CALL: explicit call result types are reserved for external functions
+LeanerE2ETests/Check/Modules/Visibility.lean:56:23: error: LEANER-TYPED-CALL: explicit call result types are reserved for external functions

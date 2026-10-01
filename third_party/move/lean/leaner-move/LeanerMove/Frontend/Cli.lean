@@ -82,6 +82,57 @@ def readXastDir (dir : System.FilePath) : IO Package := do
   let modules ← files.toList.mapM fun e => decodeFile e.path
   pure { modules }
 
+/-- The modules of a package among an export's modules: the ones whose
+source lies under the package's `sources` directory; the others came in
+through a dependency. -/
+def splitOwned (package : Package) (dir : System.FilePath) : Package :=
+  -- The export records a source as the compiler was given it, relative to
+  -- the same directory as `dir`; a leading `./` is no part of either.
+  let plain (path : String) : String :=
+    if path.startsWith "./" then (path.drop 2).toString else path
+  let ownedPrefix := plain (dir / "sources").normalize.toString
+  let owns (candidate : Module) := candidate.sources.any fun source =>
+    (plain (System.FilePath.normalize source).toString).startsWith ownedPrefix
+  let owned := package.modules.filter owns
+  let dependencies := package.modules.filter fun candidate => !owns candidate
+  { modules := owned, dependencies }
+
+/-- Whether a module is selected by `filter`: some source file name of it
+contains the filter; every module without one. -/
+def selectedBy (filter : Option String) (module : Module) : Bool :=
+  match filter with
+  | some part => module.sources.any fun source =>
+      (System.FilePath.fileName source).any fun name => (name.splitOn part).length > 1
+  | none => true
+
+/-- The package with the modules `filter` selects as its targets. A filter
+selecting no module is an error, not a run that verifies nothing. -/
+def filterTargets (package : Package) (filter : Option String) : IO Package := do
+  if let some part := filter then
+    unless package.modules.any (selectedBy filter) do
+      throw <| IO.userError s!"no module matches the filter `{part}`"
+  return { package with modules := package.modules.map fun module =>
+    { module with isTarget := selectedBy filter module } }
+
+/-- Reads an existing export of a package, made by `move exchange --format
+ast`, for verification: with `packageDir`, the modules outside the package's
+sources are the dependencies it was exported with, kept whole so their calls
+inline, but not verification targets. -/
+def readExportDir (dir : System.FilePath) (packageDir : Option System.FilePath)
+    (filter : Option String := none) : IO Package := do
+  let package ← readXastDir dir
+  let selected := selectedBy filter
+  match packageDir with
+  | some packageDir =>
+      let split := splitOwned package packageDir
+      if split.modules.isEmpty then
+        throw <| IO.userError s!"the export {dir} holds no module of the package {packageDir}"
+      let (targets, linked) := split.modules.partition selected
+      if targets.isEmpty then
+        throw <| IO.userError s!"no module of the package {packageDir} matches the filter"
+      pure { modules := targets ++ (linked ++ split.dependencies).map ({ · with isTarget := false }) }
+  | none => filterTargets package filter
+
 /-- Exports a Move package (`--package-dir`) and decodes its modules;
 `includeDeps` also exports the dependency modules with source. -/
 def exportPackage (dir : System.FilePath) (includeDeps : Bool := false) : IO Package := do
@@ -92,13 +143,40 @@ def exportPackage (dir : System.FilePath) (includeDeps : Bool := false) : IO Pac
     run exe args
     let package ← readXastDir tmp
     if !includeDeps then return package
-    -- A package's own modules are the ones under its `sources` directory;
-    -- every other exported module came in through a dependency.
-    let ownedPrefix := (dir / "sources").toString
-    let owned := package.modules.filter fun candidate =>
-      candidate.sources.any (·.startsWith ownedPrefix)
-    let dependencies := package.modules.filter fun candidate =>
-      !candidate.sources.any (·.startsWith ownedPrefix)
-    return { modules := owned, dependencies }
+    return splitOwned package dir
+
+/-- An address without its `0x` and leading zeros, in lower case. -/
+private def normalAddress (address : String) : String :=
+  let digits := (if address.startsWith "0x" then (address.drop 2).toString else address).toLower
+  let trimmed := (digits.dropWhile (· == '0')).toString
+  if trimmed.isEmpty then "0" else trimmed
+
+/-- Whether `selector` — `module`, `address::module`, or `alias::module` —
+names `module`, as `move exchange --modules` reads it. -/
+def matchesSelector (module : Module) (selector : String) : Bool :=
+  match selector.splitOn "::" with
+  | [name] => module.name == name
+  | [address, name] =>
+      let resolved := if address.startsWith "0x" then some address
+        else (module.namedAddresses.find? (·.name == address)).map (·.address)
+      module.name == name && (module.addressAlias == some address ||
+        resolved.any (normalAddress · == normalAddress module.address))
+  | _ => false
+
+/-- Exports the modules `selectors` name from the package at `dir`, with the
+modules verifying them reads, and decodes them: the named modules are the
+verification targets, the others are read whole so their calls inline. -/
+def exportModules (dir : System.FilePath) (selectors : Array String) : IO Package := do
+  let (exe, commandArgs) ← findFrontend
+  IO.FS.withTempDir fun tmp => do
+    run exe (commandArgs ++ #["--format", "ast", "--package-dir", dir.toString,
+      "--export-dir", tmp.toString, "--modules", ",".intercalate selectors.toList])
+    let package ← readXastDir tmp
+    for selector in selectors do
+      unless package.modules.any (matchesSelector · selector) do
+        throw <| IO.userError s!"the export of {dir} holds no module `{selector}`"
+    let selected (module : Module) := selectors.any (matchesSelector module)
+    let (targets, linked) := package.modules.partition selected
+    pure { modules := targets ++ linked.map ({ · with isTarget := false }) }
 
 end LeanerMove.Frontend.Cli

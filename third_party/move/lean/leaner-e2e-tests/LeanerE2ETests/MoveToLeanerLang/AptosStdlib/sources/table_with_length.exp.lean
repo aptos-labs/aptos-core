@@ -4,11 +4,11 @@
 import LeanerLang
 
 /-! Extends Table and provides functions such as length and the ability to be destroyed -/
-leaner module 0x1::table_with_length where
-  use 0x1::aptos_std::table
-  use 0x1::aptos_std::table::Table
-  use 0x1::aptos_std::table::destroy_known_empty_unsafe
-  use 0x1::std::error::invalid_state
+leaner module aptos_std::table_with_length where
+  use aptos_std::table
+  use aptos_std::table::Table
+  use aptos_std::table::destroy_known_empty_unsafe
+  use std::error::invalid_state
 
   -- native code raises this with error::invalid_arguments()
   const EALREADY_EXISTS : u64 := 100

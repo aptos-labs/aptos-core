@@ -4,7 +4,9 @@
 import Lean.Data.Json
 import LeanerLang.Builtins
 import LeanerLang.Frame
+import LeanerLang.Modifiers
 import LeanerLang.Profile
+import LeanerLang.Reserved
 import LeanerLang.Print.Layout
 
 /-!
@@ -95,22 +97,7 @@ private def fitsIndentedLine (value : String) : Bool :=
   -- Top-level declarations are indented once by the namespace command.
   value.length + 2 <= 80
 
-private def sourceReservedIdentifier (value : String) : Bool :=
-  value ∈ [
-    "move", "rust", "Unit", "Never", "Bool", "Char", "string", "Bytes",
-    "Address", "Signer", "UInt", "SInt", "UPtr", "IPtr", "Nat", "Int",
-    "u8", "u16", "u32", "u64", "u128", "u256",
-    "i8", "i16", "i32", "i64", "i128", "i256", "usize", "isize",
-    "Range", "Vector", "Fn", "const", "type", "lifetime", "evidence", "mut",
-    "private", "public", "package", "friend", "entry", "native", "opaque", "deprecated", "view",
-    "pragma", "let_pre", "let_post", "requires", "ensures", "aborts_if", "assert", "assume",
-    "invariant", "spec", "fun", "module", "namespace", "using", "where", "struct",
-    "enum", "has", "Copy", "Drop", "Store", "Key", "true", "false",
-    "abort", "panic", "do", "let", "loop", "while", "for", "break", "continue", "forall",
-    "exists", "in", "immutable", "if", "then", "else", "return", "old",
-    "copy", "drop", "discriminant", "invoke", "function",
-    "as", "match", "with", "use"
-  ]
+
 
 private def sourceIdentifier (value : String) : String :=
   let value := if value.startsWith "$" then
@@ -120,7 +107,7 @@ private def sourceIdentifier (value : String) : String :=
     else value
   if !value.isEmpty && value.all Char.isDigit then value
   else (Lean.Name.mkSimple value).toStringWithToken
-    (isToken := sourceReservedIdentifier)
+    (isToken := isReservedWord)
 
 /-- Compiler-v2 records the authored receiver head (for example
 `self.list.contains`) in the call name for some Move 2 calls. The semantic
@@ -133,31 +120,22 @@ private def executableReferenceName (value : String) : String :=
   let value := surfaceReferenceName value
   if value.startsWith "$" then value.drop 1 |>.toString else value
 
-/-- A namespace can be imported by its final segment when that segment is
-unambiguous and does not collide with a declaration in the current namespace.
-This is the fallback for symbols such as `mem::replace` whose unqualified name
-would shadow a local declaration. -/
-private def importableNamespace (unit : ValidatedUnit) (current target : NamespaceId) : Bool :=
-  if target == current then false else
-  match unit.tables.namespaces[target.index]?.bind (·.segments.back?) with
-  | none => false
-  | some alias =>
-      let shadowed := unit.tables.names.any (fun candidate =>
-        candidate.namespaceId == current && executableReferenceName candidate.name == alias)
-      let unique := unit.tables.namespaces.zipIdx.all fun (candidate, index) =>
-        candidate.segments.back? != some alias || index == target.index
-      !alias.isEmpty && !shadowed && unique
-
 private def nameAt (unit : ValidatedUnit) (id : NameId) : Except String String := do
   let some name := unit.tables.names[id.index]?
     | throw s!"LeanerLang source references missing name {id.index}"
   pure (sourceIdentifier name.name)
 
+/-- A namespace path as its source spells it: a Move module led by its
+address alias when it has one. -/
 private def namespacePath (unit : ValidatedUnit) (id : NamespaceId) : Except String String := do
   let some path := unit.tables.namespaces[id.index]?
     | throw s!"LeanerLang source references missing namespace {id.index}"
-  if path.segments.isEmpty then throw "LeanerLang cannot print an empty namespace path"
-  pure ("::".intercalate (path.segments.map sourceIdentifier).toList)
+  let some first := path.segments[0]?
+    | throw "LeanerLang cannot print an empty namespace path"
+  let leading := match path.alias with
+    | some alias => sourceIdentifier alias
+    | none => if first.startsWith "0x" then first else sourceIdentifier first
+  pure ("::".intercalate (leading :: (path.segments.drop 1).toList.map sourceIdentifier))
 
 private def pushReferencedName (names : Array NameId) (name : NameId) : Array NameId :=
   if names.contains name then names else names.push name
@@ -389,20 +367,6 @@ private def referencedNames (unit : ValidatedUnit)
               expressions := expressions.push index
   return names
 
-/-- Only declarations owned by the namespace being printed can collide with
-an imported symbol. Dependency declarations may or may not be present in a
-validated unit, so they must not influence canonical source. -/
-private def ownedDeclarationHasName (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (value : String) : Bool :=
-  let hasName (id : NameId) := unit.tables.names[id.index]?.any fun entry =>
-    executableReferenceName entry.name == value
-  ns.constants.any (hasName ·.name) ||
-    ns.structs.any (fun declaration =>
-      hasName declaration.name || declaration.variants.any (hasName ·.name)) ||
-    ns.functions.any (hasName ·.name) ||
-    ns.specFunctions.any (hasName ·.name) ||
-    ns.specVars.any (hasName ·.name)
-
 /-- Calls which canonical LeanerLang spells as intrinsic syntax do not need a
 source import even though their imported Move LIR retains the standard-library
 callee identity.  Keeping this list narrower than the receiver inventory is
@@ -417,69 +381,117 @@ private def importFreeSurfaceName (unit : ValidatedUnit) (ns : ValidatedNamespac
         isMoveStdModule ns.profile namespaceRef "vector" &&
           executableReferenceName target.name ∈ ["borrow", "borrow_mut", "length"]
 
+/-- A namespace as its source prints: its declarations, and how the source
+spells the names of other namespaces, decided once from the names it
+references. -/
+private structure PrintNamespace extends ValidatedNamespace where
+  /-- The namespaces the references spell each surface name from, or `none`
+  when a reference names nothing. -/
+  referencedSpellings : Option (Std.HashMap String (Array NamespaceId))
+  /-- Surface names of the declarations the namespace owns. Dependency
+  declarations may or may not be present in a validated unit, so they must not
+  influence canonical source. -/
+  ownedNames : Std.HashSet String
+  /-- Surface names the unit interns in the namespace. -/
+  currentNames : Std.HashSet String
+  /-- How many namespaces of the unit end in each final segment. -/
+  aliasCounts : Std.HashMap String Nat
+  /-- The `use` paths the source imports. -/
+  usePaths : Array String := #[]
+
+private instance : Coe PrintNamespace ValidatedNamespace := ⟨(·.toValidatedNamespace)⟩
+
 /-- A referenced symbol can be imported without an alias when its surface
 name is unambiguous among this namespace's actual references and does not
 collide with an owned declaration. Looking only at those semantic roots keeps
 the result independent of which dependency namespaces happen to be loaded. -/
-private def importableName (unit : ValidatedUnit) (current : NamespaceId)
+private def PrintNamespace.importsName (ns : PrintNamespace) (unit : ValidatedUnit)
     (id : NameId) : Bool :=
-  match unit.tables.names[id.index]?, unit.namespaces.find? (·.identity == current) with
-  | some target, some ns =>
+  match unit.tables.names[id.index]?, ns.referencedSpellings with
+  | some target, some spellings =>
       let targetName := executableReferenceName target.name
       let surfaceBuiltin := unit.tables.namespaces[target.namespaceId.index]?.any
         fun namespaceRef =>
           (standardCallReceiverMode? ns.profile namespaceRef targetName).isSome
-      let references := referencedNames unit ns
-      target.namespaceId != current && !targetName.isEmpty &&
+      target.namespaceId != ns.identity && !targetName.isEmpty &&
         !targetName.startsWith "$" && !surfaceBuiltin &&
-        !ownedDeclarationHasName unit ns targetName &&
-        references.all fun candidateId =>
-          -- A symbol the surface spells only as its own syntax is never
-          -- written as a name, so it cannot be taken for this alias.
-          importFreeSurfaceName unit ns candidateId ||
-          match unit.tables.names[candidateId.index]? with
-          | none => false
-          | some candidate =>
-              executableReferenceName candidate.name != targetName ||
-                candidate.namespaceId == target.namespaceId
+        !ns.ownedNames.contains targetName &&
+        (spellings.getD targetName #[]).all (· == target.namespaceId)
   | _, _ => false
 
-private def qualifiedNameAt (unit : ValidatedUnit) (current : NamespaceId)
-    (id : NameId) : Except String String := do
-  let some name := unit.tables.names[id.index]?
-    | throw s!"LeanerLang source references missing name {id.index}"
-  let localNameText := sourceIdentifier (surfaceReferenceName name.name)
-  if name.namespaceId == current then pure localNameText
-  else if importableName unit current id then pure localNameText
-  else if importableNamespace unit current name.namespaceId then
-    let some alias := unit.tables.namespaces[name.namespaceId.index]?.bind (·.segments.back?)
-      | throw s!"LeanerLang source references an empty namespace {name.namespaceId.index}"
-    pure s!"{sourceIdentifier alias}::{localNameText}"
-  else pure s!"{← namespacePath unit name.namespaceId}::{localNameText}"
+/-- A namespace can be imported by its final segment when that segment is
+unambiguous and does not collide with a name of the current namespace.
+This is the fallback for symbols such as `mem::replace` whose unqualified name
+would shadow a local declaration. -/
+private def PrintNamespace.importsNamespace (ns : PrintNamespace) (unit : ValidatedUnit)
+    (target : NamespaceId) : Bool :=
+  if target == ns.identity then false else
+  match unit.tables.namespaces[target.index]?.bind (·.segments.back?) with
+  | none => false
+  | some alias =>
+      !alias.isEmpty && !ns.currentNames.contains alias && ns.aliasCounts.getD alias 0 == 1
 
-private def inferredUsePathsFor (unit : ValidatedUnit) (ns : ValidatedNamespace) :
-    Except String (Array String) := do
-  let current := ns.identity
+private def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
+    Except String PrintNamespace := do
+  let references := referencedNames unit ns
+  let mut spellings : Std.HashMap String (Array NamespaceId) := {}
+  let mut complete := true
+  for id in references do
+    unless importFreeSurfaceName unit ns id do
+      match unit.tables.names[id.index]? with
+      | none => complete := false
+      | some name =>
+          let key := executableReferenceName name.name
+          let known := spellings.getD key #[]
+          unless known.contains name.namespaceId do
+            spellings := spellings.insert key (known.push name.namespaceId)
+  let declared := ns.constants.map (·.name) ++
+    ns.structs.flatMap (fun declaration =>
+      #[declaration.name] ++ declaration.variants.map (·.name)) ++
+    ns.functions.map (·.name) ++ ns.specFunctions.map (·.name) ++ ns.specVars.map (·.name)
+  let ownedNames := declared.foldl (init := {}) fun names id =>
+    match unit.tables.names[id.index]? with
+    | some entry => names.insert (executableReferenceName entry.name)
+    | none => names
+  let currentNames := unit.tables.names.foldl (init := {}) fun names candidate =>
+    if candidate.namespaceId == ns.identity then
+      names.insert (executableReferenceName candidate.name)
+    else names
+  let aliasCounts := unit.tables.namespaces.foldl (init := {}) fun counts candidate =>
+    match candidate.segments.back? with
+    | some alias => counts.insert alias (counts.getD alias 0 + 1)
+    | none => counts
+  let view : PrintNamespace := {
+    toValidatedNamespace := ns
+    referencedSpellings := if complete then some spellings else none
+    ownedNames, currentNames, aliasCounts }
   let mut paths := #[]
-  for id in referencedNames unit ns do
+  for id in references do
     let some name := unit.tables.names[id.index]?
       | throw s!"LeanerLang source references missing name {id.index}"
     if importFreeSurfaceName unit ns id then
       pure ()
-    else if importableName unit current id then
+    else if view.importsName unit id then
       let path := s!"{← namespacePath unit name.namespaceId}::{
         sourceIdentifier (executableReferenceName name.name)}"
       unless paths.contains path do paths := paths.push path
-    else if importableNamespace unit current name.namespaceId then
+    else if view.importsNamespace unit name.namespaceId then
       let path ← namespacePath unit name.namespaceId
       unless paths.contains path do paths := paths.push path
-  pure <| paths.qsort (· < ·)
+  pure { view with usePaths := paths.qsort (· < ·) }
 
-private def inferredUsePaths (unit : ValidatedUnit) (current : NamespaceId) :
-    Except String (Array String) := do
-  let some ns := unit.namespaces.find? (·.identity == current)
-    | throw s!"LeanerLang source references missing owned namespace {current.index}"
-  inferredUsePathsFor unit ns
+private def qualifiedNameAt (unit : ValidatedUnit) (ns : PrintNamespace)
+    (id : NameId) : Except String String := do
+  let some name := unit.tables.names[id.index]?
+    | throw s!"LeanerLang source references missing name {id.index}"
+  let localNameText := sourceIdentifier (surfaceReferenceName name.name)
+  if name.namespaceId == ns.identity then pure localNameText
+  else if ns.importsName unit id then pure localNameText
+  else if ns.importsNamespace unit name.namespaceId then
+    let some alias := unit.tables.namespaces[name.namespaceId.index]?.bind (·.segments.back?)
+      | throw s!"LeanerLang source references an empty namespace {name.namespaceId.index}"
+    pure s!"{sourceIdentifier alias}::{localNameText}"
+  else pure s!"{← namespacePath unit name.namespaceId}::{localNameText}"
 
 private def binderName (binders : Array LeanerIR.GenericBinder) (index : Nat) : Except String String := do
   let some binder := binders[index]?
@@ -532,7 +544,7 @@ private def binderText (unit : ValidatedUnit) (binder : LeanerIR.GenericBinder) 
 
 mutual
   private partial def typeTextFuel (unit : ValidatedUnit)
-      (ns : ValidatedNamespace) (binders : Array LeanerIR.GenericBinder)
+      (ns : PrintNamespace) (binders : Array LeanerIR.GenericBinder)
       (id : TypeId) (fuel : Nat) : Except String String := do
     if fuel == 0 then throw "cyclic type reached the LeanerLang source backend"
     let some type := unit.tables.types[id.index]?
@@ -586,7 +598,7 @@ mutual
         pure s!"&{lifetime}{mutability}{separator}{referent}"
     | .typeParameter index => binderName binders index
     | .nominal name arguments =>
-        let name ← qualifiedNameAt unit ns.identity name
+        let name ← qualifiedNameAt unit ns name
         if arguments.isEmpty then pure name else
           let arguments ← arguments.mapM fun argument => match argument with
             | .typeArg value => typeTextFuel unit ns binders value.typeId (fuel - 1)
@@ -608,7 +620,7 @@ mutual
     | .eventStore | .typeDomain _ | .resourceDomain .. | .stateDomain | .profile _ =>
         throw s!"validated type {id.index} is outside the current LeanerLang parser"
 
-  private partial def typeText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+  private partial def typeText (unit : ValidatedUnit) (ns : PrintNamespace)
       (binders : Array LeanerIR.GenericBinder) (id : TypeId) : Except String String :=
     typeTextFuel unit ns binders id (unit.tables.types.size + 1)
 end
@@ -982,7 +994,7 @@ private def declarationLocalNames (ns : ValidatedNamespace) (locals : Array Loca
 
 private structure Context where
   unit : ValidatedUnit
-  ns : ValidatedNamespace
+  ns : PrintNamespace
   locals : Array LocalDecl
   /-- Source spelling of each local, disambiguating shadowed mutable locals.
   Empty falls back to the declared names. -/
@@ -1001,6 +1013,9 @@ private structure Context where
   /-- Shared pattern binders rendered as implicitly read field selections. -/
   fieldAliasLocals : Array LocalId := #[]
   temporaryLocals : Array LocalId := #[]
+  /-- Locals declared without initializer (`let mut x : T`), which are
+  assigned as themselves, never substituted as compiler temporaries. -/
+  declaredLocals : Array LocalId := #[]
   /-- Iterator whose canonical `for` body is currently being rendered.  It
   lets the source backend hide the increment inserted before a current-level
   `continue` by the surface lowerer. -/
@@ -1010,6 +1025,14 @@ private structure Context where
   /-- Bindings of the declaration being printed whose mutability the pattern
   itself must carry, as in `let (mut head, tail) := ...`. -/
   mutableBindings : Array LocalId := #[]
+
+/-- Whether a statement's value has the unit type. -/
+private def unitValued (context : Context) (statement : ExprId) : Bool :=
+  (context.ns.expressions[statement.index]?).any fun node =>
+    match context.unit.tables.types[node.typeId.index]? with
+    | some LeanerIR.Ty.unit => true
+    | some (LeanerIR.Ty.tuple elements) => elements.isEmpty
+    | _ => false
 
 /-- Source specification contexts expose direct references by value and use
 mathematical integers at direct value boundaries. Mirror the frontend's
@@ -1113,7 +1136,7 @@ private def specificationCallName (context : Context) (reference : QualifiedRef)
   let localName := sourceIdentifier localName
   let imported ← if reference.namespaceId == context.ns.identity then pure false else do
     let expected := s!"{← namespacePath context.unit reference.namespaceId}::{localName}"
-    pure ((← inferredUsePaths context.unit context.ns.identity).contains expected)
+    pure (context.ns.usePaths.contains expected)
   let name ← if reference.namespaceId == context.ns.identity then pure localName
     else if imported then pure localName
     else pure s!"{← namespacePath context.unit reference.namespaceId}::{localName}"
@@ -1156,7 +1179,8 @@ private def numericTemporaryLocal? (context : Context) (id : LocalId) : Bool :=
   | _ => false
 
 private def compilerTemporaryLocal? (context : Context) (id : LocalId) : Bool :=
-  context.temporaryLocals.contains id || numericTemporaryLocal? context id
+  !context.declaredLocals.contains id &&
+    (context.temporaryLocals.contains id || numericTemporaryLocal? context id)
 
 /-- Does the operand of a field selection need delimiters? Field access binds
 tighter than every control-flow form, and Move prints a selection through a
@@ -1534,6 +1558,20 @@ private def hiddenStorageBorrow? (context : Context) (pattern : PatternId)
   let .operation (.global (.borrow _)) _ _ _ := valueNode.kind | none
   some localId
 
+/-- Whether the referent of a reference type is known not to be copyable. -/
+private def referenceTypeNotCopyable (context : Context) (typeId : TypeId) : Bool := Id.run do
+  let some (.reference reference) := context.unit.tables.types[typeId.index]? | return false
+  let some profile := context.ns.profile | return false
+  return LeanerIR.Validation.typeHasAbility? context.unit context.ns profile context.binders
+    reference.referent .copy == some false
+
+/-- Whether the value a local reference place refers to is known not to be
+copyable. -/
+private def referentNotCopyable (context : Context) (base : PlaceId) : Bool := Id.run do
+  let some (.localVar localId) := context.ns.places[base.index]? | return false
+  let some localDecl := context.locals[localId.index]? | return false
+  return referenceTypeNotCopyable context localDecl.type.typeId
+
 /-- The referent a borrow's printed text names, when the text is a borrow.
 Cancelling a source-level `*&` pair keeps compiler scaffolding out of the
 generated source and, in a place, keeps the target a place. -/
@@ -1568,8 +1606,12 @@ private partial def placeText (context : Context)
       if context.specification then return baseText
       -- MIR commonly stores a borrow in a compiler temporary and immediately
       -- dereferences it.  Once the temporary is unfolded, cancel the
-      -- source-level `*&` pair instead of exposing compiler scaffolding.
-      if let some referent := borrowedReferentText? baseText then return referent
+      -- source-level `*&` pair instead of exposing compiler scaffolding —
+      -- unless the value is not copyable: read bare, it would be moved, where
+      -- the read through the borrow leaves it in place.
+      if let some referent := borrowedReferentText? baseText then
+        if !referentNotCopyable context base then return referent
+        return s!"*{baseText}"
       let baseText := match context.ns.places[base.index]? with
         | some (.localVar _) => baseText
         | _ => s!"({baseText})"
@@ -1924,6 +1966,11 @@ mutual
             fun _ => some value
 end
 
+/-- Whether a binding pattern binds the given local. -/
+private def patternBindsLocal? (ns : ValidatedNamespace) (pattern : PatternId)
+    (targetLocal : LocalId) (fuel : Nat) : Bool :=
+  (patternLocalIds ns pattern fuel).contains targetLocal
+
 /-- Whether a structured region assigns the given local on at least one path.
 This is deliberately weaker than `assignedValueToLocal?`: guarded MIR arms can
 assign the return place through a nested conditional, in which case retaining
@@ -1935,6 +1982,7 @@ private partial def writesLocal? (ns : ValidatedNamespace) (node : ExprId)
   | none => false
   | some expression => match expression.kind with
     | .assign target _ => localPlace? ns target == some targetLocal
+    | .assignPattern pattern _ => patternBindsLocal? ns pattern targetLocal fuel
     | .block statements result =>
         statements.any (writesLocal? ns · targetLocal (fuel - 1)) ||
           result.any (writesLocal? ns · targetLocal (fuel - 1))
@@ -1980,6 +2028,28 @@ private partial def assignmentsBeforeLocal? (ns : ValidatedNamespace)
   | .letDecl _ _ body => assignmentsBeforeLocal? ns body targetLocal (fuel - 1)
   | _ => none
 
+
+/-- Whether the first write of `targetLocal` in `node` is an assignment
+statement at its sequential top level — a statement of a block, or of the
+continuation of a declaration — which the block rendering turns into the
+local's declaration. A first write inside a branch is not. -/
+private partial def firstWriteSequential? (ns : ValidatedNamespace) (node : ExprId)
+    (targetLocal : LocalId) (fuel : Nat) : Bool :=
+  if fuel == 0 then false else
+  match ns.expressions[node.index]? with
+  | none => false
+  | some expression => match expression.kind with
+    | .block statements result =>
+        match statements.toList.find? (writesLocal? ns · targetLocal (fuel - 1)) with
+        | some first => match ns.expressions[first.index]? with
+          | some { kind := .assign target _, .. } => localPlace? ns target == some targetLocal
+          | some { kind := .letDecl .., .. } => firstWriteSequential? ns first targetLocal (fuel - 1)
+          | _ => false
+        | none => result.any (firstWriteSequential? ns · targetLocal (fuel - 1))
+    | .letDecl _ value body =>
+        !value.any (writesLocal? ns · targetLocal (fuel - 1)) &&
+          firstWriteSequential? ns body targetLocal (fuel - 1)
+    | _ => false
 /-- rustc's return place is assigned in both sides of a branch before the
 continuation returns it.  Recover the source conditional instead of leaking
 the undeclared MIR return local into LeanerLang. -/
@@ -2104,9 +2174,7 @@ private def standardVectorFunction? (context : Context) (reference : QualifiedRe
   | some qualified, some namespaceRef =>
       qualified.namespaceId == reference.namespaceId &&
         executableReferenceName qualified.name == functionName &&
-        namespaceRef.segments.size >= 2 &&
-        namespaceRef.segments[namespaceRef.segments.size - 2]? == some "std" &&
-        namespaceRef.segments.back? == some "vector"
+        isMoveStdModule context.ns.profile namespaceRef "vector"
   | _, _ => false
 
 private def standardReceiverFunction? (context : Context)
@@ -2509,6 +2577,28 @@ private def hiddenReferenceMutation? (context : Context) (pattern : PatternId)
   let fuel := context.ns.expressions.size + context.ns.places.size + 1
   if holderUnused context holder [.inl value] {} {} fuel then some value else none
 
+/-- The locals of an uninitialized declaration: in Move, whose `let x;`
+declares a local before its first write, those written whose first write is
+not a sequential assignment get a declaration `let mut x : T` and are
+assigned as themselves; the others, and every local of another profile,
+remain compiler temporaries, declared by their first assignment, or never
+spelled when never written. -/
+private def uninitializedLocals (context : Context) (pattern : PatternId) (body : ExprId)
+    (fuel : Nat) : Except String (Array String × Context) := do
+  let mut declarations := #[]
+  let mut active := context
+  for localId in ← bindingPatternLocalIds context pattern do
+    if context.ns.profile != some Profile.move || !writesLocal? context.ns body localId fuel ||
+        firstWriteSequential? context.ns body localId fuel then
+      active := { active with temporaryLocals := active.temporaryLocals.push localId }
+    else
+      let some localDecl := context.locals[localId.index]?
+        | throw s!"LeanerLang source references missing local {localId.index}"
+      let type ← typeText context.unit context.ns context.binders localDecl.type.typeId
+      declarations := declarations.push s!"let mut {← localName context localId} : {type}"
+      active := { active with declaredLocals := active.declaredLocals.push localId }
+  return (declarations, active)
+
 /-- The holder of a computed reference that one assignment writes through as
 a place, `let $t := e; (*$t).f := v`, which spells `e.f := v`. The holder
 roots the place through field projections and appears nowhere else. -/
@@ -2585,7 +2675,7 @@ private partial def expressionText (context : Context) (id : ExprId)
       integerLiteralText context.unit context.ns context.specification expression.typeId value
   | .value value none => constText value
   | .constant reference =>
-      qualifiedNameAt context.unit context.ns.identity reference.name
+      qualifiedNameAt context.unit context.ns reference.name
   | .localVar localId => do
       if let some (_, value) := context.constantLocals.find? (·.1 == localId) then
         return value
@@ -2680,7 +2770,13 @@ private partial def expressionText (context : Context) (id : ExprId)
             throw "core.ref.dereference must have exactly one operand"
           let argument ← expressionText context arguments[0]! (fuel - 1)
           if context.specification then return argument
-          if let some referent := borrowedReferentText? argument then return referent
+          -- A borrow cancels with its dereference unless the value is not
+          -- copyable: read bare, it would be moved.
+          let notCopyable := (context.ns.expressions[arguments[0]!.index]?).any fun borrow =>
+            referenceTypeNotCopyable context borrow.typeId
+          if let some referent := borrowedReferentText? argument then
+            if !notCopyable then return referent
+            return s!"*{argument}"
           if context.ns.profile == some .move then
             -- Move field selection through a reference yields a reference the
             -- surface reads implicitly, with or without an intervening
@@ -2911,7 +3007,7 @@ private partial def expressionText (context : Context) (id : ExprId)
               pure s!"{receiver}.{method}{typeSuffix}({
                 commaSep (renderedArguments.drop 1)})"
             else do
-              let name ← qualifiedNameAt context.unit context.ns.identity reference.name
+              let name ← qualifiedNameAt context.unit context.ns reference.name
               pure s!"{name}{typeSuffix}({commaSep renderedArguments})"
           -- A signature this unit holds — its own, or one a dependency
           -- interface carries — is what the reader needs to recover the
@@ -2930,7 +3026,7 @@ private partial def expressionText (context : Context) (id : ExprId)
       | .call (.closure reference) =>
           unless instantiations.isEmpty do
             throw "generic closure construction is outside the current LeanerLang parser"
-          let name ← qualifiedNameAt context.unit context.ns.identity reference.name
+          let name ← qualifiedNameAt context.unit context.ns reference.name
           let result ← contextTypeText context expression.typeId
           let captures ← arguments.mapM (expressionText context · (fuel - 1))
           let suffix := if captures.isEmpty then "" else ", " ++ commaSep captures
@@ -3349,9 +3445,14 @@ private partial def expressionText (context : Context) (id : ExprId)
         return s!"core.prim.{← primitiveText checked.operation}({commaSep arguments})"
       else if let some value := forwardedValue? context.ns statements result then
         return ← expressionText context value (fuel - 1) true
+      -- Folding absorbs the branches' assignments, so only a temporary's
+      -- may be absorbed: a declared local is assigned as itself.
       else if let some (condition, thenValue, thenAssignments,
           elseValue, elseAssignments) :=
-          forwardedConditional? context.ns statements result then
+          (forwardedConditional? context.ns statements result).filter
+            fun (_, _, thenAssignments, _, elseAssignments) =>
+              (thenAssignments ++ elseAssignments).all
+                (compilerTemporaryLocal? context ·.1) then
         let renderForwarded (value : ExprId) (assignments : Array (LocalId × ExprId)) := do
           let active ← assignments.foldlM (init := context) fun active (localId, valueId) => do
             if compilerTemporaryLocal? active localId then
@@ -3428,7 +3529,11 @@ private partial def expressionText (context : Context) (id : ExprId)
               if resultNode.kind matches .value .unit _ ||
                   resultNode.kind matches .operation (.primitive .tuple) _ #[] _ ||
                   resultNode.kind matches .block #[] none then
-                pure statements
+                -- The unit result stays spelled after a statement whose own
+                -- value is not unit: elided, that value would read as the
+                -- block's.
+                let lastIsUnit := originalStatements.back?.all (unitValued active)
+                pure (if lastIsUnit then statements else statements.push "()")
               else
                 let resultText ← expressionText active result (fuel - 1) false statementPosition
                 let terminator := statementTerminator active.ns result resultText
@@ -3458,11 +3563,16 @@ private partial def expressionText (context : Context) (id : ExprId)
       -- Structurization introduces locals before the assignment which gives
       -- them their first value.  Keep those identities available to the
       -- sequential-block substitution below so neither rustc's return place
-      -- nor source-level immutable `let` temporaries leak as undeclared names.
-      let temporaryLocals ← bindingPatternLocalIds context pattern
-      expressionText { context with
-        temporaryLocals := context.temporaryLocals ++ temporaryLocals }
-        body (fuel - 1) tailPosition
+      -- nor source-level immutable `let` temporaries leak as undeclared names;
+      -- a local first assigned in a branch is declared.
+      let (declarations, active) ← uninitializedLocals context pattern body fuel
+      let bodyText ← expressionText active body (fuel - 1) tailPosition
+      if declarations.isEmpty then return bodyText
+      -- The declarations open the body's own block, whose entries are
+      -- already indented under its `do`.
+      if bodyText.startsWith "do\n" then
+        return s!"do\n{indent (lines declarations)}\n{(bodyText.drop 3).toString}"
+      return blockText (declarations.push bodyText)
   | .letDecl pattern (some value) body =>
       if let some slot := indexTemporary? context pattern body then
         let valueText ← expressionText context value (fuel - 1)
@@ -3554,7 +3664,10 @@ private partial def expressionText (context : Context) (id : ExprId)
               let declaration ← declarationText pattern value active fuel
               let (entries, result) ← collectTail active body (fuel - 1)
               pure (#[declaration] ++ entries, result)
-        | .letDecl _ none body => collectTail active body (fuel - 1)
+        | .letDecl pattern none body =>
+            let (declarations, active) ← uninitializedLocals active pattern body fuel
+            let (entries, result) ← collectTail active body (fuel - 1)
+            pure (declarations ++ entries, result)
         | .block statements result =>
             let rendered ← statements.mapM fun statement => do
               let statementText ← expressionText active statement (fuel - 1) false true
@@ -3567,7 +3680,16 @@ private partial def expressionText (context : Context) (id : ExprId)
             | none => pure (rendered, none)
             | some result =>
                 let (entries, value) ← collectTail active result (fuel - 1)
-                pure (rendered ++ entries, value)
+                -- A unit result after a statement whose own value is not
+                -- unit stays spelled: elided, the statement's value would
+                -- read as the block's.
+                let lastIsUnit := statements.back?.all (unitValued active)
+                match value with
+                | some (_, "()") =>
+                    if entries.isEmpty && !statements.isEmpty && !lastIsUnit then
+                      pure (rendered.push "()", none)
+                    else pure (rendered ++ entries, value)
+                | _ => pure (rendered ++ entries, value)
         | _ => pure (#[], some (node, ← expressionText active node (fuel - 1) tailPosition))
       let declaration ← declarationText pattern value context fuel
       let (entries, result) ← collectTail context body (fuel - 1)
@@ -3882,6 +4004,10 @@ private def conditionText (context : Context) (condition : Condition) : Except S
         unless typeParameters.isEmpty do
           throw "generic update module invariants are outside the current LeanerLang parser"
         pure ("invariant [update]", none)
+    | .axiom_ typeParameters => do
+        unless typeParameters.isEmpty do
+          throw "generic module axioms are outside the current LeanerLang parser"
+        pure ("axiom", none)
     | kind => throw s!"condition kind `{repr kind}` is outside the current LeanerLang parser"
   let properties ← condition.properties.mapM flagAttributeName
   let properties := if properties.isEmpty then "" else s!"[{commaSep properties}] "
@@ -3933,7 +4059,7 @@ private def isMoveVariantsProperty : ProfileValue → Bool
   | { profile := .move, tag := "struct.variants", payload := "" } => true
   | _ => false
 
-private def nominalContractText? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def nominalContractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : LeanerIR.StructDecl) (name : String) :
     Except String (Option String) := do
   let contract := declaration.contract
@@ -3953,7 +4079,7 @@ private def nominalContractText? (unit : ValidatedUnit) (ns : ValidatedNamespace
   let entries := entries ++ pragmas.map fun pragma => s!"pragma {pragma};"
   pure <| some s!"spec {name} where\n{indent (lines entries)}"
 
-private def fieldText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def fieldText (unit : ValidatedUnit) (ns : PrintNamespace)
     (binders : Array LeanerIR.GenericBinder)
     (field : LeanerIR.FieldDecl) : Except String String := do
   pure s!"{← nameAt unit field.name} : {← typeText unit ns binders field.type.typeId}"
@@ -3979,7 +4105,7 @@ private def isFunctionModifierAttribute : Attribute → Bool
       ["entry", "native", "opaque", "deprecated", "view", "bytecode_instruction"].contains name
   | _ => false
 
-private def nominalText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def nominalText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : LeanerIR.StructDecl) :
     Except String String := do
   unless declaration.properties.all isMoveVariantsProperty do
@@ -4005,82 +4131,7 @@ private def nominalText (unit : ValidatedUnit) (ns : ValidatedNamespace)
   | none => pure declarationText
   | some contract => pure s!"{declarationText}\n\n{contract}"
 
-private structure PrintedModifiers where
-  visibility : LeanerLang.Visibility := .private_
-  isDeprecated : Bool := false
-  isView : Bool := false
-  isEntry : Bool := false
-  isNative : Bool := false
-  isOpaque : Bool := false
-
-private def visibilityOf (value : String) : Except String LeanerLang.Visibility :=
-  match value with
-  | "private" | "visibility.private" => pure .private_
-  | "public" | "visibility.public" => pure .public_
-  | "package" | "visibility.package" => pure .package
-  | "friend" | "visibility.friend" => pure .friend
-  | _ => throw s!"unknown function visibility `{value}`"
-
-private def mergeVisibility (current : Option LeanerLang.Visibility)
-    (next : LeanerLang.Visibility) : Except String (Option LeanerLang.Visibility) :=
-  match current with
-  | none => pure (some next)
-  | some previous =>
-      if previous == next then pure current
-      else throw "function carries conflicting visibility metadata"
-
-private def functionModifiers
-    (declaration : LeanerIR.FunctionDecl FunctionBody) : Except String PrintedModifiers := do
-  let mut result : PrintedModifiers := {}
-  let mut visibility : Option LeanerLang.Visibility := none
-  for value in declaration.profileData do
-    unless value.profile == declaration.profile do
-      throw s!"function profile metadata `{value.tag}` belongs to a different profile"
-    if value.tag.startsWith "visibility." then
-      visibility ← mergeVisibility visibility (← visibilityOf value.tag)
-    else match value.tag with
-      | "function.regular" => pure ()
-      | "function.entry" => result := { result with isEntry := true }
-      | "function.native" => result := { result with isNative := true }
-      -- Move classifies both tags as frontend-only provenance. Canonical
-      -- LeanerLang retains the ordinary function and prefix-call semantics.
-      | "function.inlineRetained" | "function.receiver" => pure ()
-      | tag => throw s!"function profile property `{tag}` has no canonical LeanerLang spelling"
-  for attr in declaration.attributes do
-    match attr with
-    | .assign "visibility" (.qualifiedName value) _ =>
-        visibility ← mergeVisibility visibility (← visibilityOf value)
-    | .call "entry" arguments _ =>
-        unless arguments.isEmpty do throw "the `entry` modifier attribute has arguments"
-        result := { result with isEntry := true }
-    | .call "native" arguments _ =>
-        unless arguments.isEmpty do throw "the `native` modifier attribute has arguments"
-        result := { result with isNative := true }
-    | .call "opaque" arguments _ =>
-        unless arguments.isEmpty do throw "the `opaque` modifier attribute has arguments"
-        result := { result with isOpaque := true }
-    | .call "deprecated" arguments _ =>
-        unless arguments.isEmpty do throw "the `deprecated` modifier attribute has arguments"
-        result := { result with isDeprecated := true }
-    | .call "view" arguments _ =>
-        unless arguments.isEmpty do throw "the `view` modifier attribute has arguments"
-        result := { result with isView := true }
-    | .call "bytecode_instruction" arguments _ =>
-        unless arguments.isEmpty do
-          throw "the `bytecode_instruction` provenance attribute has arguments"
-    | _ => pure () -- Ordinary metadata is printed above the declaration.
-  result := { result with visibility := visibility.getD .private_ }
-  if result.isNative && result.isOpaque then
-    throw "a function cannot be both native and opaque"
-  match declaration.body with
-  | .structured _ =>
-      if result.isNative || result.isOpaque then
-        throw "a native or opaque function unexpectedly has an executable body"
-      pure result
-  | .absent =>
-      pure <| if result.isNative then result else { result with isOpaque := true }
-
-private def modifiersText (modifiers : PrintedModifiers) : String :=
+private def modifiersText (modifiers : LeanerLang.FunctionModifiers) : String :=
   let values := #[]
   let values := match modifiers.visibility with
     | .private_ => values
@@ -4097,7 +4148,7 @@ private def modifiersText (modifiers : PrintedModifiers) : String :=
 private def isFalseExpression (ns : ValidatedNamespace) (id : ExprId) : Bool :=
   (ns.expressions[id.index]?).any fun expression => expression.kind == .value (.bool false)
 
-private def contractText? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def contractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : LeanerIR.FunctionDecl FunctionBody) (name : String) :
     Except String (Option String) := do
   let contract := declaration.contract
@@ -4136,17 +4187,17 @@ private def contractText? (unit : ValidatedUnit) (ns : ValidatedNamespace)
   let entries := entries ++ printedPragmas
   pure <| some s!"spec {name} where\n{indent (lines entries)}"
 
-private def constantText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def constantText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : LeanerIR.ConstantDecl) : Except String String := do
   unless declaration.profileData.isEmpty && declaration.attributes.isEmpty do
     throw "constant metadata has no canonical LeanerLang spelling yet"
   let some expression := ns.expressions[declaration.value.index]?
     | throw "constant initializer is missing from the expression arena"
-  let .value value _ := expression.kind
-    | throw "non-literal constant initializers are outside the current LeanerLang printer"
-  let value ← match value with
-    | .integer value => integerLiteralText unit ns false declaration.type.typeId value
-    | value => constText value
+  let value ← match expression.kind with
+    | .value (.integer value) _ => integerLiteralText unit ns false declaration.type.typeId value
+    | .value value _ => constText value
+    -- A vector literal, as an elaborated namespace states one.
+    | _ => expressionText { unit, ns, locals := #[] } declaration.value (ns.expressions.size + 1)
   pure s!"const {← nameAt unit declaration.name} : {← typeText unit ns #[] declaration.type.typeId} := \
     {value}"
 
@@ -4154,16 +4205,16 @@ private def constantText (unit : ValidatedUnit) (ns : ValidatedNamespace)
 including standard aliases that the module never mentions. Names are already
 resolved in checked LIR, so these frontend-only entries are not part of the
 canonical program projection. A module's own address alias is likewise already
-spelled by the middle segment of its structural `address::alias::module` path;
-accept it only when the redundant metadata agrees with that path. Metadata
-that can affect a declaration remains an explicit capability error. -/
+the alias of its namespace reference; accept it only when the redundant
+metadata agrees with that reference. Metadata that can affect a declaration
+remains an explicit capability error. -/
 private def isResolvedMoveEnvironment (unit : ValidatedUnit) (ns : ValidatedNamespace) :
     ProfileValue → Bool
   | { profile := .move, tag := "metadata.namedAddress", .. } => true
   | { profile := .move, tag := "metadata.addressAlias", payload } =>
-      match unit.tables.namespaces[ns.identity.index]? with
-      | some { segments := #[_, alias, _] } => !alias.isEmpty && payload == alias
-      | _ => false
+      match unit.tables.namespaces[ns.identity.index]?.bind (·.alias) with
+      | some alias => !alias.isEmpty && payload == alias
+      | none => false
   | _ => false
 
 private def stringArrayPayload (payload : String) : Except String (Array String) := do
@@ -4281,13 +4332,13 @@ private def nominalDocumentation (declaration : LeanerIR.StructDecl) : String :=
       variant.fields.map (fun field => field.doc)
   "\n".intercalate <| docs.filter (fun doc => !doc.trimAscii.isEmpty) |>.toList
 
-private def functionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : LeanerIR.FunctionDecl FunctionBody) : Except String String := do
   unless ns.profile == some declaration.profile do
     throw "function profile differs from its namespace profile"
   unless declaration.signature.predicates.isEmpty do
     throw "function predicates are outside the current LeanerLang printer"
-  let modifiers ← functionModifiers declaration
+  let modifiers ← declaredModifiers declaration
   let name ← nameAt unit declaration.name
   let binders := " ".intercalate
     (← declaration.signature.generics.mapM (binderText unit)).toList
@@ -4332,7 +4383,7 @@ private def functionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
   | none => pure functionText
   | some contract => pure s!"{functionText}\n\n{contract}"
 
-private def specFunctionText (unit : ValidatedUnit) (ns : ValidatedNamespace)
+private def specFunctionText (unit : ValidatedUnit) (ns : PrintNamespace)
     (declaration : LeanerIR.SpecFunctionDecl) : Except String String := do
   unless ns.profile == some declaration.profile do
     throw "specification-function profile differs from its namespace profile"
@@ -4402,157 +4453,176 @@ private def renderSemanticNamespace (unit : ValidatedUnit)
     (identity : NamespaceId) : Except Error String := do
   let some ns := unit.namespaces.find? (·.identity == identity)
     | throw { message := s!"LeanerLang source references missing owned namespace {identity.index}" }
-  let (profile, profileName) ← match ns.profile with
-    | some .move => pure (.move, "move")
-    | some .rust => pure (.rust, "rust")
-    | some (.extension _) =>
-        throw <| errorAt unit ns.loc "extension-profile namespaces are outside the current printer"
-    | none => throw <| errorAt unit ns.loc "profileless namespaces are outside the current printer"
-  unless canonicalProfileConfig profile == unit.profiles[0]? && unit.profiles.size == 1 do
-    throw <| errorAt unit ns.loc
-      "profile configuration has no lossless spelling in the current LeanerLang header"
-  unless ns.imports.isEmpty do
-    throw <| errorAt unit ns.loc "namespace imports are outside the current LeanerLang printer"
-  let owner := (unit.tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
-  let mut skippedComments := #[]
-  let mut friends := #[]
-  for value in ns.profileMetadata do
-    unless isResolvedMoveEnvironment unit ns value do
-      match ← atLocation unit ns.loc (friendPath? owner value) with
-      | some path => friends := friends.push path
-      | none =>
-        match ← atLocation unit ns.loc (skippedDeclarationComment? value) with
-        | some comment => skippedComments := skippedComments.push comment
-        | none => throw (errorAt unit ns.loc
-            s!"namespace profile metadata `{value.tag}` is outside the current LeanerLang printer")
-  unless ns.attributes.isEmpty do
-    throw <| errorAt unit ns.loc "namespace attributes are outside the current LeanerLang printer"
-  let pragmas ← atLocation unit ns.loc <| ns.pragmas.mapM pragmaText
-  let uses ← atLocation unit ns.loc <| inferredUsePaths unit ns.identity
-  unless ns.traits.isEmpty && ns.implementations.isEmpty do
-    throw <| errorAt unit ns.loc
-      "namespace traits and implementations are outside the current LeanerLang printer"
-  unless ns.specVars.isEmpty do
-    throw <| errorAt unit ns.loc
-      "namespace specification variables are outside the current LeanerLang printer"
-  -- Intrinsic declarations print inverted, as source attributes on their
-  -- owner and target declarations (`@[intrinsic_map]` on the owner,
-  -- `@[map_new (Owner)]` on each bound function or specification function).
-  let mut intrinsicAttributes : Array (Nat × String) := #[]
-  for declaration in ns.intrinsics do
-    let some owner := ns.tables.names[declaration.owner.index]?
-      | throw <| errorAt unit declaration.loc "an intrinsic owner name is out of range"
-    let ownerText := sourceIdentifier owner.name
-    intrinsicAttributes := intrinsicAttributes.push
-      (declaration.owner.index, s!"intrinsic_{declaration.model}")
-    for binding in declaration.executableBindings ++ declaration.specBindings do
-      unless binding.target.namespaceId == ns.identity do
-        throw <| errorAt unit binding.loc
-          "an intrinsic binding outside its owner's namespace is outside the current LeanerLang printer"
+  renderNamespaceText unit (← atLocation unit ns.loc (PrintNamespace.of unit ns))
+where
+  renderNamespaceText (unit : ValidatedUnit) (ns : PrintNamespace) : Except Error String := do
+    let (profile, profileName) ← match ns.profile with
+      | some .move => pure (.move, "move")
+      | some .rust => pure (.rust, "rust")
+      | some (.extension _) =>
+          throw <| errorAt unit ns.loc "extension-profile namespaces are outside the current printer"
+      | none => throw <| errorAt unit ns.loc "profileless namespaces are outside the current printer"
+    unless canonicalProfileConfig profile == unit.profiles[0]? && unit.profiles.size == 1 do
+      throw <| errorAt unit ns.loc
+        "profile configuration has no lossless spelling in the current LeanerLang header"
+    unless ns.imports.isEmpty do
+      throw <| errorAt unit ns.loc "namespace imports are outside the current LeanerLang printer"
+    let owner := (unit.tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+    let mut skippedComments := #[]
+    let mut friends := #[]
+    for value in ns.profileMetadata do
+      unless isResolvedMoveEnvironment unit ns value do
+        match ← atLocation unit ns.loc (friendPath? owner value) with
+        | some path => friends := friends.push path
+        | none =>
+          match ← atLocation unit ns.loc (skippedDeclarationComment? value) with
+          | some comment => skippedComments := skippedComments.push comment
+          | none => throw (errorAt unit ns.loc
+              s!"namespace profile metadata `{value.tag}` is outside the current LeanerLang printer")
+    unless ns.attributes.isEmpty do
+      throw <| errorAt unit ns.loc "namespace attributes are outside the current LeanerLang printer"
+    let pragmas ← atLocation unit ns.loc <| ns.pragmas.mapM pragmaText
+    let uses := ns.usePaths
+    unless ns.traits.isEmpty && ns.implementations.isEmpty do
+      throw <| errorAt unit ns.loc
+        "namespace traits and implementations are outside the current LeanerLang printer"
+    unless ns.specVars.isEmpty do
+      throw <| errorAt unit ns.loc
+        "namespace specification variables are outside the current LeanerLang printer"
+    -- Intrinsic declarations print inverted, as source attributes on their
+    -- owner and target declarations (`@[intrinsic_map]` on the owner,
+    -- `@[map_new (Owner)]` on each bound function or specification function).
+    let mut intrinsicAttributes : Array (Nat × String) := #[]
+    for declaration in ns.intrinsics do
+      let some owner := ns.tables.names[declaration.owner.index]?
+        | throw <| errorAt unit declaration.loc "an intrinsic owner name is out of range"
+      let ownerText := sourceIdentifier owner.name
       intrinsicAttributes := intrinsicAttributes.push
-        (binding.target.name.index, s!"{binding.role} ({ownerText})")
-  let withAttributes (name : NameId) (attributes : Array Attribute)
-      (body : String) : Except Error String := do
-    let values := intrinsicAttributes.filterMap fun (index, value) =>
-      if index == name.index then some value else none
-    let values := values ++ (← (attributes.mapM sourceAttributeText).mapError
-      fun message => ({ message } : Error))
-    pure <| if values.isEmpty then body
-      else s!"@[{", ".intercalate values.toList}]\n{body}"
-  let mut ordered : Array SourceOrderedText := #[]
-  let mut fallback := 0
-  for declaration in ns.constants do
-    let (file, start, _) := sourceOrderKey unit declaration.loc fallback
-    ordered := ordered.push {
-      file, start, priority := 1, fallback
-      text := documented declaration.doc
-        (← atLocation unit declaration.loc (constantText unit ns declaration)) }
-    fallback := fallback + 1
-  for declaration in ns.structs do
-    let (file, start, _) := sourceOrderKey unit declaration.loc fallback
-    ordered := ordered.push {
-      file, start, priority := 1, fallback
-      text := documented (nominalDocumentation declaration)
-        (← withAttributes declaration.name declaration.attributes
-          (← atLocation unit declaration.loc (nominalText unit ns declaration))) }
-    fallback := fallback + 1
-  for declaration in ns.specFunctions do
-    unless isDerivedSpecFunction unit ns declaration do
+        (declaration.owner.index, s!"intrinsic_{declaration.model}")
+      for binding in declaration.executableBindings ++ declaration.specBindings do
+        unless binding.target.namespaceId == ns.identity do
+          throw <| errorAt unit binding.loc
+            "an intrinsic binding outside its owner's namespace is outside the current LeanerLang printer"
+        intrinsicAttributes := intrinsicAttributes.push
+          (binding.target.name.index, s!"{binding.role} ({ownerText})")
+    let withAttributes (name : NameId) (attributes : Array Attribute)
+        (body : String) : Except Error String := do
+      let values := intrinsicAttributes.filterMap fun (index, value) =>
+        if index == name.index then some value else none
+      let values := values ++ (← (attributes.mapM sourceAttributeText).mapError
+        fun message => ({ message } : Error))
+      pure <| if values.isEmpty then body
+        else s!"@[{", ".intercalate values.toList}]\n{body}"
+    let mut ordered : Array SourceOrderedText := #[]
+    let mut fallback := 0
+    for declaration in ns.constants do
       let (file, start, _) := sourceOrderKey unit declaration.loc fallback
       ordered := ordered.push {
         file, start, priority := 1, fallback
         text := documented declaration.doc
-          (← withAttributes declaration.name declaration.contract.pragmas
-            (← atLocation unit declaration.loc (specFunctionText unit ns declaration))) }
+          (← atLocation unit declaration.loc (constantText unit ns declaration)) }
       fallback := fallback + 1
-  for declaration in ns.invariants do
-    let (file, start, _) := sourceOrderKey unit declaration.loc fallback
-    let context : Context := {
-      unit, ns, locals := declaration.locals
-      localNames := declarationLocalNames ns declaration.locals 0
-        (some declaration.condition.expression)
-      specification := true
-      logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
-    let invariant ← atLocation unit declaration.loc
-      (conditionText context declaration.condition)
-    ordered := ordered.push {
-      file, start, priority := 1, fallback
-      text := s!"spec module where\n{indent invariant}" }
-    fallback := fallback + 1
-  for declaration in ns.functions do
-    let (file, start, _) := sourceOrderKey unit declaration.loc fallback
-    ordered := ordered.push {
-      file, start, priority := 1, fallback
-      text := documented declaration.doc
-        (← withAttributes declaration.name
-          (declaration.attributes.filter (!isFunctionModifierAttribute ·))
-          (← atLocation unit declaration.loc (functionText unit ns declaration))) }
-    fallback := fallback + 1
-  -- Compiler-v2 can retain comments from dependency files whose inline
-  -- functions were expanded into this module. Those declarations do not
-  -- survive as Leaner items, so their comments have no valid attachment here
-  -- (the legacy Move printer dropped the same unmatched pool entries).
-  let declarationLocations := #[ns.loc] ++ ns.constants.map (·.loc) ++
-    ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++
-    ns.invariants.map (·.loc) ++ ns.functions.map (·.loc)
-  let declarationFiles := declarationLocations.filterMap fun loc =>
-    (primaryRange? unit.tables loc (unit.tables.locations.size + 1)).map (·.file.index)
-  for comment in ns.comments do
-    let commentFile? :=
-      (primaryRange? unit.tables comment.loc (unit.tables.locations.size + 1)).map (·.file.index)
-    if commentFile?.all declarationFiles.contains then
-      let (file, start, _) := sourceOrderKey unit comment.loc fallback
+    for declaration in ns.structs do
+      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
       ordered := ordered.push {
-        file, start, priority := if comment.isDoc then 0 else 1, fallback
-        text := sourceCommentText comment }
+        file, start, priority := 1, fallback
+        text := documented (nominalDocumentation declaration)
+          (← withAttributes declaration.name declaration.attributes
+            (← atLocation unit declaration.loc (nominalText unit ns declaration))) }
       fallback := fallback + 1
-  let sorted := ordered.qsort fun left right =>
-    left.file < right.file || (left.file == right.file &&
-      (left.start < right.start || (left.start == right.start &&
-        (left.priority < right.priority || (left.priority == right.priority &&
-          left.fallback < right.fallback)))))
-  let declarations := sorted.map (·.text)
-  let declarations := if skippedComments.isEmpty then declarations
-    else #[lines skippedComments] ++ declarations
-  let declarations := if pragmas.isEmpty then declarations
-    else #[lines (pragmas.map fun pragma => s!"pragma {pragma};")] ++ declarations
-  let declarations := if friends.isEmpty then declarations
-    else #[lines (friends.map fun path => s!"friend {path};")] ++ declarations
-  let declarations := if uses.isEmpty then declarations
-    else #[lines (uses.map fun path => s!"use {path}")] ++ declarations
-  let path ← atLocation unit ns.loc (namespacePath unit ns.identity)
-  pure <| "-- Copyright © Aptos Foundation\n" ++
-    "-- SPDX-License-Identifier: Apache-2.0\n\n" ++
-    "import LeanerLang\n\n" ++
-    (if ns.doc.trimAscii.isEmpty then "" else documentationText ns.doc ++ "\n") ++
-    s!"leaner namespace {path} using {profileName} where\n" ++
-    indent ("\n\n".intercalate declarations.toList) ++ "\n"
+    for declaration in ns.specFunctions do
+      unless isDerivedSpecFunction unit ns declaration do
+        let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+        ordered := ordered.push {
+          file, start, priority := 1, fallback
+          text := documented declaration.doc
+            (← withAttributes declaration.name declaration.contract.pragmas
+              (← atLocation unit declaration.loc (specFunctionText unit ns declaration))) }
+        fallback := fallback + 1
+    for declaration in ns.invariants do
+      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      let context : Context := {
+        unit, ns, locals := declaration.locals
+        localNames := declarationLocalNames ns declaration.locals 0
+          (some declaration.condition.expression)
+        specification := true
+        logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
+      let invariant ← atLocation unit declaration.loc
+        (conditionText context declaration.condition)
+      ordered := ordered.push {
+        file, start, priority := 1, fallback
+        text := s!"spec module where\n{indent invariant}" }
+      fallback := fallback + 1
+    for declaration in ns.functions do
+      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      ordered := ordered.push {
+        file, start, priority := 1, fallback
+        text := documented declaration.doc
+          (← withAttributes declaration.name
+            (declaration.attributes.filter (!isFunctionModifierAttribute ·))
+            (← atLocation unit declaration.loc (functionText unit ns declaration))) }
+      fallback := fallback + 1
+    -- Compiler-v2 can retain comments from dependency files whose inline
+    -- functions were expanded into this module. Those declarations do not
+    -- survive as Leaner items, so their comments have no valid attachment here
+    -- (the legacy Move printer dropped the same unmatched pool entries).
+    let declarationLocations := #[ns.loc] ++ ns.constants.map (·.loc) ++
+      ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++
+      ns.invariants.map (·.loc) ++ ns.functions.map (·.loc)
+    let declarationFiles := declarationLocations.filterMap fun loc =>
+      (primaryRange? unit.tables loc (unit.tables.locations.size + 1)).map (·.file.index)
+    for comment in ns.comments do
+      let commentFile? :=
+        (primaryRange? unit.tables comment.loc (unit.tables.locations.size + 1)).map (·.file.index)
+      if commentFile?.all declarationFiles.contains then
+        let (file, start, _) := sourceOrderKey unit comment.loc fallback
+        ordered := ordered.push {
+          file, start, priority := if comment.isDoc then 0 else 1, fallback
+          text := sourceCommentText comment }
+        fallback := fallback + 1
+    let sorted := ordered.qsort fun left right =>
+      left.file < right.file || (left.file == right.file &&
+        (left.start < right.start || (left.start == right.start &&
+          (left.priority < right.priority || (left.priority == right.priority &&
+            left.fallback < right.fallback)))))
+    let declarations := sorted.map (·.text)
+    let declarations := if skippedComments.isEmpty then declarations
+      else #[lines skippedComments] ++ declarations
+    let declarations := if pragmas.isEmpty then declarations
+      else #[lines (pragmas.map fun pragma => s!"pragma {pragma};")] ++ declarations
+    let declarations := if friends.isEmpty then declarations
+      else #[lines (friends.map fun path => s!"friend {path};")] ++ declarations
+    let declarations := if uses.isEmpty then declarations
+      else #[lines (uses.map fun path => s!"use {path}")] ++ declarations
+    let path ← atLocation unit ns.loc (namespacePath unit ns.identity)
+    pure <| "-- Copyright © Aptos Foundation\n" ++
+      "-- SPDX-License-Identifier: Apache-2.0\n\n" ++
+      "import LeanerLang\n\n" ++
+      (if ns.doc.trimAscii.isEmpty then "" else documentationText ns.doc ++ "\n") ++
+      s!"leaner namespace {path} using {profileName} where\n" ++
+      indent ("\n\n".intercalate declarations.toList) ++ "\n"
+
+/-- The Move address aliases a unit spells its namespaces with. -/
+def unitAliases (unit : ValidatedUnit) : Array (String × String) :=
+  unit.tables.namespaces.foldl (init := #[]) fun found ref =>
+    match ref.alias, ref.segments[0]? with
+    | some alias, some address =>
+        if found.any (·.1 == alias) then found else found.push (alias, address)
+    | _, _ => found
+
+/-- The aliases a unit spells that an environment does not declare as they
+stand: a rendering declares them itself. -/
+private def undeclaredAliases (environment : Lean.Environment) (unit : ValidatedUnit) :
+    Array (String × String) :=
+  (unitAliases unit).filter fun (alias, address) =>
+    (addressAliases environment)[alias]? != some address
 
 private def renderWithLeadingCommentsAt (environment : Lean.Environment)
     (unit : ValidatedUnit) (identity : NamespaceId) (width : Nat)
     (leadingComments : Array String) : Except Error String := do
   let source ← renderSemanticNamespace unit identity
   Layout.formatSource environment source width "<generated>" leadingComments
+      (undeclaredAliases environment unit)
     |>.mapError fun message =>
     { message := s!"{message}\n--- semantic source ---\n{source}" }
 
@@ -4569,6 +4639,26 @@ other owned namespaces as authoritative declaration context for imports. -/
 def renderNamespace (environment : Lean.Environment) (unit : ValidatedUnit)
     (identity : NamespaceId) (width : Nat := 80) : Except Error String :=
   renderWithLeadingCommentsAt environment unit identity width #[]
+
+/-- The other namespaces a namespace's rendering names. -/
+def referencedNamespaces (unit : ValidatedUnit) (ns : ValidatedNamespace) :
+    Array NamespaceId :=
+  (referencedNames unit ns).foldl (init := #[]) fun found id =>
+    match unit.tables.names[id.index]? with
+    | some name =>
+        if name.namespaceId == ns.identity || found.contains name.namespaceId then found
+        else found.push name.namespaceId
+    | none => found
+
+/-- Render several owned namespaces of a unit as one self-contained source,
+in the given order: a namespace must follow the namespaces it uses. -/
+def renderNamespaceParts (environment : Lean.Environment) (unit : ValidatedUnit)
+    (identities : Array NamespaceId) (width : Nat := 80) :
+    Except Error (String × Array String) := do
+  let sources ← identities.mapM (renderSemanticNamespace unit)
+  Layout.formatSourceParts environment sources width "<generated>"
+      (undeclaredAliases environment unit) |>.mapError fun message =>
+    { message := s!"{message}\n--- semantic sources ---\n{"\n".intercalate sources.toList}" }
 
 private def compileErrorText : CompileError → String
   | .frontend diagnostics =>
@@ -4592,14 +4682,23 @@ private def compileErrorTextAt (command : String) : CompileError → String
         s!"{diagnostic.render}{location}"
   | error => compileErrorText error
 
-private def parseSourceUnit (environment : Lean.Environment) (source sourceName : String) :
-    Except Error CompilationUnit := do
+/-- Parse one namespace's source for compilation: its Move addresses made
+canonical against the aliases the source declares, then `aliases` (a unit's
+own), then the environment's. -/
+private def parseSourceUnit (environment : Lean.Environment) (source sourceName : String)
+    (aliases : Array (String × String) := #[]) : Except Error CompilationUnit := do
   let (command, comments, namespaceDoc) ← Layout.namespaceStart source
     |>.mapError fun message => { message }
   let parsedSyntax ← Lean.Parser.runParserCategory environment `command command sourceName
     |>.mapError fun message => { message }
-  compilationUnitOfSyntax parsedSyntax sourceName comments namespaceDoc
+  let known := Layout.preludeAliases source ++ aliases
+  let lookup (alias : String) : Option String :=
+    (known.find? (·.1 == alias)).map (·.2) <|> (addressAliases environment)[alias]?
+  let (parsedSyntax, spelled) ← canonicalMoveCommandWith lookup parsedSyntax
     |>.mapError fun (_, message) => { message }
+  let unit ← compilationUnitOfSyntax parsedSyntax sourceName comments namespaceDoc
+    |>.mapError fun (_, message) => { message }
+  pure { unit with namespaces := unit.namespaces.map fun ns => { ns with aliases := spelled } }
 
 /-- Declaration-only source view used while checking a namespace against the
 other namespaces in its compilation unit. Bodies and contracts are deliberately
@@ -4627,6 +4726,17 @@ private def dependencyInterfaceNamespace (source : Namespace) : Namespace := {
   comments := #[]
   items := source.items.filterMap dependencyInterfaceItem? }
 
+/-- The declarations of a namespace a dependency interface keeps: their
+signatures, without the bodies, contracts, pragmas, constants, invariants,
+and comments `dependencyInterfaceItem?` would drop after printing them. -/
+private def interfaceSource (ns : ValidatedNamespace) : ValidatedNamespace :=
+  { ns with
+    functions := ns.functions.map fun declaration =>
+      { declaration with body := .absent, contract := {}, pragmas := #[] }
+    specFunctions := ns.specFunctions.map fun declaration => { declaration with body := none }
+    structs := ns.structs.map fun declaration => { declaration with contract := {} }
+    constants := #[], invariants := #[], comments := #[], pragmas := #[] }
+
 /-- The Move function whose logical meaning this specification function is,
 if it is one. An interface records the companion's signature whether or not
 the declaring unit also gave it a body. -/
@@ -4647,7 +4757,7 @@ a hidden `$name` spec function. It is suppressed in ordinary source, but a
 dependency interface must retain that signature so calls in specifications
 resolve to the logical overload rather than the executable declaration. -/
 private def moveCompanionInterfaceText (unit : ValidatedUnit)
-    (ns : ValidatedNamespace) (declaration : LeanerIR.SpecFunctionDecl)
+    (ns : PrintNamespace) (declaration : LeanerIR.SpecFunctionDecl)
     (name : String) : Except String String := do
   let binders := " ".intercalate
     (← declaration.signature.generics.mapM (binderText unit)).toList
@@ -4687,7 +4797,7 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
         throw { message := s!"dependency namespace {interface.namespaceId.index} has no printable profile" }
   let some anchorLoc := unit.namespaces[0]?.map (·.loc)
     | throw { message := "a compilation unit has no namespace to anchor a dependency interface" }
-  let ns : ValidatedNamespace := {
+  let declarations : ValidatedNamespace := {
     loc := anchorLoc
     identity := interface.namespaceId
     profile := interface.profile
@@ -4695,6 +4805,7 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
     functions := interface.functions
     specFunctions := interface.specFunctions
     tables := unit.tables }
+  let ns ← (PrintNamespace.of unit declarations).mapError fun message => { message }
   let path ← (namespacePath unit interface.namespaceId).mapError fun message => { message }
   let nominals ← interface.structs.mapM fun declaration =>
     (nominalText unit ns declaration).mapError fun message => { message }
@@ -4715,7 +4826,7 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
         ({ message } : Error)
   -- The interface's own references print with the same aliases as ordinary
   -- source, so it carries the `use` paths that give those aliases a meaning.
-  let uses ← (inferredUsePathsFor unit ns).mapError fun message => ({ message } : Error)
+  let uses := ns.usePaths
   let declarations := (if uses.isEmpty then #[] else
       #[lines (uses.map fun path => s!"use {path}")]) ++
     nominals ++ functions ++ specFunctions ++ companions
@@ -4724,6 +4835,34 @@ private def dependencyInterfaceText (unit : ValidatedUnit)
     "import LeanerLang\n\n" ++
     s!"leaner namespace {path} using {profileName} where\n" ++
     indent ("\n\n".intercalate declarations.toList) ++ "\n"
+
+/-- An owned namespace of a validated unit as the declarations another
+namespace is lowered against: its signatures, without bodies or contracts. -/
+def interfaceNamespace (environment : Lean.Environment) (unit : ValidatedUnit)
+    (identity : NamespaceId) (aliases : Array (String × String) := unitAliases unit) :
+    Except Error Namespace := do
+  let some dependency := unit.namespaces.find? (·.identity == identity)
+    | throw { message := s!"missing dependency namespace {identity.index} in compilation context" }
+  let some dependencyPath := unit.tables.namespaces[identity.index]?.map (·.segments)
+    | throw { message := s!"missing dependency namespace {identity.index} in compilation context" }
+  let interface ← (PrintNamespace.of unit (interfaceSource dependency)).mapError
+    fun message => ({ message } : Error)
+  let semantic ← renderSemanticNamespace.renderNamespaceText unit interface
+  let mut companions := #[]
+  for declaration in interface.specFunctions do
+    if let some name := moveCompanionName? unit interface declaration then
+      companions := companions.push
+        (← moveCompanionInterfaceText unit interface declaration name
+          |>.mapError fun message => { message })
+  let semantic := if companions.isEmpty then semantic else
+    semantic.trimAsciiEnd.toString ++ "\n\n" ++
+      indent ("\n\n".intercalate companions.toList) ++ "\n"
+  let parsed ← parseSourceUnit environment semantic s!"<dependency {identity.index}>" aliases
+  let [parsedNs] := parsed.namespaces.toList
+    | throw { message := s!"dependency {identity.index} did not render as one namespace" }
+  unless parsedNs.path == dependencyPath do
+    throw { message := s!"dependency {identity.index} rendered at another path" }
+  pure (dependencyInterfaceNamespace parsedNs)
 
 /-- Canonically recompile one source namespace against all declaration
 signatures in an existing validated compilation unit, returning the freshly
@@ -4735,51 +4874,23 @@ def reimportSourceInContext (environment : Lean.Environment) (source : String)
     (context : ValidatedUnit) (identity : NamespaceId)
     (sourceName : String := "<source>") : Except Error ValidatedUnit := do
   let (command, _, _) ← Layout.namespaceStart source |>.mapError fun message => { message }
-  let sourceUnit ← parseSourceUnit environment source sourceName
+  let aliases := unitAliases context
+  let sourceUnit ← parseSourceUnit environment source sourceName aliases
   let [sourceNs] := sourceUnit.namespaces.toList
     | throw { message := "formatted LeanerLang source must own exactly one namespace" }
-  let some contextNs := context.namespaces.find? (·.identity == identity)
-    | throw { message := s!"missing owned namespace {identity.index} in compilation context" }
   let some storedPath := context.tables.namespaces[identity.index]?.map (·.segments)
     | throw { message := s!"missing source namespace {identity.index} in compilation context" }
-  -- Move's exchange AST retains a named-address alias as a middle segment
-  -- (`0x1::std::vector`). A module declaration has the canonical Move shape
-  -- `address::module`, while qualified references may still use the alias.
-  let expectedPath := if contextNs.profile == some .move && storedPath.size > 1 then
-    #[storedPath[0]!, storedPath.back!]
-  else storedPath
-  unless sourceNs.path == expectedPath do
-    throw { message := s!"source namespace `{"::".intercalate sourceNs.path.toList}` does not match compilation-context namespace `{"::".intercalate expectedPath.toList}`" }
+  unless sourceNs.path == storedPath do
+    throw { message := s!"source namespace `{"::".intercalate sourceNs.path.toList}` does not match compilation-context namespace `{"::".intercalate storedPath.toList}`" }
   let mut dependencies := #[]
   for dependency in context.namespaces do
     if dependency.identity != identity then
-      let some dependencyPath := context.tables.namespaces[dependency.identity.index]?.map
-          (·.segments)
-        | throw { message := s!"missing dependency namespace {dependency.identity.index} in compilation context" }
-      let semantic ← renderSemanticNamespace context dependency.identity
-      let mut companions := #[]
-      for declaration in dependency.specFunctions do
-        if let some name := moveCompanionName? context dependency declaration then
-          companions := companions.push
-            (← moveCompanionInterfaceText context dependency declaration name
-              |>.mapError fun message => { message })
-      let semantic := if companions.isEmpty then semantic else
-        semantic.trimAsciiEnd.toString ++ "\n\n" ++
-          indent ("\n\n".intercalate companions.toList) ++ "\n"
-      let parsed ← parseSourceUnit environment semantic
-        s!"<dependency {dependency.identity.index}>"
-      let [parsedNs] := parsed.namespaces.toList
-        | throw { message := s!"dependency {dependency.identity.index} did not render as one namespace" }
-      -- A Move module header intentionally drops compiler-owned package aliases
-      -- (`0x1::std::vector` becomes `0x1::vector`). Qualified `use` paths retain
-      -- those aliases. Restore the authoritative context path on this private
-      -- declaration interface so imported calls resolve to their signatures.
-      dependencies := dependencies.push {
-        dependencyInterfaceNamespace parsedNs with path := dependencyPath }
+      dependencies := dependencies.push
+        (← interfaceNamespace environment context dependency.identity aliases)
   for interface in context.dependencies do
     let semantic ← dependencyInterfaceText context interface
     let parsed ← parseSourceUnit environment semantic
-      s!"<dependency interface {interface.namespaceId.index}>"
+      s!"<dependency interface {interface.namespaceId.index}>" aliases
     let [parsedNs] := parsed.namespaces.toList
       | throw { message :=
           s!"dependency interface {interface.namespaceId.index} did not render as one namespace" }
@@ -4787,15 +4898,11 @@ def reimportSourceInContext (environment : Lean.Environment) (source : String)
         (·.segments)
       | throw { message :=
           s!"missing dependency namespace {interface.namespaceId.index} in compilation context" }
-    dependencies := dependencies.push {
-      dependencyInterfaceNamespace parsedNs with path := dependencyPath }
-  -- The Move module header drops the package alias its stored path keeps
-  -- (`0x1::std::vector` is written `0x1::vector`). Compiling under the
-  -- authoritative path leaves one namespace per module, so a reference to an
-  -- imported name reads the same here as it does in the unit being printed.
-  let combined : CompilationUnit := {
-    sourceName
-    namespaces := #[{ sourceNs with path := storedPath }] ++ dependencies }
+    unless parsedNs.path == dependencyPath do
+      throw { message :=
+        s!"dependency interface {interface.namespaceId.index} rendered at another path" }
+    dependencies := dependencies.push (dependencyInterfaceNamespace parsedNs)
+  let combined : CompilationUnit := { sourceName, namespaces := #[sourceNs] ++ dependencies }
   compile combined |>.mapError fun error => {
     message := compileErrorTextAt command error }
 
@@ -4809,19 +4916,12 @@ def reimportUnit (environment : Lean.Environment) (unit : ValidatedUnit)
   for original in unit.namespaces do
     let source ← renderNamespace environment unit original.identity width
     let parsed ← parseSourceUnit environment source
-      s!"<reimport {original.identity.index}>"
+      s!"<reimport {original.identity.index}>" (unitAliases unit)
     let [parsedNs] := parsed.namespaces.toList
       | throw
           { message :=
             s!"reimported namespace {original.identity.index} did not render as one namespace" }
-    -- Restore the authoritative table path on the parsed namespace so
-    -- qualified references resolve across the combined unit regardless of
-    -- package-alias forms the renderer drops from module headers.
-    let some storedPath := unit.tables.namespaces[original.identity.index]?.map (·.segments)
-      | throw
-          { message :=
-            s!"missing namespace {original.identity.index} in compilation tables" }
-    namespaces := namespaces.push { parsedNs with path := storedPath }
+    namespaces := namespaces.push parsedNs
   compile { sourceName := "<reimport>", namespaces := namespaces } |>.mapError
     fun error =>
       { message := s!"round-trip recompilation failed: {compileErrorText error}" : Error }
@@ -4841,7 +4941,8 @@ carry Lean's elaboration environment. -/
 unsafe def loadEnvironment : IO Lean.Environment := do
   Lean.enableInitializersExecution
   Lean.initSearchPath (← Lean.findSysroot)
-  Lean.importModules #[{ module := `LeanerLang.Elab }] {} (loadExts := true)
+  Lean.importModules #[{ module := `LeanerLang.Elab }, { module := `LeanerLang.Addresses }] {}
+    (loadExts := true)
 
 /-- Runtime printer entry point for generators without an existing Lean
 environment. -/

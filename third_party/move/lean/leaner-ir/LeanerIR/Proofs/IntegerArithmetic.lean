@@ -29,6 +29,14 @@ theorem bitwiseAnd_nonnegative (left right : Int)
   rw [← Int.toNat_of_nonneg leftNonnegative, ← Int.toNat_of_nonneg rightNonnegative]
   rfl
 
+theorem bitwiseAnd_comm (left right : Int) : bitwiseAnd left right = bitwiseAnd right left := by
+  cases left <;> cases right <;> simp only [bitwiseAnd, Nat.and_comm, Nat.or_comm]
+
+theorem bitwiseAnd_nonneg {left right : Int} (leftNonnegative : 0 ≤ left)
+    (rightNonnegative : 0 ≤ right) : 0 ≤ bitwiseAnd left right := by
+  rw [bitwiseAnd_nonnegative left right leftNonnegative rightNonnegative]
+  exact Int.natCast_nonneg _
+
 theorem bitwiseAnd_mod (left right modulus : Int)
     (leftLower : 0 ≤ left) (leftUpper : left < modulus)
     (rightLower : 0 ≤ right) (rightUpper : right < modulus) :

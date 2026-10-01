@@ -1,227 +1,185 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
+-- The core of Aptos `ordered_map`, represented as a sorted vector. The generic
+-- implementation is exercised through compiler v2 and MoveVM at `u64` and
+-- `Bool` keys.
+leaner module 0x0::LeanerOrderedMap where
+  use 0x1::std::cmp
+  use 0x1::std::cmp::Ordering
 
-/-!
-The core of Aptos `ordered_map`, represented as a sorted vector.  The generic
-implementation below is the same source shape as the Lean-side benchmark;
-the public concrete functions exercise it through compiler v2 and MoveVM.
--/
-module LeanerOrderedMap where
-
-  @[move_struct]
-  structure Entry (K V : Type) where
+  struct Entry {K has Copy, Drop, Store} {V has Copy, Drop, Store} has Copy, Drop, Store where
     key : K
     value : V
-    deriving Copy, Drop, Store
 
-  @[move_struct]
-  structure Map (K V : Type) where
-    entries : Move.Vector (Entry K V)
-    deriving Copy, Drop, Store
+  struct Map {K has Copy, Drop, Store} {V has Copy, Drop, Store} has Copy, Drop, Store where
+    entries : Vector<Entry<K, V> >
 
-  @[move_struct]
-  structure U64Store where
-    map : Map U64 U64
-    deriving Key
+  struct U64Store has Key where
+    map : Map<u64, u64>
 
-  @[move_struct]
-  structure BoolStore where
-    map : Map Bool U64
-    deriving Key
+  struct BoolStore has Key where
+    map : Map<Bool, u64>
 
-  /-! ## Functions -/
+  fun empty {K has Copy, Drop, Store} {V has Copy, Drop, Store}() -> Map<K, V> :=
+    new Map<K, V> { entries := vector<Entry<K, V> >[] }
 
-  fun empty {K V : Type} : Map K V :=
-    { entries := Move.Vector.empty }
-
-  partial fun lower_bound_loop {K V : Type} (entries : &Move.Vector (Entry K V))
-      (key : &K) (low high : U64) : Action U64 := do
-    if low < high then
-      let middle := low + ((high - low) / 2)
-      let entryKey ← &entries[middle].key
-      if entryKey < key then
-        continue lower_bound_loop entries key (middle + 1) high
+  -- Binary search for the first entry whose key is not less than `key`.
+  fun lower_bound_loop {K has Copy, Drop, Store} {V has Copy, Drop, Store}
+      (entries : &Vector<Entry<K, V> >, key : &K, low : u64, high : u64) -> u64 := do
+    let mut low := low
+    let mut high := high
+    while low < high do
+      let middle := low + (high - low) / 2
+      let order := (cmp::compare::<K>(&entries[middle].key, key) : Ordering)
+      if (cmp::is_lt(&order) : Bool) then
+        low := middle + 1
       else
-        continue lower_bound_loop entries key low middle
-    else
-      pure low
+        high := middle
+    low
 
-  fun lower_bound {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
-    let entries ← &map.entries
-    lower_bound_loop entries key 0 entries.length
+  fun lower_bound {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &Map<K, V>, key : &K) ->
+      u64 := do
+    let entries := &map.entries
+    lower_bound_loop::<K, V>(entries, key, 0, (*entries).length)
 
-  fun length {K V : Type} (map : &Map K V) : Action U64 := do
-    let entries ← &map.entries
-    pure entries.length
+  fun length {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &Map<K, V>) -> u64 := do
+    let entries := &map.entries
+    (*entries).length
 
-  fun borrow_key_at {K V : Type} (map : &Map K V) (index : U64) : Action (&K) := do
-    let entries ← &map.entries
+  fun borrow_key_at {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &Map<K, V>,
+      index : u64) -> &K := do
+    let entries := &map.entries
     &entries[index].key
 
-  fun contains {K V : Type} (map : &Map K V) (key : &K) : Action Bool := do
-    let index ← lower_bound map key
-    let entries ← &map.entries
-    if index < entries.length then
-      let entryKey ← &entries[index].key
-      pure (entryKey == key)
-    else
-      pure false
+  fun contains {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &Map<K, V>,
+      key : &K) -> Bool := do
+    let index := lower_bound::<K, V>(map, key)
+    let entries := &map.entries
+    if index < (*entries).length then
+      core.prim.equal(&entries[index].key, key)
+    else false
 
-  fun borrow {K V : Type} (map : &Map K V) (key : &K) : Action (&V) := do
-    let index ← lower_bound map key
-    let entries ← &map.entries
-    if index < entries.length then
-      let entryKey ← &entries[index].key
-      if entryKey == key then
-        &entries[index].value
-      else
-        abort 2
-    else
-      abort 2
+  fun borrow {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &Map<K, V>,
+      key : &K) -> &V := do
+    let index := lower_bound::<K, V>(map, key)
+    let entries := &map.entries
+    if index < (*entries).length then
+      if core.prim.equal(&entries[index].key, key) then &entries[index].value
+      else abort(2)
+    else abort(2)
 
-  fun get_u64 {K : Type} (map : &Map K U64) (key : &K) : Action U64 := do
-    let valueRef ← borrow map key
-    (*valueRef)
+  fun get_u64 {K has Copy, Drop, Store}(map : &Map<K, u64>, key : &K) -> u64 := do
+    let value := borrow::<K, u64>(map, key)
+    *value
 
-  fun existing_index {K V : Type} (map : &Map K V) (key : &K) : Action U64 := do
-    let index ← lower_bound map key
-    let entries ← &map.entries
-    if index < entries.length then
-      let entryKey ← &entries[index].key
-      if entryKey == key then
-        pure index
-      else
-        abort 2
-    else
-      abort 2
+  fun existing_index {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &Map<K, V>,
+      key : &K) -> u64 := do
+    let index := lower_bound::<K, V>(map, key)
+    let entries := &map.entries
+    if index < (*entries).length then
+      if core.prim.equal(&entries[index].key, key) then index
+      else abort(2)
+    else abort(2)
 
-  fun add {K V : Type} (map : &mut Map K V) (key : K) (value : V) :
-      Action Unit := do
-    let keyView ← &key
-    let index ← lower_bound map keyView
-    let entryCount ← length map
-    if index < entryCount then
-      let entriesView ← &map.entries
-      let entryKey ← &entriesView[index].key
-      if entryKey == keyView then
-        abort 1
-    let entries ← &mut map.entries
-    entries.insert index { key, value }
+  fun add {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &mut Map<K, V>,
+      key : K, value : V) -> Unit := do
+    let index := lower_bound::<K, V>(map, &key)
+    let entries := &map.entries
+    if index < (*entries).length then
+      if core.prim.equal(&entries[index].key, &key) then abort(1)
+    let entry := new Entry<K, V> { key := key, value := value }
+    let entries := &mut map.entries
+    *entries := core.prim.insertVector(*entries, index, entry)
 
-  fun remove {K V : Type} (map : &mut Map K V) (key : &K) : Action V := do
-    let index ← existing_index map key
-    let entries ← &mut map.entries
-    let removed ← entries.remove index
-    pure removed.value
+  fun remove {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &mut Map<K, V>,
+      key : &K) -> V := do
+    let index := existing_index::<K, V>(map, key)
+    let entries := &mut map.entries
+    let (removed, rest) := core.prim.removeVector(*entries, index)
+    *entries := rest
+    removed.value
 
-  fun populate_three (address : Address) : Action Unit := do
-    let mapRef ← &mut U64Store[address].map
-    add mapRef 30 300
-    add mapRef 10 100
-    add mapRef 20 200
+  fun populate_three(address : Address) -> Unit := do
+    let map := &mut U64Store[address].map
+    add::<u64, u64>(map, 30, 300)
+    add::<u64, u64>(map, 10, 100)
+    add::<u64, u64>(map, 20, 200)
 
-  fun populate_booleans (address : Address) : Action Unit := do
-    let mapRef ← &mut BoolStore[address].map
-    add mapRef true 10
-    add mapRef false 20
+  fun populate_booleans(address : Address) -> Unit := do
+    let map := &mut BoolStore[address].map
+    add::<Bool, u64>(map, true, 10)
+    add::<Bool, u64>(map, false, 20)
 
-  @[move_public]
-  fun publish_empty (signer : &Signer) : Action Unit :=
-    moveTo signer ({ map := empty } : U64Store)
+  public fun publish_empty(account : &Signer) -> Unit :=
+    move_to<U64Store>(account, new U64Store { map := empty::<u64, u64>() })
 
-  @[move_public]
-  fun publish_three (signer : &Signer) (address : Address) : Action Unit := do
-    moveTo signer ({ map := empty } : U64Store)
-    populate_three address
+  public fun publish_three(account : &Signer, address : Address) -> Unit := do
+    move_to<U64Store>(account, new U64Store { map := empty::<u64, u64>() })
+    populate_three(address)
 
-  @[move_public]
-  fun publish_booleans (signer : &Signer) (address : Address) : Action Unit := do
-    moveTo signer ({ map := empty } : BoolStore)
-    populate_booleans address
+  public fun publish_booleans(account : &Signer, address : Address) -> Unit := do
+    move_to<BoolStore>(account, new BoolStore { map := empty::<Bool, u64>() })
+    populate_booleans(address)
 
-  @[move_public]
-  fun empty_length (address : Address) : Action U64 := do
-    let mapRef ← &U64Store[address].map
-    length mapRef
+  public fun empty_length(address : Address) -> u64 := do
+    let map := &U64Store[address].map
+    length::<u64, u64>(map)
 
-  @[move_public]
-  fun lookup_three (address : Address) (key : U64) : Action U64 := do
-    let mapRef ← &U64Store[address].map
-    let keyRef ← &key
-    get_u64 mapRef keyRef
+  public fun lookup_three(address : Address, key : u64) -> u64 := do
+    let map := &U64Store[address].map
+    get_u64::<u64>(map, &key)
 
-  @[move_public]
-  fun contains_three (address : Address) (key : U64) : Action Bool := do
-    let mapRef ← &U64Store[address].map
-    let keyRef ← &key
-    contains mapRef keyRef
+  public fun contains_three(address : Address, key : u64) -> Bool := do
+    let map := &U64Store[address].map
+    contains::<u64, u64>(map, &key)
 
-  @[move_public]
-  fun insertion_order (address : Address) : Action U64 := do
-    let mapRef ← &U64Store[address].map
-    let firstRef ← borrow_key_at mapRef 0
-    let first ← *firstRef
-    let secondRef ← borrow_key_at mapRef 1
-    let second ← *secondRef
-    let thirdRef ← borrow_key_at mapRef 2
-    let third ← *thirdRef
-    pure (first * 100 + second * 10 + third)
+  public fun insertion_order(address : Address) -> u64 := do
+    let map := &U64Store[address].map
+    let first := *borrow_key_at::<u64, u64>(map, 0)
+    let second := *borrow_key_at::<u64, u64>(map, 1)
+    let third := *borrow_key_at::<u64, u64>(map, 2)
+    first * 100 + second * 10 + third
 
-  @[move_public]
-  fun remove_middle (address : Address) : Action U64 := do
-    let mapRef ← &mut U64Store[address].map
-    let key : U64 := 20
-    let keyRef ← &key
-    let removed ← remove mapRef keyRef
-    let stillPresent ← contains mapRef keyRef
-    let remaining ← length mapRef
-    if stillPresent then pure 0 else pure (removed + remaining)
+  public fun remove_middle(address : Address) -> u64 := do
+    let map := &mut U64Store[address].map
+    let key : u64 := 20
+    let removed := remove::<u64, u64>(map, &key)
+    let still_present := contains::<u64, u64>(map, &key)
+    let remaining := length::<u64, u64>(map)
+    if still_present then 0 else removed + remaining
 
-  @[move_public]
-  fun remove_edges (address : Address) : Action U64 := do
-    let mapRef ← &mut U64Store[address].map
-    let firstKey : U64 := 10
-    let firstKeyRef ← &firstKey
-    let first ← remove mapRef firstKeyRef
-    let lastKey : U64 := 30
-    let lastKeyRef ← &lastKey
-    let last ← remove mapRef lastKeyRef
-    let middleKey : U64 := 20
-    let middleKeyRef ← &middleKey
-    let middleRef ← borrow mapRef middleKeyRef
-    let middle ← *middleRef
-    pure (first + middle + last)
+  public fun remove_edges(address : Address) -> u64 := do
+    let map := &mut U64Store[address].map
+    let first_key : u64 := 10
+    let first := remove::<u64, u64>(map, &first_key)
+    let last_key : u64 := 30
+    let last := remove::<u64, u64>(map, &last_key)
+    let middle_key : u64 := 20
+    let middle := *borrow::<u64, u64>(map, &middle_key)
+    first + middle + last
 
-  @[move_public]
-  fun bool_keys (address : Address) : Action U64 := do
-    let mapRef ← &BoolStore[address].map
-    let key : Bool := false
-    let keyRef ← &key
-    get_u64 mapRef keyRef
+  public fun bool_keys(address : Address) -> u64 := do
+    let map := &BoolStore[address].map
+    let key := false
+    get_u64::<Bool>(map, &key)
 
-  @[move_public]
-  fun duplicate_key (address : Address) : Action Unit := do
-    let mapRef ← &mut U64Store[address].map
-    add mapRef 10 999
+  public fun duplicate_key(address : Address) -> Unit := do
+    let map := &mut U64Store[address].map
+    add::<u64, u64>(map, 10, 999)
 
-  @[move_public]
-  fun missing_remove (address : Address) : Action U64 := do
-    let mapRef ← &mut U64Store[address].map
-    let key : U64 := 11
-    let keyRef ← &key
-    remove mapRef keyRef
+  public fun missing_remove(address : Address) -> u64 := do
+    let map := &mut U64Store[address].map
+    let key : u64 := 11
+    remove::<u64, u64>(map, &key)
 
-  @[move_public]
-  fun missing_lookup (address : Address) : Action U64 := do
-    let mapRef ← &U64Store[address].map
-    let key : U64 := 11
-    let keyRef ← &key
-    get_u64 mapRef keyRef
-
-/-! ## Tests -/
+  public fun missing_lookup(address : Address) -> u64 := do
+    let map := &U64Store[address].map
+    let key : u64 := 11
+    get_u64::<u64>(map, &key)
 
 --# run --signers 0x40 -- 0x0::LeanerOrderedMap::publish_empty
 

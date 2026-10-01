@@ -9,4 +9,4 @@ leaner module 0x42::empty_module where
 
 #leaner_unit 0x42::empty_module
 
-example : «0x42».empty_module.unit.borrowDiagnostics.isEmpty = true := by decide
+example : «0x42».empty_module.unit.borrowRejections.isEmpty = true := by decide

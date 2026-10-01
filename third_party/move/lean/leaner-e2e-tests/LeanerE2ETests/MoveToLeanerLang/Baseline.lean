@@ -4,6 +4,7 @@
 import LeanerMove.Frontend
 import LeanerLang.Print
 import LeanerIR.TestInfra
+import LeanerIR.Validation.Link
 
 /-!
 # Move compiler to LeanerLang end-to-end baselines
@@ -124,6 +125,24 @@ private def testSource (environment : Lean.Environment) (source : System.FilePat
   let expectation := Baseline.expectationPath source "lean"
   Baseline.check expectation actual
 
+/-- Relocation is lossless on a package: every owned namespace, extracted,
+linked back into the unit, and extracted again, is the object it was. -/
+private def checkRelocation (directory : System.FilePath)
+    (unit : LeanerIR.Validation.ValidatedUnit) : IO Unit := do
+  let extractAll (unit : LeanerIR.Validation.ValidatedUnit) :=
+    unit.namespaces.mapM fun ns =>
+      match LeanerIR.Validation.extract unit ns.identity with
+      | .ok object => pure object
+      | .error message => throw <| IO.userError s!"{directory}: extraction failed: {message}"
+  let objects ← extractAll unit
+  let relinked ← match LeanerIR.Validation.link unit objects with
+    | .ok relinked => pure relinked
+    | .error message => throw <| IO.userError s!"{directory}: linking failed: {message}"
+  let again ← extractAll relinked
+  for (object, index) in objects.zipIdx do
+    unless again[index]? == some object do
+      throw <| IO.userError s!"{directory}: namespace {index} changed under relocation"
+
 private def testPackage (environment : Lean.Environment) (directory : System.FilePath) : IO Nat := do
   let some parent := directory.parent
     | throw <| IO.userError s!"Move package {directory} has no parent directory"
@@ -145,6 +164,8 @@ private def testPackage (environment : Lean.Environment) (directory : System.Fil
       pure none
     let some package := package?
       | return 1
+    if let .ok unit := LeanerMove.Frontend.LIR.Backend.fromXast package then
+      checkRelocation directory unit
     let mut count := 0
     for sourceModule in package.modules do
       let some sourceName := sourceModule.sources[sourceModule.loc.file]?

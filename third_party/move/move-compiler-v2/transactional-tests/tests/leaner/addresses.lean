@@ -2,25 +2,14 @@
 
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
+leaner module 0x42::LeanerAddresses where
+  public fun own_address() -> Address := @0x42
 
-address_alias application = 0x42
+  public fun literal_address() -> Address := @0xCAFE
 
-module LeanerAddresses at application where
-
-  @[move_public]
-  fun own_address : Address :=
-    @application
-
-  @[move_public]
-  fun literal_address : Address :=
-    @0xCAFE
-
-  @[move_public]
-  fun is_application (address : Address) : Bool :=
-    address == @application
+  public fun is_application(address : Address) -> Bool := address == @0x42
 
 --# run 0x42::LeanerAddresses::own_address
 

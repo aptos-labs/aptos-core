@@ -233,6 +233,9 @@ pub enum FeatureFlag {
     /// are verified on every load, so a previously published module with such a signature
     /// stops loading once this is enabled.
     CHECK_FUNCTION_TYPE_ABILITIES = 129,
+    /// Rejects publishing new modules that would run eager `init_module`. Modules must
+    /// use a newer compiler with lazy initialization support instead. Off by default.
+    DISABLE_EAGER_MODULE_INITIALIZATION = 130,
 }
 
 /// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default

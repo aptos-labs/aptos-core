@@ -6,10 +6,7 @@ use super::common::{
 };
 use crate::{errors::NoEffectsReason, executor::AptosTransactionExecutor, outcome::TxnOutcome};
 use aptos_types::transaction::{BlockEpiloguePayload, FeeDistribution};
-use move_core_types::{ident_str, identifier::IdentStr};
 use move_value_view::IterAsMoveVector;
-
-const BLOCK_EPILOGUE: &IdentStr = ident_str!("block_epilogue");
 
 impl<'guard> AptosTransactionExecutor<'guard> {
     /// Executes a block-epilogue (system) transaction.
@@ -40,10 +37,15 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let FeeDistribution::V0 { amount } = fee_distribution;
         let txn_data = SystemTxnMetadata::for_block_epilogue(block_epilogue);
         let mut interp = self.system_session(&txn_data);
-        let result = call_block_function(&mut interp, self.guard, BLOCK_EPILOGUE, |call| {
-            call.arg(&IterAsMoveVector(amount.keys().copied()))?;
-            call.arg(&IterAsMoveVector(amount.values().copied()))
-        });
+        let result = call_block_function(
+            &mut interp,
+            self.symbols,
+            self.symbols.block_epilogue,
+            |call| {
+                call.arg(&IterAsMoveVector(amount.keys().copied()))?;
+                call.arg(&IterAsMoveVector(amount.values().copied()))
+            },
+        );
         match result {
             Ok(()) => system_txn_outcome(interp),
             Err(failure) => match discard_system_session(interp) {

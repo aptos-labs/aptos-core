@@ -14,10 +14,13 @@ use crate::{
         heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
     memory::{
-        read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
-        write_u64,
+        read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_enum_tag,
+        write_ptr, write_u64,
     },
-    types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
+    types::{
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
+    },
 };
 use mono_move_core::{
     interner::{view_module_id, InternedIdentifier, InternedModuleId},
@@ -29,8 +32,8 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
     DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
-    ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE,
-    OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    MicroOp, ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_core_types::account_address::AccountAddress;
@@ -125,6 +128,23 @@ impl<'a> ProductionNativeContext<'a> {
             extensions,
             pool: RootPool::new(),
             returns_started: Cell::new(false),
+        }
+    }
+
+    /// The caller of the Move function invoking this native, and its saved return PC.
+    fn caller_frame(&self) -> Option<(&Function, u64)> {
+        // SAFETY: native dispatch and Move calls write these metadata fields. The native's
+        // saved FP names its live caller frame, whose saved function is either null (entry)
+        // or an arena-owned function that remains alive throughout execution.
+        unsafe {
+            let caller_fp = read_ptr(
+                self.frame_ptr.sub(FRAME_METADATA_SIZE),
+                META_SAVED_FP_OFFSET,
+            );
+            let metadata = caller_fp.sub(FRAME_METADATA_SIZE);
+            let caller =
+                (read_ptr(metadata, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()?;
+            Some((caller, read_u64(metadata, META_SAVED_PC_OFFSET)))
         }
     }
 }
@@ -305,20 +325,21 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn caller_module(&self) -> Option<InternedModuleId> {
-        // Walk two frames up: the native's metadata records its immediate
-        // caller's frame pointer, and that caller's metadata records *its*
-        // caller. A null saved-function pointer marks the entry frame, which
-        // has no caller.
-        unsafe {
-            let caller_fp = read_ptr(
-                self.frame_ptr.sub(FRAME_METADATA_SIZE),
-                META_SAVED_FP_OFFSET,
-            );
-            let caller_caller = read_ptr(
-                caller_fp.sub(FRAME_METADATA_SIZE),
-                META_SAVED_FUNC_PTR_OFFSET,
-            ) as *const Function;
-            caller_caller.as_ref().map(|f| f.module_id)
+        self.caller_frame().map(|(caller, _)| caller.module_id)
+    }
+
+    fn direct_caller_module(&self) -> Option<InternedModuleId> {
+        let (caller, return_pc) = self.caller_frame()?;
+        let call_pc = usize::try_from(return_pc.checked_sub(1)?).ok()?;
+        // CallIndirect is a statically named Move call resolved by the loader; function
+        // values use CallClosure. The saved return PC is one past the call micro-op.
+        if matches!(
+            caller.code.ops().get(call_pc),
+            Some(MicroOp::CallDirect { .. } | MicroOp::CallIndirect { .. })
+        ) {
+            Some(caller.module_id)
+        } else {
+            None
         }
     }
 

@@ -143,6 +143,7 @@ deriving instance ToExpr for BorrowCertificate
 deriving instance ToExpr for LeanerIR.Validation.Severity
 deriving instance ToExpr for LeanerIR.Validation.RelatedLocation
 deriving instance ToExpr for LeanerIR.Validation.Diagnostic
+deriving instance ToExpr for LeanerIR.Validation.OwnedDiagnostic
 deriving instance ToExpr for LeanerIR.Validation.ResolutionIndex
 deriving instance ToExpr for ValidatedUnit
 deriving instance ToExpr for FunctionHandle

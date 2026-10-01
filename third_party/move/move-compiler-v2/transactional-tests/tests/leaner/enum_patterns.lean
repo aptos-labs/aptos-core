@@ -1,45 +1,58 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerEnumPatterns where
+leaner module 0x0::LeanerEnumPatterns where
+  enum Atom has Copy, Drop, Store where
+    | None
+    | Number (value : u64)
 
-  @[move_enum]
-  inductive Atom where
-    | none
-    | number (value : U64)
-    deriving Copy, Drop, Store
+  enum Envelope has Copy, Drop, Store where
+    | Empty
+    | One (value : Atom)
+    | Two (left : Atom, right : Atom)
 
-  @[move_enum]
-  inductive Envelope where
-    | empty
-    | one (value : Atom)
-    | two (left right : Atom)
-    deriving Copy, Drop, Store
-
-  /-! ## Functions -/
-
-  fun nested_total (envelope : Envelope) : U64 :=
+  -- By-value payload patterns bind variables or wildcards, so the nested
+  -- patterns are spelled as nested matches with wildcard fallbacks.
+  fun nested_total(envelope : Envelope) -> u64 :=
     match envelope with
-    | .one (.number value) => value
-    | .two (.number left) (.number right) => left + right
-    | _ => 0
+      | Envelope::One { value := atom } =>
+          match atom with
+            | Atom::Number { value := value } => value
+            | _ => 0
+      | Envelope::Two { left := left_atom, right := right_atom } =>
+          match left_atom with
+            | Atom::Number { value := left } =>
+                match right_atom with
+                  | Atom::Number { value := right } => left + right
+                  | _ => 0
+            | _ => 0
+      | _ => 0
 
-  fun one_number (value : U64) : U64 :=
-    nested_total (.one (.number value))
+  fun one_number(value : u64) -> u64 :=
+    nested_total(new Envelope::One { value := new Atom::Number { value } })
 
-  fun one_none : U64 := nested_total (.one .none)
+  fun one_none() -> u64 := nested_total(new Envelope::One { value := new Atom::None {} })
 
-  fun two_numbers (left right : U64) : U64 :=
-    nested_total (.two (.number left) (.number right))
+  fun two_numbers(left : u64, right : u64) -> u64 :=
+    nested_total(new Envelope::Two {
+      left := new Atom::Number { value := left },
+      right := new Atom::Number { value := right }
+    })
 
-  fun left_missing (right : U64) : U64 :=
-    nested_total (.two .none (.number right))
+  fun left_missing(right : u64) -> u64 :=
+    nested_total(new Envelope::Two {
+      left := new Atom::None {},
+      right := new Atom::Number { value := right }
+    })
 
-  fun right_missing (left : U64) : U64 :=
-    nested_total (.two (.number left) .none)
-
-/-! ## Tests -/
+  fun right_missing(left : u64) -> u64 :=
+    nested_total(new Envelope::Two {
+      left := new Atom::Number { value := left },
+      right := new Atom::None {}
+    })
 
 --# run 0x0::LeanerEnumPatterns::one_number --args 7u64
 

@@ -877,8 +877,9 @@ resolution index. All namespaces in a validated compilation unit share one
 checked table snapshot, so `NameId` and `TypeId` remain meaningful across the
 returned namespace boundary. -/
 private def nominalDeclarationForType? (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (typeId : TypeId) : Option (ValidatedNamespace × StructDecl × Array GenericArgument) := do
-  let .nominal name arguments ← ns.tables.types[typeId.index]? | none
+    (typeId : TypeId) (typeAt : Nat → Option Ty := fun index => ns.tables.types[index]?) :
+    Option (ValidatedNamespace × StructDecl × Array GenericArgument) := do
+  let .nominal name arguments ← typeAt typeId.index | none
   let owned : Option (ValidatedNamespace × StructDecl) := do
     let declarationId ← unit.resolution.nominal? name
     let targetNs ← ownedNamespaceForName? unit name
@@ -945,7 +946,7 @@ private def typeNeedsSubstitution (tables : Tables) : Nat → TypeId → Bool
 private def fieldTypeNeedsSubstitution (ns : ValidatedNamespace) (typeId : TypeId) : Bool :=
   typeNeedsSubstitution ns.tables (ns.tables.types.size + 1) typeId
 
-private def instantiateLifetime? (ns : ValidatedNamespace)
+def instantiateLifetime? (ns : ValidatedNamespace)
     (instantiations : Array GenericArgument) (lifetime : LifetimeId) : Option LifetimeId := do
   let declaration ← ns.tables.lifetimes[lifetime.index]?
   match declaration.kind with
@@ -954,18 +955,35 @@ private def instantiateLifetime? (ns : ValidatedNamespace)
       | _ => none
   | .static | .inference | .local => some lifetime
 
+theorem instantiateLifetime?_eraseLoc (ns : ValidatedNamespace)
+    (instantiations : Array GenericArgument) (lifetime : LifetimeId) :
+    instantiateLifetime? ns (instantiations.map GenericArgument.eraseLoc) lifetime =
+      instantiateLifetime? ns instantiations lifetime := by
+  simp only [instantiateLifetime?, Array.getElem?_map]
+  cases ns.tables.lifetimes[lifetime.index]? with
+  | none => rfl
+  | some declaration =>
+      simp only [Option.bind_eq_bind, Option.bind_some]
+      cases declaration.kind with
+      | parameter index =>
+          dsimp only
+          cases instantiations[index]? with
+          | none => rfl
+          | some argument => cases argument <;> rfl
+      | _ => rfl
+
 /-- Source locations distinguish occurrences, not instantiated nominal
 types.  Structural lookup in the shared type arena therefore compares a
 type argument by its `TypeId` while retaining ordinary equality for the
 other generic-argument kinds. -/
-private def sameGenericArgumentValue : GenericArgument → GenericArgument → Bool
+def sameGenericArgumentValue : GenericArgument → GenericArgument → Bool
   | .typeArg left, .typeArg right => left.typeId == right.typeId
   | .const left, .const right => left == right
   | .lifetime left, .lifetime right => left == right
   | .evidence left, .evidence right => left == right
   | _, _ => false
 
-private def sameGenericArgumentValues
+def sameGenericArgumentValues
     (left right : Array GenericArgument) : Bool :=
   left.size == right.size &&
     (left.zip right).all fun (left, right) => sameGenericArgumentValue left right
@@ -973,7 +991,7 @@ private def sameGenericArgumentValues
 /-- Resolve a declaration-local generic field type to an already interned
 concrete arena type. RawUnit remains non-monomorphized: this only locates the
 structurally instantiated node emitted for the use site. -/
-private def instantiatePlaceFieldTypeFuel? (ns : ValidatedNamespace)
+def instantiatePlaceFieldTypeFuel? (ns : ValidatedNamespace)
     (instantiations : Array GenericArgument) : Nat → TypeId → Option TypeId
   | 0, _ => none
   | fuel + 1, typeId => do
@@ -1032,6 +1050,110 @@ private def instantiatePlaceFieldTypeFuel? (ns : ValidatedNamespace)
           some ⟨index⟩
       | _ => some typeId
 
+/-- An instantiation reads its type arguments' identities, not where they
+occur. -/
+theorem instantiatePlaceFieldTypeFuel?_eraseLoc (ns : ValidatedNamespace)
+    (instantiations : Array GenericArgument) (fuel : Nat) :
+    instantiatePlaceFieldTypeFuel? ns (instantiations.map GenericArgument.eraseLoc) fuel =
+      instantiatePlaceFieldTypeFuel? ns instantiations fuel := by
+  induction fuel with
+  | zero => rfl
+  | succ fuel ih =>
+      funext typeId
+      simp only [instantiatePlaceFieldTypeFuel?, ih, instantiateLifetime?_eraseLoc]
+      cases ns.tables.types[typeId.index]? with
+      | none => rfl
+      | some type =>
+          simp only [Option.bind_eq_bind, Option.bind_some, Array.getElem?_map]
+          cases type with
+          | typeParameter index =>
+              dsimp only
+              cases instantiations[index]? with
+              | none => rfl
+              | some argument => cases argument <;> rfl
+          | _ => rfl
+
+/-- `instantiatePlaceFieldTypeFuel?` reading the types through an index and
+searching them as a list: the form a kernel certificate evaluates, where an
+array is read through its list and an indexed search over it is quadratic. -/
+def instantiatePlaceFieldTypeFuelIn? (ns : ValidatedNamespace) (types : IndexedArena Ty)
+    (typeList : List Ty) (instantiations : Array GenericArgument) : Nat → TypeId → Option TypeId
+  | 0, _ => none
+  | fuel + 1, typeId => do
+      let type ← types.get? typeId.index
+      match type with
+      | .typeParameter index => match instantiations[index]? with
+          | some (.typeArg value) => some value.typeId
+          | _ => none
+      | .tuple elements => do
+          let instantiated ← elements.mapM
+            (instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel)
+          let index ← typeList.findIdx? (fun candidate => candidate == .tuple instantiated)
+          some ⟨index⟩
+      | .vector element length => do
+          let element ← instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel element
+          let index ← typeList.findIdx? fun candidate =>
+            candidate == .vector element length
+          some ⟨index⟩
+      | .typeDomain nested => do
+          let nested ← instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel nested
+          let index ← typeList.findIdx? (fun candidate => candidate == .typeDomain nested)
+          some ⟨index⟩
+      | .resourceDomain resource arguments => do
+          let arguments ← arguments.mapM fun arguments =>
+            arguments.mapM (instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel)
+          let index ← typeList.findIdx? fun candidate =>
+            candidate == .resourceDomain resource arguments
+          some ⟨index⟩
+      | .nominal name arguments => do
+          let arguments ← arguments.mapM fun argument => match argument with
+            | .typeArg value => do
+                let typeId ← instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel
+                  value.typeId
+                some (.typeArg { value with typeId })
+            | .lifetime value => .lifetime <$> instantiateLifetime? ns instantiations value
+            | .const value => some (.const value)
+            | .evidence value => some (.evidence value)
+          let index ← typeList.findIdx? fun candidate => match candidate with
+            | .nominal candidateName candidateArguments =>
+                candidateName == name &&
+                  sameGenericArgumentValues candidateArguments arguments
+            | _ => false
+          some ⟨index⟩
+      | .function arguments result abilities => do
+          let arguments ← arguments.mapM
+            (instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel)
+          let result ← instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel result
+          let index ← typeList.findIdx? fun candidate =>
+            candidate == .function arguments result abilities
+          some ⟨index⟩
+      | .reference reference => do
+          let referent ← instantiatePlaceFieldTypeFuelIn? ns types typeList instantiations fuel
+            reference.referent
+          let lifetime ← instantiateLifetime? ns instantiations reference.lifetime
+          let instantiated := .reference { reference with referent, lifetime }
+          let index ← typeList.findIdx? (fun candidate => candidate == instantiated)
+          some ⟨index⟩
+      | _ => some typeId
+
+/-- A search over an array is the search over its list. -/
+theorem findIdx?_toList {α : Type} (values : Array α) (p : α → Bool) :
+    values.toList.findIdx? p = values.findIdx? p := by
+  rw [← List.findIdx?_toArray, Array.toArray_toList]
+
+/-- The indexed form agrees with the native one at the namespace's own tables. -/
+theorem instantiatePlaceFieldTypeFuelIn?_eq (ns : ValidatedNamespace)
+    (instantiations : Array GenericArgument) (fuel : Nat) :
+    instantiatePlaceFieldTypeFuelIn? ns (.ofArray ns.tables.types) ns.tables.types.toList
+        instantiations fuel =
+      instantiatePlaceFieldTypeFuel? ns instantiations fuel := by
+  induction fuel with
+  | zero => rfl
+  | succ fuel ih =>
+      funext typeId
+      simp only [instantiatePlaceFieldTypeFuelIn?, instantiatePlaceFieldTypeFuel?,
+        IndexedArena.get?_ofArray, ih, findIdx?_toList]
+
 /-- Instantiate a declaration-local field type using the generic arguments of
 its nominal use, locating the already interned concrete type in the arena. -/
 def instantiatePlaceFieldType? (ns : ValidatedNamespace)
@@ -1060,22 +1182,24 @@ fuel keeps the resolver total, which the semantic-preparation rewrites need
 so a prepared unit stays a computable value. -/
 private def staticPlaceInfoFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (context : ScanContext) (fuel : Nat)
-    (id : PlaceId) : Option StaticPlaceInfo := do
+    (id : PlaceId) (placeAt : Nat → Option Place := arenaGet? ns.places)
+    (typeAt : Nat → Option Ty := fun index => ns.tables.types[index]?) :
+    Option StaticPlaceInfo := do
   match fuel with
   | 0 => none
   | fuel + 1 =>
-  let place ← arenaGet? ns.places id.index
+  let place ← placeAt id.index
   match place with
   | .localVar localId => do
       let declaration ← context.locals[localId.index]?
       some { typeId := declaration.type.typeId, writable := declaration.mutable }
   | .deref base => do
-      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base
-      let .reference reference ← ns.tables.types[baseInfo.typeId.index]? | none
+      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base placeAt typeAt
+      let .reference reference ← typeAt baseInfo.typeId.index | none
       some { typeId := reference.referent, writable := reference.kind == .mutable }
   | .index base index => do
-      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base
-      match ns.tables.types[baseInfo.typeId.index]? with
+      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base placeAt typeAt
+      match typeAt baseInfo.typeId.index with
       | some (.vector element _) => some { typeId := element, writable := baseInfo.writable }
       | some (.tuple elements) => do
           let index ← literalIndex? ns index
@@ -1083,8 +1207,8 @@ private def staticPlaceInfoFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace
           some { typeId := element, writable := baseInfo.writable }
       | _ => none
   | .subslice base start stop fromEnd => do
-      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base
-      match ns.tables.types[baseInfo.typeId.index]? with
+      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base placeAt typeAt
+      match typeAt baseInfo.typeId.index with
       | some (.vector _ none) => some baseInfo
       | some (.vector element (some (.integer length))) => do
           if length < 0 then none else
@@ -1094,17 +1218,17 @@ private def staticPlaceInfoFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace
           some { typeId := ⟨resultTypeIndex⟩, writable := baseInfo.writable }
       | _ => none
   | .downcast base variant => do
-      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base
-      let (targetNs, declaration, _) ← nominalDeclarationForType? unit ns baseInfo.typeId
+      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base placeAt typeAt
+      let (targetNs, declaration, _) ← nominalDeclarationForType? unit ns baseInfo.typeId typeAt
       let variantName ← sourceName? ns variant
       if declaration.variants.any (fun candidate =>
           sourceName? targetNs candidate.name == some variantName) then
         some { baseInfo with selectedVariant := some variantName }
       else none
   | .field base _ field => do
-      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base
+      let baseInfo ← staticPlaceInfoFuel? unit ns context fuel base placeAt typeAt
       let (targetNs, declaration, instantiations) ←
-        nominalDeclarationForType? unit ns baseInfo.typeId
+        nominalDeclarationForType? unit ns baseInfo.typeId typeAt
       let fieldName ← sourceName? ns field
       let selected ← selectedPlaceFieldTypes? targetNs declaration
         baseInfo.selectedVariant fieldName
@@ -1607,7 +1731,7 @@ private def primitiveTypeDiagnostics (ns : ValidatedNamespace) (logical : Bool)
   | .swapVector | .reverseSliceVector =>
       swapVectorPrimitiveDiagnostics ns logical loc resultType arguments
   | .checkVectorIndex _ =>
-      let resultErrors := if ns.tables.types[resultType.index]? == some .unit then #[]
+      let resultErrors := if isUnitType ns resultType then #[]
         else typeMismatch loc "vector index check must return unit"
       match arguments.toList with
       | [vector, index] =>
@@ -1629,7 +1753,7 @@ private def primitiveTypeDiagnostics (ns : ValidatedNamespace) (logical : Bool)
           | _ => resultErrors ++ typeMismatch loc "a signer's address requires a &Signer"
       | _ => resultErrors
   | .destroyEmptyVector =>
-      let resultErrors := if ns.tables.types[resultType.index]? == some .unit then #[]
+      let resultErrors := if isUnitType ns resultType then #[]
         else typeMismatch loc "empty-vector destruction must return unit"
       match arguments.toList with
       | [vector] => match exprType? ns vector >>= (ns.tables.types[·.index]?) with
@@ -1768,11 +1892,14 @@ private def associatedPredicateDiagnostics (unit : ValidatedUnit)
 the declaration's type/lifetime parameters by one checked call-site
 instantiation. All slots are pre-bound, so the unification engine acts as a
 pure instantiation checker here. -/
+private def typeMatchesSolution? (sourceNs : ValidatedNamespace) (source : TypeId)
+    (targetNs : ValidatedNamespace) (target : TypeId) (solution : Unify.Solution) : Bool :=
+  (Unify.matchType sourceNs source targetNs target ⟨0⟩ solution).isSome
+
 private def typeMatchesInstantiation? (sourceNs : ValidatedNamespace) (source : TypeId)
     (targetNs : ValidatedNamespace) (target : TypeId)
     (instantiations : Array GenericArgument) : Bool :=
-  (Unify.matchType sourceNs source targetNs target ⟨0⟩
-    (Unify.Solution.bound instantiations)).isSome
+  typeMatchesSolution? sourceNs source targetNs target (Unify.Solution.bound instantiations)
 
 private def primitiveHasAbility (profile : Profile) (ty : Ty) (ability : Ability) : Bool :=
   let ordinaryScalar := match ty with
@@ -1830,7 +1957,9 @@ private partial def typeHasAbilityFuel : Nat → ValidatedUnit → ValidatedName
       | .profile _ => none
       | _ => some (primitiveHasAbility profile ty ability)
 
-private def typeHasAbility? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+/-- Whether a type has an ability, under the abilities of the enclosing
+declaration's type parameters; `none` when it cannot be decided. -/
+def typeHasAbility? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (profile : Profile) (generics : Array GenericBinder) (typeId : TypeId)
     (ability : Ability) : Option Bool :=
   typeHasAbilityFuel (ns.tables.types.size + unit.namespaces.size + 1)
@@ -1888,11 +2017,16 @@ private def structAbilityDiagnostics (unit : ValidatedUnit) (ns : ValidatedNames
 /-- Whether a source type matches a declared target under one instantiation,
 optionally through the specification projection: references erase on either
 side and logical integers occupy the unbounded integer domain. -/
+private def specMatchesSolution (sourceNs : ValidatedNamespace) (logical : Bool)
+    (sourceType : TypeId) (targetNs : ValidatedNamespace) (targetType : TypeId)
+    (solution : Unify.Solution) : Bool :=
+  (Unify.specMatch sourceNs logical sourceType targetNs targetType ⟨0⟩ solution).isSome
+
 private def specMatchesInstantiation (sourceNs : ValidatedNamespace) (logical : Bool)
     (sourceType : TypeId) (targetNs : ValidatedNamespace) (targetType : TypeId)
     (instantiations : Array GenericArgument) : Bool :=
-  (Unify.specMatch sourceNs logical sourceType targetNs targetType ⟨0⟩
-    (Unify.Solution.bound instantiations)).isSome
+  specMatchesSolution sourceNs logical sourceType targetNs targetType
+    (Unify.Solution.bound instantiations)
 
 private def argumentTypesMatchParameters (sourceNs targetNs : ValidatedNamespace)
     (logical : Bool)
@@ -2446,14 +2580,16 @@ private def dataOperandInfo? (ns : ValidatedNamespace)
     some { instantiations, reference := sourceReference }
   else none
 
+/-- The subject's instantiation of the selected declaration's parameters:
+the operand's, or, for the implicit subject of a data invariant, whatever
+the selection's own types determine (the declaration's own parameters). -/
 private def selectedTypesMatchResult (sourceNs targetNs : ValidatedNamespace)
     (logical : Bool)
-    (resultType : TypeId) (instantiations : Array GenericArgument)
+    (resultType : TypeId) (solution : Unify.Solution)
     (sourceReference : Option ReferenceType) (selected : Array TypeUse) : Bool :=
   !selected.isEmpty && match sourceReference with
   | none => selected.all fun typeUse =>
-      specMatchesInstantiation sourceNs logical resultType targetNs typeUse.typeId
-        instantiations
+      specMatchesSolution sourceNs logical resultType targetNs typeUse.typeId solution
   | some sourceReference => match sourceNs.tables.types[resultType.index]? with
       | some (.reference resultReference) =>
           sourceReference.profile == resultReference.profile &&
@@ -2461,14 +2597,13 @@ private def selectedTypesMatchResult (sourceNs targetNs : ValidatedNamespace)
             lifetimeKindsEquivalent? sourceNs sourceReference.lifetime
               sourceNs resultReference.lifetime &&
             selected.all fun typeUse =>
-              typeMatchesInstantiation? sourceNs resultReference.referent targetNs
-                typeUse.typeId instantiations
+              typeMatchesSolution? sourceNs resultReference.referent targetNs
+                typeUse.typeId solution
       | _ =>
           -- The specification projection reads a field value through the
           -- reference-typed subject.
           logical && selected.all fun typeUse =>
-            specMatchesInstantiation sourceNs logical resultType targetNs
-              typeUse.typeId instantiations
+            specMatchesSolution sourceNs logical resultType targetNs typeUse.typeId solution
 
 private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (context : ScanContext)
@@ -2511,12 +2646,14 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
       let operandErrors := if operandInfo.isSome || implicitSubject then #[] else
         typeMismatch loc "data operation operand is not its nominal target type or supported reference"
       let instantiations := operandInfo.map (·.instantiations) |>.getD #[]
+      let solution := if implicitSubject then Unify.Solution.unbound declaration.generics.size
+        else Unify.Solution.bound instantiations
       let sourceReference := operandInfo.bind (·.reference)
       match operation with
       | .select _ field => match commonFieldTypes? targetNs context.logical declaration field with
           | some selected =>
               let resultErrors := if selectedTypesMatchResult ns targetNs context.logical resultType
-                  instantiations sourceReference selected &&
+                  solution sourceReference selected &&
                   (sourceReference.isNone || declaration.variants.isEmpty) then #[]
                 else typeMismatch loc "selected field types differ from the operation result"
               operandErrors ++ resultErrors
@@ -2525,7 +2662,7 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
       | .selectVariants _ fields => match variantFieldTypes? targetNs declaration fields with
           | some selected =>
               let resultErrors := if selectedTypesMatchResult ns targetNs context.logical resultType
-                  instantiations sourceReference selected then #[]
+                  solution sourceReference selected then #[]
                 else typeMismatch loc "variant field types differ from the operation result"
               operandErrors ++ resultErrors
           | none => operandErrors ++ #[.at "LIR-SEMANTIC-TARGET"
@@ -4315,31 +4452,33 @@ loans keep the full prophetic treatment. A node whose type cannot be
 recovered is left unchanged; the executable semantics reports it stuck
 rather than guessing a reference kind. -/
 
-private def isSharedReferenceType (ns : ValidatedNamespace) (typeId : TypeId) : Bool :=
-  match ns.tables.types[typeId.index]? with
+private def isSharedReferenceType (ns : ValidatedNamespace) (typeId : TypeId)
+    (typeAt : Nat → Option Ty := fun index => ns.tables.types[index]?) : Bool :=
+  match typeAt typeId.index with
   | some (.reference reference) => reference.kind == .shared
   | _ => false
 
 private def sharedOperand (ns : ValidatedNamespace) (expressionAt : Nat → Option Expr)
-    (arguments : Array ExprId) : Bool :=
+    (typeAt : Nat → Option Ty) (arguments : Array ExprId) : Bool :=
   match arguments[0]? with
   | some id => match expressionAt id.index with
-    | some expression => isSharedReferenceType ns expression.typeId
+    | some expression => isSharedReferenceType ns expression.typeId typeAt
     | none => false
   | none => false
 
 /-- Rewrite shared dereference and freeze value operations to `copyValue`,
 namespace-wide: the decision reads only the operand's recorded type. -/
 private def eraseSharedValueOperations (ns : ValidatedNamespace)
-    (expressionAt : Nat → Option Expr) : Array Expr :=
+    (expressionAt : Nat → Option Expr)
+    (typeAt : Nat → Option Ty := fun index => ns.tables.types[index]?) : Array Expr :=
   (ns.expressions.toList.map fun node =>
     match node.kind with
     | .operation (.reference .dereference) _ arguments surface =>
-        if sharedOperand ns expressionAt arguments then
+        if sharedOperand ns expressionAt typeAt arguments then
           { node with kind := .operation (.primitive .copyValue) #[] arguments surface }
         else node
     | .operation (.reference (.freeze _)) _ arguments surface =>
-        if sharedOperand ns expressionAt arguments then
+        if sharedOperand ns expressionAt typeAt arguments then
           { node with kind := .operation (.primitive .copyValue) #[] arguments surface }
         else node
     | _ => node).toArray
@@ -4426,15 +4565,15 @@ def reachableDereferences (ns : ValidatedNamespace) (root : ExprId) : List (Nat 
 /-- Find each function's shared dereference sites, typing their bases against
 the owning function's locals in the original arena. Sorting and transitive
 copy application are separate from this traversal. -/
-private def mayContainSharedReference (ns : ValidatedNamespace) : Nat → TypeId → Bool
+private def mayContainSharedReference (typeAt : Nat → Option Ty) : Nat → TypeId → Bool
   | 0, _ => true
   | fuel + 1, typeId =>
-      match arenaGet? ns.tables.types typeId.index with
+      match typeAt typeId.index with
       | some (.reference reference) =>
-          reference.kind == .shared || mayContainSharedReference ns fuel reference.referent
-      | some (.vector element _) => mayContainSharedReference ns fuel element
+          reference.kind == .shared || mayContainSharedReference typeAt fuel reference.referent
+      | some (.vector element _) => mayContainSharedReference typeAt fuel element
       | some (.tuple elements) =>
-          elements.toList.any (mayContainSharedReference ns fuel)
+          elements.toList.any (mayContainSharedReference typeAt fuel)
       | some .unit | some .never | some .bool | some .character | some .string
       | some .bytes | some .address | some .signer | some (.integer ..) => false
       -- Nominal fields, generic parameters, and profile-owned types keep
@@ -4443,41 +4582,51 @@ private def mayContainSharedReference (ns : ValidatedNamespace) : Nat → TypeId
       | _ => true
 
 private def sharedNamespacePlaceCopyChunksWith (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (expressionAt : Nat → Option Expr) (placeAt : Nat → Option Place) :
+    (expressionAt : Nat → Option Expr) (placeAt : Nat → Option Place)
+    (typeAt : Nat → Option Ty) :
     Array (List (Nat × PlaceId)) :=
+  -- The arenas are read through the given lookups and their sizes taken
+  -- once: the preparation certificates evaluate this in the kernel, which
+  -- walks an array's list for its size and for every element read.
+  let typeFuel := ns.tables.types.size + 1
+  let placeFuel := ns.places.size + 1
   (ns.functions.toList.map fun declaration =>
     match declaration.body with
     | .absent => []
     | .structured root =>
         if !declaration.locals.toList.any (fun entry =>
-            mayContainSharedReference ns (ns.tables.types.size + 1) entry.type.typeId) then
+            mayContainSharedReference typeAt typeFuel entry.type.typeId) then
           []
         else
         let context : ScanContext := { locals := declaration.locals }
         -- Type only sites owned by this body, not every namespace-wide
         -- dereference against each function's unrelated local declarations.
         (reachableDereferencesWith ns expressionAt placeAt root).filter fun (_, base) =>
-          (staticPlaceInfo? unit ns context base).any fun info =>
-            isSharedReferenceType ns info.typeId).toArray
+          (staticPlaceInfoFuel? unit ns context placeFuel base placeAt typeAt).any fun info =>
+            isSharedReferenceType ns info.typeId typeAt).toArray
 
 /-- Unsorted, type-checked sites grouped by namespace and function. -/
 abbrev SharedReferenceErasureChunks := Array (Array (List (Nat × PlaceId)))
 
 def sharedReferenceErasureChunks (marked : ValidatedUnit) : SharedReferenceErasureChunks :=
   (marked.namespaces.toList.map fun ns => sharedNamespacePlaceCopyChunksWith marked ns
-    (arenaGet? ns.expressions) (arenaGet? ns.places)).toArray
+    (arenaGet? ns.expressions) (arenaGet? ns.places) (arenaGet? ns.tables.types)).toArray
 
-/-- Proof-facing indexes are separate from the native array-based traversal. -/
-abbrev SharedReferenceErasureIndexes := List (IndexedArena Expr × IndexedArena Place)
+/-- Proof-facing indexes of each namespace's expressions, places, and types,
+separate from the native array-based traversal. -/
+abbrev SharedReferenceErasureIndexes :=
+  List (IndexedArena Expr × IndexedArena Place × IndexedArena Ty)
 
 def sharedReferenceErasureIndexes (marked : ValidatedUnit) : SharedReferenceErasureIndexes :=
   marked.namespaces.toList.map fun ns =>
-    (IndexedArena.ofArray ns.expressions, IndexedArena.ofArray ns.places)
+    (IndexedArena.ofArray ns.expressions, IndexedArena.ofArray ns.places,
+      IndexedArena.ofArray ns.tables.types)
 
 def sharedReferenceErasureChunksIndexed (marked : ValidatedUnit)
     (indexes : SharedReferenceErasureIndexes) : SharedReferenceErasureChunks :=
-  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, places) =>
-    sharedNamespacePlaceCopyChunksWith marked ns expressions.get? places.get?).toArray
+  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, places, types) =>
+    sharedNamespacePlaceCopyChunksWith marked ns expressions.get? places.get?
+      types.get?).toArray
 
 theorem sharedReferenceErasureChunksIndexed_eq (marked : ValidatedUnit) :
     sharedReferenceErasureChunksIndexed marked (sharedReferenceErasureIndexes marked) =
@@ -4532,8 +4681,8 @@ def erasedExpressionArenas (marked : ValidatedUnit) : ErasedExpressionArenas :=
 
 def erasedExpressionArenasIndexed (marked : ValidatedUnit)
     (indexes : SharedReferenceErasureIndexes) : ErasedExpressionArenas :=
-  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, _) =>
-    eraseSharedValueOperations ns expressions.get?).toArray
+  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, _, types) =>
+    eraseSharedValueOperations ns expressions.get? types.get?).toArray
 
 theorem erasedExpressionArenasIndexed_eq (marked : ValidatedUnit) :
     erasedExpressionArenasIndexed marked (sharedReferenceErasureIndexes marked) =
@@ -4545,9 +4694,8 @@ theorem erasedExpressionArenasIndexed_eq (marked : ValidatedUnit) :
   | cons ns rest ih =>
       simp only [List.map_cons, List.zip_cons_cons]
       congr 1
-      congr 1
-      funext index
-      simp [IndexedArena.get?_ofArray, arenaGet?_eq, arenaGetNative?]
+      congr 1 <;> funext index <;>
+        simp [IndexedArena.get?_ofArray, arenaGet?_eq, arenaGetNative?]
 
 theorem erasedExpressionArenas_eq_of_indexes {marked : ValidatedUnit}
     {indexes : SharedReferenceErasureIndexes} {arenas : ErasedExpressionArenas}
@@ -4565,7 +4713,7 @@ def applySharedReferenceErasureArenas (marked : ValidatedUnit)
   Internal.mkValidatedUnit marked.tables marked.profiles namespaces
     marked.dependencies marked.evidence marked.indexes marked.structurizationWitnesses
     marked.resolution marked.initializationCertificates marked.borrowCertificates
-    marked.borrowDiagnostics
+    marked.borrowRejections
 
 def applySharedReferenceErasure (marked : ValidatedUnit)
     (plan : SharedReferenceErasurePlan) : ValidatedUnit :=

@@ -1,41 +1,54 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerTailRecursion where
+-- Tail recursions written as loops over their parameter rows. The large
+-- inputs check that none of them consumes call stack per iteration.
+leaner module 0x0::LeanerTailRecursion where
+  fun countdown(remaining : u64, accumulator : u64) -> u64 := do
+    let mut remaining := remaining
+    let mut total := accumulator
+    loop do
+      if remaining < 1 then break
+      remaining := remaining - 1
+      total := total + 1
+    total
 
-  /-! ## Functions -/
+  -- Both loop parameters are updated in parallel: the pair is swapped.
+  fun alternate(remaining : u64, left : u64, right : u64) -> u64 := do
+    let mut remaining := remaining
+    let mut left := left
+    let mut right := right
+    while 0 < remaining do
+      let previous := left
+      left := right
+      right := previous
+      remaining := remaining - 1
+    left
 
-  partial fun countdown (remaining accumulator : U64) : U64 :=
-    if remaining < 1 then
-      accumulator
-    else
-      continue countdown (remaining - 1) (accumulator + 1)
+  fun effect_countdown(remaining : u64, accumulator : u64) -> u64 := do
+    let mut remaining := remaining
+    let mut total := accumulator
+    loop do
+      if remaining < 1 then return total
+      remaining := remaining - 1
+      total := total + 1
 
-  partial fun alternate (remaining left right : U64) : U64 :=
-    if remaining < 1 then
-      left
-    else
-      continue alternate (remaining - 1) right left
+  -- The last step is an ordinary recursive call from inside the loop.
+  fun mixed_countdown(remaining : u64, accumulator : u64) -> u64 := do
+    let mut remaining := remaining
+    let mut total := accumulator
+    loop do
+      if remaining < 1 then break
+      if remaining < 2 then return mixed_countdown(remaining - 1, total + 1)
+      remaining := remaining - 1
+      total := total + 1
+    total
 
-  partial fun effect_countdown (remaining accumulator : U64) : Action U64 := do
-    if remaining < 1 then
-      pure accumulator
-    else
-      continue effect_countdown (remaining - 1) (accumulator + 1)
-
-  partial fun mixed_countdown (remaining accumulator : U64) : U64 :=
-    if remaining < 1 then
-      accumulator
-    else if remaining < 2 then
-      mixed_countdown (remaining - 1) (accumulator + 1)
-    else
-      continue mixed_countdown (remaining - 1) (accumulator + 1)
-
-  partial fun sum_down (value : U64) : U64 :=
-    if value < 1 then 0 else value + sum_down (value - 1)
-
-/-! ## Tests -/
+  fun sum_down(value : u64) -> u64 :=
+    if value < 1 then 0 else value + sum_down(value - 1)
 
 --# run 0x0::LeanerTailRecursion::countdown --args 2000u64 40u64
 
