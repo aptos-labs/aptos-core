@@ -53,8 +53,8 @@ leaner module 0xCAFE::addresses where
 -- at an address is found there.
 open LeanerIR LeanerE2ETests.CheckSupport in
 run_cmd do
-  let initial ← singleResourceState `«0xCAFE».addresses "Vault" "0xCAFE" #[.integer 7]
-  assertRuns `«0xCAFE».addresses #[
+  let initial ← singleResourceState `«0xcafe».addresses "Vault" "0xCAFE" #[.integer 7]
+  assertRuns `«0xcafe».addresses #[
     ⟨"owner", #[], .returned #[.address "0xCAFE"], {}⟩,
     ⟨"framework", #[], .returned #[.address "0x1"], {}⟩,
     ⟨"the_admin", #[], .returned #[.address "0xA550C18"], {}⟩,

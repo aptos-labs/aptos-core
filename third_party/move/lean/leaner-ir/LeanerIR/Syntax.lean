@@ -80,10 +80,17 @@ structure Alignment where
   deriving Repr, BEq, Inhabited
 
 /-- Interned hierarchical namespace identity. Profiles interpret segments as
-appropriate—for example, a Move address/alias/module tuple or Rust modules. -/
+appropriate: a Move module is its address and name, a Rust namespace its
+crate and module path. `alias` is only how the source spells the leading
+segment (a Move named address such as `std` for `0x1`); identity, and so
+equality, is the segments alone. -/
 structure NamespaceRef where
   segments : Array String
-  deriving Repr, BEq, Inhabited
+  alias : Option String := none
+  deriving Repr, Inhabited
+
+instance : BEq NamespaceRef where
+  beq left right := left.segments == right.segments
 
 /-- Interned declaration spelling paired with the namespace table entry that
 owns it. A `NameId` indexes an array of these values. -/
@@ -116,7 +123,7 @@ structure ProfileValue where
   profile : Profile
   tag : String
   payload : String := ""
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Configuration of one semantic profile used by a compilation unit. Its
 `profile` is the semantic key. For `.extension id`, the ID must equal this
@@ -136,7 +143,7 @@ inductive IntWidth where
   | bits (width : Nat)
   | pointer
   | unbounded
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Pointer widths supported by Rust compilation targets and executable LIR
 integer semantics. Keeping this policy shared prevents profile validation,
@@ -159,7 +166,7 @@ aliasing, storage, and escape rules on these common modes. -/
 inductive ReferenceKind where
   | shared
   | mutable
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Source or inference form of a core lifetime. Move frontends use
 `inference` for elided lifetimes; future explicit Move and Rust syntax use
@@ -188,7 +195,7 @@ structure ReferenceType where
   kind : ReferenceKind
   referent : TypeId
   lifetime : LifetimeId
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Closed compile-time value shared by declarations, literal patterns, and
 raw switch cases. Language-specific constants use the checked `profile` case. -/
@@ -203,14 +210,63 @@ inductive ConstValue where
   | vector (elements : Array ConstValue)
   | tuple (elements : Array ConstValue)
   | profile (value : ProfileValue)
-  deriving Repr, BEq, Inhabited
+  deriving Repr, Inhabited
+
+/-! Equality of constants is decided structurally through the nesting in
+`vector` and `tuple`, which a derived instance does not reach: a total
+comparison, its agreement with equality, and the decision built on it, so
+that `==` on constants and on everything containing them is lawful. -/
+mutual
+def ConstValue.beq : ConstValue → ConstValue → Bool
+  | .unit, .unit => true
+  | .bool x, .bool y => x == y
+  | .character x, .character y => x == y
+  | .integer x, .integer y => x == y
+  | .address x, .address y => x == y
+  | .string x, .string y => x == y
+  | .bytes x, .bytes y => x == y
+  | .vector xs, .vector ys => ConstValue.beqList xs.toList ys.toList
+  | .tuple xs, .tuple ys => ConstValue.beqList xs.toList ys.toList
+  | .profile x, .profile y => decide (x = y)
+  | _, _ => false
+def ConstValue.beqList : List ConstValue → List ConstValue → Bool
+  | [], [] => true
+  | x :: xs, y :: ys => ConstValue.beq x y && ConstValue.beqList xs ys
+  | _, _ => false
+end
+
+mutual
+theorem ConstValue.beq_iff : ∀ a b : ConstValue, ConstValue.beq a b = true ↔ a = b
+  | .unit, b => by cases b <;> simp [ConstValue.beq]
+  | .bool x, b => by cases b <;> simp [ConstValue.beq]
+  | .character x, b => by cases b <;> simp [ConstValue.beq]
+  | .integer x, b => by cases b <;> simp [ConstValue.beq]
+  | .address x, b => by cases b <;> simp [ConstValue.beq]
+  | .string x, b => by cases b <;> simp [ConstValue.beq]
+  | .bytes x, b => by cases b <;> simp [ConstValue.beq]
+  | .vector xs, b => by
+      cases b <;> simp only [ConstValue.beq, Bool.false_eq_true, reduceCtorEq]
+      rw [ConstValue.beqList_iff, Array.toList_inj]; simp
+  | .tuple xs, b => by
+      cases b <;> simp only [ConstValue.beq, Bool.false_eq_true, reduceCtorEq]
+      rw [ConstValue.beqList_iff, Array.toList_inj]; simp
+  | .profile x, b => by cases b <;> simp [ConstValue.beq]
+theorem ConstValue.beqList_iff : ∀ xs ys : List ConstValue, ConstValue.beqList xs ys = true ↔ xs = ys
+  | [], ys => by cases ys <;> simp [ConstValue.beqList]
+  | x :: xs, ys => by
+      cases ys <;> simp only [ConstValue.beqList, Bool.false_eq_true, reduceCtorEq, Bool.and_eq_true,
+        List.cons.injEq]
+      rw [ConstValue.beq_iff, ConstValue.beqList_iff]
+end
+
+instance : DecidableEq ConstValue := fun a b => decidable_of_iff _ (ConstValue.beq_iff a b)
 
 /-- A use of an interned type at a particular source location. Locations live
 on uses because the same `TypeId` may occur at many authored sites. -/
 structure TypeUse where
   typeId : TypeId
   loc : LocId
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Actual argument supplied to a generic declaration. Type arguments retain
 their occurrence location; lifetime IDs use the core lifetime table, while
@@ -220,7 +276,12 @@ inductive GenericArgument where
   | const (value : ConstValue)
   | lifetime (value : LifetimeId)
   | evidence (value : EvidenceId)
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
+
+/-- The argument without its occurrence location. -/
+def GenericArgument.eraseLoc : GenericArgument → GenericArgument
+  | .typeArg value => .typeArg { value with loc := ⟨0⟩ }
+  | argument => argument
 
 /-- Core storage/value abilities. Trait obligations are first-class
 `GenericPredicate`s rather than being encoded as abilities. -/
@@ -229,7 +290,7 @@ inductive Ability where
   | drop
   | store
   | key
-  deriving Repr, BEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Application of a first-class core trait declaration. Its qualified name
 and generic arguments are source-language neutral. -/
@@ -276,7 +337,71 @@ inductive Ty where
   | typeParameter (index : Nat)
   | reference (value : ReferenceType)
   | profile (value : ProfileValue)
-  deriving Repr, BEq, Inhabited
+  deriving Repr, DecidableEq, Inhabited
+
+/-! Structural equality of generic arguments and types as plain comparisons,
+which the kernel evaluates by matching alone: what certificates over the
+type tables compare with. Each agrees with equality. -/
+
+def GenericArgument.beq : GenericArgument → GenericArgument → Bool
+  | .typeArg left, .typeArg right => left.typeId == right.typeId && left.loc == right.loc
+  | .const left, .const right => left == right
+  | .lifetime left, .lifetime right => left == right
+  | .evidence left, .evidence right => left == right
+  | _, _ => false
+
+theorem GenericArgument.beq_iff (left right : GenericArgument) :
+    GenericArgument.beq left right = true ↔ left = right := by
+  cases left <;> cases right <;> simp [GenericArgument.beq, TypeUse.mk.injEq]
+  rename_i left right
+  cases left; cases right; simp
+
+def GenericArgument.beqList : List GenericArgument → List GenericArgument → Bool
+  | [], [] => true
+  | left :: lefts, right :: rights => GenericArgument.beq left right && beqList lefts rights
+  | _, _ => false
+
+theorem GenericArgument.beqList_iff (lefts rights : List GenericArgument) :
+    GenericArgument.beqList lefts rights = true ↔ lefts = rights := by
+  induction lefts generalizing rights with
+  | nil => cases rights <;> simp [GenericArgument.beqList]
+  | cons left lefts ih =>
+      cases rights with
+      | nil => simp [GenericArgument.beqList]
+      | cons right rights =>
+          simp only [GenericArgument.beqList, Bool.and_eq_true, GenericArgument.beq_iff, ih,
+            List.cons.injEq]
+
+def Ty.beq : Ty → Ty → Bool
+  | .unit, .unit => true
+  | .never, .never => true
+  | .bool, .bool => true
+  | .character, .character => true
+  | .string, .string => true
+  | .bytes, .bytes => true
+  | .address, .address => true
+  | .signer, .signer => true
+  | .integer width signed, .integer width' signed' => decide (width = width') && signed == signed'
+  | .tuple elements, .tuple elements' => elements.toList == elements'.toList
+  | .vector element length, .vector element' length' => element == element' && length == length'
+  | .range, .range => true
+  | .eventStore, .eventStore => true
+  | .typeDomain type, .typeDomain type' => type == type'
+  | .resourceDomain resource arguments, .resourceDomain resource' arguments' =>
+      resource == resource' && decide (arguments = arguments')
+  | .stateDomain, .stateDomain => true
+  | .nominal name arguments, .nominal name' arguments' =>
+      name == name' && GenericArgument.beqList arguments.toList arguments'.toList
+  | .function arguments result abilities, .function arguments' result' abilities' =>
+      arguments.toList == arguments'.toList && result == result' && decide (abilities = abilities')
+  | .typeParameter index, .typeParameter index' => index == index'
+  | .reference value, .reference value' => decide (value = value')
+  | .profile value, .profile value' => decide (value = value')
+  | _, _ => false
+
+theorem Ty.beq_iff (left right : Ty) : Ty.beq left right = true ↔ left = right := by
+  cases left <;> cases right <;>
+    simp [Ty.beq, GenericArgument.beqList_iff, Array.toList_inj, and_assoc]
 
 /-- Unicode scalar values exclude the surrogate range even though it lies
 inside the 21-bit Unicode code-point space. -/

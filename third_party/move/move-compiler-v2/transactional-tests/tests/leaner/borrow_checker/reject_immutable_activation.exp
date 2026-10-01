@@ -1,11 +1,11 @@
 processed 1 task
-task 0 lines 1-19:  publish [import Move]
+task 0 lines 3-14:  publish [import LeanerMove]
 Error: compilation errors:
- error: borrow safety error `writer`: cannot activate a mutable reference while an immutable reference is live in the same tree (conflicts with `observation`)
-   ┌─ TEMPFILE:10:5
-   │
-10 │     writer := 3
-   │     ^^^^^^^^^^^
+ error: LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active shared loan
+  ┌─ TEMPFILE:9:19
+  │
+9 │     let writer := &mut owner
+  │                   ^^^^^^^^^^
 
 
 exiting with Leaner elaboration errors

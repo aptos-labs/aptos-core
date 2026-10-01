@@ -1,25 +1,17 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
+leaner module 0x0::LeanerBorrowRejectPoisonedCall where
+  fun observe(input : &mut u64) -> u64 := do
+    let result := *input
+    result
 
-module LeanerBorrowRejectPoisonedCall where
-
-  fun observe (input : &mut U64) : Action U64 := do
-    let result ← *input
-    pure result
-
-  spec observe (_input : &mut U64) where
-    ensures True
-
-  fun run : Action U64 := do
-    let owner : U64 := 0
-    let selected ← &mut owner
-    let poisoned ← &mut owner
-    selected := 1
-    observe poisoned
-
-  spec run where
-    ensures True
+  fun run() -> u64 := do
+    let mut owner : u64 := 0
+    let selected := &mut owner
+    let poisoned := &mut owner
+    *selected := 1
+    observe(poisoned)

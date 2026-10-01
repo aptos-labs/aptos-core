@@ -5,8 +5,11 @@ import LeanerIR.Import.Json
 import LeanerIR.Validation.Check
 import LeanerIR.Validation.Initialization
 import LeanerIR.Validation.Capability
+import LeanerIR.Validation.InstantiationCertificate
+import LeanerIR.Validation.Link
 import LeanerIR.Semantics.Runtime
 import LeanerIR.Semantics.Operations
+import LeanerIR.Semantics.Frames
 import LeanerIR.Semantics.BigStep
 import LeanerIR.Interpreter.Interpreter
 import LeanerIR.Proofs.Interpreter
@@ -14,6 +17,7 @@ import LeanerIR.Semantics.Typing
 import LeanerIR.Proofs.Fuel
 import LeanerIR.Proofs.Completeness
 import LeanerIR.Proofs.Order
+import LeanerIR.Proofs.Maps
 import LeanerIR.Proofs.Spec
 import LeanerIR.Proofs.Representation
 import LeanerIR.Proofs.Contract

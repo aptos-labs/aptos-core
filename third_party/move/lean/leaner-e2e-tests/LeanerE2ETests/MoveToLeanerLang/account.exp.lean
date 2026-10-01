@@ -25,7 +25,7 @@ leaner module 0x42::account where
     ensures global<Balance>(addr).balance.value
         == old(global<Balance>(addr).balance.value) + amount
     aborts_if global<Balance>(addr).balance.value + amount > MAX_U64
-    modifies global<Balance>(addr)
+    modifies global<Balance>(addr), *
 
   public entry fun withdraw(addr : Address, amount : u64) -> Unit := do
     let value := &mut Balance[addr].balance.value
@@ -39,6 +39,7 @@ leaner module 0x42::account where
         == old(global<Balance>(addr).balance.value) - amount
     aborts_if global<Balance>(addr).balance.value
         < amount with E_INSUFFICIENT_BALANCE
+    modifies *
 
   public entry fun publish(account : &Signer, amount : u64) -> Unit := do
     move_to<Balance>(

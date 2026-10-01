@@ -14,17 +14,17 @@ This module provides a solution for unsorted maps, that is it has the properties
 DEPRECATED: since it's implementation is inneficient, it
 has been deprecated in favor of `ordered_map.move`.
 -/
-leaner module 0x1::simple_map where
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::option::Option
-  use 0x1::std::option::extract
-  use 0x1::std::option::is_none
-  use 0x1::std::option::is_some
-  use 0x1::std::option::none
-  use 0x1::std::option::some
-  use 0x1::std::option::spec_borrow
-  use 0x1::std::vector
-  use 0x1::std::vector::spec_contains
+leaner module aptos_std::simple_map where
+  use std::error::invalid_argument
+  use std::option::Option
+  use std::option::extract
+  use std::option::is_none
+  use std::option::is_some
+  use std::option::none
+  use std::option::some
+  use std::option::spec_borrow
+  use std::vector
+  use std::vector::spec_contains
 
   /--
   Map key already exists
@@ -90,8 +90,8 @@ leaner module 0x1::simple_map where
     ensures [abstract] ∀ (k : «Key»),
         spec_contains_key(result, k) <==> spec_contains(keys, k)
     ensures [abstract] ∀ (i in 0 .. keys.length),
-        spec_get(result, 0x1::std::vector::borrow(keys, i))
-          == 0x1::std::vector::borrow(values, i)
+        spec_get(result, std::vector::borrow(keys, i))
+          == std::vector::borrow(values, i)
 
   /--
   Create an empty SimpleMap.
@@ -142,7 +142,7 @@ leaner module 0x1::simple_map where
     self : SimpleMap<«Key», Value>
   ) -> Unit := do
     let SimpleMap<«Key», Value> { data := data } := self
-    data.destroy_empty()
+    core.prim.destroyEmptyVector(data)
 
   spec destroy_empty where
     pragma intrinsic
@@ -174,27 +174,39 @@ leaner module 0x1::simple_map where
     self'.reverse()
     v2.reverse()
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(38)
+    spec assume folds_capture_anchor!(69)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
-      let (e1, e2) := (self'.pop_back(), v2.pop_back())
+      let (e1, e2) :=
+        (do
+            let _t0 := &mut self'
+            if _t0.length == 0 then moveVectorError(2)
+            let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+            *_t0 := _t2
+            _t1,
+          do
+            let _t3 := &mut v2
+            if _t3.length == 0 then moveVectorError(2)
+            let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+            *_t3 := _t5
+            _t4)
       let (key, value) := (e1, e2)
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(38, old(self')).length >= len
+      invariant with_state_anchor!(69, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(38, old(self')).length
-        == with_state_anchor!(38, old(v2)).length
+      invariant with_state_anchor!(69, old(self')).length
+        == with_state_anchor!(69, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(38, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(38, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(38, old(self')).length), true
+        self'[j] == with_state_anchor!(69, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(69, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(69, old(self')).length), true
       invariant true
-    self'.destroy_empty()
-    v2.destroy_empty()
+    core.prim.destroyEmptyVector(self')
+    core.prim.destroyEmptyVector(v2)
 
   spec add_all where
     pragma intrinsic
@@ -213,9 +225,13 @@ leaner module 0x1::simple_map where
         *data := core.prim.pushVector(
           *data, new Element<«Key», Value> { key, value }
         )
-        data.swap(i, len)
+        *data := core.prim.swapVector(*data, i, len)
         let Element<«Key», Value> { key := key, value := value } :=
-          data.pop_back()
+          do
+            if data.length == 0 then moveVectorError(2)
+            let (_t10, _t11) := core.prim.removeVector(*data, data.length - 1)
+            *data := _t11
+            _t10
         return (some(key), some(value));
     self.data := core.prim.pushVector(
       self.data, new Element<«Key», Value> { key, value }
@@ -249,7 +265,7 @@ leaner module 0x1::simple_map where
       «spec_map_ref$lambda$0»(self, self.length),
       «spec_map_ref_aborts$lambda$1»(self, self.length)
     )
-    let _inline_summary_result_46 :=
+    let _inline_summary_result_77 :=
       do
         let mut result := vector<«Key»>[]
         let i := 0
@@ -269,9 +285,9 @@ leaner module 0x1::simple_map where
           invariant ∀ (j in 0 .. i), result[j] == self[j].key
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_46
+    spec assert _inline_summary_result_77
       == «spec_map_ref$lambda$0»(self, self.length)
-    _inline_summary_result_46
+    _inline_summary_result_77
 
   spec keys where
     pragma verify = false
@@ -287,7 +303,7 @@ leaner module 0x1::simple_map where
       «spec_map_ref$lambda$2»(self, self.length),
       «spec_map_ref_aborts$lambda$3»(self, self.length)
     )
-    let _inline_summary_result_51 :=
+    let _inline_summary_result_82 :=
       do
         let mut result := vector<Value>[]
         let i := 0
@@ -307,9 +323,9 @@ leaner module 0x1::simple_map where
           invariant ∀ (j in 0 .. i), result[j] == self[j].value
           invariant ∀ (j in 0 .. i), !false
         result
-    spec assert _inline_summary_result_51
+    spec assert _inline_summary_result_82
       == «spec_map_ref$lambda$2»(self, self.length)
-    _inline_summary_result_51
+    _inline_summary_result_82
 
   spec values where
     pragma verify = false
@@ -327,31 +343,37 @@ leaner module 0x1::simple_map where
     let mut self := data
     self.reverse()
     let mut self := self
-    spec assume folds_capture_anchor!(53)
-    spec assume folds_capture_anchor!(52)
+    spec assume folds_capture_anchor!(84)
+    spec assume folds_capture_anchor!(83)
     let len := self.length
     while len > 0 do
-      let e := self.pop_back()
+      let e :=
+        do
+          let _t6 := &mut self
+          if _t6.length == 0 then moveVectorError(2)
+          let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
+          *_t6 := _t8
+          _t7
       let e := e
       let Element<«Key», Value> { key := key, value := value } := e
       keys := core.prim.pushVector(keys, key)
       values := core.prim.pushVector(values, value)
       len := len - 1
     where
-      invariant with_state_anchor!(52, old(self)).length >= len
+      invariant with_state_anchor!(83, old(self)).length >= len
       invariant len == self.length
       invariant ∀ (j in 0 .. len),
-        self[j] == with_state_anchor!(52, old(self))[j]
-      invariant ∀ (j in len .. with_state_anchor!(52, old(self)).length), true
+        self[j] == with_state_anchor!(83, old(self))[j]
+      invariant ∀ (j in len .. with_state_anchor!(83, old(self)).length), true
       invariant (keys, values)
         == «spec_fold$gen$1»(
           with_state_anchor!(
-            53, old(keys)
-          ), with_state_anchor!(53, old(values)),
-          with_state_anchor!(52, old(self)).length - len,
-          with_state_anchor!(52, old(self))
+            84, old(keys)
+          ), with_state_anchor!(84, old(values)),
+          with_state_anchor!(83, old(self)).length - len,
+          with_state_anchor!(83, old(self))
         )
-    self.destroy_empty()
+    core.prim.destroyEmptyVector(self)
     (keys, values)
 
   spec to_vec_pair where
@@ -361,8 +383,8 @@ leaner module 0x1::simple_map where
     ensures [abstract] ∀ (k : «Key»),
         spec_contains(result, k) <==> spec_contains_key(self, k)
     ensures [abstract] ∀ (i in 0 .. result.length),
-        spec_get(self, 0x1::std::vector::borrow(result, i))
-          == 0x1::std::vector::borrow(spec.result[1], i)
+        spec_get(self, std::vector::borrow(result, i))
+          == std::vector::borrow(spec.result[1], i)
 
   /--
   Remove a key/value pair from the map. The key must exist.
@@ -484,23 +506,35 @@ leaner module 0x1::simple_map where
   -- =================================================================
   -- Module Specification
   -- Switch to module documentation context
+  /--
+  The result of mapping `f` over the prefix `v[0..end]`.
+  -/
   spec fun «spec_map_ref$lambda$0» {T0} {T1}(
     v : Vector<Element<T0, T1> >, end : Int
   ) : Vector<T0> :=
     if end == 0 then vec::<T0>()
     else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
 
+  /--
+  The result of mapping `f` over the prefix `v[0..end]`.
+  -/
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
     v : Vector<Element<T0, T1> >, end : Int
   ) : Vector<T1> :=
     if end == 0 then vec::<T1>()
     else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
 
+  /--
+  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  -/
   spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
     v : Vector<Element<T0, T1> >, end : Int
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
 
+  /--
+  Whether mapping `f` over the prefix `v[0..end]` aborts.
+  -/
   spec fun «spec_map_ref_aborts$lambda$3» {T0} {T1}(
     v : Vector<Element<T0, T1> >, end : Int
   ) : Bool :=

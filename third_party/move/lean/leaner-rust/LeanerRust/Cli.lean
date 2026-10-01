@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import LeanerRust.Driver
+import LeanerRust.SourceVerify
 
 namespace LeanerIR.Rust.Cli
 
@@ -13,7 +13,9 @@ private def usage : String :=
       [--target <triple>] [-- <additional rustc arguments>]\n\
     leaner-rust import-crate <Cargo.toml> --package <name> \
       [--output <unit.raw.json>] [--features <a,b>] \
-      [--no-default-features] [--target <triple>]"
+      [--no-default-features] [--target <triple>]\n\
+    leaner-rust verify <source.rs> [--spec <specs.lean>] [--output <generated.lean>] \
+      [-- <additional rustc arguments>]"
 
 private structure Options where
   request : ImportRequest
@@ -80,6 +82,38 @@ private partial def parseCargoOptions (options : CargoOptions) (arguments : List
       parseCargoOptions { options with target := some target } rest
   | argument :: _ => throw s!"unknown import-crate argument `{argument}`"
 
+private structure VerifyOptions where
+  source : System.FilePath
+  specFile : Option System.FilePath := none
+  output : Option System.FilePath := none
+  rustcArgs : Array String := #[]
+
+private partial def parseVerifyOptions (options : VerifyOptions) :
+    List String → Except String VerifyOptions
+  | [] => pure options
+  | "--spec" :: path :: rest => do
+      if options.specFile.isSome then throw "--spec may be specified only once"
+      parseVerifyOptions { options with specFile := some path } rest
+  | "--output" :: path :: rest => do
+      if options.output.isSome then throw "--output may be specified only once"
+      parseVerifyOptions { options with output := some path } rest
+  | "--" :: rest => pure { options with rustcArgs := rest.toArray }
+  | argument :: _ => throw s!"unknown verify argument `{argument}`"
+
+/-- Verify a Rust file; the rendering is written to `--output`, or to
+`<name>.rs.lean`. -/
+private def verifySource (options : VerifyOptions) : IO UInt32 := do
+  let start ← IO.monoNanosNow
+  let output := options.output.getD (options.source.addExtension "lean")
+  let environment ← LeanerLang.Perf.withPhase .load LeanerLang.SourceVerify.importLeanerLang
+  let reports ← SourceVerify.verifyFile environment options.source options.specFile output
+    options.rustcArgs
+  for report in reports do IO.println report.render
+  IO.println s!"leaner-rust: generated {output}"
+  -- The wall time per phase is a report on the run, not one of its messages.
+  IO.eprintln s!"leaner-rust: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
+  pure <| if reports.any (·.severity == .error) then 1 else 0
+
 private def report (result : ImportResult) (output : System.FilePath) : IO UInt32 := do
   let status := if result.cacheHit then "cache hit" else "exported and validated"
   IO.println s!"leaner-rust: {status}: {output}"
@@ -100,6 +134,10 @@ def run (arguments : List String) : IO UInt32 := do
         | .ok request => pure request
         | .error message => throw <| IO.userError s!"{message}\n{usage}"
       report (← importCargoCrate request) request.output
+  | "verify" :: source :: rest =>
+      match parseVerifyOptions { source := System.FilePath.mk source } rest with
+      | .ok options => verifySource options
+      | .error message => throw <| IO.userError s!"{message}\n{usage}"
   | _ => throw <| IO.userError usage
 
 end LeanerIR.Rust.Cli

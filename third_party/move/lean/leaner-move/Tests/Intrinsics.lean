@@ -13,7 +13,7 @@ open LeanerIR.Move.Intrinsics
 private def ownRef (name : Nat) : QualifiedRef :=
   { namespaceId := ⟨0⟩, name := ⟨name⟩ }
 
-private def use (type : Nat) : TypeUse :=
+private def typeUse (type : Nat) : TypeUse :=
   { typeId := ⟨type⟩, loc := ⟨1⟩ }
 
 private def mapSignature (parameters : Array Nat) (result : Nat) : Signature :=
@@ -22,8 +22,8 @@ private def mapSignature (parameters : Array Nat) (result : Nat) : Signature :=
       { name := "K", kind := .typeArg, loc := ⟨1⟩ },
       { name := "V", kind := .typeArg, loc := ⟨1⟩ }]
     parameters := parameters.mapIdx fun index type =>
-      { name := s!"p{index}", typeUse := use type }
-    results := #[use result] }
+      { name := s!"p{index}", typeUse := typeUse type }
+    results := #[typeUse result] }
 
 private def specFunction (name : Nat) (signature : Signature) : SpecFunctionDecl :=
   let locals := signature.parameters.mapIdx fun index parameter => {
@@ -52,8 +52,8 @@ private def fixture : RawUnit where
       .typeParameter 0,
       .typeParameter 1,
       .nominal ⟨0⟩ #[
-        .typeArg (use 1),
-        .typeArg (use 2)],
+        .typeArg (typeUse 1),
+        .typeArg (typeUse 2)],
       .bool]
     namespaces := #[{ segments := #["0x1", "Intrinsics"] }]
     names := #[

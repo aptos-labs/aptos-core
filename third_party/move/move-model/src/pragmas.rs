@@ -13,8 +13,14 @@ use crate::{
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
-/// Pragma indicating whether verification should be performed for a function.
+/// Pragma indicating whether verification should be performed for a function:
+/// `true`, `false`, or `manual`.
 pub const VERIFY_PRAGMA: &str = "verify";
+
+/// Value of the `verify` pragma stating that an authored proof establishes the
+/// function's specification: the Leaner verifier requires `verify f by ...` in
+/// the proof file; the Move Prover treats it as `true`.
+pub const VERIFY_MANUAL: &str = "manual";
 
 /// Pragma defining a timeout.
 pub const TIMEOUT_PRAGMA: &str = "timeout";
@@ -25,6 +31,12 @@ pub const SEED_PRAGMA: &str = "seed";
 /// Pragma indicating an estimate how long verification takes. Verification
 /// is skipped if the timeout is smaller than this.
 pub const VERIFY_DURATION_ESTIMATE_PRAGMA: &str = "verify_duration_estimate";
+
+/// Pragma indicating the heartbeat budget of the function's verification in
+/// the Leaner verifier, in thousands of Lean `maxHeartbeats` units; a function
+/// whose proof needs more than the default raises it for itself. Ignored by
+/// the Move Prover.
+pub const HEARTBEATS_PRAGMA: &str = "heartbeats";
 
 /// Pragma indicating whether implementation of function should be ignored and
 /// instead treated to be like a native function.
@@ -664,6 +676,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
 /// Pragmas accepted in a module specification block.
 const MODULE_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    HEARTBEATS_PRAGMA,
     EMITS_IS_STRICT_PRAGMA,
     EMITS_IS_PARTIAL_PRAGMA,
     ABORTS_IF_IS_STRICT_PRAGMA,
@@ -676,6 +689,7 @@ const MODULE_PRAGMAS: &[&str] = &[
 /// Pragmas accepted in a function specification block.
 const FUNCTION_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    HEARTBEATS_PRAGMA,
     TIMEOUT_PRAGMA,
     SEED_PRAGMA,
     VERIFY_DURATION_ESTIMATE_PRAGMA,

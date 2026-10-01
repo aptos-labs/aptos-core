@@ -14,6 +14,7 @@ canonical Move `leaner module` and Rust `leaner namespace` headers, together
 with a growing profile-selected expression and declaration subset, are
 implemented. Remaining `core.*`, `spec.*`, extension-profile, and dependency
 forms state the target language unless their sections say otherwise.
+Open work is listed in [`roadmap.md`](roadmap.md), section 8.
 
 The language has two audiences:
 
@@ -196,6 +197,16 @@ profile interprets the segments—for example, Move treats leading segments as
 an address or package alias, while Rust treats them as crate/module identity.
 The underlying identity remains structural and is not reconstructed from a
 display string.
+
+A Move module path is `address::module`, its address a literal or a named
+address declared with `address_alias` (`address_alias std = 0x1`;
+`LeanerLang.Addresses` declares the conventional Aptos ones). The alias is
+only a spelling: elaboration makes every Move path lead with the canonical
+address, so `std::vector` and `0x1::vector` name one module, and `@std` is
+the address `0x1`. The LIR namespace reference keeps the alias it was
+spelled with (`NamespaceRef.alias`, not part of its identity), and the
+printer spells the module with it again; a rendering declares the aliases
+its environment lacks.
 
 Dependencies are explicit:
 
@@ -1233,9 +1244,19 @@ The declaration families are:
 spec fun f {T} (x : T) : Bool := expression
 opaque spec fun predicate (x : T) : Bool
 spec var ghost_count : Nat := 0
-axiom name {T} where proposition
-spec namespace where invariant proposition
+spec module where
+  invariant proposition
+  axiom proposition
 ```
+
+The implemented surface states module invariants and axioms as members of
+one `spec module where` block; an axiom is assumed by every verification of
+the module's functions and is never an obligation, an invariant is assumed
+at entry and established at exit. Generic axioms and invariants (the
+`{T}` of the design) and proof-local labels are not yet parsed. A Move
+spec variable `x` arrives as the ghost resource `Ghost$x` the model backs
+it with, a struct with one field `v` at address 0, whose existence is an
+axiom of the module; `update x = e` is a write of that resource.
 
 A specification function has a physical typed signature, optional body,
 locals, contract, profile, origin, and profile data. A specification variable

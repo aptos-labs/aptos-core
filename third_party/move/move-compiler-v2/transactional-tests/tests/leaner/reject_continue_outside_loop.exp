@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-10:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LEANER-CONTINUE-CONTEXT: `continue` appears outside a loop
+  ┌─ TEMPFILE:8:5
+  │
+8 │     continue
+  │     ^^^^^^^^
+
+
+exiting with Leaner elaboration errors

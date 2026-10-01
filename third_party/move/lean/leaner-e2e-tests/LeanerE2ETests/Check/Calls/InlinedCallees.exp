@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Calls/InlinedCallees.lean:90:4: error: the specification clause `ensures result == 2` is not established
+LeanerE2ETests/Check/Calls/InlinedCallees.lean:89:7: error: leaner verification failed: the automatic verification of `twice_of_one` failed; provide a proof: `verify twice_of_one by …` in the module (`verify twice_of_one by skip` shows the obligations it leaves)

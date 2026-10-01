@@ -4,9 +4,10 @@
 import LeanerLang
 
 /-!
-Concrete scalar callers consume the generic callee's one typed theorem.
-The result's canonical decoder supplies its runtime shape by a shared lemma;
-the caller neither reverifies the body nor splits every runtime constructor.
+Concrete scalar callers consume the generic callee's one typed theorem: the
+callees are opaque, so callers reason through their contracts. The result's
+canonical decoder supplies its runtime shape by a shared lemma; the caller
+neither reverifies the body nor splits every runtime constructor.
 -/
 
 namespace LeanerLang.Tests.Check.Generics.GenericScalarCalls
@@ -14,6 +15,7 @@ namespace LeanerLang.Tests.Check.Generics.GenericScalarCalls
 leaner module 0x42::generic_scalar_calls where
   fun carry {T}(value : T) -> T := value
   spec carry where
+    pragma opaque
     ensures result == value
     aborts_if false
 
@@ -56,6 +58,7 @@ leaner module 0x42::generic_scalar_calls where
   -- Obligation marker. Consuming the summary must not require one.
   fun carry_strict {T}(value : T) -> T := value
   spec carry_strict where
+    pragma opaque
     pragma aborts_if_is_strict
     ensures result == value
 

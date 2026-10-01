@@ -337,6 +337,8 @@ syntax (name := leanerNegativeTypedIntegerExpr)
     kwUSize <|> kwISize) : leanerExpr
 syntax (name := leanerAddressExpr) kwAddressLiteral "(" str ")" : leanerExpr
 syntax (name := leanerMoveAddressExpr) "@" num : leanerExpr
+/-- A Move named address as a value: `@std`, the address `std` stands for. -/
+syntax (name := leanerMoveAliasAddressExpr) "@" ident : leanerExpr
 syntax (name := leanerStringExpr) str : leanerExpr
 syntax (name := leanerByteStringExpr) atomic(kwByteStringPrefix str) : leanerExpr
 syntax (name := leanerBytesExpr) "b[" num,* "]" : leanerExpr
@@ -459,9 +461,11 @@ syntax (name := leanerConstructorFieldSyntax)
   leanerFieldIdentifier ":=" leanerExpr : leanerConstructorField
 syntax (name := leanerConstructorFieldShorthandSyntax)
   leanerIdentifier : leanerConstructorField
+-- Atomic up to its brace, so that a local named `new` is an identifier
+-- wherever no construction follows it.
 syntax (name := leanerNamedConstructExpr) (priority := low)
-  kwNew leanerType (leanerConstructorVariant)?
-    "{" leanerConstructorField,* "}" : leanerExpr
+  atomic(kwNew leanerType (leanerConstructorVariant)? "{") leanerConstructorField,* "}" :
+    leanerExpr
 declare_syntax_cat leanerFieldName
 syntax (name := leanerFieldNameSyntax) leanerFieldIdentifier : leanerFieldName
 syntax (name := leanerSelectExpr)
@@ -579,6 +583,10 @@ syntax (name := leanerLetStatementSyntax)
   kwLet (kwMut)? leanerBindingPattern ":" leanerType ":=" leanerExpr (";")? : leanerStatement
 syntax (name := leanerInferredLetStatementSyntax)
   kwLet (kwMut)? leanerBindingPattern ":=" leanerExpr (";")? : leanerStatement
+/-- A declaration without initializer: the local is assigned before it is read,
+on every path, as Move's `let x: T;` is. -/
+syntax (name := leanerDeclareStatementSyntax)
+  kwLet (kwMut)? leanerBindingPattern ":" leanerType (";")? : leanerStatement
 declare_syntax_cat leanerBlockEntry
 syntax (name := leanerBlockStatementEntry) leanerStatement : leanerBlockEntry
 syntax (name := leanerBareExpressionEntry) (priority := low)
@@ -801,6 +809,10 @@ declare_syntax_cat leanerNamespaceInvariantMember
 syntax (name := leanerNamespaceInvariantMemberSyntax)
   kwInvariant (leanerConditionProperties)? leanerExpr (";")? :
     leanerNamespaceInvariantMember
+/-- An axiom of the module: a proposition assumed by every verification of
+its functions and never an obligation. -/
+syntax (name := leanerNamespaceAxiomMemberSyntax)
+  "axiom" leanerExpr (";")? : leanerNamespaceInvariantMember
 syntax (name := leanerNamespaceInvariantItem) (priority := high)
   kwSpec kwModule kwWhere ppLine ppIndent(leanerNamespaceInvariantMember*) : leanerItem
 /-- A theorem among a module's items: a lemma about the module's

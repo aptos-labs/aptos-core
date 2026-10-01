@@ -1,17 +1,12 @@
 processed 1 task
-task 0 lines 1-28:  publish [import Move]
+task 0 lines 3-12:  publish [import LeanerMove]
 Error: compilation errors:
- error: cannot evaluate code because an unresolved expression uses 'sorry' and/or contains errors
-   ┌─ TEMPFILE:19:40
-   │
-19 │ end LeanerTxnRejectRecursiveGenericType
-   │                                        ^
-
-error: recursive Move type `LeanerTxnRejectRecursiveGenericType.Left` is not supported by the prototype
-   ┌─ TEMPFILE:19:40
-   │
-19 │ end LeanerTxnRejectRecursiveGenericType
-   │                                        ^
+ error: LIR-MOVE-RECURSIVE-TYPE: Move nominal fields contain a recursive type definition
+  ┌─ TEMPFILE:6:3
+  │  
+6 │ ╭   struct Left {T} has Copy, Drop, Store where
+7 │ │     right : Right<T>
+  │ ╰^
 
 
 exiting with Leaner elaboration errors

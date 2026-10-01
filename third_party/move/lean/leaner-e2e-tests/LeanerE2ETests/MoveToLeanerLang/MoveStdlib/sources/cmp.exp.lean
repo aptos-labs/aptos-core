@@ -3,7 +3,7 @@
 
 import LeanerLang
 
-leaner module 0x1::cmp where
+leaner module std::cmp where
   enum Ordering has Copy, Drop where
     | Less
     | Equal

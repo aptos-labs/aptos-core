@@ -26,7 +26,7 @@ from Unix error codes [see here](https://cloud.google.com/apis/design/errors#han
 associated HTTP error code which can be used in REST apis. The mapping from error code to http code is not 1:1;
 error codes here are a bit richer than HTTP codes.
 -/
-leaner module 0x1::error where
+leaner module std::error where
   /--
   Caller specified an invalid argument (http: 400)
   -/
@@ -100,7 +100,7 @@ leaner module 0x1::error where
 
   spec canonical where
     pragma opaque
-    let_pre shl_res := category << 16
+    let_pre shl_res := (category << 16) % 18446744073709551616
     ensures [concrete] result == shl_res + reason
     aborts_if [abstract] false
     ensures [abstract] result == category

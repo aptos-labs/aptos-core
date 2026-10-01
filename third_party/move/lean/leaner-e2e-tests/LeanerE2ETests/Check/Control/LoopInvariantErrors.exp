@@ -1,9 +1,9 @@
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:9:0: error: a loop invariant at entry is not established
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:9:0: error: a loop invariant at an iteration is not established
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:18:7: error: leaner verification failed
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:16:16: error: the loop invariant `i < n` is not established at entry
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:16:16: error: the loop invariant `i < n` is not preserved by an iteration
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:18:7: error: leaner verification failed: the automatic verification of `bad_entry` failed; provide a proof: `verify bad_entry by …` in the module (`verify bad_entry by skip` shows the obligations it leaves)
 LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:30:4: error: the specification clause `ensures result == n` is not established
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:29:7: error: leaner verification failed
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:9:0: error: a loop invariant at an iteration is not established
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:41:7: error: leaner verification failed
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:29:7: error: leaner verification failed: the automatic verification of `weak_exit` failed; provide a proof: `verify weak_exit by …` in the module (`verify weak_exit by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:39:16: error: the loop invariant `i == 0` is not preserved by an iteration
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:41:7: error: leaner verification failed: the automatic verification of `bad_step` failed; provide a proof: `verify bad_step by …` in the module (`verify bad_step by skip` shows the obligations it leaves)
 LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:52:4: error: the specification clause `ensures result == 1` is not established
-LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:51:7: error: leaner verification failed
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:51:7: error: leaner verification failed: the automatic verification of `bad_default` failed; provide a proof: `verify bad_default by …` in the module (`verify bad_default by skip` shows the obligations it leaves)

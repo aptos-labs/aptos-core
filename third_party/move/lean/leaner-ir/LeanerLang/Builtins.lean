@@ -25,14 +25,12 @@ private def isOneAddress (value : String) : Bool :=
   if !value.startsWith "0x" then false else
     List.dropWhile (· == '0') (value.toList.drop 2) == ['1']
 
+/-- Whether a Move namespace is the standard module `0x1::moduleName`,
+however its address is spelled. -/
 def isMoveStdModule (profile : Option Profile)
     (namespaceRef : NamespaceRef) (moduleName : String) : Bool :=
-  profile == some .move && namespaceRef.segments.size >= 2 &&
-    namespaceRef.segments.size <= 3 &&
+  profile == some .move && namespaceRef.segments.size == 2 &&
     namespaceRef.segments[0]?.any isOneAddress &&
-    (namespaceRef.segments.size == 2 ||
-      namespaceRef.segments[1]? == some "std" ||
-      namespaceRef.segments[1]? == some "") &&
     namespaceRef.segments.back? == some moduleName
 
 private partial def vectorElementType? (tables : Tables) (typeId : TypeId)

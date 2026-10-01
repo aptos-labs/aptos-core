@@ -1,0 +1,11 @@
+LeanerE2ETests/SourceVerify/vault_errors.move:21:9: error: the specification clause `aborts_if global<Vault>(addr).balance + amount > MAX_U64` is not established
+LeanerE2ETests/SourceVerify/vault_errors.move:22:9: error: the specification clause `aborts_if global<Vault>(addr).balance + amount
+        > global<Vault>(addr).cap with E_OVER_CAP` is not established
+LeanerE2ETests/SourceVerify/vault_errors.move:20:5: error: leaner verification failed: the automatic verification of `deposit` failed; provide a proof: `verify deposit by …` in `LeanerE2ETests/SourceVerify/vault_errors.proof.lean` (`verify deposit by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/vault_errors.move:38:9: error: the specification clause `ensures result == old(global<Vault>(addr).balance) - amount + 1` is not established
+LeanerE2ETests/SourceVerify/vault_errors.move:35:5: error: leaner verification failed: the automatic verification of `withdraw` failed; provide a proof: `verify withdraw by …` in `LeanerE2ETests/SourceVerify/vault_errors.proof.lean` (`verify withdraw by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/vault_errors.move:49:9: error: the specification clause `ensures global<Vault>(addr).balance + result > global<Vault>(addr).cap` is not established
+LeanerE2ETests/SourceVerify/vault_errors.move:47:5: error: leaner verification failed: the automatic verification of `headroom` failed; provide a proof: `verify headroom by …` in `LeanerE2ETests/SourceVerify/vault_errors.proof.lean` (`verify headroom by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/vault_errors.move:61:13: error: the loop invariant `i < periods` is not established at entry
+LeanerE2ETests/SourceVerify/vault_errors.move:61:13: error: the loop invariant `i < periods` is not preserved by an iteration
+LeanerE2ETests/SourceVerify/vault_errors.move:66:5: error: leaner verification failed: the automatic verification of `fees` failed; provide a proof: `verify fees by …` in `LeanerE2ETests/SourceVerify/vault_errors.proof.lean` (`verify fees by skip` shows the obligations it leaves)

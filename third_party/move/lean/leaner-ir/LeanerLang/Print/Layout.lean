@@ -4,6 +4,7 @@
 import LeanerLang.Elab
 import LeanerLang.Operators
 import LeanerLang.Comments
+import LeanerLang.Reserved
 
 /-!
 # LeanerLang printer layout engine
@@ -98,28 +99,12 @@ private def byteLiteral (values : Array UInt8) : String :=
   else
     "b[" ++ ", ".intercalate (values.toList.map (toString ·.toNat)) ++ "]"
 
-private def reservedIdentifier (value : String) : Bool :=
-  value ∈ [
-    "move", "rust", "Unit", "Never", "Bool", "Char", "string", "Bytes",
-    "Address", "Signer", "UInt", "SInt", "UPtr", "IPtr", "Nat", "Int",
-    "u8", "u16", "u32", "u64", "u128", "u256",
-    "i8", "i16", "i32", "i64", "i128", "i256", "usize", "isize",
-    "Range", "Vector", "Fn", "const", "type", "lifetime", "evidence", "mut",
-    "private", "public", "package", "friend", "entry", "native", "opaque",
-    "deprecated", "view", "pragma", "let_pre", "let_post", "modifies", "reads",
-    "requires", "ensures", "aborts_if", "assert", "assume",
-    "invariant", "spec", "fun", "module", "namespace", "using", "where", "struct",
-    "enum", "has", "Copy", "Drop", "Store", "Key", "true", "false",
-    "abort", "panic", "do", "let", "loop", "while", "for", "break", "continue", "forall",
-    "exists", "in", "immutable", "if", "then", "else", "return", "old",
-    "copy", "drop", "discriminant", "invoke", "function",
-    "as", "match", "with", "use"
-  ]
+
 
 private def identifier (value : String) : String :=
   let value := if value.startsWith "'" then (value.drop 1).toString else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken (isToken := reservedIdentifier)
+  else (Lean.Name.mkSimple value).toStringWithToken (isToken := isReservedWord)
 
 private def pragmaName (value : String) : String :=
   if value == "opaque" then value else identifier value
@@ -979,7 +964,13 @@ mutual
     -- what separates it from a trailing `return` supplying a block's value.
     | .expression value@(.return_ ..) => do pure ((← expressionDoc value) ++ text ";")
     | .expression value => expressionDoc value
-    | .letDecl mutable pattern type value _ => do
+    | .letDecl mutable pattern type none _ =>
+        -- A declaration without initializer keeps its type: nothing else
+        -- determines it.
+        let annotation := type.map (fun type => text (" : " ++ typeText type.value)) |>.getD .nil
+        pure <| text "let " ++ (if mutable then text "mut " else .nil) ++ patternDoc pattern ++
+          annotation
+    | .letDecl mutable pattern type (some value) _ => do
         -- An abort produces no value from which to reconstruct the binder's
         -- type. Keep its annotation, including for the derived spec reading.
         let annotation := if value matches .throw_ .. then
@@ -1339,11 +1330,14 @@ private def documentationDoc (documentation : String) : Doc :=
   | lines => vcat <| #[text "/-!"] ++
       lines.toArray.map (fun line => text line.trimAsciiEnd.toString) ++ #[text "-/"]
 
-/-- Pretty-print a parsed LeanerLang compilation unit. `leadingComments` are
-top-level namespace comments discarded as trivia by Lean's parser; the source
-backend uses these for explicit unsupported-declaration notices. -/
-def format (unit : CompilationUnit) (width : Nat := 80)
-    (leadingComments : Array String := #[]) : Except String String := do
+/-- Lay out a parsed LeanerLang compilation unit as its prelude (header,
+import, and address aliases) and one rendering per namespace, in order;
+`joinParts` makes the file. `leadingComments` are top-level namespace
+comments discarded as trivia by Lean's parser; the source backend uses these
+for explicit unsupported-declaration notices. -/
+def formatParts (unit : CompilationUnit) (width : Nat := 80)
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    Except String (String × Array String) := do
   let namespaces ← unit.namespaces.mapM fun ns => do
     let uses := ns.uses.map fun path => text s!"use {pathText path}"
     let friends := ns.friends.map fun declaration =>
@@ -1375,20 +1369,36 @@ def format (unit : CompilationUnit) (width : Nat := 80)
     let entries := useEntries ++ friendEntries ++ pragmas ++ leadingCommentDocs ++ items
     let (kind, path) ← match ns.profile with
       | .move => do
-          let path := if ns.path.size == 3 then #[ns.path[0]!, ns.path[2]!]
-            else ns.path
-          unless path.size == 2 && path[0]?.any isMoveAddress do
-            throw "a Move module path must be exactly `0xADDRESS::module_name`"
-          pure ("module", path)
+          unless ns.path.size == 2 && ns.path[0]?.any (fun first =>
+              isMoveAddress first || first.front?.any fun c => c.isAlpha || c == '_') do
+            throw "a Move module path must be exactly `address::module_name`, its address a \
+              literal or an alias"
+          pure ("module", ns.path)
       | .rust => pure ("namespace", ns.path)
     let head := text s!"leaner {kind} {pathText path} where"
     let declaration := head ++ Format.nest 2 (hard ++ blankSep entries)
     if ns.doc.trimAscii.isEmpty then pure declaration
     else pure <| documentationDoc ns.doc ++ hard ++ declaration
-  let document := text "-- Copyright © Aptos Foundation" ++ hard ++
+  -- The address aliases the namespaces spell that the environment lacks.
+  let aliasDeclarations := if declaredAliases.isEmpty then Format.nil else
+    vcat (declaredAliases.map fun (name, address) =>
+      text s!"address_alias {identifier name} = {address}") ++ hard ++ hard
+  let prelude := text "-- Copyright © Aptos Foundation" ++ hard ++
     text "-- SPDX-License-Identifier: Apache-2.0" ++ hard ++ hard ++
-    text "import LeanerLang" ++ hard ++ hard ++ blankSep namespaces ++ hard
-  pure (renderDoc document width)
+    text "import LeanerLang" ++ hard ++ hard ++ aliasDeclarations
+  pure (renderDoc prelude width, namespaces.map (renderDoc · width))
+
+/-- The file of a prelude and its namespaces: the namespaces separated by a
+blank line, the file ending in a newline. -/
+def joinParts (prelude : String) (namespaces : Array String) : String :=
+  prelude ++ "\n\n".intercalate namespaces.toList ++ "\n"
+
+/-- Pretty-print a parsed LeanerLang compilation unit as one file. -/
+def format (unit : CompilationUnit) (width : Nat := 80)
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    Except String String := do
+  let (prelude, namespaces) ← formatParts unit width leadingComments declaredAliases
+  pure (joinParts prelude namespaces)
 
 def namespaceStart (source : String) : Except String (String × Array Comment × String) := do
   let lines := source.splitOn "\n"
@@ -1402,15 +1412,34 @@ def namespaceStart (source : String) : Except String (String × Array Comment ×
   let command := "\n".intercalate commandLines.toList
   pure (command, commentsOfSource command, documentationBefore source commandStart)
 
+/-- The `address_alias` declarations before a source's first namespace. -/
+def preludeAliases (source : String) : Array (String × String) :=
+  (source.splitOn "\n").toArray.filterMap fun line => do
+    let rest ← (line.trimAscii.toString.dropPrefix? "address_alias ").map (·.toString)
+    let [name, address] := (rest.splitOn "=").map (·.trimAscii.toString) | none
+    some (name.replace "«" "" |>.replace "»" "", address)
+
+private def parseSource (environment : Environment) (source sourceName : String) :
+    Except String CompilationUnit := do
+  let (command, comments, namespaceDoc) ← namespaceStart source
+  let parsedSyntax ← Lean.Parser.runParserCategory environment `command command sourceName
+  compilationUnitOfSyntax parsedSyntax sourceName comments namespaceDoc |>.mapError (·.2)
+
 /-- Parse the semantic printer's source with the registered LeanerLang grammar,
 convert it through the frontend AST boundary, and lay it out at `width`. -/
 def formatSource (environment : Environment) (source : String) (width : Nat := 80)
     (sourceName : String := "<generated>")
-    (additionalLeadingComments : Array String := #[]) : Except String String := do
-  let (command, comments, namespaceDoc) ← namespaceStart source
-  let parsedSyntax ← Lean.Parser.runParserCategory environment `command command sourceName
-  let unit ← compilationUnitOfSyntax parsedSyntax sourceName comments namespaceDoc
-    |>.mapError (·.2)
-  format unit width additionalLeadingComments
+    (additionalLeadingComments : Array String := #[])
+    (declaredAliases : Array (String × String) := #[]) : Except String String := do
+  format (← parseSource environment source sourceName) width additionalLeadingComments
+    (preludeAliases source ++ declaredAliases)
+
+/-- Lay out several semantic sources, one namespace each, as one file with
+their namespaces in the given order. -/
+def formatSourceParts (environment : Environment) (sources : Array String) (width : Nat := 80)
+    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[]) :
+    Except String (String × Array String) := do
+  let units ← sources.mapM (parseSource environment · sourceName)
+  formatParts { sourceName, namespaces := units.flatMap (·.namespaces) } width #[] declaredAliases
 
 end LeanerLang.Print.Layout
