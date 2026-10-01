@@ -6,9 +6,12 @@
 //! pointer slot validity, invalid jump targets, op/descriptor variant
 //! mismatch, etc.
 //!
+//! The loader runs [`verify_function`] on every lowered function before it
+//! is cached, so a rejected lowering never reaches the interpreter. The test
+//! harnesses that build `Function`s by hand call [`assert_verified`] instead.
+//!
 //! Descriptors themselves are not re-verified here; their soundness is
-//! enforced by [`mono_move_core::ObjectDescriptor`]'s constructors at
-//! publish time.
+//! enforced by [`crate::ObjectDescriptor`]'s constructors at publish time.
 //!
 //! TODO(cleanup):
 //! 1. Call this something other than verifier (well-formedness checker) to
@@ -17,7 +20,7 @@
 //! 3. Precisely list out what is checked and what is out of scope.
 //! 4. For instructions with more than 1 destination, they must be disjoint.
 
-use mono_move_core::{
+use crate::{
     captured_values_size,
     native::NativeABI,
     types::{view_type_list, InternedType},
