@@ -100,8 +100,25 @@ jobs:
           name: cli-builds-linux-arm
           path: aptos-cli-*.zip
 
-  # Apple Silicon only. Intel (x86_64) macOS builds are no longer published;
-  # all future macOS CLI releases support arm64 only.
+  # Last Intel (x86_64) macOS CLI build. This release prints a deprecation
+  # warning on startup. Remove this job after it ships; later macOS CLI
+  # releases are Apple Silicon (arm64) only.
+  build-macos-x86_64-binary:
+    name: "Build MacOS x86_64 binary"
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-macos-x86-64
+          path: aptos-cli-*.zip
+
   build-macos-arm-binary:
     name: "Build MacOS ARM binary"
     runs-on: macos-latest
@@ -146,6 +163,7 @@ jobs:
       - build-linux-binary
       - build-linux-arm-binary
       - build-macos-arm-binary
+      - build-macos-x86_64-binary
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: "write"

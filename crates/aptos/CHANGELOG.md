@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- macOS CLI releases no longer include an x86_64 (Intel) binary. All future macOS builds support Apple Silicon (arm64) only. `aptos update aptos` on Intel Macs reports that x86_64 is unsupported.
+- Deprecate macOS x86_64 (Intel) CLI builds. This release still publishes an Intel binary and prints a deprecation warning on startup. The next macOS CLI release will be Apple Silicon (arm64) only.
 
 ## [9.6.0]
 - Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.
