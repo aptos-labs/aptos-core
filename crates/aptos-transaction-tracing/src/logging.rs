@@ -35,6 +35,11 @@ pub struct LogSchema {
     outcome: Option<&'static str>,
     age_ms: Option<u64>,
     num_stages: Option<usize>,
+    api_handler_enter_timestamp_usecs: Option<u64>,
+    api_transaction_decoded_timestamp_usecs: Option<u64>,
+    api_mempool_submit_timestamp_usecs: Option<u64>,
+    api_mempool_accepted_timestamp_usecs: Option<u64>,
+    mempool_insert_timestamp_usecs: Option<u64>,
 
     // GC summary counters (only used by `TxnTraceGcSummary`)
     evicted_traces: Option<u64>,
@@ -55,8 +60,13 @@ pub struct LogSchema {
     //
     // `block_proposed_ms` can be negative: it records the proposer's
     // `block.timestamp_usecs`, which is on a different validator's clock and
-    // can precede this node's MempoolInsert. Every other stage uses the
-    // local clock and is non-negative.
+    // can precede this node's MempoolInsert. API stages also precede
+    // MempoolInsert and are intentionally negative for accepted transactions.
+    api_handler_enter_ms: Option<i64>,
+    api_transaction_decoded_ms: Option<i64>,
+    api_mempool_submit_ms: Option<i64>,
+    api_mempool_accepted_ms: Option<i64>,
+    api_to_mempool_ms: Option<i64>,
     mempool_insert_ms: Option<i64>,
     qs_batch_pull_ms: Option<i64>,
     qs_batch_created_ms: Option<i64>,
@@ -105,12 +115,22 @@ impl LogSchema {
             outcome: None,
             age_ms: None,
             num_stages: None,
+            api_handler_enter_timestamp_usecs: None,
+            api_transaction_decoded_timestamp_usecs: None,
+            api_mempool_submit_timestamp_usecs: None,
+            api_mempool_accepted_timestamp_usecs: None,
+            mempool_insert_timestamp_usecs: None,
             evicted_traces: None,
             evicted_batch_mappings: None,
             evicted_block_mappings: None,
             remaining_traces: None,
             remaining_batch_mappings: None,
             remaining_block_mappings: None,
+            api_handler_enter_ms: None,
+            api_transaction_decoded_ms: None,
+            api_mempool_submit_ms: None,
+            api_mempool_accepted_ms: None,
+            api_to_mempool_ms: None,
             mempool_insert_ms: None,
             qs_batch_pull_ms: None,
             qs_batch_created_ms: None,
