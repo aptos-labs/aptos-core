@@ -10,7 +10,8 @@ use crate::{
 use aptos_config::config::HotStateConfig;
 use aptos_drop_helper::DropHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
+    positions::PositionOverlay, state::LedgerState,
+    state_view::cached_state_view::ShardedStateCache, HotStateUpdates,
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -39,6 +40,7 @@ impl ExecutionOutput {
         to_discard: TransactionsWithOutput,
         to_retry: TransactionsWithOutput,
         result_state: LedgerState,
+        positions: Option<PositionOverlay>,
         state_reads: ShardedStateCache,
         hot_state_updates: HotStateUpdates,
         block_end_info: Option<BlockEndInfo>,
@@ -67,6 +69,7 @@ impl ExecutionOutput {
             to_discard,
             to_retry,
             result_state,
+            positions,
             state_reads,
             hot_state_updates,
             block_end_info,
@@ -78,7 +81,7 @@ impl ExecutionOutput {
         })
     }
 
-    pub fn new_empty(state: LedgerState) -> Self {
+    pub fn new_empty(state: LedgerState, positions: Option<PositionOverlay>) -> Self {
         Self::new_impl(Inner {
             is_block: false,
             first_version: state.next_version(),
@@ -88,6 +91,7 @@ impl ExecutionOutput {
             to_retry: TransactionsWithOutput::new_empty(),
             state_reads: ShardedStateCache::new_empty(state.version()),
             result_state: state,
+            positions,
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
@@ -109,6 +113,7 @@ impl ExecutionOutput {
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
             result_state: LedgerState::new_empty(HotStateConfig::default()),
+            positions: None,
             state_reads: ShardedStateCache::new_empty(None),
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
@@ -133,6 +138,8 @@ impl ExecutionOutput {
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
             result_state: self.result_state.clone(),
+            // No writes in a reconfig suffix, so the overlay is unchanged.
+            positions: self.positions.clone(),
             state_reads: ShardedStateCache::new_empty(self.next_version().checked_sub(1)),
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
@@ -177,6 +184,9 @@ pub struct Inner {
     pub to_retry: TransactionsWithOutput,
 
     pub result_state: LedgerState,
+    /// Native position index after this chunk, the position-side
+    /// counterpart of `result_state`. `None` when the feature is off.
+    pub positions: Option<PositionOverlay>,
     /// State items read during execution, useful for calculating the state storge usage and
     /// indices used by the db pruner.
     pub state_reads: ShardedStateCache,

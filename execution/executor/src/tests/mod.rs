@@ -524,6 +524,7 @@ fn apply_transaction_by_writeset(
         txn_outs,
         aux_info,
         &ledger_summary.state,
+        ledger_summary.positions.as_ref(),
         state_view,
         TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     )
