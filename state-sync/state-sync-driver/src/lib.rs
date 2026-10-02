@@ -13,6 +13,7 @@ mod logging;
 pub mod metadata_storage;
 pub mod metrics;
 mod notification_handlers;
+pub mod snapshot_kind;
 mod storage_synchronizer;
 mod utils;
 
