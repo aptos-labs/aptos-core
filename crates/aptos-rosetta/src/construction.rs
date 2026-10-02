@@ -429,7 +429,7 @@ async fn simulate_transaction(
         };
 
         // Multiply the gas price times the max gas amount to use
-        let suggested_fee = Amount::suggested_gas_fee(simulated_gas_unit_price, max_gas_amount);
+        let suggested_fee = Amount::suggested_gas_fee(simulated_gas_unit_price, max_gas_amount)?;
 
         Ok((suggested_fee, simulated_gas_unit_price, max_gas_amount))
     } else {
@@ -476,15 +476,27 @@ async fn construction_metadata(
     )
     .await?;
 
-    // If both are present, we skip simulation
-    let (suggested_fee, gas_unit_price, max_gas_amount) = simulate_transaction(
-        rest_client.as_ref(),
-        server_context.chain_id,
-        &request.options,
-        &internal_operation,
-        sequence_number,
-    )
-    .await?;
+    // If both max gas and gas price are provided, skip simulation.
+    let (suggested_fee, gas_unit_price, max_gas_amount) =
+        if let (Some(max_gas_amount), Some(gas_price_per_unit)) = (
+            request.options.max_gas_amount.as_ref(),
+            request.options.gas_price_per_unit.as_ref(),
+        ) {
+            (
+                Amount::suggested_gas_fee(gas_price_per_unit.0, max_gas_amount.0)?,
+                gas_price_per_unit.0,
+                max_gas_amount.0,
+            )
+        } else {
+            simulate_transaction(
+                rest_client.as_ref(),
+                server_context.chain_id,
+                &request.options,
+                &internal_operation,
+                sequence_number,
+            )
+            .await?
+        };
 
     Ok(ConstructionMetadataResponse {
         metadata: ConstructionMetadata {
@@ -1477,20 +1489,27 @@ async fn construction_preprocess(
         .metadata
         .as_ref()
         .and_then(|inner| inner.public_keys.as_ref());
-
-    // A public key can be provided for simulation, otherwise, a max gas amount would be given.
-    if request
+    let has_max_gas = request
         .metadata
         .as_ref()
         .and_then(|inner| inner.max_gas_amount)
-        .is_none()
-        && public_keys
-            .as_ref()
-            .map(|inner| inner.is_empty())
-            .unwrap_or(false)
-    {
+        .is_some();
+    let has_gas_price = request
+        .metadata
+        .as_ref()
+        .and_then(|inner| inner.gas_price)
+        .is_some();
+    let has_public_keys = public_keys
+        .map(|inner| !inner.is_empty())
+        .unwrap_or(false);
+
+    // Simulation can be skipped only when both max gas and gas price are provided.
+    // Otherwise public keys are required so metadata can simulate/estimate.
+    // TODO: Support simulation without public keys so callers can omit them when only
+    // estimating gas (Aptos REST simulation currently requires a public key).
+    if !(has_max_gas && has_gas_price) && !has_public_keys {
         return Err(ApiError::InvalidInput(Some(
-            "Must provide either max gas amount or public keys to estimate max gas amount"
+            "Must provide either both max gas amount and gas price, or public keys for simulation"
                 .to_string(),
         )));
     }
@@ -1530,7 +1549,7 @@ async fn construction_preprocess(
     })
 }
 
-/// Construction submit command (OFFLINE)
+/// Construction submit command (ONLINE)
 ///
 /// Submits a transaction to the blockchain
 ///
