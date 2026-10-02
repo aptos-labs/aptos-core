@@ -195,7 +195,14 @@ jobs:
       # mislav/bump-homebrew-formula-action#340, no patch released).
       # dawidd6/action-homebrew-bump-formula wraps `brew bump-formula-pr`,
       # which handles redirects correctly.
-      - uses: dawidd6/action-homebrew-bump-formula@1446dca236b0440c6f02723a3f14f13be2c04ab0 # pin@v7
+      #
+      # Pinned commit was bumped from v7 to v10: v7 failed with
+      # `undefined method 'safe_system' for module Homebrew (NoMethodError)`
+      # because newer Homebrew releases moved `safe_system` off the
+      # top-level `Homebrew` module. Upstream fixed this in
+      # dawidd6/action-homebrew-bump-formula@e762a0d ("Fix safe_system
+      # undefined error"), which is included starting with v9.
+      - uses: dawidd6/action-homebrew-bump-formula@b12d2bc99c46444125e606142f28200ec71a1214 # pin@v10
         with:
           token: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_CORE_HOMEBREW_BUMPER }}
           formula: aptos
