@@ -5,14 +5,13 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
+    interner::{InternedModuleId, ModuleId},
     types::{InternedType, EMPTY_TYPE_LIST},
-    Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO,
-    Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp, SortedSafePointEntries,
-    ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    verify_function, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
+    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
+    ObjectDescriptor, ObjectDescriptorTable, SortedSafePointEntries, ValueLayout,
+    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
-mod common;
-
-use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
 /// A descriptor table paired with an empty layout provider, to satisfy the
 /// verifier's `DescriptorProvider + LayoutProvider` bound. These tests do not
@@ -40,11 +39,20 @@ fn trivial_descriptors() -> VerifierProvider {
     VerifierProvider(ObjectDescriptorTable::new())
 }
 
+/// Interned module id for hand-built test functions.
+fn test_module_id() -> InternedModuleId {
+    static MODULE_ID: ModuleId = ModuleId::new(
+        move_core_types::account_address::AccountAddress::ONE,
+        GlobalArenaPtr::from_static("test"),
+    );
+    GlobalArenaPtr::from_static(&MODULE_ID)
+}
+
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
 fn minimal_func() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
+        module_id: test_module_id(),
         def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
