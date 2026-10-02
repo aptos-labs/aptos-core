@@ -119,6 +119,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],
+        xir_dependencies: vec![],
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,

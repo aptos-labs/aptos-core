@@ -62,6 +62,14 @@ inductive AttributeArg where
   | name (path : String) (args : List AttributeArg)
   | num (value : Nat)
   | bool (value : Bool)
+  /-- `name = value`, as in `#[resource_group_member(group = 0x1::object::ObjectGroup)]`.
+
+  Move source has this form and Lean's attribute syntax does not, so nothing
+  here constructs one; it exists to carry an argument read from a Rust-produced
+  XIR module through to whatever is re-emitted. Without it such a module cannot
+  be decoded at all, which puts every framework module using
+  `resource_group_member` out of reach. -/
+  | assign (name : String) (value : AttributeArg)
   deriving BEq, Repr
 
 /-- A user-provided source attribute: a head name applied to positional
@@ -98,6 +106,20 @@ structure StructMeta where
   variantNames : Option (List (String × List String)) := none
   abilities : AbilitySet
   attributes : List Attribute := []
+  /-- Visibility of the type itself (Move 2.4), governing construction,
+  destruction, field access, and variant matching from other modules.
+
+  Carried for the same reason `FunMeta.visibility` is: dropping it makes a
+  re-emitted module say `private`, silently revoking access that the original
+  granted.
+
+  Defaults to private, which is what both sources of a `StructMeta` want today.
+  A document without the field — written before type visibility existed — read
+  as private before this and still does. A Lean-*authored* module has nothing
+  else to say either: `Move.Compiler.LIR` builds this from a struct declaration
+  that carries no visibility, so declaring a public type from Lean is a
+  language feature that does not exist yet rather than something lost here. -/
+  visibility : Visibility := .private_
   deriving BEq, Repr
 
 /-- Non-semantic information for one positional function declaration. -/

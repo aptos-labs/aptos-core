@@ -262,6 +262,8 @@ private partial def encodeAttributeArg : AttributeArg → Json
         Json.mkObj [("name", .str path), ("args", arr (args.map encodeAttributeArg))]
   | .num value => Json.mkObj [("num", .str (toString value))]
   | .bool value => Json.mkObj [("bool", .bool value)]
+  | .assign name value =>
+      Json.mkObj [("assign", .str name), ("value", encodeAttributeArg value)]
 
 private def encodeAttribute (decl : Attribute) : Json :=
   if decl.args.isEmpty then Json.mkObj [("name", .str decl.name)] else
@@ -276,6 +278,11 @@ private def attributeFields (attributes : List Attribute) :
     List (String × Json) :=
   if attributes.isEmpty then [] else
     [("attributes", arr (attributes.map encodeAttribute))]
+
+private def encodeVisibility : Visibility → String
+  | .private_ => "private"
+  | .public_ => "public"
+  | .friend => "friend"
 
 private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json := do
   unless decl.name = info.name do
@@ -295,6 +302,7 @@ private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json 
     ]
   let fields := [
     ("name", .str decl.name),
+    ("visibility", .str (encodeVisibility info.visibility)),
     ("type_parameters", encodeTypeParams decl.typeParams),
     ("abilities", encodeAbilities info.abilities),
     ("fields", arr fields)
@@ -302,11 +310,6 @@ private def encodeStruct (decl : MStruct) (info : StructMeta) : JsonResult Json 
   return Json.mkObj <| match variants with
     | none => fields
     | some variants => fields ++ [("variants", variants)]
-
-private def encodeVisibility : Visibility → String
-  | .private_ => "private"
-  | .public_ => "public"
-  | .friend => "friend"
 
 private def encodeSourceSpan (span : SourceSpan) : Json :=
   Json.mkObj [("start", nat span.start), ("end", nat span.end)]
@@ -392,7 +395,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 6),
+    ("version", nat 7),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -473,6 +476,13 @@ private partial def decodeAttributeArg (json : Json) :
   | .error _ =>
   match json.getObjVal? "bool" with
   | .ok value => return .bool (← value.getBool?)
+  | .error _ =>
+  -- `{assign, value}`, keyed disjointly from `name` precisely so that the
+  -- probes above cannot half-read it and drop the value.
+  match json.getObjVal? "assign" with
+  | .ok nameJson =>
+      return .assign (← nameJson.getStr?)
+        (← decodeAttributeArg (← json.getObjVal? "value"))
   | .error _ => throw "unknown attribute argument"
 
 private def decodeAttribute (json : Json) : JsonResult Attribute := do
@@ -528,7 +538,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 || version = 5 || version = 6 do
+  unless version = 3 || version = 4 || version = 5 || version = 6 || version = 7 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -546,7 +556,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
     | .ok value => value.getArr?
     | .error _ => pure #[]
   let legacy := Json.mkObj [
-    ("version", nat 10),
+    ("version", nat 11),
     ("structs", .arr structsJson),
     ("funs", .arr functionsJson)
   ]
@@ -564,12 +574,18 @@ def decodeMModule (text : String) : JsonResult MModule := do
             pure (variantName, fields)
           pure (some variants)
       | .error _ => pure none
+    -- Absent means private, matching the Rust reader's `serde(default)`, so a
+    -- document written before type visibility existed still decodes.
+    let visibility ← match structJson.getObjVal? "visibility" with
+      | .ok value => decodeVisibility (← value.getStr?)
+      | .error _ => pure .private_
     return ({
       name := structName
       fieldNames := fieldNames
       variantNames := variantNames
       abilities := ← decodeAbilities (← structJson.getObjVal? "abilities")
       attributes := ← decodeAttributes structJson
+      visibility := visibility
     } : StructMeta)
   let funMeta ← functionsJson.toList.mapM fun functionJson => do
     return ({
