@@ -196,7 +196,7 @@ jobs:
         run: |
           # Cache mounts survive layer invalidation and --no-cache. Only clear
           # compiled artifacts in this runner's restored snapshot, not downloads.
-          cache_filters=(--filter type=exec.cachemount --filter 'description~=^cached mount /aptos/target ')
+          cache_filters=(--filter type=exec.cachemount --filter description~=builder-target-cache-)
           docker buildx du --verbose "${cache_filters[@]}"
           docker buildx prune --force "${cache_filters[@]}"
           remaining=$(docker buildx du --format '{{.ID}}' "${cache_filters[@]}")
