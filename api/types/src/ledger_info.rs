@@ -22,6 +22,24 @@ pub struct LedgerInfo {
 }
 
 impl LedgerInfo {
+    /// The ledger info of a node that has not bootstrapped yet.
+    ///
+    /// Such a node holds no ledger data, so there is nothing to report beyond
+    /// the chain it belongs to. Used so a liveness check can answer without
+    /// reading storage.
+    pub fn not_bootstrapped(chain_id: &ChainId) -> Self {
+        Self {
+            chain_id: chain_id.id(),
+            epoch: U64::from(0),
+            ledger_version: U64::from(0),
+            oldest_ledger_version: U64::from(0),
+            block_height: U64::from(0),
+            oldest_block_height: U64::from(0),
+            ledger_timestamp: U64::from(0),
+            txn_encryption_key: None,
+        }
+    }
+
     pub fn new(
         chain_id: &ChainId,
         info: &LedgerInfoWithSignatures,

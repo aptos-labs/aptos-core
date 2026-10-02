@@ -103,6 +103,7 @@ pub fn create_full_node_driver_configuration() -> DriverConfiguration {
         consensus_observer_config,
         role,
         waypoint,
+        local_genesis: None,
     }
 }
 

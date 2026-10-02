@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    driver::DriverConfiguration,
+    driver::{DriverConfiguration, GenesisCommitter},
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
@@ -501,14 +501,23 @@ impl<
                 .await;
         }
 
-        // Get the highest synced and known ledger info versions
-        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        // Get the highest synced and known ledger info versions. A node that has
+        // never committed anything reports no version at all, which is the same
+        // starting point as genesis for the comparisons below, but not for
+        // deciding whether a snapshot can be restored into it.
+        let pre_committed_version = self.storage.get_pre_committed_version().map_err(|error| {
+            Error::StorageError(format!(
+                "Failed to get the pre-committed version: {error:?}"
+            ))
+        })?;
+        let nothing_committed = pre_committed_version.is_none();
+        let highest_synced_version = pre_committed_version.unwrap_or(GENESIS_TRANSACTION_VERSION);
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
         // Check if we need to sync more data
         if self.get_bootstrapping_mode().is_fast_sync()
-            && highest_synced_version == GENESIS_TRANSACTION_VERSION
+            && nothing_committed
             && highest_known_ledger_version == GENESIS_TRANSACTION_VERSION
         {
             // The node is fast syncing and an epoch change isn't
@@ -537,6 +546,7 @@ impl<
         if self.get_bootstrapping_mode().is_fast_sync() {
             // We're fast syncing
             self.fetch_missing_state_snapshot_data(
+                nothing_committed,
                 highest_synced_version,
                 highest_known_ledger_info,
             )
@@ -549,12 +559,20 @@ impl<
     }
 
     /// Fetches all missing state snapshot data in order to bootstrap the node
+    ///
+    /// A snapshot restore writes the state as of the target version and leaves
+    /// anything already committed below it in place, where those older rows go
+    /// on satisfying reads for keys that were deleted before the target. Only a
+    /// node that has committed nothing at all can be restored into; one that
+    /// already holds data (genesis included) has to catch up by syncing
+    /// transactions forward instead.
     async fn fetch_missing_state_snapshot_data(
         &mut self,
+        nothing_committed: bool,
         highest_synced_version: Version,
         highest_known_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        if highest_synced_version == GENESIS_TRANSACTION_VERSION {
+        if nothing_committed {
             // We're fast syncing a new node. Resume against the already-pinned
             // target if a snapshot sync has started, otherwise target the highest
             // known ledger info. (All snapshot kinds sync to the same target.)
@@ -565,9 +583,23 @@ impl<
                 Some(target) => target,
                 None => highest_known_ledger_info,
             };
+            // The network has nothing beyond genesis, so there is no snapshot to
+            // sync to. Commit the local genesis blob rather than streaming a copy
+            // of it back from a peer.
+            if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION
+                && let Some(commit_genesis) = self
+                    .driver_configuration
+                    .local_genesis
+                    .as_ref()
+                    .map(|local_genesis| local_genesis.commit.clone())
+            {
+                return self.bootstrap_from_local_genesis(commit_genesis).await;
+            }
             self.drive_snapshot_stages(target).await
         } else {
-            // This node has already synced some state. Ensure the node is not too far behind.
+            // This node has already committed data, so it cannot be restored
+            // into. Ensure it is not too far behind to catch up by syncing
+            // transactions forward.
             let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
             let num_versions_behind = highest_known_ledger_version
                 .checked_sub(highest_synced_version)
@@ -597,6 +629,28 @@ impl<
                        num_versions_behind, highest_known_ledger_version, max_num_versions_behind);
             }
         }
+    }
+
+    /// Commits the local genesis blob and completes bootstrapping.
+    ///
+    /// Used when the fast-sync target is genesis itself. The commit is
+    /// idempotent, so a node that already holds genesis (e.g. restarted after a
+    /// previous run took this path) just proceeds to completion.
+    async fn bootstrap_from_local_genesis(
+        &mut self,
+        commit_genesis: GenesisCommitter,
+    ) -> Result<(), Error> {
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(
+            "The network advertises nothing beyond genesis. Committing local genesis instead of fast syncing to it."
+        ));
+
+        commit_genesis().map_err(|error| {
+            Error::UnexpectedError(format!(
+                "Failed to commit the local genesis blob! Error: {error:?}"
+            ))
+        })?;
+
+        self.bootstrapping_complete().await
     }
 
     /// Attempts to fetch a data notification from the active stream
