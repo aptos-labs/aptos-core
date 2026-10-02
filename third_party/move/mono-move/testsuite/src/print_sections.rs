@@ -20,7 +20,8 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
     types::{InternedType, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, LayoutId, LayoutProvider, VMResult, ValueLayout,
+    DescriptorId, FieldTypes, FrameOffset, FrameworkSymbols, LayoutId, LayoutProvider, VMResult,
+    ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -259,6 +260,10 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
         self.guard.publish_layout(layout)
+    }
+
+    fn framework_symbols(&self) -> &FrameworkSymbols {
+        self.guard.framework_symbols()
     }
 
     fn publish_variant_layouts(

@@ -28,9 +28,9 @@ use mono_move_core::{
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter,
-    Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult,
-    ValueLayout,
+    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols, Function, FunctionPtr,
+    GasMeter, Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError,
+    VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -962,6 +962,10 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
         self.loader.guard.publish_layout(layout)
+    }
+
+    fn framework_symbols(&self) -> &FrameworkSymbols {
+        self.loader.guard.framework_symbols()
     }
 
     fn publish_variant_layouts(
