@@ -127,7 +127,9 @@ use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
+mod operands;
 mod unspecialized;
+pub use operands::OperandKind;
 pub use unspecialized::{
     CmpKind, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
     JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, ShiftOperand, ValueCmpOp, ValueRefCmpOp,
