@@ -175,7 +175,7 @@ impl CliCommand<Vec<TransactionSummary>> for SubmitVote {
 /// Precheck before any delegation pool governance operations. Check if feature flags are enabled.
 /// Also check if partial governance voting is enabled for delegation pool. If not, send a
 /// transaction to enable it.
-async fn delegation_pool_governance_precheck(
+pub(crate) async fn delegation_pool_governance_precheck(
     txn_options: &TransactionOptions,
     pool_address: AccountAddress,
 ) -> CliTypedResult<Option<TransactionSummary>> {
