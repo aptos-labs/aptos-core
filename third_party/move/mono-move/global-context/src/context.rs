@@ -764,18 +764,23 @@ impl<'ctx> ExecutionGuard<'ctx> {
     }
 
     /// Publishes the layout for the type it was built for and returns its
-    /// assigned [`LayoutId`].
-    pub fn publish_layout(&self, layout: ValueLayout) -> LayoutId {
-        let ty = layout.ty.expect("a published layout carries its type");
+    /// assigned [`LayoutId`]. Idempotent on the type.
+    ///
+    /// Expects a layout that carries its type: a struct, a vector or a frozen
+    /// enum. Returns [`None`] for a layout without one, which never belongs in
+    /// the by-type table: references and functions have reserved ids, and
+    /// enum variant bodies go through [`Self::publish_variant_layouts`].
+    pub fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
+        let ty = layout.ty?;
         if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
-            return *id;
+            return Some(*id);
         }
 
         // TODO(perf): consider if we should append to the table without holding the shard lock.
-        *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
+        Some(*self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
             let idx = self.ctx.layouts.table.push(layout);
             LayoutId::from_usize(idx)
-        })
+        }))
     }
 
     /// Publishes the variant-body layouts of enum and returns their [`LayoutId`]s.

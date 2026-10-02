@@ -927,8 +927,9 @@ pub trait SpecializerContext: LayoutProvider {
     ) -> DescriptorId;
 
     /// Publishes `layout` for the type it was built for and returns its
-    /// assigned id. Idempotent.
-    fn publish_layout(&self, layout: ValueLayout) -> LayoutId;
+    /// assigned id. Idempotent. [`None`] if the layout carries no type, which
+    /// only variant bodies and the reserved reference and function layouts do.
+    fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId>;
 
     /// Publishes the variant-body layouts of `enum_ty` (one per variant, in tag
     /// order), returning their ids. Idempotent on `enum_ty`: re-publishing the
@@ -1576,7 +1577,10 @@ fn discover_type_metadata(
             match (elem_id, descriptor_id) {
                 (Some(elem_id), Some(descriptor_id)) => {
                     let layout = ValueLayout::vector(ty, elem_id, descriptor_id);
-                    Ok(Some(ctx.publish_layout(layout)))
+                    let id = ctx
+                        .publish_layout(layout)
+                        .ok_or(LoweringError::LayoutWithoutType)?;
+                    Ok(Some(id))
                 },
                 _ => Ok(None),
             }
@@ -1653,7 +1657,10 @@ fn discover_type_metadata(
                     else {
                         return Ok(None);
                     };
-                    Ok(Some(ctx.publish_layout(value_layout)))
+                    let id = ctx
+                        .publish_layout(value_layout)
+                        .ok_or(LoweringError::LayoutWithoutType)?;
+                    Ok(Some(id))
                 },
                 Some(FieldTypes::Enum(variants)) => {
                     // An enum is an 8-byte heap pointer at the type level.
@@ -1766,7 +1773,10 @@ fn discover_type_metadata(
                                 ctx.publish_variant_layouts(ty, variant_value_layouts);
                             let value_layout =
                                 ValueLayout::frozen_enum(ty, descriptor_id, variant_ids, size);
-                            return Ok(Some(ctx.publish_layout(value_layout)));
+                            let id = ctx
+                                .publish_layout(value_layout)
+                                .ok_or(LoweringError::LayoutWithoutType)?;
+                            return Ok(Some(id));
                         }
                     }
 

@@ -3,12 +3,12 @@
 
 //! Running a script payload.
 
-use super::args::{check_callable_signature, check_no_return_values, place_user_txn_args};
-use crate::errors::{invariant_violation, MoveExecutionFailure, ScriptRejection};
+use super::args::run_user_txn_call;
+use crate::errors::{MoveExecutionFailure, ScriptRejection};
 use aptos_types::{chain_id::ChainId, vm::module_metadata::get_compilation_metadata};
 use mono_move_core::{interner::SCRIPT_MAIN, types::InternedTypeList, Interner};
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{CompletedCall, InterpreterContext, RuntimeStatus};
+use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
@@ -34,33 +34,24 @@ pub(crate) fn run_script<'a>(
     let func = interp
         .load_script(code, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;
+    // Loading the script put its module into the read set.
     let module = interp
-        .read_set()
-        .get_loaded(guard.arena_ref_for_module_id(func.module_id))
+        .load_module(func.module_id)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    let prepared = &module.ir().module;
-    check_script_allowed(prepared, chain_id).map_err(MoveExecutionFailure::RejectedScript)?;
+    check_script_allowed(&module.ir().module, chain_id)
+        .map_err(MoveExecutionFailure::RejectedScript)?;
     // A script's `main` is checked like an entry function: same return-value
     // and parameter-type rules, same order, before any argument is decoded.
-    let def_idx = module
-        .function_def_idx(guard.identifier_of(SCRIPT_MAIN))
-        .ok_or_else(|| invariant_violation("a loaded script defines `main`"))
-        .map_err(MoveExecutionFailure::RuntimeError)?;
-    check_no_return_values(prepared, def_idx).map_err(MoveExecutionFailure::InvalidArguments)?;
-    let num_signer_params = check_callable_signature(guard, interp, &func.param_tys)?;
-    let mut call = interp
-        .build_call(func)
-        .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(
-        &mut call,
-        num_signer_params,
+    run_user_txn_call(
+        guard,
+        interp,
+        module,
+        guard.identifier_of(SCRIPT_MAIN),
+        func,
         sender,
         secondary_signers,
         &convert_txn_args(args),
-    )?;
-    call.run()
-        .map(CompletedCall::into_status)
-        .map_err(|err| MoveExecutionFailure::RuntimeError(err.into_error()))
+    )
 }
 
 /// Checks that AptosVM would run `script`, loaded as a module: mainnet refuses
