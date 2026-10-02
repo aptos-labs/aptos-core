@@ -543,7 +543,7 @@ async fn ensure_fetchable_metadata_url(url: &Url) -> CliTypedResult<()> {
 fn ip_is_global(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
-            let [a, b, _, _] = v4.octets();
+            let [a, b, c, _] = v4.octets();
             !(v4.is_unspecified()
                 || v4.is_loopback()
                 || v4.is_private()
@@ -553,7 +553,9 @@ fn ip_is_global(ip: &IpAddr) -> bool {
                 || v4.is_multicast()
                 || a == 0
                 || (a == 100 && (b & 0xc0) == 64) // 100.64.0.0/10 (CGNAT)
-                || (a == 192 && b == 0)) // 192.0.0.0/24 (IETF protocol assignments)
+                || (a == 192 && b == 0 && c == 0) // 192.0.0.0/24 (IETF protocol assignments)
+                || (a == 198 && (b & 0xfe) == 18) // 198.18.0.0/15 (benchmarking)
+                || a >= 240) // 240.0.0.0/4 (reserved, incl. 255.255.255.255)
         },
         IpAddr::V6(v6) => {
             if let Some(v4) = v6.to_ipv4_mapped() {
@@ -1253,6 +1255,10 @@ mod metadata_url_tests {
             "192.168.1.1",
             "169.254.169.254", // cloud metadata endpoint
             "100.64.0.1",      // CGNAT
+            "192.0.0.1",       // 192.0.0.0/24 IETF protocol assignments
+            "198.19.0.1",      // 198.18.0.0/15 benchmarking
+            "240.0.0.1",       // 240.0.0.0/4 reserved
+            "255.255.255.255", // broadcast
             "0.0.0.0",
             "::1",
             "fc00::1",
@@ -1269,6 +1275,7 @@ mod metadata_url_tests {
             "1.1.1.1",
             "8.8.8.8",
             "93.184.216.34",
+            "192.0.1.1", // rest of 192.0.0.0/16 outside the /24 stays global
             "2606:4700:4700::1111",
         ] {
             assert!(ip_is_global(&ip(s)), "{} should be global", s);
