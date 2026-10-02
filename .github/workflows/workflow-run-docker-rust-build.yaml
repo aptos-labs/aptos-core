@@ -11,6 +11,11 @@ on:
         required: true
         type: string
         description: ID of the docker cache to use for the build
+      RESET_CARGO_CACHE:
+        required: false
+        type: boolean
+        default: false
+        description: Clear compiled Cargo artifacts on this runner before building, preserving dependency downloads
       FEATURES:
         required: false
         type: string
@@ -57,6 +62,11 @@ on:
         required: true
         type: string
         description: The git SHA1 to build. If not specified, the latest commit on the triggering branch will be built
+      RESET_CARGO_CACHE:
+        required: false
+        type: boolean
+        default: false
+        description: Clear compiled Cargo artifacts on this runner before building, preserving dependency downloads
       FEATURES:
         required: false
         type: string
@@ -180,6 +190,21 @@ jobs:
           PROFILE_PERF: ${{ env.PROFILE_PERF }}
           FEATURE_FAILPOINTS: ${{ env.FEATURE_FAILPOINTS }}
           FEATURE_CONSENSUS_ONLY: ${{ env.FEATURE_CONSENSUS_ONLY }}
+
+      - name: Reset Cargo build cache
+        if: ${{ inputs.RESET_CARGO_CACHE && steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' && inputs.DRY_RUN == false }}
+        run: |
+          # Cache mounts survive layer invalidation and --no-cache. Only clear
+          # compiled artifacts in this runner's restored snapshot, not downloads.
+          cache_filters=(--filter type=exec.cachemount --filter 'description~=^cached mount /aptos/target ')
+          docker buildx du --verbose "${cache_filters[@]}"
+          docker buildx prune --force "${cache_filters[@]}"
+          remaining=$(docker buildx du --format '{{.ID}}' "${cache_filters[@]}")
+          if [[ -n "$remaining" ]]; then
+            echo "::error::Cargo target cache mounts remain after pruning: $remaining"
+            exit 1
+          fi
+          echo 'Cleared Cargo target cache mounts; dependency downloads were retained.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and Push Rust images
         if: ${{ steps.check-images.outcome == 'failure' && steps.lock.outputs.wait_images != 'true' && inputs.DRY_RUN == false }}
