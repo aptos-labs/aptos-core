@@ -81,9 +81,9 @@ fun get_x_of(r0, r1): u64 {
     r2: 0x42::basic::Point
   code:
   L0:
-    0: [r2] := call make_point, [r0, r1] @2
+    0: [r2] := call_exempt make_point, [r0, r1] @2
     1: x0 := imm_borrow_loc r2 @4
-    2: [x0] := call get_x, [x0] @5
+    2: [x0] := call_exempt get_x, [x0] @5
     3: ret [x0] @6
 }
 
@@ -137,10 +137,10 @@ fun get_x_of() {
   code:
     0: Move8 [64] <- [8] @2
     1: Move8 [56] <- [0] @2
-    2: CallIndirect 0x42::basic::make_point @2
+    2: CallByNameExempt 0x42::basic::make_point @2
     3: Move(16) [16] <- [56] @2
     4: SlotBorrow [56] <- &[16] @4
-    5: CallIndirect 0x42::basic::get_x @5
+    5: CallByNameExempt 0x42::basic::get_x @5
     6: Move8 [0] <- [56] @6
     7: Return @6
 }

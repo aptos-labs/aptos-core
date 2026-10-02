@@ -171,6 +171,9 @@ pub struct Function {
     pub module_id: InternedModuleId,
     /// Definition index of this function in its defining module.
     pub def_idx: FunctionDefinitionIndex,
+    /// Whether `#[module_lock]` requires this function to hold a module lock
+    /// until it returns.
+    pub has_module_lock: bool,
     pub code: Code,
     /// Gas cost of the entry basic block.
     pub entry_gas: u64,

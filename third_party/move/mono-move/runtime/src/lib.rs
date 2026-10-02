@@ -9,6 +9,7 @@ pub(crate) mod heap;
 mod interpreter;
 pub(crate) mod memory;
 mod native_context;
+mod reentrancy;
 mod types;
 mod value_cmp;
 mod value_conv;

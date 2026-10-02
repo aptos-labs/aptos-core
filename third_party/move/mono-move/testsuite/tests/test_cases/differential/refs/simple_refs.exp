@@ -29,7 +29,7 @@ fun add(r0, r1): u64 {
   L0:
     0: x0 := imm_borrow_loc r0 @0
     1: x1 := imm_borrow_loc r1 @1
-    2: [x0] := call add_refs, [x0, x1] @2
+    2: [x0] := call_exempt add_refs, [x0, x1] @2
     3: ret [x0] @3
 }
 
@@ -55,7 +55,7 @@ fun add() {
   code:
     0: SlotBorrow [40] <- &[0] @0
     1: SlotBorrow [56] <- &[8] @1
-    2: CallIndirect 0xc0ffee::refs::add_refs @2
+    2: CallByNameExempt 0xc0ffee::refs::add_refs @2
     3: Move8 [0] <- [40] @3
     4: Return @3
 }

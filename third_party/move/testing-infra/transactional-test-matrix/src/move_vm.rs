@@ -263,14 +263,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "no type depth limit",
     ),
     MonoMoveDivergence::semantic(
-        "tests/re_entrancy/cyclic_calls.masm",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/re_entrancy/cyclic_closure_calls.masm",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
         "tests/recursion/runtime_layout_deeply_nested.masm",
         "no value depth limit",
     ),

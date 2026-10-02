@@ -51,7 +51,7 @@ fun first(): u64 {
   L0:
     0: x0 := ld_u64 11 @0
     1: x1 := ld_u64 22 @1
-    2: [x0, r0] := call swap_back, [x0, x1] @2
+    2: [x0, r0] := call_exempt swap_back, [x0, x1] @2
     3: ret [x0] @4
 }
 
@@ -63,7 +63,7 @@ fun second(): u64 {
   L0:
     0: x0 := ld_u64 11 @0
     1: x1 := ld_u64 22 @1
-    2: [r1, r0] := call swap_back, [x0, x1] @2
+    2: [r1, r0] := call_exempt swap_back, [x0, x1] @2
     3: ret [r0] @6
 }
 
@@ -76,7 +76,7 @@ fun second_offset(): u64 {
   L0:
     0: x0 := ld_u64 11 @0
     1: x1 := ld_u64 22 @1
-    2: [r1, r2] := call swap_back, [x0, x1] @2
+    2: [r1, r2] := call_exempt swap_back, [x0, x1] @2
     3: r0 := sub r2, #5 @4
     4: ret [r0] @8
 }
@@ -98,7 +98,7 @@ fun first() {
   code:
     0: StoreImm8 [32] <- #11 @0
     1: StoreImm8 [40] <- #22 @1
-    2: CallIndirect 0xc0ffee::ret_swap::swap_back @2
+    2: CallByNameExempt 0xc0ffee::ret_swap::swap_back @2
     3: Move8 [0] <- [40] @2
     4: Move8 [0] <- [32] @4
     5: Return @4
@@ -110,7 +110,7 @@ fun second() {
   code:
     0: StoreImm8 [40] <- #11 @0
     1: StoreImm8 [48] <- #22 @1
-    2: CallIndirect 0xc0ffee::ret_swap::swap_back @2
+    2: CallByNameExempt 0xc0ffee::ret_swap::swap_back @2
     3: Move8 [8] <- [40] @2
     4: Move8 [0] <- [48] @2
     5: Return @6
@@ -122,7 +122,7 @@ fun second_offset() {
   code:
     0: StoreImm8 [48] <- #11 @0
     1: StoreImm8 [56] <- #22 @1
-    2: CallIndirect 0xc0ffee::ret_swap::swap_back @2
+    2: CallByNameExempt 0xc0ffee::ret_swap::swap_back @2
     3: Move8 [8] <- [48] @2
     4: Move8 [16] <- [56] @2
     5: SubU64Imm [0] <- [16] - #5 @4

@@ -608,13 +608,30 @@ pub fn try_build_context<'a>(
         )
     });
 
-    // 5. Reserve the 8-byte box-pointer slot for `move_to`/`move_from`
-    //    lowering, when the body uses either. It holds the intermediate heap
-    //    pointer between the alloc/move and the box/unbox copy. Must not be
-    //    GC-tracked.
-    let needs_resource_box_slot = func_ir
-        .instrs()
-        .any(|instr| matches!(instr, Instr::MoveTo { .. } | Instr::MoveFrom { .. }));
+    // 5. Verify that each resource op targets a struct in this module, as the
+    //    runtime reentrancy check requires. Resource ops take local struct
+    //    indices, so this is unreachable for well-formed bytecode: it is defense
+    //    in depth against specializer bugs. Substitution cannot change module
+    //    membership, so check the original type. Also reserve an 8-byte slot
+    //    for the intermediate box pointer used by `move_to` and `move_from`.
+    //    This slot must not be registered as a GC root.
+    let mut needs_resource_box_slot = false;
+    for instr in func_ir.instrs() {
+        let Some(resource_ty) = resource_type_in_instr(instr) else {
+            continue;
+        };
+        let in_this_module = matches!(
+            view_type(resource_ty),
+            Type::Nominal { module_id, .. } if *module_id == module_ir.module.id()
+        );
+        if !in_this_module {
+            return Err(LoweringError::ResourceTypeForeignModule {
+                op: instr.opcode_name(),
+            }
+            .into());
+        }
+        needs_resource_box_slot |= matches!(instr, Instr::MoveTo { .. } | Instr::MoveFrom { .. });
+    }
     let resource_box_slot = needs_resource_box_slot.then(|| reserve_slot(&mut frame_data_size, 8));
 
     // 6. Single IR pass over the function's enum ops: (1) verify each one's enum
@@ -743,10 +760,12 @@ pub fn try_build_context<'a>(
             CalleeRegion::Skip(reason) => return Ok(BuildContextOutcome::Skipped(reason)),
         };
         let (callee_module_id, callee_func_name) = callee_identity(&module_ir.module, handle_idx);
-        // TODO(correctness): The native registry is trusted unconditionally
-        // here. Consider cross-checking against the callee module's
-        // `is_native` flag so a registered impl cannot shadow a Move-body
-        // function with the same qualified name.
+        // TODO(correctness): check the callee definition's `is_native` flag before
+        // choosing `CallNative`. Qualified-name lookup can replace a Move body
+        // with a native.
+        // The loader rejects this when it loads the callee module, but a
+        // cross-module `CallNative` bypasses that load. Checking the definition
+        // would change which modules are loaded and their gas charges.
         let native_idx = natives.resolve(callee_module_id, callee_func_name, call_ty_args);
         // Descriptor IDs for the native's resource types (published by the
         // discovery pass, keyed on the concrete type); e.g. `add_box` uses its
@@ -1055,6 +1074,7 @@ pub fn try_lower_function(
         name,
         module_id: module_ir.module.id(),
         def_idx: func_ir.def_idx,
+        has_module_lock: module_ir.module.definition_has_module_lock(func_ir.def_idx),
         code: Code::with_origins(code, origins),
         entry_gas,
         param_slots,

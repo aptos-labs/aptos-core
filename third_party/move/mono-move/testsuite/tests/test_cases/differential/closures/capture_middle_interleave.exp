@@ -40,7 +40,7 @@ fun caller(): u64 {
   L0:
     0: r1 := ld_u64 7 @0
     1: r0 := pack_closure g, 10, [r1] @1
-    2: [r1, r2, r3] := call three_rets, [] @3
+    2: [r1, r2, r3] := call_exempt three_rets, [] @3
     3: [r2] := call_closure [|u64, u64|(u64) has drop], [r1, r2, r0] @6
     4: ret [r2] @7
 }
@@ -75,7 +75,7 @@ fun caller() {
   code:
     0: StoreImm8 [8] <- #7 @0
     1: PackClosure [0] <- func_ref=Unresolved(g), mask=10, captured_desc=0, captured=[[8](8)] @1
-    2: CallIndirect 0x66::capture_middle_interleave::three_rets @3
+    2: CallByNameExempt 0x66::capture_middle_interleave::three_rets @3
     3: Move8 [8] <- [56] @3
     4: Move8 [16] <- [64] @3
     5: Move8 [24] <- [72] @3

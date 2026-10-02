@@ -20,8 +20,10 @@ pub type VMResult<T> = Result<T, VMInternalError>;
 
 /// Where a VM error was attributed.
 ///
-/// The interpreter attaches the executing frame's location when known. The
-/// loader uses [`ErrorLocation::Script`] for script deserialization failures.
+/// The interpreter attaches the executing frame's location when known. A call
+/// rejected by the reentrancy checker instead names only the module of the
+/// calling frame's caller. The loader uses [`ErrorLocation::Script`] for script
+/// deserialization failures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorLocation {
     /// A Move instruction: its module, defining function, and offset in that

@@ -1,0 +1,18 @@
+processed 8 tasks
+task 0 lines 5-33:  publish --verbose [module 0x66::a]
+task 1 lines 36-54:  publish --verbose [module 0x66::b]
+task 2 lines 57-112:  publish --verbose [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    message: Module 0x0000000000000000000000000000000000000000000000000000000000000066::a forms a cyclic dependency,
+    major_status: CYCLIC_MODULE_DEPENDENCY,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 3 lines 115-115:  run 0x66::a::entry_ok --verbose
+task 4 lines 117-117:  run 0x66::a::locked_entry --verbose
+task 5 lines 119-119:  run 0x66::a::entry_restore --verbose
+task 6 lines 121-121:  run 0x66::a::entry_lie --verbose
+task 7 lines 123-123:  run 0x66::a::entry_deep --verbose

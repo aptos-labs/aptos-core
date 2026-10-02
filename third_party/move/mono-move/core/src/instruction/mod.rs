@@ -45,9 +45,9 @@
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's parameter region. Call instructions ([`CallIndirect`],
-//!   [`CallDirect`]) implicitly write the metadata `(pc, fp, func_ptr)` at
-//!   the end of the caller frame and sets `fp` to the callee frame.
+//!   into the callee's parameter region. Various call instructions
+//!   write the metadata `(pc, fp, func_ptr)` at the end of the caller frame,
+//!   then set `fp` to the callee frame.
 //!   **Return**: the compiler emits explicit micro-ops to write return
 //!   values at the start of the callee's frame (potentially overwriting
 //!   parameter slots). The `Return` instruction itself implicitly restores
@@ -592,6 +592,81 @@ pub enum MicroOp {
     },
 
     //======================================================================
+    // Calls and return
+    //======================================================================
+    // Arguments should already be in the callee's parameter region; each call
+    // writes the frame metadata and moves `fp` (module docs, "Calling
+    // convention").
+    //
+    // Move-function calls vary on two axes:
+    //
+    //   | callee named by | checked    | exempt           |
+    //   |-----------------|------------|------------------|
+    //   | module + name   | CallByName | CallByNameExempt |
+    //   | pointer         | CallByPtr  | CallByPtrExempt  |
+    //
+    // A by-name site may be patched only to the pointer op in its column,
+    // pointing at the function the name resolves to. Checking an exempt call
+    // is harmless; exempting a checked call is unsound. `CallClosure` (with
+    // the closure ops) is always checked.
+    //======================================================================
+    /// Calls the function named by `module_id`, `func_name`, and `ty_args`.
+    /// Checked: records the call with the reentrancy checker and tags the
+    /// callee's saved return PC so its `Return` undoes that record.
+    CallByName {
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    },
+
+    /// Calls the function named by `module_id`, `func_name`, and `ty_args`.
+    /// Exempt: emitted only for a callee in the caller's module without
+    /// `#[module_lock]`.
+    CallByNameExempt {
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    },
+
+    /// Calls the function at `ptr`. Checked, like [`MicroOp::CallByName`];
+    /// only a `CallByName` site may be patched to it.
+    // TODO(perf): Dead code until a pass patches resolved call sites.
+    CallByPtr {
+        ptr: FunctionPtr,
+    },
+
+    /// Calls the function at `ptr`. Exempt, like
+    /// [`MicroOp::CallByNameExempt`]; only a `CallByNameExempt` site may be
+    /// patched to it.
+    // TODO(perf): Dead code until a pass patches resolved call sites.
+    CallByPtrExempt {
+        ptr: FunctionPtr,
+    },
+
+    /// Call a native function. Native functions follow the same calling convention,
+    /// meaning that the specializer has already emitted micro-ops to place arguments
+    /// into the callee's argument region.
+    //
+    // TODO(perf): [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
+    // and see if we want to move it into a side table instead.
+    //
+    // TODO(correctness): revisit `is_allocating()` for this op when heap allocation
+    // within natives is sorted out.
+    CallNative {
+        native_idx: NativeIdx,
+        ty_args: InternedTypeList,
+        abi: Box<NativeABI>,
+    },
+
+    /// Return from the current function call. The specializer has already
+    /// emitted micro-ops to write return values at the start of the
+    /// callee's frame. This instruction implicitly restores `pc` and `fp`
+    /// from the metadata at `fp - FRAME_METADATA_SIZE`. If the saved `pc`
+    /// carries the reentrancy tag, it first undoes the checked call's
+    /// reentrancy record.
+    Return,
+
+    //======================================================================
     // Control flow
     //======================================================================
     // Fused compare-and-branch (no separate cmp + flags).
@@ -605,47 +680,6 @@ pub enum MicroOp {
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
-    /// Call a function by module identity and name. The specializer has already
-    /// emitted micro-ops to place arguments into the callee's parameter region.
-    /// This instruction implicitly writes the metadata `(pc, fp, func_ptr)` at
-    /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
-    /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
-    CallIndirect {
-        module_id: InternedModuleId,
-        func_name: InternedIdentifier,
-        ty_args: InternedTypeList,
-    },
-
-    /// Call a function via direct pointer. Same calling convention as
-    /// [`MicroOp::CallIndirect`].
-    // TODO(perf): Currently dead code — the specializer never emits this. A follow-up
-    // pass should patch same-module `CallIndirect` sites to `CallDirect` once
-    // the target is known to live in the same module.
-    CallDirect {
-        ptr: FunctionPtr,
-    },
-
-    /// Call a native function. Native functions follow the same calling convention,
-    /// meaning that the specializer has already emitted micro-ops to place arguments
-    /// into the callee's argument region.
-    ///
-    /// TODO(perf): [`NativeABI`] is boxed to avoid increasing the micro-op size. Should revisit
-    /// and see if we want to move it into a side table instead.
-    ///
-    /// TODO(correctness): revisit `is_allocating()` for this op when heap allocation
-    /// within natives is sorted out.
-    CallNative {
-        native_idx: NativeIdx,
-        ty_args: InternedTypeList,
-        abi: Box<NativeABI>,
-    },
-
-    /// Return from the current function call. The compiler has already
-    /// emitted micro-ops to write return values at the start of the
-    /// callee's frame. This instruction implicitly restores `pc` and `fp`
-    /// from the metadata at `fp - FRAME_METADATA_SIZE`.
-    Return,
-
     /// Unconditional jump.
     ///
     /// `gas` is the cost of the destination block, charged before
@@ -1473,11 +1507,21 @@ impl fmt::Display for MicroOp {
             MicroOp::BoolOr { dst, lhs, rhs } => {
                 write!(f, "BoolOr [{}] <- [{}] | [{}]", dst.0, lhs.0, rhs.0)
             },
-            MicroOp::CallIndirect {
+            MicroOp::CallByName {
+                module_id,
+                func_name,
+                ty_args,
+            }
+            | MicroOp::CallByNameExempt {
                 module_id,
                 func_name,
                 ty_args,
             } => {
+                let name = if matches!(self, MicroOp::CallByName { .. }) {
+                    "CallByName"
+                } else {
+                    "CallByNameExempt"
+                };
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
                 // TODO(completeness): Have a safe display impl that takes guard.
@@ -1485,7 +1529,7 @@ impl fmt::Display for MicroOp {
                 let addr = module_id.address().short_str_lossless();
                 let module_name = unsafe { module_id.name().as_ref_unchecked() };
                 let func_name = unsafe { func_name.as_ref_unchecked() };
-                write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)?;
+                write!(f, "{} 0x{}::{}::{}", name, addr, module_name, func_name)?;
                 if !ty_args.is_empty() {
                     write!(f, "<")?;
                     display_type_list(f, *ty_args)?;
@@ -1493,12 +1537,17 @@ impl fmt::Display for MicroOp {
                 }
                 Ok(())
             },
-            MicroOp::CallDirect { ptr } => {
+            MicroOp::CallByPtr { ptr } | MicroOp::CallByPtrExempt { ptr } => {
+                let name = if matches!(self, MicroOp::CallByPtr { .. }) {
+                    "CallByPtr"
+                } else {
+                    "CallByPtrExempt"
+                };
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
                 // TODO(completeness): Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
-                write!(f, "CallDirect {}", func.name())
+                write!(f, "{} {}", name, func.name())
             },
             MicroOp::CallNative {
                 native_idx,
@@ -2252,8 +2301,10 @@ impl MicroOp {
             | MicroOp::ShlU64Imm { .. }
             | MicroOp::ShrU64 { .. }
             | MicroOp::ShrU64Imm { .. }
-            | MicroOp::CallIndirect { .. }
-            | MicroOp::CallDirect { .. }
+            | MicroOp::CallByName { .. }
+            | MicroOp::CallByNameExempt { .. }
+            | MicroOp::CallByPtr { .. }
+            | MicroOp::CallByPtrExempt { .. }
             | MicroOp::CallNative { .. }
             | MicroOp::Return
             | MicroOp::Jump { .. }

@@ -27,9 +27,9 @@ fun trigger(): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call pair_provider, [] @0
+    0: [x0] := call_exempt pair_provider, [] @0
     1: [r0, x0] := unpack 0x66::unpack_partial_xfer_probe::Pair, x0 @1
-    2: [x0] := call id, [x0] @2
+    2: [x0] := call_exempt id, [x0] @2
     3: r0 := add r0, x0 @3
     4: ret [r0] @4
 }
@@ -59,10 +59,10 @@ fun trigger() {
   frame_data_size: 8
   entry_gas: 155
   code:
-    0: CallIndirect 0x66::unpack_partial_xfer_probe::pair_provider @0
+    0: CallByNameExempt 0x66::unpack_partial_xfer_probe::pair_provider @0
     1: Move8 [0] <- [32] @1
     2: Move8 [32] <- [40] @1
-    3: CallIndirect 0x66::unpack_partial_xfer_probe::id @2
+    3: CallByNameExempt 0x66::unpack_partial_xfer_probe::id @2
     4: AddU64 [0] <- [0] + [32] @3
     5: Return @4
 }

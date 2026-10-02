@@ -11,10 +11,10 @@ use crate::{
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
-        IdentifierIndex, ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
-        StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
-        VariantIndex,
+        ConstantPoolIndex, FieldHandleIndex, FunctionAttribute, FunctionDefinitionIndex,
+        FunctionHandleIndex, FunctionInstantiationIndex, IdentifierIndex, ModuleHandleIndex,
+        SignatureIndex, SignatureToken, StructDefinitionIndex, StructFieldInformation,
+        StructHandle, StructHandleIndex, VariantFieldHandleIndex, VariantIndex,
     },
     CompiledModule,
 };
@@ -161,6 +161,31 @@ impl PreparedModule {
     /// own included.
     pub fn module_ids(&self) -> &[InternedModuleId] {
         &self.module_ids
+    }
+
+    /// Whether this module's function definition `def_idx` is declared
+    /// `#[module_lock]`.
+    pub fn definition_has_module_lock(&self, def_idx: FunctionDefinitionIndex) -> bool {
+        self.handle_has_module_lock(self.module.function_def_at(def_idx).function)
+    }
+
+    /// Whether the callee named by `handle_idx` is defined in this module without
+    /// `#[module_lock]`.
+    ///
+    /// The bytecode verifier rejects duplicate `(module, name)` handles, so a
+    /// same-module callee uses its definition's handle and attributes. Imported
+    /// attributes may differ from the callee's definition and are not read
+    /// here.
+    pub fn is_unlocked_local_callee(&self, handle_idx: FunctionHandleIndex) -> bool {
+        self.module.function_handle_at(handle_idx).module == self.module.self_handle_idx()
+            && !self.handle_has_module_lock(handle_idx)
+    }
+
+    fn handle_has_module_lock(&self, handle_idx: FunctionHandleIndex) -> bool {
+        self.module
+            .function_handle_at(handle_idx)
+            .attributes
+            .contains(&FunctionAttribute::ModuleLock)
     }
 
     /// Returns interned types corresponding to the compiled module's

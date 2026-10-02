@@ -337,6 +337,24 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
             format!("Failed to move resource into {addr:?}"),
         ),
 
+        // V1 names the module in long form.
+        E::ReentrancyUnderModuleLock { module, function } => V1ErrorInfo::with_message(
+            StatusCode::RUNTIME_DISPATCH_ERROR,
+            format!(
+                "Reentrancy disallowed: reentering `{module}` via function `{function}` \
+                 (module lock is active)"
+            ),
+        ),
+        // V1 names the struct in short form, without type arguments.
+        E::ResourceAccessDuringReentrancy { module, name } => V1ErrorInfo::with_message(
+            StatusCode::RUNTIME_DISPATCH_ERROR,
+            format!(
+                "Resource `{}::{name}` cannot be accessed because of active reentrancy of \
+                 defining module.",
+                module.short_str_lossless()
+            ),
+        ),
+
         // V1 names both variants ("expected enum variant Circle, found
         // Square"), which needs variant names at the fault site; mono carries
         // only the found tag. Reported with mono text rather than reproduced.
@@ -416,7 +434,7 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::NativeFunctionNotLoadable { .. }
         | L::LoweringSkipped { .. }
         | L::ResourceLayoutNotDerivable => return V1Equivalent::NoV1Failure,
-        L::GlobalContext(_) | L::InvariantViolation(_) => {
+        L::GlobalContext(_) | L::NativeShadowsMoveFunction { .. } | L::InvariantViolation(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
         },
     };
@@ -498,7 +516,9 @@ fn primitive_name(ty: IntTy) -> &'static str {
 mod tests {
     use super::*;
     use move_binary_format::errors::PartialVMError;
-    use move_core_types::{account_address::AccountAddress, int256::I256};
+    use move_core_types::{
+        account_address::AccountAddress, ident_str, int256::I256, language_storage::ModuleId,
+    };
 
     /// The mapping for an error V1 has a counterpart for.
     fn described(err: &RuntimeError) -> V1ErrorInfo {
@@ -680,6 +700,44 @@ mod tests {
         );
     }
 
+    /// Both reentrancy errors reproduce V1's text: the module in long form for
+    /// the lock error, the struct in short form for the resource error.
+    #[test]
+    fn reentrancy_messages_match_v1() {
+        let module = || {
+            Box::new(ModuleId::new(
+                AccountAddress::from_hex_literal("0x42").unwrap(),
+                ident_str!("caller").to_owned(),
+            ))
+        };
+        let lock = described(&RuntimeError::ReentrancyUnderModuleLock {
+            module: module(),
+            function: ident_str!("do_something").to_owned(),
+        });
+        assert_eq!(lock.status, StatusCode::RUNTIME_DISPATCH_ERROR);
+        assert_eq!(
+            lock.message.text(),
+            Some(
+                "Reentrancy disallowed: reentering \
+                 `0000000000000000000000000000000000000000000000000000000000000042::caller` \
+                 via function `do_something` (module lock is active)"
+            )
+        );
+
+        let resource = described(&RuntimeError::ResourceAccessDuringReentrancy {
+            module: module(),
+            name: ident_str!("R").to_owned(),
+        });
+        assert_eq!(resource.status, StatusCode::RUNTIME_DISPATCH_ERROR);
+        assert_eq!(
+            resource.message.text(),
+            Some(
+                "Resource `0x42::caller::R` cannot be accessed because of active reentrancy \
+                 of defining module."
+            )
+        );
+    }
+
     /// Vector faults report through the sub-status and carry no message.
     #[test]
     fn vector_errors_describe_by_sub_status() {
@@ -831,6 +889,11 @@ mod tests {
                 error: PartialVMError::new(StatusCode::MISSING_DEPENDENCY).finish(Location::Script),
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
+            LoaderError::NativeShadowsMoveFunction {
+                address: AccountAddress::ONE,
+                module: "m".to_string(),
+                name: "f".to_string(),
+            },
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
         ];
         for err in &cases {
@@ -844,6 +907,7 @@ mod tests {
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
+                | LoaderError::NativeShadowsMoveFunction { .. }
                 | LoaderError::InvariantViolation(_) => {},
             }
             let status = match describe_loader_error(err) {
