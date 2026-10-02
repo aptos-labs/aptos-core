@@ -124,17 +124,19 @@ impl CliCommand<RotateSummary> for RotateKey {
                 ));
             };
 
-            // Verify that config exists by attempting to load it.
-            let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
-
-            // Verify that the new profile name does not already exist in the config.
-            if let Some(profiles) = config.profiles {
-                if profiles.contains_key(new_profile_name) {
-                    return Err(CliError::CommandArgumentError(format!(
-                        "Profile {} already exists",
-                        new_profile_name
-                    )));
-                };
+            // Verify that the new profile name does not already exist in the config,
+            // if a config exists. A missing config is fine: it will be created when
+            // the new profile is saved.
+            if CliConfig::config_exists(ConfigSearchMode::CurrentDirAndParents) {
+                let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+                if let Some(profiles) = config.profiles {
+                    if profiles.contains_key(new_profile_name) {
+                        return Err(CliError::CommandArgumentError(format!(
+                            "Profile {} already exists",
+                            new_profile_name
+                        )));
+                    };
+                }
             }
         };
 
@@ -292,20 +294,30 @@ impl CliCommand<RotateSummary> for RotateKey {
         // specified, then it will have already been error checked above.
         let new_profile_name = self.new_profile_options.save_to_profile.unwrap();
 
-        // If no config exists, then the error should've been caught earlier during the profile
-        // name verification step.
-        let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
+        // Load the config if it exists, otherwise start a fresh one. Saving below
+        // creates the config file.
+        let mut config = if CliConfig::config_exists(ConfigSearchMode::CurrentDirAndParents) {
+            CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?
+        } else {
+            CliConfig::default()
+        };
         if config.profiles.is_none() {
             config.profiles = Some(BTreeMap::new());
         }
 
-        // Create new config.
+        // Create new config, inheriting settings from the current profile when one
+        // exists rather than requiring it.
+        let base_profile = match self.txn_options.profile_options.profile() {
+            Ok(profile) => profile,
+            Err(CliError::ConfigNotFoundError(_)) => ProfileConfig::default(),
+            Err(err) => return Err(err),
+        };
         let mut new_profile_config = ProfileConfig {
             public_key: Some(new_public_key),
             account: Some(current_address),
             private_key: new_private_key,
             derivation_path: new_derivation_path,
-            ..self.txn_options.profile_options.profile()?
+            ..base_profile
         };
 
         if let Some(url) = self.txn_options.rest_options.url {
