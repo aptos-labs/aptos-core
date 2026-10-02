@@ -50,7 +50,7 @@ static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
 /// values are "true", "t", "1", "yes" or "y" (all case-insensitive). Any other
 /// values are considered false (including when the variable is not set).
 #[inline]
-fn is_env_variable_true(env_variable: &str) -> bool {
+pub fn is_env_variable_true(env_variable: &str) -> bool {
     match env::var(env_variable) {
         Ok(value) => {
             matches!(

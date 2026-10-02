@@ -23,21 +23,49 @@ on:
         type: boolean
         required: false
         default: false
-        description: "Skip checks - If checked, the release will skip version checks"
+        description: "Skip checks - If checked, the release will skip the version format and already-released checks (Cargo.toml must still match the release version, and re-releasing a version requires deleting its existing release and tag first)"
 
 permissions:
   contents: read
 
 
 jobs:
+  # Update checks compare the binary's embedded Cargo version with release tags.
+  # Resolves the one commit that every job builds and the release tags, and checks
+  # that it contains the version used in the release tag.
+  preflight:
+    name: "Check release version"
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.check.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_git_ref_override }}
+          sparse-checkout: crates/aptos/Cargo.toml
+          sparse-checkout-cone-mode: false
+      - name: Check crates/aptos/Cargo.toml version
+        id: check
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          VERSION=$(sed -n '/^\w*version = /p' crates/aptos/Cargo.toml | sed 's/^.*=[ ]*"//g' | sed 's/".*$//g')
+          if [[ "$VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "Wanted to release $RELEASE_VERSION, but crates/aptos/Cargo.toml at $SHA says $VERSION"
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
   # TODO: Deprecated, please use "Linux" instead as it's more straightforwardly named
   build-ubuntu22-binary:
     name: "Build Ubuntu 22.04 binary"
+    needs: preflight
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-22.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
@@ -50,11 +78,12 @@ jobs:
   # Add one for 24.04 to be clear
   build-ubuntu24-binary:
     name: "Build Ubuntu 24.04 binary"
+    needs: preflight
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Ubuntu-24.04" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
@@ -69,11 +98,12 @@ jobs:
   # TODO: Possibly find a way to support a baseline GLIBC rather than just whatever is on 22.04
   build-linux-binary:
     name: "Build Linux binary"
+    needs: preflight
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "true"
@@ -86,11 +116,12 @@ jobs:
   # Generic linux arm should be the older version, more likely compatible
   build-linux-arm-binary:
     name: "Build Linux ARM binary"
+    needs: preflight
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "Linux" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
@@ -102,11 +133,12 @@ jobs:
 
   build-macos-x86_64-binary:
     name: "Build MacOS x86_64 binary"
+    needs: preflight
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
@@ -118,11 +150,12 @@ jobs:
 
   build-macos-arm-binary:
     name: "Build MacOS ARM binary"
+    needs: preflight
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh "macOS" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false"
@@ -134,11 +167,12 @@ jobs:
 
   build-windows-binary:
     name: "Build Windows binary"
+    needs: preflight
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
+          ref: ${{ needs.preflight.outputs.sha }}
       # Ensure that long paths work
       - name: Ensure long paths work
         run: git config --global core.longpaths true
@@ -154,6 +188,7 @@ jobs:
   release-binaries:
     name: "Release binaries"
     needs:
+      - preflight
       - build-ubuntu22-binary
       - build-ubuntu24-binary
       - build-windows-binary
@@ -161,7 +196,7 @@ jobs:
       - build-linux-arm-binary
       - build-macos-arm-binary
       - build-macos-x86_64-binary
-    runs-on: 2cpu-gh-ubuntu24-x64
+    runs-on: ubuntu-24.04
     permissions:
       contents: "write"
       pull-requests: "read"
@@ -172,15 +207,36 @@ jobs:
         with:
           pattern: cli-builds-*
           merge-multiple: true
+      # With files attached, `gh release create` creates a draft, uploads the files, then
+      # publishes, so the tag and release only appear once every binary is available.
       - name: Create GitHub Release
-        uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # pin@v1.2.1
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
-          prerelease: false
-          title: "${{ format('Aptos CLI Release v{0}', inputs.release_version) }}"
-          files: |
-            aptos-cli-*.zip
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          SOURCE_SHA: ${{ needs.preflight.outputs.sha }}
+        run: |
+          TAG="aptos-cli-v$RELEASE_VERSION"
+          TAGS=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/aptos-cli-v" --jq '.[].ref | ltrimstr("refs/tags/")')
+          # GitHub ignores --target for an existing tag, so the release would attach to its commit.
+          if grep -Fxq "$TAG" <<< "$TAGS"; then
+            echo "Tag $TAG already exists. Delete it first: gh release delete $TAG --cleanup-tag, or git push --delete origin $TAG if it has no release."
+            exit 1
+          fi
+          # Release notes cover the changes since the highest stable CLI tag below this one, if any.
+          PREVIOUS_TAG=$({ grep -E '^aptos-cli-v[0-9]+\.[0-9]+\.[0-9]+$' <<< "$TAGS"; echo "$TAG"; } \
+            | sort -u -V | grep -Fx -B1 "$TAG" | grep -Fvx "$TAG" || true)
+          NOTES_START=()
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            NOTES_START=(--notes-start-tag "$PREVIOUS_TAG")
+          fi
+          gh release create "$TAG" aptos-cli-*.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "Aptos CLI Release v$RELEASE_VERSION" \
+            --generate-notes \
+            "${NOTES_START[@]}" \
+            --latest
 
   bump-homebrew-version-pr:
     name: "Make PR to bump version in Homebrew"

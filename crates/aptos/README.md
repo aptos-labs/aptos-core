@@ -24,6 +24,16 @@ aptos update aptos
 
 To build from this repository instead, see [Building from source](#building-from-source).
 
+### Update notices
+
+When both stdout and stderr are terminals and `CI` is not set to a true value (`true`, `t`, `1`,
+`yes` or `y`, in any case), the CLI checks for a newer release every 3 days, retrying once after a
+day if a check fails or does not complete, and prints a notice on stderr after the command's output. The
+check queries the Homebrew formula API (`formulae.brew.sh`) for Homebrew installs and the GitHub API
+(`api.github.com`) otherwise, and is skipped for source builds and OS package-manager installs. The
+next check time is stored in `~/.aptos/update_check.json`; until `~/.aptos` exists (for example
+after `aptos init`), no check runs. Set `APTOS_DISABLE_UPDATE_CHECK=1` to disable it.
+
 ## Getting started
 
 Initialize a profile, which stores a key pair and network settings in `.aptos/config.yaml` in the

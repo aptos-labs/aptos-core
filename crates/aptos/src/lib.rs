@@ -98,6 +98,17 @@ impl Tool {
             },
         }
     }
+
+    /// Returns whether this command allows an update notice after its output.
+    pub fn shows_update_notice(&self) -> bool {
+        use Tool::*;
+        match self {
+            // `update` reports versions itself; `workspace` uses stdio for its control protocol.
+            Update(_) | Workspace(_) => false,
+            Account(_) | Config(_) | Genesis(_) | Governance(_) | Info(_) | Init(_) | Key(_)
+            | Move(_) | Multisig(_) | Node(_) | Stake(_) => true,
+        }
+    }
 }
 
 /// Show build information about the CLI
@@ -121,4 +132,18 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
 fn verify_tool() {
     use clap::CommandFactory;
     Tool::command().debug_assert()
+}
+
+#[test]
+fn update_notice_is_skipped_for_update_commands() {
+    let shows_update_notice = |args: &[&str]| {
+        Tool::try_parse_from(args)
+            .expect("arguments should parse")
+            .shows_update_notice()
+    };
+    assert!(!shows_update_notice(&[
+        "aptos", "update", "aptos", "--check"
+    ]));
+    assert!(shows_update_notice(&["aptos", "info"]));
+    assert!(shows_update_notice(&["aptos", "move", "compile"]));
 }

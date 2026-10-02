@@ -26,6 +26,15 @@ Match the requested bump type to the version field and to how you group notes un
 2. When releasing, add `## [<new version>]` immediately below `# Unreleased` and move the bullets for this release under it (newest release section stays directly under `Unreleased`).
 3. If nothing is pending after a release, keep one placeholder bullet under `# Unreleased` (for example `- _No changes yet._`) so the section is clearly intentional, not an oversight.
 
+## Release tags
+
+Installed CLIs compare their version against the newest `aptos-cli-vX.Y.Z` tag that has a published GitHub release (not a pre-release, with assets), and tell users to upgrade within 3 days of it appearing. Homebrew installs compare against the Homebrew formula instead, so they are only told once the homebrew-core bump PR from the release workflow merges.
+
+- Only the "Release CLI" workflow should create `aptos-cli-v*` tags. The lookup tries just the 3 newest stable tags, so stray tags above the real release slow it down, and three of them break both the notice and `aptos update aptos`.
+- The workflow builds and tags one commit (`source_git_ref_override` if given, otherwise the dispatched commit), so `crates/aptos/Cargo.toml` at that commit must equal the release version (its `preflight` job enforces this). Binaries whose version differs from their tag are told to upgrade on every check.
+- The release job publishes only after every binary is uploaded, so a failed run leaves at most a draft release and no tag. Delete that draft before re-running.
+- The release job never replaces an existing release. To re-release a version, first run `gh release delete aptos-cli-vX.Y.Z --cleanup-tag`.
+
 ## Verification
 
 After edits, run:
