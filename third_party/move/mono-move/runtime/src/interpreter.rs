@@ -23,6 +23,7 @@ use crate::{
         write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
     },
     native_context::{LoaderAccess, ProductionNativeContext, ProductionNativeRegistry},
+    reentrancy::ReentrancyState,
     types::{
         ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
         META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
@@ -208,6 +209,41 @@ unsafe fn saved_caller_ptr(fp: *mut u8) -> *const Function {
     // SAFETY: the caller guarantees `fp` is a live frame pointer, so the
     // metadata below it is readable.
     unsafe { read_ptr(fp.sub(FRAME_METADATA_SIZE), META_SAVED_FUNC_PTR_OFFSET) as *const Function }
+}
+
+/// Frame metadata flag: the reentrancy checker recorded the call that pushed
+/// this frame, and this frame's `Return` pops that record. Packed into the top
+/// bit of the `saved_pc` word.
+/// Return PCs stay below `2^63`: they cannot exceed the instruction count,
+/// which is bounded by Rust's `isize::MAX` allocation limit. The root frame has
+/// no reentrancy record, so its flag is never set.
+const CHECKED_FRAME_FLAG: u64 = 1 << 63;
+
+/// Whether the reentrancy checker recorded the call that pushes a frame, so
+/// the callee's `Return` pops that record. Exempt and native calls are
+/// `Unchecked`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FrameFlag {
+    Checked,
+    Unchecked,
+}
+
+/// Returns the return address saved in the frame at `fp`, and its flag.
+///
+/// # Safety
+///
+/// `fp` must point at a live frame, whose metadata sits immediately below it.
+#[inline(always)]
+pub(crate) unsafe fn saved_return_pc(fp: *mut u8) -> (usize, FrameFlag) {
+    // SAFETY: the caller guarantees `fp` is a live frame pointer, so the
+    // metadata below it is readable.
+    let saved_pc = unsafe { read_u64(fp.sub(FRAME_METADATA_SIZE), META_SAVED_PC_OFFSET) };
+    let flag = if saved_pc & CHECKED_FRAME_FLAG == 0 {
+        FrameFlag::Unchecked
+    } else {
+        FrameFlag::Checked
+    };
+    ((saved_pc & !CHECKED_FRAME_FLAG) as usize, flag)
 }
 
 /// What a finished transaction leaves behind: the frozen heap, the
@@ -610,6 +646,27 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     err.at(location)
 }
 
+/// Attributes a rejected reentrant call to the module of the calling frame's
+/// caller, without a function or bytecode offset. Rejection requires
+/// cross-module reentry, so the calling frame has a caller.
+///
+/// # Safety
+///
+/// `fp` must point at a live frame, whose saved function pointer is null or
+/// names a live function.
+#[cold]
+unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalError {
+    // SAFETY: guaranteed by the caller.
+    match unsafe { saved_caller_ptr(fp).as_ref() } {
+        Some(caller) => {
+            err.at(
+                frame_module(caller.module_id).map_or(ErrorLocation::Script, ErrorLocation::Module)
+            )
+        },
+        None => err,
+    }
+}
+
 /// Returns the callers of the frame identified by `regs`, most recent caller
 /// first, each at its call instruction. Excludes the current frame, so the
 /// root frame has an empty trace.
@@ -648,7 +705,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
         };
         let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
         // The saved pc is the return address, one past the call micro-op.
-        let return_pc = unsafe { read_u64(meta, META_SAVED_PC_OFFSET) } as usize;
+        let (return_pc, _) = unsafe { saved_return_pc(fp) };
         let Some((function, offset)) = return_pc
             .checked_sub(1)
             .and_then(|call_pc| bytecode_origin(caller, call_pc))
@@ -706,6 +763,8 @@ pub struct InterpreterContext<'guard> {
     /// reads / pending writes, linear journal for rollback, and
     /// checkpoint stack.
     pub(crate) read_write_set: ResourceReadWriteSet,
+    /// Per-session reentrancy checker state.
+    reentrancy: ReentrancyState,
     rng: StdRng,
 }
 
@@ -792,6 +851,7 @@ impl<'guard> InterpreterContext<'guard> {
             heap,
             root_pool: RootPool::new(),
             read_write_set: ResourceReadWriteSet::new(),
+            reentrancy: ReentrancyState::new(),
             rng: StdRng::seed_from_u64(0),
         }
     }
@@ -976,6 +1036,7 @@ impl<'guard> InterpreterContext<'guard> {
             heap,
             root_pool,
             mut read_write_set,
+            reentrancy: _,
             rng: _,
         } = self;
 
@@ -1028,6 +1089,7 @@ impl<'guard> InterpreterContext<'guard> {
         let base = self.stack.as_ptr();
 
         self.registers = VMRegisters::new(&self.stack, func);
+        self.reentrancy.reset(func);
 
         // Sentinel metadata -- this is needed so we don't have to special-case
         // the root frame.
@@ -1748,7 +1810,7 @@ impl InterpreterContext<'_> {
                 // dispatch, and copy-and-patch JIT.
                 match *instr {
                     // ----- Control flow (set pc explicitly, return early) -----
-                    MicroOp::CallIndirect {
+                    MicroOp::CallByName {
                         module_id,
                         func_name,
                         ty_args,
@@ -1761,17 +1823,63 @@ impl InterpreterContext<'_> {
                         //   2. target = load_function(...)
                         //   3. IC insert target
                         //   4. Patching:
-                        //      If can patch caller, try it.
+                        //      If can patch caller, try it, keeping the
+                        //      checked or exempt form (see the "Calls and
+                        //      return" section of `MicroOp`).
                         // A load failure propagates unlocated and is attributed
                         // to this call instruction like any other failure. This
                         // is deliberately unlike V1, which names the caller's
                         // module without an offset.
                         let target = self.load_function(module_id, func_name, ty_args)?;
-                        self.call(func, regs, target)?;
+                        // Error precedence: reentrancy, stack overflow.
+                        //
+                        // TODO(cleanup): `enter` can move into `push_call_frame_at`
+                        // after the stack and gas checks, replacing the three
+                        // call-site enters. Stack overflow would then be reported
+                        // before reentrancy, unlike the V1 VM.
+                        //
+                        // TODO(metering): the callee's entry block is charged after
+                        // the reentrancy check. Determine whether out-of-gas or
+                        // dispatch errors should take precedence when call gas
+                        // is calibrated.
+                        self.reentrancy
+                            .enter(func.module_id, target, false)
+                            .map_err(|err| locate_rejected_call(err, fp))?;
+                        self.push_call_frame(func, regs, target, FrameFlag::Checked)?;
                         continue;
                     },
-                    MicroOp::CallDirect { ptr } => {
-                        self.call(func, regs, ptr.as_ref_unchecked())?;
+                    MicroOp::CallByNameExempt {
+                        module_id,
+                        func_name,
+                        ty_args,
+                    } => {
+                        let target = self.load_function(module_id, func_name, ty_args)?;
+                        debug_assert!(
+                            target.module_id == func.module_id && !target.has_module_lock,
+                            "CallByNameExempt at a call site the reentrancy checker must observe"
+                        );
+                        self.push_call_frame(func, regs, target, FrameFlag::Unchecked)?;
+                        continue;
+                    },
+                    MicroOp::CallByPtr { ptr } => {
+                        let callee = ptr.as_ref_unchecked();
+                        // Error precedence: reentrancy, stack overflow. The
+                        // metering note at `CallByName` applies here too.
+                        self.reentrancy
+                            .enter(func.module_id, callee, false)
+                            .map_err(|err| locate_rejected_call(err, fp))?;
+                        self.push_call_frame(func, regs, callee, FrameFlag::Checked)?;
+                        continue;
+                    },
+                    MicroOp::CallByPtrExempt { ptr } => {
+                        let callee = ptr.as_ref_unchecked();
+                        // Skips the reentrancy checker, so only a
+                        // `CallByNameExempt` site may be patched to it.
+                        debug_assert!(
+                            callee.module_id == func.module_id && !callee.has_module_lock,
+                            "CallByPtrExempt at a call site the reentrancy checker must observe"
+                        );
+                        self.push_call_frame(func, regs, callee, FrameFlag::Unchecked)?;
                         continue;
                     },
 
@@ -2037,12 +2145,15 @@ impl InterpreterContext<'_> {
                         if caller.is_null() {
                             break RuntimeStatus::Success;
                         }
+                        let (pc, flag) = saved_return_pc(fp);
+                        if flag == FrameFlag::Checked {
+                            self.reentrancy.exit(func)?;
+                        }
+                        let meta = fp.sub(FRAME_METADATA_SIZE);
                         // SAFETY: We have just checked that the saved function
                         // pointer is non-null.
                         regs.func = NonNull::new_unchecked(caller as *mut Function);
-
-                        let meta = fp.sub(FRAME_METADATA_SIZE);
-                        regs.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
+                        regs.pc = pc;
                         regs.fp = read_ptr(meta, META_SAVED_FP_OFFSET);
                         continue;
                     },
@@ -2603,7 +2714,13 @@ impl InterpreterContext<'_> {
                     MicroOp::IntNegate(ref op) => exec_int_negate(fp, op)?,
                     MicroOp::IntCast(ref op) => exec_int_cast(fp, op)?,
 
+                    // Each resource op checks reentrancy before touching storage,
+                    // so a rejected access reads nothing.
+                    //
+                    // TODO(metering): charge resource IO and execution gas after
+                    // the reentrancy check.
                     MicroOp::Exists { addr, ty, dst } => {
+                        self.reentrancy.check_resource_access(ty)?;
                         let address = read_account_address(fp, addr);
                         let group = self.resource_group_of(ty)?;
                         let exists = self.read_write_set.exists(
@@ -2615,6 +2732,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::BorrowGlobal { addr, ty, dst } => {
+                        self.reentrancy.check_resource_access(ty)?;
                         let address = read_account_address(fp, addr);
                         let group = self.resource_group_of(ty)?;
                         let ptr = self.read_write_set.borrow_global(
@@ -2628,6 +2746,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::BorrowGlobalMut { addr, ty, dst } => {
+                        self.reentrancy.check_resource_access(ty)?;
                         let address = read_account_address(fp, addr);
                         let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
@@ -2649,6 +2768,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::MoveFrom { addr, ty, dst } => {
+                        self.reentrancy.check_resource_access(ty)?;
                         let address = read_account_address(fp, addr);
                         let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
@@ -2673,6 +2793,7 @@ impl InterpreterContext<'_> {
                         ty,
                         src,
                     } => {
+                        self.reentrancy.check_resource_access(ty)?;
                         // Dereference the `&signer` to obtain the 32-byte publishing address
                         let (base, offset) = read_fat_ptr(fp, signer_ref);
                         let address = read_account_address(base, offset as usize);
@@ -3330,7 +3451,13 @@ impl InterpreterContext<'_> {
             // and unifies closure call codegen with direct call codegen.
             // See George's pseudocode in PR #19519 review thread.
 
-            // Stack-overflow check up front: `call_unchecked` skips the
+            // Every closure call is checked. Error precedence: reentrancy,
+            // stack overflow.
+            self.reentrancy
+                .enter(func.module_id, callee, true)
+                .map_err(|err| locate_rejected_call(err, fp))?;
+
+            // Stack-overflow check up front: `push_call_frame_at` skips the
             // check, so we do it here before writing the callee's
             // parameters at `new_fp`.
             let new_fp = self.check_stack_for_call(func, fp, callee.extended_frame_size)?;
@@ -3390,9 +3517,8 @@ impl InterpreterContext<'_> {
             }
 
             // Standard call protocol: save metadata and switch to the
-            // callee frame. Use the unchecked variant — we already
-            // validated the stack above.
-            self.call_unchecked(func, &mut regs, callee, new_fp)?;
+            // callee frame at the `new_fp` validated above.
+            self.push_call_frame_at(func, &mut regs, callee, new_fp, FrameFlag::Checked)?;
             Ok(regs)
         }
     }
@@ -3423,8 +3549,8 @@ impl InterpreterContext<'_> {
         Ok(unsafe { fp.add(caller_frame_size) })
     }
 
-    /// Implementation of call opcodes. Validates the stack first, then
-    /// hands off to [`Self::call_unchecked`].
+    /// Pushes `callee`'s frame for a call micro-op. Validates the stack first,
+    /// then hands off to [`Self::push_call_frame_at`].
     ///
     /// # Safety
     ///
@@ -3432,35 +3558,35 @@ impl InterpreterContext<'_> {
     /// caller's VM registers and `caller` be the currently executing
     /// function.
     #[inline(always)]
-    unsafe fn call(
+    unsafe fn push_call_frame(
         &mut self,
         caller: &Function,
         regs: &mut VMRegisters,
         callee: &Function,
+        flag: FrameFlag,
     ) -> VMResult<()> {
         let new_fp =
             unsafe { self.check_stack_for_call(caller, regs.fp, callee.extended_frame_size)? };
-        unsafe { self.call_unchecked(caller, regs, callee, new_fp) }
+        unsafe { self.push_call_frame_at(caller, regs, callee, new_fp, flag) }
     }
 
-    /// Perform the standard call protocol after the caller has already
-    /// computed `new_fp` (and ensured the callee's frame fits on the
-    /// stack). Used by `exec_call_closure`, which needs `new_fp` earlier
-    /// to safely write the callee's parameters before the call.
+    /// Pushes `callee`'s frame at `new_fp`, which the caller has already
+    /// computed (and ensured the callee's frame fits on the stack).
     ///
     /// # Safety
     ///
-    /// In addition to the contract on [`Self::call`], `new_fp` must equal
+    /// In addition to the contract on [`Self::push_call_frame`], `new_fp` must equal
     /// `regs.fp + caller.frame_size()`. The callee's full extended frame
     /// starting at `new_fp` must fit within the stack, as verified by
     /// [`Self::check_stack_for_call`].
     #[inline(always)]
-    unsafe fn call_unchecked(
+    unsafe fn push_call_frame_at(
         &mut self,
         caller: &Function,
         regs: &mut VMRegisters,
         callee: &Function,
         new_fp: *mut u8,
+        flag: FrameFlag,
     ) -> VMResult<()> {
         // Charge the callee's entry block before any of its instructions run.
         self.gas_meter.charge(callee.entry_gas)?;
@@ -3475,11 +3601,8 @@ impl InterpreterContext<'_> {
             }
             // Save the caller's registers into its frame metadata before
             // switching `regs` to the callee.
-            self.write_frame_metadata(caller, regs);
+            self.write_frame_metadata(caller, regs, flag);
         }
-        // TODO(correctness): track calls and returns for V1's resource-lock
-        // and `#[module_lock]` reentrancy checks. Without these checks, MonoMove
-        // can commit reentrant writes that V1 rejects with `RUNTIME_DISPATCH_ERROR`.
         regs.fp = new_fp;
         regs.pc = 0;
         regs.func = NonNull::from(callee);
@@ -3496,10 +3619,14 @@ impl InterpreterContext<'_> {
     /// `caller` must be the currently executing function and `regs` must carry
     /// the caller's VM registers.
     #[inline(always)]
-    unsafe fn write_frame_metadata(&self, caller: &Function, regs: &VMRegisters) {
+    unsafe fn write_frame_metadata(&self, caller: &Function, regs: &VMRegisters, flag: FrameFlag) {
         unsafe {
             let meta = regs.fp.add(caller.param_and_local_sizes_sum);
-            write_u64(meta, META_SAVED_PC_OFFSET, (regs.pc + 1) as u64);
+            let flag_bits = match flag {
+                FrameFlag::Checked => CHECKED_FRAME_FLAG,
+                FrameFlag::Unchecked => 0,
+            };
+            write_u64(meta, META_SAVED_PC_OFFSET, (regs.pc + 1) as u64 | flag_bits);
             write_ptr(meta, META_SAVED_FP_OFFSET, regs.fp);
             write_ptr(
                 meta,
@@ -3529,7 +3656,7 @@ impl InterpreterContext<'_> {
 
         // Write frame metadata just like normal calls. This is still needed
         // as some natives may want to inspect the call stack.
-        unsafe { self.write_frame_metadata(caller, &regs) };
+        unsafe { self.write_frame_metadata(caller, &regs, FrameFlag::Unchecked) };
 
         // Zero out return-slot bytes that extend past the args, for extra safety.
         if abi.total_frame_size() > abi.args_end() {

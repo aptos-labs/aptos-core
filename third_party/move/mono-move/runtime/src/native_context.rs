@@ -13,14 +13,12 @@ use crate::{
         alloc_obj, alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc,
         deserialize_or_gc, heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
+    interpreter::saved_return_pc,
     memory::{
-        read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len,
-        write_closure_func_ref_and_mask, write_enum_tag, write_ptr, write_u64, MemoryRegion,
+        read_descriptor, read_obj_size, read_ptr, read_vec_len, write_closure_func_ref_and_mask,
+        write_enum_tag, write_ptr, write_u64, MemoryRegion,
     },
-    types::{
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
-    },
+    types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
     interner::{view_module_id, InternedFunctionRef, InternedIdentifier, InternedModuleId},
@@ -38,7 +36,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::ExecutionGuard;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
-use shared_dsa::UnorderedMap;
+use shared_dsa::{UnorderedMap, UnorderedSet};
 use std::{
     cell::{Cell, RefMut, UnsafeCell},
     cmp::Ordering,
@@ -156,7 +154,7 @@ impl<'a> ProductionNativeContext<'a> {
     }
 
     /// The caller of the Move function invoking this native, and its saved return PC.
-    fn caller_frame(&self) -> Option<(&Function, u64)> {
+    fn caller_frame(&self) -> Option<(&Function, usize)> {
         // SAFETY: native dispatch and Move calls write these metadata fields. The native's
         // saved FP names its live caller frame, whose saved function is either null (entry)
         // or an arena-owned function that remains alive throughout execution.
@@ -168,7 +166,8 @@ impl<'a> ProductionNativeContext<'a> {
             let metadata = caller_fp.sub(FRAME_METADATA_SIZE);
             let caller =
                 (read_ptr(metadata, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()?;
-            Some((caller, read_u64(metadata, META_SAVED_PC_OFFSET)))
+            let (return_pc, _) = saved_return_pc(caller_fp);
+            Some((caller, return_pc))
         }
     }
 
@@ -432,12 +431,16 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn direct_caller_module(&self) -> Option<InternedModuleId> {
         let (caller, return_pc) = self.caller_frame()?;
-        let call_pc = usize::try_from(return_pc.checked_sub(1)?).ok()?;
-        // CallIndirect is a statically named Move call resolved by the loader; function
-        // values use CallClosure. The saved return PC is one past the call micro-op.
+        let call_pc = return_pc.checked_sub(1)?;
+        // Only statically named Move calls count; function values use
+        // `CallClosure`. The saved return PC is one past the calling op.
+        let call_op = caller.code.ops().get(call_pc)?;
         if matches!(
-            caller.code.ops().get(call_pc),
-            Some(MicroOp::CallDirect { .. } | MicroOp::CallIndirect { .. })
+            call_op,
+            MicroOp::CallByName { .. }
+                | MicroOp::CallByNameExempt { .. }
+                | MicroOp::CallByPtr { .. }
+                | MicroOp::CallByPtrExempt { .. }
         ) {
             Some(caller.module_id)
         } else {
@@ -1231,6 +1234,12 @@ pub struct ProductionNativeRegistry {
     funcs: Vec<ProductionNativeFunction>,
     names: Vec<NativeName>,
     by_name: UnorderedMap<NativeName, NativeIdx>,
+    /// `(address, module, function)` of every registered native, across all
+    /// dispatches.
+    // TODO(cleanup): only serves the loader's native-shadowing check. Remove it
+    // with `is_registered` once lowering chooses `CallNative` from the callee
+    // definition's `is_native` flag.
+    qualified_names: UnorderedSet<(AccountAddress, &'static str, &'static str)>,
 }
 
 impl ProductionNativeRegistry {
@@ -1244,6 +1253,7 @@ impl ProductionNativeRegistry {
         let mut funcs = Vec::with_capacity(entries.len());
         let mut names = Vec::with_capacity(entries.len());
         let mut by_name = UnorderedMap::with_capacity(entries.len());
+        let mut qualified_names = UnorderedSet::with_capacity(entries.len());
         for (position, (name, func)) in entries.into_iter().enumerate() {
             let idx = NativeIdx(position as u32);
             if by_name.insert(name, idx).is_some() {
@@ -1252,6 +1262,7 @@ impl ProductionNativeRegistry {
                     name.module, name.function
                 );
             }
+            qualified_names.insert((name.address, name.module, name.function));
             funcs.push(func);
             names.push(name);
         }
@@ -1259,6 +1270,7 @@ impl ProductionNativeRegistry {
             funcs,
             names,
             by_name,
+            qualified_names,
         }
     }
 
@@ -1268,6 +1280,7 @@ impl ProductionNativeRegistry {
             funcs: vec![],
             names: vec![],
             by_name: UnorderedMap::new(),
+            qualified_names: UnorderedSet::new(),
         }
     }
 
@@ -1331,5 +1344,14 @@ impl NativeResolver for ProductionNativeRegistry {
                 ..query
             })
             .copied()
+    }
+
+    fn is_registered(&self, module: InternedModuleId, function: InternedIdentifier) -> bool {
+        let module_id = view_module_id(module);
+        self.qualified_names.contains(&(
+            *module_id.address(),
+            view_name(module_id.name()),
+            view_name(function),
+        ))
     }
 }

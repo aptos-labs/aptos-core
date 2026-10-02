@@ -11,7 +11,7 @@ use super::ssa_function::SSAFunction;
 use crate::{
     stackless_exec_ir::{
         BasicBlock, BinaryOp, CallClosureData, CallData, CmpKind, HomeIndex, ImmValue, Instr,
-        InstrSeq, Label, PackClosureData, SsaSlot, UnaryOp,
+        InstrSeq, Label, PackClosureData, ReentrancyCheck, SsaSlot, UnaryOp,
     },
     validate::TranslationWitness,
 };
@@ -1073,6 +1073,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                         function_handle: *idx,
                         ty_args: ty::EMPTY_TYPE_LIST,
                         args,
+                        reentrancy_check: reentrancy_check(module, *idx),
                     }),
                 });
             },
@@ -1095,6 +1096,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                         function_handle: handle_idx,
                         ty_args,
                         args,
+                        reentrancy_check: reentrancy_check(module, handle_idx),
                     }),
                 });
             },
@@ -1348,6 +1350,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 // ================================================================================================
 // Type/field helpers
 // ================================================================================================
+
+/// Whether the reentrancy checker must observe a call through `handle_idx`.
+/// A same-module callee without `#[module_lock]` preserves module activity,
+/// module locks, and resource access, so its call can skip the check.
+fn reentrancy_check(module: &PreparedModule, handle_idx: FunctionHandleIndex) -> ReentrancyCheck {
+    if module.is_unlocked_local_callee(handle_idx) {
+        ReentrancyCheck::Exempt
+    } else {
+        ReentrancyCheck::Required
+    }
+}
 
 fn struct_field_count(module: &PreparedModule, idx: StructDefinitionIndex) -> usize {
     match &module.struct_defs[idx.0 as usize].field_information {

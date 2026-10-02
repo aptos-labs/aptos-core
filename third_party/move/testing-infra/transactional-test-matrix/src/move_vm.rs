@@ -263,20 +263,20 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "no type depth limit",
     ),
     MonoMoveDivergence::semantic(
-        "tests/re_entrancy/cyclic_calls.masm",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
-        "tests/re_entrancy/cyclic_closure_calls.masm",
-        "no reentrancy checks",
-    ),
-    MonoMoveDivergence::semantic(
         "tests/recursion/runtime_layout_deeply_nested.masm",
         "no value depth limit",
     ),
     MonoMoveDivergence::semantic(
         "tests/recursion/runtime_type_deeply_nested.masm",
         "no type depth limit",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/re_entrancy/move_from_while_borrowed.masm",
+        "no reference counts: V1 reports the dangling reference first",
+    ),
+    MonoMoveDivergence::semantic(
+        "tests/re_entrancy/storage_errors_under_reentry.masm",
+        "reentrancy checked before storage: V1 reports the storage failure first",
     ),
     MonoMoveDivergence::rendering(
         "tests/stack_size/unpack_variant_generic_mismatch.masm",

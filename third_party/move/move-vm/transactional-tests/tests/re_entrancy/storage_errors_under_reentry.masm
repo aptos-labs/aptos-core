@@ -1,0 +1,42 @@
+// A closure re-enters `a` to move a missing resource out and to publish an
+// existing one.
+
+//# publish --verbose
+module 0x66::a
+
+struct R has key
+    x: u64
+
+fun take(a: address) acquires R
+    move_loc a
+    move_from R
+    unpack R
+    pop
+    ret
+
+fun publish(s: signer)
+    borrow_loc s
+    ld_u64 1
+    pack R
+    move_to R
+    ret
+
+public fun move_from_missing()
+    ld_const<address> 0x77
+    pack_closure take, 0
+    call_closure<|address|>
+    ret
+
+public fun move_to_existing(s: signer)
+    borrow_loc s
+    ld_u64 1
+    pack R
+    move_to R
+    move_loc s
+    pack_closure publish, 0
+    call_closure<|signer|>
+    ret
+
+//# run 0x66::a::move_from_missing --verbose
+
+//# run 0x66::a::move_to_existing --signers 0x66 --verbose

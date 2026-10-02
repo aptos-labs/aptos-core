@@ -89,3 +89,7 @@ harness = false
 [[bench]]
 name = "int_arith_loop"
 harness = false
+
+[[bench]]
+name = "calls"
+harness = false
