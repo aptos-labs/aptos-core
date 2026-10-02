@@ -169,6 +169,20 @@ pub const INTRINSIC_FUN_MAP_SPEC_KEY_AT: &str = "map_spec_key_at";
 /// `[spec] fun map_rank<K, V>(m: Map<K, V>, k: K): num`
 pub const INTRINSIC_FUN_MAP_SPEC_RANK: &str = "map_spec_rank";
 
+/// The key at insertion position `i`, for `0 <= i < len`.
+///
+/// Declared *instead of* `map_spec_key_at` by a map whose entries stay in
+/// insertion order rather than key order. Two consequences: the enumeration is
+/// not asserted to ascend under `cmp::compare`, and equality compares positions,
+/// because content alone does not determine the order a program can observe.
+/// `[spec] fun map_spec_insertion_key_at<K, V>(m: Map<K, V>, i: num): K`
+pub const INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT: &str = "map_spec_insertion_key_at";
+
+/// The insertion position of contained key `k`; the inverse of
+/// `map_spec_insertion_key_at`
+/// `[spec] fun map_spec_insertion_rank<K, V>(m: Map<K, V>, k: K): num`
+pub const INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK: &str = "map_spec_insertion_rank";
+
 /// Get the number of entries in the map
 /// `[move] fun map_len<K, V>(m: &Map<K, V>): u64`
 pub const INTRINSIC_FUN_MAP_LEN: &str = "map_len";
@@ -469,6 +483,14 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_KEY_AT, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_RANK, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK,
+                IntrinsicFunDef::spec_fun(),
+            ),
             (
                 INTRINSIC_FUN_MAP_LEN,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_LEN), None),

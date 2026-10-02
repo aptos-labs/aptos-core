@@ -484,7 +484,15 @@ datatype {{Self}} {
 {%- else -%}
 {%- set VEQ = "GetTable(" ~ c1 ~ ", k) == GetTable(" ~ c2 ~ ", k)" -%}
 {%- endif -%}
-{%- if options.native_equality and not impl.has_ghost_carrier and not instance.1.has_ghost -%}
+{#- An insertion-ordered map adds position agreement: its order is not a
+    function of its content, so two maps holding the same entries are only
+    equal if a program observing the order cannot tell them apart. For a
+    key-ordered enumeration the positions follow from the content, so the
+    conjunct is omitted and the output stays byte-identical. -#}
+{#- `HAS_ENUM` is also required: it additionally excludes bv instances, for
+    which no enumeration is emitted and the conjunct would not resolve. -#}
+{%- set ORDER_EQ = impl.insertion_ordered and HAS_ENUM -%}
+{%- if options.native_equality and not impl.has_ghost_carrier and not instance.1.has_ghost and not ORDER_EQ -%}
 function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     t1 == t2
 }
@@ -493,7 +501,13 @@ function $IsEqual'{{Type}}{{S}}'(t1: {{Self}}, t2: {{Self}}): bool {
     LenTable({{c1}}) == LenTable({{c2}}) &&
     (forall k: int :: ContainsTable({{c1}}, k) <==> ContainsTable({{c2}}, k)) &&
     (forall k: int :: ContainsTable({{c1}}, k) ==> {{VEQ}}) &&
+{%- if ORDER_EQ %}
+    (forall k: int :: ContainsTable({{c2}}, k) ==> {{VEQ}}) &&
+    (forall i: int :: 0 <= i && i < LenTable({{c1}}) ==>
+        $IsEqual'{{instance.0.suffix}}'({{EKA}}({{c1}}, i), {{EKA}}({{c2}}, i)))
+{%- else %}
     (forall k: int :: ContainsTable({{c2}}, k) ==> {{VEQ}})
+{%- endif %}
 }
 {%- endif %}
 
@@ -1423,9 +1437,10 @@ axiom (forall t: {{Table}}, i: int :: {{"{"}}{{EKA}}(t, i)}
     {{EWF}}(t) && 0 <= i && i < LenTable(t) ==>
         ContainsTable(t, {{ENC}}({{EKA}}(t, i)))
         && {{ERK}}(t, {{ENC}}({{EKA}}(t, i))) == i);
-{%- if instance.0.cmp_available %}
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
 // Strictly ascending under `cmp::compare`; emitted only when a cmp
-// instantiation for the key type exists in this run.
+// instantiation for the key type exists in this run. Suppressed for an
+// insertion-ordered enumeration, where it would be false.
 axiom (forall t: {{Table}}, i: int, j: int :: {{"{"}}{{EKA}}(t, i), {{EKA}}(t, j)}
     {{EWF}}(t) && 0 <= i && i < j && j < LenTable(t) ==>
         $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, i), {{EKA}}(t, j)) == $1.cmp.Ordering.Less());
