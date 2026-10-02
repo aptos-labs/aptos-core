@@ -55,7 +55,7 @@ use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryRegion};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
-    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
+    FrameworkSymbols, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
     TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
@@ -345,7 +345,7 @@ impl GlobalContext {
     ) -> Self {
         let num_workers = num_workers.max(1);
 
-        Self {
+        let mut this = Self {
             ctx: Context {
                 identifiers: DashMap::default(),
                 module_ids: DashMap::default(),
@@ -360,14 +360,16 @@ impl GlobalContext {
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
-        }
+        };
+        install_framework_symbols(&mut this.ctx, &this.global_arena);
+        this
     }
 
     /// Makes `value` available to every execution guard through
     /// [`ExecutionGuard::preinstalled`]. This is for things a client needs in
-    /// every transaction but only has to prepare once per context, such as
-    /// interned framework symbols. A value of the same type replaces the
-    /// previous one, and all values are cleared when the arenas are reset.
+    /// every transaction but only has to prepare once per context. A value of
+    /// the same type replaces the previous one, and all values are cleared
+    /// when the arenas are reset.
     pub fn preinstall<T: Any + Send + Sync>(&mut self, value: T) {
         self.ctx
             .preinstalled
@@ -455,6 +457,10 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         unsafe {
             self.global_arena.reset_all_arenas_unchecked();
         }
+
+        // The interner started over, so the framework symbols are interned
+        // again. A client's preinstalled values are its own to redo.
+        install_framework_symbols(self.ctx, self.global_arena);
     }
 }
 
@@ -483,6 +489,13 @@ impl<'ctx> ExecutionGuard<'ctx> {
         ctx.preinstalled
             .get(&TypeId::of::<T>())
             .and_then(|value| value.downcast_ref::<T>())
+    }
+
+    /// The framework symbols the system refers to, interned once per context
+    /// rather than on every use.
+    pub fn framework_symbols(&self) -> &'ctx FrameworkSymbols {
+        self.preinstalled::<FrameworkSymbols>()
+            .expect("the framework symbols are installed at construction and after every reset")
     }
 
     /// Inserts a loaded module into the cache, keyed by its interned ID.
@@ -1042,6 +1055,20 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 // Only private APIs below.
 // ------------------------
 
+/// Interns the framework symbols the system refers to and preinstalls them
+/// for [`ExecutionGuard::framework_symbols`]. Runs at construction and after
+/// every reset, when the interner starts over, so no execution is in progress.
+fn install_framework_symbols(ctx: &mut Context, global_arena: &GlobalArenaPool) {
+    let symbols = FrameworkSymbols::new(&ExecutionGuard {
+        ctx,
+        global_arena: global_arena
+            .try_lock_arena(0)
+            .expect("no execution is in progress on a fresh or reset context"),
+    });
+    ctx.preinstalled
+        .insert(TypeId::of::<FrameworkSymbols>(), Box::new(symbols));
+}
+
 impl<'ctx> MaintenanceGuard<'ctx> {
     /// Clears all caches stored in [`Context`]. Triggered when the global
     /// arena requires a full reset (and thus, any cache that stores pointers
@@ -1077,7 +1104,8 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         function_refs.clear();
         descriptors.reset();
         layouts.reset();
-        // Dropped, not rebuilt: whoever resets preinstalls again.
+        // Dropped, not rebuilt: `reset_arena_pool` reinstalls the framework
+        // symbols, and whoever resets preinstalls its own values again.
         preinstalled.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no

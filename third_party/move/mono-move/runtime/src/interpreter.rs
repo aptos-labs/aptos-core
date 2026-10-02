@@ -32,7 +32,7 @@ use crate::{
     value_conv::{bcs::DeserializeHooks, rust::write_value},
 };
 use mono_move_core::{
-    captured_values_size, intern_type_tag,
+    captured_values_size,
     interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
     native::{
         NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus, RootPool,
@@ -58,10 +58,9 @@ use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     identifier::Identifier,
     int256::{I256, U256},
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::ModuleId,
     vm_status::AbortLocation,
 };
 use move_value_view::MoveValueView;
@@ -341,23 +340,11 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
         // Taken before the hooks below borrow the interpreter's fields.
         let (dst, ty) = self.next_slot()?;
 
-        // Materialize the `0x1::object::ObjectCore` type, which is needed for checking
-        // whether there is a valid object under a deserialized address.
-        //
-        // TODO(perf): interned once per untrusted argument, whether or not it
-        // holds an `Object`; cache it for the transaction.
+        // The `0x1::object::ObjectCore` type, needed for checking that a valid
+        // object sits under a deserialized address, is interned once per
+        // context.
         let guard = self.interp.loader.guard();
-        let object_core_tag = TypeTag::Struct(Box::new(StructTag {
-            address: AccountAddress::ONE,
-            module: ident_str!("object").to_owned(),
-            name: ident_str!("ObjectCore").to_owned(),
-            type_args: vec![],
-        }));
-        let object_core = intern_type_tag(&object_core_tag, guard).map_err(|err| {
-            VMInternalError::new(RuntimeError::InvariantViolation(
-                RuntimeInvariantViolation::Unreachable(err.to_string()),
-            ))
-        })?;
+        let object_core = guard.framework_symbols().object_core;
 
         // Set up the hooks required for validating certain value types, deserialized from
         // untrusted bytes.

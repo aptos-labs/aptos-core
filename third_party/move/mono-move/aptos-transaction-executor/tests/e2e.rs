@@ -84,8 +84,7 @@ fn execute_v2_with<S: StateView>(
     state: &S,
     run: impl for<'guard> FnOnce(&AptosTransactionExecutor<'guard>) -> TxnOutcome,
 ) -> TransactionOutput {
-    let mut global_ctx = GlobalContext::with_num_execution_workers(1);
-    AptosTransactionExecutor::preinstall(&mut global_ctx);
+    let global_ctx = GlobalContext::with_num_execution_workers(1);
     let guard = global_ctx
         .try_execution_context(0)
         .expect("execution context is available");
@@ -110,8 +109,7 @@ fn execute_v2_in<S: StateView>(
         &data_provider,
         &env,
         usage,
-    )
-    .expect("the context is prepared");
+    );
     let (output, _groups) = run(&executor)
         .materialize(
             guard,
@@ -132,8 +130,7 @@ fn execute_v2_sequence<S: StateView + Sync>(
     use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
 
     let state = DeltaStateStore::new_with_base(base);
-    let mut global_ctx = GlobalContext::with_num_execution_workers(1);
-    AptosTransactionExecutor::preinstall(&mut global_ctx);
+    let global_ctx = GlobalContext::with_num_execution_workers(1);
     let guard = global_ctx
         .try_execution_context(0)
         .expect("execution context is available");

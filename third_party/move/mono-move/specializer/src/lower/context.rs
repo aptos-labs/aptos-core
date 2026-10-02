@@ -32,9 +32,10 @@ use mono_move_core::{
         EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
-    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
-    Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule, SizedSlot,
-    SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset,
+    FrameworkSymbols, Function, Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule,
+    SizedSlot, SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE,
+    MAX_ALIGN,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -931,6 +932,9 @@ pub trait SpecializerContext: LayoutProvider {
     /// only variant bodies and the reserved reference and function layouts do.
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId>;
 
+    /// The framework symbols, interned once per context.
+    fn framework_symbols(&self) -> &FrameworkSymbols;
+
     /// Publishes the variant-body layouts of `enum_ty` (one per variant, in tag
     /// order), returning their ids. Idempotent on `enum_ty`: re-publishing the
     /// same enum reuses the cached ids rather than appending a fresh set.
@@ -1460,9 +1464,6 @@ fn chain_path_is_inline_contained<SlotForm>(
 /// argument reads both from storage.
 //
 // TODO(completeness): hard-coded here, like `resource_types_for_native`.
-//
-// TODO(perf): the interner lookups below probe a map on every generic nominal
-// reached, even though the type they name is static. Cache them once.
 fn discover_object_resource_types(
     ctx: &mut impl SpecializerContext,
     interner: &impl Interner,
@@ -1472,20 +1473,14 @@ fn discover_object_resource_types(
     visited: &mut UnorderedSet<InternedType>,
     descriptors: &mut LoweringDescriptors,
 ) -> VMResult<()> {
-    // Checked first so that nominals of any other arity cost no interner lookup.
     let &[resource] = view_type_list(ty_args) else {
         return Ok(());
     };
-    let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
-    if module_id != object || name != interner.identifier_of(ident_str!("Object")) {
+    let symbols = ctx.framework_symbols();
+    if module_id != symbols.object || name != symbols.object_struct {
         return Ok(());
     }
-    let object_core = interner.nominal_of(
-        object,
-        interner.identifier_of(ident_str!("ObjectCore")),
-        EMPTY_TYPE_LIST,
-    );
-    for ty in [resource, object_core] {
+    for ty in [resource, symbols.object_core] {
         discover_type_metadata(ctx, interner, ty, EMPTY_TYPE_LIST, visited, descriptors)?;
         publish_struct_descriptor_for(ctx, ty, &mut descriptors.structs)?;
     }
