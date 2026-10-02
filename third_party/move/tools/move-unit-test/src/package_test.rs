@@ -193,9 +193,8 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
         tracing::enable_tracing(Some(&trace_path.display().to_string()))
     }
 
-    // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
-    // the trace files.
-    if !unit_test_config
+    // Run the tests.
+    let tests_succeeded = unit_test_config
         .run_and_report_unit_tests(
             test_plan,
             Some(natives),
@@ -206,11 +205,7 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
             unit_test_config.fail_fast,
         )
         .unwrap()
-        .1
-    {
-        cleanup_trace();
-        return Ok(UnitTestResult::Failure);
-    }
+        .1;
 
     // Compute the coverage map. This will be used by other commands after this.
     if compute_coverage && !no_tests {
@@ -219,7 +214,11 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
         output_map_to_file(&coverage_map_path, &coverage_map)?;
     }
     cleanup_trace();
-    Ok(UnitTestResult::Success)
+    Ok(if tests_succeeded {
+        UnitTestResult::Success
+    } else {
+        UnitTestResult::Failure
+    })
 }
 
 impl From<UnitTestResult> for ExitStatus {
