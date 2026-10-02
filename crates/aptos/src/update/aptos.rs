@@ -120,20 +120,10 @@ impl BinaryUpdater for AptosUpdateTool {
         // for all major triples, so we have to generalize to one of the binaries we do
         // happen to build. We figure this out based on what system the CLI was built on.
         let build_info = cli_build_information();
-        let target = match build_info.get(BUILD_OS).context("Failed to determine build info of current CLI")?.as_str() {
-            "linux-x86_64" => "Linux-x86_64",
-            "linux-aarch64" => "Linux-aarch64",
-            "macos-aarch64" => "macOS-arm64",
-            "windows-x86_64" => "Windows-x86_64",
-            // Intel Mac binaries are no longer published. Future macOS CLI
-            // releases support Apple Silicon (arm64) only.
-            "macos-x86_64" => {
-                return Err(anyhow!(
-                    "macOS x86_64 (Intel) is no longer supported. Future Aptos CLI macOS releases are Apple Silicon (arm64) only"
-                ));
-            },
-            wildcard => return Err(anyhow!("Self-updating is not supported on your OS ({}) right now, please download the binary manually", wildcard)),
-        };
+        let build_os = build_info
+            .get(BUILD_OS)
+            .context("Failed to determine build info of current CLI")?;
+        let target = release_target_for_build_os(build_os)?;
 
         let current_version = match &info.current_version {
             Some(version) => version,
@@ -152,6 +142,26 @@ impl BinaryUpdater for AptosUpdateTool {
             .no_confirm(self.prompt_options.assume_yes)
             .build()
             .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
+    }
+}
+
+/// Map the CLI build-info OS string to a published release archive suffix.
+///
+/// macOS x86_64 is intentionally rejected: future CLI releases publish Apple
+/// Silicon (arm64) only.
+fn release_target_for_build_os(build_os: &str) -> Result<&'static str> {
+    match build_os {
+        "linux-x86_64" => Ok("Linux-x86_64"),
+        "linux-aarch64" => Ok("Linux-aarch64"),
+        "macos-aarch64" => Ok("macOS-arm64"),
+        "windows-x86_64" => Ok("Windows-x86_64"),
+        "macos-x86_64" => Err(anyhow!(
+            "macOS x86_64 (Intel) is no longer supported. Future Aptos CLI macOS releases are Apple Silicon (arm64) only"
+        )),
+        wildcard => Err(anyhow!(
+            "Self-updating is not supported on your OS ({}) right now, please download the binary manually",
+            wildcard
+        )),
     }
 }
 
@@ -187,5 +197,32 @@ impl CliCommand<String> for AptosUpdateTool {
 
     async fn execute(self) -> CliTypedResult<String> {
         update_binary(self).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::release_target_for_build_os;
+
+    #[test]
+    fn macos_arm64_still_maps_to_the_published_archive() {
+        assert_eq!(
+            release_target_for_build_os("macos-aarch64").unwrap(),
+            "macOS-arm64"
+        );
+    }
+
+    #[test]
+    fn macos_x86_64_is_no_longer_a_published_target() {
+        let err = release_target_for_build_os("macos-x86_64").unwrap_err();
+        let message = format!("{:#}", err);
+        assert!(
+            message.contains("x86_64"),
+            "expected the Intel macOS error to name x86_64, got: {message}"
+        );
+        assert!(
+            message.contains("arm64"),
+            "expected the Intel macOS error to point at arm64, got: {message}"
+        );
     }
 }
