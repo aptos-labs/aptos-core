@@ -145,10 +145,10 @@ async fn network_status(
     check_network(request.network_identifier, &server_context)?;
     let chain_id = server_context.chain_id;
     let rest_client = server_context.rest_client()?;
-    let block_cache = server_context.block_cache()?;
+    let block_retriever = server_context.block_retriever()?;
 
     // Retrieve the genesis block info
-    let genesis_block_identifier = block_cache
+    let genesis_block_identifier = block_retriever
         .get_block_info_by_height(0, chain_id)
         .await?
         .block_id;
@@ -158,13 +158,13 @@ async fn network_status(
     let state = response.state();
 
     // Get the oldest block
-    let oldest_block_identifier = block_cache
+    let oldest_block_identifier = block_retriever
         .get_block_info_by_height(state.oldest_block_height, chain_id)
         .await?
         .block_id;
 
     // Get the latest block
-    let current_block = block_cache
+    let current_block = block_retriever
         .get_block_info_by_height(state.block_height, chain_id)
         .await?;
     let current_block_identifier = current_block.block_id;

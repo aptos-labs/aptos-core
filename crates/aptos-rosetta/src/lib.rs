@@ -30,7 +30,10 @@ mod network;
 pub mod client;
 pub mod common;
 pub mod error;
+pub mod node_client;
 pub mod types;
+
+use crate::node_client::{NodeClient, RestNodeClient};
 
 #[cfg(test)]
 mod test;
@@ -41,21 +44,22 @@ pub const ROSETTA_VERSION: &str = "1.4.12";
 /// Rosetta API context for use on all APIs
 #[derive(Clone, Debug)]
 pub struct RosettaContext {
-    /// A rest client to connect to a fullnode
-    rest_client: Option<Arc<aptos_rest_client::Client>>,
+    /// A node client to read chain state (production wraps the REST client;
+    /// tests inject a mock).  `None` means offline mode.
+    rest_client: Option<Arc<dyn NodeClient>>,
     /// ChainId of the chain to connect to
     pub chain_id: ChainId,
-    /// Block index cache
-    pub block_cache: Option<Arc<BlockRetriever>>,
+    /// Fetches blocks by height from the node (`None` in offline mode).
+    pub block_retriever: Option<Arc<BlockRetriever>>,
     /// Set of supported currencies
     pub currencies: HashSet<Currency>,
 }
 
 impl RosettaContext {
     pub async fn new(
-        rest_client: Option<Arc<aptos_rest_client::Client>>,
+        rest_client: Option<Arc<dyn NodeClient>>,
         chain_id: ChainId,
-        block_cache: Option<Arc<BlockRetriever>>,
+        block_retriever: Option<Arc<BlockRetriever>>,
         mut currencies: HashSet<Currency>,
     ) -> Self {
         // Always add APT
@@ -71,12 +75,12 @@ impl RosettaContext {
         RosettaContext {
             rest_client,
             chain_id,
-            block_cache,
+            block_retriever,
             currencies,
         }
     }
 
-    fn rest_client(&self) -> ApiResult<Arc<aptos_rest_client::Client>> {
+    fn rest_client(&self) -> ApiResult<Arc<dyn NodeClient>> {
         if let Some(ref client) = self.rest_client {
             Ok(client.clone())
         } else {
@@ -84,9 +88,9 @@ impl RosettaContext {
         }
     }
 
-    fn block_cache(&self) -> ApiResult<Arc<BlockRetriever>> {
-        if let Some(ref block_cache) = self.block_cache {
-            Ok(block_cache.clone())
+    fn block_retriever(&self) -> ApiResult<Arc<BlockRetriever>> {
+        if let Some(ref block_retriever) = self.block_retriever {
+            Ok(block_retriever.clone())
         } else {
             Err(ApiError::NodeIsOffline)
         }
@@ -137,21 +141,22 @@ pub async fn bootstrap_async(
 
     let api = WebServer::from(api_config.clone());
     let handle = tokio::spawn(async move {
-        // If it's Online mode, add the block cache
-        let rest_client = rest_client.map(Arc::new);
+        // If it's Online mode, wrap the REST client in the NodeClient seam and
+        // build the block retriever.
+        let node_client: Option<Arc<dyn NodeClient>> =
+            rest_client.map(|client| Arc::new(RestNodeClient::new(client)) as Arc<dyn NodeClient>);
 
-        // TODO: The BlockRetriever has no cache, and should probably be renamed from block_cache
-        let block_cache = rest_client.as_ref().map(|rest_client| {
+        let block_retriever = node_client.as_ref().map(|node_client| {
             Arc::new(BlockRetriever::new(
                 api_config.max_transactions_page_size,
-                rest_client.clone(),
+                node_client.clone(),
             ))
         });
 
         let context = RosettaContext::new(
-            rest_client.clone(),
+            node_client.clone(),
             chain_id,
-            block_cache,
+            block_retriever,
             supported_currencies,
         )
         .await;
