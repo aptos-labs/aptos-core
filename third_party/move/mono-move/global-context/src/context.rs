@@ -54,9 +54,10 @@ use anyhow::Result;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryRegion};
 use mono_move_core::{
-    reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
-    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    reserved_layout_id, reserved_layouts, ConstantPoolIndex, ConstantPoolProvider, DescriptorId,
+    DescriptorProvider, FrameOffset, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId,
+    ObjectDescriptor, TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
@@ -826,6 +827,20 @@ impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
 
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.layout_id_for(ty)
+    }
+}
+
+impl<'ctx> ConstantPoolProvider for ExecutionGuard<'ctx> {
+    /// Resolves constants of cached modules. Scripts are cached by hash, not
+    /// module id, so their constants are unknown here; the loader binds the
+    /// script module directly when it verifies a lowering.
+    fn constant_type(
+        &self,
+        module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> Option<InternedType> {
+        let module = self.get_module(self.arena_ref_for_module_id(module_id))?;
+        module.ir().module.constant_type(idx)
     }
 }
 

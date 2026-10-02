@@ -380,6 +380,12 @@ impl PreparedModule {
         self.constant_types[idx.0 as usize]
     }
 
+    /// Interned type of the constant at `idx`, or `None` if `idx` is out of
+    /// range of the constant pool.
+    pub fn constant_type(&self, idx: ConstantPoolIndex) -> Option<InternedType> {
+        self.constant_types.get(idx.0 as usize).copied()
+    }
+
     /// Raw (BCS-encoded) bytes of the constant at `idx`.
     pub fn constant_data_at(&self, idx: ConstantPoolIndex) -> &[u8] {
         &self.module.constant_pool()[idx.0 as usize].data
