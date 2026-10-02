@@ -47,7 +47,12 @@ use move_core_types::{
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fmt::Formatter,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+};
 
 /// Tool for on-chain governance
 ///
@@ -457,8 +462,13 @@ fn execution_payload(bytecode: Vec<u8>, proposal_id: u64) -> TransactionPayload 
 
 /// Retrieve the Metadata from the given URL
 async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
+    // A proposal's metadata_location is attacker-controlled on-chain data, and
+    // `aptos governance view-proposal` fetches it from the verifier's host. Guard
+    // the request against SSRF before it is issued.
+    ensure_fetchable_metadata_url(metadata_url).await?;
     let client = reqwest::ClientBuilder::default()
         .tls_built_in_root_certs(true)
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|err| CliError::UnexpectedError(format!("Failed to build HTTP client {}", err)))?;
     client
@@ -480,6 +490,83 @@ async fn get_metadata_from_url(metadata_url: &Url) -> CliTypedResult<Vec<u8>> {
                 metadata_url, err
             ))
         })
+}
+
+/// Reject metadata URLs that could turn the verifier's host into an SSRF proxy:
+/// only http(s) is fetched, and the host must not resolve to any
+/// non-globally-routable address (loopback, private, link-local, etc.). Redirects
+/// are disabled by the caller so a public host cannot bounce to an internal one.
+async fn ensure_fetchable_metadata_url(url: &Url) -> CliTypedResult<()> {
+    match url.scheme() {
+        "http" | "https" => {},
+        scheme => {
+            return Err(CliError::CommandArgumentError(format!(
+                "Refusing to fetch metadata url with unsupported scheme {:?}",
+                scheme
+            )))
+        },
+    }
+
+    let host = url
+        .host_str()
+        .ok_or_else(|| CliError::CommandArgumentError("Metadata url has no host".to_string()))?;
+    let port = url.port_or_known_default().unwrap_or(0);
+
+    let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to resolve metadata url host {}: {}",
+                host, err
+            ))
+        })?
+        .collect();
+
+    if addrs.is_empty() {
+        return Err(CliError::CommandArgumentError(format!(
+            "Metadata url host {} did not resolve to any address",
+            host
+        )));
+    }
+    if let Some(addr) = addrs.iter().find(|addr| !ip_is_global(&addr.ip())) {
+        return Err(CliError::CommandArgumentError(format!(
+            "Refusing to fetch metadata url resolving to non-global address {}",
+            addr.ip()
+        )));
+    }
+    Ok(())
+}
+
+/// Whether an IP address is globally routable, i.e. not loopback, private,
+/// link-local, unique-local, shared (CGNAT) or otherwise non-public. This is a
+/// conservative local stand-in for the still-unstable `IpAddr::is_global`.
+fn ip_is_global(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let [a, b, _, _] = v4.octets();
+            !(v4.is_unspecified()
+                || v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_documentation()
+                || v4.is_multicast()
+                || a == 0
+                || (a == 100 && (b & 0xc0) == 64) // 100.64.0.0/10 (CGNAT)
+                || (a == 192 && b == 0)) // 192.0.0.0/24 (IETF protocol assignments)
+        },
+        IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return ip_is_global(&IpAddr::V4(v4));
+            }
+            let first = v6.segments()[0];
+            !(v6.is_unspecified()
+                || v6.is_loopback()
+                || v6.is_multicast()
+                || (first & 0xfe00) == 0xfc00 // fc00::/7 (unique local)
+                || (first & 0xffc0) == 0xfe80) // fe80::/10 (link local)
+        },
+    }
 }
 
 /// Extract the proposal id from the events of a proposal creation transaction.
@@ -1145,4 +1232,75 @@ struct JsonMetadata {
 struct JsonMetadataPair {
     key: String,
     value: HexEncodedBytes,
+}
+
+#[cfg(test)]
+mod metadata_url_tests {
+    use super::{ensure_fetchable_metadata_url, ip_is_global};
+    use reqwest::Url;
+    use std::net::IpAddr;
+
+    fn ip(s: &str) -> IpAddr {
+        s.parse().unwrap()
+    }
+
+    #[test]
+    fn classifies_non_global_addresses() {
+        for s in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.169.254", // cloud metadata endpoint
+            "100.64.0.1",      // CGNAT
+            "0.0.0.0",
+            "::1",
+            "fc00::1",
+            "fe80::1",
+            "::ffff:127.0.0.1", // IPv4-mapped loopback
+        ] {
+            assert!(!ip_is_global(&ip(s)), "{} should be non-global", s);
+        }
+    }
+
+    #[test]
+    fn classifies_global_addresses() {
+        for s in [
+            "1.1.1.1",
+            "8.8.8.8",
+            "93.184.216.34",
+            "2606:4700:4700::1111",
+        ] {
+            assert!(ip_is_global(&ip(s)), "{} should be global", s);
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_unsupported_scheme() {
+        let url = Url::parse("file:///etc/passwd").unwrap();
+        assert!(ensure_fetchable_metadata_url(&url).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn rejects_internal_hosts() {
+        for s in [
+            "http://127.0.0.1/meta",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://10.0.0.5:8080/x",
+            "https://[::1]/x",
+        ] {
+            let url = Url::parse(s).unwrap();
+            assert!(
+                ensure_fetchable_metadata_url(&url).await.is_err(),
+                "{} should be rejected",
+                s
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn allows_public_host() {
+        let url = Url::parse("https://1.1.1.1/metadata").unwrap();
+        assert!(ensure_fetchable_metadata_url(&url).await.is_ok());
+    }
 }
