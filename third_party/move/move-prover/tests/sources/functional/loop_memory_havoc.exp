@@ -269,6 +269,40 @@ error: precondition does not hold at this call
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
     =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
+    =         a = <redacted>
+    =         n = <redacted>
+    =         depth = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:415: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:420: rec_bump
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:421: rec_bump
+    =     enter loop, variable(s) $t4 havocked and reassigned
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
+
+error: precondition does not hold at this call
+    ┌─ tests/sources/functional/loop_memory_havoc.move:427:9
+    │
+427 │         requires exists<R>(a);
+    │         ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
+    =         a = <redacted>
+    =         n = <redacted>
+    =         depth = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:415: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:420: rec_bump
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:421: rec_bump
+    =     enter loop, variable(s) $t4 havocked and reassigned
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
 
 error: post-condition does not hold
     ┌─ tests/sources/functional/loop_memory_havoc.move:428:9

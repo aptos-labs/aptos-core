@@ -240,22 +240,22 @@ fun Test::call_generic_frame($t0|addr: address, $t1|other: address) {
 fun Test::call_without_frame($t0|addr: address, $t1|value: u64) {
      var $t2: bool
      var $t3: num
-  0: assume exists<0x42::Test::R>($t0)
-  1: assume exists<0x42::Test::R>($t0)
-  2: opaque begin: Test::set_without_frame($t0, $t1)
-  3: $t2 := havoc[val]()
-  4: if ($t2) goto 5 else goto 8
-  5: label L3
-  6: trace_abort($t3)
-  7: goto 14
-  8: label L2
-  9: havoc_global<0x42::Test::R>()
- 10: assume forall $rsc: 0x42::Test::R: ResourceDomain<0x42::Test::R>(): WellFormed($rsc)
- 11: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1)
- 12: opaque end: Test::set_without_frame($t0, $t1)
- 13: return ()
- 14: label L1
- 15: abort($t3)
+     # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:37:9+25
+  0: assert exists<0x42::Test::R>($t0)
+  1: opaque begin: Test::set_without_frame($t0, $t1)
+  2: $t2 := havoc[val]()
+  3: if ($t2) goto 4 else goto 7
+  4: label L3
+  5: trace_abort($t3)
+  6: goto 13
+  7: label L2
+  8: havoc_global<0x42::Test::R>()
+  9: assume forall $rsc: 0x42::Test::R: ResourceDomain<0x42::Test::R>(): WellFormed($rsc)
+ 10: assume Eq<u64>(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), $t1)
+ 11: opaque end: Test::set_without_frame($t0, $t1)
+ 12: return ()
+ 13: label L1
+ 14: abort($t3)
 }
 
 
@@ -297,26 +297,25 @@ fun Test::get_and_incr($t0|addr: address): u64 {
      var $t8: u64
      var $t9: u64
      var $t10: &mut u64
-  0: assume Neq<address>($t0, 0x0)
-  1: $t2 := exists<0x42::Test::R>($t0)
-  2: if ($t2) goto 7 else goto 3
-  3: label L1
-  4: $t3 := 33
-  5: $t4 := move($t3)
-  6: goto 18
-  7: label L0
-  8: $t5 := borrow_global<0x42::Test::R>($t0) on_abort goto 18 with $t4
-  9: $t6 := get_field<0x42::Test::R>.v($t5)
- 10: $t7 := get_field<0x42::Test::R>.v($t5)
- 11: $t8 := 1
- 12: $t9 := +($t7, $t8) on_abort goto 18 with $t4
- 13: $t10 := borrow_field<0x42::Test::R>.v($t5)
- 14: write_ref($t10, $t9)
- 15: write_back[Reference($t5).v (u64)]($t10)
- 16: write_back[0x42::Test::R@]($t5)
- 17: return $t6
- 18: label L2
- 19: abort($t4)
+  0: $t2 := exists<0x42::Test::R>($t0)
+  1: if ($t2) goto 6 else goto 2
+  2: label L1
+  3: $t3 := 33
+  4: $t4 := move($t3)
+  5: goto 17
+  6: label L0
+  7: $t5 := borrow_global<0x42::Test::R>($t0) on_abort goto 17 with $t4
+  8: $t6 := get_field<0x42::Test::R>.v($t5)
+  9: $t7 := get_field<0x42::Test::R>.v($t5)
+ 10: $t8 := 1
+ 11: $t9 := +($t7, $t8) on_abort goto 17 with $t4
+ 12: $t10 := borrow_field<0x42::Test::R>.v($t5)
+ 13: write_ref($t10, $t9)
+ 14: write_back[Reference($t5).v (u64)]($t10)
+ 15: write_back[0x42::Test::R@]($t5)
+ 16: return $t6
+ 17: label L2
+ 18: abort($t4)
 }
 
 
@@ -381,7 +380,8 @@ fun Test::incr_twice() {
      var $t5: u64
      var $t6: bool
   0: $t0 := 0x1
-  1: assume Neq<address>($t0, 0x0)
+     # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
+  1: assert Neq<address>($t0, 0x0)
   2: $t1 := opaque begin: Test::get_and_incr($t0)
   3: @9 := save_mem(Test::R)
   4: assume Identical($t2, Or(Not(exists<0x42::Test::R>($t0)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t0)), 1), 18446744073709551615)))
@@ -398,7 +398,8 @@ fun Test::incr_twice() {
  15: $t1 := opaque end: Test::get_and_incr($t0)
  16: drop($t1)
  17: $t4 := 0x1
- 18: assume Neq<address>($t4, 0x0)
+     # VC: precondition does not hold at this call at tests/spec_instrumentation/opaque_call.move:15:6+22
+ 18: assert Neq<address>($t4, 0x0)
  19: $t5 := opaque begin: Test::get_and_incr($t4)
  20: @11 := save_mem(Test::R)
  21: assume Identical($t6, Or(Not(exists<0x42::Test::R>($t4)), Ge(Add(select Test::R.v<0x42::Test::R>(global<0x42::Test::R>($t4)), 1), 18446744073709551615)))
@@ -543,15 +544,14 @@ fun Test::set_without_frame($t0|addr: address, $t1|value: u64) {
      var $t3: &mut 0x42::Test::R
      var $t4: num
      var $t5: &mut u64
-  0: assume exists<0x42::Test::R>($t0)
-  1: $t3 := borrow_global<0x42::Test::R>($t0) on_abort goto 7 with $t4
-  2: $t5 := borrow_field<0x42::Test::R>.v($t3)
-  3: write_ref($t5, $t1)
-  4: write_back[Reference($t3).v (u64)]($t5)
-  5: write_back[0x42::Test::R@]($t3)
-  6: return ()
-  7: label L1
-  8: abort($t4)
+  0: $t3 := borrow_global<0x42::Test::R>($t0) on_abort goto 6 with $t4
+  1: $t5 := borrow_field<0x42::Test::R>.v($t3)
+  2: write_ref($t5, $t1)
+  3: write_back[Reference($t3).v (u64)]($t5)
+  4: write_back[0x42::Test::R@]($t3)
+  5: return ()
+  6: label L1
+  7: abort($t4)
 }
 
 

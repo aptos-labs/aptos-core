@@ -1,0 +1,52 @@
+Move prover returns: exiting with verification errors
+error: precondition does not hold at this call
+   ┌─ tests/sources/regression/inlined_requires_asserted.move:14:9
+   │
+14 │         requires x < 10;
+   │         ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/inlined_requires_asserted.move:27: pub_entry
+   =     at tests/sources/regression/inlined_requires_asserted.move:20: f
+   =     at tests/sources/regression/inlined_requires_asserted.move:14: g (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/regression/inlined_requires_asserted.move:39:9
+   │
+39 │         requires x < 10;
+   │         ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/inlined_requires_asserted.move:52: pub_entry
+   =     at tests/sources/regression/inlined_requires_asserted.move:45: f
+   =     at tests/sources/regression/inlined_requires_asserted.move:39: g (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/regression/inlined_requires_asserted.move:39:9
+   │
+39 │         requires x < 10;
+   │         ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/inlined_requires_asserted.move:59: direct
+   =     at tests/sources/regression/inlined_requires_asserted.move:39: g (spec)
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/regression/inlined_requires_asserted.move:72:9
+   │
+72 │         requires x < 10;
+   │         ^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/inlined_requires_asserted.move:85: pub_entry
+   =     at tests/sources/regression/inlined_requires_asserted.move:78: f
+   =     at tests/sources/regression/inlined_requires_asserted.move:72: g (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/inlined_requires_asserted.move:131:9
+    │
+131 │         ensures result == 0;
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/inlined_requires_asserted.move:128: pub_entry
+    =     at tests/sources/regression/inlined_requires_asserted.move:118: g
+    =         x = <redacted>
+    =     at tests/sources/regression/inlined_requires_asserted.move:119: g
+    =         result = <redacted>
+    =     at tests/sources/regression/inlined_requires_asserted.move:131: pub_entry (spec)
