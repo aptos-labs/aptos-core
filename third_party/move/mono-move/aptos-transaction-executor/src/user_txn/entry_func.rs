@@ -3,24 +3,25 @@
 
 //! Running an entry-function payload.
 
-use super::args::{check_callable_signature, check_no_return_values, place_user_txn_args};
+use super::args::run_user_txn_call;
 use crate::errors::{InvalidArguments, MoveExecutionFailure};
 use mono_move_core::{
     interner::InternedIdentifier, types::InternedTypeList, Interner, PreparedModule,
 };
 use mono_move_global_context::{ExecutionGuard, LoadedModule};
 use mono_move_natives::RandomnessContext;
-use mono_move_runtime::{CompletedCall, InterpreterContext, RuntimeStatus};
+use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
-/// Checks that a user transaction may call the given function based on info from its definition.
+/// Checks what sets an entry function apart from a script's `main`, based on
+/// info from its definition. The checks the two share follow in
+/// [`run_user_txn_call`].
 /// - It must not be a native.
 /// - It must be an entry function.
-/// - It must not return values.
 fn check_callable_definition(
     module: &PreparedModule,
     def_idx: FunctionDefinitionIndex,
@@ -32,7 +33,7 @@ fn check_callable_definition(
     if !def.is_entry {
         return Err(InvalidArguments::NotEntryFunction);
     }
-    check_no_return_values(module, def_idx)
+    Ok(())
 }
 
 /// Whether the function `def_idx` of `module`, named `name`, may call the
@@ -79,18 +80,14 @@ pub(crate) fn call_entry_function<'a>(
     let func = interp
         .load_function(module_id, function_name, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    let num_signer_params = check_callable_signature(guard, interp, &func.param_tys)?;
-    let mut call = interp
-        .build_call(func)
-        .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(
-        &mut call,
-        num_signer_params,
+    run_user_txn_call(
+        guard,
+        interp,
+        module,
+        function_name,
+        func,
         sender,
         secondary_signers,
         args,
-    )?;
-    call.run()
-        .map(CompletedCall::into_status)
-        .map_err(|err| MoveExecutionFailure::RuntimeError(err.into_error()))
+    )
 }

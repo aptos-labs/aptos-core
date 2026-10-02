@@ -7,30 +7,59 @@
 
 use crate::errors::{invariant_violation, InvalidArguments, MoveExecutionFailure};
 use mono_move_core::{
-    interner::{view_module_id, InternedIdentifier, InternedModuleId},
+    interner::{view_module_id, InternedIdentifier},
     types::{
         is_signer_or_signer_immut_ref, view_name, view_type, view_type_list, InternedType, Type,
     },
-    LayoutKind, LayoutProvider, PreparedModule, VMResult, ValueLayout,
+    FieldValueLayout, Function, LayoutId, LayoutKind, LayoutProvider, PreparedModule, VMResult,
 };
-use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{CallBuilder, InterpreterContext, RuntimeError};
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::{
-        FunctionAttribute, FunctionDefinitionIndex, StructFieldInformation, VariantIndex,
-        Visibility,
-    },
+use mono_move_global_context::{ExecutionGuard, LoadedModule};
+use mono_move_runtime::{
+    CallBuilder, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus,
 };
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{DOLLAR_SIGN_DELIMITER, PACK},
-};
+use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIndex};
+use move_core_types::account_address::AccountAddress;
 use shared_dsa::UnorderedMap;
+
+/// Runs a user transaction's call to `func`, which `module` defines under
+/// `name`: checks that a transaction may call the function, builds the call,
+/// places the arguments and runs it. Entry functions and scripts share this
+/// path so that their checks cannot drift apart.
+pub(super) fn run_user_txn_call<'a>(
+    guard: &ExecutionGuard<'a>,
+    interp: &mut InterpreterContext<'a>,
+    module: &LoadedModule,
+    name: InternedIdentifier,
+    func: &'a Function,
+    sender: &AccountAddress,
+    secondary_signers: &[AccountAddress],
+    args: &[Vec<u8>],
+) -> Result<RuntimeStatus, MoveExecutionFailure> {
+    let def_idx = module
+        .function_def_idx(name)
+        .ok_or_else(|| invariant_violation("a loaded function is defined by its module"))
+        .map_err(MoveExecutionFailure::RuntimeError)?;
+    check_no_return_values(&module.ir().module, def_idx)
+        .map_err(MoveExecutionFailure::InvalidArguments)?;
+    let num_signer_params = check_callable_signature(guard, interp, &func.param_tys)?;
+    let mut call = interp
+        .build_call(func)
+        .map_err(MoveExecutionFailure::RuntimeError)?;
+    place_user_txn_args(
+        &mut call,
+        num_signer_params,
+        sender,
+        secondary_signers,
+        args,
+    )?;
+    call.run()
+        .map(CompletedCall::into_status)
+        .map_err(|err| MoveExecutionFailure::RuntimeError(err.into_error()))
+}
 
 /// Checks that the function returns no values, which no transaction payload
 /// may do.
-pub(super) fn check_no_return_values(
+fn check_no_return_values(
     module: &PreparedModule,
     def_idx: FunctionDefinitionIndex,
 ) -> Result<(), InvalidArguments> {
@@ -45,16 +74,22 @@ pub(super) fn check_no_return_values(
 /// Checks that a user transaction may call the given function, based on info from its signature.
 /// - All signers must be in leading positions.
 /// - All other parameters must be of the allowed types.
-pub(super) fn check_callable_signature<'a>(
+fn check_callable_signature<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
     param_tys: &[InternedType],
 ) -> Result<usize, MoveExecutionFailure> {
     let num_signer_params =
         leading_signer_params(param_tys).map_err(MoveExecutionFailure::InvalidArguments)?;
-    let answered = &mut UnorderedMap::new();
+    let cached_allowed_arg_types = &mut UnorderedMap::new();
     for &ty in &param_tys[num_signer_params..] {
-        if !is_allowed_arg_type(guard, interp, ty, answered)
+        // Lowering the function published the layout of every parameter type
+        // and everything reachable from it.
+        let id = guard
+            .layout_id(ty)
+            .ok_or_else(|| invariant_violation("a parameter type's layout is published"))
+            .map_err(MoveExecutionFailure::RuntimeError)?;
+        if !is_allowed_arg_layout(guard, interp, id, cached_allowed_arg_types)
             .map_err(MoveExecutionFailure::RuntimeError)?
         {
             return Err(MoveExecutionFailure::InvalidArguments(
@@ -65,215 +100,162 @@ pub(super) fn check_callable_signature<'a>(
     Ok(num_signer_params)
 }
 
-/// Whether a type can be allowed as a transaction argument. `answered` holds
-/// the types already decided, without which a type whose fields share a type
-/// is walked once per path to it rather than once.
+/// Whether a value with the given layout can be allowed as a transaction
+/// argument. The walk follows the published layouts, one per type, so a type
+/// reached along several paths is decided once.
 //
 // TODO(security): audit the depth of type arguments this recursion can reach
 // so the check stays bounded.
-fn is_allowed_arg_type<'a>(
+fn is_allowed_arg_layout<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
-    ty: InternedType,
-    answered: &mut UnorderedMap<InternedType, bool>,
+    id: LayoutId,
+    cached_allowed_arg_types: &mut UnorderedMap<LayoutId, bool>,
 ) -> VMResult<bool> {
-    if let Some(&allowed) = answered.get(&ty) {
+    if let Some(&allowed) = cached_allowed_arg_types.get(&id) {
         return Ok(allowed);
     }
-    let allowed = is_allowed_arg_type_uncached(guard, interp, ty, answered)?;
-    answered.insert(ty, allowed);
+    let allowed = is_allowed_arg_layout_uncached(guard, interp, id, cached_allowed_arg_types)?;
+    cached_allowed_arg_types.insert(id, allowed);
     Ok(allowed)
 }
 
-fn is_allowed_arg_type_uncached<'a>(
+fn is_allowed_arg_layout_uncached<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
-    ty: InternedType,
-    answered: &mut UnorderedMap<InternedType, bool>,
+    id: LayoutId,
+    cached_allowed_arg_types: &mut UnorderedMap<LayoutId, bool>,
 ) -> VMResult<bool> {
-    Ok(match view_type(ty) {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::I8
-        | Type::I16
-        | Type::I32
-        | Type::I64
-        | Type::I128
-        | Type::I256
-        | Type::Address => true,
-        Type::Vector { elem } => is_allowed_arg_type(guard, interp, *elem, answered)?,
-        Type::Nominal {
-            module_id,
-            name,
-            ty_args,
-        } => {
-            let module = view_module_id(*module_id);
-            match (
-                *module.address() == AccountAddress::ONE,
-                view_name(module.name()),
-                view_name(*name),
-            ) {
-                (true, "option", "Option") => {
-                    let &[elem] = view_type_list(*ty_args) else {
-                        return Ok(false);
-                    };
-                    is_allowed_arg_type(guard, interp, elem, answered)?
-                },
-                // Only a resource can sit under an object's address, so the
-                // existence check needs a nominal type to look for.
-                (true, "object", "Object") => {
-                    let &[resource] = view_type_list(*ty_args) else {
-                        return Ok(false);
-                    };
-                    matches!(view_type(resource), Type::Nominal { .. })
-                },
-                (true, "string", "String")
-                | (true, "fixed_point32", "FixedPoint32")
-                | (true, "fixed_point64", "FixedPoint64") => true,
-                _ => is_allowed_nominal_type(guard, interp, ty, *module_id, *name, answered)?,
+    let layout = guard
+        .layout(id)
+        .ok_or_else(|| invariant_violation("a layout id resolves to a published layout"))?;
+    Ok(match &layout.kind {
+        LayoutKind::Bool
+        | LayoutKind::UnsignedInt
+        | LayoutKind::SignedInt
+        | LayoutKind::Address => true,
+        // Signers come from the transaction itself, and neither a reference
+        // nor a function value can be built from bytes.
+        LayoutKind::Signer | LayoutKind::Ref | LayoutKind::Function => false,
+        LayoutKind::Vector { elem_id, .. } => {
+            is_allowed_arg_layout(guard, interp, *elem_id, cached_allowed_arg_types)?
+        },
+        LayoutKind::Struct { fields } => {
+            match is_allowed_nominal_type(interp, nominal_type_of(layout.ty)?)? {
+                Some(allowed) => allowed,
+                None => are_allowed_arg_fields(guard, interp, fields, cached_allowed_arg_types)?,
             }
         },
-        Type::Signer
-        | Type::ImmutRef { .. }
-        | Type::MutRef { .. }
-        | Type::Function { .. }
-        | Type::TypeParam { .. } => false,
+        LayoutKind::FrozenEnum { variants, .. } => {
+            match is_allowed_nominal_type(interp, nominal_type_of(layout.ty)?)? {
+                Some(allowed) => allowed,
+                None => {
+                    // An argument may carry any variant, so every variant's
+                    // fields are checked.
+                    for &variant in variants.iter() {
+                        let body = guard.layout(variant).ok_or_else(|| {
+                            invariant_violation("a variant body's layout is published")
+                        })?;
+                        let LayoutKind::Struct { fields } = &body.kind else {
+                            return Err(invariant_violation("a variant body has a struct layout"));
+                        };
+                        if !are_allowed_arg_fields(guard, interp, fields, cached_allowed_arg_types)?
+                        {
+                            return Ok(false);
+                        }
+                    }
+                    true
+                },
+            }
+        },
     })
 }
 
-/// Whether a struct or enum outside the framework whitelist can be allowed as
+/// Whether every field laid out by a struct or variant body can be allowed as
 /// a transaction argument.
-/// - Its definition must declare `copy` and not `key`.
-/// - It must have public pack function: `pack$S` (if struct), or pack functions for
-//    every variant (if enum).
-/// - Its field types must all be allowed.
-//
-// TODO(perf): the answer depends only on the type, so cache it instead of
-// walking the defining module's functions and fields on every transaction.
-fn is_allowed_nominal_type<'a>(
+fn are_allowed_arg_fields<'a>(
     guard: &ExecutionGuard<'a>,
     interp: &mut InterpreterContext<'a>,
-    ty: InternedType,
-    module_id: InternedModuleId,
-    name: InternedIdentifier,
-    answered: &mut UnorderedMap<InternedType, bool>,
+    fields: &[FieldValueLayout],
+    cached_allowed_arg_types: &mut UnorderedMap<LayoutId, bool>,
 ) -> VMResult<bool> {
-    let module = &interp.load_module(module_id)?.ir().module;
-    let Some(handle) = module.nominal_handle(module_id, name) else {
-        return Ok(false);
-    };
-    if !handle.abilities.has_copy() || handle.abilities.has_key() {
-        return Ok(false);
-    }
-    let Some(def_idx) = module.interned_nominal_type_def_idx(name) else {
-        return Ok(false);
-    };
-    let has_pack_function = |function_name: &str, attribute: FunctionAttribute| {
-        module.function_defs().iter().any(|def| {
-            let handle = module.function_handle_at(def.function);
-            module.identifier_at(handle.name).as_str() == function_name
-                && def.visibility == Visibility::Public
-                && handle.attributes.contains(&attribute)
-        })
-    };
-    let struct_name = view_name(name);
-    match &module.struct_def_at(def_idx).field_information {
-        StructFieldInformation::Declared(_) => {
-            if !has_pack_function(
-                &format!("{PACK}{DOLLAR_SIGN_DELIMITER}{struct_name}"),
-                FunctionAttribute::Pack,
-            ) {
-                return Ok(false);
-            }
-        },
-        StructFieldInformation::DeclaredVariants(variants) => {
-            for (tag, variant) in variants.iter().enumerate() {
-                let variant_name = module.identifier_at(variant.name);
-                if !has_pack_function(
-                    &format!(
-                        "{PACK}{DOLLAR_SIGN_DELIMITER}{struct_name}{DOLLAR_SIGN_DELIMITER}{variant_name}"
-                    ),
-                    FunctionAttribute::PackVariant(tag as VariantIndex),
-                ) {
-                    return Ok(false);
-                }
-            }
-        },
-        StructFieldInformation::Native => return Ok(false),
-    }
-    // Note: Lowering already published the layout of all fields, so they should be
-    // readable without substitution.
-    let Some(field_tys) = instantiated_field_types(guard, ty)? else {
-        return Ok(false);
-    };
-    for field_ty in field_tys {
-        if !is_allowed_arg_type(guard, interp, field_ty, answered)? {
+    for field in fields {
+        if !is_allowed_arg_layout(guard, interp, field.id, cached_allowed_arg_types)? {
             return Ok(false);
         }
     }
     Ok(true)
 }
 
-/// The instantiated types of a struct's fields, or of every variant's fields
-/// for an enum. [`None`] if a field is a reference or a function value, which
-/// share one layout and so have no type of their own.
-fn instantiated_field_types(
-    guard: &ExecutionGuard<'_>,
-    ty: InternedType,
-) -> VMResult<Option<Vec<InternedType>>> {
-    let layout = guard
-        .layout_by_ty(ty)
-        .ok_or_else(|| invariant_violation("a parameter type's layout is published"))?;
-    match &layout.kind {
-        LayoutKind::Struct { .. } => struct_field_types(guard, layout),
-        LayoutKind::FrozenEnum { variants, .. } => {
-            let mut tys = Vec::new();
-            for &id in variants.iter() {
-                let body = guard
-                    .layout(id)
-                    .ok_or_else(|| invariant_violation("a variant body's layout is published"))?;
-                match struct_field_types(guard, body)? {
-                    Some(variant_tys) => tys.extend(variant_tys),
-                    None => return Ok(None),
-                }
-            }
-            Ok(Some(tys))
-        },
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Signer
-        | LayoutKind::Vector { .. }
-        | LayoutKind::Ref
-        | LayoutKind::Function => Err(invariant_violation(
-            "a struct or enum has a struct or enum layout",
-        )),
-    }
+/// The type a struct or enum layout was published for.
+fn nominal_type_of(ty: Option<InternedType>) -> VMResult<InternedType> {
+    ty.ok_or_else(|| invariant_violation("a struct or enum layout carries its type"))
 }
 
-/// The instantiated types of the fields laid out by a struct or variant body.
-fn struct_field_types(
-    guard: &ExecutionGuard<'_>,
-    layout: &ValueLayout,
-) -> VMResult<Option<Vec<InternedType>>> {
-    let LayoutKind::Struct { fields } = &layout.kind else {
-        return Err(invariant_violation("a struct body has a struct layout"));
+/// Decides whether a struct or enum can be allowed as a transaction argument
+/// from its type alone, or returns [`None`] when its fields decide.
+/// - The framework types AptosVM accepts are allowed; `Object<T>` only if `T`
+///   is a nominal type.
+/// - Any other struct or enum must declare `copy` and not `key`, and must be
+///   packable from outside its module. See [`LoadedModule::has_public_pack_api`].
+///   Its fields, those of every variant for an enum, then decide.
+//
+// TODO(perf): cache the answer per type across transactions instead of reading
+// the defining module's abilities and pack API on every one. Such a cache must
+// be dropped when the defining module is upgraded: an enum may gain a variant
+// whose fields are not allowed.
+fn is_allowed_nominal_type<'a>(
+    interp: &mut InterpreterContext<'a>,
+    ty: InternedType,
+) -> VMResult<Option<bool>> {
+    let Type::Nominal {
+        module_id,
+        name,
+        ty_args,
+    } = view_type(ty)
+    else {
+        return Err(invariant_violation(
+            "a struct or enum layout describes a nominal type",
+        ));
     };
-    fields
-        .iter()
-        .map(|field| {
-            guard
-                .layout(field.id)
-                .ok_or_else(|| invariant_violation("a field's layout is published"))
-                .map(|field_layout| field_layout.ty)
-        })
-        .collect()
+    let module = view_module_id(*module_id);
+    match (
+        *module.address() == AccountAddress::ONE,
+        view_name(module.name()),
+        view_name(*name),
+    ) {
+        // An `Option<T>` is allowed exactly when `T` is, which its one
+        // field of `T`s decides.
+        (true, "option", "Option") => Ok(None),
+        // Only a resource can sit under an object's address, so the
+        // existence check needs a nominal type to look for.
+        (true, "object", "Object") => {
+            let &[resource] = view_type_list(*ty_args) else {
+                return Ok(Some(false));
+            };
+            Ok(Some(matches!(view_type(resource), Type::Nominal { .. })))
+        },
+        (true, "string", "String")
+        | (true, "fixed_point32", "FixedPoint32")
+        | (true, "fixed_point64", "FixedPoint64") => Ok(Some(true)),
+        _ => {
+            let module = interp.load_module(*module_id)?;
+            let prepared = &module.ir().module;
+            let Some(handle) = prepared.nominal_handle(*module_id, *name) else {
+                return Ok(Some(false));
+            };
+            if !handle.abilities.has_copy() || handle.abilities.has_key() {
+                return Ok(Some(false));
+            }
+            let Some(def_idx) = prepared.interned_nominal_type_def_idx(*name) else {
+                return Ok(Some(false));
+            };
+            if !module.has_public_pack_api(def_idx) {
+                return Ok(Some(false));
+            }
+            Ok(None)
+        },
+    }
 }
 
 /// Counts the leading signer parameters, rejecting a signer that follows a
@@ -295,7 +277,7 @@ fn leading_signer_params(param_tys: &[InternedType]) -> Result<usize, InvalidArg
 /// Fills the call in parameter order: the `num_signer_params` leading signer
 /// parameters from the sender and secondary signers, everything else from the
 /// transaction's BCS arguments.
-pub(super) fn place_user_txn_args<'a>(
+fn place_user_txn_args<'a>(
     call: &mut CallBuilder<'a, '_>,
     num_signer_params: usize,
     sender: &'a AccountAddress,
@@ -327,6 +309,9 @@ pub(super) fn place_user_txn_args<'a>(
             let Some(runtime_error) = err.downcast_ref::<RuntimeError>() else {
                 return MoveExecutionFailure::RuntimeError(err);
             };
+            // TODO(cleanup): group the BCS decoding and argument validation
+            // errors in `RuntimeError` so this match can be exhaustive and a
+            // new variant cannot slip through the wildcard.
             let reason = match runtime_error {
                 RuntimeError::MalformedStringArgument => InvalidArguments::MalformedString,
                 RuntimeError::ObjectArgumentDoesNotExist => InvalidArguments::ObjectDoesNotExist,

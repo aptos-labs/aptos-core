@@ -257,7 +257,7 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
-    fn publish_layout(&self, layout: ValueLayout) -> LayoutId {
+    fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
         self.guard.publish_layout(layout)
     }
 
