@@ -123,9 +123,15 @@ impl BinaryUpdater for AptosUpdateTool {
         let target = match build_info.get(BUILD_OS).context("Failed to determine build info of current CLI")?.as_str() {
             "linux-x86_64" => "Linux-x86_64",
             "linux-aarch64" => "Linux-aarch64",
-            "macos-x86_64" => "macOS-x86_64",
             "macos-aarch64" => "macOS-arm64",
             "windows-x86_64" => "Windows-x86_64",
+            // Intel Mac binaries are no longer published. Future macOS CLI
+            // releases support Apple Silicon (arm64) only.
+            "macos-x86_64" => {
+                return Err(anyhow!(
+                    "macOS x86_64 (Intel) is no longer supported. Future Aptos CLI macOS releases are Apple Silicon (arm64) only"
+                ));
+            },
             wildcard => return Err(anyhow!("Self-updating is not supported on your OS ({}) right now, please download the binary manually", wildcard)),
         };
 
