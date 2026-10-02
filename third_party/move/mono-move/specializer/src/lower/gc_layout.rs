@@ -165,7 +165,7 @@ fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> VMResul
         | LayoutKind::Vector { .. }
         | LayoutKind::FrozenEnum { .. }
         | LayoutKind::Function => vec![0],
-        LayoutKind::Struct { fields } => {
+        LayoutKind::Struct { fields, .. } => {
             let mut out = vec![];
             for field in fields.iter() {
                 for rel in layout_pointer_offsets(layouts, field.id)? {

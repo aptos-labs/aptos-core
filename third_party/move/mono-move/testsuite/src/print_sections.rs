@@ -20,7 +20,7 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
     types::{InternedType, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, LayoutId, LayoutProvider, VMResult, ValueLayout,
+    DescriptorId, FrameOffset, LayoutId, LayoutProvider, NominalFields, VMResult, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -213,14 +213,14 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         &mut self,
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
-    ) -> VMResult<Option<FieldTypes>> {
+    ) -> VMResult<Option<NominalFields>> {
         if *module_id != self.module_ir.module.id() {
             return Ok(None);
         }
         Ok(self
             .module_ir
             .module
-            .interned_field_types(*nominal_name)
+            .interned_fields(*nominal_name)
             .cloned())
     }
 

@@ -240,7 +240,7 @@ impl<'a> LoweringState<'a> {
             .layouts
             .layout_by_ty(struct_ty)
             .ok_or(LoweringError::StructLayoutNotPopulated { op })?;
-        let LayoutKind::Struct { fields } = &layout.kind else {
+        let LayoutKind::Struct { fields, .. } = &layout.kind else {
             return Err(VMInternalError::new(LoweringError::NominalTypeNotStruct {
                 op,
             }));
@@ -270,7 +270,7 @@ impl<'a> LoweringState<'a> {
             .layouts
             .layout_by_ty(struct_ty)
             .ok_or(LoweringError::StructLayoutNotPopulated { op })?;
-        let LayoutKind::Struct { fields } = &layout.kind else {
+        let LayoutKind::Struct { fields, .. } = &layout.kind else {
             return Err(VMInternalError::new(LoweringError::NominalTypeNotStruct {
                 op,
             }));
