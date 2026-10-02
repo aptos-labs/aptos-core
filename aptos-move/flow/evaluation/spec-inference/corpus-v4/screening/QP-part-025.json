@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/lomuto_partition",
+  "reference_proved": true,
+  "reference_sha256": "20d7d3ad9215a829e572068954a71c144a84985a7c0bf02ccaf98ab4728c6757",
+  "schema_version": 2,
+  "target": "inference_corpus::lomuto_partition::partition",
+  "task_id": "QP-part-025",
+  "threshold_seconds": 20,
+  "wall_seconds": 3.9,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

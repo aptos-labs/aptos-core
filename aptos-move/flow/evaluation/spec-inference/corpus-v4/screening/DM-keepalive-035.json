@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_dead_mans_switch_tracker",
+  "reference_proved": true,
+  "reference_sha256": "7599ba70277ac348e69161e580515119b4cefe61141a383a4de3c1f623bf166e",
+  "schema_version": 2,
+  "target": "aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive",
+  "task_id": "DM-keepalive-035",
+  "threshold_seconds": 20,
+  "wall_seconds": 3.6,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

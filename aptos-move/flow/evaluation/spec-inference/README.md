@@ -65,6 +65,22 @@ python3 -m venv .venv
 cc -O2 -Wall -Wextra -Werror sandbox/landlock_exec.c -o sandbox/landlock-exec
 ```
 
+The pinned Codex CLI and its code-mode host are the `rust-v0.153.2` release
+assets for the machine, unpacked side by side under the names the launcher
+looks for, and put first on `PATH` for preflight and launch:
+
+```text
+arch=$(uname -m)-unknown-linux-musl; dir=evaluation-artifacts/tools/codex-0.153.2
+mkdir -p $dir && cd $dir
+for asset in codex codex-code-mode-host; do
+  gh release download rust-v0.153.2 --repo openai/codex --pattern "$asset-$arch.tar.gz"
+  tar xzf "$asset-$arch.tar.gz" && mv "$asset-$arch" "$asset" && rm "$asset-$arch.tar.gz"
+done
+```
+
+`model_profile select` records the host digest pinned for the machine it runs
+on, and preflight refuses any other host.
+
 Credentialed commands go through `sandbox/with-glm-env.sh`, which reads
 `ZAI_API_KEY` from `~/.config/ai-keys.env`, maps it to the bearer token the
 Anthropic-compatible endpoint wants, and forwards only `ANTHROPIC_AUTH_TOKEN`.

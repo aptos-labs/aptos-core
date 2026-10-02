@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_bulk_order_utils",
+  "reference_proved": true,
+  "reference_sha256": "046dec9dcfabc70371c09afc30d875eba84b0ed60c6cf9d657138b75644cd125",
+  "schema_version": 2,
+  "target": "aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization",
+  "task_id": "TR-sanitize-028",
+  "threshold_seconds": 20,
+  "wall_seconds": 3.6,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

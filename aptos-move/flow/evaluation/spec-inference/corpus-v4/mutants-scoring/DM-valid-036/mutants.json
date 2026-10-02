@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 100,
+        "offset": 1893,
+        "sha256": "ca0ac14d9b053ff0923d1c77a6268a2e4c9301c2c40b66b7400bcb2dea50e477"
+      },
+      "edit": {
+        "at": 37,
+        "kind": "substitute",
+        "length": 27,
+        "to": "0\n            };"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-valid-036-missing-time-is-zero",
+      "obligation_category": "normal-result",
+      "rationale": "An order without a creation time counts as created at time zero.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 38,
+        "offset": 1547,
+        "sha256": "60ca566b5140265440e49abd1d290af527428dcfce5c61256e06408b2ba5fbda"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 7,
+        "to": "if (!itr"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-valid-036-registration-inverted",
+      "obligation_category": "normal-result",
+      "rationale": "Registered accounts are always valid and unregistered ones are looked up.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 92,
+        "offset": 1688,
+        "sha256": "4ee359b3fe7a99eb2f056a1038bd0c7e4c1904a9710b76d1746f618689ec1815"
+      },
+      "edit": {
+        "at": 41,
+        "kind": "substitute",
+        "length": 13,
+        "to": "now_microseconds()"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-valid-036-microsecond-clock",
+      "obligation_category": "normal-result",
+      "rationale": "The clock is read in microseconds and compared against seconds.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "7599ba70277ac348e69161e580515119b4cefe61141a383a4de3c1f623bf166e",
+  "task_id": "DM-valid-036"
+}

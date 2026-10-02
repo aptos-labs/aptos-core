@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 59,
+        "offset": 2572,
+        "sha256": "3dafc62b05337c0ce08b6e54db22812edb413ab419aae3e8ba0022f569dd2439"
+      },
+      "edit": {
+        "at": 54,
+        "kind": "substitute",
+        "length": 4,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-pending-046-includes-last-executed",
+      "obligation_category": "normal-result",
+      "rationale": "The last executed transaction is listed as pending.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 34,
+        "offset": 2714,
+        "sha256": "be516133f31e9f437ab4076d37cf43a4830d5275f974c23330abce4966d0877f"
+      },
+      "edit": {
+        "at": 9,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-pending-046-reads-next",
+      "obligation_category": "abort",
+      "rationale": "The unassigned next sequence number is read.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 73,
+        "offset": 2761,
+        "sha256": "26e22321476a7cb9613e208c5fcd359c1e87037906c156cbdb58863d12e9d017"
+      },
+      "edit": {
+        "at": 62,
+        "kind": "substitute",
+        "length": 9,
+        "to": "borrow(i + 1)"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-pending-046-reads-successor",
+      "obligation_category": "normal-result",
+      "rationale": "Each entry is the following transaction.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "a1a4cf5672b0bbd55af239a1a9cd175f5eff3cbdefc6d090e78c01adc8dbdb1b",
+  "task_id": "MS-pending-046"
+}

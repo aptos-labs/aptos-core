@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 55,
+        "offset": 3887,
+        "sha256": "6641544e67cb5f6fbd4b2b3129c1cb5eb16d55c80c6fae2e3624f71606df74bf"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 9,
+        "to": "let i = 1"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-nonzero-031-skips-first",
+      "obligation_category": "normal-result",
+      "rationale": "The first size is never checked.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 4041,
+        "sha256": "f2a28371d26a989a26d7ae1cd5fa95b1ccd1b48ca3da57d5345185231baf4718"
+      },
+      "edit": {
+        "at": 11,
+        "kind": "substitute",
+        "length": 13,
+        "to": "        false\n"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-nonzero-031-rejects-all",
+      "obligation_category": "normal-result",
+      "rationale": "A vector without zeros is reported as invalid.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 20,
+        "offset": 3955,
+        "sha256": "456a333362a599ce6b00a7b4b1224e612181fa7d6b8fdcebbaf6fe1384b94e11"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-nonzero-031-any-size-rejected",
+      "obligation_category": "normal-result",
+      "rationale": "Every size counts as zero.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "046dec9dcfabc70371c09afc30d875eba84b0ed60c6cf9d657138b75644cd125",
+  "task_id": "TR-nonzero-031"
+}

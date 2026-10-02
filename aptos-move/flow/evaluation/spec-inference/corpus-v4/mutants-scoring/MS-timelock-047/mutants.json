@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 47,
+        "offset": 4399,
+        "sha256": "03a22c5256cd3173f3be7bddae256ff0349069fa9580ec4bc51b1fd990cfe42d"
+      },
+      "edit": {
+        "at": 30,
+        "kind": "substitute",
+        "length": 2,
+        "to": "||"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-timelock-047-threshold-without-option",
+      "obligation_category": "abort",
+      "rationale": "A missing override threshold is unwrapped.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 69,
+        "offset": 4199,
+        "sha256": "4e946f3f8d43aed09bf6a8c33fdfac55b2eac066abbdfcba7c9ef01d804e7ce0"
+      },
+      "edit": {
+        "at": 14,
+        "kind": "substitute",
+        "length": 54,
+        "to": "now_seconds()"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-timelock-047-age-is-now",
+      "obligation_category": "normal-result",
+      "rationale": "The age ignores the creation time.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 56,
+        "offset": 3525,
+        "sha256": "33fd426ad97bd815d2f7fbbefca41242e74f7a7efb9b12fb62be11486b2c2aef"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 10,
+        "to": "if (!exists"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-timelock-047-lock-presence-inverted",
+      "obligation_category": "normal-result",
+      "rationale": "The timelock is consulted only when there is none.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "a1a4cf5672b0bbd55af239a1a9cd175f5eff3cbdefc6d090e78c01adc8dbdb1b",
+  "task_id": "MS-timelock-047"
+}

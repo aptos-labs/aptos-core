@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 2019,
+        "sha256": "29e851b85584aefcaa921a8f1b8d9dd452f92896ba7e0ffefe2b10cc65000b39"
+      },
+      "edit": {
+        "at": 34,
+        "kind": "substitute",
+        "length": 1,
+        "to": ">="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-valid-036-session-start-exclusive",
+      "obligation_category": "normal-result",
+      "rationale": "An order created at the session start is invalid.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 42,
+        "offset": 2205,
+        "sha256": "dfd86fc484714327a76683b6a8b5bdd5f50df074c87804291b4ad4081c18c914"
+      },
+      "edit": {
+        "at": 27,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-valid-036-expiry-exclusive",
+      "obligation_category": "normal-result",
+      "rationale": "A session is expired already at its expiration time.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 60,
+        "offset": 1644,
+        "sha256": "02293bf8b699a2ca63e1c8a5da8bf17c497907463a7fdd367dae9b6749520344"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 11,
+        "to": "return false"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_dead_mans_switch_tracker.move",
+      "mutant_id": "DM-valid-036-unregistered-invalid",
+      "obligation_category": "normal-result",
+      "rationale": "Orders of accounts without a keep-alive are invalid.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "7599ba70277ac348e69161e580515119b4cefe61141a383a4de3c1f623bf166e",
+  "task_id": "DM-valid-036"
+}

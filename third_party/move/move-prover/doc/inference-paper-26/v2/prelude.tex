@@ -8,9 +8,13 @@
 \usepackage{esz}
 \usepackage{mathpartir}
 \usepackage{graphicx}
+% The per-target tables are wider than the LNCS text block: set them in landscape.
+\usepackage[figuresright]{rotating}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
 \usepackage{xspace}
 \usepackage{xurl}
-\usepackage{caption}
 % Zapf Dingbats rather than bbding: bbding is a METAFONT bitmap font, which
 % embeds as Type 3 with no Unicode map -- it extracts as garbage and arXiv
 % flags it. \Checkmark/\XSolidBrush keep their names so call sites are
@@ -23,25 +27,25 @@
 \usepackage{enumitem}
 % Must load before `\lstMakeShortInline` makes `|` active, otherwise its own
 % sources are read with that catcode and break.
-% From the workshop template's package set; `url` and `amsfonts` are already
-% covered by xurl and amssymb, and nicefrac is unused.
 \usepackage{booktabs}
 \usepackage{microtype}
 
 \usepackage{tcolorbox}
 \tcbuselibrary{listings,breakable,skins}
-% Citations come from natbib, which the NeurIPS style loads; the driver passes
-% it [numbers,compress]. The style also fixes the page geometry, so do not
-% load geometry here.
+% llncs fixes the page geometry; do not load geometry here.
 
-% The NeurIPS style does not load hyperref itself; load it here and colorize.
-\usepackage[bookmarks,unicode,colorlinks=true,
+% hypertexnames=false: llncs's chapter counter makes appendix sections reuse body anchors.
+\usepackage[bookmarks,unicode,colorlinks=true,hypertexnames=false,
             linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 \def\UrlFont{\rmfamily}
 
+% Inline code snippets are rigid boxes; stretch spaces rather than overrun the margin.
+\setlength{\emergencystretch}{1.5em}
+
 \newcommand{\Section}[1]{\section{#1}}
 \newcommand{\SubSection}[1]{\subsection{#1}}
-\newcommand{\Paragraph}[1]{\vspace{0.25ex}\noindent\textbf{#1.}\xspace}
+% LNCS third-level heading: bold, run-in, unnumbered; the class adds no period.
+\newcommand{\Paragraph}[1]{\subsubsection{#1.}}
 
 % Labeled-paragraph list: bold inline label, lightly indented.
 % Use as \begin{Description} \item[Label.] body \item[...] ... \end{Description}.
@@ -53,13 +57,11 @@
 \newlist{Itemize}{itemize}{1}
 \setlist[Itemize]{label=--, leftmargin=1em, labelindent=0pt, labelsep=0.5em, itemsep=0.5ex, topsep=0.5ex}
 
-% Double-blind support: the workshop style sets `\if@anonymous` when built
-% without the `preprint` option, so the same sources serve both drivers.
+% Double-blind support: the drivers declare `\ifAnonymous`, set only by
+% main-anon.tex, so the same sources serve both.
 % \Anon{normal}{anonymized} -- use it for anything naming the authors,
 % their employer, or their internal systems.
-\makeatletter
-\newcommand{\Anon}[2]{\if@anonymous #2\else #1\fi}
-\makeatother
+\newcommand{\Anon}[2]{\ifAnonymous #2\else #1\fi}
 
 \newcommand{\TODO}[2]{%
     \noindent\textcolor{gray}{%
@@ -67,19 +69,14 @@
     }
 }
 
-% Tuned for the one-column layout: captions need to clear their float, and a
-% float needs to clear the body text around it.
-\setlength{\belowcaptionskip}{1ex}
-\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
 \newenvironment{Figure}{
     \begin{figure}[tb]
 } {
     \end{figure}
 }
 
-% Full-width variant. In the one-column LNCS layout figure* is identical to
-% figure; the environment is kept so the body can be shared with the
-% two-column short version in ../v2.
+% Full-width variant; in the one-column LNCS layout figure* is identical to
+% figure.
 \newenvironment{WideFigure}{
     \begin{figure*}[!t]
 } {
@@ -191,7 +188,9 @@
         {!=}{{$\neq$}}2
         {==>}{{$\Longrightarrow$}}3
         {forall}{{$\forall$}}1
-        {exists}{{$\exists$}}1,
+        {exists}{{$\exists$}}1
+        % Later entries win: `exists<R>(a)` is the resource predicate, not a quantifier.
+        {exists<}{{exists<}}7,
 }
 
 
@@ -319,6 +318,13 @@
 % tcolorbox rather than a listings frame: the tag is overlaid on the first line
 % of the box, and listings paints its own `backgroundcolor` per line *after*
 % anything emitted before it, which would bury the tag.
+% Per-cell dot plot: one hue per model, chrome in neutral grays.
+\definecolor{ModelSol}{HTML}{2A78D6}
+\definecolor{ModelTerra}{HTML}{EB6834}
+\definecolor{CellMuted}{HTML}{898781}
+\definecolor{CellGrid}{HTML}{E1E0D9}
+\definecolor{CellAxis}{HTML}{C3C2B7}
+
 \definecolor{UserRule}{HTML}{3F8A4E}
 \definecolor{UserBack}{HTML}{F2F9F3}
 \definecolor{AgentRule}{HTML}{2C6FB5}
