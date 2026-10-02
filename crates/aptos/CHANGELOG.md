@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- _No changes yet._
+- Interactive runs now check every 3 days for a newer CLI release and print a notice on stderr when one is available. Set `APTOS_DISABLE_UPDATE_CHECK=1` to disable it.
 
 ## [9.6.0]
 - Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.

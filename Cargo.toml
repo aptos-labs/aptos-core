@@ -809,6 +809,7 @@ rustc-hash = "2"
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
+semver = "1.0.21"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
 serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }

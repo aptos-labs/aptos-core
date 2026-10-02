@@ -59,3 +59,6 @@ ARG GIT_BRANCH
 ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
+
+# The CLI version is managed by the image build, so disable update notices.
+ENV APTOS_DISABLE_UPDATE_CHECK=1

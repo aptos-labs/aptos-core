@@ -85,11 +85,13 @@ self_update = { git = "https://github.com/banool/self_update.git", rev = "830615
     "archive-zip",
     "compression-zip-deflate",
 ] }
+semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 set_env = { workspace = true }
 tempfile = { workspace = true }
+termcolor = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

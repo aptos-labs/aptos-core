@@ -9,7 +9,7 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use aptos::Tool;
+use aptos::{update::UpdateCheck, Tool};
 use clap::Parser;
 use std::{process::exit, time::Duration};
 
@@ -55,18 +55,26 @@ fn main() {
         .unwrap();
 
     // Run the corresponding tool.
-    let result = runtime.block_on(Tool::parse().execute());
+    let tool = Tool::parse();
+    let update_check = tool
+        .shows_update_notice()
+        .then(UpdateCheck::start)
+        .flatten();
+    let result = runtime.block_on(tool.execute());
 
     // Shutdown the runtime with a timeout. We do this to make sure that we don't sit
     // here waiting forever waiting for tasks that sometimes don't want to exit on
     // their own (e.g. telemetry, containers spawned by the localnet, etc).
     runtime.shutdown_timeout(Duration::from_millis(50));
 
+    let failed = result.is_err();
     match result {
-        Ok(inner) => println!("{}", inner),
-        Err(inner) => {
-            println!("{}", inner);
-            exit(1);
-        },
+        Ok(output) | Err(output) => println!("{}", output),
+    }
+    if let Some(update_check) = update_check {
+        update_check.finish();
+    }
+    if failed {
+        exit(1);
     }
 }
