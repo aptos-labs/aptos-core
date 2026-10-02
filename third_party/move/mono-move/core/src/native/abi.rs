@@ -82,6 +82,11 @@ impl NativeABI {
         self.required_descriptors.get(i).copied()
     }
 
+    /// All GC descriptors the native requires, in the order it expects.
+    pub fn required_descriptors(&self) -> &[DescriptorId] {
+        &self.required_descriptors
+    }
+
     pub fn args(&self) -> &[FrameSlot] {
         &self.args
     }

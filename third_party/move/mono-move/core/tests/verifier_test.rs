@@ -1,30 +1,52 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests for the static verifier (`verify_function`, `verify_descriptors`).
+//! Tests for the static verifier (`verify_function`).
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     interner::{InternedModuleId, ModuleId},
-    types::{InternedType, EMPTY_TYPE_LIST},
-    verify_function, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
-    ObjectDescriptor, ObjectDescriptorTable, SortedSafePointEntries, ValueLayout,
-    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    native::{FrameSlot, NativeABI, NativeIdx},
+    types::{InternedType, InternedTypeList, Type, ADDRESS_TY, EMPTY_TYPE_LIST, U64_TY},
+    verify_function, CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, ConstantPoolIndex,
+    ConstantPoolProvider, DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO,
+    Function, FunctionDefinitionIndex, FunctionPtr, IntBinaryOp, IntNegateOp, IntOperand,
+    IntShiftOp, IntTy, LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable,
+    PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, SortedSafePointEntries, ValueCmpOp,
+    ValueLayout, VecUnpackOp, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
-/// A descriptor table paired with an empty layout provider, to satisfy the
-/// verifier's `DescriptorProvider + LayoutProvider` bound. These tests do not
-/// exercise value-comparison operands, the only ops that read a layout.
-struct VerifierProvider(ObjectDescriptorTable);
+/// A descriptor table paired with an empty layout provider and a fixed
+/// constant pool, to satisfy the verifier's provider bound. These tests do
+/// not exercise nominal types, the only operands that read a layout.
+struct TestProvider {
+    descriptors: ObjectDescriptorTable,
+    constants: Vec<InternedType>,
+}
 
-impl DescriptorProvider for VerifierProvider {
-    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
-        self.0.descriptor(id)
+impl TestProvider {
+    fn new(descriptors: ObjectDescriptorTable) -> Self {
+        Self {
+            descriptors,
+            constants: vec![],
+        }
+    }
+
+    fn with_constants(constants: Vec<InternedType>) -> Self {
+        Self {
+            descriptors: ObjectDescriptorTable::new(),
+            constants,
+        }
     }
 }
 
-impl LayoutProvider for VerifierProvider {
+impl DescriptorProvider for TestProvider {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.descriptors.descriptor(id)
+    }
+}
+
+impl LayoutProvider for TestProvider {
     fn layout(&self, _id: LayoutId) -> Option<&ValueLayout> {
         None
     }
@@ -34,9 +56,19 @@ impl LayoutProvider for VerifierProvider {
     }
 }
 
+impl ConstantPoolProvider for TestProvider {
+    fn constant_type(
+        &self,
+        _module_id: InternedModuleId,
+        idx: ConstantPoolIndex,
+    ) -> Option<InternedType> {
+        self.constants.get(idx.0 as usize).copied()
+    }
+}
+
 /// A table holding only the reserved descriptors.
-fn trivial_descriptors() -> VerifierProvider {
-    VerifierProvider(ObjectDescriptorTable::new())
+fn trivial_descriptors() -> TestProvider {
+    TestProvider::new(ObjectDescriptorTable::new())
 }
 
 /// Interned module id for hand-built test functions.
@@ -640,7 +672,7 @@ fn vec_pushback_rejects_non_vector_descriptor() {
     let mut descriptors = ObjectDescriptorTable::new();
     let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
     let func = vec_pushback_func(struct_desc);
-    let errors = verify_function(&func, &VerifierProvider(descriptors));
+    let errors = verify_function(&func, &TestProvider::new(descriptors));
     assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
         && e.message.contains("not a non-empty Vector or Trivial")));
 }
@@ -664,4 +696,821 @@ fn heap_new_rejects_vector_descriptor() {
     assert!(errors
         .iter()
         .any(|e| e.message.contains("not a Struct or Enum")));
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for the checks below
+// ---------------------------------------------------------------------------
+
+fn slot(offset: u32, size: u32, align: u32) -> SizedSlot {
+    SizedSlot {
+        offset: FO(offset),
+        size,
+        align,
+    }
+}
+
+/// `[T]` type list with a single `u64`.
+fn one_u64() -> InternedTypeList {
+    static LIST: [InternedType; 1] = [U64_TY];
+    let list: &'static [InternedType] = &LIST;
+    InternedTypeList::new(GlobalArenaPtr::from_static(list))
+}
+
+/// `[T]` type list with two `u64`s.
+fn two_u64() -> InternedTypeList {
+    static LIST: [InternedType; 2] = [U64_TY, U64_TY];
+    let list: &'static [InternedType] = &LIST;
+    InternedTypeList::new(GlobalArenaPtr::from_static(list))
+}
+
+fn ref_u64() -> InternedType {
+    static REF: Type = Type::ImmutRef { inner: U64_TY };
+    GlobalArenaPtr::from_static(&REF)
+}
+
+fn errors_of(func: &Function) -> Vec<String> {
+    verify_function(func, &trivial_descriptors())
+        .into_iter()
+        .map(|e| e.message)
+        .collect()
+}
+
+fn assert_error_contains(func: &Function, needle: &str) {
+    let errors = errors_of(func);
+    assert!(
+        errors.iter().any(|m| m.contains(needle)),
+        "expected an error containing {needle:?}, got {errors:#?}"
+    );
+}
+
+fn assert_verifies(func: &Function) {
+    let errors = errors_of(func);
+    assert!(errors.is_empty(), "unexpected errors: {errors:#?}");
+}
+
+/// A callee with one `u64` parameter at offset 0 and no return values.
+fn one_param_callee() -> Function {
+    Function {
+        param_slots: vec![slot(0, 8, 8)],
+        param_tys: vec![U64_TY],
+        param_region_size: 8,
+        ..minimal_func()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Alignment
+// ---------------------------------------------------------------------------
+
+#[test]
+fn misaligned_u64_slot_rejected() {
+    let func = func_with_single_op(MicroOp::AddU64 {
+        dst: FO(4),
+        lhs: FO(8),
+        rhs: FO(8),
+    });
+    assert_error_contains(&func, "not 8-byte aligned");
+}
+
+#[test]
+fn misaligned_fat_pointer_rejected() {
+    let func = func_with_single_op(MicroOp::VecLen {
+        dst: FO(0),
+        vec_ref: FO(4),
+    });
+    assert_error_contains(&func, "[4, 20) is not 8-byte aligned");
+}
+
+#[test]
+fn misaligned_pointer_offset_rejected() {
+    let func = Function {
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(4)]),
+        param_and_local_sizes_sum: 24,
+        extended_frame_size: 48,
+        ..minimal_func()
+    };
+    assert_error_contains(&func, "[4, 12) is not 8-byte aligned");
+}
+
+#[test]
+fn move8_and_byte_copies_need_no_alignment() {
+    assert_verifies(&func_with_single_op(MicroOp::Move8 {
+        dst: FO(1),
+        src: FO(9),
+    }));
+    assert_verifies(&func_with_single_op(MicroOp::Move {
+        dst: FO(1),
+        src: FO(9),
+        size: 8,
+    }));
+    // The frame side of the 8-byte heap moves is unaligned too.
+    assert_verifies(&func_with_single_op(MicroOp::HeapMoveFrom8 {
+        dst: FO(1),
+        heap_ptr: FO(16),
+        offset: 0,
+    }));
+}
+
+#[test]
+fn int_slots_use_natural_alignment_up_to_max_align() {
+    // u32 operands must be 4-aligned.
+    let func = func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
+        dst: FO(2),
+        lhs: FO(0),
+        rhs: IntOperand::SlotU32(FO(4)),
+    }));
+    assert_error_contains(&func, "[2, 6) is not 4-byte aligned");
+    // u128 operands are read unaligned, so any offset is fine.
+    assert_verifies(&func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
+        dst: FO(4),
+        lhs: FO(4),
+        rhs: IntOperand::SlotU128(FO(4)),
+    })));
+}
+
+#[test]
+fn value_cmp_uses_the_layout_alignment() {
+    // A vector compares through an aligned 8-byte pointer.
+    static VEC_U64: Type = Type::Vector { elem: U64_TY };
+    let vec_ty: InternedType = GlobalArenaPtr::from_static(&VEC_U64);
+    let func = func_with_single_op(MicroOp::ValueCmp(ValueCmpOp {
+        negate: false,
+        dst: FO(0),
+        lhs: FO(4),
+        rhs: FO(16),
+        ty: vec_ty,
+    }));
+    assert_error_contains(&func, "[4, 12) is not 8-byte aligned");
+}
+
+// ---------------------------------------------------------------------------
+// Frame geometry, parameter and return slots
+// ---------------------------------------------------------------------------
+
+#[test]
+fn callee_fp_must_be_aligned() {
+    // `param_and_local_sizes_sum` is 8-aligned, but `frame_size()` is what
+    // the callee fp lands on; with FRAME_METADATA_SIZE = 24 the two agree,
+    // so only the first message fires for a misaligned sum.
+    let func = Function {
+        param_and_local_sizes_sum: 12,
+        extended_frame_size: 48,
+        ..minimal_func()
+    };
+    assert_error_contains(
+        &func,
+        "param_and_local_sizes_sum (12) must be 8-byte aligned",
+    );
+    assert_error_contains(&func, "frame_size() (36) must be 8-byte aligned");
+}
+
+#[test]
+fn param_slot_count_must_match_param_types() {
+    let func = Function {
+        param_slots: vec![slot(0, 8, 8)],
+        param_tys: vec![],
+        param_region_size: 8,
+        ..minimal_func()
+    };
+    assert_error_contains(
+        &func,
+        "number of param slots (1) must equal number of param types (0)",
+    );
+}
+
+#[test]
+fn param_slot_must_lie_in_param_region() {
+    let func = Function {
+        param_region_size: 0,
+        ..one_param_callee()
+    };
+    assert_error_contains(&func, "param slot [0, 8) exceeds param_region_size (0)");
+    assert_verifies(&one_param_callee());
+}
+
+#[test]
+fn param_slots_must_be_ascending_and_disjoint() {
+    let func = Function {
+        param_slots: vec![slot(0, 8, 8), slot(4, 8, 4)],
+        param_tys: vec![U64_TY, U64_TY],
+        param_region_size: 16,
+        param_and_local_sizes_sum: 16,
+        extended_frame_size: 40,
+        ..minimal_func()
+    };
+    assert_error_contains(&func, "param slots 0 and 1 are not ascending and disjoint");
+}
+
+#[test]
+fn sized_slot_alignment_is_validated() {
+    let bad_align = Function {
+        param_slots: vec![slot(0, 8, 0)],
+        ..one_param_callee()
+    };
+    assert_error_contains(
+        &bad_align,
+        "param slot 0: align 0 must be a power of two in [1, 8]",
+    );
+    let too_big = Function {
+        param_slots: vec![slot(0, 8, 16)],
+        ..one_param_callee()
+    };
+    assert_error_contains(&too_big, "align 16 must be a power of two in [1, 8]");
+    let misaligned = Function {
+        param_slots: vec![slot(4, 8, 8)],
+        param_region_size: 16,
+        param_and_local_sizes_sum: 16,
+        extended_frame_size: 40,
+        ..one_param_callee()
+    };
+    assert_error_contains(&misaligned, "param slot 0: offset 4 is not 8-byte aligned");
+    let zero_size = Function {
+        param_slots: vec![slot(0, 0, 8)],
+        ..one_param_callee()
+    };
+    assert_error_contains(&zero_size, "param slot 0: size must be > 0");
+}
+
+#[test]
+fn return_slot_count_must_match_return_types() {
+    let func = Function {
+        return_slots: vec![slot(0, 8, 8)],
+        return_tys: EMPTY_TYPE_LIST,
+        ..minimal_func()
+    };
+    assert_error_contains(
+        &func,
+        "number of return slots (1) must equal number of return types (0)",
+    );
+}
+
+#[test]
+fn return_slots_must_fit_data_region_and_be_disjoint() {
+    let too_wide = Function {
+        return_slots: vec![slot(0, 16, 8)],
+        return_tys: one_u64(),
+        ..minimal_func()
+    };
+    assert_error_contains(
+        &too_wide,
+        "return slot [0, 16) exceeds param_and_local_sizes_sum (8)",
+    );
+    let overlapping = Function {
+        return_slots: vec![slot(0, 8, 8), slot(0, 8, 8)],
+        return_tys: two_u64(),
+        param_and_local_sizes_sum: 16,
+        extended_frame_size: 40,
+        ..minimal_func()
+    };
+    assert_error_contains(
+        &overlapping,
+        "return slots 0 and 1 are not ascending and disjoint",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// GC layouts
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pointer_slot_beyond_params_requires_zero_frame() {
+    let func = Function {
+        zero_frame: false,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        ..minimal_func()
+    };
+    assert_error_contains(
+        &func,
+        "pointer slot 0 beyond param_region_size (0) but zero_frame is false",
+    );
+    assert_verifies(&Function {
+        zero_frame: true,
+        ..func
+    });
+    // A pointer-typed parameter is written by the caller and needs no zeroing.
+    assert_verifies(&Function {
+        zero_frame: false,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        ..one_param_callee()
+    });
+}
+
+#[test]
+fn safe_points_must_be_sorted_in_bounds_at_allocating_ops_and_disjoint_from_base() {
+    let safe_point = |co: u32, offsets: Vec<FO>| SafePointEntry {
+        code_offset: CO(co),
+        layout: FrameLayoutInfo::new(offsets),
+    };
+    // `ForceGC` is allocating; `Return` is not.
+    let base = || Function {
+        code: Code::from_vec(vec![MicroOp::ForceGC, MicroOp::Return]),
+        param_and_local_sizes_sum: 24,
+        extended_frame_size: 48,
+        ..minimal_func()
+    };
+    let unsorted = Function {
+        safe_point_layouts: SortedSafePointEntries::new(vec![
+            safe_point(1, vec![]),
+            safe_point(0, vec![]),
+        ]),
+        ..base()
+    };
+    assert_error_contains(&unsorted, "entries not strictly sorted");
+    let out_of_bounds = Function {
+        safe_point_layouts: SortedSafePointEntries::new(vec![safe_point(5, vec![])]),
+        ..base()
+    };
+    assert_error_contains(&out_of_bounds, "code_offset 5 out of bounds");
+    let not_allocating = Function {
+        safe_point_layouts: SortedSafePointEntries::new(vec![safe_point(1, vec![FO(0)])]),
+        ..base()
+    };
+    assert_error_contains(&not_allocating, "is not at an allocating op");
+    let duplicate = Function {
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        safe_point_layouts: SortedSafePointEntries::new(vec![safe_point(0, vec![FO(0)])]),
+        ..base()
+    };
+    assert_error_contains(&duplicate, "offset 0 duplicates frame_layout");
+    let ok = Function {
+        safe_point_layouts: SortedSafePointEntries::new(vec![safe_point(0, vec![FO(8)])]),
+        ..base()
+    };
+    assert_verifies(&ok);
+}
+
+// ---------------------------------------------------------------------------
+// Control flow
+// ---------------------------------------------------------------------------
+
+#[test]
+fn last_op_must_be_a_terminator() {
+    let falls_off = Function {
+        code: Code::from_vec(vec![MicroOp::StoreImm8 {
+            dst: FO(0),
+            imm: [0; 8],
+        }]),
+        ..minimal_func()
+    };
+    assert_error_contains(&falls_off, "last op must be a terminator");
+    for terminator in [
+        MicroOp::Return,
+        MicroOp::Abort { code: FO(0) },
+        MicroOp::Jump {
+            target: CO(0),
+            gas: 0,
+        },
+    ] {
+        assert_verifies(&Function {
+            code: Code::from_vec(vec![terminator]),
+            ..minimal_func()
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Statically decidable runtime invariant violations
+// ---------------------------------------------------------------------------
+
+#[test]
+fn bitwise_on_signed_rejected() {
+    let func = func_with_single_op(MicroOp::IntBitAnd(IntBinaryOp {
+        dst: FO(0),
+        lhs: FO(0),
+        rhs: IntOperand::SlotI64(FO(8)),
+    }));
+    assert_error_contains(&func, "bitwise on signed type");
+}
+
+#[test]
+fn shift_on_signed_rejected() {
+    let func = func_with_single_op(MicroOp::IntShl(IntShiftOp {
+        ty: IntTy::I64,
+        dst: FO(0),
+        lhs: FO(0),
+        rhs: ShiftOperand::ImmU8(1),
+    }));
+    assert_error_contains(&func, "shift on signed type");
+    assert_verifies(&func_with_single_op(MicroOp::IntShl(IntShiftOp {
+        ty: IntTy::U64,
+        dst: FO(0),
+        lhs: FO(0),
+        rhs: ShiftOperand::SlotU8(FO(8)),
+    })));
+}
+
+#[test]
+fn negate_on_unsigned_rejected() {
+    let func = func_with_single_op(MicroOp::IntNegate(IntNegateOp {
+        ty: IntTy::U64,
+        dst: FO(0),
+        src: FO(0),
+    }));
+    assert_error_contains(&func, "negate on unsigned type");
+    assert_verifies(&func_with_single_op(MicroOp::IntNegate(IntNegateOp {
+        ty: IntTy::I64,
+        dst: FO(0),
+        src: FO(0),
+    })));
+}
+
+#[test]
+fn value_cmp_on_reference_type_rejected() {
+    let func = func_with_single_op(MicroOp::ValueCmp(ValueCmpOp {
+        negate: false,
+        dst: FO(0),
+        lhs: FO(0),
+        rhs: FO(8),
+        ty: ref_u64(),
+    }));
+    assert_error_contains(&func, "value comparison on a reference type");
+}
+
+// ---------------------------------------------------------------------------
+// Offsets, sizes, and multi-destination ops
+// ---------------------------------------------------------------------------
+
+#[test]
+fn heap_offset_plus_size_must_not_overflow() {
+    assert_error_contains(
+        &func_with_single_op(MicroOp::HeapReadOffset {
+            dst: FO(0),
+            obj_ref: FO(8),
+            offset: u32::MAX,
+            size: 1,
+        }),
+        "overflows u32",
+    );
+    assert_error_contains(
+        &func_with_single_op(MicroOp::HeapMoveFrom {
+            dst: FO(0),
+            heap_ptr: FO(8),
+            offset: u32::MAX,
+            size: 8,
+        }),
+        "overflows u32",
+    );
+    assert_error_contains(
+        &func_with_single_op(MicroOp::HeapMoveToImm8 {
+            heap_ptr: FO(8),
+            offset: u32::MAX - 4,
+            imm: 0,
+        }),
+        "overflows u32",
+    );
+    assert_error_contains(
+        &func_with_single_op(MicroOp::EnumReadVariantFieldByTag {
+            dst: FO(0),
+            enum_ref: FO(8),
+            offsets: Box::new([None, Some(u32::MAX)]),
+            size: 4,
+        }),
+        "overflows u32",
+    );
+}
+
+#[test]
+fn deep_copy_heap_ptrs_offsets_are_checked() {
+    assert_error_contains(
+        &func_with_single_op(MicroOp::DeepCopyHeapPtrs {
+            base: FO(u32::MAX),
+            offsets: Box::new([1]),
+        }),
+        "overflows u32",
+    );
+    assert_error_contains(
+        &func_with_single_op(MicroOp::DeepCopyHeapPtrs {
+            base: FO(0),
+            offsets: Box::new([4]),
+        }),
+        "[4, 12) is not 8-byte aligned",
+    );
+    assert_verifies(&func_with_single_op(MicroOp::DeepCopyHeapPtrs {
+        base: FO(0),
+        offsets: Box::new([0, 8]),
+    }));
+}
+
+#[test]
+fn vec_unpack_destinations_must_be_disjoint() {
+    let func = func_with_single_op(MicroOp::VecUnpack(Box::new(VecUnpackOp {
+        src: FO(16),
+        elem_size: 8,
+        dsts: vec![FO(0), FO(4)],
+    })));
+    assert_error_contains(&func, "VecUnpack: destinations [0, 8) and [4, 12) overlap");
+    assert_verifies(&func_with_single_op(MicroOp::VecUnpack(Box::new(
+        VecUnpackOp {
+            src: FO(16),
+            elem_size: 8,
+            dsts: vec![FO(8), FO(0)],
+        },
+    ))));
+}
+
+#[test]
+fn slot_borrow_base_must_be_in_data_region() {
+    let func = func_with_single_op(MicroOp::SlotBorrow {
+        dst: FO(0),
+        local: FO(24),
+    });
+    assert_error_contains(
+        &func,
+        "SlotBorrow local 24 is outside the data region [0, 24)",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+#[test]
+fn store_imm_vec_constant_index_must_exist() {
+    let func = func_with_single_op(MicroOp::StoreImmVec {
+        dst: FO(0),
+        idx: ConstantPoolIndex(0),
+    });
+    let errors = verify_function(&func, &TestProvider::with_constants(vec![]));
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("constant pool index 0 out of range")));
+}
+
+#[test]
+fn store_imm_vec_destination_is_sized_for_the_constant() {
+    let func = func_with_single_op(MicroOp::StoreImmVec {
+        dst: FO(0),
+        idx: ConstantPoolIndex(0),
+    });
+    // A u64 constant fits an 8-byte slot...
+    let errors = verify_function(&func, &TestProvider::with_constants(vec![U64_TY]));
+    assert!(errors.is_empty(), "{errors:#?}");
+    // ...but a 32-byte address written at offset 0 runs into the metadata.
+    let errors = verify_function(&func, &TestProvider::with_constants(vec![ADDRESS_TY]));
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("[0, 32) overlaps metadata")));
+}
+
+// ---------------------------------------------------------------------------
+// Descriptors
+// ---------------------------------------------------------------------------
+
+#[test]
+fn enum_new_tag_must_name_a_variant() {
+    let mut descriptors = ObjectDescriptorTable::new();
+    let enum_desc = descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![]]).unwrap());
+    let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    let provider = TestProvider::new(descriptors);
+    let enum_new = |descriptor_id, variant| {
+        func_with_single_op(MicroOp::EnumNew {
+            dst: FO(0),
+            descriptor_id,
+            variant,
+        })
+    };
+    let errors = verify_function(&enum_new(enum_desc, 1), &provider);
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("tag 1 out of range")));
+    let errors = verify_function(&enum_new(struct_desc, 0), &provider);
+    assert!(errors.iter().any(|e| e.message.contains("is not an Enum")));
+    let errors = verify_function(&enum_new(enum_desc, 0), &provider);
+    assert!(errors.is_empty(), "{errors:#?}");
+}
+
+// ---------------------------------------------------------------------------
+// Calls
+// ---------------------------------------------------------------------------
+
+fn native_call(abi: NativeABI) -> MicroOp {
+    MicroOp::CallNative {
+        native_idx: NativeIdx(0),
+        ty_args: EMPTY_TYPE_LIST,
+        abi: Box::new(abi),
+    }
+}
+
+fn native_abi(args: Vec<FrameSlot>, heap_ptr_offsets: Vec<FO>) -> NativeABI {
+    NativeABI::new(args, vec![], heap_ptr_offsets, vec![]).unwrap()
+}
+
+#[test]
+fn native_slot_region_must_fit_the_frame() {
+    let abi = native_abi(vec![FrameSlot { offset: 0, size: 8 }], vec![]);
+    // frame_size() is 48 here, so the native's 8-byte region ends at 56.
+    assert_error_contains(
+        &func_with_single_op(native_call(abi.clone())),
+        "native slot region [48, 56) exceeds extended_frame_size 48",
+    );
+    assert_verifies(&Function {
+        extended_frame_size: 56,
+        ..func_with_single_op(native_call(abi))
+    });
+}
+
+#[test]
+fn native_pointer_offsets_are_aligned_bounded_and_inside_args() {
+    let with_abi = |abi| Function {
+        extended_frame_size: 72,
+        ..func_with_single_op(native_call(abi))
+    };
+    let beyond_region = native_abi(vec![FrameSlot { offset: 0, size: 8 }], vec![FO(8)]);
+    assert_error_contains(
+        &with_abi(beyond_region),
+        "native heap pointer offset 8 exceeds the slot region (8)",
+    );
+    let misaligned = native_abi(
+        vec![FrameSlot {
+            offset: 0,
+            size: 16,
+        }],
+        vec![FO(4)],
+    );
+    assert_error_contains(
+        &with_abi(misaligned),
+        "native heap pointer offset 4 is not 8-byte aligned",
+    );
+    let outside_arg = native_abi(
+        vec![FrameSlot { offset: 0, size: 8 }, FrameSlot {
+            offset: 16,
+            size: 8,
+        }],
+        vec![FO(8)],
+    );
+    assert_error_contains(
+        &with_abi(outside_arg),
+        "native heap pointer offset 8 is not inside an argument slot",
+    );
+    let ok = native_abi(
+        vec![FrameSlot {
+            offset: 0,
+            size: 16,
+        }],
+        vec![FO(0), FO(8)],
+    );
+    assert_verifies(&with_abi(ok));
+}
+
+#[test]
+fn native_required_descriptors_must_exist() {
+    // Mint an id the trivial table does not hold.
+    let mut other = ObjectDescriptorTable::new();
+    let missing = other.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    let abi = NativeABI::new(vec![], vec![], vec![], vec![missing]).unwrap();
+    assert_error_contains(
+        &func_with_single_op(native_call(abi)),
+        "native required descriptor 0",
+    );
+}
+
+#[test]
+fn call_direct_callee_must_fit_the_callee_region() {
+    let callee = FunctionPtr::new(Box::new(Function {
+        return_slots: vec![slot(0, 8, 8)],
+        return_tys: one_u64(),
+        ..one_param_callee()
+    }));
+    let call = MicroOp::CallDirect { ptr: callee };
+    // No callee region at all: frame_size() == extended_frame_size.
+    assert_error_contains(
+        &func_with_single_op(call.clone()),
+        "CallDirect: callee param_region_size 8 exceeds the callee region (0)",
+    );
+    assert_error_contains(
+        &func_with_single_op(call.clone()),
+        "CallDirect: callee return slot 0 [0, 8) exceeds the callee region (0)",
+    );
+    assert_verifies(&Function {
+        extended_frame_size: 56,
+        ..func_with_single_op(call)
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Closures
+// ---------------------------------------------------------------------------
+
+fn pack_closure(op: PackClosureOp) -> Function {
+    Function {
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        ..func_with_single_op(MicroOp::PackClosure(Box::new(op)))
+    }
+}
+
+/// A closure over `one_param_callee` capturing its single `u64` parameter
+/// from frame slot 8.
+fn capturing_closure() -> PackClosureOp {
+    PackClosureOp {
+        dst: FO(0),
+        func_ref: ClosureFuncRef::Resolved(FunctionPtr::new(Box::new(one_param_callee()))),
+        mask: 0b1,
+        captured_data_descriptor_id: Some(TRIVIAL_DESCRIPTOR_ID),
+        values_size: 8,
+        captured: vec![slot(8, 8, 8)],
+    }
+}
+
+#[test]
+fn pack_closure_well_formed_accepted() {
+    assert_verifies(&pack_closure(capturing_closure()));
+}
+
+#[test]
+fn pack_closure_descriptor_and_captures_must_agree() {
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            captured: vec![],
+            values_size: 0,
+            mask: 0,
+            ..capturing_closure()
+        }),
+        "provided but no captures",
+    );
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            captured_data_descriptor_id: None,
+            ..capturing_closure()
+        }),
+        "captured_data_descriptor_id is None",
+    );
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            captured_data_descriptor_id: Some(POINTER_VEC_DESCRIPTOR_ID),
+            ..capturing_closure()
+        }),
+        "is not a Trivial or CapturedData",
+    );
+}
+
+#[test]
+fn pack_closure_mask_and_captured_list_must_match_the_callee() {
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            mask: 0b11,
+            ..capturing_closure()
+        }),
+        "captured list length 1 does not match mask captured count 2",
+    );
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            mask: 0b10,
+            ..capturing_closure()
+        }),
+        "mask 0x2 sets bits beyond callee param count 1",
+    );
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            captured: vec![slot(8, 4, 4)],
+            values_size: 4,
+            ..capturing_closure()
+        }),
+        "captured[0].size 4 != callee param_slots[0].size 8",
+    );
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            captured: vec![slot(8, 8, 4)],
+            ..capturing_closure()
+        }),
+        "captured[0].align 4 != callee param_slots[0].align 8",
+    );
+}
+
+#[test]
+fn pack_closure_values_size_and_captured_alignment_are_checked() {
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            values_size: 16,
+            ..capturing_closure()
+        }),
+        "values_size 16 != captured layout size 8",
+    );
+    assert_error_contains(
+        &pack_closure(PackClosureOp {
+            captured: vec![slot(8, 8, 0)],
+            ..capturing_closure()
+        }),
+        "PackClosure: captured[0]: align 0 must be a power of two",
+    );
+}
+
+#[test]
+fn call_closure_provided_args_are_checked() {
+    let call = |provided_args| {
+        func_with_single_op(MicroOp::CallClosure(Box::new(CallClosureOp {
+            closure_src: FO(0),
+            provided_args,
+        })))
+    };
+    assert_verifies(&call(vec![slot(8, 8, 8)]));
+    assert_error_contains(
+        &call(vec![slot(8, 0, 8)]),
+        "provided_args[0]: size must be > 0",
+    );
+    assert_error_contains(&call(vec![slot(8, 8, 3)]), "align 3 must be a power of two");
+    assert_error_contains(&call(vec![slot(20, 8, 8)]), "overlaps metadata");
 }
