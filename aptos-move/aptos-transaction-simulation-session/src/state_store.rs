@@ -5,7 +5,10 @@ use anyhow::{bail, Result};
 use aptos_types::{
     access_path::Path,
     state_store::{
-        state_key::{inner::StateKeyInner, StateKey},
+        state_key::{
+            inner::{StateKeyInner, TradingNativeKey},
+            StateKey,
+        },
         table::TableHandle,
     },
 };
@@ -84,7 +87,13 @@ impl std::fmt::Display for HumanReadable<&StateKey> {
                 write!(f, "table_item::{}::{}", handle.0, hex::encode(key))
             },
             StateKeyInner::Raw(bytes) => write!(f, "raw::{}", hex::encode(bytes)),
-            StateKeyInner::TradingNative(key) => write!(f, "trading_native::{:?}", key),
+            StateKeyInner::TradingNative(key) => match key {
+                TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                } => write!(f, "position::{}::{}::{}", exchange, account, market),
+            },
         }
     }
 }
@@ -147,6 +156,12 @@ impl FromStr for HumanReadable<StateKey> {
                 let bytes = hex::decode(bytes)?;
                 Ok(HumanReadable(StateKey::raw(&bytes)))
             },
+            ["position", exchange, account, market] => {
+                let exchange = AccountAddress::from_str(exchange)?;
+                let account = AccountAddress::from_str(account)?;
+                let market = AccountAddress::from_str(market)?;
+                Ok(HumanReadable(StateKey::position(exchange, account, market)))
+            },
             _ => bail!("Unknown StateKey format: {}", s),
         }
     }
@@ -168,6 +183,7 @@ fn test_state_key_roundtrip() -> Result<()> {
         "table_item::0x1::",
         "raw::aabbccdd",
         "raw::",
+        "position::0x5::0x1234::0x2",
     ];
 
     for key in keys {

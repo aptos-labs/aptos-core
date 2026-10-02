@@ -6,6 +6,16 @@ use aptos_gas_schedule::AptosGasParameters;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
+/// Cap on distinct positions a single transaction may write. Position writes
+/// are not part of the gas-metered write set, so this is a hard bound rather
+/// than a gas-derived one, and applies even to otherwise unlimited configs.
+/// A `NativePosition` is fixed-size, so bounding the count bounds the bytes;
+/// a separate byte limit would be redundant.
+///
+/// TODO[native_position](metering): derive this from gas parameters like the
+/// other limits once position writes are gas-metered, instead of a const.
+pub const MAX_POSITION_WRITE_OPS_PER_TRANSACTION: usize = 1000;
+
 #[derive(Clone, Debug)]
 pub struct ChangeSetConfigs {
     gas_feature_version: u64,
@@ -116,6 +126,10 @@ impl ChangeSetConfigs {
             && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
         {
             return storage_write_limit_reached(Some("Too many write ops."));
+        }
+
+        if change_set.num_position_write_ops() > MAX_POSITION_WRITE_OPS_PER_TRANSACTION {
+            return storage_write_limit_reached(Some("Too many position write ops."));
         }
 
         let mut write_set_size = 0;

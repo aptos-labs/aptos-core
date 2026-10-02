@@ -615,10 +615,11 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 "Can't convert account raw key {:?} to WriteSetChange",
                 state_key
             )),
-            StateKeyInner::TradingNative(_) => Err(format_err!(
-                "Can't convert trading-native key {:?} to WriteSetChange",
-                state_key
-            )),
+            StateKeyInner::TradingNative(_) => {
+                // Not surfaced through the legacy REST WriteSetChange;
+                // queried via dedicated trading-native endpoints instead.
+                Ok(vec![])
+            },
         }
     }
 
