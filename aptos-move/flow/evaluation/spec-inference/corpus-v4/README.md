@@ -6,6 +6,9 @@ reference specifications, the mutants and every round built on them can be
 published as an artifact. V3.2 measured the same kind of task on private Etna
 code that cannot be redistributed.
 
+[`REPRODUCE.md`](REPRODUCE.md) explains how to verify the corpus and a
+published round, and how to rerun the experiment.
+
 The selection criterion is the one V3.2 already stated: **specification
 absence, not code privacy**. A model may know public code, but it cannot recall
 a specification nobody wrote. No target has a specification upstream; the

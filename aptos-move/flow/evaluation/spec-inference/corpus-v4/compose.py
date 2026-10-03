@@ -24,7 +24,7 @@ packages it reads are assembled under `references/build/` exactly as
 
     python3 corpus-v4/compose.py                  # into corpus-v4/inspect/
     python3 corpus-v4/compose.py --output DIR
-    python3 corpus-v4/compose.py --task MM-min-013
+    python3 corpus-v4/compose.py --task TR-match-029
 """
 
 from __future__ import annotations
