@@ -125,6 +125,9 @@ def main() -> None:
 
     spec = json.loads(args.spec.read_text(encoding="utf-8"))
     for task_id, entries in sorted(spec.items()):
+        # The task id becomes a directory name under both --out and
+        # --disjoint-from, so it is checked before either is touched.
+        task_id = require_plain_name(task_id, "task_id")
         cases = [build_case(args.package, entry, args.role) for entry in entries]
         ids = [case["mutant_id"] for case in cases]
         if len(set(ids)) != len(ids):
@@ -146,8 +149,7 @@ def main() -> None:
                             f"the refutation set"
                         )
 
-        # Likewise the task id, which becomes a directory name.
-        destination = args.out / require_plain_name(task_id, "task_id")
+        destination = args.out / task_id
         destination.mkdir(parents=True, exist_ok=True)
         path = destination / "mutants.json"
         path.write_text(
