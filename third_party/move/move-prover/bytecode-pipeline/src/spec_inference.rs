@@ -189,7 +189,6 @@ struct SpecInferenceRun {
 pub enum PartialAbortReason {
     MemoryHavoc,
     UnknownCallee(QualifiedId<FunId>),
-    DynamicCall,
 }
 
 /// State at a program point during backward WP analysis, also used in bytecode dumps.
@@ -1365,21 +1364,33 @@ fn inferred_abort_depends_on_partial_callee(
     {
         return false;
     }
-    let mut found = false;
-    condition.exp.visit_pre_order(&mut |node| {
-        if let ExpData::Call(_, AstOp::Behavior(move_model::ast::BehaviorKind::AbortsOf, _), args) =
-            node
-            && let Some(fun_exp) = args.first()
-            && let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref()
-            && env
+    // A partial closure taints the condition as the function of an
+    // `aborts_of`, and as an argument anywhere, since a callee's `aborts_of`
+    // includes the aborts of the function values passed to it. As the
+    // function of another predicate it contributes no aborts.
+    fn is_partial_closure(env: &GlobalEnv, exp: &ExpData) -> bool {
+        matches!(exp, ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _)
+            if env
                 .get_function((*module_id).qualified(*fun_id))
-                .is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
-        {
-            found = true;
-        }
-        !found
-    });
-    found
+                .is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false))
+    }
+    fn depends(env: &GlobalEnv, exp: &Exp) -> bool {
+        let mut found = false;
+        exp.visit_pre_order(&mut |node| {
+            if let ExpData::Call(_, AstOp::Behavior(kind, _), args) = node
+                && let Some((target, call_args)) = args.split_first()
+            {
+                found = (*kind == move_model::ast::BehaviorKind::AbortsOf
+                    && is_partial_closure(env, target))
+                    || call_args.iter().any(|arg| depends(env, arg));
+                return false;
+            }
+            found = is_partial_closure(env, node);
+            !found
+        });
+        found
+    }
+    depends(env, &condition.exp)
 }
 
 /// Behavioral predicates are currently left uninterpreted when an abort
@@ -2258,9 +2269,6 @@ fn update_spec<'env>(
                             )
                         }
                     },
-                    PartialAbortReason::DynamicCall => {
-                        "a dynamic call has no trusted complete abort summary".to_owned()
-                    },
                 });
             }
             if has_flagged_abort {
@@ -2319,6 +2327,7 @@ fn update_spec<'env>(
     // clauses are a lower bound so callers do not assume abort completeness.
     let num_params = fun_env.get_parameter_count();
     let mut dropped_abort_condition = false;
+    let mut dropped_closure_abort_condition = false;
     spec.conditions.retain(|condition| {
         if !condition.properties.contains_key(&inferred_sym) {
             return true;
@@ -2333,7 +2342,14 @@ fn update_spec<'env>(
         if references_only_params && !unsourcifiable_behavior && !unsourcifiable_ghost {
             return true;
         }
-        dropped_abort_condition |= matches!(condition.kind, ConditionKind::AbortsIf);
+        let is_abort = matches!(condition.kind, ConditionKind::AbortsIf);
+        if references_only_params && !unsourcifiable_ghost {
+            // Only the closure has no spelling, which is a limit of the
+            // source syntax rather than of WP.
+            dropped_closure_abort_condition |= is_abort;
+            return false;
+        }
+        dropped_abort_condition |= is_abort;
         if partial_abort_reasons.is_empty() {
             env.diag(
                 Severity::Bug,
@@ -2347,9 +2363,18 @@ fn update_spec<'env>(
         }
         false
     });
+    if dropped_closure_abort_condition {
+        partial_abort_reasons.push(
+            "an abort condition passes a closure to a behavioral predicate, which has no \
+             source-level spelling"
+                .to_owned(),
+        );
+    }
     if dropped_abort_condition {
         partial_abort_reasons
             .push("an abort condition had no representable source-level spelling".to_owned());
+    }
+    if dropped_abort_condition || dropped_closure_abort_condition {
         spec.properties.insert(
             pool.make(ABORTS_IF_IS_PARTIAL_PRAGMA),
             PropertyValue::Value(Value::Bool(true)),
@@ -6121,14 +6146,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         } else if self.callee_has_trusted_abort_summary(&fun_exp) {
             let aborts = self.mk_aborts_of_with_state(fun_exp, args, aborts_pre, aborts_post);
             state.add_aborts(aborts);
-        } else {
-            let reason = match fun_exp.as_ref() {
-                ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) => {
-                    PartialAbortReason::UnknownCallee(module_id.qualified(*fun_id))
-                },
-                _ => PartialAbortReason::DynamicCall,
-            };
-            state.partial_abort_reasons.insert(reason);
+        } else if let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() {
+            state
+                .partial_abort_reasons
+                .insert(PartialAbortReason::UnknownCallee(
+                    module_id.qualified(*fun_id),
+                ));
         }
 
         // Update post-state for predecessor: they see this call's pre-state
@@ -6254,7 +6277,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     /// its callee would otherwise lose the callee's abort behavior.
     fn callee_has_trusted_abort_summary(&self, fun_exp: &Exp) -> bool {
         let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() else {
-            return false;
+            // Invoking a function value aborts exactly when `aborts_of` over
+            // it holds. A closure over a partial contract reaching it is
+            // caught by `propagate_inferred_partial_aborts`.
+            return true;
         };
         let callee_qid = (*module_id).qualified(*fun_id);
         let callee = self.global_env().get_function(callee_qid);
@@ -8652,9 +8678,6 @@ mod tests {
         incoming
             .partial_abort_reasons
             .insert(PartialAbortReason::MemoryHavoc);
-        incoming
-            .partial_abort_reasons
-            .insert(PartialAbortReason::DynamicCall);
         assert_eq!(current.join(&incoming), JoinResult::Changed);
         assert_eq!(
             current.partial_abort_reasons,
