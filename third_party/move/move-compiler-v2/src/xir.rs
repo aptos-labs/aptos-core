@@ -9,6 +9,7 @@
 //! compiler-v2 stackless checks, optimizations, file-format generator, and
 //! verifier own all later compilation stages.
 
+use crate::env_pipeline::function_checker::call_access_error;
 use anyhow::{bail, ensure, Context, Result};
 use codespan::Span;
 use move_binary_format::file_format::Visibility as MoveVisibility;
@@ -712,6 +713,7 @@ fn import_source(
         added_id == module_id,
         "model assigned an unexpected module id"
     );
+    env.add_package_friends(module_id);
     for (decl, fun_id) in xir.functions.iter().zip(&function_ids) {
         let qid = module_id.qualified(*fun_id);
         let data = translate_function(
@@ -984,6 +986,7 @@ fn translate_function(
         external_struct_ids,
         function_ids,
         decl,
+        qid,
         loc: func_env.get_loc(),
         function_loc: func_env.get_loc(),
         code: vec![],
@@ -1121,6 +1124,8 @@ struct FunctionTranslator<'a> {
     external_struct_ids: &'a [QualifiedId<StructId>],
     function_ids: &'a [FunId],
     decl: &'a FunctionDecl,
+    /// The function being translated.
+    qid: QualifiedId<FunId>,
     loc: Loc,
     function_loc: Loc,
     code: Vec<Bytecode>,
@@ -1789,6 +1794,23 @@ impl FunctionTranslator<'_> {
                     _ => vec![],
                 };
                 let callee = self.env.get_function(target);
+                // Inline functions and lemmas have no bytecode; source calls to
+                // them are expanded before translation, which XIR cannot do.
+                ensure!(
+                    !callee.is_excluded_from_bytecode_gen(),
+                    "{oper:?}: `{}` has no bytecode (an inline function or lemma), so it cannot be called",
+                    callee.get_full_name_with_address()
+                );
+                // The same visibility rule the source compiler applies to calls,
+                // for the same modules: those being compiled. A dependency was
+                // checked in its own build.
+                if self.env.get_module(self.module_id).is_primary_target() {
+                    if let Some((message, _)) =
+                        call_access_error(&self.env.get_function(self.qid), &callee)
+                    {
+                        bail!("{oper:?}: {message}");
+                    }
+                }
                 ensure!(
                     callee.get_type_parameter_count() == type_args.len(),
                     "function `{}` takes {} type arguments, but the call supplies {}",
@@ -3033,6 +3055,309 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
+    /// XIR calling into a Move module compiled in the same run, following the
+    /// steps of `run_move_compiler` and reporting after each phase as it does:
+    /// an ordinary function compiles, its warnings reported by the Move checks
+    /// and the XIR function's by the XIR checks; an inline function is rejected.
+    #[test]
+    fn xir_calls_into_move_compiled_in_the_same_run() {
+        struct TempFile(PathBuf);
+        impl Drop for TempFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let math =
+            TempFile(std::env::temp_dir().join(format!("xir_math_{}.move", std::process::id())));
+        std::fs::write(
+            &math.0,
+            "module 0x42::math {
+                public fun plain(a: u64, b: u64): u64 { let x = a; x = b; x }
+                public inline fun max(a: u64, b: u64): u64 { if (a > b) a else b }
+            }",
+        )
+        .unwrap();
+        // The result, and the diagnostics reported after the Move checks and
+        // after the XIR checks.
+        let compile = |callee: &str| -> (Result<usize>, String, String) {
+            let options = Options {
+                sources: vec![math.0.to_string_lossy().into_owned()],
+                dependencies: move_stdlib::move_stdlib_files(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..Options::default()
+            };
+            let mut env = crate::run_checker(options.clone()).unwrap();
+            crate::env_check_and_transform_pipeline(&options).run(&mut env);
+            let mut targets = crate::run_stackless_bytecode_gen(&env);
+            crate::run_stackless_bytecode_pipeline(
+                &env,
+                crate::stackless_bytecode_check_pipeline(&options),
+                &mut targets,
+            );
+            let report = |env: &GlobalEnv| {
+                let mut out = codespan_reporting::term::termcolor::Buffer::no_color();
+                env.report_diag(&mut out, codespan_reporting::diagnostic::Severity::Warning);
+                String::from_utf8_lossy(&out.into_inner()).to_string()
+            };
+            let move_checks = report(&env);
+            crate::env_optimization_pipeline(&options).run(&mut env);
+            let mut targets = crate::run_stackless_bytecode_gen(&env);
+            let mut module =
+                instruction_module(Instr::Call(vec![2], Oper::Function(1), vec![0, 1]));
+            module.functions[0].params = 2;
+            // The result goes to a named local that is never read, which the
+            // XIR checks report.
+            let locals = module.functions[0].locals.len();
+            module.functions[0].local_names = (0..locals)
+                .map(|local| (local == 2).then(|| "unread".to_owned()))
+                .collect();
+            module.functions.truncate(1);
+            module.external_functions = vec![move_model_exchange::XirExternalFunction {
+                address: "0x42".to_owned(),
+                module: "math".to_owned(),
+                function: callee.to_owned(),
+            }];
+            let source = parse_source(
+                PathBuf::from("calls.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+            )
+            .unwrap();
+            let checked = crate::import_and_check_xir(&mut env, &options, &[source]);
+            let xir_checks = report(&env);
+            let result = checked.map(|mut xir_targets| {
+                crate::merge_xir_targets(&mut targets, &mut xir_targets);
+                crate::run_stackless_bytecode_pipeline(
+                    &env,
+                    crate::stackless_bytecode_optimization_pipeline(&options),
+                    &mut targets,
+                );
+                let units = crate::annotate_units(crate::run_file_format_gen(&mut env, &targets));
+                crate::run_bytecode_verifier(&units, &mut env);
+                units.len()
+            });
+            (result, move_checks, xir_checks)
+        };
+        let (plain, move_checks, xir_checks) = compile("plain");
+        assert!(
+            matches!(plain, Ok(2))
+                && move_checks.contains("`x` is unused")
+                && !xir_checks.contains("`x` is unused")
+                && xir_checks.contains("`unread` is unused"),
+            "{plain:?}\nMove checks:\n{move_checks}\nXIR checks:\n{xir_checks}"
+        );
+        let (max, ..) = compile("max");
+        let error = format!("{:#}", max.unwrap_err());
+        assert!(
+            error.contains("`0x42::math::max` has no bytecode"),
+            "{error}"
+        );
+    }
+
+    /// A call into another module follows the source compiler's visibility
+    /// rule. A package function is callable from the same package, which makes
+    /// the XIR module a friend of the callee, but not from a dependency's.
+    #[test]
+    fn calls_respect_the_callee_visibility() {
+        struct TempFile(PathBuf);
+        impl Drop for TempFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let write = |name: &str, text: &str| {
+            let file = TempFile(
+                std::env::temp_dir()
+                    .join(format!("xir_visibility_{name}_{}.move", std::process::id())),
+            );
+            std::fs::write(&file.0, text).unwrap();
+            file
+        };
+        let callee_text = |module: &str| {
+            format!(
+                "module 0x0::{module} {{
+                    public fun open(): u64 {{ 1 }}
+                    fun closed(): u64 {{ 2 }}
+                    public(package) fun for_package(): u64 {{ 4 }}
+                }}"
+            )
+        };
+        // `package` and `friendly` are compiled with the XIR module (Move does
+        // not allow package and friend functions in one module); `dependency`
+        // is only a dependency, loaded because `user` calls it.
+        let package = write("package", &callee_text("package"));
+        let friendly = write(
+            "friendly",
+            "module 0x0::friendly { public(friend) fun for_friends(): u64 { 3 } }",
+        );
+        let dependency = write("dependency", &callee_text("dependency"));
+        let user = write(
+            "user",
+            "module 0x0::user { public fun f(): u64 { 0x0::dependency::open() } }",
+        );
+        let path = |file: &TempFile| file.0.to_string_lossy().into_owned();
+        let cases = [
+            ("package", "open", None),
+            ("package", "closed", Some("is private to module")),
+            ("friendly", "for_friends", Some("(not a friend of")),
+            ("package", "for_package", None),
+            ("dependency", "open", None),
+            (
+                "dependency",
+                "for_package",
+                Some("cannot be called from a different package"),
+            ),
+        ];
+        let mut wrong = vec![];
+        for (callee, function, expected) in cases {
+            // l0 is a `u64` for the callee's result; the external function's id
+            // follows the module's own two.
+            let mut module = instruction_module(Instr::Call(vec![0], Oper::Function(2), vec![]));
+            module.external_functions = vec![move_model_exchange::XirExternalFunction {
+                address: "0x0".to_owned(),
+                module: callee.to_owned(),
+                function: function.to_owned(),
+            }];
+            // Sources, not dependencies, are always loaded.
+            let options = Options {
+                sources: vec![path(&package), path(&friendly), path(&user)],
+                dependencies: [move_stdlib::move_stdlib_files(), vec![path(&dependency)]].concat(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..Options::default()
+            };
+            let mut env = crate::run_checker(options.clone()).unwrap();
+            // The stubs must be legal Move, as the source checks judge it.
+            crate::env_check_and_transform_pipeline(&options).run(&mut env);
+            assert!(!env.has_errors(), "the Move stubs do not compile");
+            let source = parse_source(
+                PathBuf::from("visibility.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+            )
+            .unwrap();
+            let result = import_sources(&mut env, &[source], &mut FunctionTargetsHolder::default());
+            match (expected, result) {
+                (None, Ok(())) => {},
+                (Some(fragment), Err(error)) if format!("{error:#}").contains(fragment) => {},
+                (_, result) => wrong.push(format!("`{callee}::{function}`: {result:?}")),
+            }
+            // The compiled callee must name the XIR module as a friend exactly
+            // when the call relies on package visibility.
+            if callee == "package" {
+                let pool = env.symbol_pool();
+                let find = |name: &str| {
+                    env.get_modules()
+                        .find(|m| m.get_name().name() == pool.make(name))
+                        .unwrap()
+                };
+                let friended = find("package").has_friend(&find(&module.module.name).get_id());
+                if friended != (function == "for_package") {
+                    wrong.push(format!("`{callee}::{function}`: friended = {friended}"));
+                }
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// Calls to functions without bytecode: a native is callable; an inline
+    /// function or a lemma is not, since only source calls get expanded.
+    #[test]
+    fn calls_to_functions_without_bytecode() {
+        struct TempFile(PathBuf);
+        impl Drop for TempFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let helpers = TempFile(
+            std::env::temp_dir().join(format!("xir_no_bytecode_{}.move", std::process::id())),
+        );
+        std::fs::write(
+            &helpers.0,
+            "module 0x0::helpers {
+                public inline fun twice(x: u64): u64 { x + x }
+                spec module {
+                    lemma stays(x: u64) { ensures x == x; }
+                }
+            }",
+        )
+        .unwrap();
+        // (address, module, function, type arguments, destinations, sources,
+        // expected error); l0 and l1 are `u64`, l10 a `vector<u64>`.
+        let cases: [(
+            &str,
+            &str,
+            &str,
+            Vec<Ty>,
+            Vec<usize>,
+            Vec<usize>,
+            Option<&str>,
+        ); 3] = [
+            (
+                "0x1",
+                "vector",
+                "empty",
+                vec![Ty::U64],
+                vec![10],
+                vec![],
+                None,
+            ),
+            (
+                "0x0",
+                "helpers",
+                "twice",
+                vec![],
+                vec![0],
+                vec![1],
+                Some("has no bytecode"),
+            ),
+            (
+                "0x0",
+                "helpers",
+                "stays",
+                vec![],
+                vec![],
+                vec![1],
+                Some("has no bytecode"),
+            ),
+        ];
+        let mut wrong = vec![];
+        for (address, module_name, function, args, dsts, srcs, expected) in cases {
+            let oper = if args.is_empty() {
+                Oper::Function(2)
+            } else {
+                Oper::FunctionInst(2, args)
+            };
+            let mut module = instruction_module(Instr::Call(dsts, oper, srcs));
+            module.external_functions = vec![move_model_exchange::XirExternalFunction {
+                address: address.to_owned(),
+                module: module_name.to_owned(),
+                function: function.to_owned(),
+            }];
+            // A source, not a dependency: unused dependencies are not loaded.
+            let options = Options {
+                sources: vec![helpers.0.to_string_lossy().into_owned()],
+                dependencies: move_stdlib::move_stdlib_files(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..Options::default()
+            };
+            let mut env = crate::run_checker(options).unwrap();
+            let source = parse_source(
+                PathBuf::from("no_bytecode.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+            )
+            .unwrap();
+            let result = import_sources(&mut env, &[source], &mut FunctionTargetsHolder::default());
+            match (expected, result) {
+                (None, Ok(())) => {},
+                (Some(fragment), Err(error)) if format!("{error:#}").contains(fragment) => {},
+                (_, result) => wrong.push(format!("`{module_name}::{function}`: {result:?}")),
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
     /// The call graph is exactly what the translated code calls, including the
     /// library calls operations are lowered to. Locals: l0-l2 `u64`, l4
     /// `address`, l9 `bool`, l10 `vector<u64>`.
@@ -3233,6 +3558,98 @@ mod tests {
             match result {
                 Ok(Err(error)) if format!("{error:#}").contains("sources") => {},
                 other => wrong.push(format!("{srcs:?}: {other:?}")),
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// As in the source compiler, package visibility applies only to modules
+    /// being compiled: their calls are checked and they become package
+    /// friends. A dependency was checked in its own build, and is never a
+    /// friend of the package, even in whole-program mode, where every module
+    /// counts as a target.
+    #[test]
+    fn package_rules_apply_only_to_modules_being_compiled() {
+        struct TempFile(PathBuf);
+        impl Drop for TempFile {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let write = |name: &str, text: &str| {
+            let file = TempFile(
+                std::env::temp_dir()
+                    .join(format!("xir_package_{name}_{}.move", std::process::id())),
+            );
+            std::fs::write(&file.0, text).unwrap();
+            file
+        };
+        // `package` is compiled; `library` is a dependency of another package
+        // at the same address, kept loaded because `user` calls it.
+        let package = write(
+            "package",
+            "module 0x0::package { public(package) fun for_package(): u64 { 4 } }",
+        );
+        let library = write(
+            "library",
+            "module 0x0::library {
+                public fun open(): u64 { 1 }
+                public(package) fun for_package(): u64 { 4 }
+            }",
+        );
+        let user = write(
+            "user",
+            "module 0x0::user { public fun f(): u64 { 0x0::library::open() } }",
+        );
+        let path = |file: &TempFile| file.0.to_string_lossy().into_owned();
+        // (case, callee module, whole program)
+        let cases = [
+            ("a dependency calls its own package", "library", false),
+            ("a dependency calls into the package", "package", false),
+            ("whole program", "package", true),
+        ];
+        let mut wrong = vec![];
+        for (case, callee, whole_program) in cases {
+            let options = Options {
+                sources: vec![path(&package), path(&user)],
+                dependencies: [move_stdlib::move_stdlib_files(), vec![path(&library)]].concat(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..Options::default()
+            };
+            let mut env = crate::run_checker(options).unwrap();
+            if whole_program {
+                env.treat_everything_as_target(true);
+            }
+            let mut module = instruction_module(Instr::Call(vec![0], Oper::Function(2), vec![]));
+            module.external_functions = vec![move_model_exchange::XirExternalFunction {
+                address: "0x0".to_owned(),
+                module: callee.to_owned(),
+                function: "for_package".to_owned(),
+            }];
+            // Loaded as a dependency, not a target.
+            let source = parse_source_with_target(
+                PathBuf::from("dependency.xir.json"),
+                String::new(),
+                &serde_json::to_string(&module).unwrap(),
+                false,
+            )
+            .unwrap();
+            if let Err(error) =
+                import_sources(&mut env, &[source], &mut FunctionTargetsHolder::default())
+            {
+                wrong.push(format!("{case}: {error:#}"));
+                continue;
+            }
+            let pool = env.symbol_pool();
+            let find = |name: &str| {
+                env.get_modules()
+                    .find(|m| m.get_name().name() == pool.make(name))
+                    .unwrap()
+            };
+            if find(callee).has_friend(&find(&module.module.name).get_id()) {
+                wrong.push(format!(
+                    "{case}: the dependency was made a friend of `{callee}`"
+                ));
             }
         }
         assert!(wrong.is_empty(), "{wrong:#?}");
