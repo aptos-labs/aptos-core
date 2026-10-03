@@ -125,30 +125,14 @@ jobs:
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
 
-  # This job determines which tests to run
-  test-target-determinator:
-    needs: [permission-check]
-    runs-on: 2cpu-gh-ubuntu24-x64
-    outputs:
-      run_framework_upgrade_test: ${{ steps.determine_test_targets.outputs.run_framework_upgrade_test }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # Target determination must analyze the PR revision with full history.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-      - name: Run the test target determinator
-        id: determine_test_targets
-        # This workflow runs on pull_request_target and then checks out the PR.
-        # Load the action outside the mutable workspace so changing its manifest
-        # in a future PR cannot break the runner's cached post-step metadata.
-        uses: aptos-labs/aptos-core/.github/actions/test-target-determinator@main
-        with:
-          BASE_REF: origin/${{ github.base_ref || 'main' }}
-
-  # This is a PR required job.
+  # This is a PR required job. A PR skips the build only when the E2E selection
+  # needs no images and no label requests an image build or an image consumer.
   rust-images:
-    needs: [permission-check, determine-docker-build-metadata]
+    needs: [permission-check, determine-docker-build-metadata, e2e-test-determinator]
+    if: |
+      !cancelled() &&
+      needs.permission-check.result == 'success' &&
+      needs.determine-docker-build-metadata.result == 'success'
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
@@ -157,6 +141,7 @@ jobs:
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
+      SKIP_JOB: ${{ github.event_name == 'pull_request_target' && needs.e2e-test-determinator.outputs.docker_images == 'false' && !contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') && !contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test') }}
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
@@ -227,7 +212,7 @@ jobs:
   node-api-compatibility-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
-      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
+      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.rust-images.result) && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
@@ -246,7 +231,7 @@ jobs:
   cli-e2e-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
-      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
+      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.rust-images.result) && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
@@ -264,7 +249,7 @@ jobs:
   faucet-tests-main:
     needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
     if: |
-      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && needs.rust-images.result == 'success' && (
+      !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.rust-images.result) && (
         github.event_name == 'push' ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
@@ -293,7 +278,7 @@ jobs:
       !cancelled() &&
       needs.permission-check.result == 'success' &&
       needs.determine-docker-build-metadata.result == 'success' &&
-      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
@@ -326,9 +311,11 @@ jobs:
   fetch-last-released-docker-image-tag:
     needs:
       - permission-check
-    #  runs only when need to run forge-compat-test or forge-framework-upgrade-test
+      - e2e-test-determinator
+    # Runs only when forge-compat-test or forge-framework-upgrade-test runs; a
+    # failed selection still runs it so that forge-compat-test fails visibly.
     if: |
-      !failure() && !cancelled() && needs.permission-check.result == 'success' && (
+      !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
@@ -336,6 +323,10 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
+      ) && (
+        needs.e2e-test-determinator.result != 'success' ||
+        contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'forge-compatibility') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test')
       )
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
@@ -388,11 +379,11 @@ jobs:
       !cancelled() &&
       needs.permission-check.result == 'success' &&
       needs.determine-docker-build-metadata.result == 'success' &&
-      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
-      needs.fetch-last-released-docker-image-tag.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.fetch-last-released-docker-image-tag.result) &&
       (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
@@ -434,11 +425,11 @@ jobs:
       !cancelled() &&
       needs.permission-check.result == 'success' &&
       needs.determine-docker-build-metadata.result == 'success' &&
-      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
-      needs.fetch-last-released-docker-image-tag.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.fetch-last-released-docker-image-tag.result) &&
       (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') ||
@@ -468,7 +459,7 @@ jobs:
       !cancelled() &&
       needs.permission-check.result == 'success' &&
       needs.determine-docker-build-metadata.result == 'success' &&
-      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
@@ -496,7 +487,7 @@ jobs:
       !cancelled() &&
       needs.permission-check.result == 'success' &&
       needs.determine-docker-build-metadata.result == 'success' &&
-      needs.rust-images.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.rust-images.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-failpoints.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-performance.result) &&
       contains(fromJSON('["success","skipped"]'), needs.rust-images-consensus-only-perf-test.result) &&
