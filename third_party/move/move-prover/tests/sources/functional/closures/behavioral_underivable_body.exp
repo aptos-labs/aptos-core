@@ -1,0 +1,12 @@
+Move prover returns: exiting with condition generation errors
+error: this function has no specification but is referenced by a behavioral predicate
+   ┌─ tests/sources/functional/closures/behavioral_underivable_body.move:7:5
+   │
+ 7 │ ╭     fun sum_to(n: u64): u64 {
+ 8 │ │         let i = 0;
+ 9 │ │         let s = 0;
+10 │ │         while (i < n) {
+   · │
+14 │ │         s
+15 │ │     }
+   │ ╰─────^

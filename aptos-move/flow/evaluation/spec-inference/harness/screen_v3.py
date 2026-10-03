@@ -43,6 +43,7 @@ from .compatibility import (
     prove_reference,
     stage_identity,
     tool_executables,
+    wp_model_gate,
 )
 from dataclasses import asdict
 
@@ -87,6 +88,13 @@ async def screen_corpus_v3(
             config, package, record["target"], threshold
         )
         reference = await _prove_reference(config, manifest_path, record, threshold)
+        gate = await wp_model_gate(
+            config,
+            _reference_package(manifest_path, record),
+            record["module"],
+            require_plain_name(record["function"], "function"),
+            threshold,
+        )
         # `check_compatibility` also requires that WP's unaided output verify.
         # That is the right bar for a prepared corpus-v1.1 sample, where the
         # dependency contracts have to be complete before a target is asked of
@@ -102,9 +110,12 @@ async def screen_corpus_v3(
             "schema_version": 2,
             "task_id": task_id,
             "target": record["target"],
-            "passed": bool(well_formed and reference["proved"]),
+            "passed": bool(well_formed and reference["proved"] and gate["passed"]),
             "well_formed": well_formed,
             "reference_proved": reference["proved"],
+            # WP on the reference without the target's own contract: an
+            # error is a WP model gap, which must be fixed before a round.
+            "wp_model_gate": gate,
             # The package is always assembled beneath the corpus root.  Its
             # digest identifies the content; a corpus-relative label identifies
             # the package without publishing the machine's checkout path.
@@ -130,8 +141,14 @@ async def screen_corpus_v3(
         summaries.append(summary)
         if summary["passed"]:
             state = "pass" + (" (wp-hard)" if wp_hard else "")
+        elif not well_formed:
+            state = "FAIL (not well-formed)"
+        elif not reference["proved"]:
+            state = "FAIL (reference does not prove)"
+        elif not gate["stripped_spec_blocks"]:
+            state = "FAIL (no target contract in the reference)"
         else:
-            state = "FAIL (not well-formed)" if not well_formed else "FAIL (reference does not prove)"
+            state = "FAIL (WP model gap: " + "; ".join(gate["errors"]) + ")"
         print(f"[{index}/{len(records)}] {task_id}: {state} in {summary['wall_seconds']}s", flush=True)
 
     failed = [s for s in summaries if not s["passed"]]
@@ -186,6 +203,11 @@ async def _prove_reference(
     Assembled by `build_references.py` into a gitignored tree, so a missing one
     is a preparation error rather than a property of the task.
     """
+    package = _reference_package(manifest_path, record)
+    return await prove_reference(config, package, [record["target"]], threshold)
+
+
+def _reference_package(manifest_path: Path, record: dict[str, Any]) -> Path:
     # The manifest supplies this, so it is input: an absolute segment would
     # discard the reference root and `..` would climb out of it, and the proof
     # that came back would still be recorded as this task's solvability
@@ -197,7 +219,7 @@ async def _prove_reference(
             f"no assembled reference for {record['task_id']} at {package}; "
             "run `python3 corpus-v3.2/build_references.py` first"
         )
-    return await prove_reference(config, package, [record["target"]], threshold)
+    return package
 
 
 def main() -> None:

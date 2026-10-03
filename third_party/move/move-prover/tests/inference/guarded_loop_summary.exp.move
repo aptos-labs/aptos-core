@@ -32,7 +32,7 @@ module 0x42::guarded_loop_summary {
         store
     }
     spec partition(values: &mut vector<u64>, pivot: u64): u64 {
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         let cse_ = len(values) >= 1 && values[len(values) - 1] == update(update(values, pivot, values[len(values) - 1]), len(values) - 1, values[pivot])[len(values) - 1];
         ensures [inferred = sathard] len(values) == len(old(values)) && (len(old(values)) == len(values) && (len(old(values)) >= 1 && values[len(old(values)) - 1] == update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1])) ==> (forall y: u64, z: vector<u64>: len(z) == len(old(values)) && len(old(values)) == len(z) && y <= len(old(values)) - 1 && z[len(old(values)) - 1] == update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1] && (forall x: num: (0 <= x && x < y ==> z[x] < update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1]) && (y <= x && x < len(old(values)) - 1 ==> z[x] >= update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1])) ==> result == y);
         ensures [inferred = sathard] len(values) == len(old(values)) && (len(old(values)) == len(values) && (len(old(values)) >= 1 && values[len(old(values)) - 1] == update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1])) ==> (forall y: u64, z: vector<u64>: len(z) == len(old(values)) && len(old(values)) == len(z) && y <= len(old(values)) - 1 && z[len(old(values)) - 1] == update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1] && (forall x: num: (0 <= x && x < y ==> z[x] < update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1]) && (y <= x && x < len(old(values)) - 1 ==> z[x] >= update(update(old(values), pivot, old(values)[len(old(values)) - 1]), len(old(values)) - 1, old(values)[pivot])[len(old(values)) - 1])) ==> values == update(update(z, y, z[len(old(values)) - 1]), len(old(values)) - 1, z[y]));
@@ -47,19 +47,5 @@ module 0x42::guarded_loop_summary {
 
 }
 /*
-Inference diagnostics:
-warning: WP could not characterize the aborts of `guarded_loop_summary::partition` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an emitted abort condition is flagged `vacuous` or `sathard`
-   ┌─ tests/inference/guarded_loop_summary.move:6:5
-   │
- 6 │ ╭     fun partition(values: &mut vector<u64>, pivot: u64): u64 {
- 7 │ │         let last = values.length() - 1;
- 8 │ │         values.swap(pivot, last);
- 9 │ │         let p = values[last];
-   · │
-32 │ │         store
-33 │ │     }
-   │ ╰─────^
-
 Verification: Succeeded.
 */

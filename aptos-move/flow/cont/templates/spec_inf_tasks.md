@@ -25,8 +25,9 @@ contracts. Check one coherent candidate, then refine the rejected parts.
 
 `{{ tool(name="move_package_wp") }}` is available as an inference pass. Decide
 whether and when to use it alongside direct reasoning and invariant synthesis.
-It runs on any scope, loops included. Interpret its result using **WP tool**
-below.
+It runs on any scope, but it characterizes a loop only once the loop carries
+invariants: without them it covers loop-free code only and reports each loop
+which needs one. Interpret its result using **WP tool** below.
 {% if not args.no_wp_simplification %}
 Once the repairable warnings are resolved, simplify as much as the contract
 needs while preserving its meaning, then check the candidate.

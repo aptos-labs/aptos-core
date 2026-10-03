@@ -104,7 +104,15 @@ git diff corpus-v4/screening corpus-v4/metadata corpus-v4/manifest.json
 ```
 
 The screening diff should show only `wall_seconds` and the digests of the local
-tools; `passed`, `well_formed`, `reference_proved` and `wp_hard` must match.
+tools; `passed`, `well_formed`, `reference_proved`, `wp_model_gate` and
+`wp_hard` must match.
+
+`wp_model_gate` runs WP with `--aborts-if-is-strict` over the target's module
+in its reference package, with only the target's own contract removed. The
+reference keeps its loop invariants and dependency contracts, so an error there
+is a gap in WP's models (a native, an intrinsic, or a write WP cannot
+characterize exactly), not work left to an arm. Screening fails such a task
+until WP is fixed.
 
 To read a task as the agents received it, with its reference and every mutant
 as a diff, compose it into an untracked directory:
@@ -144,8 +152,9 @@ archived one.
 This repeats the published protocol: Terra 5.6 (`gpt-5.6-terra`) through the
 Codex CLI at `high` effort, three arms, four replicates of all 26 tasks (312
 cells), concurrency 3, the ordinary mutant set withheld as a disqualification
-gate and the held-out set used for scoring. A six-task pilot cost about $0.42
-and 3.5 minutes per cell, so a full round is on the order of $130 and six hours.
+gate and the held-out set used for scoring. A full round took about four and a
+half hours and cost about $78 at API-equivalent prices ($2.00 per million input
+tokens, $0.20 cached, $12.00 output), a mean of $0.25 per cell.
 
 **Environment.**
 
@@ -178,10 +187,15 @@ python3 -m harness.model_profile select --model terra56 --config config/default.
   --output $ROUND/config.json --source-commit $COMMIT
 for arm in agent-only hybrid-guided hybrid-flexible; do
   move-flow plugin $ROUND/plugins/acceptance/${arm//-/_} --inference-tactic $arm \
-    --evaluation-mode --feedback-level acceptance --max-verification-timeout 20 \
-    --flow-source-commit $COMMIT
+    --evaluation-mode --feedback-level acceptance --aborts-if-is-strict \
+    --infer-unspecified-helpers --max-verification-timeout 20 --flow-source-commit $COMMIT
 done
 ```
+
+`--aborts-if-is-strict` makes WP report an abort characterization it cannot
+make exact as an error instead of emitting `aborts_if_is_partial`, which the
+acceptance check rejects anyway. `--infer-unspecified-helpers` makes WP, run on
+one function, also infer that function's callees which have no specification.
 
 and write `$ROUND/plugins.json`:
 

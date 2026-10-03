@@ -180,11 +180,15 @@ async fn make_session_client(
         inference_tactic: Some(tactic),
         evaluation_mode,
         feedback_level: None,
+        aborts_if_is_strict: false,
+        infer_unspecified_helpers: false,
     };
     let evaluation = EvaluationConfig {
         inference_tactic: tactic,
         evaluation_mode,
         feedback_level,
+        aborts_if_is_strict: false,
+        infer_unspecified_helpers: false,
     };
 
     let (client_half, server_half) = tokio::io::duplex(8192);

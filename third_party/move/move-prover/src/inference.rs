@@ -41,8 +41,10 @@ use move_model::{
     symbol::Symbol,
 };
 use move_prover_bytecode_pipeline::{
+    options::ProverOptions,
     pipeline_factory,
     spec_inference::{InferredConditionTargets, InferredFrameTargets},
+    verification_analysis,
 };
 use move_stackless_bytecode::{
     function_target_pipeline::FunctionTargetsHolder, print_targets_with_annotations_for_test,
@@ -306,14 +308,21 @@ fn has_inferred_output(fun: &FunctionEnv<'_>, inferred_sym: Symbol) -> bool {
 
 /// Returns true when `fun` is in the user-specified verification scope.
 /// Mirrors the predicate used by `is_within_verification_scope` in
-/// `verification_analysis.rs`, which gates the spec inference processor itself.
+/// `verification_analysis.rs`, which gates the spec inference processor itself:
+/// a single function brings its unspecified helpers along if so configured.
 /// Threading this check into the writers ensures `filter` restricts which
 /// source files are edited, not just which functions get inferred conditions.
 fn matches_verify_scope(fun: &FunctionEnv, scope: &VerificationScope) -> bool {
+    let infer_helpers = ProverOptions::get(fun.module_env.env).infer_unspecified_helpers;
     match scope {
         VerificationScope::All => true,
         VerificationScope::Public => fun.is_exposed(),
-        VerificationScope::Only(name) => fun.matches_name(name),
+        VerificationScope::Only(name) => {
+            fun.matches_name(name)
+                || infer_helpers
+                    && verification_analysis::inference_helpers(fun.module_env.env, name)
+                        .contains(&fun.get_qualified_id())
+        },
         VerificationScope::OnlyModule(name) => fun.module_env.matches_name(name),
         VerificationScope::None => false,
     }

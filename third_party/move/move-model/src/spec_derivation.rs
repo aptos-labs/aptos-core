@@ -26,7 +26,7 @@
 use crate::{
     ast::{
         Condition, ConditionKind, Exp, ExpData, MatchArm, MemoryLabel, MemoryRange, Operation,
-        Pattern, QuantKind, Value, VisitorPosition,
+        Pattern, QuantKind, Spec, Value, VisitorPosition,
     },
     exp_generator::{ExpGenerator, FunExpGenerator, RangeCheckKind},
     exp_rewriter::{strip_all_olds, ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -863,6 +863,26 @@ pub fn functional_result_spec_values(
     env: &GlobalEnv,
     id: QualifiedId<FunId>,
 ) -> BTreeMap<usize, Exp> {
+    result_spec_values(env, id, false)
+}
+
+/// Whether the function's specification determines each of its results as a
+/// value over its pre-state arguments and global memory. Then the behavioral
+/// `result_of` the specification constrains is the call's actual result, even
+/// for a transparent function whose body runs in its place.
+pub fn spec_determines_results(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
+    let result_count = env.get_function(id).get_result_type().flatten().len();
+    let determined = result_spec_values(env, id, true);
+    (0..result_count).all(|idx| determined.contains_key(&idx))
+}
+
+/// The results the specification determines, by index: as pure single-state
+/// values, or also reading global memory when `allow_memory`.
+fn result_spec_values(
+    env: &GlobalEnv,
+    id: QualifiedId<FunId>,
+    allow_memory: bool,
+) -> BTreeMap<usize, Exp> {
     use crate::ast::ConditionKind;
 
     let fun = env.get_function(id);
@@ -879,8 +899,8 @@ pub fn functional_result_spec_values(
     let inferred_prop = env
         .symbol_pool()
         .make(crate::pragmas::CONDITION_INFERRED_PROP);
-    fun.get_spec()
-        .conditions
+    let spec = fun.get_spec();
+    spec.conditions
         .iter()
         .filter(|cond| cond.kind == ConditionKind::Ensures)
         .filter(|cond| {
@@ -899,10 +919,27 @@ pub fn functional_result_spec_values(
                     let ExpData::Call(_, Operation::Result(idx), _) = lhs.as_ref() else {
                         return None;
                     };
-                    spec_value_over_prestate(env, rhs, &mut_params).then(|| (*idx, rhs.clone()))
+                    let rhs = inline_pre_state_lets(env, &spec, rhs.clone());
+                    spec_value_over_prestate(env, &rhs, &mut_params, allow_memory)
+                        .then_some((*idx, rhs))
                 })
         })
         .collect()
+}
+
+/// Replaces the spec's pre-state `let` bindings in `exp` by their values. A
+/// later binding can use an earlier one, so they are replaced last to first.
+fn inline_pre_state_lets(env: &GlobalEnv, spec: &Spec, exp: Exp) -> Exp {
+    spec.conditions.iter().rev().fold(exp, |exp, cond| {
+        let ConditionKind::LetPre(symbol, _) = cond.kind else {
+            return exp;
+        };
+        let mut replacer = |_id: NodeId, target: RewriteTarget| match target {
+            RewriteTarget::LocalVar(found) if found == symbol => Some(cond.exp.clone()),
+            _ => None,
+        };
+        ExpRewriter::new(env, &mut replacer).rewrite_exp(exp)
+    })
 }
 
 fn has_functional_result_spec(env: &GlobalEnv, id: QualifiedId<FunId>) -> bool {
@@ -923,6 +960,7 @@ fn has_exact_move_value_model(
         .get_intrinsics()
         .get_spec_fun_for_move_fun(&id)
         .is_some()
+        || well_known::has_map_intrinsic_wp(env, id)
     {
         return true;
     }
@@ -1071,14 +1109,17 @@ pub fn spec_aborts_are_exact(env: &GlobalEnv, fun: QualifiedId<FunId>) -> bool {
     // and is dropped when the predicate is translated, so treating it as an
     // exact characterization would leave `aborts_of` defaulting to `false`
     // for a function which can abort.
+    // An intrinsic's prover model defines its aborts: the bound abort
+    // condition, or none at all; likewise a native the prelude models as
+    // total.
+    let intrinsics = env.get_intrinsics();
     let authoritative = fun_env
         .get_spec()
         .filter_kind(ConditionKind::AbortsIf)
         .any(|cond| condition_is_caller_visible(env, cond))
-        || env
-            .get_intrinsics()
-            .get_abort_spec_fun_for_move_fun(&fun)
-            .is_some();
+        || intrinsics.get_abort_spec_fun_for_move_fun(&fun).is_some()
+        || intrinsics.is_non_aborting_move_fun(&fun)
+        || well_known::is_non_aborting_prelude_native(&fun_env);
     authoritative && !fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
 }
 
@@ -1179,6 +1220,130 @@ pub fn derive_fun_aborts_conditions(
             .map(|exp| rewriter.rewrite_exp(exp.clone()))
             .collect(),
     )
+}
+
+/// The exact input-output behavior of a function's own body as `ensures`
+/// conditions phrased over its parameter temporaries and results -- the form
+/// a source-level `ensures` of that function takes: one equation per
+/// declared result and per `&mut` parameter's post-state. `None` when the
+/// behavior is not exactly describable this way: the body is outside the
+/// derivable fragment or not the authoritative contract (native, inline,
+/// opaque), writes global memory, or a value depends on global memory or
+/// embeds a behavioral carrier or closure.
+pub fn derive_fun_ensures_conditions(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> Option<Vec<Exp>> {
+    let cache = summary_cache(env);
+    let key = (fun, type_inst.to_vec());
+    if let Some(entry) = cache.ensures_entries.borrow().get(&key) {
+        return entry.clone();
+    }
+    if !cache.in_progress.borrow_mut().insert(fun) {
+        return None;
+    }
+    let computed = compute_fun_ensures_conditions(env, fun, type_inst);
+    cache.in_progress.borrow_mut().remove(&fun);
+    cache
+        .ensures_entries
+        .borrow_mut()
+        .insert(key, computed.clone());
+    computed
+}
+
+fn compute_fun_ensures_conditions(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    type_inst: &[Type],
+) -> Option<Vec<Exp>> {
+    let (param_syms, param_decls, body) = fun_body_over_placeholders(env, fun, type_inst)?;
+    let fun_env = env.get_function(fun);
+    let result_ty = fun_env.get_result_type().instantiate(type_inst);
+    let var_types: BTreeMap<Symbol, Type> = param_decls.iter().cloned().collect();
+    let loc = fun_env.get_loc();
+    let mut builder = FunExpGenerator::new(fun_env, loc.clone());
+    let derived = derive_spec(&mut builder, &param_decls, &var_types, &result_ty, &body)?;
+    if !derived.modifies.as_ref().is_some_and(|m| m.is_empty())
+        || !derived.deferred_applications.is_empty()
+    {
+        return None;
+    }
+    let mut_syms: BTreeSet<Symbol> = param_decls
+        .iter()
+        .filter(|(_, ty)| ty.is_mutable_reference())
+        .map(|(sym, _)| *sym)
+        .collect();
+    let exact = |value: &Exp| {
+        !mentions_syms_outside_old(value, &mut_syms)
+            && exps_are_pure_single_state(env, [value])
+            && !value.any(&mut |e| {
+                matches!(
+                    e,
+                    ExpData::Call(_, Operation::Behavior(..) | Operation::Closure(..), _)
+                )
+            })
+    };
+    let result_tys = result_ty.clone().flatten();
+    let results = derived.results.as_ref()?;
+    if results.len() != result_tys.len() || !results.iter().all(exact) {
+        return None;
+    }
+    let mut_values = derived.mut_param_values.as_ref()?;
+    // Placeholders become the parameter temporaries, typed as declared so a
+    // `&mut` parameter reads as one; the `old(..)` wrappers of the
+    // derivation's ensures convention keep naming the pre-state.
+    let temps: BTreeMap<Symbol, usize> = param_syms
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(idx, sym)| (sym, idx))
+        .collect();
+    let mut replacer = |id: NodeId, target: RewriteTarget| match target {
+        RewriteTarget::LocalVar(sym) => temps.get(&sym).map(|idx| {
+            let node = env.new_node(env.get_node_loc(id), param_decls[*idx].1.clone());
+            ExpData::Temporary(node, *idx).into_exp()
+        }),
+        RewriteTarget::Temporary(_) => None,
+    };
+    let mut rewriter = ExpRewriter::new(env, &mut replacer);
+    let bool_node = || env.new_node(loc.clone(), Type::Primitive(PrimitiveType::Bool));
+    let mut ensures = vec![];
+    for (idx, (value, ty)) in results.iter().zip(&result_tys).enumerate() {
+        let result = ExpData::Call(
+            env.new_node(loc.clone(), ty.clone()),
+            Operation::Result(idx),
+            vec![],
+        )
+        .into_exp();
+        let value = rewriter.rewrite_exp(value.clone());
+        ensures.push(ExpData::Call(bool_node(), Operation::Eq, vec![result, value]).into_exp());
+    }
+    for (idx, (sym, ty)) in param_decls.iter().enumerate() {
+        if !ty.is_mutable_reference() {
+            continue;
+        }
+        let (_, value) = mut_values.iter().find(|(s, _)| s == sym)?;
+        if !exact(value) {
+            return None;
+        }
+        let post = ExpData::Temporary(env.new_node(loc.clone(), ty.clone()), idx).into_exp();
+        let value = rewriter.rewrite_exp(value.clone());
+        ensures.push(ExpData::Call(bool_node(), Operation::Eq, vec![post, value]).into_exp());
+    }
+    Some(ensures)
+}
+
+/// Whether the behavioral predicates over a function without a specification
+/// are interpreted by its own body: its results, `&mut` post-states, and
+/// aborts are all exactly derivable ([`derive_fun_ensures_conditions`],
+/// [`derive_fun_aborts_conditions`]).
+pub fn has_derived_behavior(env: &GlobalEnv, fun: QualifiedId<FunId>, type_inst: &[Type]) -> bool {
+    let fun_env = env.get_function(fun);
+    fun_env.get_spec().conditions.is_empty()
+        && !fun_env.is_native_or_intrinsic()
+        && derive_fun_ensures_conditions(env, fun, type_inst).is_some()
+        && derive_fun_aborts_conditions(env, fun, type_inst).is_some()
 }
 
 /// The memoized abort summary of a function's body: the placeholder
@@ -1447,7 +1612,12 @@ pub fn mentions_syms_outside_old(exp: &Exp, syms: &BTreeSet<Symbol>) -> bool {
 /// references, no free local variables (e.g. from spec `let` bindings),
 /// and mentions of the given `&mut` parameters only under `old(..)` (a
 /// plain mention denotes the post-state).
-fn spec_value_over_prestate(env: &GlobalEnv, exp: &Exp, mut_params: &BTreeSet<usize>) -> bool {
+fn spec_value_over_prestate(
+    env: &GlobalEnv,
+    exp: &Exp,
+    mut_params: &BTreeSet<usize>,
+    allow_memory: bool,
+) -> bool {
     if !exp.free_vars().is_empty() {
         return false;
     }
@@ -1467,7 +1637,7 @@ fn spec_value_over_prestate(env: &GlobalEnv, exp: &Exp, mut_params: &BTreeSet<us
         }
         ok
     });
-    ok && exps_are_pure_single_state(env, [exp])
+    ok && (allow_memory || exps_are_pure_single_state(env, [exp]))
 }
 
 /// The parameter index a spec expression mentions directly, looking
@@ -1577,6 +1747,7 @@ struct CalleeValueSummaryCache {
     ref_entries: RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<CalleeRefResultSummary>>>,
     aborts_entries:
         RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<(Vec<Symbol>, Vec<Exp>)>>>,
+    ensures_entries: RefCell<BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<Vec<Exp>>>>,
     /// Memory read by the body-derived abort conditions. Derived from
     /// `aborts_entries`, but cached separately: it is queried at every
     /// behavioral-predicate site, including inside expression walks.
@@ -2971,8 +3142,8 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             return self.finish_intrinsic_wp(mid, fid, &type_inst, &inputs, &mut_places, wp);
         }
 
-        // 1.5. Exact WP for intrinsic-map mutators (value-level add/del
-        // roles), phrased over the map type's declared spec functions.
+        // 1.5. Exact WP for the value-level intrinsic-map roles, phrased
+        // over the map type's declared spec functions.
         if let Some(wp) = well_known::map_intrinsic_wp(
             self.builder.global_env(),
             self.builder,
@@ -3118,6 +3289,10 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         // A `&mut`-returning intrinsic (`borrow_mut`) yields a place.
         let result_ref = callee.get_result_type().instantiate(type_inst);
         if result_ref.is_mutable_reference() {
+            // Only a vector element is a place of this analysis.
+            if !callee.module_env.is_std_vector() {
+                return Err(Unsupported);
+            }
             let Some((place, _)) = mut_places.first() else {
                 return Err(Unsupported);
             };
@@ -3622,7 +3797,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                     }
                     for (lhs, rhs) in [(&eq_args[0], &eq_args[1]), (&eq_args[1], &eq_args[0])] {
                         if let ExpData::Call(_, Operation::Result(i), _) = lhs.as_ref() {
-                            if spec_value_over_prestate(env, rhs, &mut_params) {
+                            if spec_value_over_prestate(env, rhs, &mut_params, false) {
                                 found.entry(*i).or_insert_with(|| rhs.clone());
                             }
                         }
@@ -3696,7 +3871,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                         // mention of a `&mut` parameter as a dereference).
                         if let Some(idx) = param_mention(lhs) {
                             if mut_params.contains(&idx)
-                                && spec_value_over_prestate(env, rhs, &mut_params)
+                                && spec_value_over_prestate(env, rhs, &mut_params, false)
                             {
                                 whole.entry(idx).or_insert_with(|| rhs.clone());
                             }
@@ -3708,7 +3883,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                         {
                             if let Some(idx) = param_mention(&sel_args[0]) {
                                 if mut_params.contains(&idx)
-                                    && spec_value_over_prestate(env, rhs, &mut_params)
+                                    && spec_value_over_prestate(env, rhs, &mut_params, false)
                                 {
                                     by_field
                                         .entry(idx)
