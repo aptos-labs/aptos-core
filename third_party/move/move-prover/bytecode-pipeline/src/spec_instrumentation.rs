@@ -936,15 +936,19 @@ impl<'a> Instrumenter<'a> {
         // Emit `let` bindings.
         self.emit_lets(spec, false, self.self_is_bv_internal);
 
-        // Inject preconditions as assumes. This is done for all self.variant values.
+        // Assume preconditions in the verification variant only. A Baseline body is
+        // inlined into its callers, which assert the callee's caller-visible preconditions
+        // at the call; it assumes nothing they do not check.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_start()); // reset to function level
-        for (loc, exp) in spec.pre_conditions(&self.builder) {
-            let is_concrete = self.is_concrete_cond(&loc);
-            self.builder.set_loc(loc);
-            self.builder
-                .emit_with(move |attr_id| Prop(attr_id, Assume, exp));
-            self.tag_contract_prop(self.self_is_bv_internal && !is_concrete);
+        if self.is_verified() {
+            for (loc, exp) in spec.pre_conditions(&self.builder) {
+                let is_concrete = self.is_concrete_cond(&loc);
+                self.builder.set_loc(loc);
+                self.builder
+                    .emit_with(move |attr_id| Prop(attr_id, Assume, exp));
+                self.tag_contract_prop(self.self_is_bv_internal && !is_concrete);
+            }
         }
 
         // Emit well-formedness checks for choice expressions in let bindings.
@@ -1235,25 +1239,15 @@ impl<'a> Instrumenter<'a> {
         self.emit_lets(&callee_spec, false, callee_is_bv_internal);
         self.builder.set_loc_from_attr(id);
 
-        // Emit pre conditions if this is the verification variant or if the callee
-        // is opaque. For inlined callees outside of verification entry points, we skip
-        // emitting any pre-conditions because they are assumed already at entry into the
-        // function.
-        if self.is_verified() || callee_opaque {
-            for (loc, cond) in callee_spec.pre_conditions(&self.builder) {
-                self.emit_traces(&callee_spec, &cond);
-                // Determine whether we want to emit this as an assertion or an assumption.
-                let prop_kind = match self.builder.data.variant {
-                    FunctionVariant::Verification(..) => {
-                        self.builder
-                            .set_loc_and_vc_info(loc, REQUIRES_FAILS_MESSAGE);
-                        Assert
-                    },
-                    FunctionVariant::Baseline => Assume,
-                };
-                self.builder.emit_with(|id| Prop(id, prop_kind, cond));
-                self.tag_contract_prop(callee_is_bv_internal);
-            }
+        // Callee preconditions are the caller's obligation in every variant. A Baseline
+        // body is inlined into the verified roots that call it, so its assertions are
+        // discharged there.
+        for (loc, cond) in callee_spec.pre_conditions(&self.builder) {
+            self.emit_traces(&callee_spec, &cond);
+            self.builder
+                .set_loc_and_vc_info(loc, REQUIRES_FAILS_MESSAGE);
+            self.builder.emit_with(|id| Prop(id, Assert, cond));
+            self.tag_contract_prop(callee_is_bv_internal);
         }
 
         // Emit well-formedness checks for choice expressions in callee's pre-state let bindings.
