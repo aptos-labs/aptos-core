@@ -188,7 +188,7 @@ pub(crate) struct StateStore {
     persisted_state: PersistedState,
     buffered_state_target_items: usize,
     internal_indexer_db: Option<InternalIndexerDB>,
-    hot_state_config: HotStateConfig,
+    pub hot_state_config: HotStateConfig,
 }
 
 impl Deref for StateStore {

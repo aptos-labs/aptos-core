@@ -15,7 +15,7 @@ use crate::{
     stream_engine::{bound_by_range, DataStreamEngine, StreamEngine},
     streaming_client::{
         ContinuouslyStreamTransactionOutputsRequest, GetAllEpochEndingLedgerInfosRequest,
-        GetAllStatesRequest, GetAllTransactionsRequest, StreamRequest,
+        GetAllStatesRequest, GetAllTransactionsRequest, SnapshotKind, StreamRequest,
     },
     tests::{utils, utils::create_ledger_info},
 };
@@ -517,7 +517,7 @@ fn transform_state_values_stream_notifications() {
     let stream_request = StreamRequest::GetAllStates(GetAllStatesRequest {
         version,
         start_index,
-        state_kind: StateKind::MainState,
+        snapshot_kind: SnapshotKind::MAIN_STATE,
     });
 
     // Create a global data summary with a single state range
