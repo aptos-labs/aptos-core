@@ -35,6 +35,11 @@ on:
         type: boolean
         description: If true, the workflow will not build and push images.
         default: false
+      SKIP_JOB:
+        required: false
+        type: boolean
+        description: If true, skip the build without reserving a runner; the skipped job still reports its check.
+        default: false
     secrets:
       AWS_ACCESS_KEY_ID:
         required: false
@@ -105,6 +110,7 @@ permissions:
 
 jobs:
   rust-all:
+    if: ${{ !inputs.SKIP_JOB }}
     runs-on: runs-on,cpu=64,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
     steps:
       - uses: actions/checkout@v4

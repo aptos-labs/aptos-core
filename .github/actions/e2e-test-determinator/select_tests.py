@@ -90,8 +90,10 @@ def main():
     args.plan_file.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
     # Write outputs only after validating a complete successful plan.
+    images = any(REGISTRY[name]["docker_images"] for name in selected)
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write("selected_e2e_tests=" + json.dumps(selected) + "\n")
+        output.write(f"docker_images={str(images).lower()}\n")
     with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
         summary.write("### E2E selection\n\n```json\n" + rendered + "\n```\n")
 

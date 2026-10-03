@@ -33,6 +33,8 @@ jobs:
   # we ensure that the Aptos CLI works with all 3 prod networks, at least
   # based on the tests in the test suite.
   run-cli-tests:
+    # A failed selection still runs the job so that the required check fails.
+    if: ${{ !inputs.SKIP_JOB || inputs.SELECTION_RESULT != 'success' }}
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -124,7 +126,3 @@ jobs:
           path: ${{ runner.temp }}/cli-e2e-output.tar.gz
           if-no-files-found: warn
           retention-days: 14
-
-      # Print out whether the job was skipped.
-      - run: echo "Skipping CLI E2E tests!"
-        if: ${{ inputs.SKIP_JOB }}

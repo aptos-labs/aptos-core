@@ -94,14 +94,21 @@ cargo x list-e2e-tests                  # Also supports --format json
 ```
 
 The shared [registry](../../.github/actions/e2e-test-determinator/registry.json)
-covers CLI/API and Forge E2E and compatibility. Unknown E2E names or missing referenced definitions fail both `subsystem`
+covers CLI/API, Forge E2E and compatibility, smoke tests, and batch encryption.
+Each runner declares whether it consumes the release Docker images. Unknown E2E names or missing referenced definitions fail both `subsystem`
 and `compare` with a nonzero exit. Registry tests verify workflow jobs and required
 nightly coverage. A new runner needs registration, dependencies, workflow wiring,
 and nightly coverage; assigning a registered runner is configuration-only.
 
 The [E2E action](../../.github/actions/e2e-test-determinator/action.yaml) emits
-selected names; consumers gate jobs or set `SKIP_JOB`. Workflow event, label,
-permission, same-repository, image-build, and documentation gates also apply.
+selected names and whether a selected runner needs the release images;
+consumers gate jobs or set `SKIP_JOB`. An unselected runner's job is skipped
+without reserving a runner and still reports its check; a failed selection runs it
+so that the check fails. Lint+Test and the Docker workflow each run the selection.
+A PR skips the release image build when no selected runner needs it and no label
+requests an image build or a label-driven image consumer.
+Workflow event, label, permission, same-repository, image-build, and
+documentation gates also apply.
 Planner failures fail visibly, including required checks. Push/manual/nightly
 runs retain full selection. `CICD:run-all-e2e-tests` bypasses selection, but
 specialized label/permission gates apply. Explicit performance overrides force
@@ -186,15 +193,17 @@ failed jobs once through the [retry workflow](../../.github/workflows/nightly-fu
 which absorbs lost runners and other infrastructure failures. The final attempt
 posts its result to
 `#cicd-testing` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
-one linked square per night for the last seven completed runs on the branch
+one square per night for the last seven completed runs on the branch
 (green, yellow for passing only after the retry, red, a cross for a cancelled run
 that is not retried, or grey for skipped),
-oldest first, ending with the current run. Failed attempts add one row per failed
-job, including failures outside Move: its square on each night of the bar,
-tonight's linked to the job log, then the failed steps. Skipped suites follow on
+oldest first, ending with the current run. Each square is followed by the night's
+day of month, linked to its run; Slack does not make emoji-only link text
+clickable. Failed attempts add one row per failed
+job, including failures outside Move: its square on each night of the bar, then
+the job name linked to tonight's log and the failed steps. Skipped suites follow on
 one line. A cancelled run lists only jobs that failed before the cancellation.
 Jobs that passed only on the retry get the same row under "Passed on retry",
-tonight's yellow square linked to the failed first attempt. Add a notification
+tonight's square yellow and the name linked to the failed first attempt. Add a notification
 step for any further channel. Missing dispatches or runs cancelled before
 notification need external scheduler monitoring.
 

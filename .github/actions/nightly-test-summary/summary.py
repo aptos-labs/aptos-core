@@ -4,6 +4,7 @@
 
 """Render a nightly result for GitHub and Slack; never sends notifications itself."""
 
+from datetime import datetime
 import html
 import json
 import os
@@ -45,29 +46,44 @@ def night_square(run):
     return square(conclusion, run.get("attempt", 1) > 1, conclusion == "cancelled")
 
 
-def build_history(previous, run_url, failed, attempt=1, cancelled=False):
-    """One linked square per night, oldest first, ending with this run."""
-    cells = [f"<{run['url']}|{night_square(run)}>" for run in recent_nights(previous)]
+def night_cell(night, url, created_at):
+    """A night's square, then its day of month linked to the run.
+
+    Slack does not make emoji-only link text clickable, so the day carries the link.
+    """
+    day = datetime.fromisoformat(created_at.replace("Z", "+00:00")).day if created_at else "tonight"
+    return f"{night}<{url}|{day}>"
+
+
+def build_history(previous, run_url, failed, attempt=1, cancelled=False, created_at=None):
+    """One square per night, oldest first, ending with this run."""
+    cells = [
+        night_cell(night_square(run), run["url"], run["createdAt"])
+        for run in recent_nights(previous)
+    ]
     if cancelled:
         tonight = CANCELLED
     else:
         tonight = square("failure" if failed else "success", attempt > 1)
-    cells.append(f"<{run_url}|{tonight}>")
-    return f"Last {len(cells)} nights: " + "".join(cells)
+    cells.append(night_cell(tonight, run_url, created_at))
+    return f"Last {len(cells)} nights: " + " ".join(cells)
 
 
 def job_row(job, tonight, nights):
-    """A job's square on each night of the bar, tonight's linked to its log, then its failed steps."""
+    """A job's square on each night of the bar, its name linked to tonight's log, then its failed steps."""
     cells = []
     for run in nights:
         past = {past["name"]: past.get("conclusion") for past in run.get("jobs") or []}
         retried = job["name"] in failed_names(run.get("first_attempt_jobs"))
         run_cancelled = run.get("conclusion") == "cancelled"
         cells.append(square(past.get(job["name"]), retried, run_cancelled))
-    cells.append(f"<{job['html_url']}|{tonight}>" if job.get("html_url") else tonight)
+    cells.append(tonight)
+    name = html.escape(job["name"], quote=False)
+    if job.get("html_url"):
+        name = f"<{job['html_url']}|{name}>"
     steps = [step["name"] for step in job.get("steps", []) if step.get("conclusion") in FAILED]
-    text = job["name"] + (" \u2014 " + ", ".join(steps) if steps else "")
-    return "".join(cells) + "  " + html.escape(text, quote=False)
+    failed_steps = html.escape(" \u2014 " + ", ".join(steps), quote=False) if steps else ""
+    return "".join(cells) + "  " + name + failed_steps
 
 
 def job_rows(jobs, previous, cancelled=False):
@@ -103,6 +119,7 @@ def build_summary(
     previous_runs=None,
     attempt=1,
     first_attempt_jobs=None,
+    created_at=None,
 ):
     needs = dict(needs)
     cancelled = needs.pop(CANCELLATION_JOB, {}).get("result") == "success"
@@ -123,7 +140,7 @@ def build_summary(
         verdict = "passed"
     lines = [
         f"Nightly full-suite {verdict}",
-        build_history(previous_runs, run_url, bool(incomplete), attempt, cancelled),
+        build_history(previous_runs, run_url, bool(incomplete), attempt, cancelled, created_at),
         f"Branch: {html.escape(branch, quote=False)}; commit: {sha}",
         f"<{run_url}|Run, logs, and artifacts>",
     ]
@@ -206,6 +223,9 @@ def main():
     nights = recent_nights(
         [run for run in history or [] if str(run.get("databaseId")) != run_id]
     )
+    this_run = next(
+        (run for run in history or [] if str(run.get("databaseId")) == run_id), {}
+    )
     for run in nights:
         run["jobs"] = run_jobs(run["databaseId"])
         if run.get("attempt", 1) > 1:
@@ -220,6 +240,7 @@ def main():
         nights,
         attempt,
         run_jobs(run_id, 1) if attempt > 1 else None,
+        this_run.get("createdAt"),
     )
     with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
         output.write(f"failed={str(failed).lower()}\n")
