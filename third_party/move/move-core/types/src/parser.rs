@@ -178,7 +178,7 @@ fn next_token(s: &str) -> Result<Option<(Token, usize)>> {
                 let len = r.len();
                 (Token::Whitespace(r), len)
             },
-            c if c.is_ascii_alphabetic() => {
+            c if c.is_ascii_alphabetic() || c == '_' || c == '$' => {
                 let mut r = String::new();
                 r.push(c);
                 for c in it {
@@ -577,6 +577,10 @@ mod tests {
             "0x2::M::S_",
             "0x3::M_::S",
             "0x4::M_::S_",
+            "0x5::_M::S",
+            "0x6::$M::S",
+            "0x7::_M_::S_",
+            "0x8::$M_$::S",
             "0x00000000004::M::S",
             "0x1::M::S<u64>",
             "0x1::M::S<u16>",
@@ -603,6 +607,15 @@ mod tests {
             "Should have failed to parse type tag {}",
             s
         );
+
+        // A lone `_` or `$` is not a valid identifier (length must be > 1).
+        for s in &["0x1::_::S", "0x1::$::S"] {
+            assert!(
+                parse_type_tag(s).is_err(),
+                "Should have failed to parse type tag {}",
+                s
+            );
+        }
     }
 
     #[test]

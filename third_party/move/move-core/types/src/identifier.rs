@@ -41,7 +41,8 @@ use std::{borrow::Borrow, fmt, ops::Deref, str::FromStr};
 /// Return true if this character can appear in a Move identifier.
 ///
 /// Note: there are stricter restrictions on whether a character can begin a Move
-/// identifier--only alphabetic characters are allowed here.
+/// identifier--only alphabetic characters, or `_`/`$` followed by at least one
+/// further identifier character (see `is_valid`), are allowed here.
 #[inline]
 pub const fn is_valid_identifier_char(c: char) -> bool {
     matches!(c, '_' | '$' | 'a'..='z' | 'A'..='Z' | '0'..='9')
