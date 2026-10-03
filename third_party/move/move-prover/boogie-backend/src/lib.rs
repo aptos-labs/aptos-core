@@ -38,6 +38,7 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
         INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT, INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
         INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_KEY_AT,
         INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
@@ -216,6 +217,10 @@ struct MapImpl {
     // enumeration view: i-th key / key rank
     fun_spec_key_at: String,
     fun_spec_rank: String,
+    /// Whether the enumeration above is in insertion order rather than key order.
+    /// Insertion order is not determined by the content, so equality must compare
+    /// positions, and the enumeration must not be assumed to ascend under `cmp`.
+    insertion_ordered: bool,
     // abort-condition spec functions
     fun_spec_aborts_destroy_empty: String,
     fun_spec_aborts_add: String,
@@ -655,6 +660,34 @@ impl MapImpl {
             .get_decl_for_struct(&struct_qid)
             .expect("intrinsic decl");
         let iter_parts = Self::iter_ptr_parts(env, decl);
+
+        // A map declares its enumeration either in key order or in insertion order.
+        // The two share every rank axiom; they differ only in whether positions
+        // ascend under `cmp` and whether equality compares them, so the rest of the
+        // template reads one pair of names plus the flag.
+        let key_at_insertion = Self::triple_opt_to_name(
+            env,
+            decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT),
+        );
+        let rank_insertion = Self::triple_opt_to_name(
+            env,
+            decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK),
+        );
+        let insertion_ordered = !key_at_insertion.is_empty() && !rank_insertion.is_empty();
+        let key_at_sorted =
+            Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT));
+        let rank_sorted =
+            Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_RANK));
+        let fun_spec_key_at = if key_at_sorted.is_empty() {
+            key_at_insertion
+        } else {
+            key_at_sorted
+        };
+        let fun_spec_rank = if rank_sorted.is_empty() {
+            rank_insertion
+        } else {
+            rank_sorted
+        };
         let fun_iter_borrow_mut = Self::triple_opt_to_name(
             env,
             decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT),
@@ -889,14 +922,9 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
             ),
-            fun_spec_key_at: Self::triple_opt_to_name(
-                env,
-                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT),
-            ),
-            fun_spec_rank: Self::triple_opt_to_name(
-                env,
-                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_RANK),
-            ),
+            fun_spec_key_at,
+            fun_spec_rank,
+            insertion_ordered,
             fun_spec_aborts_destroy_empty: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY),
