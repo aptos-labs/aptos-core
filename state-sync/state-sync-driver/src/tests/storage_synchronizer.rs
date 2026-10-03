@@ -8,6 +8,7 @@ use crate::{
         CommitNotification, CommitNotificationListener, CommittedTransactions,
         ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
+    snapshot_chunk::SnapshotChunk,
     storage_synchronizer::{
         NotificationMetadata, StorageSynchronizer, StorageSynchronizerHandles,
         StorageSynchronizerInterface,
@@ -27,7 +28,9 @@ use crate::{
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_crypto::HashValue;
-use aptos_data_streaming_service::data_notification::NotificationId;
+use aptos_data_streaming_service::{
+    data_notification::NotificationId, streaming_client::SnapshotKind,
+};
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_executor_types::ChunkCommitNotification;
 use aptos_infallible::{Mutex, RwLock};
@@ -650,7 +653,7 @@ async fn test_save_states_receiver_error() {
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MAIN_STATE,
         )
         .unwrap();
 
@@ -658,7 +661,13 @@ async fn test_save_states_receiver_error() {
     // notification and that there's no pending data.
     let notification_id = 0;
     storage_synchronizer
-        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .save_state_values(
+            notification_id,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
@@ -730,17 +739,29 @@ async fn test_save_states_completion() {
         .initialize_snapshot_synchronizer(
             target_ledger_info.clone(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MAIN_STATE,
         )
         .unwrap();
 
     // Save multiple state chunks (including the last chunk)
     storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .save_state_values(
+            0,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
     storage_synchronizer
-        .save_state_values(1, create_state_value_chunk_with_proof(true))
+        .save_state_values(
+            1,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
         .await
         .unwrap();
 
@@ -816,11 +837,17 @@ async fn test_finalize_fast_sync_dropped_commit_listener() {
         .initialize_snapshot_synchronizer(
             target_ledger_info.clone(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MAIN_STATE,
         )
         .unwrap();
     storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(true))
+        .save_state_values(
+            0,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
         .await
         .unwrap();
     state_synchronizer_handle.await.unwrap();
@@ -863,14 +890,20 @@ async fn test_save_states_invalid_chunk() {
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
-            StateKind::MainState,
+            SnapshotKind::MAIN_STATE,
         )
         .unwrap();
 
     // Save a state chunk and verify we get an error notification
     let notification_id = 0;
     storage_synchronizer
-        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .save_state_values(
+            notification_id,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
@@ -888,7 +921,13 @@ async fn test_save_states_without_initialize() {
     // Attempting to save the states should panic as the state
     // synchronizer was not initialized!
     storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .save_state_values(
+            0,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(false),
+            ),
+        )
         .await
         .unwrap();
 }

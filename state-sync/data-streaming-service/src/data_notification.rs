@@ -6,7 +6,7 @@ use aptos_data_client::interface::{Response, ResponsePayload};
 use aptos_storage_interface::StateKind;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use std::{
@@ -46,6 +46,7 @@ pub enum DataPayload {
     ContinuousTransactionsWithProof(LedgerInfoWithSignatures, TransactionListWithProofV2),
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     EndOfStream,
+    HotStateValuesWithProof(HotStateValueChunkWithProof),
     StateValuesWithProof(StateKind, StateValueChunkWithProof),
     TransactionOutputsWithProof(TransactionOutputListWithProofV2),
     TransactionsWithProof(TransactionListWithProofV2),
