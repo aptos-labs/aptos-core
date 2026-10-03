@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/spec_int_instantiation.move:64:9
+   │
+64 │         ensures result == option::spec_some(x + 2); // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/spec_int_instantiation.move:59: inc_wrong
+   =         x = <redacted>
+   =     at tests/sources/functional/spec_int_instantiation.move:60: inc_wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/spec_int_instantiation.move:63: inc_wrong (spec)
+   =     at tests/sources/functional/spec_int_instantiation.move:64: inc_wrong (spec)

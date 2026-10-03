@@ -26,14 +26,14 @@ module 0x42::find_closure {
         pragma opaque = true, aborts_if_is_partial = true;
         ensures [inferred = sathard] (forall x: u64: x < len(v) ==> !result_of<pred>(v[x]) && !aborts_of<pred>(v[x])) ==> result == len(v);
         ensures [inferred = sathard] forall y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x]) && !aborts_of<pred>(v[x])) && (y < len(v) && result_of<pred>(v[y])) ==> result == y;
+        aborts_if [inferred = sathard] exists y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x]) && !aborts_of<pred>(v[x])) && (y < len(v) && aborts_of<pred>(v[y]));
     }
 
 }
 /*
 Inference diagnostics:
 warning: WP could not characterize the aborts of `find_closure::find` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = a dynamic call has no trusted complete abort summary
-  = a callee's `aborts_of` behavior is not accounted for
+  = an emitted abort condition is flagged `vacuous` or `sathard`
    ┌─ tests/inference/find_closure.move:9:5
    │
  9 │ ╭     public fun find<T>(v: &vector<T>, pred: |&T|bool has copy + drop): u64 {

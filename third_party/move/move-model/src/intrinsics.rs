@@ -451,6 +451,17 @@ impl IntrinsicsAnnotation {
         decl.intrinsic_to_spec_fun.get(abort_intrinsic_sym).cloned()
     }
 
+    /// Whether the Move function is bound to an intrinsic whose prover model never aborts,
+    /// i.e. whose role has no abort-condition counterpart (see `IntrinsicFunDef`). A role
+    /// with such a counterpart is not covered, even when the declaration leaves it unbound.
+    pub fn is_non_aborting_move_fun(&self, move_qid: &QualifiedId<FunId>) -> bool {
+        self.get_decl_for_move_fun(move_qid).is_some_and(|decl| {
+            decl.move_fun_to_intrinsic
+                .get(move_qid)
+                .is_some_and(|sym| !decl.move_to_abort_spec_intrinsic.contains_key(sym))
+        })
+    }
+
     /// Get the intrinsic decl for a spec function
     pub fn get_decl_for_spec_fun(&self, qid: &QualifiedId<SpecFunId>) -> Option<&IntrinsicDecl> {
         self.intrinsic_spec_funs
