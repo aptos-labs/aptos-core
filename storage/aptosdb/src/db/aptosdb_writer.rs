@@ -149,6 +149,12 @@ impl DbWriter for AptosDB {
         expected_root_hash: HashValue,
     ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, HotStateValue>>> {
         gauged_api("get_hot_state_snapshot_receiver", || {
+            // `StateStore::reset()` at finalize discards a restored hot state when this is
+            // set, and a restart in the middle wipes the partially restored one.
+            ensure!(
+                !self.state_store.hot_state_config.delete_on_restart,
+                "Restoring a hot state snapshot requires hot_state_config.delete_on_restart = false."
+            );
             crate::hot_state_restore::get_hot_state_snapshot_receiver(
                 Arc::clone(&self.state_store.hot_state_kv_db),
                 Arc::clone(&self.state_store.hot_state_merkle_db),
