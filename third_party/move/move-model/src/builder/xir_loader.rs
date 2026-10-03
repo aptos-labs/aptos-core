@@ -162,4 +162,23 @@ impl GlobalEnv {
             vec![],
         ))
     }
+
+    /// Replaces the functions an XIR function calls with those of its
+    /// translated code. Calls the reader lowers, such as vector operations and
+    /// a generic `<`, exist only there.
+    pub fn set_xir_called_functions(
+        &mut self,
+        fun: QualifiedId<FunId>,
+        called: BTreeSet<QualifiedId<FunId>>,
+    ) {
+        let data = self
+            .get_module_data_mut(fun.module_id)
+            .function_data
+            .get_mut(&fun.id)
+            .expect("the XIR function is loaded");
+        data.used_funs = Some(called.clone());
+        data.called_funs = Some(called);
+        // As for `set_function_def`: cached call-graph entries may now be stale.
+        self.call_graph_cache.invalidate();
+    }
 }

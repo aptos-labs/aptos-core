@@ -193,16 +193,16 @@ where
     Ok((env, annotated_units))
 }
 
-/// Moves validated XIR targets into the generated Move target holder.
+/// Moves validated XIR targets into the generated Move target holder. The XIR
+/// holder also holds the Move functions XIR calls, regenerated for its checks;
+/// where the Move pipeline already produced one, its target is kept.
 fn merge_xir_targets(targets: &mut FunctionTargetsHolder, xir_targets: &mut FunctionTargetsHolder) {
     let ids_and_variants = xir_targets.get_funs_and_variants().collect::<Vec<_>>();
     for (id, variant) in ids_and_variants {
-        assert!(
-            targets.get_data(&id, &variant).is_none(),
-            "XIR target overlaps generated Move target"
-        );
         let data = xir_targets.remove_target_data(&id, &variant);
-        targets.insert_target_data(&id, variant, data);
+        if targets.get_data(&id, &variant).is_none() {
+            targets.insert_target_data(&id, variant, data);
+        }
     }
 }
 
