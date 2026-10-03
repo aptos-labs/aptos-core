@@ -761,13 +761,34 @@ pub fn vector_intrinsic_wp<'env, G: ExpGenerator<'env>>(
     })
 }
 
-/// Returns the WP description for an intrinsic-map mutator bound to one of
-/// the value-level add/del roles (`map_add_no_override`,
-/// `map_add_override_if_exists`, `map_del_must_exist`,
-/// `map_del_return_key`), phrased over the intrinsic spec functions the map
-/// type declares (`map_spec_set`, `map_spec_del`, `map_spec_get`) and its
-/// declared abort-condition spec function. The reference-returning mutators
-/// (`map_borrow_mut*`, iterator borrows) are not handled.
+/// The intrinsic-map roles [`map_intrinsic_wp`] describes.
+const MAP_INTRINSIC_WP_ROLES: [&str; 7] = [
+    crate::pragmas::INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
+    crate::pragmas::INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
+    crate::pragmas::INTRINSIC_FUN_MAP_UPSERT,
+    crate::pragmas::INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
+    crate::pragmas::INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
+    crate::pragmas::INTRINSIC_FUN_MAP_REMOVE_OR_NONE,
+    crate::pragmas::INTRINSIC_FUN_MAP_GET,
+];
+
+/// Whether the function is bound to a role [`map_intrinsic_wp`] describes.
+pub fn has_map_intrinsic_wp(env: &GlobalEnv, fun_qid: QualifiedId<FunId>) -> bool {
+    MAP_INTRINSIC_WP_ROLES.iter().any(|name| {
+        env.get_intrinsics()
+            .is_intrinsic_of_for_move_fun(env.symbol_pool(), &fun_qid, name)
+    })
+}
+
+/// Returns the WP description for an intrinsic-map function bound to one of
+/// the value-level roles (`map_add_no_override`, `map_add_override_if_exists`,
+/// `map_upsert`, `map_del_must_exist`, `map_del_return_key`,
+/// `map_remove_or_none`, `map_get`), phrased over the intrinsic spec
+/// functions the map type declares (`map_spec_set`, `map_spec_del`,
+/// `map_spec_get`, `map_spec_has_key`), its declared abort-condition spec
+/// function, and `option::spec_some`/`spec_none` for `Option` results. The
+/// reference-returning mutators (`map_borrow_mut*`, iterator borrows) are not
+/// handled.
 ///
 /// `args` are the pre-state argument expressions in source order, at the
 /// value level (references read back to values). Returns `None` when the
@@ -786,53 +807,84 @@ pub fn map_intrinsic_wp<'env, G: ExpGenerator<'env>>(
 ) -> Option<IntrinsicWp> {
     use crate::pragmas::{
         INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
-        INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
-        INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_SET,
+        INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY, INTRINSIC_FUN_MAP_GET,
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE, INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET,
+        INTRINSIC_FUN_MAP_SPEC_HAS_KEY, INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_UPSERT,
     };
     let intrinsics = env.get_intrinsics();
     let decl = intrinsics.get_decl_for_move_fun(&fun_qid)?;
     let pool = env.symbol_pool();
-    let role = [
-        INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
-        INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
-        INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
-        INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
-    ]
-    .into_iter()
-    .find(|name| intrinsics.is_intrinsic_of_for_move_fun(pool, &fun_qid, name))?;
-    // Builds a call to a declared intrinsic spec function, instantiated
-    // with the map instantiation (all these spec functions are generic
-    // exactly over the key and value type).
-    let spec_call = |sf_qid: QualifiedId<SpecFunId>, call_args: Vec<Exp>| -> Option<Exp> {
-        let sf_decl = env.get_spec_fun(sf_qid);
-        if sf_decl.params.len() != call_args.len() || sf_decl.type_params.len() != type_inst.len() {
-            return None;
-        }
-        let result_ty = sf_decl.result_type.instantiate(type_inst);
-        env.add_used_spec_fun_transitive(sf_qid);
-        Some(g.mk_call_with_inst(
-            &result_ty,
-            type_inst.to_vec(),
-            Operation::SpecFunction(
-                sf_qid.module_id,
-                sf_qid.id,
-                crate::ast::MemoryRange::default(),
-            ),
-            call_args,
-        ))
-    };
+    let role = MAP_INTRINSIC_WP_ROLES
+        .into_iter()
+        .find(|name| intrinsics.is_intrinsic_of_for_move_fun(pool, &fun_qid, name))?;
+    let spec_call =
+        |sf_qid: QualifiedId<SpecFunId>, inst: &[Type], call_args: Vec<Exp>| -> Option<Exp> {
+            let sf_decl = env.get_spec_fun(sf_qid);
+            if sf_decl.params.len() != call_args.len() || sf_decl.type_params.len() != inst.len() {
+                return None;
+            }
+            let result_ty = sf_decl.result_type.instantiate(inst);
+            env.add_used_spec_fun_transitive(sf_qid);
+            Some(g.mk_call_with_inst(
+                &result_ty,
+                inst.to_vec(),
+                Operation::SpecFunction(
+                    sf_qid.module_id,
+                    sf_qid.id,
+                    crate::ast::MemoryRange::default(),
+                ),
+                call_args,
+            ))
+        };
+    // Calls a declared intrinsic spec function, instantiated with the map
+    // instantiation (all these spec functions are generic exactly over the
+    // key and value type).
     let role_call = |name: &str, call_args: Vec<Exp>| -> Option<Exp> {
-        spec_call(decl.lookup_spec_fun(env, name)?, call_args)
+        spec_call(decl.lookup_spec_fun(env, name)?, type_inst, call_args)
     };
     // The declared abort condition over the pre-state arguments; the abort
     // spec function's parameters mirror the Move function's (value-level).
     let declared_abort = || -> Option<Exp> {
         spec_call(
             intrinsics.get_abort_spec_fun_for_move_fun(&fun_qid)?,
+            type_inst,
             args.to_vec(),
         )
     };
     let arg = |i: usize| args.get(i).cloned();
+    // The entry of key `args[1]` in map `args[0]` as the function's declared
+    // `Option` result: `spec_some(spec_get(m, k))` if present, else
+    // `spec_none()`.
+    let has_key = || role_call(INTRINSIC_FUN_MAP_SPEC_HAS_KEY, vec![arg(0)?, arg(1)?]);
+    let entry_option = || -> Option<Exp> {
+        let result_ty = env
+            .get_function(fun_qid)
+            .get_result_type()
+            .instantiate(type_inst);
+        let Type::Struct(option_mid, _, elem_inst) = &result_ty else {
+            return None;
+        };
+        let option_module = env.get_module(*option_mid);
+        if !option_module.is_option() {
+            return None;
+        }
+        let value = role_call(INTRINSIC_FUN_MAP_SPEC_GET, vec![arg(0)?, arg(1)?])?;
+        let some = spec_call(
+            find_spec_fun_in_module(&option_module, "spec_some")?,
+            elem_inst,
+            vec![value],
+        )?;
+        let none = spec_call(
+            find_spec_fun_in_module(&option_module, "spec_none")?,
+            elem_inst,
+            vec![],
+        )?;
+        Some(g.mk_ite(
+            has_key()?.as_ref().clone(),
+            some.as_ref().clone(),
+            none.as_ref().clone(),
+        ))
+    };
     Some(match role {
         // add(m, k, v): post-state `spec_set(m, k, v)`; aborts per the
         // declared condition (key already present) resp. never for the
@@ -849,6 +901,20 @@ pub fn map_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             IntrinsicWp {
                 aborts,
                 outputs: vec![role_call(INTRINSIC_FUN_MAP_SPEC_SET, args.to_vec())?],
+            }
+        },
+        // upsert(m, k, v): returns the previous entry; post-state
+        // `spec_set(m, k, v)`; never aborts.
+        INTRINSIC_FUN_MAP_UPSERT => {
+            if args.len() != 3 {
+                return None;
+            }
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![
+                    entry_option()?,
+                    role_call(INTRINSIC_FUN_MAP_SPEC_SET, args.to_vec())?,
+                ],
             }
         },
         // del(m, k): returns `spec_get(m, k)` (with the key first for the
@@ -869,6 +935,34 @@ pub fn map_intrinsic_wp<'env, G: ExpGenerator<'env>>(
             IntrinsicWp {
                 aborts: declared_abort()?,
                 outputs,
+            }
+        },
+        // remove_or_none(m, k): returns the entry; the map is unchanged when
+        // the key is absent; never aborts.
+        INTRINSIC_FUN_MAP_REMOVE_OR_NONE => {
+            if args.len() != 2 {
+                return None;
+            }
+            let post = g.mk_ite(
+                has_key()?.as_ref().clone(),
+                role_call(INTRINSIC_FUN_MAP_SPEC_DEL, args.to_vec())?
+                    .as_ref()
+                    .clone(),
+                arg(0)?.as_ref().clone(),
+            );
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![entry_option()?, post],
+            }
+        },
+        // get(m, k): returns the entry; never aborts.
+        INTRINSIC_FUN_MAP_GET => {
+            if args.len() != 2 {
+                return None;
+            }
+            IntrinsicWp {
+                aborts: g.mk_bool_const(false),
+                outputs: vec![entry_option()?],
             }
         },
         _ => return None,

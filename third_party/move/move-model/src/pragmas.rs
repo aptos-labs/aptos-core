@@ -28,6 +28,10 @@ pub const TIMEOUT_PRAGMA: &str = "timeout";
 /// Pragma defining a random seed.
 pub const SEED_PRAGMA: &str = "seed";
 
+/// Property of a recursive spec function carrying the `:weight` of its
+/// defining axiom (`spec fun NAME(...): T [weight = N]`).
+pub const WEIGHT_PROP: &str = "weight";
+
 /// Pragma indicating an estimate how long verification takes. Verification
 /// is skipped if the timeout is smaller than this.
 pub const VERIFY_DURATION_ESTIMATE_PRAGMA: &str = "verify_duration_estimate";
@@ -397,7 +401,8 @@ pub struct IntrinsicFunDef {
     pub is_move_fun: bool,
     /// For Move functions only: the name of the spec counterpart used for pure spec calls.
     pub spec_fun: Option<&'static str>,
-    /// For Move functions only: the name of the abort-condition spec function.
+    /// For Move functions only: the name of the abort-condition spec function. `None` means
+    /// the prover's model of the function never aborts.
     pub abort_spec_fun: Option<&'static str>,
 }
 

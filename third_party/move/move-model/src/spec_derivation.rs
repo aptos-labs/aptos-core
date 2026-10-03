@@ -923,6 +923,7 @@ fn has_exact_move_value_model(
         .get_intrinsics()
         .get_spec_fun_for_move_fun(&id)
         .is_some()
+        || well_known::has_map_intrinsic_wp(env, id)
     {
         return true;
     }
@@ -1071,14 +1072,15 @@ pub fn spec_aborts_are_exact(env: &GlobalEnv, fun: QualifiedId<FunId>) -> bool {
     // and is dropped when the predicate is translated, so treating it as an
     // exact characterization would leave `aborts_of` defaulting to `false`
     // for a function which can abort.
+    // An intrinsic's prover model defines its aborts: the bound abort
+    // condition, or none at all.
+    let intrinsics = env.get_intrinsics();
     let authoritative = fun_env
         .get_spec()
         .filter_kind(ConditionKind::AbortsIf)
         .any(|cond| condition_is_caller_visible(env, cond))
-        || env
-            .get_intrinsics()
-            .get_abort_spec_fun_for_move_fun(&fun)
-            .is_some();
+        || intrinsics.get_abort_spec_fun_for_move_fun(&fun).is_some()
+        || intrinsics.is_non_aborting_move_fun(&fun);
     authoritative && !fun_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
 }
 
@@ -2971,8 +2973,8 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             return self.finish_intrinsic_wp(mid, fid, &type_inst, &inputs, &mut_places, wp);
         }
 
-        // 1.5. Exact WP for intrinsic-map mutators (value-level add/del
-        // roles), phrased over the map type's declared spec functions.
+        // 1.5. Exact WP for the value-level intrinsic-map roles, phrased
+        // over the map type's declared spec functions.
         if let Some(wp) = well_known::map_intrinsic_wp(
             self.builder.global_env(),
             self.builder,

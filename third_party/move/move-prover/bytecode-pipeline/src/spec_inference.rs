@@ -119,7 +119,7 @@ use move_model::{
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
-        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, INTRINSIC_FUN_MAP_HAS_KEY, OPAQUE_PRAGMA,
+        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
     sourcifier::Sourcifier,
     spec_derivation,
@@ -6144,17 +6144,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         };
         let env = self.global_env();
         let callee = env.get_function((*module_id).qualified(*fun_id));
-        let callee_qid = callee.get_qualified_id();
-        // An intrinsic map membership query is a total read. Its executable
-        // implementation may contain loops (for example BigOrderedMap tree
-        // traversal), but inference substitutes the paired `map_spec_has_key`
-        // function and must not carry the implementation loop's partial-abort
-        // marker into the caller.
-        if env.get_intrinsics().is_intrinsic_of_for_move_fun(
-            env.symbol_pool(),
-            &callee_qid,
-            INTRINSIC_FUN_MAP_HAS_KEY,
-        ) {
+        // An intrinsic is described by its prover model, not its executable
+        // implementation (which may loop, e.g. BigOrderedMap tree traversal).
+        if env
+            .get_intrinsics()
+            .is_non_aborting_move_fun(&callee.get_qualified_id())
+        {
             return true;
         }
         if callee.is_well_known(well_known::TYPE_NAME_MOVE)

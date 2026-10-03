@@ -1127,3 +1127,45 @@ impl MapImpl {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::NATIVE_TEMPLATE;
+    use move_model::pragmas::INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS;
+
+    /// A map intrinsic without an abort-condition counterpart is modeled as
+    /// never aborting (`Intrinsics::is_non_aborting_move_fun`), so its
+    /// template procedures must not abort, and those of the others must.
+    #[test]
+    fn map_intrinsic_abort_conditions_match_template() {
+        let template = std::str::from_utf8(NATIVE_TEMPLATE).expect("UTF-8 template");
+        let lines: Vec<&str> = template.lines().collect();
+        for (role, def) in INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.iter() {
+            if !def.is_move_fun {
+                continue;
+            }
+            let name = format!(
+                "{{{{impl.fun_{}}}}}",
+                role.strip_prefix("map_").expect("map role")
+            );
+            let mut procedures = 0;
+            for (start, line) in lines.iter().enumerate() {
+                if !(line.starts_with("procedure ") && line.contains(&name)) {
+                    continue;
+                }
+                procedures += 1;
+                let aborts = lines[start..]
+                    .iter()
+                    .take_while(|line| **line != "}")
+                    .any(|line| line.contains("$Abort") || line.contains("$ExecFailureAbort"));
+                assert_eq!(
+                    aborts,
+                    def.abort_spec_fun.is_some(),
+                    "template procedure of `{}` disagrees with its abort condition",
+                    role
+                );
+            }
+            assert!(procedures > 0, "no template procedure for `{}`", role);
+        }
+    }
+}

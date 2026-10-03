@@ -3017,9 +3017,18 @@ impl<'env> BoogieTranslator<'env> {
             // (e.g. via uninterpreted functions); for now this is restricted.
             // A predicate over this function type reaches every target of the
             // type through the evaluator, however the value is named -- as a
-            // closure, parameter, local, or struct field.
+            // closure, parameter, local, or struct field. An intrinsic whose
+            // aborts the prover's model defines publishes that model instead.
+            let qid = info.fun.to_qualified_id();
+            let modeled_intrinsic = self
+                .env
+                .get_intrinsics()
+                .get_decl_for_move_fun(&qid)
+                .is_some()
+                && spec_derivation::spec_aborts_are_exact(self.env, qid);
             if closure_spec.conditions.is_empty()
                 && !fun_env.is_native()
+                && !modeled_intrinsic
                 && self.named_by_behavioral_predicate(&info.fun.to_qualified_id())
             {
                 self.env.error(
