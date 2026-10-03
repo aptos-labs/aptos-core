@@ -165,9 +165,6 @@ class ScoringSetTest(unittest.TestCase):
                 seen[mutant_id] = task_dir.name
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class TaskIdConfinementTest(unittest.TestCase):
     """A spec's task id is checked before it reaches any path.
@@ -207,3 +204,7 @@ class TaskIdConfinementTest(unittest.TestCase):
                 with patch("sys.argv", argv):
                     with self.assertRaisesRegex(ValueError, "task_id"):
                         module.main()
+
+
+if __name__ == "__main__":
+    unittest.main()
