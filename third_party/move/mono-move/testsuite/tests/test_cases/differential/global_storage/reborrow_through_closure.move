@@ -1,8 +1,7 @@
 // A closure re-borrows a resource while the caller still holds a `&mut` to
 // it. The static acquires check cannot see through the function value, so
-// both borrows reach the runtime. V1 rejects the re-borrow with its reentrancy
-// check; MonoMove has no such check yet, so both borrows must alias the same
-// value.
+// both borrows reach the runtime, where the reentrancy check rejects the
+// re-borrow.
 
 // RUN: publish
 module 0x42::reborrow_through_closure {
@@ -49,8 +48,10 @@ module 0x42::reborrow_through_closure {
 
 // RUN: execute 0x42::reborrow_through_closure::through_lambda_body --args 0x42, 0x42
 // CHECK-V1-SUBSTR: RUNTIME_DISPATCH_ERROR
-// CHECK-V2: results: 2
+// CHECK-V2-SUBSTR: resource `0x42::reborrow_through_closure::R` is locked while its module is re-entered
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x42::reborrow_through_closure::through_lambda_call --args 0x42, 0x42
 // CHECK-V1-SUBSTR: RUNTIME_DISPATCH_ERROR
-// CHECK-V2: results: 2
+// CHECK-V2-SUBSTR: resource `0x42::reborrow_through_closure::R` is locked while its module is re-entered
+// CHECK-ERROR-PARITY

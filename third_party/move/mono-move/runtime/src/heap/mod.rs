@@ -973,9 +973,9 @@ pub(crate) enum TopFrame<'a> {
 /// interpreter and the micro-op verifier:
 ///
 /// - **Frame metadata integrity**: each frame's saved `fp`, `func_ptr`,
-///   and `pc` are written by [`MicroOp::Return`], [`MicroOp::CallDirect`],
-///   [`MicroOp::CallIndirect`] and never modified by user-visible micro-ops.
-///   A corrupted saved `fp` leads to out-of-bounds stack reads (UB).
+///   and `pc` are written only by frame initialization and the call protocol,
+///   never by user-visible data operations. A corrupted saved `fp` leads to
+///   out-of-bounds stack reads (UB).
 /// - **Pointer-slot accuracy**: `Function::frame_layout` (and the
 ///   matching `safe_point_layouts` entry, if any) together list every
 ///   frame offset that may hold a live heap pointer, and *only* those

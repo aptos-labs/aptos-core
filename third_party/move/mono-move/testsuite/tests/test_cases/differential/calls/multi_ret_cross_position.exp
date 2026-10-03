@@ -30,8 +30,8 @@ fun caller(r0) {
     r1: u64
   code:
   L0:
-    0: [x1, x2, r1] := call three_rets, [] @1
-    1: [] := call sink, [r0, x1, x2] @3
+    0: [x1, x2, r1] := call_exempt three_rets, [] @1
+    1: [] := call_exempt sink, [r0, x1, x2] @3
     2: ret [] @4
 }
 === micro-ops ===
@@ -58,11 +58,11 @@ fun caller() {
   frame_data_size: 16
   entry_gas: 126
   code:
-    0: CallIndirect 0x66::test::three_rets @1
+    0: CallByNameExempt 0x66::test::three_rets @1
     1: Move8 [8] <- [56] @1
     2: Move8 [56] <- [48] @3
     3: Move8 [48] <- [40] @3
     4: Move8 [40] <- [0] @3
-    5: CallIndirect 0x66::test::sink @3
+    5: CallByNameExempt 0x66::test::sink @3
     6: Return @4
 }

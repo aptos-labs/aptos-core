@@ -733,7 +733,7 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stackless_exec_ir::CallData;
+    use crate::stackless_exec_ir::{CallData, ReentrancyCheck};
     use mono_move_core::types::EMPTY_TYPE_LIST;
     use move_binary_format::file_format::FunctionHandleIndex;
 
@@ -749,6 +749,7 @@ mod tests {
                 function_handle: FunctionHandleIndex(0),
                 ty_args: EMPTY_TYPE_LIST,
                 args,
+                reentrancy_check: ReentrancyCheck::Required,
             }),
         }];
         let analysis = BlockAnalysis::analyze(&instrs, |_| true);

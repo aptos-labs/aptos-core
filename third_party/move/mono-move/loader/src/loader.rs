@@ -37,7 +37,9 @@ use mono_move_global_context::{
     ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
 };
 use move_binary_format::{
-    access::ScriptAccess, errors::VMError, file_format::CompiledScript,
+    access::{ModuleAccess, ScriptAccess},
+    errors::VMError,
+    file_format::CompiledScript,
     module_script_conversion::script_into_module,
 };
 use shared_dsa::UnorderedSet;
@@ -162,9 +164,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     }
 
     // TODO(cleanup): Revisit the handling of native functions here.
-    //
     // Need to make sure:
-    // 1. A registered native function impl does not shadow a Move-body function with the same name.
+    // 1. Registered natives must not shadow functions with Move bodies.
+    //    `check_natives_do_not_shadow` rejects such a module when it is loaded.
+    //    Still missing: a call from another module becomes `CallNative` by name
+    //    without loading the callee's module, so a shadowed callee runs the
+    //    native instead of its Move body and skips the reentrancy check. Fix:
+    //    choose `CallNative` from the callee definition's `is_native` flag.
     // 2. A missing native function impl only triggers an error when it's actually being called, not
     //    during load time.
     pub fn load_function(
@@ -377,6 +383,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let cost = script_code.len() as u64;
         let module_ir =
             specializer::destack(script_into_module(script, SCRIPT_MAIN.as_str()), self.guard)?;
+        self.check_natives_do_not_shadow(&module_ir)?;
         let module = LoadedModule::new(
             module_ir,
             cost,
@@ -764,7 +771,32 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         //   This can run verification twice because destack runs it and we verified before.
         //   Destack should take a hook so we can add more things to verify.
         let module_ir = specializer::destack(compiled_module, self.guard)?;
+        self.check_natives_do_not_shadow(&module_ir)?;
         Ok((module_ir, cost))
+    }
+
+    /// Rejects native registrations that shadow this module's Move bodies.
+    /// Lowering resolves natives by qualified name, so a matching registration
+    /// would replace the Move body and bypass its frame and reentrancy checks.
+    fn check_natives_do_not_shadow(&self, module_ir: &ModuleIR) -> VMResult<()> {
+        let module = &module_ir.module;
+        for fdef in module.function_defs() {
+            if fdef.is_native() {
+                continue;
+            }
+            let name = module.interned_identifier_at(module.function_handle_at(fdef.function).name);
+            if self.natives.is_registered(module.id(), name) {
+                let id = view_module_id(module.id());
+                return Err(VMInternalError::new(
+                    LoaderError::NativeShadowsMoveFunction {
+                        address: *id.address(),
+                        module: view_name(id.name()).to_string(),
+                        name: view_name(name).to_string(),
+                    },
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Called if module does not exist in the cache.

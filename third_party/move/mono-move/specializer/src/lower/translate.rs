@@ -16,7 +16,8 @@ use crate::{
     gas::{self, CostResolver},
     stackless_exec_ir::{
         instr_utils::{clobbers_transfer, for_each_value_use, is_fallthrough_terminator},
-        BinaryOp, FunctionIR, ImmValue, Instr, Label, NamedSlot, TransferPosition, UnaryOp,
+        BinaryOp, FunctionIR, ImmValue, Instr, Label, NamedSlot, ReentrancyCheck, TransferPosition,
+        UnaryOp,
     },
 };
 use mono_move_core::{
@@ -1366,7 +1367,7 @@ impl<'a> LoweringState<'a> {
 
             // --- Calls ---
             Instr::Call { data } => {
-                self.lower_call(func_ir, &data.args, &data.rets)?;
+                self.lower_call(func_ir, &data.args, &data.rets, data.reentrancy_check)?;
             },
 
             // --- Return ---
@@ -2289,6 +2290,7 @@ impl<'a> LoweringState<'a> {
         _func_ir: &FunctionIR,
         args: &[NamedSlot],
         rets: &[NamedSlot],
+        reentrancy_check: ReentrancyCheck,
     ) -> VMResult<()> {
         let cs = &self.ctx.call_sites[self.call_site_cursor];
 
@@ -2357,16 +2359,25 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             None => {
-                self.emit(MicroOp::CallIndirect {
-                    module_id: cs.callee_module_id,
-                    func_name: cs.callee_func_name,
-                    ty_args: cs.ty_args,
+                let (module_id, func_name, ty_args) =
+                    (cs.callee_module_id, cs.callee_func_name, cs.ty_args);
+                self.emit(match reentrancy_check {
+                    ReentrancyCheck::Required => MicroOp::CallByName {
+                        module_id,
+                        func_name,
+                        ty_args,
+                    },
+                    ReentrancyCheck::Exempt => MicroOp::CallByNameExempt {
+                        module_id,
+                        func_name,
+                        ty_args,
+                    },
                 })?;
             },
         }
         self.call_site_cursor += 1;
 
-        // Place each ret (Transfer rets are already written by `CallIndirect`).
+        // Place each ret (Transfer rets are already written by the call).
         self.bind_call_returns(rets, &cs.ret_slots)?;
         Ok(())
     }

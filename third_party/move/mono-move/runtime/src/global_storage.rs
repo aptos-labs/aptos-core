@@ -62,6 +62,7 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey, types::InternedType, ResourceProvider,
     StorageRead, VMResult,
 };
+use move_core_types::account_address::AccountAddress;
 use std::ptr::NonNull;
 
 /// Counter incremented by every checkpoint. Used to tell whether a pending
@@ -169,6 +170,30 @@ impl Entry {
         }
     }
 
+    /// Returns this entry's resource pointer, or a `BorrowGlobal` error if the
+    /// resource is absent.
+    pub(crate) fn borrow_ptr(&self, addr: AccountAddress) -> Result<NonNull<u8>, RuntimeError> {
+        self.as_ptr().ok_or(RuntimeError::ResourceDoesNotExist {
+            op: GlobalStorageOp::BorrowGlobal,
+            addr,
+        })
+    }
+
+    /// Returns this entry's resource pointer and whether it can be mutated directly,
+    /// or a `BorrowGlobalMut` error if the resource is absent.
+    /// [`EntryPtr::NonWritable`] values require a deep copy before mutation.
+    pub(crate) fn borrow_ptr_mut(
+        &self,
+        current_epoch: CheckpointCounter,
+        addr: AccountAddress,
+    ) -> Result<EntryPtr, RuntimeError> {
+        self.as_ptr_mut(current_epoch)
+            .ok_or(RuntimeError::ResourceDoesNotExist {
+                op: GlobalStorageOp::BorrowGlobalMut,
+                addr,
+            })
+    }
+
     /// Returns the pointer to the global value (whether local write or
     /// external read). Returns [`None`] if the resource does not exist
     /// (it was deleted or never existed).
@@ -253,6 +278,18 @@ impl ResourceReadWriteSet {
         Self::default()
     }
 
+    /// Returns the entry at `key`, reading it from the provider on first access.
+    /// Callers can check reentrancy after provider errors and before checking
+    /// whether the resource exists.
+    pub(crate) fn entry(
+        &mut self,
+        provider: &dyn ResourceProvider,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<&Entry, RuntimeError> {
+        get_or_create_resource_entry(&mut self.entries, provider, key, group).map(|entry| &*entry)
+    }
+
     /// Returns true if the resource exists at the specified key.
     pub(crate) fn exists(
         &mut self,
@@ -282,12 +319,7 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<NonNull<u8>, RuntimeError> {
-        get_or_create_resource_entry(&mut self.entries, provider, key, group)?
-            .as_ptr()
-            .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
-                op: GlobalStorageOp::BorrowGlobal,
-                addr: key.address(),
-            })
+        self.entry(provider, key, group)?.borrow_ptr(key.address())
     }
 
     /// First step when mutably borrowing a resource. Returns an error if the
@@ -303,12 +335,9 @@ impl ResourceReadWriteSet {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<EntryPtr, RuntimeError> {
-        get_or_create_resource_entry(&mut self.entries, provider, key, group)?
-            .as_ptr_mut(self.current_epoch)
-            .ok_or_else(|| RuntimeError::ResourceDoesNotExist {
-                op: GlobalStorageOp::BorrowGlobalMut,
-                addr: key.address(),
-            })
+        let epoch = self.current_epoch;
+        self.entry(provider, key, group)?
+            .borrow_ptr_mut(epoch, key.address())
     }
 
     /// Second step when mutably borrowing a resource. Only used for pointers

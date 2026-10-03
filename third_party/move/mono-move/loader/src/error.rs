@@ -40,6 +40,16 @@ pub enum LoaderError {
     #[error("Resource type layout is not derivable")]
     ResourceLayoutNotDerivable,
 
+    /// A registered native shares the qualified name of a function with a Move
+    /// body. Lowering would run the native instead of the body, bypassing the
+    /// Move frame and its reentrancy checks.
+    #[error("Native registered for {address}::{module}::{name}, which has a Move body")]
+    NativeShadowsMoveFunction {
+        address: AccountAddress,
+        module: String,
+        name: String,
+    },
+
     #[error("Script does not deserialize: {message}")]
     ScriptDeserializationFailed { message: String },
 
@@ -74,7 +84,9 @@ impl IntoExecutionError for LoaderError {
                 ExecutionErrorKind::Placeholder
             },
 
-            InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            NativeShadowsMoveFunction { .. } | InvariantViolation(_) => {
+                ExecutionErrorKind::InvariantViolation
+            },
         }
     }
 }

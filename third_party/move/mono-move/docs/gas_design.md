@@ -75,7 +75,7 @@ The ISA-agnostic design of `mono-move-gas` means the instrumentation pass itself
 
 Instrumentation is folded into lowering rather than run as a separate pass. As the lowerer emits a block's micro-ops, it sums the IR-level cost of that block's instructions (§4.2). It charges no cost via a standalone op; instead each block's cost is charged by the instruction that transfers control into it:
 
-- **Entry block.** Block 0's cost is stored on the function as `entry_gas`. The call protocol charges it before any of the callee's instructions run — in `call_unchecked` for callees, and at the start of `run` for the root invocation.
+- **Entry block.** Block 0's cost is stored on the function as `entry_gas`. The call protocol charges it before any of the callee's instructions run — in `push_call_frame_at` for callees, and at the start of `run` for the root invocation.
 
 - **Every other block.** Its cost is stored on the predecessor jump that targets it. The unconditional `Jump` carries a single `gas` field (the target block's cost). Each conditional jump carries `gas_taken` and `gas_fallthrough` (the costs of the taken and fallthrough blocks); the interpreter charges exactly one, for the block it transfers into, before updating the pc.
 

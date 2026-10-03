@@ -249,6 +249,7 @@ fn classify_loader_error(err: &LoaderError) -> TestResult {
         // Unit tests never load scripts.
         LoaderError::GlobalContext(_)
         | LoaderError::InvariantViolation(_)
+        | LoaderError::NativeShadowsMoveFunction { .. }
         | LoaderError::ScriptDeserializationFailed { .. }
         | LoaderError::ScriptVerificationFailed { .. } => TestResult::Error(err.to_string()),
     }
