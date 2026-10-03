@@ -33,10 +33,15 @@ import difflib
 import itertools
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent))
+
+from harness.identifiers import module_name  # noqa: E402
+
 SOURCES = ROOT / "package" / "sources"
 #: Two spellings of one idea in the hand-written manifest.
 STRATUM_ALIASES = {"loop": "loops"}
@@ -50,7 +55,7 @@ def strata(record: dict[str, Any]) -> set[str]:
 
 def target_source(record: dict[str, Any]) -> str:
     """The target function's body, comments and layout normalised away."""
-    name = record["module"].split("::")[-1]
+    name = module_name(record["module"])
     matches = [
         path
         for path in SOURCES.rglob("*.move")

@@ -1,0 +1,72 @@
+--- a/sources/trading/extracted_dead_mans_switch_tracker.move
++++ b/sources/trading/extracted_dead_mans_switch_tracker.move
+@@ -141,0 +142,69 @@
++
++    spec module {
++        /// The clock as `keep_alive` and `is_order_valid` read it.
++        fun now(): u64 {
++            aptos_framework::timestamp::spec_now_seconds()
++        }
++
++        /// Whether the clock has been published, which reading it requires.
++        fun has_clock(): bool {
++            exists<aptos_framework::timestamp::CurrentTimeMicroseconds>(@aptos_framework)
++        }
++    }
++
++    spec is_order_valid {
++        pragma opaque;
++        // The clock is read only for a registered account.
++        aborts_if aptos_std::big_ordered_map::spec_contains_key(tracker.state, account) && !has_clock();
++        let state = aptos_std::big_ordered_map::spec_get(tracker.state, account);
++        let created = if (std::option::spec_is_some(order_creation_time_secs)) {
++            std::option::spec_borrow(order_creation_time_secs)
++        } else {
++            now()
++        };
++        ensures !aptos_std::big_ordered_map::spec_contains_key(tracker.state, account) ==> result;
++        // An order from before the session is invalid even if the session is
++        // live; an expiration equal to the current time is still live.
++        ensures aptos_std::big_ordered_map::spec_contains_key(tracker.state, account) ==>
++            result == (state.session_start_time_secs <= created && state.expiration_time_secs >= now());
++    }
++
++    spec keep_alive {
++        pragma opaque;
++        // A zero timeout disables the switch and is exempt from the minimum.
++        aborts_if timeout_seconds != 0 && timeout_seconds < tracker.min_keep_alive_time_secs;
++        aborts_if timeout_seconds != 0 && !has_clock();
++        aborts_if timeout_seconds != 0 && now() + timeout_seconds > MAX_U64;
++        ensures tracker.min_keep_alive_time_secs == old(tracker.min_keep_alive_time_secs);
++        // Disabling an account that never registered changes nothing.
++        ensures timeout_seconds == 0
++            && !aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == old(tracker.state);
++        ensures timeout_seconds == 0
++            && aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == aptos_std::big_ordered_map::spec_remove(old(tracker.state), account);
++        // A first keep-alive keeps every existing order valid.
++        ensures timeout_seconds != 0
++            && !aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == aptos_std::big_ordered_map::spec_set(
++                old(tracker.state),
++                account,
++                KeepAliveState { session_start_time_secs: 0, expiration_time_secs: now() + timeout_seconds }
++            );
++        // A renewal after expiry (strictly later) starts a new session.
++        ensures timeout_seconds != 0
++            && aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == aptos_std::big_ordered_map::spec_set(
++                old(tracker.state),
++                account,
++                KeepAliveState {
++                    session_start_time_secs:
++                        if (now() > aptos_std::big_ordered_map::spec_get(old(tracker.state), account).expiration_time_secs) {
++                            now()
++                        } else {
++                            aptos_std::big_ordered_map::spec_get(old(tracker.state), account).session_start_time_secs
++                        },
++                    expiration_time_secs: now() + timeout_seconds
++                }
++            );
++    }

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 4432,
+        "sha256": "b06b90a94bb2a69c18a518696cfd8cf0e1b04f0724e6dd3496386e57beeb9062"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-timelock-047-threshold-strict",
+      "obligation_category": "normal-result",
+      "rationale": "Approvals equal to the override threshold do not override.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 22,
+        "offset": 4479,
+        "sha256": "cada8ce2c2045d5467c06873676fe6f3a29a1e803a8b7b1d4b376898e9bc2e48"
+      },
+      "edit": {
+        "at": 11,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-timelock-047-expiry-strict",
+      "obligation_category": "normal-result",
+      "rationale": "A timelock is not expired at exactly its period.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 51,
+        "offset": 4502,
+        "sha256": "9ea1e5a83bd41f9f12382c1fd0c80a48c3b27869243cf4b98b12c3e78180d12b"
+      },
+      "edit": {
+        "at": 29,
+        "kind": "substitute",
+        "length": 4,
+        "to": "false"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-timelock-047-no-timelock-blocks",
+      "obligation_category": "normal-result",
+      "rationale": "An account without a timelock can never execute.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "a1a4cf5672b0bbd55af239a1a9cd175f5eff3cbdefc6d090e78c01adc8dbdb1b",
+  "task_id": "MS-timelock-047"
+}

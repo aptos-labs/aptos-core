@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 26,
+        "offset": 6769,
+        "sha256": "b075d7b57e4b2a4f693d858e0993ed16bbd3159755bf82e2b2216d3076add0c4"
+      },
+      "edit": {
+        "at": 4,
+        "kind": "substitute",
+        "length": 5,
+        "to": "prices"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-match-029-checks-prices-for-empty",
+      "obligation_category": "normal-result",
+      "rationale": "Emptiness is read from the prices, so a size without a price is reported.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 20,
+        "offset": 6584,
+        "sha256": "5ac8bfb04af2a807fed3346aa2efe90b8fddc2fcf1c22c968a61fa072b8fbc67"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 4,
+        "to": "== matched_size"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-match-029-removes-at-matched-size",
+      "obligation_category": "normal-result",
+      "rationale": "A level is removed when its remainder equals the matched size.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 32,
+        "offset": 6808,
+        "sha256": "c60f949092f839934ee18d12d833be9852bcb3508f2a991ad77c4d92a282f9e6"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 17,
+        "to": ", option::some(0))"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-match-029-empty-reports-zero-size",
+      "obligation_category": "normal-result",
+      "rationale": "An exhausted side reports a size of zero instead of none.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "046dec9dcfabc70371c09afc30d875eba84b0ed60c6cf9d657138b75644cd125",
+  "task_id": "TR-match-029"
+}

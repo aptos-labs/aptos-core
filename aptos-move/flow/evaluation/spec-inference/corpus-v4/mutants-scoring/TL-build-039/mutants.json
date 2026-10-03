@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 48,
+        "offset": 2445,
+        "sha256": "b352774754178d4ac176562b0f9801e55a68db9fccf5308068963f66e75ecdae"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-build-039-shorter-multipliers",
+      "obligation_category": "abort",
+      "rationale": "A multiplier vector longer than the stakes is accepted.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 65,
+        "offset": 2654,
+        "sha256": "1dadd343bf1f17ec27bc11fa01277a01c12820a30ba3a22bd5071bf926fb3503"
+      },
+      "edit": {
+        "at": 40,
+        "kind": "substitute",
+        "length": 22,
+        "to": "multipliers_percent[0]"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-build-039-first-multiplier-everywhere",
+      "obligation_category": "abort",
+      "rationale": "Every tier takes the first multiplier, so any two tiers are out of order.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 72,
+        "offset": 2597,
+        "sha256": "cd7eb7208d598b65a246321c00a5996ccc1c6009f66dccec3a2cba93d7f0131d"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 9,
+        "to": "let i = 1"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-build-039-first-tier-dropped",
+      "obligation_category": "normal-result",
+      "rationale": "The first tier is never built.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-build-039"
+}

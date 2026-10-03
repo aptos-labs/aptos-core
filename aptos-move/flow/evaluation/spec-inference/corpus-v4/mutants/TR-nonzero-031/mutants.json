@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 20,
+        "offset": 3955,
+        "sha256": "456a333362a599ce6b00a7b4b1224e612181fa7d6b8fdcebbaf6fe1384b94e11"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 4,
+        "to": "== 1"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-nonzero-031-rejects-ones",
+      "obligation_category": "normal-result",
+      "rationale": "Size one is rejected and size zero accepted.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 28,
+        "offset": 3914,
+        "sha256": "2160016ff254c92fb56dfb1d8fc760fd4d117e0ee3d28c60df487b250f947306"
+      },
+      "edit": {
+        "at": 9,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-nonzero-031-scans-past-end",
+      "obligation_category": "abort",
+      "rationale": "The scan reads one past the end of an all-nonzero vector.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 50,
+        "offset": 3955,
+        "sha256": "dd9de4d89b77ba81cfc703db2c06800efff37cc83ddb415688f715137ee5cfde"
+      },
+      "edit": {
+        "at": 37,
+        "kind": "substitute",
+        "length": 12,
+        "to": "return true"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-nonzero-031-zero-accepted",
+      "obligation_category": "normal-result",
+      "rationale": "A zero size makes the check succeed.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "046dec9dcfabc70371c09afc30d875eba84b0ed60c6cf9d657138b75644cd125",
+  "task_id": "TR-nonzero-031"
+}

@@ -48,7 +48,7 @@ from dataclasses import asdict
 
 from .config import ExperimentConfig
 from .judge import render_command, run_command
-from .identifiers import require_plain_name
+from .identifiers import module_name, require_plain_name
 
 
 async def screen_corpus_v3(
@@ -190,7 +190,7 @@ async def _prove_reference(
     # discard the reference root and `..` would climb out of it, and the proof
     # that came back would still be recorded as this task's solvability
     # evidence.
-    module = require_plain_name(record["module"].split("::")[-1], "module")
+    module = module_name(record["module"])
     package = manifest_path.parent / "references" / "build" / module
     if not (package / "Move.toml").is_file():
         raise SystemExit(

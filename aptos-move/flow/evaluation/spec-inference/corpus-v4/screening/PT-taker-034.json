@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_price_time_index",
+  "reference_proved": true,
+  "reference_sha256": "234968f457e3570fc018729fb39f27771608ff1f71e8f7ab9393f3787cf11ba0",
+  "schema_version": 2,
+  "target": "aptos_experimental::extracted_price_time_index::is_taker_order",
+  "task_id": "PT-taker-034",
+  "threshold_seconds": 20,
+  "wall_seconds": 3.5,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

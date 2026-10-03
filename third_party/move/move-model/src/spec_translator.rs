@@ -71,6 +71,10 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     /// function entry (`saved_params`), `Some(label)` the matching
     /// `SaveStateAnchor` marker (`anchored_saved_params`).
     current_anchor: Option<MemoryLabel>,
+    /// Whether we translate an inline property (an assertion or loop invariant in the
+    /// function body), where a parameter denotes its current value, which the body may
+    /// have reassigned, rather than its value at entry.
+    in_inline_property: bool,
 }
 
 /// A flattened proof action produced by translating a structured `Proof` tree.
@@ -371,6 +375,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             in_old: false,
             shared_old_label: None,
             current_anchor: None,
+            in_inline_property: false,
         };
         translator.translate_spec(for_call);
         translator.result
@@ -398,6 +403,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             in_old: false,
             shared_old_label: None,
             current_anchor: None,
+            in_inline_property: false,
         };
         // Clone invariants so `inst` lives for the entire loop
         let invariants = invariants.collect_vec();
@@ -435,6 +441,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             in_old: false,
             shared_old_label: None,
             current_anchor: None,
+            in_inline_property: true,
         };
 
         // Handle updating of global spec variables
@@ -1133,6 +1140,15 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     }
 
     /// Returns the temporary's old-state snapshot in the current anchor scope.
+    /// Whether `exp` reads a parameter of the function. In an inline property the body may
+    /// have reassigned it, so `old` of it is the entry value rather than a no-op.
+    fn mentions_parameter(&self, exp: &Exp) -> bool {
+        let param_count = self.fun_env.get_parameter_count();
+        exp.used_temporaries()
+            .into_iter()
+            .any(|idx| idx < param_count)
+    }
+
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {
         let saved_opt = match self.current_anchor {
             None => self.result.saved_params.get(&idx),
@@ -1365,6 +1381,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 if self.current_anchor.is_none()
                     && arg.is_pure(self.builder.global_env())
                     && !is_behavior
+                    && !(self.in_inline_property && self.mentions_parameter(arg))
                 {
                     let loc = self.builder.global_env().get_node_loc(*id);
                     // Compute labels for any sub-expressions which are included into this

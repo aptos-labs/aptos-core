@@ -1,0 +1,14 @@
+--- a/sources/trading/extracted_price_time_index.move
++++ b/sources/trading/extracted_price_time_index.move
+@@ -35,0 +36,11 @@
++
++    spec is_taker_order {
++        pragma opaque;
++        aborts_if false;
++        ensures is_bid ==> result == (
++            std::option::spec_is_some(self.best_ask) && price >= std::option::spec_borrow(self.best_ask)
++        );
++        ensures !is_bid ==> result == (
++            std::option::spec_is_some(self.best_bid) && price <= std::option::spec_borrow(self.best_bid)
++        );
++    }

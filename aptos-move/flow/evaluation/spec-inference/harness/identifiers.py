@@ -43,6 +43,18 @@ def require_plain_name(value: object, label: str) -> str:
     return value
 
 
+def module_name(qualified: object, label: str = "module") -> str:
+    """The unqualified name of an `address::module` value, as a plain name.
+
+    Corpus tooling turns a manifest's module into a source glob, a patch
+    filename and a reference directory, so the last segment is as much a path
+    component as a task id is.
+    """
+    if not isinstance(qualified, str):
+        raise ValueError(f"{label} must be a string, got {qualified!r}")
+    return require_plain_name(qualified.rsplit("::", 1)[-1], label)
+
+
 def resolve_within(
     root: Path, relative: object, label: str, *, allow_root: bool = False
 ) -> Path:
