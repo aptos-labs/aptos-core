@@ -1450,12 +1450,23 @@ axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}{{ERK}}(t, {{ENC}}(k))}
     {{EWF}}(t) && ContainsTable(t, {{ENC}}(k)) ==>
         0 <= {{ERK}}(t, {{ENC}}(k)) && {{ERK}}(t, {{ENC}}(k)) < LenTable(t)
         && $IsEqual'{{instance.0.suffix}}'({{EKA}}(t, {{ERK}}(t, {{ENC}}(k))), k));
+{%- if not impl.insertion_ordered %}
 // Removal shift: a surviving key's rank drops by one exactly when it was
 // above the removed key.
+//
+// Order-preserving removal only, so this is emitted for key-ordered maps alone.
+// An insertion-ordered map is free to fill the hole instead of closing it --
+// `simple_map::remove` calls `swap_remove`, moving the last entry into the
+// vacated position -- under which surviving ranks do not shift. Stating the
+// shift for such a map would be a false axiom, which is worse than stating
+// nothing: it would license order conclusions that do not hold at runtime.
+// Saying nothing instead leaves a rank after removal unconstrained, so facts
+// that depend on it are unprovable rather than wrong.
 axiom (forall t: {{Table}}, ek: int, ek2: int :: {{"{"}}{{ERK}}(RemoveTable(t, ek), ek2)}
     {{EWF}}(t) && ContainsTable(t, ek) && ContainsTable(t, ek2) && ek2 != ek ==>
         {{ERK}}(RemoveTable(t, ek), ek2) ==
             (if {{ERK}}(t, ek2) < {{ERK}}(t, ek) then {{ERK}}(t, ek2) else {{ERK}}(t, ek2) - 1));
+{%- endif %}
 
 // A value write leaves the key set and the length alone, so it leaves ranks
 // alone. Without this, every position fact is lost across `iter_borrow_mut`,
