@@ -2022,6 +2022,7 @@ dependencies = [
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
+ "aptos-package-builder",
  "aptos-release-bundle",
  "aptos-sdk-builder",
  "aptos-types",

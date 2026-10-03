@@ -25,6 +25,7 @@ use move_model::{
         TypeParameter, TypeParameterKind,
     },
     ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
     xir_loader::{
         XirFunctionData as ModelXirFunctionData, XirModuleData as ModelXirModuleData,
         XirStructData as ModelXirStructData, XirVariantData as ModelXirVariantData,
@@ -503,6 +504,48 @@ fn import_source(
         xir.module.address,
         xir.module.name
     );
+    // Move source drops test-only items from a build without test code, and
+    // verify-only items from one without verification code; the file-format
+    // generator asserts the first and silently publishes the second. XIR cannot
+    // drop them. Without compiler options there is no code generation.
+    if let Some(options) = env.get_extension::<crate::Options>() {
+        let modes: [(&str, fn(&str) -> bool, bool, &str); 2] = [
+            (
+                "test-only",
+                well_known::is_test_only_attribute_name,
+                options.compile_test_code,
+                "test code",
+            ),
+            (
+                "verify-only",
+                well_known::is_verify_only_attribute_name,
+                options.compile_verify_code,
+                "verification code",
+            ),
+        ];
+        for (marker, is_marked, included, code) in modes {
+            if included {
+                continue;
+            }
+            let items = xir
+                .structs
+                .iter()
+                .map(|decl| ("struct", &decl.name, &decl.attributes))
+                .chain(
+                    xir.functions
+                        .iter()
+                        .map(|decl| ("function", &decl.name, &decl.attributes)),
+                );
+            for (kind, name, attributes) in items {
+                ensure!(
+                    !attributes
+                        .iter()
+                        .any(|attribute| is_marked(&attribute.name)),
+                    "{kind} `{name}` is {marker}, which a build without {code} cannot include"
+                );
+            }
+        }
+    }
     let file_id = env.add_source(
         FileHash::new(&source.text),
         Rc::new(BTreeMap::new()),
@@ -571,6 +614,21 @@ fn import_source(
                 }
             }
         }
+        // The model's `Attribute` cannot hold a literal inside an argument
+        // list, which Lean's positional grammar allows; warn and skip it.
+        let mut attributes = vec![];
+        for attribute in &decl.attributes {
+            match model_attribute(env, &loc, attribute) {
+                Ok(attribute) => attributes.push(attribute),
+                Err(error) => env.warning(
+                    &loc,
+                    &format!(
+                        "attribute `{}` on struct `{}` is not carried: {error:#}",
+                        attribute.name, decl.name
+                    ),
+                ),
+            }
+        }
         structs.push(ModelXirStructData {
             name: struct_id.symbol(),
             loc: loc.clone(),
@@ -579,6 +637,7 @@ fn import_source(
             fields,
             variants,
             visibility: MoveVisibility::Private,
+            attributes,
         });
     }
 
@@ -2592,6 +2651,243 @@ mod tests {
         assert_eq!(nested.len(), 1);
         assert_name(&nested[0], "cyclomatic");
         assert!(matches!(nested[0], Attribute::Apply(_, _, ref args) if args.is_empty()));
+    }
+
+    fn import_module(module: &XirModule) -> Result<GlobalEnv> {
+        import_module_with(module, None).map(|(env, _)| env)
+    }
+
+    /// As [`import_module`], with `options` set before the import reads them,
+    /// and keeping the translated targets.
+    fn import_module_with(
+        module: &XirModule,
+        options: Option<&Options>,
+    ) -> Result<(GlobalEnv, FunctionTargetsHolder)> {
+        let source = parse_source(
+            PathBuf::from("test.xir.json"),
+            String::new(),
+            &serde_json::to_string(module).unwrap(),
+        )?;
+        let mut env = GlobalEnv::new();
+        if let Some(options) = options {
+            env.set_extension(options.clone());
+        }
+        let mut targets = FunctionTargetsHolder::default();
+        import_sources(&mut env, &[source], &mut targets)?;
+        Ok((env, targets))
+    }
+
+    /// The names of `name`'s attributes, with nested arguments in brackets.
+    fn struct_attribute_names(env: &GlobalEnv, name: &str) -> Vec<String> {
+        fn render(env: &GlobalEnv, attribute: &Attribute) -> String {
+            let name = env.symbol_pool().string(attribute.name()).to_string();
+            match attribute {
+                Attribute::Apply(_, _, args) if args.is_empty() => name,
+                Attribute::Apply(_, _, args) => format!(
+                    "{name}[{}]",
+                    args.iter()
+                        .map(|arg| render(env, arg))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+                Attribute::Assign(_, _, AttributeValue::Value(_, value)) => {
+                    format!("{name}={value:?}")
+                },
+                Attribute::Assign(..) => format!("{name}=?"),
+            }
+        }
+        env.get_module(ModuleId::new(0))
+            .find_struct(env.symbol_pool().make(name))
+            .unwrap()
+            .get_attributes()
+            .iter()
+            .map(|attribute| render(env, attribute))
+            .collect()
+    }
+
+    #[test]
+    fn struct_attributes_reach_the_model() {
+        let mut module = account_module();
+        let annotated = module.structs[0].name.clone();
+        let plain = module.structs[1].name.clone();
+        module.structs[0].attributes = vec![
+            XirAttribute {
+                name: "event".to_owned(),
+                args: vec![],
+            },
+            XirAttribute {
+                name: "count".to_owned(),
+                args: vec![XirAttributeArg::Num {
+                    value: "7".to_owned(),
+                }],
+            },
+            XirAttribute {
+                name: "flag".to_owned(),
+                args: vec![XirAttributeArg::Bool { value: true }],
+            },
+            XirAttribute {
+                name: "lint::skip".to_owned(),
+                args: vec![XirAttributeArg::Name {
+                    name: "needless_mutable_reference".to_owned(),
+                    args: vec![],
+                }],
+            },
+        ];
+        // An enum goes through the same path as a struct; nothing refers to
+        // this one, so adding it disturbs no function.
+        module.structs.push(StructDecl {
+            name: "Tagged".to_owned(),
+            abilities: vec!["drop".to_owned()],
+            type_parameters: vec![],
+            fields: vec![],
+            variants: Some(vec![move_model_exchange::Variant {
+                name: "A".to_owned(),
+                fields: vec![],
+            }]),
+            attributes: vec![XirAttribute {
+                name: "event".to_owned(),
+                args: vec![],
+            }],
+        });
+        let env = import_module(&module).unwrap();
+        assert_eq!(struct_attribute_names(&env, &annotated), vec![
+            "event",
+            "count=Number(7)",
+            "flag=Bool(true)",
+            "lint::skip[needless_mutable_reference]",
+        ]);
+        assert_eq!(struct_attribute_names(&env, "Tagged"), vec!["event"]);
+        assert!(struct_attribute_names(&env, &plain).is_empty());
+    }
+
+    /// A literal mid-list (the `attribute_wire_shape` shape) is skipped with a
+    /// warning; the module and the struct's other attributes still load.
+    #[test]
+    fn a_struct_attribute_the_model_cannot_hold_is_skipped_with_a_warning() {
+        let mut module = account_module();
+        let name = module.structs[0].name.clone();
+        module.structs[0].attributes = vec![
+            XirAttribute {
+                name: "resource_group".to_owned(),
+                args: vec![
+                    XirAttributeArg::Name {
+                        name: "scope".to_owned(),
+                        args: vec![XirAttributeArg::Name {
+                            name: "global".to_owned(),
+                            args: vec![],
+                        }],
+                    },
+                    XirAttributeArg::Num {
+                        value: "7".to_owned(),
+                    },
+                    XirAttributeArg::Bool { value: true },
+                ],
+            },
+            XirAttribute {
+                name: "event".to_owned(),
+                args: vec![],
+            },
+        ];
+        let env = import_module(&module).expect("the module still loads");
+        assert_eq!(struct_attribute_names(&env, &name), vec!["event"]);
+        assert!(!env.has_errors());
+        let mut out = codespan_reporting::term::termcolor::Buffer::no_color();
+        env.report_diag(&mut out, codespan_reporting::diagnostic::Severity::Warning);
+        let warnings = String::from_utf8_lossy(&out.into_inner()).to_string();
+        assert!(
+            warnings.contains("attribute `resource_group` on struct")
+                && warnings.contains("not carried"),
+            "{warnings}"
+        );
+    }
+
+    /// A test-only or verify-only struct or function is rejected unless the
+    /// build compiles that code; the file-format generator would otherwise
+    /// assert on a test-only item and publish a verify-only one.
+    #[test]
+    fn test_and_verify_only_items_need_their_build() {
+        let mark = |name: &str| {
+            vec![XirAttribute {
+                name: name.to_owned(),
+                args: vec![],
+            }]
+        };
+        // Imports `module` under `options`, then generates the file format.
+        let compile = |module: &XirModule, options: Options| -> Result<usize> {
+            let (mut env, mut targets) = import_module_with(module, Some(&options))?;
+            crate::run_stackless_bytecode_pipeline(
+                &env,
+                crate::stackless_bytecode_optimization_pipeline(&options),
+                &mut targets,
+            );
+            Ok(crate::run_file_format_gen(&mut env, &targets).len())
+        };
+        let build = |test: bool, verify: bool| Options {
+            compile_test_code: test,
+            compile_verify_code: verify,
+            ..Options::default()
+        };
+        let marked = |attribute: &str, on_struct: bool| {
+            let mut module = account_module();
+            if on_struct {
+                module.structs[0].attributes = mark(attribute);
+            } else {
+                module.functions[1].attributes = mark(attribute);
+            }
+            module
+        };
+        let mut wrong = vec![];
+        // (label, module, kind, the build that excludes it, the build that includes it)
+        for (label, module, kind, without, with) in [
+            (
+                "test_only struct",
+                marked("test_only", true),
+                "struct",
+                build(false, false),
+                build(true, false),
+            ),
+            (
+                "test function",
+                marked("test", false),
+                "function",
+                build(false, false),
+                build(true, false),
+            ),
+            (
+                "verify_only struct",
+                marked("verify_only", true),
+                "struct",
+                build(false, false),
+                build(false, true),
+            ),
+            (
+                "verify_only function",
+                marked("verify_only", false),
+                "function",
+                build(false, false),
+                build(false, true),
+            ),
+            // The two kinds of build are independent.
+            (
+                "verify_only function in a test build",
+                marked("verify_only", false),
+                "function",
+                build(true, false),
+                build(false, true),
+            ),
+        ] {
+            match compile(&module, without) {
+                Err(error) if format!("{error:#}").contains(&format!("{kind} `")) => {},
+                result => wrong.push(format!("{label}, excluded: {result:?}")),
+            }
+            if let Err(error) = compile(&module, with) {
+                wrong.push(format!("{label}, included: {error:#}"));
+            }
+        }
+        if let Err(error) = compile(&account_module(), build(false, false)) {
+            wrong.push(format!("the golden module: {error:#}"));
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     #[test]
