@@ -240,4 +240,25 @@ private def withoutLocalNames : Lean.Json :=
   fixtureJson |> mapArray "functions" (·.setObjVal! "local_names" (.arr #[]))
 #guard mentions (errorAt 3 withoutLocalNames) "`source_map`"
 
+/-- The fixture's JSON with an inline function body as source, which an
+interface carries. -/
+private def withSource (version : Nat) : Bool :=
+  match fixture.encodeJson >>= Lean.Json.parse with
+  | .ok json =>
+      let functions := match json.getObjVal? "functions" with
+        | .ok (.arr fs) => Lean.Json.arr (fs.map (·.setObjVal! "source" (.str "inline fun f() {}")))
+        | _ => .arr #[]
+      (decodeMModule (atVersion version (json.setObjVal! "functions" functions))).toOption.isSome
+  | .error _ => false
+
+#guard withSource 10
+#guard !withSource 9
+
+-- Decoded by value: the gate above passes even if `source` is dropped.
+private def withInlineBody : MModule :=
+  { fixture with funMeta := fixture.funMeta.map ({ · with source := some "inline fun f() {}" }) }
+#guard (match withInlineBody.encodeJson >>= decodeMModule with
+  | .ok m => m.funMeta.head?.bind (·.source)
+  | .error _ => none) == some "inline fun f() {}"
+
 end Tests.XIR

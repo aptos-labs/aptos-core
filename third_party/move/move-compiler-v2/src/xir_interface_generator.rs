@@ -24,7 +24,7 @@
 //! the `.mv` generator does, and each is marked [`NATIVE_INTERFACE`] so that
 //! consumers do not mistake a stub for a genuine native.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 use move_core_types::account_address::AccountAddress;
 use move_model::options::ModuleRef;
@@ -366,6 +366,26 @@ impl<'a> Interface<'a> {
     }
 
     fn function_source(&self, decl: &XirFunction) -> Result<String> {
+        // An `inline` function travels as rendered source, because a dependent
+        // expands its body rather than linking to it. Emit that verbatim: it is
+        // already a complete declaration, and it must stay `inline` rather than
+        // becoming a `native` stub — there is nothing in the deployed module for
+        // such a stub to resolve to.
+        //
+        // The rendering carries its own attributes, so `decl.attributes` is not
+        // emitted here; it would duplicate them. That rendering keeps only
+        // attribute *names*, which is why the exporter refuses to produce
+        // `source` for a function whose attributes have arguments.
+        if let Some(source) = &decl.source {
+            let mut out = String::new();
+            for line in source.lines() {
+                out.push_str("    ");
+                out.push_str(line);
+                out.push('\n');
+            }
+            return Ok(out);
+        }
+
         let mut out = String::new();
         for attribute in &decl.attributes {
             out.push_str(&format!("    {}\n", attribute_source(attribute)));
@@ -375,11 +395,9 @@ impl<'a> Interface<'a> {
         let visibility = match decl.visibility {
             XirVisibility::Public => "public ",
             XirVisibility::Friend => "public(friend) ",
-            // The exporter omits private functions; one reaching here would
-            // be unreferenceable, so it is a bug rather than a no-op.
-            XirVisibility::Private => {
-                bail!("a private function does not belong in an interface")
-            },
+            // Exported only because an inline body of its module names it; a
+            // call from another module is still rejected.
+            XirVisibility::Private => "",
         };
         let entry = if decl.is_entry { "entry " } else { "" };
 

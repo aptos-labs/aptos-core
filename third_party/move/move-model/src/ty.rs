@@ -4111,12 +4111,17 @@ impl TypeDisplay<'_> {
 
         // No alias, but the struct is inside or imported into the current module
         let mut result = String::new();
-        if self.context.display_module_addr {
+        let clashes = self.context.clash_with_ty_params(struct_symbol);
+        // A module name alone needs a `use`, which a fully qualified rendering
+        // does not have.
+        if self.context.display_module_addr
+            || (clashes && self.context.fully_qualify_external_types)
+        {
             result.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
         }
         if self.context.use_module_qualification
             || !self.context.is_current_module(&struct_module_name)
-            || self.context.clash_with_ty_params(struct_symbol)
+            || clashes
         {
             result.push_str(&format!("{}::", struct_module_idstr));
         }

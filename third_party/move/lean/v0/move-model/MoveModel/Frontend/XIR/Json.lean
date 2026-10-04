@@ -338,6 +338,10 @@ private def localNameFields (localNames : List (Option String)) : List (String �
 private def callsFields (calls : List Nat) : List (String × Json) :=
   if calls.isEmpty then [] else [("calls", encodeNats calls)]
 
+private def sourceFields : Option String → List (String × Json)
+  | some source => [("source", .str source)]
+  | none => []
+
 private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
   unless decl.name = info.name do
     throw s!"function body `{decl.name}` does not match metadata `{info.name}`"
@@ -358,7 +362,7 @@ private def encodeFun (decl : MFun) (info : FunMeta) : JsonResult Json := do
     ("loops", arr (← decl.loops.mapM encodeLoop)),
     ("spec", ← encodeContract decl.spec)
   ] ++ attributeFields info.attributes ++ localNameFields info.localNames ++
-    sourceMapFields info.sourceMap ++ callsFields info.calls
+    sourceMapFields info.sourceMap ++ callsFields info.calls ++ sourceFields info.source
 
 private def encodeDialect : Dialect → String
   | .stackless => "stackless"
@@ -398,7 +402,7 @@ def MModule.toJson (module : MModule) : JsonResult Json := do
     encodeFun decl info
   let fields := [
     ("schema", .str "move-xir-module"),
-    ("version", nat 9),
+    ("version", nat 10),
     ("module", Json.mkObj [
       ("address", .str (encodeAddress module.address)),
       ("name", .str module.name),
@@ -606,6 +610,7 @@ private def checkFieldsAgainstVersion (version : Nat) (json : Json)
   if present json "external_structs" then require 6 "external_structs"
   for f in functions do
     if present f "calls" then require 9 "calls"
+    if present f "source" then require 10 "source"
     -- Without a body, the recorded calls are all there is of what a function
     -- reaches.
     let native := match f.getObjVal? "is_native" with
@@ -623,7 +628,7 @@ def decodeMModule (text : String) : JsonResult MModule := do
   let schema ← (← json.getObjVal? "schema").getStr?
   unless schema = "move-xir-module" do throw s!"unsupported XIR schema `{schema}`"
   let version ← (← json.getObjVal? "version").getNat?
-  unless version = 3 || version = 4 || version = 5 || version = 6 || version = 7 || version = 8 || version = 9 do
+  unless version = 3 || version = 4 || version = 5 || version = 6 || version = 7 || version = 8 || version = 9 || version = 10 do
     throw s!"unsupported XIR schema version {version}"
   let moduleJson ← json.getObjVal? "module"
   let address ← decodeAddress (← (← moduleJson.getObjVal? "address").getStr?)
@@ -685,6 +690,9 @@ def decodeMModule (text : String) : JsonResult MModule := do
       calls := ← match functionJson.getObjVal? "calls" with
         | .ok value => decodeNatArray value
         | .error _ => pure []
+      source := match functionJson.getObjVal? "source" with
+        | .ok (.str source) => some source
+        | _ => none
     } : FunMeta)
   let externalFuns ← externalFunsJson.toList.mapM fun functionJson => do
     return ({

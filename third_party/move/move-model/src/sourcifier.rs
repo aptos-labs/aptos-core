@@ -39,6 +39,18 @@ pub struct Sourcifier<'a> {
     sym_alias_map: RefCell<BTreeMap<Symbol, String>>,
     // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names) and more readable (e.g., local var names starting from `_v0`)
     amend: bool,
+    /// Whether to render names outside the enclosing module as `0xA::m::name`
+    /// rather than relying on that module's `use` declarations.
+    ///
+    /// Off by default, which is right when the output is re-read in the context
+    /// of the module it came from. Set it when the rendering is transplanted
+    /// somewhere else — a lone function emitted into a generated file has no
+    /// `use` declarations to shorten against, so both `option::Option` and
+    /// `helper::wrap(..)` there name an unbound module. Numbers are then not
+    /// folded into names like `MAX_U64` either, which a module constant could
+    /// shadow and which older language versions lack, and a function's
+    /// specification is not printed.
+    fully_qualify_external_names: bool,
     /// When set, state labels matching this label are suppressed during rendering.
     /// Used to avoid redundant nested labels like `S1 |~ global<T>(..S1 |~ ...)`.
     enclosing_state_label: Cell<Option<crate::ast::MemoryLabel>>,
@@ -326,7 +338,15 @@ impl<'a> Sourcifier<'a> {
             sym_alias_map: RefCell::new(BTreeMap::new()),
             enclosing_state_label: Cell::new(None),
             context_let_names: RefCell::new(BTreeSet::new()),
+            fully_qualify_external_names: false,
         }
+    }
+
+    /// Renders names outside the enclosing module with their full `0xA::m::name`
+    /// path. See [`Sourcifier::fully_qualify_external_names`].
+    pub fn with_fully_qualified_external_names(mut self) -> Self {
+        self.fully_qualify_external_names = true;
+        self
     }
 
     /// Sets the user-written `let`-binding names for the spec currently being
@@ -467,7 +487,8 @@ impl<'a> Sourcifier<'a> {
             Self::amend_fun_name(self.env(), self.sym(fun_env.get_name()), self.amend),
             self.type_params(fun_env.get_type_parameters_ref())
         );
-        let tctx = fun_env.get_type_display_ctx();
+        let mut tctx = fun_env.get_type_display_ctx();
+        tctx.fully_qualify_external_types = self.fully_qualify_external_names;
         let params = fun_env
             .get_parameters()
             .into_iter()
@@ -511,7 +532,10 @@ impl<'a> Sourcifier<'a> {
         }
 
         // Print function spec if present
-        self.print_fun_spec(&fun_env);
+        // A specification can name what the other file lacks; leave it behind.
+        if !self.fully_qualify_external_names {
+            self.print_fun_spec(&fun_env);
+        }
     }
 
     /// Amend function name to be recompilable
@@ -613,7 +637,9 @@ impl<'a> Sourcifier<'a> {
             Value::Address(address) => emit!(self.writer, "@{}", self.env().display(address)),
             Value::Number(int) => {
                 // Try to fold back into named MIN/MAX constants
-                if let Some(Type::Primitive(prim)) = ty {
+                if let (Some(Type::Primitive(prim)), false) =
+                    (ty, self.fully_qualify_external_names)
+                {
                     if let Some(name) = self.min_max_const_name(prim, int) {
                         emit!(self.writer, "{}", name);
                         return;
@@ -659,10 +685,12 @@ impl<'a> Sourcifier<'a> {
                 // For empty vector literals in spec context, emit `vector<T>[]` when the
                 // element type is known so the spec compiler can infer the element type.
                 // In non-spec (regular Move) context, bare `vector[]` is fine because
-                // the Move compiler handles type inference from surrounding context.
-                let open = if values.is_empty() && for_spec {
+                // the Move compiler handles type inference from surrounding context,
+                // unless the rendering is compiled elsewhere, without that context.
+                let open = if values.is_empty() && (for_spec || self.fully_qualify_external_names) {
                     if let Some(et) = elem_ty {
-                        let tctx = TypeDisplayContext::new(self.env());
+                        let mut tctx = TypeDisplayContext::new(self.env());
+                        tctx.fully_qualify_external_types = self.fully_qualify_external_names;
                         format!("vector<{}>[", et.display(&tctx))
                     } else {
                         "vector[".to_string()
@@ -684,6 +712,12 @@ impl<'a> Sourcifier<'a> {
                     let elem_ty = elem_tys.and_then(|tys| tys.get(pos));
                     self.print_value(value, elem_ty, for_spec)
                 })
+            },
+            // A byte string stays a constant, as it was in the source, rather than
+            // a vector built at run time.
+            Value::ByteArray(bytes) if self.fully_qualify_external_names => {
+                let hex = bytes.iter().map(|byte| format!("{byte:02x}")).join("");
+                emit!(self.writer, "x\"{}\"", hex)
             },
             Value::ByteArray(bytes) => {
                 self.print_list("vector[", ", ", "]", bytes.iter(), |byte| {
@@ -975,7 +1009,13 @@ impl<'a> Sourcifier<'a> {
         };
 
         // Replace the `invalid` characters so that the generated code is recompilable.
-        if self.amend {
+        // Compiled elsewhere, the name must also be one no other symbol has: a `for`
+        // loop's `$ub` must not become a user's `_ub`.
+        if self.amend && self.fully_qualify_external_names && sym_str.contains('$') {
+            let name = Self::new_global_unique_name(self.env(), &sym_str.replace('$', "_"));
+            self.sym_alias_map.borrow_mut().insert(sym, name.clone());
+            name
+        } else if self.amend {
             sym_str.replace('$', "_")
         } else {
             sym_str
@@ -1017,6 +1057,10 @@ impl<'a> Sourcifier<'a> {
         if tctx.is_current_module(module_name) {
             // Current module, no qualification needed
             "".to_string()
+        } else if self.fully_qualify_external_names {
+            // Where this rendering lands there are no `use` declarations, so
+            // neither an alias nor a bare module name resolves.
+            format!("{}::", module_env.get_full_name_str())
         } else {
             format!(
                 "{}::",
@@ -2070,7 +2114,18 @@ impl<'a> ExpSourcifier<'a> {
                                     }
                                     LetOrStm::Let(pat, binding) => {
                                         emit!(self.wr(), "let ");
-                                        self.print_pat(pat, false, !binding.as_ref().is_some_and(|exp| matches!(exp.as_ref(), ExpData::Call(_, Operation::Closure(..), _))));
+                                        // A closure's abilities come from the annotation, which
+                                        // is printed only for a function type with abilities. Compiled
+                                        // elsewhere, the rendering keeps it whatever the binding's
+                                        // right-hand side looks like. Only a plain variable takes
+                                        // an annotation; inside a struct or tuple pattern it is
+                                        // not Move syntax, and the field types fix the abilities.
+                                        let annotated = matches!(pat, Pattern::Var(..))
+                                            && (self.parent.fully_qualify_external_names
+                                                || binding.as_ref().is_some_and(|exp| {
+                                                    matches!(exp.as_ref(), ExpData::Call(_, Operation::Closure(..), _))
+                                                }));
+                                        self.print_pat(pat, false, !annotated);
                                         if let Some(exp) = binding {
                                             emit!(self.wr(), " = ");
                                             self.print_exp(Prio::General, matches!(exp.as_ref(), Block(..) | Sequence(..)), exp);
@@ -2262,7 +2317,17 @@ impl<'a> ExpSourcifier<'a> {
                 }
             }),
             Invoke(_, fun, args) => self.parenthesize(context_prio, Prio::Postfix, || {
-                self.print_exp(Prio::Postfix, false, fun);
+                // Compiled again, `w.call(..)` would be a call of a receiver function
+                // `call`, not of the closure in field `call`.
+                if self.parent.fully_qualify_external_names
+                    && !matches!(fun.as_ref(), LocalVar(..) | Temporary(..))
+                {
+                    emit!(self.wr(), "(");
+                    self.print_exp(Prio::General, false, fun);
+                    emit!(self.wr(), ")");
+                } else {
+                    self.print_exp(Prio::Postfix, false, fun);
+                }
                 self.print_exp_list("(", ")", args);
             }),
             Call(id, oper, args) => self.print_call(context_prio, *id, oper, args),
@@ -2397,6 +2462,24 @@ impl<'a> ExpSourcifier<'a> {
             Operation::MoveFunction(mid, fid) => {
                 self.parenthesize(context_prio, Prio::Postfix, || {
                     let fun_env = self.env().get_module(*mid).into_function(*fid);
+                    // Another module's constant is read through a generated accessor.
+                    // Compiled again elsewhere, the read must name the constant: the
+                    // accessor's name is not Move, and its amended form could be a
+                    // user's function.
+                    if self.parent.fully_qualify_external_names && fun_env.is_const_accessor() {
+                        let name = self.env().symbol_pool().string(fun_env.get_name());
+                        let constant = name
+                            .split_once(move_core_types::language_storage::DOLLAR_SIGN_DELIMITER)
+                            .map_or(name.as_str(), |(_, constant)| constant);
+                        emit!(
+                            self.wr(),
+                            "{}{}",
+                            self.parent
+                                .module_qualifier(&self.type_display_context, *mid),
+                            constant
+                        );
+                        return;
+                    }
                     emit!(
                         self.wr(),
                         "{}{}",
@@ -2664,7 +2747,9 @@ impl<'a> ExpSourcifier<'a> {
                 })
             },
             Operation::Freeze(explicit) => {
-                if *explicit {
+                // Compiled again, an implicit freeze may lose the annotation that
+                // caused it, and with it the place the reference is frozen.
+                if *explicit || self.parent.fully_qualify_external_names {
                     self.print_exp_list("freeze(", ")", &args[0..1]);
                 } else {
                     // Implicit freeze - just print the inner expression without comment
@@ -2851,15 +2936,24 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::Prefix, false, &args[0])
             }),
             Operation::Vector => self.parenthesize(context_prio, Prio::Postfix, || {
-                if args.is_empty() && self.for_spec {
+                if args.is_empty() && (self.for_spec || self.parent.fully_qualify_external_names) {
                     // In spec context, emit `vector<T>[]` so the spec compiler can
                     // infer the element type without guessing.  In non-spec (regular
                     // Move) context, bare `vector[]` is fine — the compiler infers
-                    // the type from surrounding context.
+                    // the type from surrounding context — unless the rendering is
+                    // compiled elsewhere, without the annotation that supplied it.
                     let node_ty = self.env().get_node_type(id);
                     if let Type::Vector(elem_ty) = &node_ty {
-                        let tctx = TypeDisplayContext::new(self.env());
-                        emit!(self.wr(), "vector<{}>[]", elem_ty.display(&tctx));
+                        // Compiled elsewhere, the type is printed in the function's own
+                        // context, which knows its type parameters' names.
+                        let element = if self.parent.fully_qualify_external_names {
+                            elem_ty.display(&self.type_display_context).to_string()
+                        } else {
+                            elem_ty
+                                .display(&TypeDisplayContext::new(self.env()))
+                                .to_string()
+                        };
+                        emit!(self.wr(), "vector<{}>[]", element);
                         return;
                     }
                 }

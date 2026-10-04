@@ -69,6 +69,7 @@ aptos-gas-meter = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
+move-model-exchange = { workspace = true }
 move-prover = { workspace = true }
 move-prover-test-utils = { workspace = true }
 move-unit-test = { workspace = true }

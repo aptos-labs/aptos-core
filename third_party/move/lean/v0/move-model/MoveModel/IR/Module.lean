@@ -125,6 +125,9 @@ structure FunMeta where
   /-- Functions called directly, as XIR function ids. An interface has no
   body, so this is the only record of its call graph. -/
   calls : List Nat := []
+  /-- An inline function's body as Move source. A caller expands an inline
+  function rather than calling it, so an interface carries the body. -/
+  source : Option String := none
   deriving BEq, Repr
 
 /-- A finite, deployable view of a semantic program. -/

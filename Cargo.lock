@@ -2041,6 +2041,7 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
+ "move-model-exchange",
  "move-package",
  "move-prover",
  "move-prover-boogie-backend",

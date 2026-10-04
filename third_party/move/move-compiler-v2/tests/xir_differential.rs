@@ -18,7 +18,7 @@
 
 use move_compiler_v2::{
     run_checker, run_move_compiler, run_move_compiler_to_stderr, xir_export,
-    xir_interface_generator, Options,
+    xir_interface_generator, Experiment, Options,
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_model_exchange::XirModule;
@@ -94,10 +94,94 @@ fn assert_compiles_as_from_source(dependency: &str, target: &str) {
     fs::write(&dependency_path, dependency).unwrap();
     let target_path = dir.path().join("target.move");
     fs::write(&target_path, target).unwrap();
+    assert_inline_bodies_read_back(&dependency_path);
     assert_eq!(
         compile_with_xir_dependencies(dir.path(), &target_path, &[&dependency_path]),
         compile_with_source_dependencies(&target_path, &[&dependency_path]),
     );
+}
+
+/// Compiles the interface generated from `dependency` and exports it again:
+/// each inline body must render as it did. A rendering that resolves to
+/// something else when compiled, such as `w.call(..)` meaning a receiver
+/// function rather than the closure in field `call`, reads back differently.
+/// One that loses information, such as a capture, reads back the same, which
+/// is what the bytecode comparison is for.
+fn assert_inline_bodies_read_back(dependency: &Path) {
+    let interface = interface_of(dependency, &[]).unwrap();
+    let rendered = xir_interface_generator::xir_module_to_move_source(&interface).unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("xir-read-back")
+        .tempdir()
+        .unwrap();
+    let generated = dir.path().join("generated.move");
+    fs::write(&generated, rendered).unwrap();
+    let env = run_checker(options(vec![generated.to_string_lossy().into_owned()])).unwrap();
+    assert!(
+        !env.has_errors(),
+        "the generated interface does not compile"
+    );
+    let module = env
+        .get_modules()
+        .find(|module| module.is_primary_target())
+        .expect("the generated interface was modelled");
+    let again = xir_export::export_interface(&module).unwrap();
+    for function in &interface.functions {
+        let Some(body) = &function.source else {
+            continue;
+        };
+        let read_back = again
+            .functions
+            .iter()
+            .find(|other| other.name == function.name)
+            .and_then(|other| other.source.as_deref())
+            .unwrap_or_default();
+        assert_eq!(
+            normalized(body),
+            normalized(read_back),
+            "`{}` reads back differently:\n{body}\n-- reads back as --\n{read_back}",
+            function.name
+        );
+    }
+}
+
+/// `source` with what each rendering chooses afresh made uniform: temporaries
+/// (`_t`, `_v0`, …) are named in order of appearance, and the braces and unit
+/// statements printed around an otherwise unchanged statement are dropped.
+/// The same normalization as the framework sweep's.
+fn normalized(source: &str) -> String {
+    let is_temporary = |word: &str| {
+        let rest = word
+            .strip_prefix("_t")
+            .or_else(|| word.strip_prefix("_v"))
+            .unwrap_or("x");
+        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit() || c == '_') || word == "_t"
+    };
+    let mut temporaries = std::collections::BTreeMap::new();
+    let mut out = String::new();
+    for line in source.lines() {
+        let line = line.trim();
+        if matches!(line, "{" | "}" | "};" | "();") {
+            continue;
+        }
+        let mut word = String::new();
+        for c in line.chars().chain(std::iter::once('\n')) {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                word.push(c);
+                continue;
+            }
+            if is_temporary(&word) {
+                let next = temporaries.len();
+                let canonical = temporaries.entry(word.clone()).or_insert(next);
+                out.push_str(&format!("_tmp{canonical}"));
+            } else {
+                out.push_str(&word);
+            }
+            word.clear();
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// Compiles `target` against `dependencies` given as Move source, and returns
@@ -154,6 +238,33 @@ fn compile_with_xir_dependencies(
             }
             let interface = xir_export::export_interface(&module)
                 .unwrap_or_else(|e| panic!("exporting `{}`: {:#}", module.get_full_name_str(), e));
+
+            // No compiler-generated wrapper reaches the interface. `pack$S`,
+            // `borrow$S$N` and friends are synthesized during file-format
+            // generation to realize struct visibility; a dependent derives its
+            // own handles for them from the *struct declaration*, so carrying
+            // them would be both redundant and unparseable — `$` is not a Move
+            // identifier, and the interface is consumed as Move source.
+            //
+            // This assertion cannot fail *here*: dependencies are modelled with
+            // `run_checker`, which stops before file-format generation, so the
+            // wrappers do not exist in this model to begin with. It is kept as
+            // documentation of the invariant, and because a future change to
+            // model dependencies with a full compile would make it bite. The
+            // filter is actually enforced by `move-package`'s modular build
+            // tests, whose models *have* been through the whole compiler.
+            if let Some(generated) = interface
+                .functions
+                .iter()
+                .find(|function| function.name.contains('$'))
+            {
+                panic!(
+                    "`{}` exported the compiler-generated wrapper `{}`",
+                    module.get_full_name_str(),
+                    generated.name
+                );
+            }
+
             let path = dir.join(format!(
                 "dep{index}_{}.xir.json",
                 module.get_full_name_str().replace("::", "_")
@@ -203,6 +314,12 @@ module 0xcafe::dep {
     friend 0xcafe::helper;
 
     friend struct Token has drop { v: u64 }
+
+    /// Packed and read *directly* by the target, across the package boundary.
+    /// That is what drives the compiler to synthesize `pack$Slot` and
+    /// `borrow$Slot$N` handles from this declaration alone, since an interface
+    /// carries no such functions.
+    public struct Slot has copy, drop, store { a: u64, b: bool }
 
     struct Box<T: store> has store, drop { item: T, tag: u8 }
     struct Marker<phantom P> has copy, drop, store { id: u256 }
@@ -280,7 +397,14 @@ module 0xcafe::client {
         total = total + (dep::widen(2) as u64);
         let m: dep::Marker<bool> = dep::marker();
         let _ = m;
-        total
+        // Pack, read a field of, and unpack a foreign struct directly. Each is
+        // a compiler-generated wrapper (`pack$Slot`, `borrow$Slot$0`,
+        // `unpack$Slot`) that the interface does not carry and the dependent
+        // must derive from the struct declaration.
+        let slot = dep::Slot { a: 4, b: true };
+        total = total + slot.a;
+        let dep::Slot { a, b: _ } = slot;
+        total + a
     }
 }
 "#;
@@ -368,15 +492,21 @@ fn private_constants_do_not_block_an_export() {
     interface_of(&source, &[]).expect("a private constant is not interface surface");
 }
 
-/// A `public inline` function is not offered by an interface.
+/// A `public inline` function crosses an interface as *source*, and a caller
+/// can expand it.
 ///
-/// It has no entry in the deployed module, so declaring it — which the
-/// interface would do as `native` — produces a dependent whose calls fail at
-/// runtime with `FUNCTION_RESOLUTION_FAILURE`. Omitting it makes the same
-/// program fail at compile time instead, which is the honest outcome until the
-/// package system can fall back to a monolithic build.
+/// An inline function has no entry in the deployed module, so it cannot be
+/// declared `native` and linked to — the call would fail at runtime with
+/// `FUNCTION_RESOLUTION_FAILURE`. The interface therefore carries its rendered
+/// body (`XirFunction::source`) and the dependent inlines it exactly as it
+/// would from a source dependency.
+///
+/// This is the case that decides whether the feature engages on real code:
+/// every one of `move-stdlib`'s 36 non-private inline functions is
+/// higher-order, so a lambda-taking function like `twice` here is the common
+/// shape, not an exotic one.
 #[test]
-fn inline_functions_are_not_offered_by_an_interface() {
+fn inline_functions_cross_an_interface_as_source() {
     let dir = tempfile::Builder::new()
         .prefix("xir-inline")
         .tempdir()
@@ -402,11 +532,33 @@ module 0xcafe::inl {
         .collect::<Vec<_>>();
     assert_eq!(
         names,
-        vec!["plain"],
-        "an inline function must not appear in an interface"
+        vec!["plain", "twice"],
+        "an inline function must appear in an interface"
     );
 
-    // And a caller therefore fails at compile time, not at runtime.
+    // The inline one carries a body; the ordinary one does not — it is linked
+    // against, so a declaration suffices.
+    let by_name = |name: &str| {
+        interface
+            .functions
+            .iter()
+            .find(|function| function.name == name)
+            .unwrap()
+    };
+    assert!(
+        by_name("twice")
+            .source
+            .as_deref()
+            .unwrap_or_default()
+            .contains("f(f(x))"),
+        "the inline function's body did not cross the interface"
+    );
+    assert!(
+        by_name("plain").source.is_none(),
+        "a linkable function needs no body in the interface"
+    );
+
+    // And a caller can now expand it.
     let path = write_interface(dir.path(), "inl", &interface);
     let caller = dir.path().join("caller.move");
     fs::write(
@@ -414,13 +566,205 @@ module 0xcafe::inl {
         "module 0xcafe::caller { public fun go(): u64 { 0xcafe::inl::twice(|x| x + 1, 1) } }",
     )
     .unwrap();
-    let error = compile_error(Options {
-        xir_dependencies: vec![path],
+    assert!(
+        run_move_compiler_to_stderr(Options {
+            xir_dependencies: vec![path],
+            ..options(vec![caller.to_string_lossy().into_owned()])
+        })
+        .is_ok(),
+        "a caller must be able to inline a function offered by an interface"
+    );
+}
+
+/// A rendered inline body must stand on its own in the file it lands in.
+///
+/// It is written into a generated interface that has no `use` declarations and
+/// no spec functions, so two things that are fine in the original module are
+/// fatal there: a type named by its short module alias, and a `spec` block
+/// calling into the module's spec file. Both were found by the framework sweeps
+/// rather than by reasoning, and both fail loudly — the body simply does not
+/// parse or resolve — so the risk is not silence but a broken build.
+#[test]
+fn a_rendered_inline_body_needs_no_context_from_its_module() {
+    let dir = tempfile::Builder::new()
+        .prefix("xir-inline-context")
+        .tempdir()
+        .unwrap();
+    let helper = dir.path().join("helper.move");
+    fs::write(
+        &helper,
+        "module 0xcafe::helper { public struct Wrapped has copy, drop { v: u64 } \
+         public fun wrap(v: u64): Wrapped { Wrapped { v } } }",
+    )
+    .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        r#"
+module 0xcafe::inl {
+    use 0xcafe::helper::{Self, Wrapped};
+    spec module { fun spec_ok(v: u64): bool { v > 0 } }
+    /// Names `Wrapped` through a `use`, and asserts via a spec function that
+    /// exists only in this module's spec.
+    public inline fun wrap_checked(v: u64): Wrapped {
+        spec { assert spec_ok(v); };
+        helper::wrap(v)
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    let env = run_checker(Options {
+        dependencies: vec![helper.to_string_lossy().into_owned()],
+        ..options(vec![dependency.to_string_lossy().into_owned()])
+    })
+    .unwrap();
+    let module = env
+        .get_modules()
+        .find(|module| module.is_primary_target())
+        .expect("the dependency was modelled");
+    let interface = xir_export::export_interface(&module).unwrap();
+    let source = interface
+        .functions
+        .iter()
+        .find(|function| function.name == "wrap_checked")
+        .and_then(|function| function.source.clone())
+        .expect("the inline function carries its body");
+
+    assert!(
+        source.contains("0xcafe::helper::Wrapped"),
+        "the type must carry its address, since the interface has no `use`; got:\n{source}"
+    );
+    assert!(
+        !source.contains("spec_ok"),
+        "a spec function cannot be named from an interface; got:\n{source}"
+    );
+
+    // The real check: a caller compiles against it.
+    let path = dir.path().join("inl.xir.json");
+    fs::write(&path, serde_json::to_string(&interface).unwrap()).unwrap();
+    let caller = dir.path().join("caller.move");
+    fs::write(
+        &caller,
+        "module 0xcafe::caller { public fun go(): u64 { \
+         0xcafe::helper::Wrapped { v: _ } = 0xcafe::inl::wrap_checked(1); 1 } }",
+    )
+    .unwrap();
+    let compiled = run_move_compiler_to_stderr(Options {
+        dependencies: vec![helper.to_string_lossy().into_owned()],
+        xir_dependencies: vec![path.to_string_lossy().into_owned()],
         ..options(vec![caller.to_string_lossy().into_owned()])
     });
     assert!(
-        error.contains("no function named `inl::twice`"),
-        "the call fails because the interface omits the function: {error}"
+        compiled.is_ok(),
+        "the rendered body did not compile in a foreign file: {:?}",
+        compiled.err()
+    );
+}
+
+/// Every call in a target's bytecode resolves back to a model function, even
+/// when the callee came from an interface.
+///
+/// Packing a dependency's public struct or enum across module boundaries emits
+/// a call to a compiler-generated wrapper — `pack$Shape$Line` and friends.
+/// Generating the *handle* needs only the struct declaration, which an
+/// interface carries, so bytecode comes out fine and every bytecode-level test
+/// passes. What breaks is the step after: mapping each handle back to a
+/// `FunctionEnv`. Those wrappers are declared in a callee's model only when it
+/// is loaded from bytecode or compiled from source, and a callee described by
+/// an interface is neither.
+///
+/// Nothing in this crate consumes that mapping, which is why the gap reached
+/// the Aptos e2e suite before anything caught it —
+/// `aptos_framework::extended_checks` rebuilds stackless bytecode from the
+/// compiled module and resolves every callee. The assertion here is that
+/// consumer's precondition, checked without depending on it.
+#[test]
+fn every_call_in_the_target_resolves_to_a_model_function() {
+    let dir = tempfile::Builder::new()
+        .prefix("xir-callee-resolution")
+        .tempdir()
+        .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        r#"
+module 0xcafe::shapes {
+    public enum Shape has copy, drop, store {
+        Point,
+        Line(u64),
+        Rect { w: u64, h: u64 },
+    }
+    public struct Slot has copy, drop, store { a: u64 }
+}
+"#,
+    )
+    .unwrap();
+
+    let env = run_checker(options(vec![dependency.to_string_lossy().into_owned()])).unwrap();
+    let module = env
+        .get_modules()
+        .find(|module| module.is_primary_target())
+        .expect("the dependency was modelled");
+    let interface = xir_export::export_interface(&module).unwrap();
+    let path = dir.path().join("shapes.xir.json");
+    fs::write(&path, serde_json::to_string(&interface).unwrap()).unwrap();
+
+    // Packs a variant, a positional variant, a named variant and a struct, so
+    // the target names several wrapper shapes rather than just one.
+    let target = dir.path().join("target.move");
+    fs::write(
+        &target,
+        r#"
+module 0xcafe::client {
+    use 0xcafe::shapes::{Shape, Slot};
+    public fun build(): (Shape, Shape, Shape, Slot) {
+        (Shape::Point, Shape::Line(1), Shape::Rect { w: 2, h: 3 }, Slot { a: 4 })
+    }
+    public fun width(s: &Shape): u64 {
+        match (s) { Shape::Rect { w, h: _ } => *w, _ => 0 }
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    let (compiled_env, _) = run_move_compiler_to_stderr(Options {
+        xir_dependencies: vec![path.to_string_lossy().into_owned()],
+        // The Aptos build turns this on because `extended_checks` needs the
+        // bytecode beside the model; without it there is nothing here to
+        // resolve handles against.
+        experiments: vec![format!("{}=on", Experiment::ATTACH_COMPILED_MODULE)],
+        ..options(vec![target.to_string_lossy().into_owned()])
+    })
+    .expect("compiling against the interface");
+
+    let mut resolved = 0;
+    for module in compiled_env.get_modules() {
+        let Some(compiled) = module.get_verified_module() else {
+            continue;
+        };
+        for index in 0..compiled.function_handles.len() {
+            let handle = move_binary_format::file_format::FunctionHandleIndex(index as u16);
+            // Panics rather than returning `None` when a callee is missing from
+            // the model, which is the failure this guards against.
+            let callee = module
+                .get_used_function(handle)
+                .expect("a compiled module is attached");
+            if callee.is_struct_api() {
+                assert!(
+                    callee.get_struct_api_struct().is_some(),
+                    "`{}` resolved but does not report the struct it serves",
+                    callee.get_full_name_str()
+                );
+                resolved += 1;
+            }
+        }
+    }
+    assert!(
+        resolved > 0,
+        "the target packed nothing across the interface, so this proved nothing"
     );
 }
 
@@ -732,6 +1076,321 @@ fn a_call_in_a_body_keeps_its_callee_in_the_build() {
     );
 }
 
+/// A literal at its type's maximum stays a literal in a rendered body. The
+/// builtin name `MAX_U64` exists only from language version 2.3, so a
+/// dependent on an older version could not compile it.
+#[test]
+fn an_inline_body_keeps_a_maximal_literal() {
+    let dir = tempfile::Builder::new()
+        .prefix("xir-maximal")
+        .tempdir()
+        .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        "module 0xcafe::dep { public inline fun sentinel(): u64 { 18446744073709551615 } }",
+    )
+    .unwrap();
+    let interface = interface_of(&dependency, &[]).unwrap();
+    let source = interface.functions[0].source.as_deref().unwrap_or_default();
+    assert!(
+        source.contains("18446744073709551615") && !source.contains("MAX_U64"),
+        "{source}"
+    );
+}
+
+/// A parameter named like a function of the module does not capture a call to
+/// that function: Move resolves call syntax to the module function, so the
+/// unqualified rendering means what the source meant.
+#[test]
+fn a_parameter_does_not_capture_a_module_call() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public fun helper(x: u64): u64 { x + 1 }
+            public inline fun apply(helper: |u64| u64, x: u64): u64 {
+                0xcafe::dep::helper(helper(x))
+            }
+        }",
+        "module 0xcafe::target {
+            public fun go(): u64 { 0xcafe::dep::apply(|y| y * 2, 3) }
+        }",
+    );
+}
+
+/// A public inline function may call a private inline one, which a caller
+/// expands too.
+#[test]
+fn an_inline_body_may_call_a_private_inline_function() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            inline fun helper(x: u64): u64 { x + 1 }
+            public inline fun f(x: u64): u64 { helper(x) }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::f(1) } }",
+    );
+}
+
+/// A closure local keeps the abilities its annotation gives it.
+#[test]
+fn an_inline_body_keeps_a_closure_annotation() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public inline fun twice(x: u64): u64 {
+                let f: |u64| u64 has copy + drop = |y| y + x;
+                f(1) + f(2)
+            }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::twice(5) } }",
+    );
+}
+
+/// An inline body may read its module's private constants.
+#[test]
+fn an_inline_body_may_read_a_private_constant() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            const E: u64 = 7;
+            public inline fun f(): u64 { E }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::f() } }",
+    );
+}
+
+/// A `for` loop's bound keeps a name of its own in a rendered body; it does not
+/// capture a variable the user named `_ub`.
+#[test]
+fn an_inline_for_loop_does_not_capture_a_user_variable() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public inline fun sum(n: u64): u64 {
+                let _ub = 100;
+                let s = 0;
+                for (i in 0..n) { s = s + _ub + i - i; };
+                s
+            }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::sum(3) } }",
+    );
+}
+
+/// A rendered body reads another module's public constant by name, not
+/// through the accessor the compiler generates, which a function named
+/// `const_C` would otherwise take over.
+#[test]
+fn an_inline_body_reads_another_modules_constant() {
+    let dir = tempfile::Builder::new()
+        .prefix("xir-foreign-constant")
+        .tempdir()
+        .unwrap();
+    let other = dir.path().join("other.move");
+    fs::write(
+        &other,
+        "module 0xcafe::other { public const C: u64 = 5; public fun const_C(): u64 { 99 } }",
+    )
+    .unwrap();
+    let dependency = dir.path().join("dep.move");
+    fs::write(
+        &dependency,
+        "module 0xcafe::dep { public inline fun f(): u64 { 0xcafe::other::C } }",
+    )
+    .unwrap();
+    let interface = interface_of(&dependency, &[&other]).unwrap();
+    let path = write_interface(dir.path(), "dep", &interface);
+    let target = dir.path().join("target.move");
+    fs::write(
+        &target,
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::f() } }",
+    )
+    .unwrap();
+    let (_, units) = run_move_compiler_to_stderr(Options {
+        dependencies: vec![other.to_string_lossy().into_owned()],
+        xir_dependencies: vec![path],
+        ..options(vec![target.to_string_lossy().into_owned()])
+    })
+    .expect("compiling against the interface");
+    assert_eq!(
+        serialize(units),
+        compile_with_source_dependencies(&target, &[&other, &dependency])
+    );
+}
+
+/// An inline function's own specification stays behind: it may name what the
+/// interface does not carry.
+#[test]
+fn an_inline_functions_specification_stays_behind() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            spec fun spec_g(x: u64): u64 { x }
+            public inline fun f(x: u64): u64 { x }
+            spec f { ensures result == spec_g(x); }
+            public fun h(): u64 { 1 }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::h() } }",
+    );
+}
+
+/// A private function an exported inline body calls is declared, so the
+/// interface compiles; calling the inline function is then rejected, as from
+/// source.
+#[test]
+fn an_inline_body_may_name_a_private_function() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            fun g(): u64 { 1 }
+            public inline fun f(): u64 { g() }
+            public fun h(): u64 { 2 }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::h() } }",
+    );
+}
+
+/// An empty vector keeps its element type in a rendered body.
+#[test]
+fn an_inline_body_keeps_an_empty_vectors_type() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public inline fun f(): bool {
+                let v: vector<u64> = vector[];
+                let w = v;
+                w == vector[]
+            }
+        }",
+        "module 0xcafe::target { public fun go(): bool { 0xcafe::dep::f() } }",
+    );
+}
+
+/// An empty vector of a type parameter names the parameter, not its index.
+#[test]
+fn an_inline_body_keeps_a_generic_empty_vectors_type() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public inline fun empty<T: drop>(): u64 {
+                let v: vector<T> = vector[];
+                let _w = v;
+                1
+            }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::empty<u8>() } }",
+    );
+}
+
+/// A byte constant read in a rendered body compiles as from source.
+#[test]
+fn an_inline_body_reads_a_byte_constant() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            const B: vector<u8> = b\"\";
+            public inline fun f(): bool { B == vector[] }
+        }",
+        "module 0xcafe::target { public fun go(): bool { 0xcafe::dep::f() } }",
+    );
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            const B: vector<u8> = b\"ab\";
+            public inline fun f(): bool { B == vector[] }
+        }",
+        "module 0xcafe::target { public fun go(): bool { 0xcafe::dep::f() } }",
+    );
+}
+
+/// A struct named like a type parameter of the inline function keeps its
+/// address in a rendered body.
+#[test]
+fn an_inline_body_names_a_struct_shadowed_by_a_type_parameter() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            struct T has drop { v: u64 }
+            public fun tag<X>(): u64 { 0 }
+            public inline fun g<T>(): u64 { tag<0xcafe::dep::T>() }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::g<u8>() } }",
+    );
+}
+
+/// A closure keeps its annotation when the lambda is not the binding itself.
+#[test]
+fn an_inline_body_keeps_a_wrapped_closure_annotation() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public inline fun twice(x: u64, c: bool): u64 {
+                let f: |u64| u64 has copy + drop = if (c) { |y| y + x } else { |y| y * x };
+                f(1) + f(2)
+            }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::twice(5, true) } }",
+    );
+}
+
+/// A closure in a field is called through its parentheses, not as a receiver
+/// function of the same name.
+#[test]
+fn an_inline_body_calls_a_closure_in_a_field() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public struct W has drop, copy { call: |u64, u64|(u64) has copy + drop }
+            public fun call(self: &W, a: u64, b: u64): u64 { a * 1000 + b }
+            public inline fun run(w: W): u64 { (w.call)(1, 2) }
+        }",
+        "module 0xcafe::target {
+            public fun go(): u64 { 0xcafe::dep::run(0xcafe::dep::W { call: |a, b| a + b }) }
+        }",
+    );
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public enum E has drop, copy {
+                A { call: |u64|(u64) has copy + drop },
+                B { call: |u64|(u64) has copy + drop },
+            }
+            public fun call(self: &E, a: u64): u64 { a * 1000 }
+            public inline fun run(e: E): u64 { (e.call)(1) }
+        }",
+        "module 0xcafe::target {
+            public fun go(): u64 { 0xcafe::dep::run(0xcafe::dep::E::A { call: |a| a + 1 }) }
+        }",
+    );
+}
+
+/// A mutable reference frozen by an annotation stays frozen where it was.
+#[test]
+fn an_inline_body_keeps_an_implicit_freeze() {
+    let dependency = |body: &str| {
+        format!(
+            "module 0xcafe::dep {{
+                public struct In has drop, copy {{ v: u64 }}
+                public fun read(r: &In): u64 {{ r.v }}
+                public fun read_u64(r: &u64): u64 {{ *r }}
+                public inline fun f(o: &mut In): u64 {{ {body} }}
+            }}"
+        )
+    };
+    let target = "module 0xcafe::target {
+        public fun go(): u64 { let o = 0xcafe::dep::In { v: 1 }; 0xcafe::dep::f(&mut o) }
+    }";
+    for body in [
+        "let r: &In = o; read(r) + read(r) + r.v",
+        "let (r, n): (&In, u64) = (o, 1); read(r) + n",
+        "let r: &u64 = &mut o.v; read_u64(r) + *r",
+        "let r: &In; r = o; read(r) + read(r)",
+    ] {
+        assert_compiles_as_from_source(&dependency(body), target);
+    }
+}
+
+/// A closure that captures a computed value compiles as from source.
+#[test]
+fn an_inline_body_keeps_a_computed_capture() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public fun add(a: u64, b: u64): u64 { a + b }
+            public fun apply(f: |u64| u64 has drop, x: u64): u64 { f(x) }
+            public inline fun g(c: bool, x: u64): u64 {
+                apply(|y| add(if (c) { 1 } else { 2 }, y), x)
+            }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::g(true, 5) } }",
+    );
+}
+
 /// The modules of a dependency chain `t -> a -> b`, where nothing in `t`
 /// names `b`.
 fn dependency_chain(dir: &Path) -> (PathBuf, PathBuf, PathBuf) {
@@ -1004,4 +1663,59 @@ fn package_visibility_is_friend_plus_a_synthesized_friend_declaration() {
         .expect("S was modelled");
     assert_eq!(format!("{:?}", s.get_visibility()), "Friend");
     assert!(s.has_package_visibility());
+}
+
+/// A `let`-bound closure named like a module function does not capture a call
+/// to that function either.
+#[test]
+fn a_let_bound_closure_does_not_capture_a_module_call() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public fun helper(x: u64): u64 { x + 1 }
+            public inline fun apply(x: u64): u64 {
+                let helper: |u64| u64 has drop = |y| y * 2;
+                0xcafe::dep::helper(helper(x))
+            }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::apply(3) } }",
+    );
+}
+
+/// Destructuring a struct that holds a closure renders without type
+/// annotations inside the pattern, which Move does not accept there.
+#[test]
+fn a_closure_field_destructures_as_from_source() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public struct W has copy, drop { call: |u64| u64 has copy + drop }
+            public fun make(): W { W { call: |x| x + 1 } }
+            public inline fun run(w: W): u64 { let W { call } = w; call(1) }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::run(0xcafe::dep::make()) } }",
+    );
+}
+
+/// As above, for a positional struct.
+#[test]
+fn a_positional_closure_field_destructures_as_from_source() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public struct W(|u64| u64 has copy + drop) has copy, drop;
+            public fun make(): W { W(|x| x + 1) }
+            public inline fun run(w: W): u64 { let W(c) = w; c(1) }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::run(0xcafe::dep::make()) } }",
+    );
+}
+
+/// As above, for a tuple holding a closure.
+#[test]
+fn a_tuple_holding_a_closure_destructures_as_from_source() {
+    assert_compiles_as_from_source(
+        "module 0xcafe::dep {
+            public fun make(): (|u64| u64 has copy + drop, u64) { (|x| x + 1, 2) }
+            public inline fun run(): u64 { let (f, n) = make(); f(n) }
+        }",
+        "module 0xcafe::target { public fun go(): u64 { 0xcafe::dep::run() } }",
+    );
 }

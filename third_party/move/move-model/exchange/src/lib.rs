@@ -94,8 +94,9 @@ pub const XIR_SCHEMA: &str = "move-xir-module";
 /// table; version 7 adds struct visibility; version 8 adds function types and
 /// the closure operations; version 9 adds module-level friend declarations
 /// ([`XirModule::friends`]), per-function call graphs ([`XirFunction::calls`]),
-/// bodyless non-native declarations, and `name = value` attribute arguments.
-pub const XIR_VERSION: u64 = 9;
+/// bodyless non-native declarations, and `name = value` attribute arguments;
+/// version 10 adds inline function bodies ([`XirFunction::source`]).
+pub const XIR_VERSION: u64 = 10;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -359,6 +360,9 @@ impl XirModule {
             if !fun.calls.is_empty() {
                 require(9, "calls")?;
             }
+            if fun.source.is_some() {
+                require(10, "source")?;
+            }
             // Without a body, the recorded calls are all there is of what a
             // function reaches.
             if !fun.is_native && fun.blocks.is_empty() {
@@ -572,6 +576,26 @@ pub struct XirFunction {
     pub attributes: Vec<XirAttribute>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_map: Option<XirFunctionSourceMap>,
+    /// The function's complete Move source, when a declaration alone does not
+    /// describe it.
+    ///
+    /// Set only for `inline` functions. Those have no entry in the deployed
+    /// module — they are expanded at each call site — so a dependent cannot
+    /// link against a declaration; it needs the *body* in order to inline it.
+    /// For an inline function the body therefore **is** interface, and a change
+    /// to it must invalidate dependents.
+    ///
+    /// This is Move source text inside an otherwise structured format, which is
+    /// a deliberate compromise. The faithful alternative is a typed AST, and
+    /// the one that exists — `ast::XastModule` — rejects `Lambda` outright,
+    /// while 82 of the framework's 100 non-private inline functions are
+    /// higher-order. Rendering to source costs one string and reuses the
+    /// ordinary inliner; carrying an AST would need lambda support in that
+    /// format plus an importer that does not exist.
+    ///
+    /// A producer that has no inline functions — the Lean side — never sets it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// A half-open UTF-8 byte range in the source text supplied with XIR.
@@ -1691,28 +1715,31 @@ mod tests {
 
     /// The current version is written, and older documents are still read.
     #[test]
-    fn version_9_is_written_and_older_versions_are_still_read() {
-        assert_eq!(XIR_VERSION, 9, "friends and calls are version 9");
+    fn version_10_is_written_and_older_versions_are_still_read() {
+        assert_eq!(XIR_VERSION, 10, "inline function bodies are version 10");
 
         // Documents predating the additions still read.
-        for legacy in [6u64, 7, 8] {
+        for legacy in [6u64, 7, 8, 9] {
             let legacy: XirModule = serde_json::from_value(xir_module_json(legacy)).unwrap();
             assert!(legacy.check_version().is_ok());
             assert!(legacy.friends.is_empty());
             assert!(legacy.functions.iter().all(|f| f.calls.is_empty()));
         }
 
-        // What we write is 9.
+        // What we write is the current version.
         let mut current: XirModule = serde_json::from_value(xir_module_json(6)).unwrap();
         current.version = XIR_VERSION;
         current.friends = vec![XirModuleRef {
             address: "0x1".to_owned(),
             module: "buddy".to_owned(),
         }];
-        assert_eq!(serde_json::to_value(&current).unwrap()["version"], json!(9));
+        assert_eq!(
+            serde_json::to_value(&current).unwrap()["version"],
+            json!(10)
+        );
 
         // A version this reader does not know is refused, in both directions.
-        for unknown in [2u64, 10] {
+        for unknown in [2u64, 11] {
             let module: XirModule = serde_json::from_value(xir_module_json(unknown)).unwrap();
             assert!(
                 module.check_version().is_err(),
@@ -1780,6 +1807,15 @@ mod tests {
                     let mut doc = xir_module_json(version);
                     doc["external_structs"] =
                         json!([{"address": "0x1", "module": "string", "name": "String"}]);
+                    doc
+                }),
+            ),
+            (
+                "source",
+                10,
+                Box::new(|version| {
+                    let mut doc = xir_module_json(version);
+                    doc["functions"] = function_json(json!({"source": "inline fun f() {}"}));
                     doc
                 }),
             ),

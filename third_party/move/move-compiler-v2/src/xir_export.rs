@@ -22,8 +22,10 @@ use anyhow::{bail, Context, Result};
 use move_binary_format::file_format::Visibility as MoveVisibility;
 use move_core_types::ability::AbilitySet;
 use move_model::{
-    ast::{Attribute, AttributeValue, Value},
+    ast::{Attribute, AttributeValue, Spec, SpecBlockTarget, Value},
+    exp_rewriter::ExpRewriterFunctions,
     model::{FunId, FunctionEnv, ModuleEnv, ModuleId, QualifiedId, StructEnv, StructId},
+    sourcifier::Sourcifier,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
@@ -450,6 +452,7 @@ fn export_function(refs: &mut References, fun_env: &FunctionEnv) -> Result<XirFu
         },
         attributes: export_attributes(module, fun_env.get_attributes())?,
         source_map: None,
+        source: inline_source(fun_env)?,
     })
 }
 
@@ -482,20 +485,157 @@ fn exported_structs<'env>(
 ///
 /// Private functions are excluded because a dependent cannot name them.
 ///
-/// Inline functions are excluded because a dependent cannot link them either —
-/// and unlike a private function, exporting one would be an active lie. An
-/// inline function has no entry in the deployed module (it is expanded at each
-/// call site and never reaches file-format generation), while the interface
-/// declares every function `native`. A dependent compiled against such an
-/// interface would emit a call to a function that does not exist, failing at
-/// *runtime* with `FUNCTION_RESOLUTION_FAILURE` rather than at compile time.
-/// Omitting it turns that into an unbound-function error at the call site.
+/// Inline functions **are** included, but they are the one case a declaration
+/// cannot describe. A dependent does not link an inline function, it expands
+/// it, and an inline function has no entry in the deployed module at all — it
+/// never reaches file-format generation. Declaring one `native`, as this
+/// exporter does for every other function, would therefore be an active lie:
+/// the dependent would emit a call to a function that does not exist and fail
+/// at *runtime* with `FUNCTION_RESOLUTION_FAILURE`. So an inline function
+/// carries its rendered body in [`XirFunction::source`] instead — see
+/// [`inline_source`] — and the interface generator emits that rather than a
+/// stub.
 ///
-/// So a dependent that calls a non-private inline function cannot be compiled
-/// against the interface; carrying inline bodies is left to a follow-up. The
-/// omission is not silent: the caller gets a compile error naming the function.
+/// Omitting them, which this function used to do, was the safe half-measure:
+/// it moved the failure to compile time, at the cost of making every framework
+/// package unusable as an interface, since all three export non-private inline
+/// functions.
+///
+/// Compiler-generated wrappers are excluded too. `pack$S`, `borrow_mut$S$N`
+/// and `const$NAME` are synthesized during file-format generation to realize
+/// struct visibility and cross-module constant access; a dependent never names
+/// one, the compiler generates its own calls to them, and `$` is not even a
+/// legal Move identifier — so emitting them produces an interface that cannot
+/// be parsed back.
+///
+/// These only exist in a model that has been through the *full* compiler.
+/// A model from `run_checker` alone has none, which is why an
+/// export-and-typecheck sweep cannot discover this and the first modular build
+/// did immediately.
 fn exported_in_interface(fun_env: &FunctionEnv) -> bool {
-    fun_env.visibility() != MoveVisibility::Private && !fun_env.is_inline()
+    if fun_env.is_struct_api() || fun_env.is_const_accessor() {
+        return false;
+    }
+    fun_env.visibility() != MoveVisibility::Private || reached_from_exported_inline(fun_env)
+}
+
+/// Whether a private function is reached from an exported inline function of
+/// its module, through inline functions. A dependent expands the exported one,
+/// and with it the inline functions it reaches, so their bodies cross too. A
+/// non-inline function they call crosses as a declaration, so the rendered
+/// bodies resolve; calling it from another module is still rejected.
+fn reached_from_exported_inline(fun_env: &FunctionEnv) -> bool {
+    let module = &fun_env.module_env;
+    let mut todo = module
+        .get_functions()
+        .filter(|function| function.is_inline() && function.visibility() != MoveVisibility::Private)
+        .map(|function| function.get_id())
+        .collect::<Vec<_>>();
+    let mut seen = BTreeSet::new();
+    while let Some(id) = todo.pop() {
+        if !seen.insert(id) {
+            continue;
+        }
+        for callee in module
+            .get_function(id)
+            .get_called_functions()
+            .into_iter()
+            .flatten()
+        {
+            if callee.module_id != module.get_id() {
+                continue;
+            }
+            if callee.id == fun_env.get_id() {
+                return true;
+            }
+            if module.get_function(callee.id).is_inline() {
+                todo.push(callee.id);
+            }
+        }
+    }
+    false
+}
+
+/// Empties every `spec { }` block in an expression, leaving its structure.
+///
+/// An interface carries declarations; it does not carry the module's spec file.
+/// A rendered body that mentions a spec function therefore names something the
+/// dependent cannot resolve — `vector::map_ref`'s loop invariants call
+/// `spec_map_ref`, which lives in `vector.spec.move`. Spec blocks contribute no
+/// bytecode, so emptying them removes exactly what a dependent cannot compile
+/// and nothing it needs. Verification is unaffected: the prover runs against
+/// sources, never against a generated interface.
+struct StripSpecs;
+
+impl ExpRewriterFunctions for StripSpecs {
+    fn rewrite_spec(&mut self, _target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
+        let is_empty = spec.conditions.is_empty()
+            && spec.update_map.is_empty()
+            && spec.on_impl.is_empty()
+            && spec.proof.is_none();
+        (!is_empty).then(|| Spec {
+            loc: spec.loc.clone(),
+            ..Default::default()
+        })
+    }
+}
+
+/// The Move source of an `inline` function, for [`XirFunction::source`].
+///
+/// A declaration is enough for anything a dependent *links* against; an inline
+/// function is expanded instead, so the dependent needs the body. `Sourcifier`
+/// renders it — including lambdas, which is what makes this viable where a
+/// typed-AST route is not.
+///
+/// Safe to hand to a dependent because a non-private inline function may only
+/// call what its callers can reach: `check_inline_callee_visibility` warns
+/// otherwise, and the framework produces no such warning.
+fn inline_source(fun_env: &FunctionEnv) -> Result<Option<String>> {
+    if !fun_env.is_inline() {
+        return Ok(None);
+    }
+
+    // `Sourcifier` renders an attribute as its bare name, dropping arguments —
+    // `#[expected_failure(abort_code = 1)]` becomes `#[expected_failure]`. For
+    // a declaration that is harmless, because the generator emits `attributes`
+    // from XIR, which keeps them; for a rendered body it is the whole output,
+    // so the arguments would be lost with nothing to notice.
+    //
+    // No non-private inline function in the framework has an attribute at all,
+    // so this rejects nothing today. Reported rather than dropped, on the same
+    // grounds as a non-private constant below: an interface that quietly says
+    // less than the module is worse than one that refuses to exist.
+    if let Some(attribute) = fun_env
+        .get_attributes()
+        .iter()
+        .find(|attribute| match attribute {
+            // A bare `#[name]` survives the rendering intact.
+            Attribute::Apply(_, _, args) => !args.is_empty(),
+            Attribute::Assign(..) => true,
+        })
+    {
+        let pool = fun_env.module_env.env.symbol_pool();
+        bail!(
+            "inline function `{}` carries attribute `{}` with arguments, which its rendered \
+             source cannot represent; this package must be compiled monolithically",
+            fun_env.get_full_name_str(),
+            pool.string(attribute.name())
+        )
+    }
+
+    // `amend` is what makes the rendering *recompilable*. The AST reaching here
+    // has been desugared, so it holds synthesized locals named `$t`, `$lb` and
+    // the like; `$` is not a Move identifier character, and rendering them
+    // verbatim produces source no dependent can parse. Amending rewrites them.
+    // The rendering lands in a generated file with no `use` declarations, so
+    // every external name must carry its address.
+    let sourcifier = Sourcifier::new(fun_env.module_env.env, /*amend*/ true)
+        .with_fully_qualified_external_names();
+    let def = fun_env
+        .get_def()
+        .map(|def| StripSpecs.rewrite_exp(def.clone()));
+    sourcifier.print_fun(fun_env.get_qualified_id(), def.as_ref());
+    Ok(Some(sourcifier.result()))
 }
 
 fn exported_funs<'env>(
