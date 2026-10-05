@@ -114,8 +114,8 @@ use move_model::{
     exp_simplifier::{flatten_conjunction_owned, is_complementary, ExpSimplifier},
     memory_labels::{all_labels_in_exp, MemoryLabelInfo},
     model::{
-        FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, SpecFunId, StructEnv,
-        StructId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId, SpecFunId,
+        StructEnv, StructId,
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
@@ -2326,8 +2326,7 @@ fn update_spec<'env>(
                                     "transparent callee `{callee_name}` is inside the editable WP \
                                      scope and has neither a complete opaque contract nor a body \
                                      which describes its behavior exactly (no loops, no global \
-                                     memory); infer and verify an opaque specification for that \
-                                     callee first, then rerun WP for the caller"
+                                     memory); WP cannot construct a complete caller specification"
                                 )
                             } else {
                                 format!(
@@ -2834,9 +2833,8 @@ fn report_partial_aborts(
         )
     } else if has_transparent_callee {
         format!(
-            "WP cannot complete `{}` while a transparent callee lacks a complete opaque \
-             contract. Repair the named callee boundary before changing or rerunning the \
-             caller. Reasons:",
+            "WP cannot complete `{}` through a transparent callee which has neither a \
+             complete opaque contract nor a body describing its behavior exactly. Reasons:",
             fun_env.get_full_name_str()
         )
     } else if strict_violation {
@@ -3698,19 +3696,37 @@ fn calls_match(fun1: &Exp, args1: &[Exp], fun2: &Exp, args2: &[Exp]) -> bool {
 /// path names the procedure-level `&mut` post-state even when WP
 /// propagated the body-borrow source through `let` bindings (e.g.
 /// `Eq(result, update_field(p, x, write_of(...)))` → `write_of ↦ result.x`).
+/// Only an equation that holds on every normal return binds: one under a
+/// branch guard names the post-state on that branch alone, and substituting
+/// it everywhere would rewrite the other branches' clauses with it.
 fn collect_write_of_bindings(env: &GlobalEnv, exps: &[Exp]) -> Vec<(Exp, Exp)> {
     let mut result: Vec<(Exp, Exp)> = Vec::new();
     for exp in exps {
-        exp.visit_pre_order(&mut |sub| {
-            if let ExpData::Call(_, AstOp::Eq, args) = sub {
+        for conjunct in unconditional_conjuncts(exp) {
+            if let ExpData::Call(_, AstOp::Eq, args) = conjunct.as_ref() {
                 if args.len() == 2 && is_procedure_level_path(&args[0]) {
                     decompose_write_of_binding(env, &args[0], &args[1], &mut result);
                 }
             }
-            true
-        });
+        }
     }
     result
+}
+
+/// The top-level conjuncts of `exp`, looking through `WellFormed` guards,
+/// which hold for every value.
+fn unconditional_conjuncts(exp: &Exp) -> Vec<Exp> {
+    flatten_conjunction_owned(exp)
+        .into_iter()
+        .flat_map(|conjunct| match conjunct.as_ref() {
+            ExpData::Call(_, AstOp::Implies, args)
+                if args.len() == 2 && is_well_formed_prop(&args[0]) =>
+            {
+                unconditional_conjuncts(&args[1])
+            },
+            _ => vec![conjunct],
+        })
+        .collect()
 }
 
 /// True if `exp` is a `Temporary`, the procedure result, or a `Select` /
@@ -7124,9 +7140,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     }
 
     /// Replace resource-wide update predicates based on a non-entry state
-    /// with an equality for the deepest updated field. This keeps useful
-    /// post-state information while avoiding equality claims about fields an
-    /// opaque callee's contract leaves unspecified.
+    /// with an equality for each updated field. This keeps useful post-state
+    /// information while avoiding equality claims about fields an opaque
+    /// callee's contract leaves unspecified.
     fn weaken_intermediate_field_updates(&self, state: &mut WPState) {
         struct Rewriter<'a, 'env> {
             analyzer: &'a SpecInferenceAnalyzer<'env>,
@@ -7168,33 +7184,67 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         *state = state.map(|exp| rewriter.rewrite_exp(exp.clone()));
     }
 
+    /// The conjunction of `post_value.f == v` over every field `f` that
+    /// `updated_value`, a chain of `update_field`s, writes; a value that is
+    /// itself an update is related field by field below `f`.
     fn field_update_relation(&self, post_value: Exp, updated_value: &Exp) -> Option<Exp> {
+        let mut relations = vec![];
+        self.collect_field_update_relations(
+            &post_value,
+            updated_value,
+            &mut BTreeSet::new(),
+            &mut relations,
+        );
+        // Collected from the last write back; state them in write order.
+        relations.reverse();
+        (!relations.is_empty()).then(|| self.mk_and_n(relations))
+    }
+
+    fn collect_field_update_relations(
+        &self,
+        post_value: &Exp,
+        updated_value: &Exp,
+        written: &mut BTreeSet<FieldId>,
+        relations: &mut Vec<Exp>,
+    ) {
         let ExpData::Call(
             update_id,
             AstOp::UpdateField(module_id, struct_id, field_id),
             update_args,
         ) = updated_value.as_ref()
         else {
-            return None;
+            return;
         };
         if update_args.len() != 2 {
-            return None;
+            return;
         }
         let instantiation = self.global_env().get_node_instantiation(*update_id);
         let Some(Type::Struct(_, _, type_args)) = instantiation.first() else {
-            return None;
+            return;
         };
-        let struct_env = self.get_struct(*module_id, *struct_id);
-        let field_env = struct_env.get_field(*field_id);
-        let post_field = self.mk_field_select(&field_env, type_args, post_value);
-        if matches!(
-            update_args[1].as_ref(),
-            ExpData::Call(_, AstOp::UpdateField(..), _)
-        ) {
-            self.field_update_relation(post_field, &update_args[1])
-        } else {
-            Some(self.mk_eq(post_field, update_args[1].clone()))
+        // The outermost update is the last write: an earlier write to the
+        // same field is overwritten, one to another field still holds.
+        if written.insert(*field_id) {
+            let struct_env = self.get_struct(*module_id, *struct_id);
+            let field_env = struct_env.get_field(*field_id);
+            let post_field = self.mk_field_select(&field_env, type_args, post_value.clone());
+            if matches!(
+                update_args[1].as_ref(),
+                ExpData::Call(_, AstOp::UpdateField(..), _)
+            ) {
+                let mut nested = vec![];
+                self.collect_field_update_relations(
+                    &post_field,
+                    &update_args[1],
+                    &mut BTreeSet::new(),
+                    &mut nested,
+                );
+                relations.extend(nested);
+            } else {
+                relations.push(self.mk_eq(post_field, update_args[1].clone()));
+            }
         }
+        self.collect_field_update_relations(post_value, &update_args[0], written, relations);
     }
 
     /// Rewrite the WP-internal `WriteOf(j)` carrier into user-facing

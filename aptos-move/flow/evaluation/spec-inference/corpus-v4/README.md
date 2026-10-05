@@ -114,12 +114,33 @@ or where it is hard; that is what the task asks for.
 A reference is the package with one module's complete specification written in.
 As in V3.2 only the specification is committed, as an add-only patch under
 [`references/`](references/), checked by `build_references.py` to add
-specification and no pragma beyond `opaque`.
+specification and no pragma beyond `opaque`. Every helper a target calls in the
+corpus code has a complete opaque contract there, proved against its body: the
+helpers of its own module, `new_bulk_order_request` of
+`extracted_bulk_order_types` in the `extracted_bulk_order_utils` reference, and
+`get_transaction`, whose upstream contract the multisig reference only marks
+`opaque`.
+
+## Task trees
+
+A task asks for its target's specification and nothing else. It starts from
+the package with the reference contracts of every function its target calls in
+the module, transitively, together with their loop invariants and the spec
+functions they use. The target's own reference -- its contract and the loop
+invariants in its body -- is withheld, and so is every other function's: a
+caller's contract can restate what the target does. A callee without a
+reference contract is read through its body. `prepare_tasks.py` derives these
+trees from the references, takes the call closure from `move-flow`'s package
+inventory, records each as a preparation patch under [`patches/`](patches/),
+pins it in the manifest, and rebases the mutant anchors onto it. It refuses a
+module whose reference, removed entirely, does not give back the package.
 
 ```text
 python3 corpus-v4/build.py                 # generate package/sources from the pinned commit
 python3 corpus-v4/build.py --verify        # regenerate in memory and compare with the manifest
 python3 corpus-v4/build_references.py      # assemble references/build/
+python3 corpus-v4/prepare_tasks.py         # task trees: patches/, manifest pins, mutant anchors
+python3 corpus-v4/prepare_tasks.py --verify
 python3 corpus-v4/compose.py               # per-task view into corpus-v4/inspect/
 ```
 

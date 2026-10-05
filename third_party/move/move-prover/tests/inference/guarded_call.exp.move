@@ -25,8 +25,8 @@ module 0x42::guarded_call {
     }
     spec caller(s: &mut u64, c: bool, d: u64) {
         pragma opaque = true;
-        ensures [inferred] !c ==> s == old(s);
         ensures [inferred] c ==> ensures_of<dec>(old(s), d, s);
+        ensures [inferred] !c ==> s == old(s);
         aborts_if [inferred] c && aborts_of<dec>(s, d);
     }
 
@@ -42,9 +42,9 @@ module 0x42::guarded_call {
     }
     spec caller_nested(s: &mut u64, c: bool, e: bool, d: u64) {
         pragma opaque = true;
+        ensures [inferred] c && e ==> ensures_of<dec>(old(s), d, s);
         ensures [inferred] c && !e ==> s == old(s);
         ensures [inferred] !c ==> s == old(s);
-        ensures [inferred] c && e ==> ensures_of<dec>(old(s), d, s);
         aborts_if [inferred] c && e && aborts_of<dec>(s, d);
     }
 

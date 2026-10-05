@@ -78,7 +78,6 @@ impl FlowSession {
         let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
         let uninvariant_loop_is_error = self.evaluation().uninvariant_loop_is_error();
         let aborts_if_is_strict = self.evaluation().aborts_if_is_strict;
-        let infer_unspecified_helpers = self.evaluation().infer_unspecified_helpers;
 
         let tool_timeout = self.tool_timeout();
         let wrote_files = Arc::new(AtomicBool::new(false));
@@ -129,7 +128,6 @@ impl FlowSession {
                 // `EvaluationConfig::uninvariant_loop_is_error`.
                 options.prover.uninvariant_loop_is_error = uninvariant_loop_is_error;
                 options.prover.aborts_if_is_strict = aborts_if_is_strict;
-                options.prover.infer_unspecified_helpers = infer_unspecified_helpers;
                 options.output_path = temp_dir
                     .path()
                     .join("output.bpl")
@@ -148,7 +146,7 @@ impl FlowSession {
                 let mut filtered_env_holder: Option<GlobalEnv> = None;
                 let wp_start = Instant::now();
                 let inference_result = if let Some(filter_str) = filter.as_deref() {
-                    let mut fresh = match data.build_filtered_env(Some(filter_str), &[]) {
+                    let mut fresh = match data.build_filtered_env(&[filter_str.to_string()], &[]) {
                         Ok(env) => env,
                         Err(e) => {
                             return Ok(CallToolResult::error(vec![Content::text(format!(
@@ -331,14 +329,27 @@ impl FlowSession {
                                 SpecOutput::Inline => "injected specs into",
                                 SpecOutput::File => "wrote spec files for",
                             };
+                            // The blocks as they now read, with their line
+                            // numbers, so the caller can edit them without
+                            // reading the files back.
                             let mut msg = format!(
-                                "inference succeeded, {} {} file(s) \
-                             (read the files to see the changes):\n",
+                                "inference succeeded, {} {} file(s); the inferred \
+                                 specification blocks as they now read:\n",
                                 action,
                                 modified_files.len()
                             );
                             for path in &modified_files {
                                 msg.push_str(&format!("- {}\n", path));
+                                let source = fs::read_to_string(path).unwrap_or_default();
+                                for (first_line, block) in inferred_spec_blocks(&source) {
+                                    for (offset, line) in block.lines().enumerate() {
+                                        msg.push_str(&format!(
+                                            "{:>5} | {}\n",
+                                            first_line + offset,
+                                            line
+                                        ));
+                                    }
+                                }
                             }
                             if !check_diags.is_empty() {
                                 msg.push_str(&format!(
@@ -437,5 +448,72 @@ impl FlowSession {
         }
 
         Ok(result)
+    }
+}
+
+/// The innermost specification blocks of `source` that carry an inferred
+/// condition, as `(first line, text)` with 1-based line numbers and whole
+/// lines of text. A `.spec.move` file wraps its blocks in one for the module.
+fn inferred_spec_blocks(source: &str) -> Vec<(usize, String)> {
+    let ignored = source_check::ignored_context_mask(source);
+    let mut blocks = Vec::new();
+    collect_inferred_spec_blocks(source, &ignored, 0, source.len(), &mut blocks);
+    blocks
+}
+
+fn collect_inferred_spec_blocks(
+    source: &str,
+    ignored: &[bool],
+    from: usize,
+    to: usize,
+    blocks: &mut Vec<(usize, String)>,
+) {
+    let bytes = source.as_bytes();
+    let is_ident = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'_';
+    let mut at = from;
+    while let Some(found) = source[at..to].find("spec") {
+        let start = at + found;
+        let end = start + "spec".len();
+        at = end;
+        if ignored[start]
+            || start > 0 && is_ident(bytes[start - 1])
+            || end < bytes.len() && is_ident(bytes[end])
+        {
+            continue;
+        }
+        let Some(open) = (end..to).find(|&i| !ignored[i] && bytes[i] == b'{') else {
+            return;
+        };
+        let mut depth = 0usize;
+        let Some(close) = (open..to).find(|&i| {
+            if ignored[i] {
+                return false;
+            }
+            match bytes[i] {
+                b'{' => depth += 1,
+                b'}' => depth -= 1,
+                _ => {},
+            }
+            depth == 0
+        }) else {
+            return;
+        };
+        at = close + 1;
+        let nested = blocks.len();
+        collect_inferred_spec_blocks(source, ignored, open + 1, close, blocks);
+        if blocks.len() > nested {
+            continue;
+        }
+        let line_start = source[..start].rfind('\n').map_or(0, |i| i + 1);
+        let line_end = source[close..]
+            .find('\n')
+            .map_or(source.len(), |i| close + i);
+        let text = &source[line_start..line_end];
+        if text.contains("[inferred") {
+            blocks.push((
+                source[..line_start].matches('\n').count() + 1,
+                text.to_string(),
+            ));
+        }
     }
 }

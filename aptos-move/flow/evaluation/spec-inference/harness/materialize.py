@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from .artifacts import copy_snapshot, tree_hash, validate_symlinks
@@ -55,3 +58,16 @@ def materialize_task(
             f"materialized task hash mismatch: expected {expected_sha256}, got {actual}"
         )
     return actual
+
+
+@contextmanager
+def materialized_task(shared_package: Path, preparation_patch: Path) -> Iterator[Path]:
+    """The tree a task starts from, for reading: the shared package itself when
+    the patch is empty, a temporary copy with the patch applied otherwise."""
+    if not preparation_patch.stat().st_size:
+        yield shared_package
+        return
+    with tempfile.TemporaryDirectory(prefix="move-inference-task-") as temporary:
+        tree = Path(temporary) / "package"
+        materialize_task(shared_package, preparation_patch, tree)
+        yield tree

@@ -50,6 +50,7 @@ from dataclasses import asdict
 from .config import ExperimentConfig
 from .judge import render_command, run_command
 from .identifiers import module_name, require_plain_name
+from .materialize import materialize_task
 
 
 async def screen_corpus_v3(
@@ -84,9 +85,23 @@ async def screen_corpus_v3(
     for index, record in enumerate(records, 1):
         task_id = require_plain_name(record["task_id"], "task_id")
         started = time.monotonic()
-        result = await check_compatibility(
-            config, package, record["target"], threshold
-        )
+        # A task starts from the package with its preparation patch applied,
+        # when its corpus records one: the contracts of what the target calls,
+        # without its own.
+        with tempfile.TemporaryDirectory(prefix=f"move-inference-screen-{task_id}-") as temporary:
+            if record.get("preparation_patch"):
+                task_tree = Path(temporary) / "package"
+                task_tree_sha256 = materialize_task(
+                    package,
+                    manifest_path.parent / record["preparation_patch"],
+                    task_tree,
+                    record.get("prepared_sha256"),
+                )
+            else:
+                task_tree, task_tree_sha256 = package, tree_hash(package)
+            result = await check_compatibility(
+                config, task_tree, record["target"], threshold
+            )
         reference = await _prove_reference(config, manifest_path, record, threshold)
         gate = await wp_model_gate(
             config,
@@ -110,6 +125,7 @@ async def screen_corpus_v3(
             "schema_version": 2,
             "task_id": task_id,
             "target": record["target"],
+            "task_tree_sha256": task_tree_sha256,
             "passed": bool(well_formed and reference["proved"] and gate["passed"]),
             "well_formed": well_formed,
             "reference_proved": reference["proved"],

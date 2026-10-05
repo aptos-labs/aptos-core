@@ -73,7 +73,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-order-010.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_experimental",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -96,7 +100,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-discard-011.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_experimental",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -121,7 +129,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-cancel-026.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_experimental",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -145,7 +157,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "inference_corpus::selection_machine",
+   "preparation_patch": "patches/SM-select-022.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "authored",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -170,7 +186,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "inference_corpus::lomuto_partition",
+   "preparation_patch": "patches/QP-part-025.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "authored",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -193,7 +213,15 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-sanitize-028.patch",
+   "preparation_patch_sha256": "04c6228820833310b9174152428b091a7d2c37fc6dcdef3047fd2cec9a17693f",
+   "prepared_sha256": "ffca6b7834bab8e4e692226a0afba2a72cb1ae6c59cb0288e3c846654e978492",
    "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_bulk_order_types::new_bulk_order_request",
+    "extracted_bulk_order_utils::validate_not_zero_sizes",
+    "extracted_bulk_order_utils::validate_price_ordering"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -217,7 +245,11 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-match-029.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_experimental",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -240,7 +272,14 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-reinsert-030.patch",
+   "preparation_patch_sha256": "dd95c4d9c36a5461a2e5c1fb346af7a1880573e7713cf3dbbc97b1cb1189ecc9",
+   "prepared_sha256": "69f316cc5a1d702802f48b2f3b9de820bc6ce9d23911b514b41c160916eaa6ee",
    "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_bulk_order_utils::get_price_from_match_details",
+    "extracted_bulk_order_utils::get_remaining_size_from_match_details"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -262,7 +301,11 @@
    "guessability": "guessable",
    "has_loop": true,
    "module": "aptos_experimental::extracted_bulk_order_utils",
+   "preparation_patch": "patches/TR-nonzero-031.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_experimental",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -283,7 +326,14 @@
    "guessability": "guessable",
    "has_loop": false,
    "module": "aptos_experimental::extracted_price_time_index",
+   "preparation_patch": "patches/PT-taker-034.patch",
+   "preparation_patch_sha256": "52621f736c288fdd8ab6eeacc958b701a0d2e4534541ed246c03717a970367ad",
+   "prepared_sha256": "515ccfe791fa8ffd9a80dd2b8799796e65bd875c7b257d3087ad0c273c8cb9c9",
    "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_price_time_index::best_ask_price",
+    "extracted_price_time_index::best_bid_price"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -306,7 +356,13 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_experimental::extracted_dead_mans_switch_tracker",
+   "preparation_patch": "patches/DM-keepalive-035.patch",
+   "preparation_patch_sha256": "863f82f29d5a6e5fb3c866e0be09707c8ee577fe0a6d22e383fe9c6cd905852d",
+   "prepared_sha256": "cf32d547f0e65233a79b60c11f4df7f0867874095c2160d2d33702d0ee2bb317",
    "provenance": "aptos_experimental",
+   "reference_contracts": [
+    "extracted_dead_mans_switch_tracker::disable_keep_alive"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -329,7 +385,11 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_experimental::extracted_dead_mans_switch_tracker",
+   "preparation_patch": "patches/DM-valid-036.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_experimental",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -353,7 +413,11 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_framework::extracted_rate_limiter",
+   "preparation_patch": "patches/RL-refill-037.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -376,7 +440,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-tiers-038.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -399,7 +467,14 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-build-039.patch",
+   "preparation_patch_sha256": "5d49fd649d50e4dc4b573af3d09fb429b594308a65613d5de135ca0fa005ccbd",
+   "prepared_sha256": "f8d4cfa6a684df1d1db1851f8eb514a7ea334a87320248bf03461235102506cd",
    "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_transaction_limits::new_tier",
+    "extracted_transaction_limits::validate_tiers"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -421,7 +496,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-find-040.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -443,7 +522,13 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_ethereum_derivable_account",
+   "preparation_patch": "patches/EA-scheme-041.patch",
+   "preparation_patch_sha256": "b2838899728717b01f05492a81e2b7bbf4d407d025db449a2786fbf1a7d10f6e",
+   "prepared_sha256": "c7d76c786d1a0622a2b16937e235149c6a995fd9a81b88d929ce0d619579b40b",
    "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_ethereum_derivable_account::is_alpha"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -465,7 +550,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "std::extracted_vector_range",
+   "preparation_patch": "patches/VR-range-042.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "move_stdlib",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -488,7 +577,13 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_framework::extracted_rate_limiter",
+   "preparation_patch": "patches/RL-request-043.patch",
+   "preparation_patch_sha256": "8c53312cc18aff371311d08ff8d881ff887206e3d2766e2c272cb7e124b0bd6b",
+   "prepared_sha256": "46cac80a98648dd643398a07db18e5e83dddd925a0238ce491ee1e6fbea38d53",
    "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_rate_limiter::refill"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -511,7 +606,13 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-enough-044.patch",
+   "preparation_patch_sha256": "3b2840484faf2698f90d6ea5d70356a8fd1d35b0f27c3276f17fbbba9253fcf2",
+   "prepared_sha256": "709edb26990d36e975ac5b2f3cb0d253af09bb68ae01c6036081cd0ac6d6aaea",
    "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_transaction_limits::find_min_stake_required"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -533,7 +634,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_sui_derivable_account",
+   "preparation_patch": "patches/SU-split-045.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -556,7 +661,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_multisig_account",
+   "preparation_patch": "patches/MS-pending-046.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -579,7 +688,13 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_framework::extracted_multisig_account",
+   "preparation_patch": "patches/MS-timelock-047.patch",
+   "preparation_patch_sha256": "92b8f4a23a72e53cb1486b99b008a305a559f7aa9541289eb9d9fa6657cb8bd2",
+   "prepared_sha256": "19df7da27b49d4d86e054ab206581ffaf466d6ffc8c7cdf3f7021fd143b240aa",
    "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_multisig_account::get_transaction"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -601,7 +716,11 @@
    "guessability": "guessable",
    "has_loop": false,
    "module": "aptos_framework::extracted_multisig_account",
+   "preparation_patch": "patches/MS-capacity-048.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -625,7 +744,11 @@
    "guessability": "hard",
    "has_loop": true,
    "module": "aptos_framework::extracted_jwks",
+   "preparation_patch": "patches/JW-upsert-049.patch",
+   "preparation_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "prepared_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
    "provenance": "aptos_framework",
+   "reference_contracts": [],
    "required_contract_categories": [
     "normal-result",
     "abort"
@@ -649,7 +772,15 @@
    "guessability": "hard",
    "has_loop": false,
    "module": "aptos_framework::extracted_transaction_limits",
+   "preparation_patch": "patches/TL-update-050.patch",
+   "preparation_patch_sha256": "a171a4ca119656fc1432af0f2abb64684e2ed6deef24497b8a607c27254e25b0",
+   "prepared_sha256": "2fe8e5353e19459cdb8271f15d6b3ce5288cd79ec0cddebe60c1c11e6c42a067",
    "provenance": "aptos_framework",
+   "reference_contracts": [
+    "extracted_transaction_limits::new_tier",
+    "extracted_transaction_limits::new_tiers",
+    "extracted_transaction_limits::validate_tiers"
+   ],
    "required_contract_categories": [
     "normal-result",
     "abort"

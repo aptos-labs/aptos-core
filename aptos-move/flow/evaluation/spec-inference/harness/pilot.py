@@ -21,7 +21,7 @@ from .identifiers import require_plain_name
 from .artifacts import canonical_json, sha256_file, tree_hash, write_json
 from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig, FEEDBACK_LEVELS, RunSpec
-from .materialize import materialize_task
+from .materialize import materialize_task, materialized_task
 from .mutants import NO_MUTANTS, mutation_fingerprint, require_unique_mutant_ids
 from .schedule import ARMS
 
@@ -834,6 +834,20 @@ def _require_screening_agrees(
                 f"{result['task_id']}, so its solvability evidence cannot be "
                 "tied to the reference that produced it; re-run screening"
             )
+    # A preparation patch changes what a task starts from without changing the
+    # package, so the package digest cannot notice a task tree screened before
+    # its patch changed.
+    screened_trees = {
+        result["task_id"]: result.get("task_tree_sha256")
+        for result in summary.get("results") or ()
+    }
+    for record in records:
+        prepared = record.get("prepared_sha256")
+        if prepared and screened_trees.get(record["task_id"]) != prepared:
+            raise ValueError(
+                f"{summary_path} did not screen the tree {record['task_id']} now "
+                "starts from; re-run screening"
+            )
     unevidenced = sorted(task for task, _ in claimed - cleared)
     if unevidenced:
         raise ValueError(
@@ -870,11 +884,13 @@ def _resolve_mutant_manifests(
         digests[task["task_id"]] = sha256_file(manifest)
         cases = json.loads(manifest.read_text(encoding="utf-8"))["mutants"]
         require_unique_mutant_ids(cases, f"mutant manifest for {task['task_id']}")
-        # Against the snapshot the round will actually run, so the identity is
-        # computed from the same text at schedule time and at run time.
-        fingerprints[task["task_id"]] = sorted(
-            mutation_fingerprint(case, Path(task["snapshot"])) for case in cases
-        )
+        # Against the tree the round will actually run -- the snapshot with
+        # the task's patch -- so the identity is computed from the same text at
+        # schedule time and at run time.
+        with materialized_task(Path(task["snapshot"]), Path(task["patch"])) as tree:
+            fingerprints[task["task_id"]] = sorted(
+                mutation_fingerprint(case, tree) for case in cases
+            )
     if missing:
         raise FileNotFoundError(
             "strict scoring needs TASK_ID/mutants.json under "

@@ -86,8 +86,9 @@ git status --short corpus-v4
 ```
 
 `verify.py` regenerates the package from the pinned commit and checks every
-digest, assembles the reference packages, and re-validates both mutant sets of
-every ready task with the harness's own validator. That validator proves the
+digest, assembles the reference packages, checks every task's preparation
+patch, and re-validates both mutant sets of every ready task, against the tree
+that task starts from, with the harness's own validator. That validator proves the
 reference, refuses a vacuous one, confirms the reference carries the corpus
 implementation unchanged, and runs every mutant against it. It rewrites the
 committed mutant records in place, so an empty `git status` means they were
@@ -188,14 +189,15 @@ python3 -m harness.model_profile select --model terra56 --config config/default.
 for arm in agent-only hybrid-guided hybrid-flexible; do
   move-flow plugin $ROUND/plugins/acceptance/${arm//-/_} --inference-tactic $arm \
     --evaluation-mode --feedback-level acceptance --aborts-if-is-strict \
-    --infer-unspecified-helpers --max-verification-timeout 20 --flow-source-commit $COMMIT
+    --no-wp-simplification --max-verification-timeout 20 --flow-source-commit $COMMIT
 done
 ```
 
 `--aborts-if-is-strict` makes WP report an abort characterization it cannot
 make exact as an error instead of emitting `aborts_if_is_partial`, which the
-acceptance check rejects anyway. `--infer-unspecified-helpers` makes WP, run on
-one function, also infer that function's callees which have no specification.
+acceptance check rejects anyway. `--no-wp-simplification` leaves WP's output as
+it is instead of instructing the hybrid arms to simplify it, as in the V3.2
+rounds.
 
 and write `$ROUND/plugins.json`:
 

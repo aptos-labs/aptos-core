@@ -112,11 +112,6 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
     } else {
         "0"
     };
-    let infer_unspecified_helpers = if evaluation.infer_unspecified_helpers {
-        "1"
-    } else {
-        "0"
-    };
     let mut session_env: Vec<(&str, String)> = vec![
         (
             crate::evaluation::INFERENCE_TACTIC_ENV_VAR,
@@ -133,10 +128,6 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         (
             crate::evaluation::ABORTS_IF_IS_STRICT_ENV_VAR,
             aborts_if_is_strict.to_string(),
-        ),
-        (
-            crate::evaluation::INFER_UNSPECIFIED_HELPERS_ENV_VAR,
-            infer_unspecified_helpers.to_string(),
         ),
     ];
     session_env.push((
@@ -204,10 +195,6 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
             aborts_if_is_strict.to_string(),
         ),
         (
-            crate::evaluation::EXPECTED_INFER_UNSPECIFIED_HELPERS_ENV_VAR,
-            infer_unspecified_helpers.to_string(),
-        ),
-        (
             crate::evaluation::EXPECTED_TOOL_LIST_SHA256_ENV_VAR,
             tool_list_sha256.clone(),
         ),
@@ -259,7 +246,6 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         "evaluation_mode": evaluation.evaluation_mode,
         "feedback_level": evaluation.feedback_level.as_str(),
         "aborts_if_is_strict": evaluation.aborts_if_is_strict,
-        "infer_unspecified_helpers": evaluation.infer_unspecified_helpers,
         "no_wp_simplification": args.no_wp_simplification,
         "rendered_inference_skill_sha256": sha256_hex(rendered_skill.as_bytes()),
         "mcp_tool_list_sha256": tool_list_sha256,
@@ -317,7 +303,6 @@ mod tests {
                     evaluation_mode: false,
                     feedback_level: None,
                     aborts_if_is_strict: false,
-                    infer_unspecified_helpers: false,
                 };
                 run(&args, &global).unwrap();
                 let skill = std::fs::read_to_string(output.path().join("skills/move-inf/SKILL.md"))
@@ -357,7 +342,6 @@ mod tests {
             evaluation_mode: false,
             feedback_level: None,
             aborts_if_is_strict: false,
-            infer_unspecified_helpers: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -598,7 +582,6 @@ mod tests {
             evaluation_mode: false,
             feedback_level: None,
             aborts_if_is_strict: false,
-            infer_unspecified_helpers: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -654,7 +637,6 @@ mod tests {
             evaluation_mode: true,
             feedback_level: None,
             aborts_if_is_strict: false,
-            infer_unspecified_helpers: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
@@ -721,7 +703,6 @@ mod tests {
             evaluation_mode: true,
             feedback_level: None,
             aborts_if_is_strict: false,
-            infer_unspecified_helpers: false,
         };
         let args = PluginArgs {
             output_dir: output_dir.path().to_path_buf(),
