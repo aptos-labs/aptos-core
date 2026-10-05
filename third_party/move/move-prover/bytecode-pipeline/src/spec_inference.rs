@@ -118,8 +118,8 @@ use move_model::{
         StructEnv, StructId,
     },
     pragmas::{
-        ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
-        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
+        ABORTS_IF_IS_PARTIAL_PRAGMA, ABORTS_IF_IS_STRICT_PRAGMA, CONDITION_INFERRED_PROP,
+        CONDITION_INFERRED_SATHARD, CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
     sourcifier::Sourcifier,
     spec_derivation,
@@ -450,6 +450,10 @@ pub struct InferredFrameTargets(pub BTreeSet<QualifiedId<FunId>>);
 /// merely loaded from a previous inference run.
 #[derive(Clone, Debug, Default)]
 pub struct InferredConditionTargets(pub BTreeSet<QualifiedId<FunId>>);
+
+/// Functions whose contract this run infers, fixed before any is processed.
+#[derive(Clone, Debug, Default)]
+struct ContractInferenceTargets(BTreeSet<QualifiedId<FunId>>);
 
 /// Functions skipped because source already contained generated conditions.
 /// Collected so a package-wide retry produces one bounded warning, not one
@@ -832,6 +836,20 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
         "spec_inference".to_string()
     }
 
+    fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
+        let mut inferred = ContractInferenceTargets::default();
+        for (fun, variant) in targets.get_funs_and_variants() {
+            let fun_env = env.get_function(fun);
+            let data = targets
+                .get_data(&fun, &variant)
+                .expect("function data of a listed variant");
+            if is_inference_candidate(&fun_env, data) && !has_inferred_conditions(&fun_env) {
+                inferred.0.insert(fun);
+            }
+        }
+        env.set_extension(inferred);
+    }
+
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
@@ -839,39 +857,10 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        // Skip native/intrinsic functions
-        if fun_env.is_native() || fun_env.is_intrinsic() {
+        if !is_inference_candidate(fun_env, &data) {
             return data;
         }
-
-        // Skip variants with empty code (e.g., baseline cleared by SpecInstrumentation)
-        if data.code.is_empty() {
-            return data;
-        }
-
-        // Only run inference on Verification variants (which come out of
-        // SpecInstrumentation with fully instrumented code). The Baseline
-        // variant may have been cleared. The spec is shared across variants,
-        // so we must run exactly once per function.
-        if !data.variant.is_verified() {
-            return data;
-        }
-
-        // Check if spec block is empty and needs inference
-        if !needs_inference(fun_env) {
-            return data;
-        }
-        let inferred_sym = fun_env
-            .module_env
-            .env
-            .symbol_pool()
-            .make(CONDITION_INFERRED_PROP);
-        if fun_env
-            .get_spec()
-            .conditions
-            .iter()
-            .any(|condition| condition.properties.contains_key(&inferred_sym))
-        {
+        if has_inferred_conditions(fun_env) {
             let env = fun_env.module_env.env;
             let mut skipped = env
                 .get_extension::<ExistingInferredConditionTargets>()
@@ -1577,6 +1566,39 @@ fn is_lambda_lifted_name(fun_env: &FunctionEnv) -> bool {
 // Helper Functions
 
 /// Checks if a function needs spec inference
+/// Whether inference runs on this variant of a function, unless it already
+/// carries conditions of an earlier run.
+fn is_inference_candidate(fun_env: &FunctionEnv, data: &FunctionData) -> bool {
+    // Only Verification variants come out of SpecInstrumentation with fully
+    // instrumented code; the Baseline variant may have been cleared. The spec
+    // is shared across variants, so inference runs exactly once per function.
+    !fun_env.is_native()
+        && !fun_env.is_intrinsic()
+        && !data.code.is_empty()
+        && data.variant.is_verified()
+        && needs_inference(fun_env)
+}
+
+fn has_inferred_conditions(fun_env: &FunctionEnv) -> bool {
+    let inferred_sym = fun_env
+        .module_env
+        .env
+        .symbol_pool()
+        .make(CONDITION_INFERRED_PROP);
+    fun_env
+        .get_spec()
+        .conditions
+        .iter()
+        .any(|condition| condition.properties.contains_key(&inferred_sym))
+}
+
+/// Whether the contract callers of `fun` see is the one it states now: no
+/// inference in this run will extend it.
+fn contract_is_final(env: &GlobalEnv, fun: QualifiedId<FunId>) -> bool {
+    !env.get_extension::<ContractInferenceTargets>()
+        .is_some_and(|targets| targets.0.contains(&fun))
+}
+
 fn needs_inference(fun_env: &FunctionEnv) -> bool {
     if let Some(mode) = fun_env.get_symbol_pragma(INFERENCE_PRAGMA) {
         let pool = fun_env.module_env.env.symbol_pool();
@@ -6466,7 +6488,20 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         {
             return true;
         }
+        let final_contract = contract_is_final(env, callee.get_qualified_id());
+        // A strict contract which states no abort condition states `aborts_if false`.
+        if final_contract
+            && aborts_if.is_empty()
+            && !has_aborts_with
+            && callee.is_pragma_true(ABORTS_IF_IS_STRICT_PRAGMA, || false)
+        {
+            return true;
+        }
         drop(spec);
+        // A call to an opaque function sees its contract, not its body.
+        if final_contract && callee.is_opaque() {
+            return false;
+        }
 
         // Function-target processing order does not guarantee that a callee's
         // inferred `aborts_if false` has been installed before its caller is
@@ -6511,15 +6546,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         false
     }
 
-    /// Whether `aborts_of<callee>(..)` is an exact summary of the callee's
-    /// aborts, so it can be emitted as an abort condition of the caller.
-    ///
-    /// Stated `aborts_if` clauses give that guarantee
-    /// ([`spec_derivation::spec_aborts_are_exact`]). `pragma opaque`
-    /// additionally stands in for a callee whose own contract this run is
-    /// still inferring and has not installed yet -- inference adds the
-    /// pragma to every target it processes, and a caller analyzed before
-    /// its callee would otherwise lose the callee's abort behavior.
     /// The abort condition of a call to an intrinsic-map function, from the
     /// prover's map model; `None` for any other callee.
     fn map_intrinsic_call_aborts(&self, fun_exp: &Exp, args: &[Exp]) -> Option<Exp> {
@@ -6536,6 +6562,15 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         )
     }
 
+    /// Whether `aborts_of<callee>(..)` is an exact summary of the callee's
+    /// aborts, so it can be emitted as an abort condition of the caller.
+    ///
+    /// Stated `aborts_if` clauses give that guarantee
+    /// ([`spec_derivation::spec_aborts_are_exact`]). `pragma opaque`
+    /// additionally stands in for a callee whose own contract this run is
+    /// still inferring and has not installed yet -- inference adds the
+    /// pragma to every target it processes, and a caller analyzed before
+    /// its callee would otherwise lose the callee's abort behavior.
     fn callee_has_trusted_abort_summary(&self, fun_exp: &Exp) -> bool {
         let ExpData::Call(closure_id, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref()
         else {
@@ -6546,6 +6581,12 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         };
         let callee_qid = (*module_id).qualified(*fun_id);
         let callee = self.global_env().get_function(callee_qid);
+        if contract_is_final(self.global_env(), callee_qid) && callee.is_opaque() {
+            // The call sees this contract only; with no abort condition
+            // stated, it may abort arbitrarily.
+            return spec_derivation::spec_aborts_are_exact(self.global_env(), callee_qid)
+                && !function_abort_spec_uses_generic_type_reflection(&callee);
+        }
         // `spec_aborts_are_exact` already excludes `aborts_if_is_partial`;
         // the opaque fallback must exclude it too. A callee without a
         // specification whose body describes its behavior exactly has its

@@ -8,10 +8,11 @@
   "schema_version": 2,
   "target": "aptos_framework::extracted_rate_limiter::request",
   "task_id": "RL-request-043",
+  "task_tree_sha256": "46cac80a98648dd643398a07db18e5e83dddd925a0238ce491ee1e6fbea38d53",
   "threshold_seconds": 20,
-  "wall_seconds": 4.2,
+  "wall_seconds": 5.6,
   "well_formed": true,
-  "wp_failure_kind": "implementation_failure",
+  "wp_failure_kind": "untrusted_inferred_contract",
   "wp_hard": true,
   "wp_model_gate": {
     "errors": [],

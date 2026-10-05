@@ -174,12 +174,12 @@ and survives; three first drafts were replaced for that reason.
 
 `harness.screen_v3 --all-ready` admits all twenty-six ready tasks (records in
 [`screening/`](screening/)): each is well-formed and its reference proves
-within the 20-second threshold, in under 11 seconds of wall time per task.
-Nineteen are `wp_hard`. For thirteen, unaided WP stops at a loop without an
-invariant. For five, it stops at a helper with a loop or global memory access
-and no contract yet, so the hybrid arms have to specify the helper before the
-target, the composition step V3.2 asked of `VS-redeem-004`. In `TL-find-040`,
-WP's output carries clauses it flags as untrusted.
+within the 20-second threshold, in under 12 seconds of wall time per task.
+Sixteen are `wp_hard`. For thirteen, unaided WP stops at a loop without an
+invariant. In the other three, WP's output carries clauses it flags as
+untrusted: top-level quantifiers in `TR-sanitize-028` and `TL-find-040`, and
+an existential over the limiter the `refill` callee updates in
+`RL-request-043`.
 
 The round runs all twenty-six: `select_round.py --size 26 --max-guessable 3
 --keep-redundant` selects every ready task, covering all 32 feature strata,

@@ -167,16 +167,17 @@ codex login
 
 Install the pinned Codex CLI and its code-mode host as the runbook's
 *Environment* section shows (`rust-v0.153.2` release assets into
-`evaluation-artifacts/tools/codex-0.153.2`), and put that directory first on
-`PATH`. The harness refuses any other version or host.
+`evaluation-artifacts/tools/codex-0.153.2` for `terra56`; `sol61` pins
+`rust-v0.160.1`), and put that directory first on `PATH`. The harness refuses
+any other version or host.
 
-`codex login` must sign in with a ChatGPT account that has Codex access to
-`gpt-5.6-terra`: the round configuration pins the ChatGPT endpoint, which an
-API-key login does not use. The launcher copies the saved `~/.codex/auth.json`
-into each cell's private sandbox home and removes it afterwards; it never
-reaches the artifacts. Set `MOVE_INFERENCE_CODEX_AUTH_FILE` when the login is
-stored elsewhere. Usage counts against the account's Codex limits; the dollar
-figures above are API-equivalent estimates.
+`codex login` must sign in with a ChatGPT account that has Codex access to the
+round's model (`gpt-5.6-terra`, `gpt-6.1-sol`): the round configuration pins the
+ChatGPT endpoint, which an API-key login does not use. The launcher copies the
+saved `~/.codex/auth.json` into each cell's private sandbox home and removes it
+afterwards; it never reaches the artifacts. Set `MOVE_INFERENCE_CODEX_AUTH_FILE`
+when the login is stored elsewhere. Usage counts against the account's Codex
+limits; the dollar figures above are API-equivalent estimates.
 
 **Round configuration and plugins.** Choose a new round id; every round gets
 its own directory and is never rewritten.
@@ -243,5 +244,5 @@ schedule, and rehearses an outage without spending model budget. A run that is
 interrupted resumes with `--resume`; the runbook's *Interrupted rounds* section
 explains what that keeps and what it refuses.
 
-Other models are selected the same way (`--model sol56`, or `opus` and `sonnet`
-through Claude Code); the runbook lists their credentials.
+Other models are selected the same way (`--model sol61`, `sol56`, or `opus` and
+`sonnet` through Claude Code); the runbook lists their credentials.

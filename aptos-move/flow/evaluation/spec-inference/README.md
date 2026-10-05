@@ -65,16 +65,23 @@ python3 -m venv .venv
 cc -O2 -Wall -Wextra -Werror sandbox/landlock_exec.c -o sandbox/landlock-exec
 ```
 
-The pinned Codex CLI and its code-mode host are the `rust-v0.153.2` release
+Each Codex profile pins a Codex CLI release: `sol56` and `terra56` run
+`rust-v0.153.2`, and `sol61` runs `rust-v0.160.1`, since the earlier release
+does not know `gpt-6.1-sol`. The CLI and its code-mode host are the release
 assets for the machine, unpacked side by side under the names the launcher
-looks for, and put first on `PATH` for preflight and launch:
+looks for. Put the directory of the release the round's profile pins first on
+`PATH` for preflight and launch:
 
 ```text
-arch=$(uname -m)-unknown-linux-musl; dir=evaluation-artifacts/tools/codex-0.153.2
-mkdir -p $dir && cd $dir
-for asset in codex codex-code-mode-host; do
-  gh release download rust-v0.153.2 --repo openai/codex --pattern "$asset-$arch.tar.gz"
-  tar xzf "$asset-$arch.tar.gz" && mv "$asset-$arch" "$asset" && rm "$asset-$arch.tar.gz"
+arch=$(uname -m)-unknown-linux-musl
+for version in 0.153.2 0.160.1; do
+  dir=evaluation-artifacts/tools/codex-$version; mkdir -p $dir
+  for asset in codex codex-code-mode-host; do
+    gh release download rust-v$version --repo openai/codex --dir $dir \
+      --pattern "$asset-$arch.tar.gz"
+    tar xzf "$dir/$asset-$arch.tar.gz" -C $dir && mv "$dir/$asset-$arch" "$dir/$asset"
+    rm "$dir/$asset-$arch.tar.gz"
+  done
 done
 ```
 
@@ -123,8 +130,9 @@ effort. It uses `codex exec --json`, retains the thread across controller
 follow-ups, inlines the immutable rendered `move-inf` skill, and requires the
 generated Move Flow MCP tool allowlist.
 
-`--model terra56` selects `gpt-5.6-terra` through the same Codex path with
-`high` reasoning effort. Pass `--infrastructure-retries 0` when preparing a
+`--model sol61` selects `gpt-6.1-sol` and `--model terra56` selects
+`gpt-5.6-terra`, both through the same Codex path with `high` reasoning
+effort. Pass `--infrastructure-retries 0` when preparing a
 round that must not retry genuine infrastructure failures.
 
 ```text

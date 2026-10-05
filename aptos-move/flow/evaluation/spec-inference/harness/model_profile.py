@@ -20,26 +20,36 @@ PROFILES = {
     "opus": ("claude-opus-5", "https://api.anthropic.com"),
     "sonnet": ("claude-sonnet-5", "https://api.anthropic.com"),
     "sol56": ("gpt-5.6-sol", "https://chatgpt.com/backend-api"),
+    "sol61": ("gpt-6.1-sol", "https://chatgpt.com/backend-api"),
     "terra56": ("gpt-5.6-terra", "https://chatgpt.com/backend-api"),
 }
 SUBSCRIPTION_PROFILES = {PROFILES["opus"], PROFILES["sonnet"]}
-CODEX_PROFILES = {PROFILES["sol56"], PROFILES["terra56"]}
-CODEX_CLI_VERSION = "0.153.2"
-#: The code-mode host published with the pinned CLI release, by machine: the
-#: `codex-code-mode-host-<machine>-unknown-linux-musl` asset of `rust-v0.153.2`.
+#: The Codex CLI release each Codex profile runs with. A model released after a
+#: pinned CLI needs a release which knows it; the others keep the release their
+#: rounds used.
+CODEX_CLI_VERSIONS = {"sol56": "0.153.2", "sol61": "0.160.1", "terra56": "0.153.2"}
+CODEX_PROFILES = {PROFILES[name] for name in CODEX_CLI_VERSIONS}
+#: The code-mode host published with each pinned CLI release, by machine: the
+#: `codex-code-mode-host-<machine>-unknown-linux-musl` asset of `rust-v<version>`.
 CODEX_CODE_MODE_HOST_SHA256 = {
-    "aarch64": "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c",
-    "x86_64": "f9dc99ef253919b4b48b53a346b1ebec76589eb854a1ab1a64afb4ff51cfbb61",
+    "0.153.2": {
+        "aarch64": "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c",
+        "x86_64": "f9dc99ef253919b4b48b53a346b1ebec76589eb854a1ab1a64afb4ff51cfbb61",
+    },
+    "0.160.1": {
+        "aarch64": "fbccde22982e3e679678e203a9c18eee8342fb04b096063d05159f1f80df4fd8",
+        "x86_64": "b33e8a5283f3c65c2a0aca6d43a59cfe850f624d8fa16992e3cad4fcc27c14e1",
+    },
 }
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def codex_code_mode_host_sha256() -> str:
-    """The pinned code-mode host digest for this machine."""
+def codex_code_mode_host_sha256(cli_version: str) -> str:
+    """The pinned code-mode host digest of a CLI release for this machine."""
     machine = platform.machine()
-    if machine not in CODEX_CODE_MODE_HOST_SHA256:
+    if machine not in CODEX_CODE_MODE_HOST_SHA256[cli_version]:
         raise ValueError(f"no pinned Codex code-mode host for machine `{machine}`")
-    return CODEX_CODE_MODE_HOST_SHA256[machine]
+    return CODEX_CODE_MODE_HOST_SHA256[cli_version][machine]
 
 
 def select_model(
@@ -52,7 +62,8 @@ def select_model(
     if infrastructure_retries is not None and infrastructure_retries < 0:
         raise ValueError("infrastructure retries cannot be negative")
     base_config = ExperimentConfig.load(base)
-    codex_profile = PROFILES[model] in CODEX_PROFILES
+    cli_version = CODEX_CLI_VERSIONS.get(model)
+    codex_profile = cli_version is not None
     config = replace(
         base_config,
         model=PROFILES[model][0],
@@ -62,9 +73,9 @@ def select_model(
             "high" if codex_profile else "max"
         ),
         agent_runtime="codex" if codex_profile else "claude",
-        codex_cli_version=CODEX_CLI_VERSION if codex_profile else None,
+        codex_cli_version=cli_version,
         codex_code_mode_host_sha256=(
-            codex_code_mode_host_sha256() if codex_profile else None
+            codex_code_mode_host_sha256(cli_version) if codex_profile else None
         ),
         source_commit=source_commit or base_config.source_commit,
         infrastructure_retries=(
