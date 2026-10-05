@@ -36,6 +36,30 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertEqual(cargo_test_args(nightly), cargo_test_args(legacy))
         self.assertIn("FORGE_NAMESPACE: forge-nightly-", nightly)
 
+    def test_link_texts_are_never_emoji_only(self):
+        night = {
+            "createdAt": "2026-09-01T02:00:00Z",
+            "status": "completed",
+            "conclusion": "failure",
+            "url": "https://github.com/org/repo/actions/runs/1",
+            "jobs": [{"name": "smoke", "conclusion": "failure"}],
+        }
+        _, payload = self.summary(
+            {"smoke": {"result": "failure"}},
+            previous_runs=[night],
+            created_at="2026-09-02T02:00:00Z",
+            jobs=[
+                {
+                    "name": "smoke",
+                    "conclusion": "failure",
+                    "html_url": "https://github.com/org/repo/actions/runs/2/job/3",
+                    "steps": [],
+                }
+            ],
+        )
+        texts = re.findall(r"<[^|>]+\|([^>]*)>", payload["text"])
+        self.assertEqual(texts, ["1", "2", "Run, logs, and artifacts", "smoke"])
+
     def test_history_bar_links_each_night_oldest_first_and_ends_with_this_run(self):
         def run(day, conclusion, status="completed"):
             return {
@@ -46,14 +70,19 @@ class NightlySummaryTest(unittest.TestCase):
             }
 
         previous = [run(3, "failure"), run(1, "success"), run(2, "skipped")]
-        line = build_history(previous, "https://github.com/org/repo/actions/runs/9", False)
+        line = build_history(
+            previous,
+            "https://github.com/org/repo/actions/runs/9",
+            False,
+            created_at="2026-09-09T02:00:00Z",
+        )
         self.assertEqual(
             line,
             "Last 4 nights: "
-            f"<https://github.com/org/repo/actions/runs/1|{GREEN}>"
-            f"<https://github.com/org/repo/actions/runs/2|{GREY}>"
-            f"<https://github.com/org/repo/actions/runs/3|{RED}>"
-            f"<https://github.com/org/repo/actions/runs/9|{GREEN}>",
+            f"{GREEN}<https://github.com/org/repo/actions/runs/1|1> "
+            f"{GREY}<https://github.com/org/repo/actions/runs/2|2> "
+            f"{RED}<https://github.com/org/repo/actions/runs/3|3> "
+            f"{GREEN}<https://github.com/org/repo/actions/runs/9|9>",
         )
         # Only the newest six completed nights precede this run; an in-progress
         # run is not a night, and this run's own colour follows its result.
@@ -63,14 +92,16 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertEqual(line.count("<"), 7)
         self.assertNotIn("/runs/3|", line)
         self.assertNotIn("/runs/11", line)
-        self.assertTrue(line.endswith(f"<https://github.com/org/repo/actions/runs/9|{RED}>"))
+        self.assertTrue(line.endswith(f"{RED}<https://github.com/org/repo/actions/runs/9|tonight>"))
         self.assertEqual(
             build_history(None, "https://github.com/org/repo/actions/runs/9", False),
-            f"Last 1 nights: <https://github.com/org/repo/actions/runs/9|{GREEN}>",
+            f"Last 1 nights: {GREEN}<https://github.com/org/repo/actions/runs/9|tonight>",
         )
         # Every nightly message carries the bar.
         _, payload = self.summary({"workspace": {"result": "success"}})
-        self.assertIn("Last 1 nights: <https://github.com/org/repo/actions/runs/1|", payload["text"])
+        self.assertIn(
+            f"Last 1 nights: {GREEN}<https://github.com/org/repo/actions/runs/1|", payload["text"]
+        )
 
     def test_passing_only_on_retry_is_yellow_and_names_recovered_jobs(self):
         previous = [
@@ -106,17 +137,17 @@ class NightlySummaryTest(unittest.TestCase):
         self.assertFalse(failed)
         self.assertIn("Nightly full-suite passed after retry", payload["text"])
         self.assertIn(
-            f"<https://github.com/org/repo/actions/runs/1|{YELLOW}>"
-            f"<https://github.com/org/repo/actions/runs/1|{YELLOW}>",
+            f"{YELLOW}<https://github.com/org/repo/actions/runs/1|1> "
+            f"{YELLOW}<https://github.com/org/repo/actions/runs/1|tonight>",
             payload["text"],
         )
-        # Retried jobs get a history row like failures; tonight's links to the failed attempt.
+        # Retried jobs get a history row like failures; the name links to the failed attempt.
         # The result job, still running while the summary is built, is not listed.
         self.assertTrue(
             payload["text"].endswith(
                 "Passed on retry:\n"
-                f"{YELLOW}<https://github.com/org/repo/actions/runs/2/job/7|{YELLOW}>"
-                "  flaky \u2014 Run smoke tests"
+                f"{YELLOW}{YELLOW}  <https://github.com/org/repo/actions/runs/2/job/7|flaky>"
+                " \u2014 Run smoke tests"
             )
         )
         # Failing again after the retry stays red.
@@ -127,7 +158,7 @@ class NightlySummaryTest(unittest.TestCase):
             first_attempt_jobs=[{"name": "broken", "conclusion": "failure"}],
         )
         self.assertTrue(failed)
-        self.assertIn(f"|{RED}>", payload["text"])
+        self.assertIn(f"{RED}<https://github.com/org/repo/actions/runs/1|tonight>", payload["text"])
         self.assertNotIn("Passed on retry", payload["text"])
 
     def test_failed_first_attempt_retries_instead_of_posting(self):
@@ -173,8 +204,8 @@ class NightlySummaryTest(unittest.TestCase):
             jobs=[{"name": "forge", "conclusion": "cancelled", "steps": []}],
         )
         self.assertIn(
-            f"<https://github.com/org/repo/actions/runs/1|{CANCELLED}>"
-            f"<https://github.com/org/repo/actions/runs/2|{RED}>",
+            f"{CANCELLED}<https://github.com/org/repo/actions/runs/1|1> "
+            f"{RED}<https://github.com/org/repo/actions/runs/2|2>",
             payload["text"],
         )
         # The cancelled night crosses out; the timed-out job of a failed night is red.
@@ -185,7 +216,7 @@ class NightlySummaryTest(unittest.TestCase):
             jobs=[{"name": "forge", "conclusion": "cancelled", "steps": []}],
         )
         self.assertIn("Nightly full-suite CANCELLED", payload["text"])
-        self.assertIn(f"|{CANCELLED}>\nBranch:", payload["text"])
+        self.assertIn(f"{CANCELLED}<https://github.com/org/repo/actions/runs/1|tonight>\nBranch:", payload["text"])
         # A cancellation lists only jobs that failed before it, not those it interrupted.
         _, payload = self.summary(
             {
@@ -277,11 +308,10 @@ class NightlySummaryTest(unittest.TestCase):
                 {"name": "cli", "conclusion": "skipped"},
             ],
         )
-        # Six prior nights (the oldest drops out), then tonight linked to the job log.
+        # Six prior nights (the oldest drops out), then tonight; the name links to the job log.
         self.assertIn(
-            f"{GREEN * 3}{YELLOW}{RED}{GREY}"
-            f"<https://github.com/org/repo/actions/runs/1/job/9|{RED}>"
-            "  parity \u2014 Check parity",
+            f"{GREEN * 3}{YELLOW}{RED}{GREY}{RED}"
+            "  <https://github.com/org/repo/actions/runs/1/job/9|parity> \u2014 Check parity",
             payload["text"],
         )
         self.assertIn("Skipped suites: cli-e2e", payload["text"])
@@ -310,9 +340,20 @@ class NightlySummaryTest(unittest.TestCase):
             "feature/<@everyone>'quoted'",
             "sha",
             "https://github.com/org/repo/actions/runs/1",
+            jobs=[
+                {
+                    "name": "cargo <@here>",
+                    "conclusion": "failure",
+                    "html_url": "https://github.com/org/repo/actions/runs/1/job/2",
+                    "steps": [{"name": "step <!channel>", "conclusion": "failure"}],
+                }
+            ],
         )
         self.assertTrue(failed)
         self.assertNotIn("<@everyone>", payload["text"])
+        self.assertNotIn("<@here>", payload["text"])
+        self.assertNotIn("<!channel>", payload["text"])
+        self.assertIn("job/2|cargo &lt;@here&gt;>", payload["text"])
         self.assertIn("'quoted'", payload["text"])
         self.assertIn("actions/runs/1", payload["text"])
 

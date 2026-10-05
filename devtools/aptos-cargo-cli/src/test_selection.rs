@@ -34,6 +34,8 @@ pub struct E2eRunner {
     workflow: String,
     job: String,
     nightly_jobs: Vec<String>,
+    /// Whether the runner consumes the PR's release Docker images.
+    docker_images: bool,
 }
 
 static E2E_REGISTRY: LazyLock<BTreeMap<String, E2eRunner>> = LazyLock::new(|| {

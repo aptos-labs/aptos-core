@@ -51,6 +51,8 @@ jobs:
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npmjs.
   node-api-compatibility-tests:
+    # A failed selection still runs the job so that the required check fails.
+    if: ${{ !inputs.SKIP_JOB || inputs.SELECTION_RESULT != 'success' }}
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read

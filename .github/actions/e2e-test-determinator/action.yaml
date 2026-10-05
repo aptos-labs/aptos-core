@@ -17,6 +17,9 @@ outputs:
   selected_e2e_tests:
     description: JSON list of selected E2E names
     value: ${{ steps.select.outputs.selected_e2e_tests }}
+  docker_images:
+    description: Whether a selected E2E test consumes the release Docker images
+    value: ${{ steps.select.outputs.docker_images }}
 runs:
   using: composite
   steps:

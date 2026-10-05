@@ -109,3 +109,12 @@ input_paths = [
     "terraform/helm",
     "docker"
 ]
+
+# Smoke tests run the aptos-node, CLI and debugger binaries built by the workflow.
+[e2e_tests.smoke-tests]
+affected_packages = ["smoke-test", "aptos-node", "aptos", "aptos-debugger"]
+input_paths = [".github/workflows/smoke-tests.yaml"]
+
+[e2e_tests.batch-encryption]
+affected_packages = ["aptos-batch-encryption"]
+input_paths = [".github/actions/rust-batch-encryption"]
