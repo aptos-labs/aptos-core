@@ -9,8 +9,13 @@
   "target": "aptos_framework::extracted_jwks::upsert_provider_jwks",
   "task_id": "JW-upsert-049",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 4.4,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

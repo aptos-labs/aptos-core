@@ -9,8 +9,13 @@
   "target": "aptos_experimental::extracted_price_time_index::is_taker_order",
   "task_id": "PT-taker-034",
   "threshold_seconds": 20,
-  "wall_seconds": 3.5,
+  "wall_seconds": 5.8,
   "well_formed": true,
-  "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

@@ -9,8 +9,13 @@
   "target": "aptos_framework::extracted_transaction_limits::update_config",
   "task_id": "TL-update-050",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 8.4,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

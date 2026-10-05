@@ -9,8 +9,13 @@
   "target": "aptos_framework::extracted_transaction_limits::find_min_stake_required",
   "task_id": "TL-find-040",
   "threshold_seconds": 20,
-  "wall_seconds": 4.9,
+  "wall_seconds": 5.6,
   "well_formed": true,
   "wp_failure_kind": "untrusted_inferred_contract",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

@@ -9,8 +9,13 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::reinsert_order_into_bulk_order",
   "task_id": "TR-reinsert-030",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 8.4,
   "well_formed": true,
-  "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }
