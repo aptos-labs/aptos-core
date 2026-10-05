@@ -7,50 +7,13 @@
 //! cached, so a rejected lowering never reaches the interpreter. Test harnesses
 //! that build `Function`s by hand call [`assert_verified`] instead.
 //!
-//! # What is checked
-//!
-//! Everything below is derivable from the `Function` and its micro-ops alone,
-//! given the descriptor, layout, and constant-pool providers:
-//!
-//! - **Frame geometry**: `extended_frame_size >= frame_size()`; the data
-//!   region and the callee frame pointer are `MAX_ALIGN`-aligned;
-//!   `param_region_size` lies within the data region and covers every
-//!   parameter slot.
-//! - **Parameter and return slots**: one per type, nonzero size, power-of-two
-//!   alignment up to `MAX_ALIGN`, aligned offsets, strictly ascending and
-//!   disjoint, parameters inside the parameter region and returns inside the
-//!   data region.
-//! - **Frame accesses**: every frame operand of every micro-op (per the
-//!   [`OperandKind`] schema in `instruction::operands`) lies within the
-//!   extended frame, does not overlap the frame metadata block, and is
-//!   aligned as the interpreter's access to it requires.
-//! - **GC layouts**: `frame_layout` and every safe-point layout list aligned,
-//!   in-bounds pointer slots, strictly sorted; safe points sit at allocating
-//!   ops and do not duplicate the base layout; `zero_frame` is set whenever
-//!   the base layout names a slot beyond the parameter region.
-//! - **Control flow**: jump targets in range; the last op is a terminator.
-//! - **Sizes and immediates**: variable-width copies are nonzero; `offset +
-//!   size` fits in `u32` for heap and reference offset ops; unchecked `u64`
-//!   immediates (divisor, shift amount) are in range; signedness restrictions
-//!   the interpreter would otherwise report at runtime.
-//! - **Descriptors**: allocation ops name a descriptor of the right kind, with
-//!   matching element stride and in-range enum tag; closure captured-data
-//!   descriptors keep their pointer offsets inside the values region.
-//! - **Constants**: `StoreImmVec` names an existing constant and its
-//!   destination is sized and aligned for the constant's type.
-//! - **Calls**: native slot regions and their pointer offsets fit; direct
-//!   callees' parameter regions and return slots fit the caller's callee
-//!   region; multi-destination ops have disjoint destinations.
-//!
-//! # Out of scope
-//!
-//! Anything that depends on runtime data or on dataflow: the extent borrowed
-//! by `SlotBorrow`; heap offsets against the pointee's size for ops that carry
-//! only a pointer; `elem_size` against a vector's real stride; enum offset
-//! tables against the variant count; whether a listed pointer slot actually
-//! holds a pointer at a given PC; write-before-read of slots. Descriptors
-//! themselves are not re-verified; their soundness is enforced by
-//! [`crate::ObjectDescriptor`]'s constructors at publish time.
+//! The checks are specified in `docs/micro_op_verifier.md`. Each check has a
+//! stable identifier there (`F1`, `P3`, `O1`, ...), and the implementation
+//! cites the identifier at the point where it is evaluated. Frame operands and
+//! the kind of access the interpreter performs on each one come from the
+//! schema in `instruction::operands`; everything else is specific to an op or
+//! to the function's metadata. All checks are evaluated and every violation is
+//! reported; no check depends on another having passed.
 //!
 //! TODO(cleanup): rename to a well-formedness checker to avoid ambiguity with
 //! the Move bytecode verifier.
@@ -65,7 +28,7 @@ use crate::{
     Function, LayoutProvider, MicroOp, ObjectDescriptorInner, OperandKind, PackClosureOp,
     SizedSlot, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
-use std::fmt;
+use std::{cmp::Ordering, fmt};
 
 /// Width and alignment of a heap-pointer slot, as the GC and the call
 /// protocol read it.
@@ -171,10 +134,11 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
     fn verify(&mut self) {
         let code = self.func.code.ops();
 
+        // F1.
         if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
-        // The dispatch loop falls through to `pc + 1` after any op that does
+        // F2. The dispatch loop falls through to `pc + 1` after any op that does
         // not set `pc` itself, so the last op must leave the function or jump.
         // Calls do not qualify: returning to `call_pc + 1` would run off the
         // end.
@@ -191,7 +155,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         self.verify_param_and_return_slots();
         self.verify_gc_layouts();
 
-        // Origins: either absent (hand-built functions) or one per micro-op;
+        // F7. Origins: either absent (hand-built functions) or one per micro-op;
         // a partial table would attribute errors to wrong bytecode offsets.
         let origins = self.func.code.origins();
         if !origins.is_empty() && origins.len() != code.len() {
@@ -204,6 +168,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             );
         }
 
+        // O1–O5 through the operand schema, then the op-specific checks.
         for (pc, instr) in code.iter().enumerate() {
             instr.frame_operands(&mut |off, kind| self.check(Some(pc), off, kind));
             self.verify_instruction(pc, instr);
@@ -216,6 +181,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
 
     fn verify_frame_geometry(&mut self) {
         let func = self.func;
+        // F3.
         if func.frame_size() > func.extended_frame_size {
             fail!(
                 self,
@@ -227,6 +193,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 func.frame_size()
             );
         }
+        // F4.
         if func.param_region_size > func.param_and_local_sizes_sum {
             fail!(
                 self,
@@ -236,7 +203,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 func.param_and_local_sizes_sum
             );
         }
-        // Frame metadata is written at `fp + param_and_local_sizes_sum` with
+        // F5, F6. Frame metadata is written at `fp + param_and_local_sizes_sum` with
         // aligned 8-byte stores, and the callee fp `fp + frame_size()` must
         // be `MAX_ALIGN`-aligned for the callee's own slot accesses.
         if !func.param_and_local_sizes_sum.is_multiple_of(MAX_ALIGN) {
@@ -261,7 +228,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
 
     fn verify_param_and_return_slots(&mut self) {
         let func = self.func;
-        // `CallClosure` and `CallBuilder` write `size` bytes at
+        // P1–P4 and R1–R4. `CallClosure` and `CallBuilder` write `size` bytes at
         // `callee_fp + offset` for each parameter slot, and `call_unchecked`
         // zeroes `[param_region_size, extended_frame_size)` afterwards, so a
         // slot outside the parameter region is either overwritten or out of
@@ -300,8 +267,8 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         );
     }
 
-    /// A parameter or return slot list: every slot well-formed and within
-    /// `[0, region_end)`, slots strictly ascending and disjoint.
+    /// P2–P4 / R2–R4. A parameter or return slot list: every slot
+    /// well-formed and within `[0, region_end)`, slots ascending and disjoint.
     fn check_slot_list(
         &mut self,
         kind: &str,
@@ -339,7 +306,8 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
-    /// A [`SizedSlot`] carries its own alignment, which the closure runtime
+    /// Slot well-formedness (P2, R2, L4, L9). A [`SizedSlot`] carries its own
+    /// alignment, which the closure runtime
     /// feeds to `align_up` (undefined for zero or non-power-of-two) and which
     /// must divide the offset for the slot to be where the layout says.
     fn check_sized_slot(&mut self, pc: Option<usize>, what: &str, slot: &SizedSlot) {
@@ -370,9 +338,10 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_points = self.func.safe_point_layouts.entries();
 
+        // G1, G2.
         self.check_pointer_offsets(None, base_offsets);
 
-        // The GC scans the base layout of every frame unconditionally, so a
+        // G3. The GC scans the base layout of every frame unconditionally, so a
         // slot beyond the parameter region must start out null rather than
         // holding whatever the previous frame left there.
         if !self.func.zero_frame {
@@ -390,6 +359,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             }
         }
 
+        // G4.
         if let Some(w) = safe_points
             .windows(2)
             .find(|w| w[0].code_offset.0 >= w[1].code_offset.0)
@@ -405,6 +375,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
 
         for entry in safe_points {
             let co = entry.code_offset.0 as usize;
+            // G5.
             match code.get(co) {
                 None => fail!(
                     self,
@@ -425,20 +396,34 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 Some(_) => {},
             }
             let sp_offsets = &entry.layout.heap_ptr_offsets;
+            // G6.
             self.check_pointer_offsets(Some(co), sp_offsets);
-            for off in sp_offsets.iter().filter(|off| base_offsets.contains(off)) {
-                fail!(
-                    self,
-                    Some(co),
-                    "safe_point_layouts: offset {} duplicates frame_layout",
-                    off.0
-                );
+            // G7. Both lists are strictly increasing (G2, G6), so a merge finds
+            // every duplicate in linear time. If either list is unsorted that
+            // is already reported, and a duplicate missed here is moot.
+            let (mut i, mut j) = (0, 0);
+            while let (Some(sp), Some(base)) = (sp_offsets.get(i), base_offsets.get(j)) {
+                match sp.0.cmp(&base.0) {
+                    Ordering::Less => i += 1,
+                    Ordering::Greater => j += 1,
+                    Ordering::Equal => {
+                        fail!(
+                            self,
+                            Some(co),
+                            "safe_point_layouts: offset {} duplicates frame_layout",
+                            sp.0
+                        );
+                        i += 1;
+                        j += 1;
+                    },
+                }
             }
         }
     }
 
-    /// Pointer offsets the GC reads with aligned `read_ptr`: each an
-    /// in-frame, aligned pointer slot; the list strictly sorted.
+    /// G1, G2 (and G6 for a safe point). Pointer offsets the GC reads with
+    /// aligned `read_ptr`: each an in-frame, aligned pointer slot; the list
+    /// strictly increasing.
     fn check_pointer_offsets(&mut self, pc: Option<usize>, offsets: &[FrameOffset]) {
         for &off in offsets {
             self.check(pc, off, OperandKind::Ptr);
@@ -513,7 +498,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             | EnumBorrowVariantFieldByTag { .. }
             | EnumCheckVariant { .. } => {},
 
-            // Unchecked u64 immediates: lowering uses the checked ops for
+            // I1, I2. Unchecked u64 immediates: lowering uses the checked ops for
             // zero divisors and out-of-range shifts, so these are lowering bugs.
             DivU64Imm { imm, .. } | ModU64Imm { imm, .. } if imm == 0 => {
                 self.err(Some(pc), "division by zero (imm)");
@@ -524,7 +509,8 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             },
             ShlU64Imm { .. } | ShrU64Imm { .. } => {},
 
-            // Signedness the interpreter would otherwise reject at runtime.
+            // I3, I4, I5. Signedness the interpreter would otherwise reject at
+            // runtime.
             IntBitAnd(ref op) | IntBitOr(ref op) | IntBitXor(ref op) if op.rhs.is_signed() => {
                 self.err(Some(pc), "bitwise on signed type");
             },
@@ -538,9 +524,10 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             },
             IntNegate(_) => {},
 
+            // Z1.
             Move { size, .. } => self.check_nonzero_size(pc, size),
 
-            // Forms a fat pointer to `local` without dereferencing it, so only
+            // B1. Forms a fat pointer to `local` without dereferencing it, so only
             // the base is checked: it must lie in the data region, not in the
             // metadata or callee region. The op carries no size, so the
             // borrowed extent is not bounds-checked here.
@@ -555,6 +542,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             },
             SlotBorrow { .. } => {},
 
+            // J1 (and O3 for the reference comparisons).
             Jump { target, .. }
             | JumpNotZeroU64 { target, .. }
             | JumpNotZeroByte { target, .. }
@@ -575,16 +563,18 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             ValueCmp(_) => {}, // `Value` operands are type-checked in `check`.
             ValueRefCmp(ref op) => self.check_value_type(pc, op.ty),
 
+            // C4.
             CallDirect { ref ptr } => {
                 // SAFETY: the function pointer lives in the global context,
                 // which the caller's guard keeps alive during verification.
                 let callee = unsafe { ptr.as_ref_unchecked() };
                 self.check_direct_callee(pc, callee);
             },
+            // C1, C2, C3.
             CallNative { ref abi, .. } => self.check_native_abi(pc, abi),
 
-            // Heap and reference offset ops: nonzero width, `offset + size`
-            // must not wrap.
+            // Z1, Z2. Heap and reference offset ops: nonzero width, `offset +
+            // size` must not wrap.
             HeapMoveFrom8 { offset, .. }
             | HeapMoveTo8 { offset, .. }
             | HeapMoveToImm8 { offset, .. } => {
@@ -600,7 +590,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 self.check_offset_size(pc, offset, size);
             },
             ReadRef { size, .. } | WriteRef { size, .. } => self.check_nonzero_size(pc, size),
-            // Any tag may be selected at runtime, so every present offset
+            // Z1, Z2. Any tag may be selected at runtime, so every present offset
             // must keep `offset + size` within `u32`.
             EnumReadVariantFieldByTag {
                 ref offsets, size, ..
@@ -613,7 +603,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                     self.check_offset_size(pc, offset, size);
                 }
             },
-            // The interpreter adds `base + off` in `u32`; the schema reports
+            // Z3. The interpreter adds `base + off` in `u32`; the schema reports
             // the saturated slot, this reports the overflow itself.
             DeepCopyHeapPtrs { base, ref offsets } => {
                 for &off in offsets
@@ -630,7 +620,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 }
             },
 
-            // Vectors.
+            // Z1, K3. Vectors.
             VecPushBack {
                 elem_size,
                 descriptor_id,
@@ -648,13 +638,13 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_vector_descriptor(pc, "VecPack", op.descriptor_id, op.elem_size);
             },
-            // The element copies are independent `copy_nonoverlapping`s.
+            // Z1, D1. The element copies are independent `copy_nonoverlapping`s.
             VecUnpack(ref op) => {
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_disjoint_destinations(pc, "VecUnpack", &op.dsts, op.elem_size);
             },
 
-            // Allocation descriptors.
+            // K1, K2. Allocation descriptors.
             HeapNew { descriptor_id, .. } => {
                 if let Some(inner) = self.descriptor_or_report(pc, "HeapNew", descriptor_id) {
                     if !matches!(
@@ -700,7 +690,9 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 None => {},
             },
 
+            // L1–L8.
             PackClosure(ref op) => self.verify_pack_closure(pc, op),
+            // L9.
             CallClosure(ref op) => {
                 for (i, slot) in op.provided_args.iter().enumerate() {
                     self.check_sized_slot(
@@ -730,6 +722,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         // captured. Pointer-free captures use the reserved `Trivial` slot;
         // pointer-bearing ones a `CapturedData` descriptor whose offsets must
         // lie within the values region so GC traces stay in bounds.
+        // L1, L2, L3.
         match (op.captured_data_descriptor_id, op.captured.is_empty()) {
             (None, true) => {},
             (Some(id), false) => match self.descriptor_or_report(pc, "PackClosure", id) {
@@ -766,10 +759,11 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 "PackClosure: captured non-empty but captured_data_descriptor_id is None",
             ),
         }
-        // Each captured slot's `align` drives the captured-data layout.
+        // L4. Each captured slot's `align` drives the captured-data layout.
         for (i, slot) in op.captured.iter().enumerate() {
             self.check_sized_slot(Some(pc), &format!("PackClosure: captured[{i}]"), slot);
         }
+        // L5.
         let captured_count = op.mask.count_ones() as usize;
         if op.captured.len() != captured_count {
             fail!(
@@ -786,6 +780,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                 // which the caller's guard keeps alive during verification.
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
                 let param_count = callee.param_slots.len();
+                // L6.
                 if param_count > 64 {
                     fail!(
                         self,
@@ -803,7 +798,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
                         param_count
                     );
                 }
-                // The runtime writes captured values with the slot's
+                // L7. The runtime writes captured values with the slot's
                 // `(size, align)` and reads them back at the callee parameter's
                 // natural-aligned offset, so both must match. The captured list
                 // is in mask-bit-set order through the param list.
@@ -841,7 +836,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             // against the resolved callee.
             ClosureFuncRef::Unresolved(_) => {},
         }
-        // `values_size` must equal the natural-aligned captured layout size;
+        // L8. `values_size` must equal the natural-aligned captured layout size;
         // a smaller size would let the runtime's writes run out of bounds.
         // Skipped when a captured alignment is invalid (already reported),
         // since the layout is then undefined.
@@ -872,8 +867,8 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         });
     }
 
-    /// Checks one frame operand per the [`OperandKind`] schema, resolving the
-    /// provider-dependent kinds first.
+    /// O1, with O2–O5 for the provider-dependent kinds. Checks one frame
+    /// operand per the [`OperandKind`] schema.
     fn check(&mut self, pc: Option<usize>, offset: FrameOffset, kind: OperandKind) {
         let (width, align) = match kind {
             OperandKind::Value(ty) => {
@@ -955,7 +950,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
-    /// Structural comparison is defined on values, not references; a
+    /// O3. Structural comparison is defined on values, not references; a
     /// reference type is an unconditional runtime invariant violation.
     fn check_value_type(&mut self, pc: usize, ty: InternedType) {
         if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
@@ -963,6 +958,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
+    /// D1. Destinations of a multi-destination op are pairwise disjoint.
     fn check_disjoint_destinations(
         &mut self,
         pc: usize,
@@ -989,7 +985,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
     // Calls
     // -----------------------------------------------------------------------
 
-    /// The native's slot region fits the caller's extended frame, and its
+    /// C1, C2, C3. The native's slot region fits the caller's extended frame, and its
     /// pointer slots (read by the GC with aligned `read_ptr` at the native's
     /// fp) are aligned, inside the region, and inside an argument slot.
     fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
@@ -1050,7 +1046,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
-    /// A direct callee's parameters are written into, and its return values
+    /// C4. A direct callee's parameters are written into, and its return values
     /// read back from, this function's callee region
     /// `[frame_size(), extended_frame_size)`.
     fn check_direct_callee(&mut self, pc: usize, callee: &Function) {
@@ -1109,7 +1105,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         inner
     }
 
-    /// A vector allocation's descriptor is `Trivial`, or a `Vector` with a
+    /// K3. A vector allocation's descriptor is `Trivial`, or a `Vector` with a
     /// non-empty pointer-offset list and a matching `elem_size`: the GC
     /// strides the data region by the descriptor's `elem_size`, so a mismatch
     /// would trace past the allocation.
@@ -1148,6 +1144,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
+    /// J1.
     // TODO(metering): validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.ops().len();
@@ -1162,13 +1159,14 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
+    /// Z1.
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(Some(pc), "size must be > 0");
         }
     }
 
-    /// `offset + size` fits in `u32`, so the window `[offset, offset + size)`
+    /// Z2. `offset + size` fits in `u32`, so the window `[offset, offset + size)`
     /// into a heap object or referent cannot wrap.
     fn check_offset_size(&mut self, pc: usize, offset: u32, size: u32) {
         if offset.checked_add(size).is_none() {
