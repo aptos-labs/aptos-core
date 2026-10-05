@@ -223,12 +223,17 @@
 //! # Out of scope
 //!
 //! Not checked statically, because they depend on runtime data or dataflow:
-//! the extent of a `SlotBorrow`; heap offsets against the pointee's size for
-//! ops that carry only a pointer; `elem_size` against a vector's real stride;
-//! enum offset tables against the pointee's variant count; whether a GC layout
-//! slot holds a pointer at a given pc; write-before-read. Descriptor contents
-//! are validated by `ObjectDescriptor`'s constructors at publish time. Branch
-//! gas fields are TODO(metering).
+//!
+//! - the extent of a `SlotBorrow`;
+//! - heap offsets against the pointee's size, for ops that carry only a
+//!   pointer;
+//! - `elem_size` against a vector's real stride;
+//! - enum offset tables against the pointee's variant count;
+//! - whether a GC layout slot holds a pointer at a given pc;
+//! - write-before-read of slots.
+//!
+//! Descriptor contents are validated by `ObjectDescriptor`'s constructors at
+//! publish time. Branch gas fields are TODO(metering).
 
 use crate::{
     align::MAX_ALIGN,
