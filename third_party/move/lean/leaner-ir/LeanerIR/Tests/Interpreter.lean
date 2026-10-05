@@ -119,9 +119,9 @@ private def fixture : RawUnit := {
       function 10 41 1 26 #[localDecl 0 "argument" 1 41] #[parameter 0 "argument" 1 41]
     ] }] }
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let unit ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] unit).toOption
+  (prepareExecution #[semantics] unit).toOption.map (⟨unit, ·⟩)
 
 private def handle (functionId : Nat) : FunctionHandle :=
   { namespaceId := ⟨0⟩, functionId := ⟨functionId⟩ }
@@ -129,25 +129,25 @@ private def handle (functionId : Nat) : FunctionHandle :=
 #guard executable?.isSome
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 0) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 0) #[] with
       | .ok (_, { value := .returned #[.integer 7], primary := { loc := ⟨2⟩, .. }, .. }) => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 1) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 1) #[] with
       | .ok (_, { value := .returned #[.integer 9], primary := { loc := ⟨14⟩, .. }, .. }) => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 3) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 3) #[] with
       | .ok (_, { value := .returned #[.integer 24], primary := { loc := ⟨16⟩, .. }, .. }) => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 5) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 5) #[] with
       | .ok (_, outcome) =>
           outcome.value == .threw .abort #[.integer 24, .bool false] &&
             outcome.primary.loc == ⟨18⟩ &&
@@ -156,13 +156,13 @@ private def handle (functionId : Nat) : FunctionHandle :=
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 6) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 6) #[] with
       | .ok (_, { value := .returned #[.integer 42], .. }) => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 7) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 7) #[] with
       | .ok (_, { value := .returned #[.integer 7], .. }) => true
       | _ => false
   | none => false
@@ -225,19 +225,20 @@ private def hasInitializationError (root : Nat) (loc : Nat) : Bool :=
   | .error _ => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 9) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 9) #[] with
       | .error { value := .argumentArity 1 0, primary := { loc := ⟨41⟩, .. }, .. } => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 1 (handle 1) #[] with
+  | some ⟨unit, executable⟩ => match Interpreter.run executable 1 (handle 1) #[] with
       | .error error => error.value.code == "LIR-EXEC-FUEL" &&
-          (error.primary.primaryRange? executable.unit).isSome
+          (error.primary.primaryRange? unit).isSome
       | _ => false
   | none => false
 
-private theorem successfulFixtureRunHasDerivation (executable : ExecutableUnit)
+private theorem successfulFixtureRunHasDerivation {unit : ValidatedUnit}
+    (executable : ExecutableUnit unit)
     (fuel : Nat) (function : FunctionHandle) (arguments : Array RuntimeValue)
     (success : (Interpreter.run executable fuel function arguments).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
@@ -251,7 +252,7 @@ private theorem successfulFixtureRunHasDerivation (executable : ExecutableUnit)
         LeanerIR.Proofs.Interpreter.run_sound executable fuel function arguments {}
           result.1 result.2 result_eq⟩
 
-private def preparedExecutable : ExecutableUnit := executable?.get (by native_decide)
+private def preparedExecutable := (executable?.get (by native_decide)).2
 
 example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
     BigStep.EvalFunction preparedExecutable (handle 0) #[] {} #[]

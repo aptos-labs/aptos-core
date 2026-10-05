@@ -1,0 +1,65 @@
+{
+  "batch-encryption": {
+    "description": "aptos-batch-encryption tests with TypeScript/Node.js",
+    "workflow": ".github/workflows/lint-test.yaml",
+    "job": "rust-batch-encryption-tests",
+    "nightly_jobs": [
+      "batch-encryption"
+    ],
+    "docker_images": false
+  },
+  "cli-e2e": {
+    "description": "Complete Python CLI tests on devnet/testnet/mainnet",
+    "workflow": ".github/workflows/cli-e2e-tests.yaml",
+    "job": "run-cli-tests",
+    "nightly_jobs": [
+      "cli-e2e"
+    ],
+    "docker_images": true
+  },
+  "forge-compatibility": {
+    "description": "Deployed Forge release compatibility",
+    "workflow": ".github/workflows/docker-build-test.yaml",
+    "job": "forge-compat-test",
+    "nightly_jobs": [
+      "forge-deployed"
+    ],
+    "docker_images": true
+  },
+  "forge-e2e": {
+    "description": "Deployed Forge realistic environment load test",
+    "workflow": ".github/workflows/docker-build-test.yaml",
+    "job": "forge-e2e-test",
+    "nightly_jobs": [
+      "forge-deployed"
+    ],
+    "docker_images": true
+  },
+  "lean": {
+    "description": "Lean suites, XAST/XIR compiler integration, and linked MonoVM differential tests",
+    "workflow": ".github/workflows/lean.yaml",
+    "job": "build-and-test",
+    "nightly_jobs": [
+      "lean"
+    ],
+    "docker_images": false
+  },
+  "node-api-compatibility": {
+    "description": "Generated OpenAPI specification compatibility",
+    "workflow": ".github/workflows/node-api-compatibility-tests.yaml",
+    "job": "node-api-compatibility-tests",
+    "nightly_jobs": [
+      "node-api-compatibility"
+    ],
+    "docker_images": true
+  },
+  "smoke-tests": {
+    "description": "Local swarm smoke tests in eight partitions",
+    "workflow": ".github/workflows/lint-test.yaml",
+    "job": "rust-smoke-tests-workflow",
+    "nightly_jobs": [
+      "smoke-tests"
+    ],
+    "docker_images": false
+  }
+}

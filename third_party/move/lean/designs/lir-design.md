@@ -3,7 +3,8 @@
 ## Status
 
 **Project status: initial Move-profile vertical slice implemented; the full
-roadmap remains in progress.**
+roadmap remains in progress.** Open work is listed in
+[`roadmap.md`](roadmap.md), sections 4 and 8.
 
 This document defines a new language-neutral LIR boundary shared by Move,
 Leaner source under Move and Rust profiles, and Rust MIR. It is deliberately
@@ -661,6 +662,12 @@ primitive family. Unsupported static obligations remain explicit capability
 diagnostics, not profile-string dispatch.
 Value-level borrow, dereference, and freeze use a typed reference-operation
 family until checked place normalization can select the stronger place nodes.
+A direct local read is non-consuming. Validation infers the access of one of a
+value type without `Copy` in executable code: a selection or index of it with
+`Copy` copies its place, the operand of an observer (discriminant, variant test,
+length, index check) reads its place, and otherwise the local is moved. A
+reference local keeps its read, which reference operations take at rest.
+Frontends therefore spell a Move or LeanerLang by-value use as a local read.
 Field/variant operations carry strong qualified references in a typed data
 family. Enum variants may record their observable integer discriminant, which
 is distinct from variant-array position; the value-producing discriminant
@@ -1252,9 +1259,15 @@ validate to profile-aware semantic LIR equivalent to the input.
 
 ### Executable backend
 
-For the Move profile, lowers structured executable bodies to NSIR and then to
-`MoveModel.IR`, XIR, and bytecode. Proof-only declarations may be erased only
-at this explicit boundary. Locations remain attached to derived lower nodes.
+For the Move profile, `leaner-move`'s `LeanerMove/Xir` lowers one validated
+Move namespace directly to XIR, the positional stackless CFG compiler-v2
+loads and turns into bytecode (status 2026-09-25: compiler-v2's `.lean`
+sources compile through it). Structured control becomes blocks, a value is
+the locals holding it, a place is borrowed step by step from its root, and a
+construct with no bytecode form is a located error. Proof-only declarations
+are erased only at this boundary: specifications are not transported, and
+the borrow analysis's verdict gates emission. Locations become the XIR
+source map.
 Compiling LIR back to Rust machine code is not an initial backend. A future
 Rust executable backend must preserve the Rust profile rather than route
 through Move operations.
@@ -1271,20 +1284,19 @@ cross-profile summaries require a validated boundary adapter.
 ## Move lowering terminology
 
 ```text
-LIR --erase proof-only declarations / lower structured code--> NSIR
-    --assign positional indexes-------------------------------> SIR
-    --finite serialization------------------------------------> XIR
+LIR --erase proof-only declarations / lower structured code--> XIR
 ```
 
 - **LIR**: the complete profile-aware structured representation defined here;
-- **NSIR**: the current named executable `Move.Compiler.LIR`, after rename;
-- **SIR**: positional `MoveModel.IR` stackless/verification representation;
-- **XIR**: the versioned wire representation of SIR;
+- **XIR**: the versioned positional stackless representation compiler-v2
+  loads (`move-model-exchange`'s `XirModule`);
 - **LIR JSON**: the raw-LIR wire format which replaces XAST's role.
 
 This is one profile-specific lowering, not the definition of LIR. A source
 backend consumes LIR directly and never reconstructs structured source/spec
-declarations from NSIR or SIR.
+declarations from XIR. The deprecated stack's intermediate NSIR and SIR
+(`MoveModel.IR`) have no counterpart: verification runs over the validated
+LIR, so no lower verification IR is derived.
 
 ## Checked-construction order
 
@@ -1324,12 +1336,14 @@ Encoding is deterministic:
 decodeRaw(encodeRaw(normalizeRaw(r))) = normalizeRaw(r)
 ```
 
-The version is currently spelled in four independent places: the codec's
-`jsonVersion`, validation's `checkVersion`, `RawUnit.version`'s default, and
-the Rust exporter's literal. Raising 1.0 to 1.1 for the field-place owner
-therefore took four separate fixes, each surfaced by a different failing
-suite. One Lean-side source read by the other two, and a generated constant
-for the exporter, would make the next bump a single edit.
+The version is spelled in two places: the defaults of `Version`, which the
+codec's `jsonVersion` and validation's `checkVersion` read, and the Rust
+exporter's literal. Version 1.2 added the closure mask
+(`CallKind.closure function mask`); version 1.3 the parameter frames of a
+function contract (`FunctionContract.parameterFrames`, Move's
+`modifies_of`); version 1.5 the variant of each field a variant field
+selection reads (`DataOperation.selectVariants`). A generated constant for the exporter
+would make the next bump a single edit.
 
 XAST v4 remains a compatibility frontend and converts immediately to raw LIR.
 The Rust MIR exchange similarly decodes immediately to a Rust-profile raw CFG
@@ -1679,9 +1693,10 @@ round-trips independently.
 
 ### Phase 7 — Move lower backends and retirement
 
-- Rename current executable `Move.Compiler.LIR` to NSIR (or approved name).
-- Derive NSIR and verification IR from validated LIR.
-- Remove trivial-contract and empty-loop-spec synthesis.
+- Lower validated LIR to XIR (done 2026-09-25: `LeanerMove/Xir`, the path
+  compiler-v2 compiles `.lean` sources through). Verification runs over the
+  validated LIR, so neither NSIR nor a verification IR is derived and no
+  trivial contract or empty loop specification is synthesized.
 - Remove the transpiler-owned semantic XAST view and all frontend-local
   reports.
 

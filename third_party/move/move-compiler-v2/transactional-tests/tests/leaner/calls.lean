@@ -1,37 +1,28 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-module LeanerCalls where
+leaner module 0x0::LeanerCalls where
+  fun twice(value : u64) -> u64 := value + value
 
-  /-! ## Functions -/
+  fun increment(value : u64) -> u64 := value + 1
 
-  fun twice (value : U64) : U64 :=
-    value + value
+  fun composed(value : u64) -> u64 := do
+    let doubled := twice(value)
+    increment(doubled)
 
-  fun increment (value : U64) : Action U64 := do
-    pure (value + 1)
+  fun bound_call(value : u64) -> u64 := twice(increment(value))
 
-  fun composed (value : U64) : Action U64 := do
-    let doubled := twice value
-    increment doubled
+  fun sum_down(value : u64) -> u64 :=
+    if value < 1 then 0 else value + sum_down(value - 1)
 
-  fun bound_call (value : U64) : Action U64 := do
-    let incremented ← increment value
-    pure (twice incremented)
+  fun even_flag(value : u64) -> u64 :=
+    if value < 1 then 1 else odd_flag(value - 1)
 
-  partial fun sum_down (value : U64) : U64 :=
-    if value < 1 then 0 else value + sum_down (value - 1)
-
-  mutual
-    partial fun even_flag (value : U64) : U64 :=
-      if value < 1 then 1 else odd_flag (value - 1)
-
-    partial fun odd_flag (value : U64) : U64 :=
-      if value < 1 then 0 else even_flag (value - 1)
-  end
-
-/-! ## Tests -/
+  fun odd_flag(value : u64) -> u64 :=
+    if value < 1 then 0 else even_flag(value - 1)
 
 --# run 0x0::LeanerCalls::composed --args 7u64
 

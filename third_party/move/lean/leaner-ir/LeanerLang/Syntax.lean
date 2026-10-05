@@ -43,6 +43,10 @@ private def kwISize := Lean.Parser.nonReservedSymbol "isize" true
 private def kwNat := Lean.Parser.nonReservedSymbol "Nat" true
 private def kwInt := Lean.Parser.nonReservedSymbol "Int" true
 private def kwRange := Lean.Parser.nonReservedSymbol "Range" true
+private def kwStateDomain := Lean.Parser.nonReservedSymbol "StateDomain" true
+private def kwPublish := Lean.Parser.nonReservedSymbol "publish" true
+private def kwRemove := Lean.Parser.nonReservedSymbol "remove" true
+private def kwUpdate := Lean.Parser.nonReservedSymbol "update" true
 private def kwVector := Lean.Parser.nonReservedSymbol "Vector" true
 private def kwVectorLiteral := Lean.Parser.nonReservedSymbol "vector" true
 private def kwFn := Lean.Parser.nonReservedSymbol "Fn" true
@@ -67,11 +71,16 @@ private def kwAbortsIf := Lean.Parser.nonReservedSymbol "aborts_if" true
 private def kwLetPre := Lean.Parser.nonReservedSymbol "let_pre" true
 private def kwLetPost := Lean.Parser.nonReservedSymbol "let_post" true
 private def kwModifies := Lean.Parser.nonReservedSymbol "modifies" true
+private def kwModifiesOf := Lean.Parser.nonReservedSymbol "modifies_of" true
 private def kwReads := Lean.Parser.nonReservedSymbol "reads" true
 private def kwAssert := Lean.Parser.nonReservedSymbol "assert" true
 private def kwAssertBang := Lean.Parser.nonReservedSymbol "assert!" true
 private def kwAssume := Lean.Parser.nonReservedSymbol "assume" true
 private def kwInvariant := Lean.Parser.nonReservedSymbol "invariant" true
+private def kwApply := Lean.Parser.nonReservedSymbol "apply" true
+private def kwSplit := Lean.Parser.nonReservedSymbol "split" true
+private def kwLemma := Lean.Parser.nonReservedSymbol "lemma" true
+private def kwProof := Lean.Parser.nonReservedSymbol "proof" true
 private def kwSpec := Lean.Parser.symbol "spec"
 private def kwFun := Lean.Parser.nonReservedSymbol "fun" true
 private def kwNamespace := Lean.Parser.nonReservedSymbol "namespace" true
@@ -179,6 +188,7 @@ private def kwCoreBorrow := Lean.Parser.nonReservedSymbol "core.borrow" true
 private def kwCoreBorrowPlace := Lean.Parser.nonReservedSymbol "core.borrowPlace" true
 private def kwCoreAssignPlace := Lean.Parser.nonReservedSymbol "core.assignPlace" true
 private def kwCoreDrop := Lean.Parser.nonReservedSymbol "core.drop" true
+private def kwDowncast := Lean.Parser.nonReservedSymbol "downcast" true
 private def kwDropBuiltin := Lean.Parser.nonReservedSymbol "drop" true
 private def kwCopyBuiltin := Lean.Parser.nonReservedSymbol "copy" true
 private def kwReadBuiltin := Lean.Parser.nonReservedSymbol "core.read" true
@@ -204,7 +214,7 @@ private def leanerIdentifier : Lean.Parser.Parser :=
     "i128", "i256", "usize", "isize", "Range", "Vector", "Fn", "const",
     "type", "lifetime", "evidence", "mut", "private", "public", "package",
     "friend", "entry", "native", "opaque", "deprecated", "view", "pragma",
-    "let_pre", "let_post", "modifies", "reads", "requires", "ensures",
+    "let_pre", "let_post", "modifies", "modifies_of", "reads", "requires", "ensures",
     "aborts_if", "assert", "assume", "invariant", "spec", "fun", "module",
     "namespace", "using", "where", "struct", "enum", "has", "Copy", "Drop",
     "Store", "Key", "true", "false", "abort", "panic", "do", "let", "loop",
@@ -212,7 +222,7 @@ private def leanerIdentifier : Lean.Parser.Parser :=
     "then", "else", "return", "old", "copy", "drop",
     "discriminant", "invoke", "function", "as", "match", "with"].foldr
       (fun keyword parser =>
-        (if ["let_pre", "let_post", "modifies", "reads", "requires", "ensures",
+        (if ["let_pre", "let_post", "modifies", "modifies_of", "reads", "requires", "ensures",
             "aborts_if", "invariant"].contains keyword then
           Lean.Parser.notFollowedBy (Lean.Parser.nonReservedSymbol keyword true) keyword
         else Lean.Parser.notSymbol keyword) >> parser)
@@ -230,6 +240,13 @@ declare_syntax_cat leanerPath
 @[leanerPath_parser] def leanerPathSyntax := leading_parser
   (Lean.Parser.atomic (Lean.Parser.numLit >> "::" >> leanerIdentifier) <|>
     leanerIdentifier) >>
+    Lean.Parser.many (Lean.Parser.atomic ("::" >> leanerIdentifier))
+
+/-- A path with at least one `::`: a qualified name. -/
+declare_syntax_cat leanerQualifiedName
+@[leanerQualifiedName_parser] def leanerQualifiedNameSyntax := leading_parser
+  (Lean.Parser.atomic (Lean.Parser.numLit >> "::" >> leanerIdentifier) <|>
+    Lean.Parser.atomic (leanerIdentifier >> "::" >> leanerIdentifier)) >>
     Lean.Parser.many (Lean.Parser.atomic ("::" >> leanerIdentifier))
 
 declare_syntax_cat leanerAbility
@@ -272,13 +289,17 @@ syntax (name := leanerISizeType) kwISize : leanerType
 syntax (name := leanerNatType) kwNat : leanerType
 syntax (name := leanerIntType) kwInt : leanerType
 syntax (name := leanerRangeType) kwRange : leanerType
+syntax (name := leanerStateDomainType) kwStateDomain : leanerType
 syntax (name := leanerVectorType) (priority := high)
   kwVector "<" leanerType ">" : leanerType
 syntax (name := leanerFixedVectorType)
   (priority := high)
   kwVector "<" leanerType "," kwConst num ">" : leanerType
+-- An ability list ends before a comma not followed by an ability, so a function
+-- type can precede the next parameter or type argument.
 syntax (name := leanerFunctionType)
-  kwFn "(" leanerType,* ")" "->" leanerType (kwHas leanerAbility,+)? : leanerType
+  kwFn "(" leanerType,* ")" "->" leanerType
+    (kwHas leanerAbility (atomic("," leanerAbility))*)? : leanerType
 syntax (name := leanerReferenceType)
   "&" ("[" leanerLifetime "]")? (kwMut)? leanerType : leanerType
 syntax (name := leanerTupleType) "(" leanerType,+ ")" : leanerType
@@ -337,6 +358,8 @@ syntax (name := leanerNegativeTypedIntegerExpr)
     kwUSize <|> kwISize) : leanerExpr
 syntax (name := leanerAddressExpr) kwAddressLiteral "(" str ")" : leanerExpr
 syntax (name := leanerMoveAddressExpr) "@" num : leanerExpr
+/-- A Move named address as a value: `@std`, the address `std` stands for. -/
+syntax (name := leanerMoveAliasAddressExpr) "@" ident : leanerExpr
 syntax (name := leanerStringExpr) str : leanerExpr
 syntax (name := leanerByteStringExpr) atomic(kwByteStringPrefix str) : leanerExpr
 syntax (name := leanerBytesExpr) "b[" num,* "]" : leanerExpr
@@ -364,14 +387,24 @@ syntax (name := leanerWriteBehaviorCallSyntax)
     "(" leanerExpr,* ")" : leanerBehaviorCall
 syntax (name := leanerBehaviorExpr) (priority := high)
   leanerBehaviorCall : leanerExpr
-syntax (name := leanerBehaviorAtExpr) (priority := high)
-  "@" num "|~" leanerBehaviorCall : leanerExpr
-syntax (name := leanerBehaviorPreRangeExpr) (priority := high)
-  "@" num ".." "|~" leanerBehaviorCall : leanerExpr
-syntax (name := leanerBehaviorPostRangeExpr) (priority := high)
-  ".." "@" num "|~" leanerBehaviorCall : leanerExpr
-syntax (name := leanerBehaviorFullRangeExpr) (priority := high)
-  "@" num ".." "@" num "|~" leanerBehaviorCall : leanerExpr
+-- A two-state reading at state labels: `S |~ e`, `..S |~ e`, `S.. |~ e`,
+-- `S..T |~ e`; binds below implication, so `S.. |~ a == b` reads the whole
+-- equation at `S`.
+declare_syntax_cat leanerStateRange
+syntax (name := leanerStateRangeBothSyntax)
+  leanerIdentifier ".." leanerIdentifier : leanerStateRange
+syntax (name := leanerStateRangePreSyntax) leanerIdentifier ".." : leanerStateRange
+syntax (name := leanerStateRangePostSyntax) ".." leanerIdentifier : leanerStateRange
+syntax (name := leanerStateRangeAtSyntax) leanerIdentifier : leanerStateRange
+syntax:1 (name := leanerLabeledExpr) (priority := high)
+  atomic(leanerStateRange "|~") leanerExpr:1 : leanerExpr
+-- State-change predicates between the states of the enclosing labels.
+syntax (name := leanerSpecificationPublishExpr) (priority := high)
+  kwPublish "<" leanerType ">" "(" leanerExpr "," leanerExpr ")" : leanerExpr
+syntax (name := leanerSpecificationRemoveExpr) (priority := high)
+  kwRemove "<" leanerType ">" "(" leanerExpr ")" : leanerExpr
+syntax (name := leanerSpecificationUpdateExpr) (priority := high)
+  kwUpdate "<" leanerType ">" "(" leanerExpr "," leanerExpr ")" : leanerExpr
 declare_syntax_cat leanerStorageHead
 syntax (name := leanerNamedStorageHead) leanerPath : leanerStorageHead
 syntax (name := leanerAppliedStorageHead)
@@ -381,7 +414,7 @@ syntax (name := leanerTypeArgumentsSyntax)
   atomic("::" "<") leanerType,* ">" : leanerTypeArguments
 syntax:14 (name := leanerMethodCallExpr) (priority := high)
   leanerExpr:14 colGt "." leanerIdentifier (leanerTypeArguments)?
-    "(" leanerExpr,* ")" : leanerExpr
+    colGt "(" leanerExpr,* ")" : leanerExpr
 syntax (name := leanerTypedMethodCallExpr) (priority := high)
   "(" leanerExpr:14 colGt "." leanerIdentifier (leanerTypeArguments)?
     "(" leanerExpr,* ")" ":" leanerType ")" : leanerExpr
@@ -459,15 +492,22 @@ syntax (name := leanerConstructorFieldSyntax)
   leanerFieldIdentifier ":=" leanerExpr : leanerConstructorField
 syntax (name := leanerConstructorFieldShorthandSyntax)
   leanerIdentifier : leanerConstructorField
+-- Atomic up to its brace, so that a local named `new` is an identifier
+-- wherever no construction follows it.
 syntax (name := leanerNamedConstructExpr) (priority := low)
-  kwNew leanerType (leanerConstructorVariant)?
-    "{" leanerConstructorField,* "}" : leanerExpr
+  atomic(kwNew leanerType (leanerConstructorVariant)? "{") leanerConstructorField,* "}" :
+    leanerExpr
 declare_syntax_cat leanerFieldName
 syntax (name := leanerFieldNameSyntax) leanerFieldIdentifier : leanerFieldName
 syntax (name := leanerSelectExpr)
   kwDataSelect "[" leanerType "," leanerFieldName "]" "(" leanerExpr ")" : leanerExpr
+/-- `Variant.field`: a named field arrives in the variant's dotted identifier,
+a numeric one after it. -/
+declare_syntax_cat leanerVariantFieldName
+syntax (name := leanerVariantFieldNameSyntax)
+  leanerIdentifier (noWs "." noWs num)? : leanerVariantFieldName
 syntax (name := leanerSelectVariantsExpr)
-  kwDataSelectVariants "[" leanerType "," leanerFieldName,+ "]"
+  kwDataSelectVariants "[" leanerType "," leanerVariantFieldName,+ "]"
     "(" leanerExpr ")" : leanerExpr
 declare_syntax_cat leanerVariantName
 syntax (name := leanerVariantNameSyntax) leanerIdentifier : leanerVariantName
@@ -569,16 +609,35 @@ syntax (name := leanerAssumeStatement)
   kwAssume leanerExpr (";")? : leanerSpecStatement
 syntax (name := leanerLoopInvariantStatement)
   kwInvariant leanerExpr (";")? : leanerSpecStatement
+/-- Applies lemmas: a lemma instance under implications and universal
+quantifiers. -/
+syntax (name := leanerApplyStatement)
+  kwApply leanerExpr (";")? : leanerSpecStatement
+/-- Splits cases on a Boolean or an enum's variant. -/
+syntax (name := leanerSplitStatement)
+  kwSplit leanerExpr (";")? : leanerSpecStatement
 @[leanerExpr_parser] def leanerSpecBlockExpr := leading_parser
   kwSpec >> kwDo >>
     Lean.Parser.withPosition (Lean.Parser.manyIndent
       (Lean.Parser.ppLine >> Lean.Parser.categoryParser `leanerSpecStatement 0))
 syntax (name := leanerSingleSpecExpr)
   kwSpec leanerSpecStatement : leanerExpr
+/-- A step of the function's proof: verified with the function, and not run
+where a caller inlines it. -/
+@[leanerExpr_parser] def leanerProofBlockExpr := leading_parser
+  kwProof >> kwDo >>
+    Lean.Parser.withPosition (Lean.Parser.manyIndent
+      (Lean.Parser.ppLine >> Lean.Parser.categoryParser `leanerSpecStatement 0))
+syntax (name := leanerSingleProofExpr)
+  kwProof leanerSpecStatement : leanerExpr
 syntax (name := leanerLetStatementSyntax)
   kwLet (kwMut)? leanerBindingPattern ":" leanerType ":=" leanerExpr (";")? : leanerStatement
 syntax (name := leanerInferredLetStatementSyntax)
   kwLet (kwMut)? leanerBindingPattern ":=" leanerExpr (";")? : leanerStatement
+/-- A declaration without initializer: the local is assigned before it is read,
+on every path, as Move's `let x: T;` is. -/
+syntax (name := leanerDeclareStatementSyntax)
+  kwLet (kwMut)? leanerBindingPattern ":" leanerType (";")? : leanerStatement
 declare_syntax_cat leanerBlockEntry
 syntax (name := leanerBlockStatementEntry) leanerStatement : leanerBlockEntry
 syntax (name := leanerBareExpressionEntry) (priority := low)
@@ -603,12 +662,19 @@ syntax (name := leanerTypedGenericCallSurfaceExpr) (priority := high)
   "(" leanerPath leanerTypeArguments "(" leanerExpr,* ")" ":" leanerType ")" : leanerExpr
 syntax (name := leanerInvokeExpr) (priority := high)
   kwCoreInvoke "(" leanerExpr ("," leanerExpr,+)? ")" : leanerExpr
+/-- A parameter slot of a closure's target: a captured value, or `_` for a
+parameter supplied at invocation. -/
+declare_syntax_cat leanerClosureSlot
+syntax (name := leanerCapturedSlot) leanerExpr : leanerClosureSlot
+syntax (name := leanerSuppliedSlot) "_" : leanerClosureSlot
 syntax (name := leanerClosureExpr) (priority := high)
-  kwCoreClosure "[" leanerType "]" "(" leanerPath ("," leanerExpr)* ")" : leanerExpr
+  kwCoreClosure "[" leanerType "]" "(" leanerPath (leanerTypeArguments)?
+    ("," leanerClosureSlot)* ")" : leanerExpr
 syntax (name := leanerInvokeSurfaceExpr) (priority := high)
   kwInvoke "(" leanerExpr ("," leanerExpr,+)? ")" : leanerExpr
 syntax (name := leanerFunctionValueExpr) (priority := high)
-  kwFunctionValue "[" leanerType "]" "(" leanerPath ("," leanerExpr)* ")" : leanerExpr
+  kwFunctionValue "[" leanerType "]" "(" leanerPath (leanerTypeArguments)?
+    ("," leanerClosureSlot)* ")" : leanerExpr
 declare_syntax_cat leanerBorrowKind
 syntax (name := leanerImmutableBorrowKind) kwImmutable : leanerBorrowKind
 syntax (name := leanerMutableBorrowKind) kwMut : leanerBorrowKind
@@ -617,11 +683,14 @@ syntax:max (name := leanerLocalPlace) leanerIdentifier : leanerPlace
 syntax:max (name := leanerParenPlace) "(" leanerPlace ")" : leanerPlace
 syntax:max (name := leanerDerefPlace) "*" leanerPlace:max : leanerPlace
 syntax:max (name := leanerFieldPlace) leanerPlace:max "." leanerFieldIdentifier : leanerPlace
+/-- The value of a place as the variant `Enum::Variant` names: its fields
+are that variant's. -/
+syntax (name := leanerDowncastPlace) kwDowncast leanerPlace kwAs leanerPath : leanerPlace
 syntax:13 (name := leanerBorrowPlaceSurfaceExpr)
   "&" (kwMut)? leanerPlace:max : leanerExpr
 syntax:13 (name := leanerBorrowValueSurfaceExpr) (priority := low)
   "&" (kwMut)? leanerExpr:13 : leanerExpr
-syntax:13 (name := leanerDereferenceSurfaceExpr) "*" leanerExpr:13 : leanerExpr
+syntax:13 (name := leanerDereferenceSurfaceExpr) "*" colGt leanerExpr:13 : leanerExpr
 syntax:1 (name := leanerAssignmentExpr)
   leanerExpr:2 colGt ":=" leanerExpr:1 : leanerExpr
 syntax (name := leanerPatternAssignmentExpr)
@@ -748,10 +817,17 @@ syntax (name := leanerInvariantClause)
 syntax (name := leanerModifiesClause) kwModifies leanerExpr (";")? : leanerClause
 syntax (name := leanerLooseModifiesClause) kwModifies leanerExpr "," "*" (";")? : leanerClause
 syntax (name := leanerModifiesAllClause) kwModifies "*" (";")? : leanerClause
+syntax (name := leanerModifiesOfClause)
+  kwModifiesOf "<" leanerIdentifier ">" "(" leanerParameter,* ")" leanerExpr,+ (";")? : leanerClause
+syntax (name := leanerModifiesOfAllClause)
+  kwModifiesOf "<" leanerIdentifier ">" "*" (";")? : leanerClause
 syntax (name := leanerReadsClause) kwReads leanerType (";")? : leanerClause
 syntax (name := leanerReadsAllClause) kwReads "*" (";")? : leanerClause
 syntax (name := leanerPragmaClause)
   kwPragma (leanerIdentifier <|> kwOpaque) ("=" leanerExpr)? (";")? : leanerClause
+/-- A pragma naming a declaration of another module. -/
+syntax (name := leanerQualifiedPragmaClause)
+  kwPragma leanerIdentifier "=" leanerQualifiedName (";")? : leanerClause
 
 declare_syntax_cat leanerField
 syntax (name := leanerFieldSyntax) atomic(leanerFieldIdentifier ":") leanerType : leanerField
@@ -793,6 +869,12 @@ syntax (name := leanerSpecDecreasesSyntax) kwDecreases leanerExpr:2 : leanerSpec
 syntax (name := leanerSpecFunctionItem) (priority := high)
   (docComment)? (leanerAttributeListSyntax)? (kwOpaque)? kwSpec kwFun leanerIdentifier leanerGenericBinder* "(" leanerParameter,* ")"
     ":" leanerType (leanerSpecDecreases)? (":=" leanerExpr)? : leanerItem
+/-- A lemma: its `requires` clauses imply its `ensures` clauses, established
+by the steps after `proof`. -/
+syntax (name := leanerLemmaItem) (priority := high)
+  (docComment)? kwSpec kwLemma leanerIdentifier leanerGenericBinder* "(" leanerParameter,* ")"
+    (leanerSpecDecreases)? kwWhere ppLine ppIndent(leanerClause*
+      (kwProof ppLine ppIndent(leanerSpecStatement*))?) : leanerItem
 syntax (name := leanerContractItem)
   kwSpec leanerIdentifier "{" leanerClause* "}" : leanerItem
 syntax (name := leanerContractWhereItem)
@@ -801,6 +883,10 @@ declare_syntax_cat leanerNamespaceInvariantMember
 syntax (name := leanerNamespaceInvariantMemberSyntax)
   kwInvariant (leanerConditionProperties)? leanerExpr (";")? :
     leanerNamespaceInvariantMember
+/-- An axiom of the module: a proposition assumed by every verification of
+its functions and never an obligation. -/
+syntax (name := leanerNamespaceAxiomMemberSyntax)
+  "axiom" leanerExpr (";")? : leanerNamespaceInvariantMember
 syntax (name := leanerNamespaceInvariantItem) (priority := high)
   kwSpec kwModule kwWhere ppLine ppIndent(leanerNamespaceInvariantMember*) : leanerItem
 /-- A theorem among a module's items: a lemma about the module's

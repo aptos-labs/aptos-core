@@ -73,6 +73,8 @@ inductive Ty where
   | nat
   | int
   | range
+  /-- The domain of all memories, which a quantifier binds a state label over. -/
+  | stateDomain
   | tuple (elements : Array (Located Ty))
   | vector (element : Located Ty) (length : Option Int := none)
   | function (arguments : Array (Located Ty)) (result : Located Ty)
@@ -137,16 +139,22 @@ inductive BehaviorOperation where
   | writeOf (index : Nat)
   deriving Repr, BEq, DecidableEq, Inhabited
 
-/-- Optional numeric pre/post state labels on a specification operation. -/
-structure SpecificationMemoryRange where
-  pre : Option Nat := none
-  post : Option Nat := none
-  deriving Repr, BEq, DecidableEq, Inhabited
-
 /-- Canonical specification operations whose state-anchor payload is semantic
-and therefore must survive source round trips. -/
+and therefore must survive source round trips. The states a two-state
+operation (a behavior predicate, a state-change predicate) reads come from
+the enclosing `labeled` expression. -/
 inductive SpecificationOperation where
-  | behavior (kind : BehaviorOperation) (range : SpecificationMemoryRange := {})
+  | behavior (kind : BehaviorOperation)
+  /-- The domain of all memories: the domain of a state-label binder. -/
+  | stateDomain
+  /-- `publish<R>(a, v)`: the post-state is the pre-state with `R` at `a`
+  holding `v`, which was absent. -/
+  | publish
+  /-- `remove<R>(a)`: the post-state is the pre-state without `R` at `a`. -/
+  | remove
+  /-- `update<R>(a, v)`: the post-state is the pre-state with `R` at `a`
+  replaced by `v`. -/
+  | update
   | old
   | saveStateAnchor (label : Nat)
   | withStateAnchor (label : Nat)
@@ -176,6 +184,11 @@ inductive SpecificationConditionKind where
   | assertion
   | assumption
   | loopInvariant
+  /-- Applies lemmas: a lemma instance under implications and universal
+  quantifiers. -/
+  | apply
+  /-- Splits cases on a Boolean or an enum's variant. -/
+  | split
   deriving Repr, BEq, DecidableEq, Inhabited
 
 /-- Canonical primitive operation names. Surface operators elaborate to these
@@ -264,10 +277,13 @@ inductive Place where
   | local (name : String) (span : Span := {})
   | deref (base : Place) (span : Span := {})
   | field (base : Place) (name : String) (span : Span := {})
+  /-- The value of the place as the variant `enum::variant` names, whose
+  fields it has. -/
+  | downcast (base : Place) (enum : Array String) (variant : String) (span : Span := {})
   deriving Repr, BEq, Inhabited
 
 def Place.span : Place → Span
-  | .local _ span | .deref _ span | .field _ _ span => span
+  | .local _ span | .deref _ span | .field _ _ span | .downcast _ _ _ span => span
 
 inductive PlaceOperation where
   | move
@@ -313,8 +329,10 @@ inductive Expr where
   | typedPrimitive (operation : Primitive) (result : Located Ty)
       (arguments : Array Expr) (span : Span := {})
   | call (name : Array String) (arguments : Array Expr) (span : Span := {})
-  | closure (name : Array String) (result : Located Ty)
-      (captures : Array Expr) (span : Span := {})
+  /-- A closure of a function: `captures` lists its parameters up to the
+  last captured one, `none` for one supplied at invocation. -/
+  | closure (name : Array String) (types : Array (Located Ty)) (result : Located Ty)
+      (captures : Array (Option Expr)) (span : Span := {})
   | invoke (callable : Expr) (arguments : Array Expr) (span : Span := {})
   | genericCall (name : Array String) (types : Array (Located Ty))
       (arguments : Array Expr) (span : Span := {})
@@ -343,7 +361,9 @@ inductive Expr where
   | index (value index : Expr) (span : Span := {})
   | membership (element collection : Expr) (span : Span := {})
   | variantTest (value : Expr) (variants : Array String) (span : Span := {})
-  | selectVariants (owner : Located Ty) (fields : Array String)
+  /-- The field of whichever listed variant the value holds, as
+  `(variant, field)` pairs. -/
+  | selectVariants (owner : Located Ty) (fields : Array (String × String))
       (value : Expr) (span : Span := {})
   | testVariants (owner : Located Ty) (variants : Array String)
       (value : Expr) (span : Span := {})
@@ -361,8 +381,16 @@ inductive Expr where
       (binders : Array (BindingPattern × Expr)) (body : Expr) (span : Span := {})
   | specification (operation : SpecificationOperation)
       (types : Array (Located Ty)) (arguments : Array Expr) (span : Span := {})
+  /-- A two-state reading at state labels: `S |~ e` reads both states of the
+  two-state operations of `e` at `S`, `..S |~ e` the post-state at `S`,
+  `S.. |~ e` the pre-state at `S`, and `S..T |~ e` both. A label is the
+  name of a binder over `StateDomain` or one a state-change predicate
+  defines. -/
+  | labeled (pre post : Option String) (body : Expr) (span : Span := {})
+  /-- In-body specification; `proof` when it is a step of the function's
+  proof, which a caller inlining the function does not run. -/
   | specBlock (conditions : Array (SpecificationConditionKind × Expr))
-      (span : Span := {})
+      (span : Span := {}) (proof : Bool := false)
   | block (statements : Array Statement) (result : Option Expr) (span : Span := {})
   | ifElse (condition thenBranch : Expr) (elseBranch : Option Expr) (span : Span := {})
   | match_ (scrutinee : Expr)
@@ -389,8 +417,10 @@ inductive Expr where
 following statement and the block result. -/
 inductive Statement where
   | expression (value : Expr)
+  /-- A declaration; without an initializer (`value := none`) it has a type
+  and its locals are assigned before they are read. -/
   | letDecl (mutable : Bool) (pattern : BindingPattern) (type : Option (Located Ty))
-      (value : Expr) (span : Span := {})
+      (value : Option Expr) (span : Span := {})
   deriving Repr, BEq, Inhabited
 end
 
@@ -399,7 +429,7 @@ def Expr.span : Expr → Span
       .typedInteger _ _ span | .address _ span |
       .string _ span | .bytes _ span | .local _ span |
       .primitive _ _ span | .typedPrimitive _ _ _ span | .call _ _ span |
-      .closure _ _ _ span | .invoke _ _ span |
+      .closure _ _ _ _ span | .invoke _ _ span |
       .genericCall _ _ _ span | .typedCall _ _ _ span |
       .typedGenericCall _ _ _ _ span |
       .methodCall _ _ _ _ _ span |
@@ -417,8 +447,8 @@ def Expr.span : Expr → Span
       .dereference _ span |
       .mutateReference _ _ span |
       .quantifier _ _ _ span |
-      .specification _ _ _ span |
-      .specBlock _ span |
+      .specification _ _ _ span | .labeled _ _ _ span |
+      .specBlock _ span _ |
       .ifElse _ _ _ span | .match_ _ _ span |
       .forRange _ _ _ _ span |
       .loop _ span _ | .break_ _ span _ | .continue_ span _ |
@@ -463,17 +493,26 @@ inductive ContractClause where
   | modifiesAll (span : Span := {})
   | reads (type : Located Ty) (span : Span := {})
   | readsAll (span : Span := {})
+  /-- The global memory an invocation of a function-typed parameter may
+  change: targets over formals that bind the invocation's arguments
+  (`modifies_of<f>(a : Address) global<R>(a)`). -/
+  | modifiesOf (parameter : String) (formals : Array Parameter) (targets : Array Expr)
+      (span : Span := {})
+  /-- `modifies_of<f> *`: an invocation of `f` may change any global memory. -/
+  | modifiesOfAll (parameter : String) (span : Span := {})
   deriving Repr, BEq, Inhabited
 
 def ContractClause.span : ContractClause → Span
   | .letPre _ _ _ span | .letPost _ _ _ span |
       .requires _ _ span | .ensures _ _ span | .abortsIf _ _ _ span |
       .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
-      .reads _ span | .readsAll span => span
+      .reads _ span | .readsAll span | .modifiesOf _ _ _ span | .modifiesOfAll _ span => span
 
 structure Pragma where
   name : String
   value : Expr := .bool true
+  /-- The qualified name a pragma assigns, in place of a value. -/
+  qualified : Option String := none
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -505,6 +544,8 @@ structure FunctionDecl where
   result : Located Ty := { value := .unit }
   body : Option Expr := none
   contract : Array ContractClause := #[]
+  /-- The `spec` item the contract was declared in. -/
+  contractSpan : Option Span := none
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
   span : Span := {}
@@ -522,6 +563,19 @@ structure SpecFunctionDecl where
   decreases : Option Expr := none
   body : Option Expr := none
   attributes : Array SourceAttribute := #[]
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
+/-- A lemma: over its parameters, its `requires` clauses imply its `ensures`
+clauses, established by the steps of its proof. -/
+structure LemmaDecl where
+  name : String
+  generics : Array GenericBinder := #[]
+  parameters : Array Parameter := #[]
+  /-- The measure a recursive lemma decreases, lexicographically. -/
+  decreases : Array Expr := #[]
+  contract : Array ContractClause := #[]
+  proof : Array (SpecificationConditionKind × Expr) := #[]
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -544,6 +598,8 @@ structure StructDecl where
   fields : Array FieldDecl := #[]
   abilities : Array Ability := #[]
   contract : Array ContractClause := #[]
+  /-- The `spec` item the contract was declared in. -/
+  contractSpan : Option Span := none
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
   span : Span := {}
@@ -562,6 +618,8 @@ structure EnumDecl where
   variants : Array VariantDecl := #[]
   abilities : Array Ability := #[]
   contract : Array ContractClause := #[]
+  /-- The `spec` item the contract was declared in. -/
+  contractSpan : Option Span := none
   pragmas : Array Pragma := #[]
   attributes : Array SourceAttribute := #[]
   span : Span := {}
@@ -571,6 +629,8 @@ structure EnumDecl where
 structure NamespaceInvariantDecl where
   expression : Expr
   properties : Array String := #[]
+  /-- An axiom: assumed, never an obligation. -/
+  isAxiom : Bool := false
   span : Span := {}
   deriving Repr, BEq, Inhabited
 
@@ -580,6 +640,7 @@ inductive Item where
   | enum (declaration : EnumDecl)
   | function (declaration : FunctionDecl)
   | specFunction (declaration : SpecFunctionDecl)
+  | lemma (declaration : LemmaDecl)
   | namespaceInvariants (declarations : Array NamespaceInvariantDecl)
   deriving Repr, BEq, Inhabited
 
@@ -607,6 +668,9 @@ structure Namespace where
   pragmas : Array Pragma := #[]
   comments : Array Comment := #[]
   items : Array Item := #[]
+  /-- The Move address alias each module was spelled with, by its canonical
+  path (address and name). -/
+  aliases : Array (Array String × String) := #[]
   span : Span := {}
   deriving Repr, BEq, Inhabited
 

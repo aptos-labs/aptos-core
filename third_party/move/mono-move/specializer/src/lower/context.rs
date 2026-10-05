@@ -345,6 +345,8 @@ pub struct LoweringContext<'a> {
     /// Where `Instr::Ret` writes before the `Return` micro-op. Laid out
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
+    /// Substituted return types, corresponding to `return_slots`.
+    pub return_types: InternedTypeList,
     pub num_transfer_positions: u16,
     /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
@@ -794,6 +796,7 @@ pub fn try_build_context<'a>(
         frame_data_size,
         call_sites,
         return_slots,
+        return_types: own_ret_list,
         num_transfer_positions: func_ir.num_transfer_positions,
         scratch,
         resource_box_slot,
@@ -1056,6 +1059,8 @@ pub fn try_lower_function(
         entry_gas,
         param_slots,
         param_tys,
+        return_slots: ctx.return_slots,
+        return_tys: ctx.return_types,
         param_region_size: derived.param_region_size as usize,
         param_and_local_sizes_sum,
         extended_frame_size,
@@ -1118,6 +1123,44 @@ pub fn try_discover_types_for_lowering_in_function(
         &mut descriptors,
     )?;
     Ok(descriptors)
+}
+
+/// Publishes the layout and struct descriptor of the resource type `ty`, so a
+/// global-storage read of it can be materialized outside lowered code.
+/// Returns whether the layout could be published.
+pub fn publish_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+) -> VMResult<bool> {
+    let mut visited = UnorderedSet::new();
+    let mut descriptors = LoweringDescriptors::default();
+    let layout = discover_resource_type(
+        ctx,
+        interner,
+        ty,
+        EMPTY_TYPE_LIST,
+        &mut visited,
+        &mut descriptors,
+    )?;
+    Ok(layout.is_some())
+}
+
+/// Discovers the layout of the resource type `ty` under `ty_args` and
+/// publishes its struct descriptor, so a global-storage read of it can be
+/// materialized as a GC-traceable heap object.
+fn discover_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+    ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
+) -> VMResult<Option<LayoutId>> {
+    let layout = discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
+    let ty = interner.subst_type(ty, ty_args)?;
+    publish_struct_descriptor_for(ctx, ty, &mut descriptors.structs)?;
+    Ok(layout)
 }
 
 fn try_discover_types_for_lowering_in_function_impl(
@@ -1187,9 +1230,7 @@ fn try_discover_types_for_lowering_in_function_impl(
                 arg_types,
                 view_type_list(callee_ty_args),
             ) {
-                discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-                let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-                publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.structs)?;
+                discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
             }
 
             // Here we only need layout, so there is no need to publish the type descriptor.
@@ -1235,9 +1276,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
-            discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-            let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.structs)?;
+            discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
         }
 
         // The walks above don't reach a constant's own type. A vector

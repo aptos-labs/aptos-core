@@ -1,0 +1,31 @@
+Move prover returns: exiting with verification errors
+warning: cannot derive `requires_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/requires_of_state.move:86:41
+   │
+86 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `false_at_entry` caller
+   │                                         ^^^^^^^^^^^^^^^^^^^^
+   ·
+94 │         for_each_bump(v, a, |y| y spec { requires R[a].v == 0; ensures result == y; });
+   │         ------------------------------------------------------------------------------
+   │         │                   │
+   │         │                   lambda argument
+   │         from a call inlined at this callsite
+
+warning: cannot derive `requires_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/requires_of_state.move:86:41
+    │
+ 86 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `false_at_entry` caller
+    │                                         ^^^^^^^^^^^^^^^^^^^^
+    ·
+106 │         for_each_bump(v, a, |y| y spec { requires R[a].v > 0; ensures result == y; });
+    │         -----------------------------------------------------------------------------
+    │         │                   │
+    │         │                   lambda argument
+    │         from a call inlined at this callsite
+
+tests/sources/functional/closures/inline/requires_of_state.move:28:13: error: the assertion `with_state_anchor!(0, old(global<R>(a)).v > 0)` does not hold
+tests/sources/functional/closures/inline/requires_of_state.move:49:5: error: leaner verification failed: the automatic verification of `false_at_application` failed; provide a proof: `verify false_at_application by …` in `tests/sources/functional/closures/inline/requires_of_state.proof.lean` (`verify false_at_application by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/requires_of_state.move:28:13: error: the assertion `with_state_anchor!(
+      1, old(result_of<function[Fn(Address) -> u64](read_r)>(a)) > 0
+    )` does not hold
+tests/sources/functional/closures/inline/requires_of_state.move:67:5: error: leaner verification failed: the automatic verification of `nested_false_at_application` failed; provide a proof: `verify nested_false_at_application by …` in `tests/sources/functional/closures/inline/requires_of_state.proof.lean` (`verify nested_false_at_application by skip` shows the obligations it leaves)

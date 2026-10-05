@@ -4,7 +4,7 @@
 import LeanerLang
 
 /-! A module declared under a named address, with a receiver-style function. -/
-leaner module 0x1::counter where
+leaner module aptos_framework::counter where
   struct Counter has Drop, Key where
     value : u64
 

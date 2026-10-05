@@ -1050,7 +1050,7 @@ mutual
     | .invoke => match values.toList with
         | callee :: arguments => pure s!"({callee})({", ".intercalate arguments})"
         | [] => throw "validated indirect call has no callee"
-    | .closure function =>
+    | .closure function _ =>
         if values.isEmpty then pure (← nameAt context.unit.tables function.name)
         else throw "capturing closures require source-level environment reconstruction"
     | .constructor constructor variant =>

@@ -121,6 +121,20 @@ def assume (proposition : Prop) : Spec σ ε Unit where
   ok := fun initial result final => proposition ∧ result = () ∧ final = initial
   aborts := fun _ _ => False
 
+/-- Continue, with its proof, only where a proposition holds: executions in
+which it fails do not exist; nothing is owed. -/
+def given (proposition : Prop) (continuation : proposition → Spec σ ε α) : Spec σ ε α where
+  ok := fun initial result final => ∃ holds, (continuation holds).ok initial result final
+  aborts := fun initial error => ∃ holds, (continuation holds).aborts initial error
+  undefined := fun initial => ∃ holds, (continuation holds).undefined initial
+
+/-- Where the proposition holds, continuing only there is continuing. -/
+theorem given_of {proposition : Prop} (holds : proposition)
+    (continuation : proposition → Spec σ ε α) :
+    given proposition continuation = continuation holds := by
+  have same : ∀ other, continuation other = continuation holds := fun _ => rfl
+  simp only [given, same, exists_prop_of_true holds]
+
 /-- Execute a recursive specification with at most `fuel` unfoldings.
 
 This fuel is semantic proof machinery, not a source or runtime bound.  The
@@ -224,6 +238,44 @@ body. This is the common semantic shape of a `loop` which exits directly via
       | succ fuel => exact obligation
     · intro obligation
       exact ⟨1, obligation⟩
+
+/-- Binds associate: a computation bound after a bind is bound inside its
+continuation. -/
+theorem bind_assoc (action : Spec σ ε α) (middle : α → Spec σ ε β) (next : β → Spec σ ε γ) :
+    bind (bind action middle) next = bind action (fun value => bind (middle value) next) := by
+  cases action with
+  | mk ok aborts undefined =>
+    simp only [bind, mk.injEq]
+    refine ⟨?_, ?_, ?_⟩
+    · funext initial result final
+      apply propext
+      constructor
+      · rintro ⟨value', middle', ⟨value, state, first, second⟩, third⟩
+        exact ⟨value, state, first, value', middle', second, third⟩
+      · rintro ⟨value, state, first, value', middle', second, third⟩
+        exact ⟨value', middle', ⟨value, state, first, second⟩, third⟩
+    · funext initial error
+      apply propext
+      constructor
+      · rintro ((h | ⟨value, state, first, second⟩) | ⟨value', middle', ⟨value, state, first, second⟩, third⟩)
+        · exact .inl h
+        · exact .inr ⟨value, state, first, .inl second⟩
+        · exact .inr ⟨value, state, first, .inr ⟨value', middle', second, third⟩⟩
+      · rintro (h | ⟨value, state, first, (second | ⟨value', middle', second, third⟩)⟩)
+        · exact .inl (.inl h)
+        · exact .inl (.inr ⟨value, state, first, second⟩)
+        · exact .inr ⟨value', middle', ⟨value, state, first, second⟩, third⟩
+    · funext initial
+      apply propext
+      constructor
+      · rintro ((h | ⟨value, state, first, second⟩) | ⟨value', middle', ⟨value, state, first, second⟩, third⟩)
+        · exact .inl h
+        · exact .inr ⟨value, state, first, .inl second⟩
+        · exact .inr ⟨value, state, first, .inr ⟨value', middle', second, third⟩⟩
+      · rintro (h | ⟨value, state, first, (second | ⟨value', middle', second, third⟩)⟩)
+        · exact .inl (.inl h)
+        · exact .inl (.inr ⟨value, state, first, second⟩)
+        · exact .inr ⟨value', middle', ⟨value, state, first, second⟩, third⟩
 
 @[simp] theorem pure_bind (value : α) (next : α → Spec σ ε β) :
     bind (pure value) next = next value := by

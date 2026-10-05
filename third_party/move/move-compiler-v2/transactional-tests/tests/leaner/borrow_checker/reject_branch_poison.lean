@@ -1,20 +1,15 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRejectBranch where
-
-  fun run (activate : Bool) : Action U64 := do
-    let owner : U64 := 0
-    let selected ← &mut owner
-    let poisoned ← &mut owner
+leaner module 0x0::LeanerBorrowRejectBranch where
+  fun run(activate : Bool) -> u64 := do
+    let mut owner : u64 := 0
+    let selected := &mut owner
+    let poisoned := &mut owner
     if activate then
-      selected := 1
-    let result ← *poisoned
-    pure result
-
-  spec run (activate : Bool) where
-    ensures True
+      *selected := 1
+    let result := *poisoned
+    result

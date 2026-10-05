@@ -1,10 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_types::state_store::state_key::StateKey;
+use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
 use bytes::Bytes;
-use mono_move_core::storage::resource_provider::{ResourceProvider, ResourceProviderError};
-use move_core_types::language_storage::StructTag;
+use mono_move_core::{
+    storage::resource_provider::{ResourceProvider, ResourceProviderError},
+    types::InternedType,
+};
+use mono_move_global_context::ExecutionGuard;
+use mono_move_runtime::{serialize, InterpreterContext};
+use move_core_types::{
+    account_address::AccountAddress, language_storage::StructTag, move_resource::MoveStructType,
+};
+use serde::de::DeserializeOwned;
 use std::collections::{BTreeMap, HashMap};
 
 /// Trait extending the runtime's [`ResourceProvider`] interface with additional capabilities to
@@ -16,6 +24,60 @@ pub trait AptosDataProvider: ResourceProvider {
         &self,
         group_key: &StateKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError>;
+}
+
+/// The BCS bytes of the resource of interned type `ty` at `address`, read
+/// through `interp` so the read is recorded like one made by Move code.
+/// `None` if there is none. The types are interned once, in `FrameworkSymbols`.
+//
+// TODO(perf): the value goes through BCS; decode the flat value directly.
+fn read_resource_bytes(
+    interp: &mut InterpreterContext<'_>,
+    guard: &ExecutionGuard<'_>,
+    address: AccountAddress,
+    ty: InternedType,
+) -> Result<Option<Vec<u8>>, ResourceProviderError> {
+    let Some(ptr) = interp
+        .read_resource(address, ty)
+        .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?
+    else {
+        return Ok(None);
+    };
+    // SAFETY: the read-write set pins `ptr` for as long as `interp` lives, and
+    // `read_resource` published the layout of `ty`.
+    unsafe { serialize(guard, ptr.as_ptr(), ty) }
+        .map(Some)
+        .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))
+}
+
+/// Reads the on-chain config `T`, whose interned type is `ty`, through `interp`.
+pub(crate) fn read_config<T: OnChainConfig>(
+    interp: &mut InterpreterContext<'_>,
+    guard: &ExecutionGuard<'_>,
+    ty: InternedType,
+) -> Result<Option<T>, ResourceProviderError> {
+    read_resource_bytes(interp, guard, *T::address(), ty)?
+        .map(|bytes| {
+            T::deserialize_into_config(&bytes)
+                .map_err(|e| ResourceProviderError::InvariantViolation(format!("{e:#}")))
+        })
+        .transpose()
+}
+
+/// Reads the resource `T`, whose interned type is `ty`, at `address` through
+/// `interp`.
+pub(crate) fn read_resource<T: MoveStructType + DeserializeOwned>(
+    interp: &mut InterpreterContext<'_>,
+    guard: &ExecutionGuard<'_>,
+    ty: InternedType,
+    address: AccountAddress,
+) -> Result<Option<T>, ResourceProviderError> {
+    read_resource_bytes(interp, guard, address, ty)?
+        .map(|bytes| {
+            bcs::from_bytes(&bytes)
+                .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))
+        })
+        .transpose()
 }
 
 /// A resource group's members and their stored bytes.

@@ -11,6 +11,11 @@ on:
         required: true
         type: string
         description: Use this to override the git SHA1, branch name (e.g. devnet) or tag
+      SELECTION_RESULT:
+        required: false
+        default: success
+        type: string
+        description: Planner job result; a failed planner must fail this required check
       SKIP_JOB:
         required: false
         default: false
@@ -28,11 +33,18 @@ jobs:
   # we ensure that the Aptos CLI works with all 3 prod networks, at least
   # based on the tests in the test suite.
   run-cli-tests:
+    # A failed selection still runs the job so that the required check fails.
+    if: ${{ !inputs.SKIP_JOB || inputs.SELECTION_RESULT != 'success' }}
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
       id-token: write
     steps:
+      - name: Require successful test determination
+        env:
+          SELECTION_RESULT: ${{ inputs.SELECTION_RESULT }}
+        run: test "$SELECTION_RESULT" = success
+
       - uses: actions/checkout@v4
         if: ${{ !inputs.SKIP_JOB }}
         with:
@@ -49,6 +61,7 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
       - uses: ./.github/actions/python-setup
+        id: python-setup
         if: ${{ !inputs.SKIP_JOB }}
         with:
           pyproject_directory: crates/aptos/e2e
@@ -56,7 +69,7 @@ jobs:
 
       # Run CLI tests against local testnet built from devnet branch.
       - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
-        if: ${{ !inputs.SKIP_JOB }}
+        if: ${{ !cancelled() && !inputs.SKIP_JOB && steps.python-setup.outcome == 'success' }}
         name: devnet-tests
         with:
           max_attempts: 5
@@ -65,7 +78,7 @@ jobs:
 
       # Run CLI tests against local testnet built from testnet branch.
       - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
-        if: ${{ !inputs.SKIP_JOB }}
+        if: ${{ !cancelled() && !inputs.SKIP_JOB && steps.python-setup.outcome == 'success' }}
         name: testnet-tests
         with:
           max_attempts: 5
@@ -74,7 +87,7 @@ jobs:
 
       # Run CLI tests against local testnet built from mainnet branch.
       - uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # pin@v3.0.2
-        if: ${{ !inputs.SKIP_JOB }}
+        if: ${{ !cancelled() && !inputs.SKIP_JOB && steps.python-setup.outcome == 'success' }}
         name: mainnet-tests
         with:
           max_attempts: 5
@@ -86,6 +99,30 @@ jobs:
         working-directory: docker/compose/validator-testnet
         run: docker logs aptos-tools-devnet && docker logs aptos-tools-testnet && docker logs aptos-tools-mainnet
 
-      # Print out whether the job was skipped.
-      - run: echo "Skipping CLI E2E tests!"
-        if: ${{ inputs.SKIP_JOB }}
+      # Archive first so upload-artifact never traverses PR-created symlinks.
+      - name: Archive CLI test output
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          output_dirs=("$RUNNER_TEMP"/aptos-e2e-tests-*/out)
+          if (( ${#output_dirs[@]} == 0 )); then
+            exit 0
+          fi
+          relative_dirs=()
+          for output_dir in "${output_dirs[@]}"; do
+            relative_dirs+=("${output_dir#"$RUNNER_TEMP"/}")
+          done
+          tar --create --gzip \
+            --file "$RUNNER_TEMP/cli-e2e-output.tar.gz" \
+            --directory "$RUNNER_TEMP" \
+            -- "${relative_dirs[@]}"
+
+      - name: Preserve CLI test output
+        if: ${{ always() && !inputs.SKIP_JOB && github.event_name != 'pull_request' && github.event_name != 'pull_request_target' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-e2e-output-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cli-e2e-output.tar.gz
+          if-no-files-found: warn
+          retention-days: 14

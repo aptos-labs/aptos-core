@@ -1,0 +1,8 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/global_invariants.move:18:9: error: the module invariant `invariant [global] ∀ (a : Address), exists<R>(a) ==> exists<S>(a)` does not hold after a write of memory it reads
+tests/sources/functional/global_invariants.move:58:5: error: leaner verification failed: the automatic verification of `remove_S_invalid` failed; provide a proof: `verify remove_S_invalid by …` in `tests/sources/functional/global_invariants.proof.lean` (`verify remove_S_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/global_invariants.move:18:9: error: the module invariant `invariant [global] ∀ (a : Address), exists<R>(a) ==> exists<S>(a)` does not hold after a write of memory it reads
+tests/sources/functional/global_invariants.move:38:5: error: leaner verification failed: the automatic verification of `create_R_invalid` failed; provide a proof: `verify create_R_invalid by …` in `tests/sources/functional/global_invariants.proof.lean` (`verify create_R_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/global_invariants.move:20:9: error: the module invariant `invariant [update, global] ∀ (a : Address),
+        old(exists_R(a)) ==> exists<R>(a)` does not hold after a write of memory it reads
+tests/sources/functional/global_invariants.move:62:5: error: leaner verification failed: the automatic verification of `remove_R_invalid` failed; provide a proof: `verify remove_R_invalid by …` in `tests/sources/functional/global_invariants.proof.lean` (`verify remove_R_invalid by skip` shows the obligations it leaves)

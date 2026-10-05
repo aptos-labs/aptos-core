@@ -16,7 +16,7 @@ use crate::{
         boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
         boogie_type, boogie_type_for_struct_field, boogie_type_suffix, boogie_value_blob,
         boogie_variant_field_update, boogie_well_formed_expr, bv_flag_for_type,
-        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
+        compute_evaluator_memory_union, EmittedEntities, MAX_TUPLE_SIZE,
     },
     bytecode_translator::has_native_equality,
     options::BoogieOptions,
@@ -34,17 +34,17 @@ use move_model::{
     emit, emitln,
     exp_rewriter::strip_all_olds,
     model::{
-        FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructEnv, StructId,
+        FieldEnv, FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecFunId, SpecVarId, StructEnv, StructId,
     },
-    pragmas::INTRINSIC_TYPE_MAP,
+    pragmas::{INTRINSIC_TYPE_MAP, WEIGHT_PROP},
     spec_derivation,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
     well_known::{self, TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
 use move_prover_bytecode_pipeline::{
-    mono_analysis::MonoInfo,
+    mono_analysis::{type_params_in_order, MonoInfo},
     number_operation::{GlobalNumberOperationState, NumOperation, NumOperation::Bitwise},
 };
 use std::{
@@ -105,6 +105,11 @@ pub struct SpecTranslator<'env> {
     /// into the global context of every VC in the file and regress solver performance for
     /// unrelated functions.
     arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool, bool)>>>,
+    /// Pairs of struct types that differ only in integer type arguments, for which a conversion
+    /// function from the first to the second is emitted. Specs treat every integer as a
+    /// mathematical integer, so `Option<num>` and `Option<u64>` describe the same values, but
+    /// each instantiation is its own Boogie datatype.
+    coercions: Rc<RefCell<BTreeSet<(Type, Type)>>>,
     /// The qualified instantiated ID of the function currently being verified, if any.
     /// Used to resolve behavioral predicates on function-typed parameters.
     current_fun_qid: RefCell<Option<QualifiedInstId<FunId>>>,
@@ -191,6 +196,7 @@ impl<'env> SpecTranslator<'env> {
             fun_mut_params: BTreeSet::new(),
             lifted_choice_infos: Default::default(),
             arbitrary_values: Default::default(),
+            coercions: Default::default(),
             current_fun_qid: RefCell::new(None),
             current_fun_baseline: RefCell::new(None),
             current_fun_local_types: RefCell::new(None),
@@ -375,7 +381,8 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub fn translate_spec_vars(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
-        let mut translated = BTreeSet::new();
+        // Keyed on the entity, not on the rendered name -- see `EmittedEntities`.
+        let mut translated: EmittedEntities<(SpecVarId, Vec<Type>)> = EmittedEntities::default();
         for (id, var) in module_env.get_spec_vars() {
             for type_inst in mono_info
                 .spec_vars
@@ -390,7 +397,18 @@ impl SpecTranslator<'_> {
                     &type_inst,
                     &None,
                 );
-                if !translated.insert(name) {
+                if !translated.insert(
+                    module_env.env,
+                    (
+                        *id,
+                        type_inst
+                            .iter()
+                            .map(|t| t.clone().normalize_nested_funs())
+                            .collect::<Vec<_>>(),
+                    ),
+                    &name,
+                    "specification variable",
+                ) {
                     continue;
                 }
                 if type_inst.is_empty() {
@@ -427,7 +445,8 @@ impl SpecTranslator<'_> {
 impl SpecTranslator<'_> {
     pub fn translate_spec_funs(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
         let empty = &BTreeSet::new();
-        let mut translated = BTreeSet::new();
+        // Keyed on the entity, not on the rendered name -- see `EmittedEntities`.
+        let mut translated: EmittedEntities<(SpecFunId, Vec<Type>)> = EmittedEntities::default();
         for (id, fun) in module_env.get_spec_funs() {
             for type_inst in mono_info
                 .spec_funs
@@ -437,7 +456,18 @@ impl SpecTranslator<'_> {
                 .cloned()
             {
                 let name = boogie_spec_fun_name(module_env, *id, &type_inst, false);
-                if !translated.insert(name) {
+                if !translated.insert(
+                    module_env.env,
+                    (
+                        *id,
+                        type_inst
+                            .iter()
+                            .map(|t| t.clone().normalize_nested_funs())
+                            .collect::<Vec<_>>(),
+                    ),
+                    &name,
+                    "specification function",
+                ) {
                     continue;
                 }
                 if type_inst.is_empty() {
@@ -716,29 +746,17 @@ impl SpecTranslator<'_> {
             false
         };
         let type_info_params = if type_reflection {
-            let mut covered = BTreeSet::new();
-            (0..fun.type_params.len())
+            let inst = (0..fun.type_params.len())
                 .map(|i| {
-                    // Apply type instantiation if present
-                    let ty = self
-                        .type_inst
+                    self.type_inst
                         .get(i)
                         .cloned()
-                        .unwrap_or(Type::TypeParameter(i as u16));
-                    // There can be name clashes after instantiation. Parameters still need
-                    // to be there but all are instantiated with the same type. We escape
-                    // the redundant parameters.
-                    let prefix = if !covered.insert(ty.clone()) {
-                        format!("_{}_", i)
-                    } else {
-                        "".to_string()
-                    };
-                    format!(
-                        "{}{}_info: $TypeParamInfo",
-                        prefix,
-                        boogie_type(self.env, &ty, false)
-                    )
+                        .unwrap_or(Type::TypeParameter(i as u16))
                 })
+                .collect_vec();
+            type_params_in_order(&inst)
+                .into_iter()
+                .map(|idx| format!("#{}_info: $TypeParamInfo", idx))
                 .collect_vec()
         } else {
             vec![]
@@ -798,7 +816,7 @@ impl SpecTranslator<'_> {
                     // Dual params for &mut references in old-aware spec funs
                     let inner_ty = boogie_type(self.env, &self.inst(ty.skip_reference()), bv_flag);
                     vec![
-                        format!("old_{}: {}", name_str, inner_ty),
+                        format!("$old_{}: {}", name_str, inner_ty),
                         format!("{}: {}", name_str, inner_ty),
                     ]
                 } else {
@@ -825,7 +843,7 @@ impl SpecTranslator<'_> {
         // fun's `weight` property (set by `spec fun NAME(...): T [weight = N]`).
         let rec_weight: Option<u32> = if recursive && fun.body.is_some() && !fun.uninterpreted {
             let spec = fun.spec.borrow();
-            let weight_sym = self.env.symbol_pool().make("weight");
+            let weight_sym = self.env.symbol_pool().make(WEIGHT_PROP);
             spec.properties.get(&weight_sym).and_then(|v| match v {
                 move_model::ast::PropertyValue::Value(move_model::ast::Value::Number(n)) => {
                     use num::ToPrimitive;
@@ -1084,6 +1102,7 @@ impl SpecTranslator<'_> {
     pub(crate) fn finalize(&self) {
         self.translate_choice_functions();
         self.translate_arbitrary_value_functions();
+        self.translate_coercion_functions();
     }
 
     /// Shares `parent`'s lifted-choice and arbitrary-value collections, so
@@ -1092,6 +1111,7 @@ impl SpecTranslator<'_> {
     pub(crate) fn share_collected_declarations(&mut self, parent: &Self) {
         self.lifted_choice_infos = parent.lifted_choice_infos.clone();
         self.arbitrary_values = parent.arbitrary_values.clone();
+        self.coercions = parent.coercions.clone();
         self.qid_count = parent.qid_count.clone();
     }
 
@@ -1775,7 +1795,7 @@ impl SpecTranslator<'_> {
 
     fn translate_local_var(&self, _node_id: NodeId, name: Symbol) {
         if *self.in_old_context.borrow() && self.fun_mut_params.contains(&name) {
-            emit!(self.writer, "old_{}", name.display(self.env.symbol_pool()));
+            emit!(self.writer, "$old_{}", name.display(self.env.symbol_pool()));
         } else {
             emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
         }
@@ -3307,9 +3327,9 @@ impl SpecTranslator<'_> {
             .env
             .spec_fun_uses_generic_type_reflection(&module_id.qualified_inst(fun_id, inst.clone()))
         {
-            for ty in inst {
+            for idx in type_params_in_order(inst) {
                 maybe_comma();
-                emit!(self.writer, "{}_info", boogie_type(self.env, ty, false))
+                emit!(self.writer, "#{}_info", idx)
             }
         }
         // Add memory parameters.
@@ -3534,7 +3554,11 @@ impl SpecTranslator<'_> {
                      renders as an integer, and no conversion exists for this type",
                 );
             }
-            self.translate_exp(arg);
+            if arg_is_bv {
+                self.translate_exp(arg);
+            } else {
+                self.translate_exp_as(arg, param_ty);
+            }
         }
     }
 
@@ -4293,6 +4317,36 @@ impl SpecTranslator<'_> {
         body: &Exp,
     ) {
         assert!(!kind.is_choice());
+        // A range that mentions an earlier binder is translated inside that binder's scope:
+        // `Q x in r1, y in r2(x): P` is `Q x in r1: Q y in r2(x): P`.
+        if let Some(k) = (1..ranges.len()).find(|&k| {
+            let earlier: BTreeSet<Symbol> = ranges[..k]
+                .iter()
+                .filter(|(_, range)| {
+                    !matches!(self.get_node_type(range.node_id()), Type::StateDomain)
+                })
+                .flat_map(|(pat, _)| pat.vars())
+                .map(|(_, sym)| sym)
+                .collect();
+            ranges[k]
+                .1
+                .free_vars()
+                .iter()
+                .any(|sym| earlier.contains(sym))
+        }) {
+            let inner_id = self.env.clone_node(node_id);
+            let inner = ExpData::Quant(
+                inner_id,
+                kind,
+                ranges[k..].to_vec(),
+                triggers.to_vec(),
+                condition.clone(),
+                body.clone(),
+            )
+            .into_exp();
+            self.translate_quant(node_id, kind, &ranges[..k], &[], &None, &inner);
+            return;
+        }
         // Translate range expressions. While doing, check for currently unsupported
         // type quantification
         let mut range_tmps = HashMap::new();
@@ -4380,6 +4434,7 @@ impl SpecTranslator<'_> {
                 .all(|(_, range)| matches!(self.get_node_type(range.node_id()), Type::StateDomain));
         let mut state_patterns = vec![];
         let mut state_patterns_complete = true;
+        let mut state_values: Vec<(String, Type)> = vec![];
         let mut comma = "";
         for (var, range) in ranges {
             let (_, var_name) = self.require_range_var(var);
@@ -4440,11 +4495,8 @@ impl SpecTranslator<'_> {
                         let bv_flag = false;
                         let mut entries: Vec<(String, Type)> = Vec::with_capacity(val_tys.len());
                         for (i, val_ty) in val_tys.iter().enumerate() {
-                            let boogie_var = if val_tys.len() == 1 {
-                                format!("{}_val", var_name_str)
-                            } else {
-                                format!("{}_val_{}", var_name_str, i)
-                            };
+                            let boogie_var =
+                                self.fresh_var_name(&format!("{}_val_{}", var_name_str, i));
                             if expand_value_states {
                                 if let Type::Struct(mid, sid, inst) = val_ty.skip_reference() {
                                     let struct_env = self.env.get_struct(mid.qualified(*sid));
@@ -4500,6 +4552,7 @@ impl SpecTranslator<'_> {
                             comma = ", ";
                             entries.push((boogie_var, val_ty.clone()));
                         }
+                        state_values.extend(entries.iter().cloned());
                         self.value_state_vars.borrow_mut().insert(label, entries);
                     }
                     continue;
@@ -4584,10 +4637,8 @@ impl SpecTranslator<'_> {
                     }
                     emit!(self.writer, "{}{}", separator, type_check);
                 },
-                Type::ResourceDomain(..) | Type::StateDomain => {
-                    // No range constraint needed.
-                    continue;
-                },
+                // State values are constrained after this loop.
+                Type::ResourceDomain(..) | Type::StateDomain => continue,
                 Type::Vector(..) => {
                     let range_tmp = range_tmps.get(&var_name).unwrap();
                     let quant_var = quant_vars.get(&var_name).unwrap();
@@ -4649,6 +4700,14 @@ impl SpecTranslator<'_> {
                 | Type::Var(_) => panic!("unexpected type"),
             }
             separator = connective;
+        }
+        // Every value a state quantifier picks satisfies its Move type.
+        for (value, ty) in &state_values {
+            let type_check = boogie_well_formed_expr(self.env, value, ty, false);
+            if !type_check.is_empty() {
+                emit!(self.writer, "{}{}", separator, type_check);
+                separator = connective;
+            }
         }
         emit!(self.writer, "{}", separator);
         self.with_range_selector_assignments(
@@ -4753,6 +4812,154 @@ impl SpecTranslator<'_> {
         emit!(self.writer, "{}({})", fun_name, args);
     }
 
+    /// Translates `exp` where a value of type `expected` is required, converting between two
+    /// instantiations of a struct that differ only in integer type arguments.
+    fn translate_exp_as(&self, exp: &Exp, expected: &Type) {
+        let actual = self.get_node_type(exp.node_id());
+        let (actual, expected) = (actual.skip_reference(), expected.skip_reference());
+        if self.register_coercion(exp.node_id(), actual, expected) {
+            emit!(
+                self.writer,
+                "{}(",
+                boogie_coercion_fun_name(self.env, actual, expected)
+            );
+            self.translate_exp(exp);
+            emit!(self.writer, ")");
+        } else {
+            self.translate_exp(exp);
+        }
+    }
+
+    /// Whether a value of `from` must be converted to be used as `to`, registering the conversion
+    /// functions this needs, nested ones included. Only instantiations of one struct whose type
+    /// arguments differ in integer types are converted; a mismatch inside any other type is
+    /// reported at `node_id`.
+    fn register_coercion(&self, node_id: NodeId, from: &Type, to: &Type) -> bool {
+        if from == to
+            || !integer_compatible(from, to)
+            || boogie_type(self.env, from, false) == boogie_type(self.env, to, false)
+        {
+            return false;
+        }
+        let (Type::Struct(mid, sid, from_inst), Type::Struct(_, _, to_inst)) = (from, to) else {
+            self.env.error(
+                &self.env.get_node_loc(node_id),
+                &format!(
+                    "`{}` is used where `{}` is expected; integer types inside such values \
+                     can only be converted within a struct",
+                    from.display(&self.env.get_type_display_ctx()),
+                    to.display(&self.env.get_type_display_ctx()),
+                ),
+            );
+            return false;
+        };
+        if !self
+            .coercions
+            .borrow_mut()
+            .insert((from.clone(), to.clone()))
+        {
+            return true;
+        }
+        let struct_env = self.env.get_module(*mid).into_struct(*sid);
+        let state = self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        for field in struct_env.get_fields().chain(struct_env.get_ghost_fields()) {
+            let field_from = field.get_type().instantiate(from_inst);
+            let field_to = field.get_type().instantiate(to_inst);
+            if boogie_type_for_struct_field(&state, &field, self.env, &field_from)
+                != boogie_type_for_struct_field(&state, &field, self.env, &field_to)
+                && !self.register_coercion(node_id, &field_from, &field_to)
+            {
+                self.env.error(
+                    &self.env.get_node_loc(node_id),
+                    &format!(
+                        "field `{}` of `{}` cannot be converted to `{}`",
+                        field.get_name().display(self.env.symbol_pool()),
+                        from.display(&self.env.get_type_display_ctx()),
+                        to.display(&self.env.get_type_display_ctx()),
+                    ),
+                );
+            }
+        }
+        true
+    }
+
+    /// Emits the conversion functions registered by `register_coercion`.
+    fn translate_coercion_functions(&self) {
+        let env = self.env;
+        let state = env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        for (from, to) in self.coercions.borrow().iter() {
+            let (mid, sid, from_inst) = from.require_struct();
+            let (_, _, to_inst) = to.require_struct();
+            let struct_env = env.get_module(mid).into_struct(sid);
+            let field_value = |field: &FieldEnv| {
+                let select = format!("x->{}", boogie_field_sel(field));
+                let field_from = field.get_type().instantiate(from_inst);
+                let field_to = field.get_type().instantiate(to_inst);
+                if boogie_type_for_struct_field(&state, field, env, &field_from)
+                    == boogie_type_for_struct_field(&state, field, env, &field_to)
+                {
+                    select
+                } else {
+                    format!(
+                        "{}({})",
+                        boogie_coercion_fun_name(env, &field_from, &field_to),
+                        select
+                    )
+                }
+            };
+            let body = if struct_env.has_variants() {
+                let variants = struct_env.get_variants().collect_vec();
+                let mut body = String::new();
+                for (pos, variant) in variants.iter().enumerate() {
+                    let fields = struct_env
+                        .get_fields_of_variant(*variant)
+                        .chain(struct_env.get_ghost_fields())
+                        .map(|f| field_value(&f))
+                        .join(", ");
+                    let value = format!(
+                        "{}({})",
+                        boogie_struct_variant_name(&struct_env, to_inst, *variant),
+                        fields
+                    );
+                    if pos + 1 < variants.len() {
+                        body.push_str(&format!(
+                            "if x is {} then {} else ",
+                            boogie_struct_variant_name(&struct_env, from_inst, *variant),
+                            value
+                        ));
+                    } else {
+                        body.push_str(&value);
+                    }
+                }
+                body
+            } else {
+                let fields = struct_env
+                    .get_fields()
+                    .chain(struct_env.get_ghost_fields())
+                    .map(|f| field_value(&f))
+                    .join(", ");
+                format!(
+                    "{}({})",
+                    boogie_struct_name(&struct_env, to_inst, false),
+                    fields
+                )
+            };
+            emitln!(
+                self.writer,
+                "function {{:inline}} {}(x: {}): {} {{\n    {}\n}}",
+                boogie_coercion_fun_name(env, from, to),
+                boogie_type(env, from, false),
+                boogie_type(env, to, false),
+                body
+            );
+        }
+    }
+
     fn translate_eq_neq(&self, boogie_val_fun: &str, args: &[Exp]) {
         let ty_binding = self.get_node_type(args[0].node_id());
         let ty = ty_binding.skip_reference();
@@ -4765,9 +4972,9 @@ impl SpecTranslator<'_> {
         // runtime state for ghost-bearing types.
         if let Type::Tuple(elems) = ty {
             if elems.len() >= 2 {
-                let has_ghost = elems
+                let has_ghost = !elems
                     .iter()
-                    .any(|e| crate::bytecode_translator::type_has_ghost_transitively(self.env, e));
+                    .all(|e| has_native_equality(self.env, self.options, e));
                 let negated = boogie_val_fun.starts_with('!');
                 if !has_ghost {
                     emit!(self.writer, "(");
@@ -4833,7 +5040,11 @@ impl SpecTranslator<'_> {
         emit!(self.writer, "{}'{}'(", boogie_val_fun, suffix);
         self.translate_exp(&args[0]);
         emit!(self.writer, ", ");
-        self.translate_exp(&args[1]);
+        if bv_flag {
+            self.translate_exp(&args[1]);
+        } else {
+            self.translate_exp_as(&args[1], ty);
+        }
         emit!(self.writer, ")");
     }
 
@@ -5377,11 +5588,11 @@ impl SpecTranslator<'_> {
                     };
                     emit!(
                         self.writer,
-                        &format!(" && $1_signer_is_txn_signer({})", target)
+                        &format!(" && $1.signer.is_txn_signer({})", target)
                     );
                     emit!(
                         self.writer,
-                        &format!(" && $1_signer_is_txn_signer_addr({}->$addr)", target)
+                        &format!(" && $1.signer.is_txn_signer_addr({}->$addr)", target)
                     );
                 }
             },
@@ -5402,6 +5613,37 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, "; {})", check);
             },
         }
+    }
+}
+
+/// The name of the function converting a value of `from` to `to`, two instantiations of one
+/// struct that differ only in integer type arguments.
+fn boogie_coercion_fun_name(env: &GlobalEnv, from: &Type, to: &Type) -> String {
+    format!(
+        "$Coerce'{}'_'{}'",
+        boogie_type_suffix(env, from, false),
+        boogie_type_suffix(env, to, false)
+    )
+}
+
+/// Whether `t1` and `t2` have the same structure, differing at most in which integer types occur
+/// in them. Specs treat every integer as a mathematical integer, so such types describe the
+/// same values.
+fn integer_compatible(t1: &Type, t2: &Type) -> bool {
+    match (t1, t2) {
+        (Type::Primitive(_), Type::Primitive(_)) => t1 == t2 || (t1.is_number() && t2.is_number()),
+        (Type::Struct(m1, s1, i1), Type::Struct(m2, s2, i2)) => {
+            m1 == m2
+                && s1 == s2
+                && i1.len() == i2.len()
+                && i1.iter().zip(i2).all(|(a, b)| integer_compatible(a, b))
+        },
+        (Type::Vector(e1), Type::Vector(e2)) => integer_compatible(e1, e2),
+        (Type::Reference(_, b1), Type::Reference(_, b2)) => integer_compatible(b1, b2),
+        (Type::Tuple(ts1), Type::Tuple(ts2)) => {
+            ts1.len() == ts2.len() && ts1.iter().zip(ts2).all(|(a, b)| integer_compatible(a, b))
+        },
+        _ => t1 == t2,
     }
 }
 

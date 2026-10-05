@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 65,
+        "offset": 2640,
+        "sha256": "5428df4d85103a559138d0858866270b5bb491eea4d66042acf8926b5ea30b21"
+      },
+      "edit": {
+        "at": 27,
+        "kind": "substitute",
+        "length": 37,
+        "to": "multisig_account.next_sequence_number - 1"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-pending-046-stops-before-last",
+      "obligation_category": "normal-result",
+      "rationale": "The newest pending transaction is omitted.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 59,
+        "offset": 2835,
+        "sha256": "64931f9909cb793ccb118f0ccc7a6a7c23f4c85f4ea6b4a6155d95b24cd3f18e"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 6,
+        "to": "i += 2"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-pending-046-skips-every-other",
+      "obligation_category": "normal-result",
+      "rationale": "Every second pending transaction is skipped.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 59,
+        "offset": 2572,
+        "sha256": "3dafc62b05337c0ce08b6e54db22812edb413ab419aae3e8ba0022f569dd2439"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 29,
+        "to": "next_sequence_number"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-pending-046-starts-past-next",
+      "obligation_category": "normal-result",
+      "rationale": "The scan starts past the queue, so nothing is pending.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "a1a4cf5672b0bbd55af239a1a9cd175f5eff3cbdefc6d090e78c01adc8dbdb1b",
+  "task_id": "MS-pending-046"
+}

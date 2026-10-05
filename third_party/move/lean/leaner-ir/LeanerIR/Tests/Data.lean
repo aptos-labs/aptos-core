@@ -61,7 +61,7 @@ private def fixture : RawUnit where
       { loc := ⟨6⟩, typeId := ⟨0⟩,
         kind := .operation (.data (.testVariants choice #["Right"])) #[] #[⟨5⟩] },
       { loc := ⟨7⟩, typeId := ⟨0⟩,
-        kind := .operation (.data (.selectVariants choice #["value"])) #[] #[⟨5⟩] },
+        kind := .operation (.data (.selectVariants choice #[("Right", "value")])) #[] #[⟨5⟩] },
       { loc := ⟨8⟩, typeId := ⟨0⟩,
         kind := .operation (.primitive .logicalAnd) #[] #[⟨4⟩, ⟨6⟩] },
       { loc := ⟨9⟩, typeId := ⟨0⟩,
@@ -83,9 +83,9 @@ private def fixture : RawUnit where
         alignment := ⟨0⟩
       }] }]
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 private def invalidDataFixture : RawUnit :=
   let ns := fixture.namespaces[0]!
@@ -134,12 +134,12 @@ private def partialFieldMoveFixture : RawUnit :=
           id := ⟨0⟩, name := "pair", type := typeUse 1 14,
           mutable := true, loc := ⟨14⟩ }] }] }] }
 
-private def partialFieldExecutable? : Option ExecutableUnit := do
+private def partialFieldExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] partialFieldMoveFixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 #guard match partialFieldExecutable? with
-  | some executable => match Interpreter.run executable 32
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32
       { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[] with
       | .ok (_, { value := .returned #[.bool false], .. }) => true
       | _ => false
@@ -455,21 +455,21 @@ private def discriminantFixture : RawUnit :=
         origin := ⟨0⟩
         alignment := ⟨0⟩ } }] }
 
-private def discriminantExecutable? : Option ExecutableUnit := do
+private def discriminantExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] discriminantFixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 private def handle (functionId : Nat) : FunctionHandle := {
   namespaceId := ⟨0⟩, functionId := ⟨functionId⟩ }
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 0) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 0) #[] with
       | .ok (_, { value := .returned #[.bool true], .. }) => true
       | _ => false
   | none => false
 
 #guard match discriminantExecutable? with
-  | some executable => match Interpreter.run executable 32 (handle 1) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 1) #[] with
       | .ok (_, { value := .returned #[.integer 29], .. }) => true
       | _ => false
   | none => false
@@ -496,7 +496,7 @@ private def ordinaryEnumReadFixture : RawUnit :=
           file := ⟨0⟩, startByte := 10, endByte := 11 }
   | .ok _ => false
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
 private theorem successfulRunHasDerivation (fuel : Nat) (function : FunctionHandle)
     (success : (Interpreter.run prepared fuel function #[]).isOk) :

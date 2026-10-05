@@ -168,8 +168,8 @@ leaner module 0x42::ordered_map where
       (transitive : Std.TransCmp order)
       (below : ∀ i : Int, 0 ≤ i → i < index → order (key i) needle = .lt)
       (past : size ≤ index) :
-      False ↔ ∃ i : Int, 0 ≤ i ∧ i < size ∧ key i = needle := by
-    refine ⟨False.elim, fun ⟨i, i0, i1, i2⟩ => ?_⟩
+      ∀ i : Int, 0 ≤ i → i < size → ¬key i = needle := by
+    intro i i0 i1 i2
     have lt := below i i0 (by omega)
     rw [i2, Std.ReflCmp.compare_self (cmp := order)] at lt
     cases lt
@@ -256,9 +256,9 @@ leaner module 0x42::ordered_map where
       (below : ∀ a : Int, 0 ≤ a → a < index →
         order ((Option.map key xs[a.toNat]?).getD .unit) needle = .lt)
       (past : xs.size ≤ index) :
-      ¬∃ a : Int, 0 ≤ a ∧ a < xs.size ∧
-        (Option.map key xs[a.toNat]?).getD .unit = needle := by
-    rintro ⟨a, a0, a1, a2⟩
+      ∀ a : Int, 0 ≤ a → a < xs.size →
+        ¬(Option.map key xs[a.toNat]?).getD .unit = needle := by
+    intro a a0 a1 a2
     have lt := below a a0 (by omega)
     rw [a2, Std.ReflCmp.compare_self (cmp := order)] at lt
     cases lt
@@ -278,9 +278,9 @@ leaner module 0x42::ordered_map where
         ¬order ((Option.map key xs[a.toNat]?).getD .unit) needle = .lt)
       (h0 : 0 ≤ index) (hi : index < xs.size)
       (miss : (Option.map key xs[index.toNat]?).getD .unit ≠ needle) :
-      ¬∃ a : Int, 0 ≤ a ∧ a < xs.size ∧
-        (Option.map key xs[a.toNat]?).getD .unit = needle := by
-    rintro ⟨a, a0, a1, a2⟩
+      ∀ a : Int, 0 ≤ a → a < xs.size →
+        ¬(Option.map key xs[a.toNat]?).getD .unit = needle := by
+    intro a a0 a1 a2
     rcases Int.lt_trichotomy a index with lt | eq | gt
     · have lt := below a a0 lt
       rw [a2, Std.ReflCmp.compare_self (cmp := order)] at lt
@@ -298,10 +298,6 @@ leaner module 0x42::ordered_map where
           first | assumption | omega | infer_instance |
             (rw [entryAt_found (found := ‹_›)]; intro same
              exact ‹¬_ = _› (LeanerIR.Proofs.Codec.encode_injective _ same)))
-      | (intro absent; apply absent; have found := ‹(_ : Array _)[_]? = some _›
-         apply present _ _ _ _ found <;> first | assumption | omega)
-      | (have found := ‹(_ : Array _)[_]? = some _›
-         apply present_with _ _ _ _ _ found <;> first | assumption | omega)
 
   -- ## Update
 
@@ -362,17 +358,16 @@ leaner module 0x42::ordered_map where
         order ((Option.map key xs[a.toNat]?).getD .unit) (key e) = .lt)
       (above : ∀ a : Int, i ≤ a → a < xs.size →
         ¬order ((Option.map key xs[a.toNat]?).getD .unit) (key e) = .lt)
-      (absent : ¬∃ a : Int, 0 ≤ a ∧ a < xs.size ∧
-        (Option.map key xs[a.toNat]?).getD .unit = key e) :
-      ∀ a b : Int, 0 ≤ a → a < b → b < (xs.insertIdx i.toNat e h).size →
+      (absent : ∀ a : Int, 0 ≤ a → a < xs.size →
+        ¬(Option.map key xs[a.toNat]?).getD .unit = key e) :
+      ∀ a b : Int, 0 ≤ a → a < b → b < ((xs.size + 1 : Nat) : Int) →
         order ((Option.map key (xs.insertIdx i.toNat e h)[a.toNat]?).getD .unit)
           ((Option.map key (xs.insertIdx i.toNat e h)[b.toNat]?).getD .unit) = .lt := by
     have greater : ∀ a : Int, i ≤ a → a < xs.size →
         order (key e) ((Option.map key xs[a.toNat]?).getD .unit) = .lt :=
       fun a h1 h2 => above_of_not_below order transitive lawful _ _ (above a h1 h2)
-        fun same => absent ⟨a, by omega, h2, same⟩
+        fun same => absent a (by omega) h2 same
     intro a b h0 hab hb
-    rw [Array.size_insertIdx] at hb
     rw [entryAt_insert key xs i e h hi a h0, entryAt_insert key xs i e h hi b (by omega)]
     by_cases a1 : a < i
     · rw [if_pos a1]
@@ -400,7 +395,7 @@ leaner module 0x42::ordered_map where
         (∀ k : Int, 0 ≤ k → k < p →
           (Option.map entry (xs.insertIdx i.toNat e h)[k.toNat]?).getD .unit =
             (Option.map entry xs[k.toNat]?).getD .unit) ∧
-        (∀ k : Int, p < k → k < (xs.insertIdx i.toNat e h).size →
+        (∀ k : Int, p < k → k < ((xs.size + 1 : Nat) : Int) →
           (Option.map entry (xs.insertIdx i.toNat e h)[k.toNat]?).getD .unit =
             (Option.map entry xs[(k - 1).toNat]?).getD .unit) := by
     refine ⟨i, hi, by omega, ?_, ?_, fun k h0 hk => ?_, fun k hk _ => ?_⟩
@@ -463,11 +458,10 @@ leaner module 0x42::ordered_map where
       (sorted : ∀ a b : Int, 0 ≤ a → a < b → b < xs.size →
         order ((Option.map key xs[a.toNat]?).getD .unit)
           ((Option.map key xs[b.toNat]?).getD .unit) = .lt) :
-      ∀ a b : Int, 0 ≤ a → a < b → b < (xs.eraseIdx i.toNat h).size →
+      ∀ a b : Int, 0 ≤ a → a < b → b < ((xs.size - 1 : Nat) : Int) →
         order ((Option.map key (xs.eraseIdx i.toNat h)[a.toNat]?).getD .unit)
           ((Option.map key (xs.eraseIdx i.toNat h)[b.toNat]?).getD .unit) = .lt := by
     intro a b h0 hab hb
-    rw [Array.size_eraseIdx] at hb
     rw [entryAt_erase key xs i h a h0, entryAt_erase key xs i h b (by omega)]
     split <;> split
     · exact sorted a b h0 hab (by omega)
@@ -485,7 +479,7 @@ leaner module 0x42::ordered_map where
         (∀ k : Int, 0 ≤ k → k < p →
           (Option.map entry (xs.eraseIdx i.toNat h)[k.toNat]?).getD .unit =
             (Option.map entry xs[k.toNat]?).getD .unit) ∧
-        (∀ k : Int, p ≤ k → k < (xs.eraseIdx i.toNat h).size →
+        (∀ k : Int, p ≤ k → k < ((xs.size - 1 : Nat) : Int) →
           (Option.map entry (xs.eraseIdx i.toNat h)[k.toNat]?).getD .unit =
             (Option.map entry xs[(k + 1).toNat]?).getD .unit) := by
     refine ⟨i, hi, by omega, entryAt_found key xs i e found, entryAt_found value xs i e found,
@@ -501,8 +495,6 @@ leaner module 0x42::ordered_map where
           first | assumption | omega | infer_instance |
             (rw [entryAt_found (found := ‹_›)]; intro same
              exact ‹¬_ = _› (LeanerIR.Proofs.Codec.encode_injective _ same)))
-      | (intro absent; apply absent; have found := ‹(_ : Array _)[_]? = some _›
-         apply present _ _ _ _ found <;> first | assumption | omega)
       | (apply sorted_erase <;> first | assumption | omega)
       | (have found := ‹(_ : Array _)[_]? = some _›
          apply erase_at _ _ _ _ _ _ _ _ found <;> first | assumption | omega)
@@ -526,6 +518,10 @@ leaner module 0x42::ordered_map where
     let key : u64 := 20
     let removed := remove::<u64, u64>(&mut map, &key)
     if contains::<u64, u64>(&map, &key) then 0 else removed
+  -- Every insertion and removal is computed on the concrete map, its order
+  -- owed where each mutation ends.
+  spec remove_scenario where
+    pragma heartbeats = 300
 
   fun duplicate_scenario() -> u64 := do
     let mut map := empty::<u64, u64>()
@@ -573,6 +569,8 @@ leaner module 0x42::ordered_map where
     let middle_key : u64 := 2
     let middle := *borrow::<u64, u64>(&map, &middle_key)
     first + last + middle
+  spec remove_edges_scenario where
+    pragma heartbeats = 300
 
 -- Run the functions on concrete inputs in the interpreter and compare the
 -- outcomes at `u64` and `Bool` keys.

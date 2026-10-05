@@ -3,7 +3,7 @@
 
 import LeanerLang
 
-leaner module 0x1::bit_vector where
+leaner module std::bit_vector where
   /--
   The provided index is out of bounds
   -/

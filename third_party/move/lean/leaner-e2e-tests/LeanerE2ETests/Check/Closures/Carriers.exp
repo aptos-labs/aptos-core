@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Closures/Carriers.lean:42:4: error: the specification clause `ensures result == x * 2` is not established
+LeanerE2ETests/Check/Closures/Carriers.lean:41:7: error: leaner verification failed: the automatic verification of `apply_triple_incorrect` failed; provide a proof: `verify apply_triple_incorrect by …` in the module (`verify apply_triple_incorrect by skip` shows the obligations it leaves)

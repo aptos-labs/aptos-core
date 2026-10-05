@@ -1,0 +1,43 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/references.move:1:1: error: verification failed with a residual obligation:
+case right
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : LeanerIR.Proofs.Denote.HList params
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
+      (fun failure => LeanerIR.Proofs.Obligation "references.lean" 5787 5801 True) state
+value✝ value : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+a✝³ : { val := 10, fits := ⋯ } = value
+a✝² : value = value✝
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+          (LeanerIR.Proofs.Denote.Term.lit ()) env)
+        leanerContinuation✝ (fun failure => LeanerIR.Proofs.Obligation "references.lean" 5787 5801 True)
+        state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+a✝¹ : value.val = 10
+a✝ : value = value✝
+⊢ False
+tests/sources/functional/references.move:75:5: error: leaner verification failed: the automatic verification of `mut_ref_incorrect` failed; provide a proof: `verify mut_ref_incorrect by …` in `tests/sources/functional/references.proof.lean` (`verify mut_ref_incorrect by skip` shows the obligations it leaves)

@@ -1,89 +1,128 @@
 {
-  "round": "corpus3.2-run7-codex-sol56-high",
-  "model": "gpt-5.6-sol",
+  "round": "corpus3.2-run11-codex-sol56-high-exact-cost.tar.gz",
+  "label": "Sol~5.6",
   "tasks": 20,
   "replicates": 4,
   "arms": {
     "agent_only": {
       "cells": 80,
-      "recorded": 80,
-      "operational": 77,
-      "scored": 19,
-      "pending": 58,
-      "complete": 19,
-      "first_attempt_failures": 3,
-      "verdicts": {
-        "weak_contract": 3
-      },
-      "total_cost": 41.35,
-      "mean_cost": 0.5169,
-      "ci95_mean_cost": [
-        0.4856,
-        0.5502
+      "complete": 74,
+      "failed": 4,
+      "unmeasured": 2,
+      "failed_tasks": [
+        "OV-order-006"
       ],
-      "mean_input_k": 479.4,
-      "mean_output_k": 6.64,
-      "edits": 133,
-      "verifies": 140,
-      "wp_calls": 0
+      "total_cost": 26.65,
+      "mean_cost": 0.3331,
+      "ci95_mean_cost": [
+        0.3159,
+        0.3512
+      ],
+      "median_cost": 0.2836,
+      "max_cost": 0.7524,
+      "mean_input_k": 249.7,
+      "mean_output_k": 4.86,
+      "mean_wall_s": 119.0
     },
     "hybrid_guided": {
       "cells": 80,
-      "recorded": 80,
-      "operational": 80,
-      "scored": 18,
-      "pending": 62,
-      "complete": 18,
-      "first_attempt_failures": 0,
-      "verdicts": {},
-      "total_cost": 39.3,
-      "mean_cost": 0.4912,
-      "ci95_mean_cost": [
-        0.4521,
-        0.5352
+      "complete": 77,
+      "failed": 3,
+      "unmeasured": 0,
+      "failed_tasks": [
+        "QP-part-025"
       ],
-      "mean_input_k": 449.7,
-      "mean_output_k": 6.9,
-      "edits": 160,
-      "verifies": 124,
-      "wp_calls": 172,
+      "total_cost": 27.44,
+      "mean_cost": 0.343,
+      "ci95_mean_cost": [
+        0.3186,
+        0.3709
+      ],
+      "median_cost": 0.3015,
+      "max_cost": 1.4005,
+      "mean_input_k": 263.3,
+      "mean_output_k": 5.29,
+      "mean_wall_s": 125.0,
       "ratio_vs_agent": {
-        "estimate": 0.95,
+        "estimate": 1.03,
         "ci95": [
-          0.853,
-          1.051
+          0.935,
+          1.135
         ]
       },
-      "cheaper_on_tasks": 13
+      "cheaper_on_tasks": 8,
+      "task_ratios": {
+        "BA-base-012": 1.04,
+        "BK-bucket-016": 1.23,
+        "LP-price-021": 0.92,
+        "MD-median-015": 1.25,
+        "MM-min-013": 0.94,
+        "OV-order-006": 1.02,
+        "PM-curve-027": 0.64,
+        "QP-part-025": 1.15,
+        "SM-select-022": 1.75,
+        "TL-lev-020": 1.29,
+        "TR-cancel-026": 1.02,
+        "TR-discard-011": 1.1,
+        "TR-order-010": 1.32,
+        "TS-trial-019": 0.65,
+        "UC-credits-008": 0.83,
+        "VS-contrib-003": 0.58,
+        "VS-fees-001": 1.07,
+        "VS-redeem-004": 0.92,
+        "VS-shares-002": 0.62,
+        "WU-consume-023": 1.08
+      }
     },
     "hybrid_flexible": {
       "cells": 80,
-      "recorded": 80,
-      "operational": 80,
-      "scored": 18,
-      "pending": 62,
-      "complete": 18,
-      "first_attempt_failures": 0,
-      "verdicts": {},
-      "total_cost": 38.68,
-      "mean_cost": 0.4835,
-      "ci95_mean_cost": [
-        0.4475,
-        0.5217
+      "complete": 77,
+      "failed": 1,
+      "unmeasured": 2,
+      "failed_tasks": [
+        "QP-part-025"
       ],
-      "mean_input_k": 444.0,
-      "mean_output_k": 5.81,
-      "edits": 118,
-      "verifies": 124,
-      "wp_calls": 145,
+      "total_cost": 28.97,
+      "mean_cost": 0.3621,
+      "ci95_mean_cost": [
+        0.3393,
+        0.3853
+      ],
+      "median_cost": 0.2939,
+      "max_cost": 1.1458,
+      "mean_input_k": 292.5,
+      "mean_output_k": 5.1,
+      "mean_wall_s": 120.4,
       "ratio_vs_agent": {
-        "estimate": 0.935,
+        "estimate": 1.087,
         "ci95": [
-          0.842,
-          1.04
+          1.0,
+          1.182
         ]
       },
-      "cheaper_on_tasks": 15
+      "cheaper_on_tasks": 9,
+      "task_ratios": {
+        "BA-base-012": 1.41,
+        "BK-bucket-016": 0.92,
+        "LP-price-021": 0.97,
+        "MD-median-015": 1.28,
+        "MM-min-013": 0.91,
+        "OV-order-006": 1.24,
+        "PM-curve-027": 0.84,
+        "QP-part-025": 1.15,
+        "SM-select-022": 1.05,
+        "TL-lev-020": 1.59,
+        "TR-cancel-026": 1.04,
+        "TR-discard-011": 1.2,
+        "TR-order-010": 1.41,
+        "TS-trial-019": 0.64,
+        "UC-credits-008": 0.85,
+        "VS-contrib-003": 0.8,
+        "VS-fees-001": 1.45,
+        "VS-redeem-004": 1.15,
+        "VS-shares-002": 0.81,
+        "WU-consume-023": 0.96
+      }
     }
   }
 }

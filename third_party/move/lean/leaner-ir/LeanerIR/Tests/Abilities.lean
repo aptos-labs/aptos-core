@@ -73,17 +73,17 @@ private def fixture : RawUnit where
       }] }]
 
 private def prepare? (schema : ProfileSchema) (semantics : SemanticProfile)
-    (raw : RawUnit) : Option ExecutableUnit := do
+    (raw : RawUnit) : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] raw).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
-private def executable? : Option ExecutableUnit :=
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) :=
   prepare? rustSchema rustSemantics fixture
 
 private def handle : FunctionHandle := { namespaceId := ⟨0⟩, functionId := ⟨0⟩ }
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.unit], .. }) => true
       | _ => false
   | none => false
@@ -135,8 +135,24 @@ private def localReadFixture : RawUnit :=
       ns with expressions := ns.expressions.set! 2 {
         ns.expressions[2]! with kind := .localVar ⟨0⟩ } }] }
 
-#guard preparationHasDiagnosticAt rustSchema rustSemantics localReadFixture
-  "LIR-SEMANTIC-ABILITY" ⟨2⟩
+-- A direct read of a local without `Copy` moves it: read once, the value is
+-- returned; read twice, the second read finds the local moved.
+#guard match prepare? rustSchema rustSemantics localReadFixture with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
+      | .ok (_, { value := .returned #[.nominal _ _ #[.bool true]], .. }) => true
+      | _ => false
+  | none => false
+
+private def twiceReadFixture : RawUnit :=
+  let ns := localReadFixture.namespaces[0]!
+  { localReadFixture with namespaces := #[{
+      ns with expressions := (ns.expressions ++ #[
+        ({ loc := ⟨7⟩, typeId := ⟨2⟩, kind := .localVar ⟨0⟩ } : Expr),
+        { loc := ⟨8⟩, typeId := ⟨2⟩, kind := .block #[⟨2⟩] (some ⟨4⟩) }])
+        |>.set! 3 { ns.expressions[3]! with kind := .letDecl ⟨0⟩ (some ⟨1⟩) ⟨5⟩ } }] }
+
+#guard validationHasDiagnosticAt rustSchema rustSemantics twiceReadFixture
+  "LIR-SEMANTIC-INITIALIZATION" ⟨7⟩
 
 private def placeReadFixture : RawUnit :=
   let ns := copyFixture.namespaces[0]!
@@ -161,11 +177,11 @@ private def moveValueFixture : RawUnit :=
         body := .structured ⟨2⟩
         locals := #[] }] }] }
 
-private def moveValueExecutable? : Option ExecutableUnit :=
+private def moveValueExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) :=
   prepare? rustSchema rustSemantics moveValueFixture
 
 #guard match moveValueExecutable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.nominal _ none #[.bool true]], .. }) => true
       | _ => false
   | none => false
@@ -175,11 +191,11 @@ private def copyableFixture : RawUnit :=
   { copyFixture with namespaces := #[{
       ns with structs := #[{ ns.structs[0]! with abilities := #[.copy] }] }] }
 
-private def copyableExecutable? : Option ExecutableUnit :=
+private def copyableExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) :=
   prepare? rustSchema rustSemantics copyableFixture
 
 #guard match copyableExecutable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.nominal _ none #[.bool true]], .. }) => true
       | _ => false
   | none => false
@@ -273,10 +289,10 @@ requiring nested fields to have `Key`. -/
 #guard validationHasDiagnosticAt moveSchema moveSemantics (moveKeyFixture 3)
   "LIR-SEMANTIC-ABILITY" ⟨9⟩
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
-private def copyPrepared : ExecutableUnit := copyableExecutable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
+private def copyPrepared := (copyableExecutable?.get (by native_decide)).2
 
-private theorem successfulRunHasDerivation (executable : ExecutableUnit)
+private theorem successfulRunHasDerivation {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     (success : (Interpreter.run executable 16 handle #[]).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
       BigStep.EvalFunction executable handle #[] {} #[] finalState outcome.value := by

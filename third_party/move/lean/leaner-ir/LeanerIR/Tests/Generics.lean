@@ -1,6 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import LeanerIR.Proofs.Denote.Types
 import LeanerIR.Proofs.Interpreter
 import LeanerIR.Validation.Check
 
@@ -98,7 +99,7 @@ private def fixture : RawUnit where
         kind := .letDecl ⟨0⟩ (some ⟨2⟩) ⟨4⟩ },
       { loc := ⟨6⟩, typeId := ⟨1⟩, kind := .value (.bool false) },
       { loc := ⟨7⟩, typeId := ⟨6⟩,
-        kind := .operation (.call (.closure (functionRef 6)))
+        kind := .operation (.call (.closure (functionRef 6) 1))
           #[typeArgument 1 7] #[⟨0⟩] },
       { loc := ⟨8⟩, typeId := ⟨1⟩,
         kind := .operation (.call .invoke) #[] #[⟨7⟩, ⟨6⟩] },
@@ -201,20 +202,56 @@ private def fixture : RawUnit where
           { id := ⟨1⟩, name := "boxed", type := typeUse 11 20, loc := ⟨20⟩ }]
       }] }]
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 private def handle (functionId : Nat) : FunctionHandle := {
   namespaceId := ⟨0⟩, functionId := ⟨functionId⟩ }
 
 #guard match executable? with
-  | some executable =>
+  | some ⟨_, executable⟩ =>
       [0, 2, 3, 5].all fun functionId =>
         match Interpreter.run executable 32 (handle functionId) #[] with
         | .ok (_, { value := .returned #[.bool true], .. }) => true
         | _ => false
   | none => false
+
+-- A closure of a generic target fixes the target's type instantiation where
+-- it is built; an invocation runs under it, not under the invoking frame's.
+#guard match executable? with
+  | some ⟨unit, executable⟩ =>
+      match Interpreter.Internal.evalExpr 8 executable ⟨0⟩ {} {} ⟨7⟩ with
+      | .ok { control := { value := .value (.closure target _ instantiation _), .. }, .. } =>
+          !instantiation.isEmpty && instantiation ==
+            SemanticOperations.callTypeInstantiation unit target #[]
+              #[typeArgument 1 7]
+      | _ => false
+  | none => false
+
+section Typing
+open LeanerIR.Proofs.Denote
+
+private def paramRow : NRow := .cons (.param 0) .nil
+private def boolRow : NRow := .cons .bool .nil
+
+-- A closure's rows at its instantiation are its target's own rows with the
+-- type parameter replaced by its argument, read at the parameter's node; the
+-- closure inhabits the function type at those rows only.
+#guard match executable? with
+  | some ⟨unit, executable⟩ =>
+      match Interpreter.Internal.evalExpr 8 executable ⟨0⟩ {} {} ⟨7⟩ with
+      | .ok { control := { value := .value closure, .. }, .. } => match closure with
+        | .closure target mask instantiation _ =>
+            closureRows? unit target mask == some (paramRow, paramRow, paramRow) &&
+              closureRowsIn? unit target mask instantiation == some (boolRow, boolRow, boolRow) &&
+              NTy.admits unit (.function boolRow [false] boolRow) closure &&
+              !NTy.admits unit (.function paramRow [false] paramRow) closure
+        | _ => false
+      | _ => false
+  | none => false
+
+end Typing
 
 private def preparationHasDiagnosticAt (raw : RawUnit) (code : String) (loc : LocId) : Bool :=
   match validate #[schema] raw with
@@ -448,7 +485,7 @@ private def expressionLifetimeScopeFixture : RawUnit :=
 #guard validationHasDiagnosticAt expressionLifetimeScopeFixture
   "LIR-SEMANTIC-GENERIC-SCOPE" (some ⟨0⟩)
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
 private theorem successfulRunHasDerivation (function : FunctionHandle)
     (success : (Interpreter.run prepared 32 function #[]).isOk) :

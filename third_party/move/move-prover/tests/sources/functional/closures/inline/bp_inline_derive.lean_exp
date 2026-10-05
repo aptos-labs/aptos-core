@@ -1,0 +1,3 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/bp_inline_derive.move:4:1: error: specification operation LeanerIR.Operation.specification
+  (LeanerIR.SpecOperation.publish { pre := none, post := none }) is not supported in generated contracts

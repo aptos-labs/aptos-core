@@ -118,6 +118,7 @@ spec aptos_framework::genesis {
 
     spec create_employee_validators {
         pragma opaque;
+        include staking_contract::PreconditionsInCreateContract;
     }
 
     spec create_initialize_validators_with_commission {

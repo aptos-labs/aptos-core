@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/boogie_name_injectivity.move:72:9: error: the specification clause `ensures result == true` is not established
+tests/sources/regression/boogie_name_injectivity.move:71:5: error: leaner verification failed: the automatic verification of `confuse` failed; provide a proof: `verify confuse by …` in the module (`verify confuse by skip` shows the obligations it leaves)
+tests/sources/regression/boogie_name_injectivity.move:82:9: error: the specification clause `ensures result == true` is not established
+tests/sources/regression/boogie_name_injectivity.move:81:5: error: leaner verification failed: the automatic verification of `no_collision_control` failed; provide a proof: `verify no_collision_control by …` in the module (`verify no_collision_control by skip` shows the obligations it leaves)

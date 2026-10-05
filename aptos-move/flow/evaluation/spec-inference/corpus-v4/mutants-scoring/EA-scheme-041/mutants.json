@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 55,
+        "offset": 634,
+        "sha256": "4d57c9f0d28c88c663a763b9973b640254236d96931b84403dc5cf7758cb8dff"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 55,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_ethereum_derivable_account.move",
+      "mutant_id": "EA-scheme-041-first-unchecked",
+      "obligation_category": "abort",
+      "rationale": "The first character is not required to be a letter.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 9,
+        "offset": 871,
+        "sha256": "78c76135b5eb05b92922939dbe992cdcd44c754aba5c44a6cabdbad6afe2cc9e"
+      },
+      "edit": {
+        "at": 5,
+        "kind": "substitute",
+        "length": 4,
+        "to": "0x5f"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_ethereum_derivable_account.move",
+      "mutant_id": "EA-scheme-041-dot-becomes-underscore",
+      "obligation_category": "abort",
+      "rationale": "An underscore is accepted in place of a dot.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 36,
+        "offset": 697,
+        "sha256": "19276db2bbfd6dad56a1b692f4aea9461eccb9708f4b1a84a0de3cbb3b45aa48"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 9,
+        "to": "let i = 2"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_ethereum_derivable_account.move",
+      "mutant_id": "EA-scheme-041-second-unchecked",
+      "obligation_category": "abort",
+      "rationale": "The second character is never checked.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2f8fe332da8753837afd1c4423fbeb55a64af0c003023499d5dca75d07f2b08e",
+  "task_id": "EA-scheme-041"
+}

@@ -14,6 +14,7 @@ canonical Move `leaner module` and Rust `leaner namespace` headers, together
 with a growing profile-selected expression and declaration subset, are
 implemented. Remaining `core.*`, `spec.*`, extension-profile, and dependency
 forms state the target language unless their sections say otherwise.
+Open work is listed in [`roadmap.md`](roadmap.md), section 8.
 
 The language has two audiences:
 
@@ -196,6 +197,16 @@ profile interprets the segments—for example, Move treats leading segments as
 an address or package alias, while Rust treats them as crate/module identity.
 The underlying identity remains structural and is not reconstructed from a
 display string.
+
+A Move module path is `address::module`, its address a literal or a named
+address declared with `address_alias` (`address_alias std = 0x1`;
+`LeanerLang.Addresses` declares the conventional Aptos ones). The alias is
+only a spelling: elaboration makes every Move path lead with the canonical
+address, so `std::vector` and `0x1::vector` name one module, and `@std` is
+the address `0x1`. The LIR namespace reference keeps the alias it was
+spelled with (`NamespaceRef.alias`, not part of its identity), and the
+printer spells the module with it again; a rendering declares the aliases
+its environment lacks.
 
 Dependencies are explicit:
 
@@ -809,6 +820,26 @@ constants; the inclusive flag is explicit.
 Patterns occur in `let`, destructuring assignment, match arms, destructors,
 and quantifier binders.
 
+A match takes the first arm whose pattern fits the value and whose guard,
+evaluated after the binding, holds; a guard that fails continues with the
+locals and state before the arm. A value no arm fits, a value a
+destructuring `let` or assignment does not fit, and an access to a field of
+an enum value whose variant lacks it (a selection, or a place stepping
+through the field or a downcast to another variant) make the profile's
+mismatch throw (`patternMismatchThrow?`): Move aborts with compiler-v2's
+incomplete-match code `0xCA26CBD9BE0B0001`. A profile without one has no
+outcome there. A binding fails atomically, binding no local.
+
+A pattern matched through a reference binds references to the fields it
+names. The frontends write such patterns, and a pass before validation
+rewrites each into what Move's compiler emits for it
+(`LeanerIR.Import.elaborateReferencePatterns`): tests of the variants on
+the way, borrows of the bound fields, the mismatch throw where a `let` or an
+assignment does not fit, and arms tried in order for a `match`. The place
+`downcast p as Enum::Variant` is the value at `p` as that variant, whose
+fields it has; a field several variants give different types is reached
+through it.
+
 ## Structured expressions and control
 
 All validated bodies use the following tree forms:
@@ -1008,16 +1039,18 @@ Typed nominal data operations use qualified targets:
 
 ```lean
 core.data.select[Type, field](value)
-core.data.selectVariants[Type, field₁, ...](value)
+core.data.selectVariants[Type, Variant₁.field₁, ...](value)
 core.data.testVariants[Type, Variant₁, ...](value)
 core.data.discriminant[Type](value)
 core.data.updateField[Type, field](value, replacement)
 ```
 
 The multi-variant operations express fields common to selected variants and
-variant tests without lowering through integers. A `selectVariants` field is
-listed for each variant that defines the selected payload; fieldless variants
-are omitted. `discriminant` returns the declared observable discriminant.
+variant tests without lowering through integers. `selectVariants` lists each
+variant it reads with that variant's field; a value holding an unlisted
+variant is a mismatch. A field access `value.field` of an enum lists every
+variant that declares the field, so the core form is printed only for a
+selection of some of them, such as Move's specification `x.Variant.field`. `discriminant` returns the declared observable discriminant.
 
 ## Global storage
 
@@ -1233,9 +1266,19 @@ The declaration families are:
 spec fun f {T} (x : T) : Bool := expression
 opaque spec fun predicate (x : T) : Bool
 spec var ghost_count : Nat := 0
-axiom name {T} where proposition
-spec namespace where invariant proposition
+spec module where
+  invariant proposition
+  axiom proposition
 ```
+
+The implemented surface states module invariants and axioms as members of
+one `spec module where` block; an axiom is assumed by every verification of
+the module's functions and is never an obligation, an invariant is assumed
+at entry and established at exit. Generic axioms and invariants (the
+`{T}` of the design) and proof-local labels are not yet parsed. A Move
+spec variable `x` arrives as the ghost resource `Ghost$x` the model backs
+it with, a struct with one field `v` at address 0, whose existence is an
+axiom of the module; `update x = e` is a write of that resource.
 
 A specification function has a physical typed signature, optional body,
 locals, contract, profile, origin, and profile data. A specification variable
@@ -1307,6 +1350,21 @@ printer restores the surface marker instead of printing that internal
 attribute. Invariant checking conservatively treats unlisted families as
 potentially modified.
 
+A function-typed parameter keeps global memory unless its contract declares
+a footprint for it, the global memory an invocation of the parameter may
+change:
+
+```lean
+modifies_of<f>(a : Address) global<Resource>(a)
+modifies_of<f> *
+```
+
+The formals bind an invocation's arguments in the targets, which are
+`global` resources at keys as in `modifies`; `modifies_of<f> *` leaves all of
+global memory open. The clause lowers to a `ParameterFrame` of the
+contract. A higher-order function's theorem assumes each parameter's frame,
+and a caller establishes it of the function value it passes.
+
 In-body specification blocks use the same conditions, pragmas, and frame at a
 structured program point:
 
@@ -1336,6 +1394,12 @@ A single in-body condition uses the inline `spec assume ...`, `spec assert
 `spec do`. A loop-owned `where` region contains one or more logical `let`
 bindings and loop invariants and is never interpreted as an independent
 following specification block.
+
+Verification checks an `assert` where it is stated and assumes it after
+that point. An `assume` is not used. `spec assume save_state_anchor!(n)`
+records the locals and state at its point, and `with_state_anchor!(n, e)` in
+a later assertion reads them as `old` inside `e`.
+
 Pragmas are always the leading entries of a declaration contract. Leaner does
 not support Move schemas, so `include` is an ordinary identifier rather than a
 soft keyword. Printable byte-vector pragma payloads use byte strings—for

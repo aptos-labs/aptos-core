@@ -16,12 +16,13 @@ mod materialize;
 mod natives;
 mod outcome;
 mod providers;
+mod symbols;
 mod system_txns;
 mod user_txn;
 
 pub use errors::{
-    DiscardReason, ExecutionStage, ExecutionStatus, MaterializationError, MoveExecutionFailure,
-    NoEffectsReason, PreExecutionCheckFailure, SystemTxnFailure,
+    DiscardReason, ExecutionStage, ExecutionStatus, ExecutorCreationError, MaterializationError,
+    MoveExecutionFailure, NoEffectsReason, PreExecutionCheckFailure, SystemTxnFailure,
 };
 pub use executor::AptosTransactionExecutor;
 pub use natives::production_natives;

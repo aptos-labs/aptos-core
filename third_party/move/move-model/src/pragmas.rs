@@ -13,8 +13,14 @@ use crate::{
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;
 
-/// Pragma indicating whether verification should be performed for a function.
+/// Pragma indicating whether verification should be performed for a function:
+/// `true`, `false`, or `manual`.
 pub const VERIFY_PRAGMA: &str = "verify";
+
+/// Value of the `verify` pragma stating that an authored proof establishes the
+/// function's specification: the Leaner verifier requires `verify f by ...` in
+/// the proof file; the Move Prover treats it as `true`.
+pub const VERIFY_MANUAL: &str = "manual";
 
 /// Pragma defining a timeout.
 pub const TIMEOUT_PRAGMA: &str = "timeout";
@@ -22,9 +28,19 @@ pub const TIMEOUT_PRAGMA: &str = "timeout";
 /// Pragma defining a random seed.
 pub const SEED_PRAGMA: &str = "seed";
 
+/// Property of a recursive spec function carrying the `:weight` of its
+/// defining axiom (`spec fun NAME(...): T [weight = N]`).
+pub const WEIGHT_PROP: &str = "weight";
+
 /// Pragma indicating an estimate how long verification takes. Verification
 /// is skipped if the timeout is smaller than this.
 pub const VERIFY_DURATION_ESTIMATE_PRAGMA: &str = "verify_duration_estimate";
+
+/// Pragma indicating the heartbeat budget of the function's verification in
+/// the Leaner verifier, in thousands of Lean `maxHeartbeats` units; a function
+/// whose proof needs more than the default raises it for itself. Ignored by
+/// the Move Prover.
+pub const HEARTBEATS_PRAGMA: &str = "heartbeats";
 
 /// Pragma indicating whether implementation of function should be ignored and
 /// instead treated to be like a native function.
@@ -156,6 +172,20 @@ pub const INTRINSIC_FUN_MAP_SPEC_KEY_AT: &str = "map_spec_key_at";
 /// of `map_spec_key_at`
 /// `[spec] fun map_rank<K, V>(m: Map<K, V>, k: K): num`
 pub const INTRINSIC_FUN_MAP_SPEC_RANK: &str = "map_spec_rank";
+
+/// The key at insertion position `i`, for `0 <= i < len`.
+///
+/// Declared *instead of* `map_spec_key_at` by a map whose entries stay in
+/// insertion order rather than key order. Two consequences: the enumeration is
+/// not asserted to ascend under `cmp::compare`, and equality compares positions,
+/// because content alone does not determine the order a program can observe.
+/// `[spec] fun map_spec_insertion_key_at<K, V>(m: Map<K, V>, i: num): K`
+pub const INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT: &str = "map_spec_insertion_key_at";
+
+/// The insertion position of contained key `k`; the inverse of
+/// `map_spec_insertion_key_at`
+/// `[spec] fun map_spec_insertion_rank<K, V>(m: Map<K, V>, k: K): num`
+pub const INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK: &str = "map_spec_insertion_rank";
 
 /// Get the number of entries in the map
 /// `[move] fun map_len<K, V>(m: &Map<K, V>): u64`
@@ -385,7 +415,8 @@ pub struct IntrinsicFunDef {
     pub is_move_fun: bool,
     /// For Move functions only: the name of the spec counterpart used for pure spec calls.
     pub spec_fun: Option<&'static str>,
-    /// For Move functions only: the name of the abort-condition spec function.
+    /// For Move functions only: the name of the abort-condition spec function. `None` means
+    /// the prover's model of the function never aborts.
     pub abort_spec_fun: Option<&'static str>,
 }
 
@@ -457,6 +488,14 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
             (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_KEY_AT, IntrinsicFunDef::spec_fun()),
             (INTRINSIC_FUN_MAP_SPEC_RANK, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK,
+                IntrinsicFunDef::spec_fun(),
+            ),
             (
                 INTRINSIC_FUN_MAP_LEN,
                 IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_LEN), None),
@@ -664,6 +703,7 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, Intri
 /// Pragmas accepted in a module specification block.
 const MODULE_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    HEARTBEATS_PRAGMA,
     EMITS_IS_STRICT_PRAGMA,
     EMITS_IS_PARTIAL_PRAGMA,
     ABORTS_IF_IS_STRICT_PRAGMA,
@@ -676,6 +716,7 @@ const MODULE_PRAGMAS: &[&str] = &[
 /// Pragmas accepted in a function specification block.
 const FUNCTION_PRAGMAS: &[&str] = &[
     VERIFY_PRAGMA,
+    HEARTBEATS_PRAGMA,
     TIMEOUT_PRAGMA,
     SEED_PRAGMA,
     VERIFY_DURATION_ESTIMATE_PRAGMA,

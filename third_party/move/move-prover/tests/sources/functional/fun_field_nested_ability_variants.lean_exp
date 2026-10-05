@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/fun_field_nested_ability_variants.move:27:5: error: no denotation for `mk_a`: a type argument without values is not carried by the denotation
+tests/sources/functional/fun_field_nested_ability_variants.move:34:5: error: no denotation for `mk_b`: a type argument without values is not carried by the denotation
+tests/sources/functional/fun_field_nested_ability_variants.move:45:5: error: no denotation for `probe_identity`: a type argument without values is not carried by the denotation

@@ -93,11 +93,23 @@ mutual
         (fields_typed : ValuesHaveTypes unit declaringNamespace.tables
           fields.toList fieldTypes) :
         ValueHasType unit tables (.nominal source variant fields) typeId
-    | closure {tables : Tables} (typeId : TypeId) (function : FunctionHandle)
-        (captures : Array RuntimeValue) (arguments : Array TypeId) (result : TypeId)
-        (abilities : Array Ability)
-        (type_eq : tables.types[typeId.index]? = some (.function arguments result abilities)) :
-        ValueHasType unit tables (.closure function captures) typeId
+    /-- A closure is typed against its target: the parameters its mask
+    leaves open are as many as the function type's arguments, and each
+    capture has its parameter's type under the closure's instantiation. -/
+    | closure {tables : Tables} (typeId : TypeId) (function : FunctionHandle) (mask : Nat)
+        (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue)
+        (arguments : Array TypeId) (result : TypeId) (abilities : Array Ability)
+        (targetNs : ValidatedNamespace) (declaration : FunctionDecl FunctionBody)
+        (type_eq : tables.types[typeId.index]? = some (.function arguments result abilities))
+        (namespace_eq : unit.namespaces[function.namespaceId.index]? = some targetNs)
+        (declaration_eq : targetNs.functions[function.functionId.index]? = some declaration)
+        (mask_bound : mask < 2 ^ declaration.signature.parameters.size)
+        (open_eq : (ClosureMask.extract mask false declaration.signature.parameters.toList).length =
+          arguments.size)
+        (captures_typed : ValuesHaveTypes unit targetNs.tables captures.toList
+          (ClosureMask.extract mask true (declaration.signature.parameters.toList.map fun parameter =>
+            SemanticOperations.instantiatedTypeId typeInstantiation parameter.typeUse.typeId))) :
+        ValueHasType unit tables (.closure function mask typeInstantiation captures) typeId
     | borrow {tables : Tables} (typeId : TypeId) (loan : Nat) (current : RuntimeValue)
         (referenceType : ReferenceType)
         (type_eq : tables.types[typeId.index]? = some (.reference referenceType))
@@ -1038,7 +1050,6 @@ private theorem overflowingBinaryInteger_ok_typed {ns : ValidatedNamespace}
   dsimp only [List.toList_toArray] at ok_eq
   rw [value_eq, overflow_eq] at ok_eq
   simp [resolveTargetIntegerType?] at ok_eq
-  obtain ⟨-, ok_eq⟩ := ok_eq
   split at ok_eq
   · simp only [Option.bind_eq_some_iff, Option.some.injEq, Except.ok.injEq] at ok_eq
     obtain ⟨bounds, -, out, wrap_eq, out_def⟩ := ok_eq

@@ -1,0 +1,21 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_rate_limiter",
+  "reference_proved": true,
+  "reference_sha256": "b6dcddbf64696687c8871357247833b914344d17356192d0b325b25800cd325c",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_rate_limiter::request",
+  "task_id": "RL-request-043",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.2,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

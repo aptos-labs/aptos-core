@@ -12,18 +12,20 @@ use crate::{
         boogie_behavioral_fun_spec_name, boogie_behavioral_result_fun_name,
         boogie_behavioral_spec_fun_name, boogie_byte_blob, boogie_closure_pack_name,
         boogie_constant_blob, boogie_debug_track_abort, boogie_debug_track_local,
-        boogie_debug_track_return, boogie_equality_for_type, boogie_field_sel, boogie_field_update,
-        boogie_fun_apply_name, boogie_fun_param_name, boogie_function_name, boogie_int_suffix,
+        boogie_debug_track_return, boogie_equality_for_type, boogie_field_sel,
+        boogie_field_type_name_component, boogie_field_update, boogie_fun_apply_name,
+        boogie_fun_param_name, boogie_function_name, boogie_int_suffix,
         boogie_make_vec_from_strings, boogie_modifies_memory_name, boogie_native_fun_has_spec_fun,
         boogie_native_spec_fun_name, boogie_num_literal, boogie_num_type_base,
-        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_struct_field_name, boogie_struct_field_result_fun_name,
-        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
-        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
-        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
-        boogie_well_formed_check, boogie_well_formed_expr, bv_flag_for_type,
-        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
+        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_id_name,
+        boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
+        boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
+        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
+        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
+        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
+        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
+        bv_flag_for_type, compute_evaluator_memory_union, field_bv_flag_global_state,
+        normalized_inst_id, EmittedEntities, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -55,7 +57,7 @@ use move_model::{
     spec_translator::wrap_mut_ref_spec_fun_inputs_deep,
     symbol::Symbol,
     ty::{PrimitiveType, Type, TypeDisplayContext, BOOL_TYPE},
-    well_known::{TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
+    well_known::{RECEIVER_PARAM_NAME, TYPE_INFO_MOVE, TYPE_NAME_GET_MOVE, TYPE_NAME_MOVE},
 };
 use move_prover_bytecode_pipeline::{
     mono_analysis,
@@ -543,10 +545,14 @@ impl<'env> BoogieTranslator<'env> {
                 TypeIdentToken::convert_to_bytes(TypeIdentToken::make(">")),
             );
 
-            // type name <-> type info: struct
+            // type name <-> type info: struct, rendered as `0x<address>::module::Name<args>`
+            // with the address in hex without leading zeroes. The hex digits are left
+            // uninterpreted.
+            emitln!(writer, "function $AddressShortHex(a: int): Vec int;");
             let mut tokens = TypeIdentToken::make("0x");
-            // TODO(mengxu): this is not a correct radix16 encoding of an integer
-            tokens.push(TypeIdentToken::Variable("MakeVec1(t->a)".to_string()));
+            tokens.push(TypeIdentToken::Variable(
+                "$AddressShortHex(t->a)".to_string(),
+            ));
             tokens.extend(TypeIdentToken::make("::"));
             tokens.push(TypeIdentToken::Variable("t->m".to_string()));
             tokens.extend(TypeIdentToken::make("::"));
@@ -556,13 +562,6 @@ impl<'env> BoogieTranslator<'env> {
                 "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
                             t is $TypeParamStruct ==> $IsEqual'vec'u8''($TypeName(t), {}));",
                 TypeIdentToken::convert_to_bytes(tokens)
-            );
-            // TODO(mengxu): this will parse it to an uninterpreted struct
-            emitln!(
-                writer,
-                "axiom (forall t: $TypeParamInfo :: {{$TypeName(t)}} \
-                            $IsPrefix'vec'u8''($TypeName(t), {}) ==> t is $TypeParamVector);",
-                TypeIdentToken::convert_to_bytes(TypeIdentToken::make("0x")),
             );
         }
 
@@ -600,7 +599,7 @@ impl<'env> BoogieTranslator<'env> {
                 // Emit uninterpreted function for arbitrary ordering of generic type
                 emitln!(
                     writer,
-                    "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1_cmp_Ordering;",
+                    "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1.cmp.Ordering;",
                     suffix,
                     param_type,
                     param_type
@@ -609,13 +608,13 @@ impl<'env> BoogieTranslator<'env> {
                 self.emit_function(
                     writer,
                     &format!(
-                        "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                        "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                         suffix, param_type, param_type
                     ),
                     || {
                         emitln!(
                             writer,
-                            "if $IsEqual'{}'(v1, v2) then $1_cmp_Ordering_Equal()",
+                            "if $IsEqual'{}'(v1, v2) then $1.cmp.Ordering.Equal()",
                             suffix
                         );
                         emitln!(writer, "else $Arbitrary_cmp_ordering'{}'(v1, v2)", suffix);
@@ -625,11 +624,11 @@ impl<'env> BoogieTranslator<'env> {
                 self.emit_procedure(
                     writer,
                     &format!(
-                        "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                        "$1.cmp.compare'{}'(v1: {}, v2: {}) returns ($ret0: $1.cmp.Ordering)",
                         suffix, param_type, param_type
                     ),
                     || {
-                        emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                        emitln!(writer, "$ret0 := $1.cmp.$compare'{}'(v1, v2);", suffix);
                     },
                 );
             }
@@ -639,9 +638,12 @@ impl<'env> BoogieTranslator<'env> {
         self.spec_translator
             .translate_axioms(env, mono_info.as_ref());
 
-        let mut translated_types = BTreeSet::new();
+        // Keyed on the entity, not on the rendered Boogie name -- see `EmittedEntities`.
+        let mut translated_types: EmittedEntities<QualifiedInstId<StructId>> =
+            EmittedEntities::default();
         let mut translated_memory: Vec<(QualifiedInstId<StructId>, String)> = vec![];
-        let mut translated_funs = BTreeSet::new();
+        let mut translated_funs: EmittedEntities<QualifiedInstId<FunId>> =
+            EmittedEntities::default();
         let mut verified_functions_count = 0;
         debug!("generating verification conditions");
         for module_env in self.env.get_modules() {
@@ -659,14 +661,23 @@ impl<'env> BoogieTranslator<'env> {
                     .get(&struct_env.get_qualified_id())
                     .unwrap_or(empty)
                 {
+                    let struct_qid = struct_env.get_qualified_id().instantiate(type_inst.clone());
                     let struct_name = boogie_struct_name(struct_env, type_inst, false);
-                    if !translated_types.insert(struct_name) {
+                    // Abilities are abstracted out of Boogie names, so two
+                    // instantiations differing only in the abilities of a nested
+                    // function type denote one Boogie entity. Normalize the key to
+                    // match, or they would look like a name collision.
+                    if !translated_types.insert(
+                        env,
+                        normalized_inst_id(struct_env.get_qualified_id(), type_inst),
+                        &struct_name,
+                        "struct",
+                    ) {
                         continue;
                     }
                     if struct_env.has_memory() {
-                        let mem_qid = struct_env.get_qualified_id().instantiate(type_inst.clone());
-                        let mem_name = boogie_resource_memory_name(env, &mem_qid, &None);
-                        translated_memory.push((mem_qid, mem_name))
+                        let mem_name = boogie_resource_memory_name(env, &struct_qid, &None);
+                        translated_memory.push((struct_qid, mem_name))
                     }
                     StructTranslator {
                         parent: self,
@@ -765,8 +776,19 @@ impl<'env> BoogieTranslator<'env> {
                             ))
                             .unwrap_or(empty)
                         {
+                            // The variant is deliberately not part of the key: several
+                            // non-verified variants legitimately collapse onto one
+                            // inlined body, which is what this guard is for.
                             let fun_name = boogie_function_name(fun_env, type_inst, &[]);
-                            if !translated_funs.insert(fun_name) {
+                            if !translated_funs.insert(
+                                env,
+                                normalized_inst_id(
+                                    fun_target.func_env.get_qualified_id(),
+                                    type_inst,
+                                ),
+                                &fun_name,
+                                "function",
+                            ) {
                                 continue;
                             }
                             FunctionTranslator {
@@ -788,7 +810,19 @@ impl<'env> BoogieTranslator<'env> {
         // so one target reachable under several function types (for instance
         // differing only in abilities) must still be declared once per file.
         let mut declared_behavioral_funs: BTreeSet<QualifiedInstId<FunId>> = BTreeSet::new();
+        // Keyed on the entity, normalized so that function types differing only in
+        // abilities, which are one Boogie entity, are not reported as a collision.
+        let mut translated_fun_types: EmittedEntities<Type> = EmittedEntities::default();
         for (fun_type, closure_infos) in &mono_info.fun_infos {
+            let fun_ty_name = boogie_type(self.env, fun_type, false);
+            if !translated_fun_types.insert(
+                self.env,
+                fun_type.clone().normalize_nested_funs(),
+                &fun_ty_name,
+                "function type",
+            ) {
+                continue;
+            }
             let fun_param_infos = mono_info
                 .fun_param_infos
                 .get(fun_type)
@@ -942,29 +976,80 @@ impl<'env> BoogieTranslator<'env> {
                 })
                 .collect()
         };
+        // Captures compare fieldwise when raw equality is not Move equality for them.
         let any_ghost_capture = closure_infos.iter().any(|info| {
             capture_tys(info)
                 .iter()
-                .any(|ty| type_has_ghost_transitively(self.env, ty))
+                .any(|ty| !has_native_equality(self.env, self.options, ty))
         });
-        if !any_ghost_capture {
-            emitln!(
-                self.writer,
-                "function {{:inline}} $IsEqual'{}'(v1: {}, v2: {}): bool {{ v1 == v2 }}",
-                boogie_type_suffix(self.env, fun_type, false),
-                fun_ty_boogie_name,
-                fun_ty_boogie_name,
-            );
+        // Parameters and struct fields have no known identity: two of them, or one and a
+        // closure, may hold the same function value although their constructors differ.
+        let suffix = boogie_type_suffix(self.env, fun_type, false);
+        let unknown_variants: Vec<String> =
+            fun_param_infos
+                .iter()
+                .map(|info| boogie_fun_param_name(self.env, &info.fun, info.param_sym))
+                .chain(struct_field_infos.iter().map(|info| {
+                    boogie_struct_field_name(self.env, &info.struct_id, info.field_sym)
+                }))
+                .collect();
+        let may_be_equal = if unknown_variants.is_empty() {
+            String::new()
         } else {
             emitln!(
                 self.writer,
-                "function {{:inline}} $IsEqual'{}'(v1: {}, v2: {}): bool {{",
-                boogie_type_suffix(self.env, fun_type, false),
+                "function $IsEqualUnknown'{}'(v1: {}, v2: {}): bool;",
+                suffix,
                 fun_ty_boogie_name,
                 fun_ty_boogie_name,
             );
-            self.writer.indent();
-            let mut sep = "";
+            let symmetry = format!(
+                "axiom (forall v1: {t}, v2: {t} :: {{$IsEqualUnknown'{s}'(v1, v2)}} \
+                 $IsEqualUnknown'{s}'(v1, v2) == $IsEqualUnknown'{s}'(v2, v1));",
+                t = fun_ty_boogie_name,
+                s = suffix,
+            );
+            let transitivity = format!(
+                "axiom (forall v1: {t}, v2: {t}, v3: {t} :: \
+                 {{$IsEqualUnknown'{s}'(v1, v2), $IsEqualUnknown'{s}'(v2, v3)}} \
+                 $IsEqualUnknown'{s}'(v1, v2) && $IsEqualUnknown'{s}'(v2, v3) \
+                 ==> $IsEqualUnknown'{s}'(v1, v3));",
+                t = fun_ty_boogie_name,
+                s = suffix,
+            );
+            emitln!(self.writer, "{}", symmetry);
+            emitln!(self.writer, "{}", transitivity);
+            let is_unknown = |v: &str| {
+                unknown_variants
+                    .iter()
+                    .map(|name| format!("{} is {}", v, name))
+                    .join(" || ")
+            };
+            format!(
+                "(({}) || ({})) && $IsEqualUnknown'{}'(v1, v2)",
+                is_unknown("v1"),
+                is_unknown("v2"),
+                suffix
+            )
+        };
+        if !any_ghost_capture {
+            let body = if may_be_equal.is_empty() {
+                "v1 == v2".to_string()
+            } else {
+                format!("v1 == v2 || ({})", may_be_equal)
+            };
+            emitln!(
+                self.writer,
+                "function {{:inline}} $IsEqual'{}'(v1: {}, v2: {}): bool {{ {} }}",
+                suffix,
+                fun_ty_boogie_name,
+                fun_ty_boogie_name,
+                body,
+            );
+        } else {
+            // Captures compare through `$IsEqual`, which may recurse into this very type; an
+            // inlined function cannot, so equality is defined by an axiom.
+            let mut clauses = vec![];
             for (idx, info) in closure_infos.iter().enumerate() {
                 let pack_name = boogie_closure_pack_name(self.env, &info.fun, info.mask);
                 let mut clause = format!("(v1 is {} && v2 is {}", pack_name, pack_name);
@@ -979,27 +1064,38 @@ impl<'env> BoogieTranslator<'env> {
                     );
                 }
                 clause += ")";
-                emitln!(self.writer, "{}{}", sep, clause);
-                sep = "|| ";
+                clauses.push(clause);
             }
             for info in fun_param_infos.iter() {
                 let name = boogie_fun_param_name(self.env, &info.fun, info.param_sym);
-                emitln!(self.writer, "{}(v1 is {} && v2 is {})", sep, name, name);
-                sep = "|| ";
+                clauses.push(format!("(v1 is {} && v2 is {})", name, name));
             }
             for info in struct_field_infos.iter() {
                 let name = boogie_struct_field_name(self.env, &info.struct_id, info.field_sym);
-                emitln!(
-                    self.writer,
-                    "{}(v1 is {} && v2 is {} && v1->n == v2->n)",
-                    sep,
-                    name,
-                    name
-                );
-                sep = "|| ";
+                clauses.push(format!(
+                    "(v1 is {} && v2 is {} && v1->n == v2->n)",
+                    name, name
+                ));
             }
-            self.writer.unindent();
-            emitln!(self.writer, "}");
+            if !may_be_equal.is_empty() {
+                clauses.push(format!("({})", may_be_equal));
+            }
+            emitln!(
+                self.writer,
+                "function $IsEqual'{}'(v1: {}, v2: {}): bool;",
+                suffix,
+                fun_ty_boogie_name,
+                fun_ty_boogie_name,
+            );
+            emitln!(
+                self.writer,
+                "axiom (forall v1: {}, v2: {} :: {{$IsEqual'{}'(v1, v2)}} $IsEqual'{}'(v1, v2) <==> ({}));",
+                fun_ty_boogie_name,
+                fun_ty_boogie_name,
+                suffix,
+                suffix,
+                clauses.join(" || ")
+            );
         }
 
         let has_opaque_variant = closure_infos.iter().any(|info| {
@@ -1535,6 +1631,16 @@ impl<'env> BoogieTranslator<'env> {
         let frame_access_raw = derive_closure_frame_access(fun_env, &info.fun.inst);
         let frame_access = self.closure_frame_to_apply_frame(&frame_access_raw, &bp_arg_list);
 
+        // The target's abort condition, frame and ensures hold only under its `requires`.
+        // When it fails, abort and memory are unknown; results stay the result function of
+        // the pre-state, where its axiom finds `requires_of` false and adds nothing.
+        let guarded = fun_env.get_spec().any_kind(ConditionKind::Requires);
+        if guarded {
+            let requires_name =
+                boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::RequiresOf);
+            emitln!(self.writer, "if ({}({})) {{", requires_name, bp_args);
+            self.writer.indent();
+        }
         // Get spec memory for building post-state args
         self.emit_behavioral_predicate_body(
             &aborts_name,
@@ -1551,6 +1657,31 @@ impl<'env> BoogieTranslator<'env> {
             memory,
             &frame_access,
         );
+        if guarded {
+            self.writer.unindent();
+            emitln!(self.writer, "} else {");
+            self.writer.indent();
+            emitln!(self.writer, "havoc $abort_flag, $abort_code;");
+            let mut_ref_param_indices: Vec<usize> = params
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.is_mutable_reference())
+                .map(|(idx, _)| idx)
+                .collect();
+            self.emit_result_assignments(
+                result_locals,
+                &explicit_results,
+                &mut_ref_param_indices,
+                &result_fun_name,
+                &multi_result_fun_name,
+                &bp_args,
+            );
+            for (_, mem_name) in memory {
+                emitln!(self.writer, "havoc {};", mem_name);
+            }
+            self.writer.unindent();
+            emitln!(self.writer, "}");
+        }
     }
 
     /// Convert `FrameAccessKind` (with Exp-level addresses) to `ApplyFrameAccess`
@@ -1666,7 +1797,6 @@ impl<'env> BoogieTranslator<'env> {
             .filter(|(_, p)| p.is_mutable_reference())
             .map(|(idx, _)| idx)
             .collect();
-        let first_mut_ref_param = mut_ref_param_indices.first().copied();
 
         // Compute which memory names are covered by frame_access
         let covered_by_frame: BTreeSet<String> = frame_access
@@ -1790,82 +1920,14 @@ impl<'env> BoogieTranslator<'env> {
         let result_bp_args = post_mem_args.iter().chain(data_args.iter()).join(", ");
 
         // Assign results using result_of function (now using post-state args)
-        if !result_locals.is_empty() {
-            if result_locals.len() == 1 {
-                let result_local = &result_locals[0];
-                if explicit_result_count == 1 {
-                    if explicit_results[0].is_mutable_reference() {
-                        let base_param = first_mut_ref_param.unwrap_or(0);
-                        emitln!(
-                            self.writer,
-                            "{} := $ChildMutation(p{}, -1, {}({}));",
-                            result_local,
-                            base_param,
-                            result_fun_name,
-                            result_bp_args
-                        );
-                    } else {
-                        emitln!(
-                            self.writer,
-                            "{} := {}({});",
-                            result_local,
-                            result_fun_name,
-                            result_bp_args
-                        );
-                    }
-                } else {
-                    // Mutable reference param output: wrap in $UpdateMutation
-                    let param_idx = mut_ref_param_indices[0];
-                    emitln!(
-                        self.writer,
-                        "{} := $UpdateMutation(p{}, {}({}));",
-                        result_local,
-                        param_idx,
-                        result_fun_name,
-                        result_bp_args
-                    );
-                }
-            } else {
-                // Multiple results: use tuple projection
-                for (i, result_local) in result_locals.iter().enumerate() {
-                    if i < explicit_result_count {
-                        if explicit_results[i].is_mutable_reference() {
-                            let base_param = first_mut_ref_param.unwrap_or(0);
-                            emitln!(
-                                self.writer,
-                                "{} := $ChildMutation(p{}, -1, {}({})->${});",
-                                result_local,
-                                base_param,
-                                multi_result_fun_name,
-                                result_bp_args,
-                                i
-                            );
-                        } else {
-                            emitln!(
-                                self.writer,
-                                "{} := {}({})->${};",
-                                result_local,
-                                multi_result_fun_name,
-                                result_bp_args,
-                                i
-                            );
-                        }
-                    } else {
-                        let mut_ref_idx = i - explicit_result_count;
-                        let param_idx = mut_ref_param_indices[mut_ref_idx];
-                        emitln!(
-                            self.writer,
-                            "{} := $UpdateMutation(p{}, {}({})->${});",
-                            result_local,
-                            param_idx,
-                            multi_result_fun_name,
-                            result_bp_args,
-                            i
-                        );
-                    }
-                }
-            }
-        }
+        self.emit_result_assignments(
+            result_locals,
+            explicit_results,
+            &mut_ref_param_indices,
+            result_fun_name,
+            multi_result_fun_name,
+            &result_bp_args,
+        );
 
         // Build result args for ensures_of, dereferencing mutable reference results.
         // Behavioral predicates reason over plain values, not mutation types.
@@ -1893,6 +1955,96 @@ impl<'env> BoogieTranslator<'env> {
 
         self.writer.unindent();
         emitln!(self.writer, "}");
+    }
+
+    /// Assigns an `$apply` variant's result locals from the target's result function applied
+    /// to `result_args`: explicit results first, then the `&mut` parameter outputs.
+    fn emit_result_assignments(
+        &self,
+        result_locals: &[String],
+        explicit_results: &[Type],
+        mut_ref_param_indices: &[usize],
+        result_fun_name: &str,
+        multi_result_fun_name: &str,
+        result_args: &str,
+    ) {
+        let first_mut_ref_param = mut_ref_param_indices.first().copied();
+        if !result_locals.is_empty() {
+            if result_locals.len() == 1 {
+                let result_local = &result_locals[0];
+                if explicit_results.len() == 1 {
+                    if explicit_results[0].is_mutable_reference() {
+                        let base_param = first_mut_ref_param.unwrap_or(0);
+                        emitln!(
+                            self.writer,
+                            "{} := $ChildMutation(p{}, -1, {}({}));",
+                            result_local,
+                            base_param,
+                            result_fun_name,
+                            result_args
+                        );
+                    } else {
+                        emitln!(
+                            self.writer,
+                            "{} := {}({});",
+                            result_local,
+                            result_fun_name,
+                            result_args
+                        );
+                    }
+                } else {
+                    // Mutable reference param output: wrap in $UpdateMutation
+                    let param_idx = mut_ref_param_indices[0];
+                    emitln!(
+                        self.writer,
+                        "{} := $UpdateMutation(p{}, {}({}));",
+                        result_local,
+                        param_idx,
+                        result_fun_name,
+                        result_args
+                    );
+                }
+            } else {
+                // Multiple results: use tuple projection
+                for (i, result_local) in result_locals.iter().enumerate() {
+                    if i < explicit_results.len() {
+                        if explicit_results[i].is_mutable_reference() {
+                            let base_param = first_mut_ref_param.unwrap_or(0);
+                            emitln!(
+                                self.writer,
+                                "{} := $ChildMutation(p{}, -1, {}({})->${});",
+                                result_local,
+                                base_param,
+                                multi_result_fun_name,
+                                result_args,
+                                i
+                            );
+                        } else {
+                            emitln!(
+                                self.writer,
+                                "{} := {}({})->${};",
+                                result_local,
+                                multi_result_fun_name,
+                                result_args,
+                                i
+                            );
+                        }
+                    } else {
+                        let mut_ref_idx = i - explicit_results.len();
+                        let param_idx = mut_ref_param_indices[mut_ref_idx];
+                        emitln!(
+                            self.writer,
+                            "{} := $UpdateMutation(p{}, {}({})->${});",
+                            result_local,
+                            param_idx,
+                            multi_result_fun_name,
+                            result_args,
+                            i
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /// Generate a behavioral predicate evaluator for a function type.
@@ -2917,13 +3069,24 @@ impl<'env> BoogieTranslator<'env> {
             }
 
             // A concrete target without a specification publishes no contract,
-            // and there is no sound default for one. A sound encoding may exist
-            // (e.g. via uninterpreted functions); for now this is restricted.
-            // A predicate over this function type reaches every target of the
-            // type through the evaluator, however the value is named -- as a
-            // closure, parameter, local, or struct field.
+            // and there is no sound default for one, unless its own body
+            // describes its behavior exactly, which then interprets the
+            // predicates. A predicate over this function type reaches every
+            // target of the type through the evaluator, however the value is
+            // named -- as a closure, parameter, local, or struct field. An
+            // intrinsic whose aborts the prover's model defines publishes that
+            // model instead.
+            let qid = info.fun.to_qualified_id();
+            let modeled_intrinsic = self
+                .env
+                .get_intrinsics()
+                .get_decl_for_move_fun(&qid)
+                .is_some()
+                && spec_derivation::spec_aborts_are_exact(self.env, qid);
             if closure_spec.conditions.is_empty()
                 && !fun_env.is_native()
+                && !modeled_intrinsic
+                && !spec_derivation::has_derived_behavior(self.env, qid, &info.fun.inst)
                 && self.named_by_behavioral_predicate(&info.fun.to_qualified_id())
             {
                 self.env.error(
@@ -3048,7 +3211,7 @@ impl<'env> BoogieTranslator<'env> {
                 let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, false);
 
                 // For native functions with no Move spec, use the Boogie "$-spec" inline
-                // function (e.g. `$1_vector_$empty'T'`) as a concrete, deterministic body
+                // function (e.g. `$1.vector.$empty'T'`) as a concrete, deterministic body
                 // instead of leaving the result function uninterpreted.  This ensures that
                 // `result_of<native_fun>(args)` in inferred specs is fully constrained.
                 // Only applies when there are no memory parameters — $-spec functions in
@@ -3326,14 +3489,37 @@ impl<'env> BoogieTranslator<'env> {
             None
         };
 
+        // Without a specification, the body's exact behavior interprets
+        // `ensures_of` (and through it `result_of`); see the matching check
+        // where evaluators are emitted.
+        let derived_ensures = if kind == BehaviorKind::EnsuresOf
+            && closure_spec.conditions.is_empty()
+            && spec_derivation::has_derived_behavior(
+                self.env,
+                fun_env.get_qualified_id(),
+                type_inst,
+            ) {
+            spec_derivation::derive_fun_ensures_conditions(
+                self.env,
+                fun_env.get_qualified_id(),
+                type_inst,
+            )
+        } else {
+            None
+        };
+
         // The expressions to translate, paired with the condition kind they
-        // are phrased as. Derived abort conditions carry no spec `let`s.
-        let items: Vec<(ConditionKind, Exp)> = match derived_aborts.as_ref() {
-            Some(exps) => exps
+        // are phrased as. Derived conditions carry no spec `let`s.
+        let items: Vec<(ConditionKind, Exp)> = match (derived_aborts.as_ref(), derived_ensures) {
+            (Some(exps), _) => exps
                 .iter()
                 .map(|exp| (ConditionKind::AbortsIf, exp.clone()))
                 .collect(),
-            None => conditions
+            (None, Some(exps)) => exps
+                .into_iter()
+                .map(|exp| (ConditionKind::Ensures, exp))
+                .collect(),
+            (None, None) => conditions
                 .iter()
                 .map(|cond| (cond.kind.clone(), cond.exp.clone()))
                 .collect(),
@@ -4548,6 +4734,11 @@ impl<'env> BoogieTranslator<'env> {
             .get_spec()
             .filter_kind(ConditionKind::StructInvariant)
         {
+            // The axioms are named after `info`'s field, so only invariants whose calls all
+            // target that field are lifted.
+            if !Self::behavior_calls_all_target_field(env, &cond.exp, info) {
+                continue;
+            }
             let Some(lifted) =
                 self.extract_bp_invariant_body(&cond.exp, kind, params, ctx, mem_args)
             else {
@@ -4579,6 +4770,78 @@ impl<'env> BoogieTranslator<'env> {
                 body_str
             );
         }
+    }
+
+    /// Whether every behavioral-predicate call in the struct invariant `exp` targets `info`'s
+    /// field on the invariant's own value (no base or `self`) or on a variable universally
+    /// quantified at the top of `exp` whose type is `info.struct_id`. Any other target, such as
+    /// a fixed value of the struct type, counts as not matching.
+    fn behavior_calls_all_target_field(env: &GlobalEnv, exp: &Exp, info: &StructFieldInfo) -> bool {
+        // Admissible bases: `self` and the top-level universal variables.
+        let mut universal: BTreeSet<Symbol> = BTreeSet::new();
+        universal.insert(env.symbol_pool().make(RECEIVER_PARAM_NAME));
+        if let ExpData::Quant(_, QuantKind::Forall, ranges, ..) = exp.as_ref() {
+            for (pat, _) in ranges {
+                universal.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+            }
+        }
+        // A variable rebound below names a different value.
+        exp.visit_pre_order(&mut |e| {
+            let rebound = match e {
+                ExpData::Quant(_, _, ranges, ..) if !std::ptr::eq(e, exp.as_ref()) => {
+                    ranges.iter().flat_map(|(pat, _)| pat.vars()).collect_vec()
+                },
+                ExpData::Block(_, pat, ..) | ExpData::Lambda(_, pat, ..) => pat.vars(),
+                _ => vec![],
+            };
+            for (_, sym) in rebound {
+                universal.remove(&sym);
+            }
+            true
+        });
+        !exp.any(&mut |e| match e {
+            ExpData::Call(_, AstOperation::Behavior(..), args) => {
+                !Self::behavior_target_is_field(env, args.first(), info, &universal)
+            },
+            _ => false,
+        })
+    }
+
+    /// Whether `target` is `info`'s field of the invariant's own value or of a `universal`
+    /// variable.
+    fn behavior_target_is_field(
+        env: &GlobalEnv,
+        target: Option<&Exp>,
+        info: &StructFieldInfo,
+        universal: &BTreeSet<Symbol>,
+    ) -> bool {
+        let Some(ExpData::Call(_, op, select_args)) = target.map(|t| t.as_ref()) else {
+            return false;
+        };
+        let (mid, sid, fids) = match op {
+            AstOperation::Select(mid, sid, fid) => (mid, sid, std::slice::from_ref(fid)),
+            AstOperation::SelectVariants(mid, sid, fids) => (mid, sid, fids.as_slice()),
+            _ => return false,
+        };
+        let struct_env = env.get_module(*mid).into_struct(*sid);
+        let field_matches = fids
+            .iter()
+            .all(|fid| struct_env.get_field(*fid).get_name() == info.field_sym);
+        let base_is_this_instance = match select_args.as_slice() {
+            // A field without a base is the invariant's own value.
+            [] => true,
+            [base] => matches!(base.as_ref(), ExpData::LocalVar(node_id, sym)
+                if universal.contains(sym)
+                    && env
+                        .get_node_type(*node_id)
+                        .instantiate(&info.struct_id.inst)
+                        .skip_reference()
+                        .clone()
+                        .normalize_nested_funs()
+                        == info.struct_id.to_type()),
+            _ => false,
+        };
+        field_matches && base_is_this_instance
     }
 
     /// Render a spec-language constant as a Boogie literal. Mirrors the
@@ -4920,10 +5183,23 @@ impl BoogieTranslator<'_> {
         let env = self.env;
 
         // Strip the outer Forall.
+        // An invariant with a `where` clause is not lifted: the axiom cannot express it.
+        // Triggers are ignored; the axiom builds its own.
         let (ranges, body_exp) = match exp.as_ref() {
-            ExpData::Quant(_, QuantKind::Forall, ranges, _, _, body) => (ranges, body.clone()),
+            ExpData::Quant(_, QuantKind::Forall, ranges, _, None, body) => (ranges, body.clone()),
             _ => return None,
         };
+
+        // Only whole-domain quantifiers (`forall x: T`, `forall S in *`) are lifted: the axiom
+        // quantifies over the entire domain, so a narrower range would be widened.
+        if ranges.iter().any(|(_, range)| {
+            !matches!(
+                env.get_node_type(range.node_id()).skip_reference(),
+                Type::TypeDomain(_) | Type::StateDomain
+            )
+        }) {
+            return None;
+        }
 
         // Collect quantifier-bound symbol -> Type from ranges. Only
         // `Pattern::Var` bindings are supported.
@@ -5086,7 +5362,14 @@ impl BoogieTranslator<'_> {
                     result_fun_name, result_mem_rendered, data_args
                 )
             };
-            result_sub.insert(result_syms[0], fun_app);
+            // An absorbed premise becomes `result == witness(inputs)` by substituting the result
+            // variable, so the variable must be bound by exactly one absorbed premise and not be
+            // an input; otherwise the invariant is not lifted.
+            if var_map.contains_key(&result_syms[0])
+                || result_sub.insert(result_syms[0], fun_app).is_some()
+            {
+                return None;
+            }
         }
 
         // Build trigger_apps for the lifted kind — one witness-function app
@@ -5173,7 +5456,7 @@ impl StructTranslator<'_> {
     }
 
     /// Return identity constraint for a function-valued field `f` if it has a
-    /// `StructFieldInfo` entry, e.g. `s->$0_Continuation is $struct_field'State$0'`.
+    /// `StructFieldInfo` entry, e.g. `s->$0.Continuation is $struct_field'State$0'`.
     /// Returns `None` if the field has no function type with a StructFieldInfo.
     pub fn boogie_field_identity_constraint(
         &self,
@@ -5345,35 +5628,54 @@ impl StructTranslator<'_> {
                 &mut field_variant_map,
             );
         }
+        let num_variants = struct_env.get_variants().count();
         for ((field, (field_type, field_type_uninst)), variant_name) in field_variant_map {
-            self.emit_function(
-                &format!(
-                    "$Update'{}'_{}_{}(s: {}, x: {}): {}",
-                    struct_name,
-                    // type name is needed in the update function name
-                    // to distinguish fields with the same name but different types in different variants
-                    // remove parentheses and spaces from field type name
-                    field_type_uninst.replace(['(', ')'], "").replace(' ', "_"),
-                    field,
-                    struct_name,
-                    field_type,
-                    struct_name
-                ),
-                || {
-                    let mut else_symbol = "";
-                    for struct_variant_name in &variant_name {
-                        let match_condition = format!("s is {}", struct_variant_name);
-                        let update_str =
-                            format!("$Update'{}'_{}(s, x)", struct_variant_name, field);
-                        emitln!(writer, "{} if {} then", else_symbol, match_condition);
-                        emitln!(writer, "{}", update_str);
-                        if else_symbol.is_empty() {
-                            else_symbol = "else";
-                        }
-                    }
-                    emitln!(writer, "else s");
-                },
+            // The field type is part of the name so that same-named fields of different
+            // types in different variants stay apart. Must match
+            // `boogie_variant_field_update`.
+            let name_suffix = format!(
+                "'{}'_{}.{}",
+                struct_name,
+                field,
+                boogie_field_type_name_component(&field_type_uninst),
             );
+            let signature = format!("(s: {}, x: {}): {}", struct_name, field_type, struct_name);
+            // A receiver outside `variant_name` lacks the field, so updating it yields an
+            // unspecified value (`$Arbitrary_update`), never `s` unchanged. If every
+            // constructor is covered the last one becomes the bare `else`: no companion,
+            // so no unconstrained term is inlined into every update of this field.
+            let covers_all_variants = variant_name.len() == num_variants;
+            let (guarded, closing) = match variant_name.split_last() {
+                Some((last, rest)) if covers_all_variants => {
+                    (rest, format!("$Update'{}'_{}(s, x)", last, field))
+                },
+                Some(_) | None => (
+                    &variant_name[..],
+                    format!("$Arbitrary_update{}(s, x)", name_suffix),
+                ),
+            };
+            if !covers_all_variants {
+                emitln!(
+                    writer,
+                    "function $Arbitrary_update{}{};",
+                    name_suffix,
+                    signature
+                );
+            }
+            self.emit_function(&format!("$Update{}{}", name_suffix, signature), || {
+                for (i, struct_variant_name) in guarded.iter().enumerate() {
+                    let else_symbol = if i == 0 { "" } else { "else" };
+                    emitln!(
+                        writer,
+                        "{} if s is {} then",
+                        else_symbol,
+                        struct_variant_name
+                    );
+                    emitln!(writer, "$Update'{}'_{}(s, x)", struct_variant_name, field);
+                }
+                let else_symbol = if guarded.is_empty() { "" } else { "else " };
+                emitln!(writer, "{}{}", else_symbol, closing);
+            });
         }
 
         self.emit_is_valid_struct(struct_env, struct_name);
@@ -5492,7 +5794,7 @@ impl StructTranslator<'_> {
         // Emit uninterpreted function for arbitrary ordering fallback
         emitln!(
             writer,
-            "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1_cmp_Ordering;",
+            "function $Arbitrary_cmp_ordering'{}'(v1: {}, v2: {}): $1.cmp.Ordering;",
             suffix,
             struct_name,
             struct_name
@@ -5500,7 +5802,7 @@ impl StructTranslator<'_> {
 
         self.emit_function(
             &format!(
-                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                 suffix, struct_name, struct_name
             ),
             || {
@@ -5515,11 +5817,11 @@ impl StructTranslator<'_> {
                         let struct_variant_name_2 =
                             boogie_struct_variant_name(struct_env, self.type_inst, *v2);
                         let cmp_order_less = format!(
-                            "{} if v1 is {} && v2 is {} then $1_cmp_Ordering_Less()",
+                            "{} if v1 is {} && v2 is {} then $1.cmp.Ordering.Less()",
                             else_symbol, struct_variant_name_1, struct_variant_name_2
                         );
                         let cmp_order_greater = format!(
-                            "else if v1 is {} && v2 is {} then $1_cmp_Ordering_Greater()",
+                            "else if v1 is {} && v2 is {} then $1.cmp.Ordering.Greater()",
                             struct_variant_name_2, struct_variant_name_1
                         );
                         if else_symbol.is_empty() {
@@ -5535,7 +5837,7 @@ impl StructTranslator<'_> {
                     let suffix_variant =
                         boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, variant);
                     let cmp_order = format!(
-                        "{} if v1 is {} && v2 is {} then $1_cmp_$compare'{}'(v1, v2)",
+                        "{} if v1 is {} && v2 is {} then $1.cmp.$compare'{}'(v1, v2)",
                         else_symbol, struct_variant_name_1, struct_variant_name_1, suffix_variant
                     );
                     emitln!(writer, "{}", cmp_order);
@@ -5560,7 +5862,7 @@ impl StructTranslator<'_> {
             boogie_type_suffix_for_struct_variant(struct_env, self.type_inst, &variant);
         self.emit_function(
             &format!(
-                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                 suffix_variant, struct_name, struct_name
             ),
             || {
@@ -5569,7 +5871,7 @@ impl StructTranslator<'_> {
                     .collect_vec()
                     .is_empty()
                 {
-                    emitln!(writer, "$1_cmp_Ordering_Equal()");
+                    emitln!(writer, "$1.cmp.Ordering.Equal()");
                 } else {
                     for (pos, field) in struct_env.get_fields_of_variant(variant).enumerate() {
                         let bv_flag = self.field_bv_flag(&field);
@@ -5579,19 +5881,19 @@ impl StructTranslator<'_> {
                             bv_flag,
                         );
                         let cmp_field_call = format!(
-                            "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                            "$1.cmp.$compare'{}'(v1->{}, v2->{})",
                             field_type_name,
                             boogie_field_sel(&field),
                             boogie_field_sel(&field)
                         );
                         let cmp_field_call_less =
-                            format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                            format!("{} == $1.cmp.Ordering.Less()", cmp_field_call);
                         let cmp_field_call_greater =
-                            format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                            format!("{} == $1.cmp.Ordering.Greater()", cmp_field_call);
                         emitln!(writer, "if {}", cmp_field_call_less);
-                        emitln!(writer, "then $1_cmp_Ordering_Less()");
+                        emitln!(writer, "then $1.cmp.Ordering.Less()");
                         emitln!(writer, "else if {}", cmp_field_call_greater);
-                        emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                        emitln!(writer, "then $1.cmp.Ordering.Greater()");
                         if pos
                             < struct_env
                                 .get_fields_of_variant(variant)
@@ -5601,7 +5903,7 @@ impl StructTranslator<'_> {
                         {
                             emitln!(writer, "else");
                         } else {
-                            emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                            emitln!(writer, "else $1.cmp.Ordering.Equal()");
                         }
                     }
                 }
@@ -5756,15 +6058,15 @@ impl StructTranslator<'_> {
         }
 
         if struct_env.has_memory() {
-            // Emit memory variable.
-            let memory_name = boogie_resource_memory_name(
-                env,
-                &struct_env
-                    .get_qualified_id()
-                    .instantiate(self.type_inst.to_owned()),
-                &None,
-            );
+            // Emit memory variable, and the identity constant naming it (the `t` of
+            // `$Global`); `unique` gives pairwise distinctness across resource types.
+            let memory_name = boogie_resource_memory_name(env, &qid, &None);
             emitln!(writer, "var {}: $Memory {};", memory_name, struct_name);
+            emitln!(
+                writer,
+                "const unique {}: int;",
+                boogie_resource_memory_id_name(&memory_name)
+            );
         }
 
         // Emit compare function and procedure
@@ -5777,7 +6079,7 @@ impl StructTranslator<'_> {
                             boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
                         self.emit_function(
                             &format!(
-                                "$1_cmp_$compare'{}'(v1: {}, v2: {}): $1_cmp_Ordering",
+                                "$1.cmp.$compare'{}'(v1: {}, v2: {}): $1.cmp.Ordering",
                                 suffix, struct_name, struct_name
                             ),
                             || {
@@ -5789,34 +6091,34 @@ impl StructTranslator<'_> {
                                         bv_flag,
                                     );
                                     let cmp_field_call = format!(
-                                        "$1_cmp_$compare'{}'(v1->{}, v2->{})",
+                                        "$1.cmp.$compare'{}'(v1->{}, v2->{})",
                                         suffix_ty,
                                         boogie_field_sel(&field),
                                         boogie_field_sel(&field)
                                     );
                                     let cmp_field_call_less =
-                                        format!("{} == $1_cmp_Ordering_Less()", cmp_field_call);
+                                        format!("{} == $1.cmp.Ordering.Less()", cmp_field_call);
                                     let cmp_field_call_greater =
-                                        format!("{} == $1_cmp_Ordering_Greater()", cmp_field_call);
+                                        format!("{} == $1.cmp.Ordering.Greater()", cmp_field_call);
                                     emitln!(writer, "if {}", cmp_field_call_less);
-                                    emitln!(writer, "then $1_cmp_Ordering_Less()");
+                                    emitln!(writer, "then $1.cmp.Ordering.Less()");
                                     emitln!(writer, "else if {}", cmp_field_call_greater);
-                                    emitln!(writer, "then $1_cmp_Ordering_Greater()");
+                                    emitln!(writer, "then $1.cmp.Ordering.Greater()");
                                     if pos < struct_env.get_field_count() - 1 {
                                         emitln!(writer, "else");
                                     } else {
-                                        emitln!(writer, "else $1_cmp_Ordering_Equal()");
+                                        emitln!(writer, "else $1.cmp.Ordering.Equal()");
                                     }
                                 }
                             },
                         );
                         self.emit_procedure(
                             &format!(
-                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            "$1.cmp.compare'{}'(v1: {}, v2: {}) returns ($ret0: $1.cmp.Ordering)",
                             suffix, struct_name, struct_name
                         ),
                             || {
-                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                                emitln!(writer, "$ret0 := $1.cmp.$compare'{}'(v1, v2);", suffix);
                             },
                         );
                     } else {
@@ -5825,11 +6127,11 @@ impl StructTranslator<'_> {
                             boogie_type_suffix_for_struct(struct_env, self.type_inst, false);
                         self.emit_procedure(
                             &format!(
-                            "$1_cmp_compare'{}'(v1: {}, v2: {}) returns ($ret0: $1_cmp_Ordering)",
+                            "$1.cmp.compare'{}'(v1: {}, v2: {}) returns ($ret0: $1.cmp.Ordering)",
                             suffix, struct_name, struct_name
                         ),
                             || {
-                                emitln!(writer, "$ret0 := $1_cmp_$compare'{}'(v1, v2);", suffix);
+                                emitln!(writer, "$ret0 := $1.cmp.$compare'{}'(v1, v2);", suffix);
                             },
                         );
                     }
@@ -7386,19 +7688,19 @@ impl FunctionTranslator<'_> {
                         let inst = self.inst_slice(inst);
                         let addr_str = str_local(srcs[0]);
                         let dest_str = str_local(dests[0]);
-                        let memory = boogie_resource_memory_name(
-                            env,
-                            &mid.qualified_inst(*sid, inst),
-                            &None,
-                        );
+                        let mem_qid = mid.qualified_inst(*sid, inst);
+                        let memory = boogie_resource_memory_name(env, &mem_qid, &None);
+                        let memory_id = boogie_resource_memory_id_name(&memory);
                         emitln!(writer, "if (!$ResourceExists({}, {})) {{", memory, addr_str);
                         writer.with_indent(|| emitln!(writer, "call $ExecFailureAbort();"));
                         emitln!(writer, "} else {");
                         writer.with_indent(|| {
                             emitln!(
                                 writer,
-                                "{} := $Mutation($Global({}), EmptyVec(), $ResourceValue({}, {}));",
+                                "{} := $Mutation($Global({}, {}), EmptyVec(), \
+                                 $ResourceValue({}, {}));",
                                 dest_str,
+                                memory_id,
                                 addr_str,
                                 memory,
                                 addr_str
@@ -8204,6 +8506,9 @@ impl FunctionTranslator<'_> {
             },
             GlobalRoot(memory) => {
                 assert!(matches!(edge, BorrowEdge::Direct));
+                // `t` is not re-checked: the typed `$Memory`/`$Mutation` pairing already
+                // pins the resource type, provided distinct resource types render to
+                // distinct Boogie names.
                 let memory = &memory.to_owned().instantiate(self.type_inst);
                 let memory_name = boogie_resource_memory_name(env, memory, &None);
                 emitln!(
@@ -8236,9 +8541,8 @@ impl FunctionTranslator<'_> {
                     // Type and bitvector rendering of the value behind the
                     // destination reference (matching its declared Boogie
                     // type), for carrier detection and twin selection.
-                    let root_ty = self
-                        .inst(self.get_local_type(*idx).skip_reference())
-                        .clone();
+                    // `get_local_type` is already instantiated.
+                    let root_ty = self.get_local_type(*idx).skip_reference().clone();
                     let global_state = &self
                         .parent
                         .env
@@ -9323,10 +9627,6 @@ fn struct_has_native_equality(
     ) {
         return false;
     }
-    if options.native_equality {
-        // Everything else has native equality
-        return true;
-    }
     if struct_env.has_variants() {
         for variant in struct_env.get_variants() {
             for field in struct_env.get_fields_of_variant(variant) {
@@ -9367,10 +9667,9 @@ pub fn has_native_equality(env: &GlobalEnv, options: &BoogieOptions, ty: &Type) 
             struct_has_native_equality(&env.get_struct_qid(mid.qualified(*sid)), sinst, options)
         },
         Type::Tuple(elems) => elems.iter().all(|e| has_native_equality(env, options, e)),
-        // Function values compare through their closure captures: ghost-
-        // bearing captures disqualify raw equality like any other ghost
-        // (their `$IsEqual` is the per-variant fieldwise form).
-        Type::Fun(..) => !type_has_ghost_transitively(env, ty),
+        // Function values of unknown identity (parameters, struct fields) may be equal
+        // although their constructors differ, so function equality is always `$IsEqual`.
+        Type::Fun(..) => false,
         // Type parameters only reach this predicate in open (uninterpreted
         // sort) contexts, where raw equality is the model of Move equality.
         Type::Primitive(_)

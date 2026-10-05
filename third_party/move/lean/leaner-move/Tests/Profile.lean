@@ -94,4 +94,23 @@ private def coreExecutableUnit : RawUnit :=
   | .error diagnostics => diagnostics.any (·.code == "LIR-PROFILE-VERSION")
   | .ok _ => false
 
+-- A closure with `store` names a public or `@[persistent]` function.
+leaner module 0x42::stored_closure_targets where
+  public fun visible(x : u64) -> u64 := x
+  @[persistent]
+  fun persistent(x : u64) -> u64 := x
+  fun stored() -> Vector<Fn(u64) -> u64 has Copy, Drop, Store> :=
+    vector<Fn(u64) -> u64 has Copy, Drop, Store>[
+      function[Fn(u64) -> u64 has Copy, Drop, Store](visible),
+      function[Fn(u64) -> u64 has Copy, Drop, Store](persistent)]
+
+/--
+error: LIR-CLOSURE-STORE: a closure with `store` must target a function its profile lets a stored closure name
+-/
+#guard_msgs in
+leaner module 0x42::stored_private_closure where
+  fun hidden(x : u64) -> u64 := x
+  fun stored() -> Fn(u64) -> u64 has Copy, Drop, Store :=
+    function[Fn(u64) -> u64 has Copy, Drop, Store](hidden)
+
 end LeanerIR.Move.Tests

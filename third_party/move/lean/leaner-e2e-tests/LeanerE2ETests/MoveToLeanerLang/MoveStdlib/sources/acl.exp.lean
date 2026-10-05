@@ -9,9 +9,8 @@ have the access permission to a certain object.
 This module uses a `vector` to represent the list, but can be refactored to
 use a "set" instead when it's available in the language in the future.
 -/
-leaner module 0x1::acl where
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::vector
+leaner module std::acl where
+  use std::error::invalid_argument
 
   /--
   The ACL already contains the address.
@@ -44,7 +43,11 @@ leaner module 0x1::acl where
   Add the address to the ACL.
   -/
   public fun add(self : &mut ACL, addr : Address) -> Unit := do
-    assert!(!self.list.contains(&addr), invalid_argument(ECONTAIN))
+    assert!(
+      !core.prim.containsVector(self.list, addr), invalid_argument(
+        ECONTAIN
+      )
+    )
     self.list := core.prim.pushVector(self.list, addr)
 
   spec add where
@@ -56,9 +59,14 @@ leaner module 0x1::acl where
   Remove the address from the ACL.
   -/
   public fun remove(self : &mut ACL, addr : Address) -> Unit := do
-    let (found, index) := self.list.index_of(&addr)
+    let (found, index) := core.prim.indexOfVector(self.list, addr)
     assert!(found, invalid_argument(ENOT_CONTAIN))
-    self.list.remove(index)
+    let _t0 := &mut self.list
+    assert!(_t0.length > index, 131072)
+    let (_t1, _t2) := core.prim.removeVector(*_t0, index)
+    *_t0 := _t2
+    _t1
+    ()
 
   spec remove where
     pragma opaque
@@ -69,7 +77,7 @@ leaner module 0x1::acl where
   Return true iff the ACL contains the address.
   -/
   public fun contains(self : &ACL, addr : Address) -> Bool :=
-    self.list.contains(&addr)
+    core.prim.containsVector(self.list, addr)
 
   spec contains where
     pragma opaque

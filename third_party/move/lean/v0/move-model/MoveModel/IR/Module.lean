@@ -98,6 +98,9 @@ structure StructMeta where
   variantNames : Option (List (String × List String)) := none
   abilities : AbilitySet
   attributes : List Attribute := []
+  /-- Visibility of the type itself. Lean-authored types are private; a
+  decoded module keeps what the document says. -/
+  visibility : Visibility := .private_
   deriving BEq, Repr
 
 /-- Non-semantic information for one positional function declaration. -/

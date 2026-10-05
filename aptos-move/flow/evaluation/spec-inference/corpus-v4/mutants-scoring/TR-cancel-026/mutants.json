@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 20,
+        "offset": 7461,
+        "sha256": "b9b3bbd4dca9fde98fb1f753c64638ac50bae5b8eea24b6465160ebf162dbd09"
+      },
+      "edit": {
+        "at": 19,
+        "kind": "substitute",
+        "length": 1,
+        "to": "1"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-cancel-026-absent-returns-one",
+      "obligation_category": "normal-result",
+      "rationale": "The not-found sentinel changes, so absence is reported as a cancelled size of one.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 10,
+        "offset": 7450,
+        "sha256": "3ed3cadbe257d0cd7932fec83a35fdce28f5f58025b20b31f534af8bfdd693cd"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 1,
+        "to": "2"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-cancel-026-strides-by-two",
+      "obligation_category": "normal-result",
+      "rationale": "Every other level is skipped, so a match at an odd index is missed.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 17,
+        "offset": 7334,
+        "sha256": "67be46c46bed71e35e54e8d85a200a2be98726871aa935b1c5fc91b04af2074c"
+      },
+      "edit": {
+        "at": 7,
+        "kind": "substitute",
+        "length": 9,
+        "to": "remove(0)"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-cancel-026-removes-at-front",
+      "obligation_category": "normal-result",
+      "rationale": "The price vector loses its first level instead of the matching one.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "046dec9dcfabc70371c09afc30d875eba84b0ed60c6cf9d657138b75644cd125",
+  "task_id": "TR-cancel-026"
+}

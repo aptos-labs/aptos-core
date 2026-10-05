@@ -1,0 +1,21 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_sui_derivable_account",
+  "reference_proved": true,
+  "reference_sha256": "0a596bc6a95ada214c668a5f715f0ad1b24d7123833e69914f7435a82d6cf6eb",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_sui_derivable_account::split_signature_bytes",
+  "task_id": "SU-split-045",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.2,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

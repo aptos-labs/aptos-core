@@ -38,6 +38,7 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
         INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_ABORTS_ITER_BORROW_MUT,
         INTRINSIC_FUN_MAP_SPEC_DEL, INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
+        INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT, INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
         INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_KEY_AT,
         INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
@@ -94,7 +95,7 @@ struct TypeInfo {
     has_ghost: bool,
     is_bv: bool,
     is_type_param: bool,
-    /// True iff `$1_cmp_$compare'<suffix>'` is emitted in the prelude. Only set on K
+    /// True iff `$1.cmp.$compare'<suffix>'` is emitted in the prelude. Only set on K
     /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
     /// avoid undeclared-function errors.
     cmp_available: bool,
@@ -216,6 +217,10 @@ struct MapImpl {
     // enumeration view: i-th key / key rank
     fun_spec_key_at: String,
     fun_spec_rank: String,
+    /// Whether the enumeration above is in insertion order rather than key order.
+    /// Insertion order is not determined by the content, so equality must compare
+    /// positions, and the enumeration must not be assumed to ascend under `cmp`.
+    insertion_ordered: bool,
     // abort-condition spec functions
     fun_spec_aborts_destroy_empty: String,
     fun_spec_aborts_add: String,
@@ -642,8 +647,10 @@ impl MapImpl {
             })
             .collect();
         let struct_env = env.get_struct(struct_qid);
+        // The declaration-name prefix; `boogie_struct_name` renders an intrinsic map as
+        // its theory type instead. Uses the same separator as `boogie_module_name`.
         let struct_name = format!(
-            "${}_{}",
+            "${}.{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
         );
@@ -653,6 +660,34 @@ impl MapImpl {
             .get_decl_for_struct(&struct_qid)
             .expect("intrinsic decl");
         let iter_parts = Self::iter_ptr_parts(env, decl);
+
+        // A map declares its enumeration either in key order or in insertion order.
+        // The two share every rank axiom; they differ only in whether positions
+        // ascend under `cmp` and whether equality compares them, so the rest of the
+        // template reads one pair of names plus the flag.
+        let key_at_insertion = Self::triple_opt_to_name(
+            env,
+            decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_INSERTION_KEY_AT),
+        );
+        let rank_insertion = Self::triple_opt_to_name(
+            env,
+            decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_INSERTION_RANK),
+        );
+        let insertion_ordered = !key_at_insertion.is_empty() && !rank_insertion.is_empty();
+        let key_at_sorted =
+            Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT));
+        let rank_sorted =
+            Self::triple_opt_to_name(env, decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_RANK));
+        let fun_spec_key_at = if key_at_sorted.is_empty() {
+            key_at_insertion
+        } else {
+            key_at_sorted
+        };
+        let fun_spec_rank = if rank_sorted.is_empty() {
+            rank_insertion
+        } else {
+            rank_sorted
+        };
         let fun_iter_borrow_mut = Self::triple_opt_to_name(
             env,
             decl.get_fun_triple(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT),
@@ -887,14 +922,9 @@ impl MapImpl {
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
             ),
-            fun_spec_key_at: Self::triple_opt_to_name(
-                env,
-                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT),
-            ),
-            fun_spec_rank: Self::triple_opt_to_name(
-                env,
-                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_RANK),
-            ),
+            fun_spec_key_at,
+            fun_spec_rank,
+            insertion_ordered,
             fun_spec_aborts_destroy_empty: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY),
@@ -1005,11 +1035,9 @@ impl MapImpl {
             return empty;
         };
         let iter_env = env.get_struct(mid.qualified(*sid));
-        let prefix = format!(
-            "${}_{}",
-            boogie_module_name(&iter_env.module_env),
-            iter_env.get_name().display(iter_env.symbol_pool())
-        );
+        // With an empty instantiation this is exactly the uninstantiated name
+        // prefix, as in `iter_payload_parts` below.
+        let prefix = boogie_helpers::boogie_struct_name(&iter_env, &[], false);
         (name, prefix, !inst.is_empty())
     }
 
@@ -1021,91 +1049,28 @@ impl MapImpl {
         decl: &move_model::intrinsics::IntrinsicDecl,
     ) -> (String, String, String, bool, bool) {
         let empty = (String::new(), String::new(), String::new(), false, false);
-        let shape_msg = "the first parameter of a `map_iter_borrow_mut` function must be an \
-                         enum whose payload variant carries either a field of the key type \
-                         (a key-based iterator) or a single integer field (a position-based \
-                         iterator)";
-        let Some(fun_qid) = decl.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT) else {
-            return empty;
-        };
-        let fun_env = env.get_function(fun_qid);
-        let param_tys = fun_env.get_parameter_types();
-        let Some(Type::Struct(mid, sid, _)) = param_tys.first().map(|ty| ty.skip_reference())
-        else {
-            env.error(&fun_env.get_loc(), shape_msg);
-            return empty;
-        };
-        let iter_env = env.get_struct(mid.qualified(*sid));
-        // `get_variants` panics on a non-enum; report a proper diagnostic for
-        // a malformed binding instead of crashing the prover.
-        if !iter_env.has_variants() {
-            env.error(&fun_env.get_loc(), shape_msg);
-            return empty;
-        }
-        // A key field wins over an integer one: a keyed iterator names its key
-        // directly, which needs no enumeration.
-        let mut by_key = None;
-        let mut by_index = None;
-        for variant in iter_env.get_variants() {
-            for field in iter_env.get_fields_of_variant(variant) {
-                let sel = boogie_helpers::boogie_field_sel(&field);
-                if field.get_type() == Type::TypeParameter(0) {
-                    if by_key.is_some() {
-                        env.error(
-                            &fun_env.get_loc(),
-                            "the iterator enum of a `map_iter_borrow_mut` function must \
-                             have exactly one field of the key type",
-                        );
-                        return empty;
-                    }
-                    by_key = Some((variant, sel));
-                } else if matches!(
-                    field.get_type(),
-                    Type::Primitive(PrimitiveType::U64 | PrimitiveType::Num)
-                ) {
-                    if by_index.is_some() {
-                        env.error(
-                            &fun_env.get_loc(),
-                            "the iterator enum of a position-based `map_iter_borrow_mut` \
-                             function must have exactly one integer field",
-                        );
-                        return empty;
-                    }
-                    by_index = Some((variant, sel));
+        let found = match decl.iter_key_field(env) {
+            None => return empty,
+            Some(Ok(found)) => found,
+            Some(Err(msg)) => {
+                if let Some(fun_qid) = decl.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT)
+                {
+                    env.error(&env.get_function(fun_qid).get_loc(), msg);
                 }
-            }
-        }
-        let (is_index, found) = match (by_key, by_index) {
-            (Some(k), _) => (false, k),
-            (None, Some(i)) => (true, i),
-            (None, None) => {
-                env.error(&fun_env.get_loc(), shape_msg);
                 return empty;
             },
         };
-        if is_index
-            && decl
-                .lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT)
-                .is_none()
-        {
-            env.error(
-                &fun_env.get_loc(),
-                "a position-based `map_iter_borrow_mut` function requires \
-                 `map_spec_key_at` to be bound: the position is turned into a key \
-                 through the enumeration",
-            );
-            return empty;
-        }
-        let (variant, sel) = found;
+        let iter_env = env.get_struct(found.iter_type);
+        let sel = boogie_helpers::boogie_field_sel(&iter_env.get_field(found.field));
         // With an empty instantiation this is exactly the uninstantiated name
         // prefix; the templates append the per-instance suffix (only when the
         // enum is keyed) and the variant.
         let prefix = boogie_helpers::boogie_struct_name(&iter_env, &[], false);
         (
             prefix,
-            variant.display(iter_env.symbol_pool()).to_string(),
+            found.variant.display(iter_env.symbol_pool()).to_string(),
             sel,
-            is_index,
+            found.is_position,
             !iter_env.get_type_parameters().is_empty(),
         )
     }
@@ -1118,12 +1083,110 @@ impl MapImpl {
             None => String::new(),
             Some((addr, mod_name, fun_name)) => {
                 format!(
-                    "${}_{}_{}",
+                    "${}.{}.{}",
                     addr.expect_numerical().short_str_lossless(),
                     mod_name,
                     fun_name
                 )
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NATIVE_TEMPLATE;
+    use move_model::pragmas::INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS;
+
+    /// A map intrinsic without an abort-condition counterpart is modeled as
+    /// never aborting (`Intrinsics::is_non_aborting_move_fun`), so its
+    /// template procedures must not abort, and those of the others must.
+    #[test]
+    fn map_intrinsic_abort_conditions_match_template() {
+        let template = std::str::from_utf8(NATIVE_TEMPLATE).expect("UTF-8 template");
+        let lines: Vec<&str> = template.lines().collect();
+        for (role, def) in INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.iter() {
+            if !def.is_move_fun {
+                continue;
+            }
+            let name = format!(
+                "{{{{impl.fun_{}}}}}",
+                role.strip_prefix("map_").expect("map role")
+            );
+            let mut procedures = 0;
+            for (start, line) in lines.iter().enumerate() {
+                if !(line.starts_with("procedure ") && line.contains(&name)) {
+                    continue;
+                }
+                procedures += 1;
+                let aborts = lines[start..]
+                    .iter()
+                    .take_while(|line| **line != "}")
+                    .any(|line| line.contains("$Abort") || line.contains("$ExecFailureAbort"));
+                assert_eq!(
+                    aborts,
+                    def.abort_spec_fun.is_some(),
+                    "template procedure of `{}` disagrees with its abort condition",
+                    role
+                );
+            }
+            assert!(procedures > 0, "no template procedure for `{}`", role);
+        }
+    }
+
+    /// `well_known::map_intrinsic_aborts` derives the abort condition of a
+    /// role whose abort-condition spec function a map type leaves unbound from
+    /// the role itself; each template procedure must abort exactly on that
+    /// condition.
+    #[test]
+    fn map_intrinsic_derived_aborts_match_template() {
+        use move_model::pragmas::{
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+            INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY,
+        };
+        let template = std::str::from_utf8(NATIVE_TEMPLATE).expect("UTF-8 template");
+        let lines: Vec<&str> = template.lines().collect();
+        for (role, def) in INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS.iter() {
+            let guard = match def.abort_spec_fun {
+                Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD) => "if (ContainsTable(",
+                Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL | INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW) => {
+                    "if (!ContainsTable("
+                },
+                Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_EMPTY) => "if (LenTable(t{{U}}) == 0)",
+                Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY) => "if (LenTable(t{{U}}) != 0)",
+                _ => continue,
+            };
+            let name = format!(
+                "{{{{impl.fun_{}}}}}",
+                role.strip_prefix("map_").expect("map role")
+            );
+            for (start, line) in lines.iter().enumerate() {
+                if !(line.starts_with("procedure ") && line.contains(&name)) {
+                    continue;
+                }
+                let body: Vec<&str> = lines[start..]
+                    .iter()
+                    .take_while(|line| **line != "}")
+                    .copied()
+                    .collect();
+                let abort = body
+                    .iter()
+                    .position(|line| line.contains("$Abort") || line.contains("$ExecFailureAbort"))
+                    .unwrap_or_else(|| panic!("template procedure of `{}` never aborts", role));
+                let condition = body[..abort]
+                    .iter()
+                    .rev()
+                    .find(|line| line.trim_start().starts_with("if ("))
+                    .unwrap_or_else(|| panic!("template procedure of `{}` aborts unguarded", role));
+                assert!(
+                    condition.contains(guard),
+                    "template procedure of `{}` aborts on `{}`, not `{}`",
+                    role,
+                    condition.trim(),
+                    guard
+                );
+            }
         }
     }
 }

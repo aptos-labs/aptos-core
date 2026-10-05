@@ -1,0 +1,68 @@
+Move prover returns: exiting with verification errors
+error: global memory invariant does not hold
+   ┌─ tests/sources/regression/generic_aliasing_ghost_main.move:17:9
+   │
+17 │ ╭         invariant<T, U, X>
+18 │ │             (!exists<N>(@0x42) ==> !exists<R<T>>(@0x42) && !exists<S<U>>(@0x42) && !exists<Q<X>>(@0x42))
+19 │ │             && (exists<M>(@0x42) ==> !(exists<R<T>>(@0x42) && exists<S<U>>(@0x42)) || exists<Q<X>>(@0x42))
+20 │ │             && (exists<W<T, U, X>>(@0x7) ==> exists<W<T, U, X>>(@0x7))
+21 │ │             && (exists<W<u64, u8, T>>(@0x7) ==> exists<W<u64, u8, T>>(@0x7));
+   │ ╰─────────────────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:49: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:57: f (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:58: f (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:49: f
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:26: set_n (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:50: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:24: set_n
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:31: set_r (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:32: set_r (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:51: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:29: set_r
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:37: set_s (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:38: set_s (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:52: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:35: set_s
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:43: set_q (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:44: set_q (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:53: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:41: set_q
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:54: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:17
+
+error: global memory invariant does not hold
+   ┌─ tests/sources/regression/generic_aliasing_ghost_main.move:71:9
+   │
+71 │ ╭         invariant<T, U>
+72 │ │             (!exists<N>(@0x43) ==> !exists<R<T>>(@0x43) && !exists<S<U>>(@0x43))
+73 │ │             && (exists<M>(@0x43) ==> !(exists<R<T>>(@0x43) && exists<S<U>>(@0x43)))
+74 │ │             && (exists<W<u8, T, U>>(@0x7) ==> exists<W<u64, u64, u8>>(@0x7) || true);
+   │ ╰─────────────────────────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:96: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:103: f (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:104: f (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:96: f
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:79: set_n (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:97: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:77: set_n
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:84: set_r (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:85: set_r (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:98: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:82: set_r
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:90: set_s (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:91: set_s (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:99: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:88: set_s
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:100: f
+   =     at tests/sources/regression/generic_aliasing_ghost_main.move:71

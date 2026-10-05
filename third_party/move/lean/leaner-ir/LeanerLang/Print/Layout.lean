@@ -4,6 +4,7 @@
 import LeanerLang.Elab
 import LeanerLang.Operators
 import LeanerLang.Comments
+import LeanerLang.Reserved
 
 /-!
 # LeanerLang printer layout engine
@@ -98,28 +99,12 @@ private def byteLiteral (values : Array UInt8) : String :=
   else
     "b[" ++ ", ".intercalate (values.toList.map (toString ·.toNat)) ++ "]"
 
-private def reservedIdentifier (value : String) : Bool :=
-  value ∈ [
-    "move", "rust", "Unit", "Never", "Bool", "Char", "string", "Bytes",
-    "Address", "Signer", "UInt", "SInt", "UPtr", "IPtr", "Nat", "Int",
-    "u8", "u16", "u32", "u64", "u128", "u256",
-    "i8", "i16", "i32", "i64", "i128", "i256", "usize", "isize",
-    "Range", "Vector", "Fn", "const", "type", "lifetime", "evidence", "mut",
-    "private", "public", "package", "friend", "entry", "native", "opaque",
-    "deprecated", "view", "pragma", "let_pre", "let_post", "modifies", "reads",
-    "requires", "ensures", "aborts_if", "assert", "assume",
-    "invariant", "spec", "fun", "module", "namespace", "using", "where", "struct",
-    "enum", "has", "Copy", "Drop", "Store", "Key", "true", "false",
-    "abort", "panic", "do", "let", "loop", "while", "for", "break", "continue", "forall",
-    "exists", "in", "immutable", "if", "then", "else", "return", "old",
-    "copy", "drop", "discriminant", "invoke", "function",
-    "as", "match", "with", "use"
-  ]
+
 
 private def identifier (value : String) : String :=
   let value := if value.startsWith "'" then (value.drop 1).toString else value
   if !value.isEmpty && value.all Char.isDigit then value
-  else (Lean.Name.mkSimple value).toStringWithToken (isToken := reservedIdentifier)
+  else (Lean.Name.mkSimple value).toStringWithToken (isToken := isReservedWord)
 
 private def pragmaName (value : String) : String :=
   if value == "opaque" then value else identifier value
@@ -169,6 +154,7 @@ private partial def typeText : Ty → String
   | .nat => "Nat"
   | .int => "Int"
   | .range => "Range"
+  | .stateDomain => "StateDomain"
   | .tuple elements =>
       if elements.isEmpty then "Unit"
       else "(" ++ ", ".intercalate (elements.map (typeText ·.value)).toList ++ ")"
@@ -324,7 +310,11 @@ private def behaviorText : BehaviorOperation → String
   | .writeOf index => s!"write_of[{index}]"
 
 private def specificationText : SpecificationOperation → String
-  | .behavior kind _ => behaviorText kind
+  | .behavior kind => behaviorText kind
+  | .stateDomain => "StateDomain"
+  | .publish => "publish"
+  | .remove => "remove"
+  | .update => "update"
   | .old => "old"
   | .saveStateAnchor label => s!"saveStateAnchor[{label}]"
   | .withStateAnchor label => s!"withStateAnchor[{label}]"
@@ -352,6 +342,9 @@ private partial def placeDoc : Place → Doc
   | .local name _ => text (identifier name)
   | .deref base _ => text "*" ++ placeAtomDoc base
   | .field base name _ => placeAtomDoc base ++ text s!".{identifier name}"
+  | .downcast base enum variant _ =>
+      text "downcast " ++ placeDoc base ++
+        text s!" as {"::".intercalate (enum.map identifier).toList}::{identifier variant}"
 where
   placeAtomDoc (place : Place) : Doc := match place with
     | .local .. => placeDoc place
@@ -411,6 +404,14 @@ private partial def isKnownUnitExpression : Expr → Bool
       isKnownUnitExpression thenBranch || isAbruptExpression thenBranch
   | _ => false
 
+/-- Whether a block's last statement is an expression with a value of its own:
+a unit result after it stays spelled, since elided, that value would read as
+the block's. -/
+private def endsWithValue (statements : Array Statement) : Bool :=
+  statements.back?.any fun
+    | .expression value => !isKnownUnitExpression value && !isAbruptExpression value
+    | _ => false
+
 /-- A block used as a statement discards its result. Flatten that administrative
 scope while retaining every effect in source order; this is the form lowering
 reconstructs after a source round trip. -/
@@ -447,7 +448,7 @@ private def expressionPrecedence (expression : Expr) : Nat :=
     | .quantifier .. | .specBlock .. | .block .. | .ifElse .. | .match_ .. |
         .forRange .. | .loop .. | .break_ .. | .continue_ .. | .assign .. |
         .assignExpression .. | .assignPattern .. |
-        .return_ .. => 0
+        .return_ .. | .labeled .. => 0
     | .field .. | .storageIndex .. | .index .. | .methodCall .. => 14
     | .typedPrimitive .profileCast .. => 12
     | .placeOperation .. | .borrowPlace .. | .borrowValue .. | .rawBorrowValue .. |
@@ -556,11 +557,15 @@ mutual
           | _ => throw s!"typed primitive `{primitiveText operation}` has no canonical spelling"
         call (text head) <$> arguments.mapM expressionDoc
     | .call name arguments _ => call (text (pathText name)) <$> arguments.mapM expressionDoc
-    | .closure name result captures _ => do
-        let captures ← captures.mapM expressionDoc
+    | .closure name types result captures _ => do
+        let captures ← captures.mapM fun capture => match capture with
+          | some capture => expressionDoc capture
+          | none => pure (text "_")
+        let typeSuffix := if types.isEmpty then "" else
+          "::<" ++ closeAngles (", ".intercalate (types.map (typeText ·.value)).toList)
         let suffix := if captures.isEmpty then .nil
           else text ", " ++ commaSep captures
-        pure <| text s!"function[{typeText result.value}]({pathText name}" ++
+        pure <| text s!"function[{typeText result.value}]({pathText name}{typeSuffix}" ++
           suffix ++ text ")"
     | .invoke callable arguments _ =>
         call (text "invoke") <$> (#[callable] ++ arguments).mapM expressionDoc
@@ -627,7 +632,8 @@ mutual
         let variants := Format.joinSep (variants.map (text ∘ identifier)).toList (text " | ")
         pure <| Format.group <| (← expressionDocAt 6 value) ++ text " is " ++ variants
     | .selectVariants owner fields value _ =>
-        let fields := ", ".intercalate (fields.map identifier).toList
+        let fields := ", ".intercalate
+          (fields.map fun (variant, field) => s!"{identifier variant}.{identifier field}").toList
         call (text s!"core.data.selectVariants[{typeText owner.value}, {fields}]")
           <$> #[value].mapM expressionDoc
     | .testVariants owner variants value _ =>
@@ -668,27 +674,34 @@ mutual
           match domain with
           | .specification .typeDomain #[element] #[] _ =>
               pure <| patternDoc pattern ++ text " : " ++ text (typeText element.value)
+          -- A binder over the state domain prints as `S : StateDomain`.
+          | .specification .stateDomain #[] #[] _ =>
+              pure <| patternDoc pattern ++ text " : StateDomain"
           | _ => pure <| patternDoc pattern ++ text " in " ++ (← expressionDoc domain)
         let binders := Format.group <|
           Format.joinSep binders.toList (text ";" ++ soft)
         pure <| Format.group <| text s!"{keyword} (" ++ binders ++ text ")," ++
           Format.nest 2 (soft ++ (← expressionDoc body))
+    | .labeled pre post body _ => do
+        let range := match pre, post with
+          | some pre, some post => if pre == post then pre else s!"{pre}..{post}"
+          | some pre, none => s!"{pre}.."
+          | none, some post => s!"..{post}"
+          | none, none => ""
+        pure <| text s!"{range} |~ " ++ (← expressionDocAt 1 body)
     | .specification operation types arguments _ => do
-        if let .behavior kind range := operation then
+        if let .behavior kind := operation then
           let some target := arguments[0]?
             | throw "a behavior predicate requires a function-value target"
           unless types.isEmpty do throw "behavior predicates have no type arguments"
           let target ← expressionDocAt 14 target
           let values ← (arguments.drop 1).mapM expressionDoc
-          let invocation := call (text s!"{behaviorText kind}<" ++ target ++ text ">") values
-          let statePrefix := match range.pre, range.post with
-            | none, none => .nil
-            | some pre, none => if kind == .requiresOf || kind == .abortsOf then
-                text s!"@{pre} |~ "
-              else text s!"@{pre}.. |~ "
-            | none, some post => text s!"..@{post} |~ "
-            | some pre, some post => text s!"@{pre}..@{post} |~ "
-          return statePrefix ++ invocation
+          return call (text s!"{behaviorText kind}<" ++ target ++ text ">") values
+        if operation matches .publish | .remove | .update then
+          let some resource := types[0]?
+            | throw "a state-change predicate requires a resource type"
+          let values ← arguments.mapM expressionDoc
+          return call (text s!"{specificationText operation}<{typeText resource.value}>") values
         if let .saveStateAnchor label := operation then
           unless types.isEmpty && arguments.isEmpty do
             throw "save_state_anchor! expects only its label"
@@ -777,10 +790,11 @@ mutual
           | .intToBitVector => "[" ++ typeArguments ++ "]"
           | _ => "::<" ++ closeAngles typeArguments
         call (text s!"spec.{specificationText operation}{types}") <$> arguments.mapM expressionDoc
-    | .specBlock conditions _ => do
+    | .specBlock conditions _ proof => do
         let members ← specificationMemberDocs conditions
-        if members.size == 1 then pure <| text "spec " ++ members[0]!
-        else pure <| block (text "spec do") members
+        let keyword := if proof then "proof" else "spec"
+        if members.size == 1 then pure <| text s!"{keyword} " ++ members[0]!
+        else pure <| block (text s!"{keyword} do") members
     | .block statements result _ => do
         match statements, result with
         | #[], some result => expressionDoc result
@@ -864,7 +878,7 @@ mutual
           let .block statements (some actualCondition) _ := condition | none
           guard (!statements.isEmpty)
           let blocks ← statements.mapM fun (statement : Statement) => match statement with
-            | .expression (.specBlock conditions _) => some conditions
+            | .expression (.specBlock conditions _ false) => some conditions
             | _ => none
           let conditions := blocks.flatten
           guard (isLoopSpecification conditions)
@@ -967,6 +981,8 @@ mutual
         | .assertion => "assert "
         | .assumption => "assume "
         | .loopInvariant => "invariant "
+        | .apply => "apply "
+        | .split => "split "
       pure <| text memberPrefix ++ (← expressionDoc expression)
 
   private partial def negate : Expr → Expr
@@ -979,7 +995,13 @@ mutual
     -- what separates it from a trailing `return` supplying a block's value.
     | .expression value@(.return_ ..) => do pure ((← expressionDoc value) ++ text ";")
     | .expression value => expressionDoc value
-    | .letDecl mutable pattern type value _ => do
+    | .letDecl mutable pattern type none _ =>
+        -- A declaration without initializer keeps its type: nothing else
+        -- determines it.
+        let annotation := type.map (fun type => text (" : " ++ typeText type.value)) |>.getD .nil
+        pure <| text "let " ++ (if mutable then text "mut " else .nil) ++ patternDoc pattern ++
+          annotation
+    | .letDecl mutable pattern type (some value) _ => do
         -- An abort produces no value from which to reconstruct the binder's
         -- type. Keep its annotation, including for the derived spec reading.
         let annotation := if value matches .throw_ .. then
@@ -993,13 +1015,18 @@ mutual
   private partial def statementDocs (statements : Array Statement) : Except String (Array Doc) := do
     let rec go (remaining : List Statement) (rendered : Array Doc) := do
       match remaining with
-      | .expression (.specBlock conditions _) ::
+      | .expression specExpr@(.specBlock conditions _ false) ::
           .expression loopExpr@(.loop ..) :: rest
       | .expression loopExpr@(.loop ..) ::
-          .expression (.specBlock conditions _) :: rest =>
+          .expression specExpr@(.specBlock conditions _ false) :: rest =>
           if isLoopSpecification conditions then
-            go rest (rendered.push ((← expressionDoc loopExpr) ++ hard ++
-              block (text "where") (← specificationMemberDocs conditions)))
+            -- Only a `while` takes a `where` region; any other loop is
+            -- followed by its specification, which lowering attaches.
+            let attachment ← match loopExpr with
+              | .loop (.ifElse _ _ (some (.break_ none _ none)) _) _ none =>
+                  pure (block (text "where") (← specificationMemberDocs conditions))
+              | _ => expressionDoc specExpr
+            go rest (rendered.push ((← expressionDoc loopExpr) ++ hard ++ attachment))
           else
             let first ← statementDoc remaining.head!
             go remaining.tail (rendered.push first)
@@ -1023,7 +1050,8 @@ mutual
       let leading ← statements.pop.mapM statementDoc
       return leading ++ (← blockEntriesDoc nestedStatements nestedResult)
     let trailing ← match result with
-      | none | some (.unit _) => pure #[]
+      | none => pure #[]
+      | some (.unit _) => pure (if endsWithValue statements then #[text "()"] else #[])
       | some (.block nestedStatements nestedResult _)
       | some (.return_ (.block nestedStatements nestedResult _) _) =>
           blockEntriesDoc nestedStatements nestedResult
@@ -1070,6 +1098,11 @@ private def clauseDoc : ContractClause → Except String Doc
   | .modifiesAll _ => pure <| text "modifies *"
   | .reads type _ => pure <| text s!"reads {typeText type.value}"
   | .readsAll _ => pure <| text "reads *"
+  | .modifiesOf parameter formals targets _ => do
+      let targets ← targets.mapM expressionDoc
+      pure <| text s!"modifies_of<{identifier parameter}>" ++
+        delimited "(" ")" (formals.map parameterDoc) ++ text " " ++ commaSep targets
+  | .modifiesOfAll parameter _ => pure <| text s!"modifies_of<{identifier parameter}> *"
 where
   propertyText (properties : Array String) := if properties.isEmpty then "" else
     "[" ++ ", ".intercalate (properties.map identifier).toList ++ "] "
@@ -1163,7 +1196,9 @@ private partial def normalizeUnitTail : Expr → Expr
       else .return_ value span
   | .block statements result span =>
       match result with
-      | some (.unit _) => .block statements none span
+      | some unit@(.unit _) =>
+          if endsWithValue statements then .block statements (some unit) span
+          else .block statements none span
       | some result@(.return_ ..) =>
           let normalized := normalizeUnitTail result
           if normalized matches .unit _ then .block statements none span
@@ -1286,6 +1321,21 @@ private def itemDocs : Item → Except String (Array Doc)
             else pure <| Format.group (signature ++ text " :=" ++
               Format.nest 2 (soft ++ bodyDoc))
       pure #[attributesDoc declaration.attributes ++ declarationDoc]
+  | .lemma declaration => do
+      let signatureHead := s!"spec lemma {identifier declaration.name}\
+        {bindersText declaration.generics}"
+      let signature := hangingDelimited (text signatureHead) "(" ")"
+        (declaration.parameters.map parameterDoc) .nil
+      let signature ← match declaration.decreases.toList with
+        | [] => pure signature
+        | [measure] => pure (signature ++ text " decreases " ++ (← expressionDoc measure))
+        | measures => pure (signature ++ text " decreases " ++
+            (← expressionDoc (.primitive .tuple measures.toArray declaration.span)))
+      let clauses ← declaration.contract.mapM clauseDoc
+      let steps ← specificationMemberDocs declaration.proof
+      let entries := if steps.isEmpty then clauses
+        else clauses.push (block (text "proof") steps)
+      pure #[block (signature ++ text " where") entries]
   | .namespaceInvariants declarations => do
       let entries ← declarations.mapM fun declaration =>
         clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
@@ -1297,6 +1347,7 @@ private def itemSpan : Item → Span
   | .enum declaration => declaration.span
   | .function declaration => declaration.span
   | .specFunction declaration => declaration.span
+  | .lemma declaration => declaration.span
   | .namespaceInvariants declarations => declarations[0]?.map (·.span) |>.getD {}
 
 private def normalizedDocumentationLines (documentation : String) : List String :=
@@ -1339,11 +1390,14 @@ private def documentationDoc (documentation : String) : Doc :=
   | lines => vcat <| #[text "/-!"] ++
       lines.toArray.map (fun line => text line.trimAsciiEnd.toString) ++ #[text "-/"]
 
-/-- Pretty-print a parsed LeanerLang compilation unit. `leadingComments` are
-top-level namespace comments discarded as trivia by Lean's parser; the source
-backend uses these for explicit unsupported-declaration notices. -/
-def format (unit : CompilationUnit) (width : Nat := 80)
-    (leadingComments : Array String := #[]) : Except String String := do
+/-- Lay out a parsed LeanerLang compilation unit as its prelude (header,
+import, and address aliases) and one rendering per namespace, in order;
+`joinParts` makes the file. `leadingComments` are top-level namespace
+comments discarded as trivia by Lean's parser; the source backend uses these
+for explicit unsupported-declaration notices. -/
+def formatParts (unit : CompilationUnit) (width : Nat := 80)
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    Except String (String × Array String) := do
   let namespaces ← unit.namespaces.mapM fun ns => do
     let uses := ns.uses.map fun path => text s!"use {pathText path}"
     let friends := ns.friends.map fun declaration =>
@@ -1375,20 +1429,36 @@ def format (unit : CompilationUnit) (width : Nat := 80)
     let entries := useEntries ++ friendEntries ++ pragmas ++ leadingCommentDocs ++ items
     let (kind, path) ← match ns.profile with
       | .move => do
-          let path := if ns.path.size == 3 then #[ns.path[0]!, ns.path[2]!]
-            else ns.path
-          unless path.size == 2 && path[0]?.any isMoveAddress do
-            throw "a Move module path must be exactly `0xADDRESS::module_name`"
-          pure ("module", path)
+          unless ns.path.size == 2 && ns.path[0]?.any (fun first =>
+              isMoveAddress first || first.front?.any fun c => c.isAlpha || c == '_') do
+            throw "a Move module path must be exactly `address::module_name`, its address a \
+              literal or an alias"
+          pure ("module", ns.path)
       | .rust => pure ("namespace", ns.path)
     let head := text s!"leaner {kind} {pathText path} where"
     let declaration := head ++ Format.nest 2 (hard ++ blankSep entries)
     if ns.doc.trimAscii.isEmpty then pure declaration
     else pure <| documentationDoc ns.doc ++ hard ++ declaration
-  let document := text "-- Copyright © Aptos Foundation" ++ hard ++
+  -- The address aliases the namespaces spell that the environment lacks.
+  let aliasDeclarations := if declaredAliases.isEmpty then Format.nil else
+    vcat (declaredAliases.map fun (name, address) =>
+      text s!"address_alias {identifier name} = {address}") ++ hard ++ hard
+  let prelude := text "-- Copyright © Aptos Foundation" ++ hard ++
     text "-- SPDX-License-Identifier: Apache-2.0" ++ hard ++ hard ++
-    text "import LeanerLang" ++ hard ++ hard ++ blankSep namespaces ++ hard
-  pure (renderDoc document width)
+    text "import LeanerLang" ++ hard ++ hard ++ aliasDeclarations
+  pure (renderDoc prelude width, namespaces.map (renderDoc · width))
+
+/-- The file of a prelude and its namespaces: the namespaces separated by a
+blank line, the file ending in a newline. -/
+def joinParts (prelude : String) (namespaces : Array String) : String :=
+  prelude ++ "\n\n".intercalate namespaces.toList ++ "\n"
+
+/-- Pretty-print a parsed LeanerLang compilation unit as one file. -/
+def format (unit : CompilationUnit) (width : Nat := 80)
+    (leadingComments : Array String := #[]) (declaredAliases : Array (String × String) := #[]) :
+    Except String String := do
+  let (prelude, namespaces) ← formatParts unit width leadingComments declaredAliases
+  pure (joinParts prelude namespaces)
 
 def namespaceStart (source : String) : Except String (String × Array Comment × String) := do
   let lines := source.splitOn "\n"
@@ -1402,15 +1472,34 @@ def namespaceStart (source : String) : Except String (String × Array Comment ×
   let command := "\n".intercalate commandLines.toList
   pure (command, commentsOfSource command, documentationBefore source commandStart)
 
+/-- The `address_alias` declarations before a source's first namespace. -/
+def preludeAliases (source : String) : Array (String × String) :=
+  (source.splitOn "\n").toArray.filterMap fun line => do
+    let rest ← (line.trimAscii.toString.dropPrefix? "address_alias ").map (·.toString)
+    let [name, address] := (rest.splitOn "=").map (·.trimAscii.toString) | none
+    some (name.replace "«" "" |>.replace "»" "", address)
+
+private def parseSource (environment : Environment) (source sourceName : String) :
+    Except String CompilationUnit := do
+  let (command, comments, namespaceDoc) ← namespaceStart source
+  let parsedSyntax ← Lean.Parser.runParserCategory environment `command command sourceName
+  compilationUnitOfSyntax parsedSyntax sourceName comments namespaceDoc |>.mapError (·.2)
+
 /-- Parse the semantic printer's source with the registered LeanerLang grammar,
 convert it through the frontend AST boundary, and lay it out at `width`. -/
 def formatSource (environment : Environment) (source : String) (width : Nat := 80)
     (sourceName : String := "<generated>")
-    (additionalLeadingComments : Array String := #[]) : Except String String := do
-  let (command, comments, namespaceDoc) ← namespaceStart source
-  let parsedSyntax ← Lean.Parser.runParserCategory environment `command command sourceName
-  let unit ← compilationUnitOfSyntax parsedSyntax sourceName comments namespaceDoc
-    |>.mapError (·.2)
-  format unit width additionalLeadingComments
+    (additionalLeadingComments : Array String := #[])
+    (declaredAliases : Array (String × String) := #[]) : Except String String := do
+  format (← parseSource environment source sourceName) width additionalLeadingComments
+    (preludeAliases source ++ declaredAliases)
+
+/-- Lay out several semantic sources, one namespace each, as one file with
+their namespaces in the given order. -/
+def formatSourceParts (environment : Environment) (sources : Array String) (width : Nat := 80)
+    (sourceName : String := "<generated>") (declaredAliases : Array (String × String) := #[]) :
+    Except String (String × Array String) := do
+  let units ← sources.mapM (parseSource environment · sourceName)
+  formatParts { sourceName, namespaces := units.flatMap (·.namespaces) } width #[] declaredAliases
 
 end LeanerLang.Print.Layout

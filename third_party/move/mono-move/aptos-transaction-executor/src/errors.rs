@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_keyless_validation::KeylessValidationError;
 use aptos_types::{
     error::{split_canonical, OUT_OF_RANGE},
     transaction::validation::ECANT_PAY_GAS_DEPOSIT,
@@ -12,6 +13,15 @@ use mono_move_runtime::{
 };
 use move_core_types::vm_status::AbortLocation;
 use thiserror::Error;
+
+/// Why an executor could not be created.
+#[derive(Debug, Error)]
+pub enum ExecutorCreationError {
+    /// The global context was not prepared for this executor: see
+    /// `AptosTransactionExecutor::preinstall`.
+    #[error("the framework symbols are not preinstalled into the global context")]
+    ContextNotPrepared,
+}
 
 /// Every reason a transaction's effects could not be rendered into a
 /// `TransactionOutput`. Always an executor bug; the reasons are diagnostics.
@@ -38,6 +48,8 @@ impl MaterializationError {
 pub enum DiscardReason {
     /// The transaction's signature did not verify.
     InvalidSignature,
+    /// A keyless authenticator did not validate.
+    KeylessValidationFailure(KeylessValidationError),
     /// A transaction shape this executor does not support yet.
     Unsupported(&'static str),
     /// A payload or feature that no VM supports anymore.
@@ -91,6 +103,12 @@ pub enum PreExecutionCheckFailure {
     GasPriceBelowMinimum { price: u64, min: u64 },
     #[error("gas unit price {price} is below the encrypted-transaction minimum {min}")]
     EncryptedGasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("gas unit price {price} is below the raised-limits minimum {min}")]
+    HighLimitGasPriceBelowMinimum { price: u64, min: u64 },
+    #[error("limits multiplier {percent}% must be above {min}% and at most {max}%")]
+    InvalidLimitsMultiplier { percent: u64, min: u64, max: u64 },
+    #[error("an approved governance script may not request raised limits")]
+    LimitsRequestOnGovernanceScript,
     #[error("gas unit price {price} is above the maximum {max}")]
     GasPriceAboveMaximum { price: u64, max: u64 },
 }
@@ -188,6 +206,7 @@ pub(crate) fn call_result(status: RuntimeStatus) -> Result<(), MoveExecutionFail
             code,
             message,
             location,
+            ..
         } => Err(MoveExecutionFailure::Abort {
             code,
             message,

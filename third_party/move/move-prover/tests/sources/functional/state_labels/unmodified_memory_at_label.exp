@@ -1,0 +1,20 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/unmodified_memory_at_label.move:43:9
+   │
+43 │         ensures S1 |~ exists<Container>(signer::address_of(account)); // error: published only after S1
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:33: swap_wrong
+   =         account = <redacted>
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:34: swap_wrong
+   =         r = <redacted>
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:35: swap_wrong
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:33: swap_wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:37: swap_wrong
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:44: swap_wrong (spec)
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:45: swap_wrong (spec)
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:42: swap_wrong (spec)
+   =     at tests/sources/functional/state_labels/unmodified_memory_at_label.move:43: swap_wrong (spec)

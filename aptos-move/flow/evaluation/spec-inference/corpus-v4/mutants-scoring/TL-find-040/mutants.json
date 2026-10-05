@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 46,
+        "offset": 2949,
+        "sha256": "121598a5058a482f054aa33a453485942442ea355ba7948b3715015f6db5631f"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-find-040-finds-smaller",
+      "obligation_category": "normal-result",
+      "rationale": "The first tier below the request is chosen.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 27,
+        "offset": 3074,
+        "sha256": "c11e1d8d48fe890db1994956f80adfd547953c491a82b2b258919807a76171f7"
+      },
+      "edit": {
+        "at": 8,
+        "kind": "substitute",
+        "length": 8,
+        "to": "tiers[0]"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-find-040-always-first-tier",
+      "obligation_category": "normal-result",
+      "rationale": "The first tier's stake is returned whichever tier covers.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 76,
+        "offset": 2998,
+        "sha256": "e085eb2cf946a7f8e2255e5a6b16a1ed774bba9110a37b7c34ccbd2421d99db3"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 76,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-find-040-no-abort",
+      "obligation_category": "abort",
+      "rationale": "A request no tier covers returns the first tier's stake.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-find-040"
+}

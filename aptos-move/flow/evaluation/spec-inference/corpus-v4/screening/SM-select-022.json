@@ -1,0 +1,21 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/selection_machine",
+  "reference_proved": true,
+  "reference_sha256": "5827e3b2f0cfef7a7ca67dc11623f71be8e8c086c9e67c42cff7ab49172429ca",
+  "schema_version": 2,
+  "target": "inference_corpus::selection_machine::select",
+  "task_id": "SM-select-022",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.5,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

@@ -41,6 +41,9 @@ impl aptos_cli_common::TelemetryCallback for CliTelemetry {
 }
 
 fn main() {
+    // Intel macOS users need to see this before clap handles --help/--version.
+    aptos::warn_macos_x86_64_deprecation();
+
     // Register hooks.
     aptos_move_cli::register_package_hooks();
 

@@ -1,16 +1,11 @@
 processed 1 task
-task 0 lines 1-27:  publish [import Move]
+task 0 lines 3-22:  publish [import LeanerMove]
 Error: compilation errors:
- error: cannot write local `whole` since it is borrowed
-   ┌─ TEMPFILE:16:5
+ error: LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+   ┌─ TEMPFILE:15:18
    │
-14 │     let field ← &mut inner.value
-   │     ---------------------------- field `value` via field `inner` previously mutably borrowed here
-15 │     let whole ← &mut owner
-16 │     whole := { inner := { value := 1 } }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ write attempted here
-17 │     let result ← *field
-   │     ------------------- conflicting reference `field` used here
+15 │     let whole := &mut owner
+   │                  ^^^^^^^^^^
 
 
-exiting with Leaner stackless-bytecode checks failed
+exiting with Leaner elaboration errors

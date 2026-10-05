@@ -1,0 +1,848 @@
+{
+  "schema": "move-xast-module",
+  "version": 9,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "axioms",
+  "doc": " Module axioms are exported with the global invariants, generic ones with\n their type parameters.",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [
+    {
+      "name": "Counter",
+      "doc": "",
+      "loc": 1,
+      "abilities": [
+        "key"
+      ],
+      "type_params": [],
+      "attributes": [],
+      "is_native": false,
+      "fields": [
+        {
+          "name": "value",
+          "doc": "",
+          "ty": 0
+        }
+      ],
+      "variants": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    }
+  ],
+  "functions": [],
+  "spec_funs": [
+    {
+      "name": "injection",
+      "doc": "",
+      "loc": 2,
+      "type_params": [],
+      "params": [
+        {
+          "name": "v",
+          "ty": 2
+        }
+      ],
+      "result": 0,
+      "uninterpreted": true,
+      "is_native": false,
+      "is_move_fun": false,
+      "uses_old": false,
+      "body": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    },
+    {
+      "name": "generic_injection",
+      "doc": "",
+      "loc": 3,
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "x",
+          "ty": 3
+        }
+      ],
+      "result": 0,
+      "uninterpreted": true,
+      "is_native": false,
+      "is_move_fun": false,
+      "uses_old": false,
+      "body": null,
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [
+    {
+      "kind": "global",
+      "loc": 4,
+      "type_params": [],
+      "properties": [],
+      "exp": {
+        "ty": 7,
+        "loc": 14,
+        "kind": "quant",
+        "quant": "forall",
+        "ranges": [
+          {
+            "pattern": {
+              "ty": 4,
+              "loc": 5,
+              "kind": "var",
+              "name": "a"
+            },
+            "domain": {
+              "ty": 5,
+              "loc": 6,
+              "kind": "call",
+              "op": "type_domain",
+              "inst": [
+                4
+              ],
+              "args": [],
+              "surface": null
+            },
+            "label": null
+          }
+        ],
+        "triggers": [],
+        "condition": {
+          "ty": 7,
+          "loc": 8,
+          "kind": "call",
+          "op": {
+            "exists": null
+          },
+          "inst": [
+            6
+          ],
+          "args": [
+            {
+              "ty": 4,
+              "loc": 7,
+              "kind": "local",
+              "name": "a"
+            }
+          ],
+          "surface": null
+        },
+        "body": {
+          "ty": 7,
+          "loc": 13,
+          "kind": "call",
+          "op": "gt",
+          "inst": [],
+          "args": [
+            {
+              "ty": 0,
+              "loc": 11,
+              "kind": "call",
+              "op": {
+                "select": {
+                  "name": 0,
+                  "field": "value"
+                }
+              },
+              "inst": [
+                6
+              ],
+              "args": [
+                {
+                  "ty": 6,
+                  "loc": 10,
+                  "kind": "call",
+                  "op": {
+                    "global": null
+                  },
+                  "inst": [
+                    6
+                  ],
+                  "args": [
+                    {
+                      "ty": 4,
+                      "loc": 9,
+                      "kind": "local",
+                      "name": "a"
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 8,
+              "loc": 12,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        }
+      }
+    },
+    {
+      "kind": "axiom",
+      "loc": 15,
+      "type_params": [],
+      "properties": [],
+      "exp": {
+        "ty": 7,
+        "loc": 29,
+        "kind": "quant",
+        "quant": "forall",
+        "ranges": [
+          {
+            "pattern": {
+              "ty": 2,
+              "loc": 16,
+              "kind": "var",
+              "name": "v1"
+            },
+            "domain": {
+              "ty": 9,
+              "loc": 17,
+              "kind": "call",
+              "op": "type_domain",
+              "inst": [
+                2
+              ],
+              "args": [],
+              "surface": null
+            },
+            "label": null
+          },
+          {
+            "pattern": {
+              "ty": 2,
+              "loc": 18,
+              "kind": "var",
+              "name": "v2"
+            },
+            "domain": {
+              "ty": 9,
+              "loc": 19,
+              "kind": "call",
+              "op": "type_domain",
+              "inst": [
+                2
+              ],
+              "args": [],
+              "surface": null
+            },
+            "label": null
+          }
+        ],
+        "triggers": [],
+        "condition": null,
+        "body": {
+          "ty": 7,
+          "loc": 28,
+          "kind": "call",
+          "op": "iff",
+          "inst": [],
+          "args": [
+            {
+              "ty": 7,
+              "loc": 22,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                2
+              ],
+              "args": [
+                {
+                  "ty": 2,
+                  "loc": 20,
+                  "kind": "local",
+                  "name": "v1"
+                },
+                {
+                  "ty": 2,
+                  "loc": 21,
+                  "kind": "local",
+                  "name": "v2"
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 7,
+              "loc": 27,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 24,
+                  "kind": "call",
+                  "op": {
+                    "spec_function": {
+                      "name": 1,
+                      "range": {
+                        "pre": null,
+                        "post": null
+                      }
+                    }
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 23,
+                      "kind": "local",
+                      "name": "v1"
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 26,
+                  "kind": "call",
+                  "op": {
+                    "spec_function": {
+                      "name": 1,
+                      "range": {
+                        "pre": null,
+                        "post": null
+                      }
+                    }
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 25,
+                      "kind": "local",
+                      "name": "v2"
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        }
+      }
+    },
+    {
+      "kind": "axiom",
+      "loc": 30,
+      "type_params": [
+        "T"
+      ],
+      "properties": [],
+      "exp": {
+        "ty": 7,
+        "loc": 44,
+        "kind": "quant",
+        "quant": "forall",
+        "ranges": [
+          {
+            "pattern": {
+              "ty": 3,
+              "loc": 31,
+              "kind": "var",
+              "name": "x"
+            },
+            "domain": {
+              "ty": 10,
+              "loc": 32,
+              "kind": "call",
+              "op": "type_domain",
+              "inst": [
+                3
+              ],
+              "args": [],
+              "surface": null
+            },
+            "label": null
+          },
+          {
+            "pattern": {
+              "ty": 3,
+              "loc": 33,
+              "kind": "var",
+              "name": "y"
+            },
+            "domain": {
+              "ty": 10,
+              "loc": 34,
+              "kind": "call",
+              "op": "type_domain",
+              "inst": [
+                3
+              ],
+              "args": [],
+              "surface": null
+            },
+            "label": null
+          }
+        ],
+        "triggers": [],
+        "condition": null,
+        "body": {
+          "ty": 7,
+          "loc": 43,
+          "kind": "call",
+          "op": "iff",
+          "inst": [],
+          "args": [
+            {
+              "ty": 7,
+              "loc": 37,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                3
+              ],
+              "args": [
+                {
+                  "ty": 3,
+                  "loc": 35,
+                  "kind": "local",
+                  "name": "x"
+                },
+                {
+                  "ty": 3,
+                  "loc": 36,
+                  "kind": "local",
+                  "name": "y"
+                }
+              ],
+              "surface": null
+            },
+            {
+              "ty": 7,
+              "loc": 42,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 39,
+                  "kind": "call",
+                  "op": {
+                    "spec_function": {
+                      "name": 2,
+                      "range": {
+                        "pre": null,
+                        "post": null
+                      }
+                    }
+                  },
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 38,
+                      "kind": "local",
+                      "name": "x"
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 41,
+                  "kind": "call",
+                  "op": {
+                    "spec_function": {
+                      "name": 2,
+                      "range": {
+                        "pre": null,
+                        "post": null
+                      }
+                    }
+                  },
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 40,
+                      "kind": "local",
+                      "name": "y"
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        }
+      }
+    }
+  ],
+  "lemmas": [],
+  "labels": [],
+  "skipped": [],
+  "comments": [
+    {
+      "loc": 45,
+      "text": "// Copyright © Aptos Foundation",
+      "own_line": true
+    },
+    {
+      "loc": 46,
+      "text": "// SPDX-License-Identifier: Apache-2.0",
+      "own_line": true
+    }
+  ],
+  "sources": [
+    "axioms.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 177,
+      "end": 655
+    },
+    {
+      "file": 0,
+      "start": 203,
+      "end": 253
+    },
+    {
+      "file": 0,
+      "start": 281,
+      "end": 315
+    },
+    {
+      "file": 0,
+      "start": 424,
+      "end": 460
+    },
+    {
+      "file": 0,
+      "start": 564,
+      "end": 647
+    },
+    {
+      "file": 0,
+      "start": 581,
+      "end": 582
+    },
+    {
+      "file": 0,
+      "start": 584,
+      "end": 591
+    },
+    {
+      "file": 0,
+      "start": 614,
+      "end": 615
+    },
+    {
+      "file": 0,
+      "start": 598,
+      "end": 616
+    },
+    {
+      "file": 0,
+      "start": 634,
+      "end": 635
+    },
+    {
+      "file": 0,
+      "start": 618,
+      "end": 636
+    },
+    {
+      "file": 0,
+      "start": 618,
+      "end": 642
+    },
+    {
+      "file": 0,
+      "start": 645,
+      "end": 646
+    },
+    {
+      "file": 0,
+      "start": 618,
+      "end": 646
+    },
+    {
+      "file": 0,
+      "start": 574,
+      "end": 646
+    },
+    {
+      "file": 0,
+      "start": 324,
+      "end": 414
+    },
+    {
+      "file": 0,
+      "start": 337,
+      "end": 339
+    },
+    {
+      "file": 0,
+      "start": 341,
+      "end": 351
+    },
+    {
+      "file": 0,
+      "start": 353,
+      "end": 355
+    },
+    {
+      "file": 0,
+      "start": 357,
+      "end": 367
+    },
+    {
+      "file": 0,
+      "start": 369,
+      "end": 371
+    },
+    {
+      "file": 0,
+      "start": 375,
+      "end": 377
+    },
+    {
+      "file": 0,
+      "start": 369,
+      "end": 377
+    },
+    {
+      "file": 0,
+      "start": 393,
+      "end": 395
+    },
+    {
+      "file": 0,
+      "start": 383,
+      "end": 396
+    },
+    {
+      "file": 0,
+      "start": 410,
+      "end": 412
+    },
+    {
+      "file": 0,
+      "start": 400,
+      "end": 413
+    },
+    {
+      "file": 0,
+      "start": 383,
+      "end": 413
+    },
+    {
+      "file": 0,
+      "start": 369,
+      "end": 413
+    },
+    {
+      "file": 0,
+      "start": 330,
+      "end": 413
+    },
+    {
+      "file": 0,
+      "start": 469,
+      "end": 554
+    },
+    {
+      "file": 0,
+      "start": 485,
+      "end": 486
+    },
+    {
+      "file": 0,
+      "start": 488,
+      "end": 489
+    },
+    {
+      "file": 0,
+      "start": 491,
+      "end": 492
+    },
+    {
+      "file": 0,
+      "start": 494,
+      "end": 495
+    },
+    {
+      "file": 0,
+      "start": 497,
+      "end": 498
+    },
+    {
+      "file": 0,
+      "start": 502,
+      "end": 503
+    },
+    {
+      "file": 0,
+      "start": 497,
+      "end": 503
+    },
+    {
+      "file": 0,
+      "start": 527,
+      "end": 528
+    },
+    {
+      "file": 0,
+      "start": 509,
+      "end": 529
+    },
+    {
+      "file": 0,
+      "start": 551,
+      "end": 552
+    },
+    {
+      "file": 0,
+      "start": 533,
+      "end": 553
+    },
+    {
+      "file": 0,
+      "start": 509,
+      "end": 553
+    },
+    {
+      "file": 0,
+      "start": 497,
+      "end": 553
+    },
+    {
+      "file": 0,
+      "start": 478,
+      "end": 553
+    },
+    {
+      "file": 0,
+      "start": 0,
+      "end": 32
+    },
+    {
+      "file": 0,
+      "start": 33,
+      "end": 71
+    }
+  ],
+  "types": [
+    "u64",
+    "u8",
+    {
+      "vector": 1
+    },
+    {
+      "type_param": 0
+    },
+    "address",
+    {
+      "type_domain": 4
+    },
+    {
+      "struct": {
+        "name": 0,
+        "args": []
+      }
+    },
+    "bool",
+    "u256",
+    {
+      "type_domain": 2
+    },
+    {
+      "type_domain": 3
+    }
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "axioms"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "Counter"
+    },
+    {
+      "module": 0,
+      "name": "injection"
+    },
+    {
+      "module": 0,
+      "name": "generic_injection"
+    }
+  ]
+}

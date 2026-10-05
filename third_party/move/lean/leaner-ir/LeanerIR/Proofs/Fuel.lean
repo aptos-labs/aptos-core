@@ -19,20 +19,29 @@ open LeanerIR.Validation
 open SemanticOperations
 
 private structure MonoAt (fuel : Nat) : Prop where
-  function : ∀ executable handle typeInstantiation state arguments result,
+  function : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      handle typeInstantiation state arguments result,
     Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result →
       Internal.evalFunction (fuel + 1) executable handle typeInstantiation state arguments = .ok result
-  expression : ∀ executable namespaceId frame state exprId result,
+  expression : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state exprId result,
     Internal.evalExpr fuel executable namespaceId frame state exprId = .ok result →
       Internal.evalExpr (fuel + 1) executable namespaceId frame state exprId = .ok result
-  values : ∀ executable namespaceId frame state expressions result,
+  node : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state exprId result,
+    Internal.evalNode fuel executable namespaceId frame state exprId = .ok result →
+      Internal.evalNode (fuel + 1) executable namespaceId frame state exprId = .ok result
+  values : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state expressions result,
     Internal.evalValues fuel executable namespaceId frame state expressions = .ok result →
       Internal.evalValues (fuel + 1) executable namespaceId frame state expressions = .ok result
-  statements : ∀ executable namespaceId frame state statements result,
+  statements : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state statements result,
     Internal.evalStatements fuel executable namespaceId frame state statements = .ok result →
       Internal.evalStatements (fuel + 1) executable namespaceId frame state statements
         = .ok result
-  arms : ∀ executable namespaceId ns ownerLoc frame state value arms result,
+  arms : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId ns ownerLoc frame state value arms result,
     Internal.evalArms fuel executable namespaceId ns ownerLoc frame state value arms
         = .ok result →
       Internal.evalArms (fuel + 1) executable namespaceId ns ownerLoc frame state value arms
@@ -42,18 +51,19 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
   | 0 => {
       function := by simp [Internal.evalFunction, failAt]
       expression := by simp [Internal.evalExpr, failAt]
+      node := by simp [Internal.evalNode, failAt]
       values := by
-        intro executable namespaceId frame state expressions result h
+        intro unit executable namespaceId frame state expressions result h
         cases expressions with
         | nil => exact h
         | cons expression expressions => simp [Internal.evalValues, failAt] at h
       statements := by
-        intro executable namespaceId frame state statements result h
+        intro unit executable namespaceId frame state statements result h
         cases statements with
         | nil => exact h
         | cons statement statements => simp [Internal.evalStatements, failAt] at h
       arms := by
-        intro executable namespaceId ns ownerLoc frame state value arms result h
+        intro unit executable namespaceId ns ownerLoc frame state value arms result h
         cases arms with
         | nil => exact h
         | cons arm arms => simp [Internal.evalArms, failAt] at h }
@@ -61,11 +71,11 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
       let previous := monoAt fuel
       {
         function := by
-          intro executable handle typeInstantiation state arguments result h
+          intro unit executable handle typeInstantiation state arguments result h
           simp only [Internal.evalFunction, bind, Except.bind] at h
           rw [Internal.evalFunction.eq_2]
           simp only [bind, Except.bind]
-          cases ns_eq : executable.unit.namespaces[handle.namespaceId.index]? with
+          cases ns_eq : unit.namespaces[handle.namespaceId.index]? with
           | none => simp [ns_eq, failAt] at h
           | some ns =>
               simp only [ns_eq] at h ⊢
@@ -94,11 +104,21 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                 simp only [evaluation_eq] at h
                                 exact h
         expression := by
-          intro executable namespaceId frame state exprId result h
+          intro unit executable namespaceId frame state exprId result h
           simp only [Internal.evalExpr, bind, Except.bind] at h
           rw [Internal.evalExpr.eq_2]
           simp only [bind, Except.bind]
-          cases ns_eq : executable.unit.namespaces[namespaceId.index]? with
+          split at h
+          · cases h
+          · rename_i evaluation node_eq
+            rw [previous.node _ _ _ _ _ _ node_eq]
+            exact h
+        node := by
+          intro unit executable namespaceId frame state exprId result h
+          simp only [Internal.evalNode, bind, Except.bind] at h
+          rw [Internal.evalNode.eq_2]
+          simp only [bind, Except.bind]
+          cases ns_eq : unit.namespaces[namespaceId.index]? with
           | none => simp [ns_eq, failAt] at h
           | some ns =>
               simp only [ns_eq] at h ⊢
@@ -115,13 +135,13 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                       simp only [kind_eq] at h ⊢; exact h
                   | constant reference =>
                       simp only [kind_eq] at h ⊢
-                      cases resolve_eq : resolveConstant? executable.unit namespaceId
+                      cases resolve_eq : resolveConstant? unit namespaceId
                           reference with
                       | none => simp [resolve_eq, failAt] at h
                       | some handle =>
                           simp only [resolve_eq] at h ⊢
                           cases target_eq :
-                              executable.unit.namespaces[handle.namespaceId.index]? with
+                              unit.namespaces[handle.namespaceId.index]? with
                           | none => simp [target_eq, failAt] at h
                           | some targetNs =>
                               simp only [target_eq] at h ⊢
@@ -183,7 +203,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                               cases control_eq : initialized.control.value with
                               | value boundValue =>
                                   simp only [control_eq] at h ⊢
-                                  cases bind_eq : bindPattern executable.unit ns initialized.frame pattern
+                                  cases bind_eq : bindPattern unit ns initialized.frame pattern
                                       boundValue with
                                   | none => simp only [bind_eq] at h ⊢; exact h
                                   | some bound =>
@@ -276,23 +296,23 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                           cases control_eq : bodyResult.control.value with
                           | value value =>
                               simp only [control_eq] at h ⊢
-                              cases again_eq : Internal.evalExpr fuel executable namespaceId
+                              cases again_eq : Internal.evalNode fuel executable namespaceId
                                   bodyResult.frame bodyResult.state exprId with
                               | error error => simp [again_eq] at h
                               | ok again =>
-                                  rw [previous.expression _ _ _ _ _ _ again_eq]
+                                  rw [previous.node _ _ _ _ _ _ again_eq]
                                   simp only [again_eq] at h
                                   exact h
                           | continue_ nest =>
                               cases nest with
                               | zero =>
                                   simp only [control_eq] at h ⊢
-                                  cases again_eq : Internal.evalExpr fuel executable
+                                  cases again_eq : Internal.evalNode fuel executable
                                       namespaceId bodyResult.frame bodyResult.state
                                       exprId with
                                   | error error => simp [again_eq] at h
                                   | ok again =>
-                                      rw [previous.expression _ _ _ _ _ _ again_eq]
+                                      rw [previous.node _ _ _ _ _ _ again_eq]
                                       simp only [again_eq] at h
                                       exact h
                               | succ nest => simp only [control_eq] at h ⊢; exact h
@@ -369,14 +389,14 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                   | control state frame control => exact h
                                   | values valuesState valuesFrame values =>
                                       dsimp only at h ⊢
-                                      cases resolve_eq : resolveFunction? executable.unit
+                                      cases resolve_eq : resolveFunction? unit
                                           namespaceId callee with
                                       | none => simp only [resolve_eq] at h ⊢; exact h
                                       | some handle =>
                                           simp only [resolve_eq] at h ⊢
                                           cases fn_eq : Internal.evalFunction fuel
                                               executable handle
-                                              (callTypeInstantiation executable.unit handle
+                                              (callTypeInstantiation unit handle
                                                 valuesFrame.typeInstantiation instantiations) valuesState
                                               values.toArray with
                                           | error error => simp [fn_eq] at h
@@ -401,16 +421,21 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                       | cons callable callArguments =>
                                           dsimp only at h ⊢
                                           cases callable
-                                          case closure handle captures =>
+                                          case closure handle mask typeInstantiation captures =>
                                               dsimp only at h ⊢
-                                              cases fn_eq : Internal.evalFunction fuel
-                                                  executable handle valuesFrame.typeInstantiation valuesState
-                                                  (captures ++ callArguments.toArray) with
-                                              | error error => simp [fn_eq] at h
-                                              | ok functionResult =>
-                                                  rw [previous.function _ _ _ _ _ _ fn_eq]
-                                                  simp only [fn_eq] at h
-                                                  exact h
+                                              cases compose_eq : ClosureMask.compose mask
+                                                  captures.toList callArguments with
+                                              | none => simp [compose_eq] at h ⊢; exact h
+                                              | some composed =>
+                                                  simp only [compose_eq] at h ⊢
+                                                  cases fn_eq : Internal.evalFunction fuel
+                                                      executable handle typeInstantiation valuesState
+                                                      composed.toArray with
+                                                  | error error => simp [fn_eq] at h
+                                                  | ok functionResult =>
+                                                      rw [previous.function _ _ _ _ _ _ fn_eq]
+                                                      simp only [fn_eq] at h
+                                                      exact h
                                           all_goals exact h
                           | constructor reference variant =>
                               dsimp only at h ⊢
@@ -430,7 +455,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                                   rw [previous.values _ _ _ _ _ _ operands_eq]
                                   simp only [operands_eq] at h
                                   exact h
-                          | closure reference =>
+                          | closure reference mask =>
                               dsimp only at h ⊢
                               cases operands_eq : Internal.evalValues fuel executable
                                   namespaceId frame state arguments.toList with
@@ -566,7 +591,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                               simp only [operands_eq] at h
                               exact h
         values := by
-          intro executable namespaceId frame state expressions result h
+          intro unit executable namespaceId frame state expressions result h
           cases expressions with
           | nil => exact h
           | cons expression expressions =>
@@ -591,7 +616,7 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                   | break_ nest value => simpa [control_eq] using h
                   | continue_ nest => simpa [control_eq] using h
         statements := by
-          intro executable namespaceId frame state statements result h
+          intro unit executable namespaceId frame state statements result h
           cases statements with
           | nil => exact h
           | cons statement statements =>
@@ -611,12 +636,12 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                   | break_ nest value => simpa [control_eq] using h
                   | continue_ nest => simpa [control_eq] using h
         arms := by
-          intro executable namespaceId ns ownerLoc frame state value arms result h
+          intro unit executable namespaceId ns ownerLoc frame state value arms result h
           cases arms with
           | nil => exact h
           | cons arm arms =>
               simp only [Internal.evalArms, bind, Except.bind] at h ⊢
-              cases bind_eq : bindPattern executable.unit ns frame arm.pattern value with
+              cases bind_eq : bindPattern unit ns frame arm.pattern value with
               | none =>
                   simp only [bind_eq] at h ⊢
                   exact previous.arms _ _ _ _ _ _ _ _ _ h
@@ -650,7 +675,8 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
 
 /-- Success of the fuelled evaluator is stable under any additional fuel. -/
 theorem evalFunction_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable handle typeInstantiation state arguments result}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {handle typeInstantiation state arguments result}
     (h : Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result) :
     Internal.evalFunction fuel' executable handle typeInstantiation state arguments = .ok result := by
   induction le with
@@ -660,17 +686,30 @@ theorem evalFunction_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
 /-- Success of the fuelled expression evaluator is stable under any
 additional fuel. -/
 theorem evalExpr_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable namespaceId frame state exprId result}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {namespaceId frame state exprId result}
     (h : Internal.evalExpr fuel executable namespaceId frame state exprId = .ok result) :
     Internal.evalExpr fuel' executable namespaceId frame state exprId = .ok result := by
   induction le with
   | refl => exact h
   | step _ ih => exact (monoAt _).expression _ _ _ _ _ _ ih
 
+/-- Success of the fuelled node evaluator is stable under any additional
+fuel. -/
+theorem evalNode_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {namespaceId frame state exprId result}
+    (h : Internal.evalNode fuel executable namespaceId frame state exprId = .ok result) :
+    Internal.evalNode fuel' executable namespaceId frame state exprId = .ok result := by
+  induction le with
+  | refl => exact h
+  | step _ ih => exact (monoAt _).node _ _ _ _ _ _ ih
+
 /-- Success of the fuelled operand-list evaluator is stable under any
 additional fuel. -/
 theorem evalValues_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable namespaceId frame state expressions result}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {namespaceId frame state expressions result}
     (h : Internal.evalValues fuel executable namespaceId frame state expressions
       = .ok result) :
     Internal.evalValues fuel' executable namespaceId frame state expressions = .ok result := by
@@ -681,7 +720,8 @@ theorem evalValues_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
 /-- Success of the fuelled statement-list evaluator is stable under any
 additional fuel. -/
 theorem evalStatements_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable namespaceId frame state statements result}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {namespaceId frame state statements result}
     (h : Internal.evalStatements fuel executable namespaceId frame state statements
       = .ok result) :
     Internal.evalStatements fuel' executable namespaceId frame state statements
@@ -693,7 +733,8 @@ theorem evalStatements_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
 /-- Success of the fuelled match-arm evaluator is stable under any additional
 fuel. -/
 theorem evalArms_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable namespaceId ns ownerLoc frame state value arms result}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {namespaceId ns ownerLoc frame state value arms result}
     (h : Internal.evalArms fuel executable namespaceId ns ownerLoc frame state value arms
       = .ok result) :
     Internal.evalArms fuel' executable namespaceId ns ownerLoc frame state value arms
@@ -704,7 +745,7 @@ theorem evalArms_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
 
 /-- Success of `Interpreter.run` is stable under any additional fuel. -/
 theorem run_mono {fuel fuel' : Nat} (le : fuel ≤ fuel')
-    {executable function arguments state result}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit} {function arguments state result}
     (h : Interpreter.run executable fuel function arguments state = .ok result) :
     Interpreter.run executable fuel' function arguments state = .ok result := by
   simp only [Interpreter.run, bind, Except.bind] at h ⊢

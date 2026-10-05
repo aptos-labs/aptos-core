@@ -1,0 +1,5 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/closures/amm_example.move: LIR-SEMANTIC-TYPE: in fun swap: invoked operand is not a function type at [9270, 9358)
+LIR-SEMANTIC-TYPE: in fun create_compliant_fee_pool: closure construction result is not a function type at [12092, 12117)
+LIR-SEMANTIC-TYPE: in fun create_constant_product_pool: closure construction result is not a function type at [11280, 11296)
+LIR-SEMANTIC-TYPE: in fun create_noncompliant_fee_pool: closure construction result is not a function type at [11710, 11749)

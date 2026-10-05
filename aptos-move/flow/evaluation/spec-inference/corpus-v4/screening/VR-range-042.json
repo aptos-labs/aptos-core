@@ -1,0 +1,21 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_vector_range",
+  "reference_proved": true,
+  "reference_sha256": "96e9a23e050bdc8b21aa042149fe93cb269c59d7a92e86ddcd5694aabc20344c",
+  "schema_version": 2,
+  "target": "std::extracted_vector_range::range_with_step",
+  "task_id": "VR-range-042",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.0,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

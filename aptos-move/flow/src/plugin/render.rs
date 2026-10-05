@@ -520,6 +520,8 @@ mod tests {
             inference_tactic: None,
             evaluation_mode: false,
             feedback_level: None,
+            aborts_if_is_strict: false,
+            infer_unspecified_helpers: false,
         };
         let mut context = tera::Context::from_serialize(&global).unwrap();
         context.insert("platform_display", global.platform.display_name());
@@ -546,6 +548,8 @@ mod tests {
             inference_tactic: crate::evaluation::InferenceTactic::HybridGuided,
             evaluation_mode: false,
             feedback_level: crate::evaluation::FeedbackLevel::Acceptance,
+            aborts_if_is_strict: false,
+            infer_unspecified_helpers: false,
         });
         let files = render_all(&content_root, &context, &tool_names, &[]).unwrap();
         assert!(!files.is_empty(), "should discover at least one file");

@@ -23,6 +23,10 @@ inputs:
     description: "If true, wait for the failpoints images to be available."
     required: false
     default: false
+  FEATURE_CONSENSUS_ONLY:
+    description: "If true, wait for consensus-only-perf-test images."
+    required: false
+    default: false
 runs:
   using: composite
   steps:
@@ -35,5 +39,5 @@ runs:
     # The source code must be checkout out by the workflow that invokes this action.
     - name: Run wait-images-ci
       run: |
-        GCP_DOCKER_ARTIFACT_REPO=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }} GIT_SHA=${{ inputs.GIT_SHA }} PROFILE_RELEASE=${{ inputs.PROFILE_RELEASE }} PROFILE_PERF=${{ inputs.PROFILE_PERF }} FEATURE_FAILPOINTS=${{ inputs.FEATURE_FAILPOINTS }} ./docker/wait-images-ci.mjs --wait-for-image-seconds=${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
+        GCP_DOCKER_ARTIFACT_REPO=${{ inputs.GCP_DOCKER_ARTIFACT_REPO }} GIT_SHA=${{ inputs.GIT_SHA }} PROFILE_RELEASE=${{ inputs.PROFILE_RELEASE }} PROFILE_PERF=${{ inputs.PROFILE_PERF }} FEATURE_FAILPOINTS=${{ inputs.FEATURE_FAILPOINTS }} FEATURE_CONSENSUS_ONLY=${{ inputs.FEATURE_CONSENSUS_ONLY }} ./docker/wait-images-ci.mjs --wait-for-image-seconds=${{ inputs.WAIT_FOR_IMAGE_SECONDS }}
       shell: bash

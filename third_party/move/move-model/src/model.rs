@@ -30,7 +30,7 @@ use crate::{
     pragmas::{
         CONDITION_INJECTED_PROP, DELEGATE_INVARIANTS_TO_CALLER_PRAGMA,
         DISABLE_INVARIANTS_IN_BODY_PRAGMA, FRIEND_PRAGMA, INTRINSIC_PRAGMA, OPAQUE_PRAGMA,
-        VERIFY_PRAGMA,
+        VERIFY_MANUAL, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -1254,6 +1254,15 @@ impl GlobalEnv {
         self.diags.borrow_mut().clear();
     }
 
+    /// Drops the diagnostics added after the first `start` that `keep` rejects.
+    pub fn retain_diags_since(&self, start: usize, keep: impl Fn(&Diagnostic<FileId>) -> bool) {
+        let mut index = 0;
+        self.diags.borrow_mut().retain(|(diag, _)| {
+            index += 1;
+            index <= start || keep(diag)
+        });
+    }
+
     /// Returns the unknown location.
     pub fn unknown_loc(&self) -> Loc {
         self.unknown_loc.clone()
@@ -1792,7 +1801,9 @@ impl GlobalEnv {
                     fun.name.display(module.symbol_pool())
                 );
                 REFLECTION_FUNS.contains(&name)
-                    && fun_id.inst.iter().any(|ty| ty.is_type_parameter())
+                    // A type parameter nested in an argument, as in `type_of<G<T>>()`, also
+                    // needs its `#i_info`.
+                    && fun_id.inst.iter().any(|ty| ty.is_open())
             } else {
                 false
             }
@@ -2873,13 +2884,20 @@ impl GlobalEnv {
             .unwrap_or("")
     }
 
-    /// Returns true if the boolean property is true.
+    /// Returns true if the boolean property is true. `pragma verify = manual` is
+    /// true: the function is verified, by an authored proof.
     pub fn is_property_true(&self, properties: &PropertyBag, name: &str) -> Option<bool> {
         let sym = &self.symbol_pool().make(name);
-        if let Some(PropertyValue::Value(Value::Bool(b))) = properties.get(sym) {
-            return Some(*b);
+        match properties.get(sym) {
+            Some(PropertyValue::Value(Value::Bool(b))) => Some(*b),
+            Some(PropertyValue::Symbol(value))
+                if name == VERIFY_PRAGMA
+                    && self.symbol_pool().string(*value).as_str() == VERIFY_MANUAL =>
+            {
+                Some(true)
+            },
+            _ => None,
         }
-        None
     }
 
     /// Returns the value of a number property.
@@ -4372,6 +4390,7 @@ impl StructData {
         variants: Option<BTreeMap<Symbol, StructVariant>>,
         is_native: bool,
         visibility: Visibility,
+        attributes: Vec<Attribute>,
     ) -> Self {
         Self {
             abilities,
@@ -4380,6 +4399,7 @@ impl StructData {
             variants,
             is_native,
             visibility,
+            attributes,
             is_empty_struct: false,
             ..Self::new(name, loc)
         }
@@ -5381,9 +5401,10 @@ impl FunctionData {
 
     /// Constructs the runtime-facing part of a function declaration.
     ///
-    /// `called_funs` is `None` when a later binary attachment will recover the
-    /// call graph. Source-independent IR loaders pass `Some`, including the
-    /// empty set, because no AST or compiled module exists to derive it from.
+    /// `used_funs` and `called_funs` are `None` when a later binary attachment
+    /// will recover the call graph. Source-independent IR loaders pass `Some`,
+    /// including the empty set, because no AST or compiled module exists to
+    /// derive it from.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_runtime(
         name: Symbol,
@@ -5397,6 +5418,7 @@ impl FunctionData {
         result_type: Type,
         access_specifiers: Option<Vec<AccessSpecifier>>,
         acquired_structs: Option<BTreeSet<StructId>>,
+        used_funs: Option<BTreeSet<QualifiedId<FunId>>>,
         called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
     ) -> Self {
         Self {
@@ -5409,7 +5431,7 @@ impl FunctionData {
             result_type,
             access_specifiers,
             acquired_structs,
-            used_funs: called_funs.clone(),
+            used_funs,
             called_funs,
             ..Self::new(name, loc)
         }

@@ -14,20 +14,20 @@ it tolerates collisions.
 DEPRECATED: since it's implementation is inneficient, it
 has been deprecated in favor of `big_ordered_map.move`.
 -/
-leaner module 0x1::smart_table where
-  use 0x1::aptos_std::aptos_hash::sip_hash_from_value
-  use 0x1::aptos_std::math64::max
-  use 0x1::aptos_std::simple_map
-  use 0x1::aptos_std::simple_map::SimpleMap
-  use 0x1::aptos_std::table_with_length
-  use 0x1::aptos_std::table_with_length::TableWithLength
-  use 0x1::aptos_std::type_info::size_of_val
-  use 0x1::std::error::invalid_argument
-  use 0x1::std::error::permission_denied
-  use 0x1::std::option::Option
-  use 0x1::std::option::none
-  use 0x1::std::option::some
-  use 0x1::std::vector
+leaner module aptos_std::smart_table where
+  use aptos_std::aptos_hash::sip_hash_from_value
+  use aptos_std::math64::max
+  use aptos_std::simple_map
+  use aptos_std::simple_map::SimpleMap
+  use aptos_std::table_with_length
+  use aptos_std::table_with_length::TableWithLength
+  use aptos_std::type_info::size_of_val
+  use std::error::invalid_argument
+  use std::error::permission_denied
+  use std::option::Option
+  use std::option::none
+  use std::option::some
+  use std::vector
 
   /--
   Key not found in the smart table
@@ -149,7 +149,9 @@ leaner module 0x1::smart_table where
   public fun destroy_empty {K} {V}(self : SmartTable<K, V>) -> Unit := do
     assert!(self.size == 0, invalid_argument(ENOT_EMPTY))
     for i in 0..self.num_buckets do
-      table_with_length::remove(&mut self.buckets, i).destroy_empty()
+      core.prim.destroyEmptyVector(
+        table_with_length::remove(&mut self.buckets, i)
+      )
     let SmartTable<K, V> { buckets := buckets,
     num_buckets := _,
     level := _,
@@ -183,6 +185,7 @@ leaner module 0x1::smart_table where
     ) := vector<Entry<K, V> >[]
     for i in 1..self.num_buckets do
       table_with_length::remove(&mut self.buckets, i)
+      ()
     self.num_buckets := 1
     self.level := 0u8
     self.size := 0
@@ -243,30 +246,42 @@ leaner module 0x1::smart_table where
     self : &mut SmartTable<K, V>, keys : Vector<K>, values : Vector<V>
   ) -> Unit := do
     let mut (self', v2) := (keys, values)
-    self'.reverse()
-    v2.reverse()
+    self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
+    v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(60)
+    spec assume folds_capture_anchor!(91)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
-      let (e1, e2) := (self'.pop_back(), v2.pop_back())
+      let (e1, e2) :=
+        (do
+            let _t0 := &mut self'
+            if _t0.length == 0 then moveVectorError(2)
+            let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+            *_t0 := _t2
+            _t1,
+          do
+            let _t3 := &mut v2
+            if _t3.length == 0 then moveVectorError(2)
+            let (_t4, _t5) := core.prim.removeVector(*_t3, _t3.length - 1)
+            *_t3 := _t5
+            _t4)
       let (key, value) := (e1, e2)
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(60, old(self')).length >= len
+      invariant with_state_anchor!(91, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(60, old(self')).length
-        == with_state_anchor!(60, old(v2)).length
+      invariant with_state_anchor!(91, old(self')).length
+        == with_state_anchor!(91, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(60, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(60, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(60, old(self')).length), true
+        self'[j] == with_state_anchor!(91, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(91, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(91, old(self')).length), true
       invariant true
-    self'.destroy_empty()
-    v2.destroy_empty()
+    core.prim.destroyEmptyVector(self')
+    core.prim.destroyEmptyVector(v2)
 
   spec add_all where
     pragma verify = false
@@ -281,13 +296,13 @@ leaner module 0x1::smart_table where
   ) -> SimpleMap<K, V> := do
     let mut res := simple_map::new::<K, V>()
     for i in 0..self.num_buckets do
-      let mut (keys, values) :=
+      let (keys, values) :=
         do
           let entries := table_with_length::borrow(&self.buckets, i)
           let mut keys := vector<K>[]
           let mut values := vector<V>[]
           let self := entries
-          spec assume folds_capture_anchor!(75)
+          spec assume folds_capture_anchor!(95)
           let i := 0
           let len := self.length
           while i < len do
@@ -301,8 +316,8 @@ leaner module 0x1::smart_table where
             invariant ∀ (j in 0 .. i), true
             invariant (keys, values)
               == «spec_fold$gen$0»(
-                self, with_state_anchor!(75, old(keys)),
-                with_state_anchor!(75, old(values)), i
+                self, with_state_anchor!(95, old(keys)),
+                with_state_anchor!(95, old(values)), i
               )
             invariant ∀ (j in i .. len), true
             invariant ∀ (x : Entry<K, V>),
@@ -419,11 +434,20 @@ leaner module 0x1::smart_table where
             let «entry» := e
             bucket_index(self.level, self.num_buckets, «entry».hash)
               != new_bucket_index) then
-            self'.swap(p, i)
+            *self' := core.prim.swapVector(*self', p, i)
             p := p + 1
           i := i + 1
         p
-    let new_bucket := old_bucket.trim_reverse(p)
+    let new_bucket :=
+      do
+        assert!(old_bucket.length >= p, 131072)
+        let _t8 :=
+          slice(
+            core.prim.reverseSliceVector(*old_bucket, p, old_bucket.length), p,
+            old_bucket.length
+          )
+        *old_bucket := slice(*old_bucket, 0, p)
+        _t8
     table_with_length::add(&mut self.buckets, new_bucket_index, new_bucket)
 
   spec split_one_bucket where
@@ -685,6 +709,7 @@ leaner module 0x1::smart_table where
   -- This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
   -- while remove would continue from the identified index to the end of the vector.
   -- We need to reverse the vector to consume it efficiently
+  @[weight = 50]
   spec fun «spec_fold$gen$0» {T0} {T1}(
     _v : Vector<Entry<T0, T1> >, «keys$init» : Vector<T0>,
     «values$init» : Vector<T1>, _end : Int

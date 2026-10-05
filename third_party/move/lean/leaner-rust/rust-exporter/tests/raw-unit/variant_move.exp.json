@@ -124,6 +124,7 @@
             "loc": null,
             "modifies": [],
             "modifiesAll": false,
+            "parameterFrames": [],
             "pragmas": [],
             "reads": [],
             "readsAll": false
@@ -216,6 +217,7 @@
       "imports": [],
       "intrinsics": [],
       "invariants": [],
+      "lemmas": [],
       "loc": {
         "index": 0
       },
@@ -286,6 +288,7 @@
             "loc": null,
             "modifies": [],
             "modifiesAll": false,
+            "parameterFrames": [],
             "pragmas": [],
             "reads": [],
             "readsAll": false
@@ -341,6 +344,7 @@
             "loc": null,
             "modifies": [],
             "modifiesAll": false,
+            "parameterFrames": [],
             "pragmas": [],
             "reads": [],
             "readsAll": false
@@ -624,6 +628,6 @@
   },
   "version": {
     "major": 1,
-    "minor": 1
+    "minor": 5
   }
 }

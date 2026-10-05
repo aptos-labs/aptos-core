@@ -1,0 +1,129 @@
+{
+  "round": "corpus3.2-run10-codex-terra56-high-exact-cost.tar.gz",
+  "label": "Terra~5.6",
+  "tasks": 20,
+  "replicates": 4,
+  "arms": {
+    "agent_only": {
+      "cells": 80,
+      "complete": 74,
+      "failed": 5,
+      "unmeasured": 1,
+      "failed_tasks": [
+        "OV-order-006",
+        "QP-part-025"
+      ],
+      "total_cost": 18.84,
+      "mean_cost": 0.2355,
+      "ci95_mean_cost": [
+        0.2183,
+        0.2541
+      ],
+      "median_cost": 0.1766,
+      "max_cost": 1.2662,
+      "mean_input_k": 372.1,
+      "mean_output_k": 6.39,
+      "mean_wall_s": 124.3
+    },
+    "hybrid_guided": {
+      "cells": 80,
+      "complete": 79,
+      "failed": 1,
+      "unmeasured": 0,
+      "failed_tasks": [
+        "QP-part-025"
+      ],
+      "total_cost": 15.01,
+      "mean_cost": 0.1876,
+      "ci95_mean_cost": [
+        0.1679,
+        0.2082
+      ],
+      "median_cost": 0.1662,
+      "max_cost": 1.2045,
+      "mean_input_k": 281.2,
+      "mean_output_k": 5.05,
+      "mean_wall_s": 101.9,
+      "ratio_vs_agent": {
+        "estimate": 0.796,
+        "ci95": [
+          0.727,
+          0.866
+        ]
+      },
+      "cheaper_on_tasks": 14,
+      "task_ratios": {
+        "BA-base-012": 0.84,
+        "BK-bucket-016": 1.12,
+        "LP-price-021": 0.58,
+        "MD-median-015": 0.62,
+        "MM-min-013": 0.98,
+        "OV-order-006": 0.73,
+        "PM-curve-027": 0.48,
+        "QP-part-025": 1.24,
+        "SM-select-022": 1.22,
+        "TL-lev-020": 1.25,
+        "TR-cancel-026": 0.86,
+        "TR-discard-011": 1.18,
+        "TR-order-010": 1.13,
+        "TS-trial-019": 0.48,
+        "UC-credits-008": 0.62,
+        "VS-contrib-003": 0.35,
+        "VS-fees-001": 0.76,
+        "VS-redeem-004": 0.44,
+        "VS-shares-002": 0.51,
+        "WU-consume-023": 0.52
+      }
+    },
+    "hybrid_flexible": {
+      "cells": 80,
+      "complete": 78,
+      "failed": 2,
+      "unmeasured": 0,
+      "failed_tasks": [
+        "QP-part-025"
+      ],
+      "total_cost": 16.6,
+      "mean_cost": 0.2075,
+      "ci95_mean_cost": [
+        0.1828,
+        0.232
+      ],
+      "median_cost": 0.1617,
+      "max_cost": 1.2739,
+      "mean_input_k": 342.0,
+      "mean_output_k": 5.25,
+      "mean_wall_s": 103.0,
+      "ratio_vs_agent": {
+        "estimate": 0.881,
+        "ci95": [
+          0.783,
+          0.991
+        ]
+      },
+      "cheaper_on_tasks": 14,
+      "task_ratios": {
+        "BA-base-012": 0.94,
+        "BK-bucket-016": 1.22,
+        "LP-price-021": 0.69,
+        "MD-median-015": 0.87,
+        "MM-min-013": 0.89,
+        "OV-order-006": 0.83,
+        "PM-curve-027": 0.66,
+        "QP-part-025": 1.22,
+        "SM-select-022": 1.31,
+        "TL-lev-020": 1.26,
+        "TR-cancel-026": 0.98,
+        "TR-discard-011": 1.12,
+        "TR-order-010": 1.1,
+        "TS-trial-019": 0.53,
+        "UC-credits-008": 0.81,
+        "VS-contrib-003": 0.45,
+        "VS-fees-001": 0.92,
+        "VS-redeem-004": 0.49,
+        "VS-shares-002": 0.58,
+        "WU-consume-023": 0.76
+      }
+    }
+  }
+}

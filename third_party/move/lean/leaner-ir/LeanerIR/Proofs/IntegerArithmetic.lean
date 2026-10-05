@@ -29,6 +29,98 @@ theorem bitwiseAnd_nonnegative (left right : Int)
   rw [← Int.toNat_of_nonneg leftNonnegative, ← Int.toNat_of_nonneg rightNonnegative]
   rfl
 
+/-- Bits added to a value that holds none of them: their disjunction. -/
+private theorem xor_add_of_and_eq {a c : Nat} (within : a &&& c = c) : (a ^^^ c) + c = a := by
+  have aBelow : a < 2 ^ a := Nat.lt_two_pow_self
+  have cBelow : c < 2 ^ a := by
+    have : c ≤ a := within ▸ Nat.and_le_left
+    omega
+  have xBelow : a ^^^ c < 2 ^ a := Nat.xor_lt_two_pow aBelow cBelow
+  have disjoint : BitVec.ofNat a (a ^^^ c) &&& BitVec.ofNat a c = 0#a := by
+    apply BitVec.eq_of_toNat_eq
+    rw [BitVec.toNat_and, BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt xBelow,
+      Nat.mod_eq_of_lt cBelow, BitVec.toNat_ofNat, Nat.zero_mod]
+    apply Nat.eq_of_testBit_eq
+    intro i
+    have bit := congrArg (Nat.testBit · i) within
+    simp only [Nat.testBit_and] at bit
+    simp only [Nat.testBit_and, Nat.testBit_xor, Nat.zero_testBit]
+    cases ha : a.testBit i <;> cases hc : c.testBit i <;> simp_all
+  have sum := BitVec.toNat_add_of_and_eq_zero disjoint
+  rw [BitVec.add_eq_or_of_and_eq_zero _ _ disjoint, BitVec.toNat_or, BitVec.toNat_ofNat,
+    BitVec.toNat_ofNat, Nat.mod_eq_of_lt xBelow, Nat.mod_eq_of_lt cBelow] at sum
+  have union : (a ^^^ c) ||| c = a := by
+    apply Nat.eq_of_testBit_eq
+    intro i
+    have bit := congrArg (Nat.testBit · i) within
+    simp only [Nat.testBit_and] at bit
+    simp only [Nat.testBit_or, Nat.testBit_xor]
+    cases ha : a.testBit i <;> cases hc : c.testBit i <;> simp_all
+  omega
+
+theorem bitwiseOr_nonnegative (left right : Int)
+    (leftNonnegative : 0 ≤ left) (rightNonnegative : 0 ≤ right) :
+    bitwiseOr left right = Int.ofNat (left.toNat ||| right.toNat) := by
+  rw [← Int.toNat_of_nonneg leftNonnegative, ← Int.toNat_of_nonneg rightNonnegative]
+  rfl
+
+theorem bitwiseXor_nonnegative (left right : Int)
+    (leftNonnegative : 0 ≤ left) (rightNonnegative : 0 ≤ right) :
+    bitwiseXor left right = Int.ofNat (left.toNat ^^^ right.toNat) := by
+  rw [← Int.toNat_of_nonneg leftNonnegative, ← Int.toNat_of_nonneg rightNonnegative]
+  generalize left.toNat = m
+  generalize right.toNat = n
+  have within : (m ||| n) &&& (m &&& n) = m &&& n := by
+    apply Nat.eq_of_testBit_eq
+    intro i
+    simp only [Nat.testBit_and, Nat.testBit_or]
+    cases m.testBit i <;> cases n.testBit i <;> rfl
+  have parts : (m ||| n) ^^^ (m &&& n) = m ^^^ n := by
+    apply Nat.eq_of_testBit_eq
+    intro i
+    simp only [Nat.testBit_and, Nat.testBit_or, Nat.testBit_xor]
+    cases m.testBit i <;> cases n.testBit i <;> rfl
+  have sum := xor_add_of_and_eq within
+  rw [parts] at sum
+  have difference : (m ||| n) - (m &&& n) = m ^^^ n := by omega
+  show Int.ofNat ((m ||| n) - ((m ||| n) &&& (m &&& n))) = Int.ofNat ((m : Int).toNat ^^^ (n : Int).toNat)
+  rw [within, difference, Int.toNat_natCast, Int.toNat_natCast]
+
+/-- Exclusive disjunction with the ones below a width complements a value
+below it. -/
+theorem xor_two_pow_sub_one {n k : Nat} (below : n < 2 ^ k) :
+    n ^^^ (2 ^ k - 1) = 2 ^ k - 1 - n := by
+  have := BitVec.toNat_xor (BitVec.ofNat k n) (BitVec.allOnes k)
+  rw [BitVec.xor_allOnes, BitVec.toNat_not, BitVec.toNat_ofNat, BitVec.toNat_allOnes,
+    Nat.mod_eq_of_lt below] at this
+  omega
+
+theorem bitwiseAnd_comm (left right : Int) : bitwiseAnd left right = bitwiseAnd right left := by
+  cases left <;> cases right <;> simp only [bitwiseAnd, Nat.and_comm, Nat.or_comm]
+
+theorem bitwiseAnd_self (value : Int) : bitwiseAnd value value = value := by
+  cases value <;> simp only [bitwiseAnd, Nat.and_self, Nat.or_self]
+
+theorem bitwiseOr_self (value : Int) : bitwiseOr value value = value := by
+  cases value <;> simp only [bitwiseOr, bitwiseAnd_self] <;> rfl
+
+theorem bitwiseAnd_nonneg {left right : Int} (leftNonnegative : 0 ≤ left)
+    (rightNonnegative : 0 ≤ right) : 0 ≤ bitwiseAnd left right := by
+  rw [bitwiseAnd_nonnegative left right leftNonnegative rightNonnegative]
+  exact Int.natCast_nonneg _
+
+/-- A conjunction of nonnegative values is bounded by each. -/
+theorem bitwiseAnd_bounds {left right : Int} (leftNonnegative : 0 ≤ left)
+    (rightNonnegative : 0 ≤ right) :
+    0 ≤ bitwiseAnd left right ∧ bitwiseAnd left right ≤ left ∧
+      bitwiseAnd left right ≤ right := by
+  rw [bitwiseAnd_nonnegative left right leftNonnegative rightNonnegative, Int.ofNat_eq_coe]
+  have leftBound := Nat.and_le_left (n := left.toNat) (m := right.toNat)
+  have rightBound := Nat.and_le_right (n := left.toNat) (m := right.toNat)
+  have leftCast := Int.toNat_of_nonneg leftNonnegative
+  have rightCast := Int.toNat_of_nonneg rightNonnegative
+  refine ⟨Int.natCast_nonneg _, ?_, ?_⟩ <;> omega
+
 theorem bitwiseAnd_mod (left right modulus : Int)
     (leftLower : 0 ≤ left) (leftUpper : left < modulus)
     (rightLower : 0 ≤ right) (rightUpper : right < modulus) :

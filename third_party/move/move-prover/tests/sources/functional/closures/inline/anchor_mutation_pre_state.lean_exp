@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:13:52
+   │
+13 │     inline fun bump_other_then_apply(f: |u64| u64, a: address, b: address, x: u64): u64 {
+   │                                                    ^
+
+tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:25:5: error: operation `LeanerIR.Operation.data
+  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 2 } } "v")` is outside the current LeanerLang parser

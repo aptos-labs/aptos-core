@@ -1,60 +1,35 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open Move
-open scoped Move Move.Spec
-
-module LeanerBorrowRecursion where
-
-  partial fun drain (_slot : &mut U64) : Action Unit := do
-    let current ← *_slot
+leaner module 0x0::LeanerBorrowRecursion where
+  fun drain(slot : &mut u64) -> Unit := do
+    let current := *slot
     if current == 0 then return ()
-    _slot := current - 1
-    continue drain _slot
+    *slot := current - 1
+    drain(slot)
 
-  spec drain (_slot : &mut U64) where
-    ensures True
+  fun ping(slot : &mut u64, remaining : u64) -> Unit :=
+    if remaining == 0 then *slot := 21 else pong(slot, remaining - 1)
 
-  mutual
-    partial fun ping (_slot : &mut U64) (remaining : U64) : Action Unit := do
-      if remaining == 0 then
-        _slot := 21
-      else
-        pong _slot (remaining - 1)
+  fun pong(slot : &mut u64, remaining : u64) -> Unit :=
+    if remaining == 0 then *slot := 22 else ping(slot, remaining - 1)
 
-    partial fun pong (_slot : &mut U64) (remaining : U64) : Action Unit := do
-      if remaining == 0 then
-        _slot := 22
-      else
-        ping _slot (remaining - 1)
-  end
+  fun run() -> u64 := do
+    let mut owner : u64 := 4
+    let writer := &mut owner
+    drain(writer)
+    let result := *writer
+    result
 
-  spec ping (_slot : &mut U64) (_remaining : U64) where
-    ensures True
-
-  spec pong (_slot : &mut U64) (_remaining : U64) where
-    ensures True
-
-  fun run : Action U64 := do
-    let owner : U64 := 4
-    let writer ← &mut owner
-    drain writer
-    let result ← *writer
-    pure result
-
-  spec run where
-    ensures True
-
-  fun run_mutual : Action U64 := do
-    let owner : U64 := 0
-    let writer ← &mut owner
-    ping writer 3
-    let result ← *writer
-    pure result
-
-  spec run_mutual where
-    ensures True
+  fun run_mutual() -> u64 := do
+    let mut owner : u64 := 0
+    let writer := &mut owner
+    ping(writer, 3)
+    let result := *writer
+    result
 
 --# run 0x0::LeanerBorrowRecursion::run
 

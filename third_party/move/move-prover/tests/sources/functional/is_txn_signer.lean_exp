@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/is_txn_signer.move:17:16: error: the assertion `is_txn_signer_addr(@0x7)` does not hold
+tests/sources/functional/is_txn_signer.move:16:5: error: leaner verification failed: the automatic verification of `f1_incorrect` failed; provide a proof: `verify f1_incorrect by …` in `tests/sources/functional/is_txn_signer.proof.lean` (`verify f1_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/is_txn_signer.move:21:16: error: the assertion `is_txn_signer_addr(@0x7)` does not hold
+tests/sources/functional/is_txn_signer.move:20:5: error: leaner verification failed: the automatic verification of `f2_incorrect` failed; provide a proof: `verify f2_incorrect by …` in `tests/sources/functional/is_txn_signer.proof.lean` (`verify f2_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/is_txn_signer.move:31:16: error: the assertion `is_txn_signer_addr(@0x7)` does not hold
+tests/sources/functional/is_txn_signer.move:29:5: error: leaner verification failed: the automatic verification of `f4_incorrect` failed; provide a proof: `verify f4_incorrect by …` in `tests/sources/functional/is_txn_signer.proof.lean` (`verify f4_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/is_txn_signer.move:90:9: error: the module invariant `invariant [update] old(exists<Counter>(ADMIN_ADDRESS()))
+        && global<Counter>(ADMIN_ADDRESS()).i
+          != old(global<Counter>(ADMIN_ADDRESS()).i)
+        ==> is_txn_signer_addr(ADMIN_ADDRESS())` does not hold after a write of memory it reads
+tests/sources/functional/is_txn_signer.move:83:5: error: leaner verification failed: the automatic verification of `increment_incorrect` failed; provide a proof: `verify increment_incorrect by …` in `tests/sources/functional/is_txn_signer.proof.lean` (`verify increment_incorrect by skip` shows the obligations it leaves)

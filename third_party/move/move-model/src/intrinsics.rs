@@ -6,14 +6,28 @@
 use crate::{
     ast::{Address, Operation, PropertyBag, PropertyValue, QualifiedSymbol},
     builder::module_builder::SpecBlockContext,
-    model::{IntrinsicId, QualifiedId, SpecFunId},
+    model::{FieldId, IntrinsicId, QualifiedId, SpecFunId},
     pragmas::{
-        IntrinsicFunDef, INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
+        IntrinsicFunDef, INTRINSIC_FUN_MAP_ITER_BORROW_MUT, INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+        INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
     symbol::{Symbol, SymbolPool},
+    ty::{PrimitiveType, Type},
     FunId, GlobalEnv, Loc, ModuleBuilder, StructId,
 };
 use std::{collections::BTreeMap, ops::Deref};
+
+/// The iterator field which locates the entry a `map_iter_borrow_mut`
+/// binding borrows: a field of the key type (a keyed iterator), or else the
+/// single integer field (a position-based iterator, whose entry is
+/// `map_spec_key_at` of the position).
+#[derive(Clone, Copy, Debug)]
+pub struct IterKeyField {
+    pub iter_type: QualifiedId<StructId>,
+    pub variant: Symbol,
+    pub field: FieldId,
+    pub is_position: bool,
+}
 
 /// An information pack that holds the intrinsic declaration
 #[derive(Clone, Debug)]
@@ -107,6 +121,83 @@ impl IntrinsicDecl {
         let symbol_pool = env.symbol_pool();
         let sym = symbol_pool.make(name);
         self.intrinsic_to_move_fun.get(&sym).cloned()
+    }
+
+    /// The iterator field which locates the entry a `map_iter_borrow_mut`
+    /// binding borrows. `None` when no such function is bound, an error
+    /// message when the binding has not the required shape.
+    pub fn iter_key_field(&self, env: &GlobalEnv) -> Option<Result<IterKeyField, &'static str>> {
+        let fun_qid = self.lookup_move_fun(env, INTRINSIC_FUN_MAP_ITER_BORROW_MUT)?;
+        Some(self.iter_key_field_of(env, fun_qid))
+    }
+
+    fn iter_key_field_of(
+        &self,
+        env: &GlobalEnv,
+        fun_qid: QualifiedId<FunId>,
+    ) -> Result<IterKeyField, &'static str> {
+        let shape_msg = "the first parameter of a `map_iter_borrow_mut` function must be an \
+                         enum whose payload variant carries either a field of the key type \
+                         (a key-based iterator) or a single integer field (a position-based \
+                         iterator)";
+        let fun_env = env.get_function(fun_qid);
+        let param_tys = fun_env.get_parameter_types();
+        let Some(Type::Struct(mid, sid, _)) = param_tys.first().map(|ty| ty.skip_reference())
+        else {
+            return Err(shape_msg);
+        };
+        let iter_env = env.get_struct(mid.qualified(*sid));
+        if !iter_env.has_variants() {
+            return Err(shape_msg);
+        }
+        // A key field wins over an integer one: a keyed iterator names its key
+        // directly, which needs no enumeration.
+        let mut by_key = None;
+        let mut by_position = None;
+        for variant in iter_env.get_variants() {
+            for field in iter_env.get_fields_of_variant(variant) {
+                if field.get_type() == Type::TypeParameter(0) {
+                    if by_key.is_some() {
+                        return Err(
+                            "the iterator enum of a `map_iter_borrow_mut` function must \
+                                    have exactly one field of the key type",
+                        );
+                    }
+                    by_key = Some((variant, field.get_id()));
+                } else if matches!(
+                    field.get_type(),
+                    Type::Primitive(PrimitiveType::U64 | PrimitiveType::Num)
+                ) {
+                    if by_position.is_some() {
+                        return Err(
+                            "the iterator enum of a position-based `map_iter_borrow_mut` \
+                                    function must have exactly one integer field",
+                        );
+                    }
+                    by_position = Some((variant, field.get_id()));
+                }
+            }
+        }
+        let (is_position, (variant, field)) = match (by_key, by_position) {
+            (Some(found), _) => (false, found),
+            (None, Some(found)) => (true, found),
+            (None, None) => return Err(shape_msg),
+        };
+        if is_position
+            && self
+                .lookup_spec_fun(env, INTRINSIC_FUN_MAP_SPEC_KEY_AT)
+                .is_none()
+        {
+            return Err("a position-based `map_iter_borrow_mut` function requires \
+                        `map_spec_key_at` to be bound: the position is turned into a key \
+                        through the enumeration");
+        }
+        Ok(IterKeyField {
+            iter_type: mid.qualified(*sid),
+            variant,
+            field,
+            is_position,
+        })
     }
 
     /// Constructs a declaration directly from its parts, bypassing the
@@ -449,6 +540,28 @@ impl IntrinsicsAnnotation {
         let move_intrinsic_sym = decl.move_fun_to_intrinsic.get(move_qid)?;
         let abort_intrinsic_sym = decl.move_to_abort_spec_intrinsic.get(move_intrinsic_sym)?;
         decl.intrinsic_to_spec_fun.get(abort_intrinsic_sym).cloned()
+    }
+
+    /// Whether the Move function is bound to an intrinsic whose prover model never aborts,
+    /// i.e. whose role has no abort-condition counterpart (see `IntrinsicFunDef`). A role
+    /// with such a counterpart is not covered, even when the declaration leaves it unbound.
+    pub fn is_non_aborting_move_fun(&self, move_qid: &QualifiedId<FunId>) -> bool {
+        self.get_decl_for_move_fun(move_qid).is_some_and(|decl| {
+            decl.move_fun_to_intrinsic
+                .get(move_qid)
+                .is_some_and(|sym| !decl.move_to_abort_spec_intrinsic.contains_key(sym))
+        })
+    }
+
+    /// The abort-condition role (`map_spec_aborts_*`) of the intrinsic the Move
+    /// function is bound to, whether or not the declaration binds a spec
+    /// function to it. `None` for a role which never aborts.
+    pub fn abort_role_for_move_fun(&self, move_qid: &QualifiedId<FunId>) -> Option<Symbol> {
+        let decl = self.get_decl_for_move_fun(move_qid)?;
+        let move_intrinsic_sym = decl.move_fun_to_intrinsic.get(move_qid)?;
+        decl.move_to_abort_spec_intrinsic
+            .get(move_intrinsic_sym)
+            .copied()
     }
 
     /// Get the intrinsic decl for a spec function

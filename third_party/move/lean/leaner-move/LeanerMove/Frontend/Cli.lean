@@ -82,23 +82,120 @@ def readXastDir (dir : System.FilePath) : IO Package := do
   let modules ← files.toList.mapM fun e => decodeFile e.path
   pure { modules }
 
+/-- A path as the export records a source: relative to the directory the
+verifier runs in, as the compiler was given it, without a leading `./`. -/
+private def plainPath (path : System.FilePath) : String :=
+  let path := path.normalize.toString
+  if path.startsWith "./" then (path.drop 2).toString else path
+
+/-- The export's modules split into those `owns` selects and the
+dependencies they came in with. -/
+private def splitBy (package : Package) (owns : Module → Bool) : Package :=
+  let owned := package.modules.filter owns
+  let dependencies := package.modules.filter fun candidate => !owns candidate
+  { modules := owned, dependencies }
+
+/-- The modules of a package among an export's modules: the ones whose
+source lies under the package's `sources` directory; the others came in
+through a dependency. -/
+def splitOwned (package : Package) (dir : System.FilePath) : Package :=
+  let ownedPrefix := plainPath (dir / "sources")
+  splitBy package fun candidate =>
+    candidate.sources.any fun source => (plainPath source).startsWith ownedPrefix
+
+/-- The modules of a Move file among an export's modules: the ones it
+declares; the others came in as dependencies. -/
+def splitDeclared (package : Package) (file : System.FilePath) : Package :=
+  splitBy package fun candidate =>
+    (candidate.sources[candidate.loc.file]?).any (plainPath · == plainPath file)
+
+/-- Whether a module is selected by `filter`: some source file name of it
+contains the filter; every module without one. -/
+def selectedBy (filter : Option String) (module : Module) : Bool :=
+  match filter with
+  | some part => module.sources.any fun source =>
+      (System.FilePath.fileName source).any fun name => (name.splitOn part).length > 1
+  | none => true
+
+/-- The modules of `source` split from their dependencies (`splitOwned`,
+`splitDeclared`) for verification: those `filter` selects are the targets;
+the others and the dependencies are kept whole so their calls inline, but
+are not targets. A filter selecting no module is an error, not a run that
+verifies nothing. -/
+def packageTargets (split : Package) (source : System.FilePath)
+    (filter : Option String) : IO Package := do
+  let (targets, linked) := split.modules.partition (selectedBy filter)
+  if targets.isEmpty then
+    throw <| IO.userError s!"no module of {source} matches the filter"
+  pure { modules := targets ++ (linked ++ split.dependencies).map ({ · with isTarget := false }) }
+
+/-- Reads an existing export of `source`, a package directory or a Move
+file, made by `move exchange --format ast`, for verification: the modules
+outside the package's sources, or not declared in the file, are the
+dependencies it was exported with (`packageTargets`). -/
+def readExportDir (dir : System.FilePath) (source : System.FilePath)
+    (filter : Option String := none) : IO Package := do
+  let package ← readXastDir dir
+  let split := if ← source.isDir then splitOwned package source else splitDeclared package source
+  if split.modules.isEmpty then
+    throw <| IO.userError s!"the export {dir} holds no module of {source}"
+  packageTargets split source filter
+
+/-- The flag compiling a package in dev mode, with its `[dev-addresses]`
+and `[dev-dependencies]`. -/
+private def devFlag (dev : Bool) : Array String :=
+  if dev then #["--dev"] else #[]
+
 /-- Exports a Move package (`--package-dir`) and decodes its modules;
-`includeDeps` also exports the dependency modules with source. -/
-def exportPackage (dir : System.FilePath) (includeDeps : Bool := false) : IO Package := do
+`includeDeps` also exports the dependency modules with source, `dev`
+compiles the package in dev mode. -/
+def exportPackage (dir : System.FilePath) (includeDeps : Bool := false) (dev : Bool := false) :
+    IO Package := do
   let (exe, commandArgs) ← findFrontend
   IO.FS.withTempDir fun tmp => do
     let args := commandArgs ++ #["--format", "ast", "--package-dir", dir.toString,
-      "--export-dir", tmp.toString] ++ (if includeDeps then #["--include-deps"] else #[])
+      "--export-dir", tmp.toString] ++ (if includeDeps then #["--include-deps"] else #[]) ++
+      devFlag dev
     run exe args
     let package ← readXastDir tmp
     if !includeDeps then return package
-    -- A package's own modules are the ones under its `sources` directory;
-    -- every other exported module came in through a dependency.
-    let ownedPrefix := (dir / "sources").toString
-    let owned := package.modules.filter fun candidate =>
-      candidate.sources.any (·.startsWith ownedPrefix)
-    let dependencies := package.modules.filter fun candidate =>
-      !candidate.sources.any (·.startsWith ownedPrefix)
-    return { modules := owned, dependencies }
+    return splitOwned package dir
+
+/-- An address without its `0x` and leading zeros, in lower case. -/
+private def normalAddress (address : String) : String :=
+  let digits := (if address.startsWith "0x" then (address.drop 2).toString else address).toLower
+  let trimmed := (digits.dropWhile (· == '0')).toString
+  if trimmed.isEmpty then "0" else trimmed
+
+/-- Whether `selector` — `module`, `address::module`, or `alias::module` —
+names `module`, as `move exchange --modules` reads it. -/
+def matchesSelector (module : Module) (selector : String) : Bool :=
+  match selector.splitOn "::" with
+  | [name] => module.name == name
+  | [address, name] =>
+      let resolved := if address.startsWith "0x" then some address
+        else (module.namedAddresses.find? (·.name == address)).map (·.address)
+      module.name == name && (module.addressAlias == some address ||
+        resolved.any (normalAddress · == normalAddress module.address))
+  | _ => false
+
+/-- Exports the modules `selectors` name from the package at `dir`, with the
+modules verifying them reads, and decodes them: the named modules are the
+verification targets, the others are read whole so their calls inline. `dev`
+compiles the package in dev mode. -/
+def exportModules (dir : System.FilePath) (selectors : Array String) (dev : Bool := false) :
+    IO Package := do
+  let (exe, commandArgs) ← findFrontend
+  IO.FS.withTempDir fun tmp => do
+    run exe (commandArgs ++ #["--format", "ast", "--package-dir", dir.toString,
+      "--export-dir", tmp.toString, "--modules", ",".intercalate selectors.toList] ++
+      devFlag dev)
+    let package ← readXastDir tmp
+    for selector in selectors do
+      unless package.modules.any (matchesSelector · selector) do
+        throw <| IO.userError s!"the export of {dir} holds no module `{selector}`"
+    let selected (module : Module) := selectors.any (matchesSelector module)
+    let (targets, linked) := package.modules.partition selected
+    pure { modules := targets ++ linked.map ({ · with isTarget := false }) }
 
 end LeanerMove.Frontend.Cli

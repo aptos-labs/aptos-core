@@ -26,3 +26,14 @@ Each input with a `--print` section has a `<name>.exp` baseline. Baselines are v
 cargo test -p mono-move-testsuite --test differential          # verify against baselines
 UPBL=1 cargo test -p mono-move-testsuite --test differential   # update baselines
 ```
+
+## Transactional Tests
+
+`tests/transactional.rs` runs the compiler-v2 and move-vm transactional corpora on MonoMove through the shared framework (`move-transactional-test-runner`), against V1-vm's canonical `.exp` baselines, which this suite cannot update. Trial selection comes from `move-transactional-test-matrix`; sources with a `--gas-budget` run stay ignored because the adapter currently runs unmetered. Trial names carry the corpus (`corpus=compiler-v2`, `corpus=move-vm`), so `-- 'corpus=move-vm'` selects one corpus.
+
+A source whose MonoMove output legitimately differs is listed in the matrix crate's `mono_move_divergences` (with a category `Unsupported`, `Semantic`, or `Rendering`, and a reason) and runs against a MonoMove-owned override under `transactional-baselines/<corpus>/<path>.<config>.exp`, one per config. The manifest entry authorizes the overrides: add the entry, then run with `UB=1` to create or refresh the files. If MonoMove matches the canonical baseline under some configs only, list them with `.except(&["<config>"])` on the entry; those configs run against canonical and get no override. Startup rejects override files that no active trial reads, entries with no active trial, and overrides identical to the canonical baseline: the divergence has closed under that config, so `except` it and delete that override, or remove the entry and all its overrides if it closed everywhere.
+
+```bash
+cargo test -p mono-move-testsuite --test transactional          # verify
+UB=1 cargo test -p mono-move-testsuite --test transactional     # create or refresh overrides
+```

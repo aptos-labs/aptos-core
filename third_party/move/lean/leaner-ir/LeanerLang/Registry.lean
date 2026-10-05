@@ -27,6 +27,10 @@ module. -/
 def registeredUnits (environment : Environment) : List (Name × ValidatedUnit) :=
   (unitExtension.getState environment).toList
 
+/-- The validated Leaner namespaces this module registers, in order. -/
+def moduleUnits (environment : Environment) : List (Name × ValidatedUnit) :=
+  (unitExtension.getEntries environment).reverse
+
 /-- Persist a checked source unit. Repeating an identical declaration is
 idempotent; changing the meaning of an existing name is rejected. -/
 def registerUnit (environment : Environment) (name : Name) (unit : ValidatedUnit) :

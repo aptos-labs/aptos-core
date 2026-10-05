@@ -1,0 +1,4 @@
+LeanerE2ETests/Check/Specifications/StateLabels.lean:53:4: error: the specification clause `ensures ∃ (S : StateDomain), (..S |~ increased(addr)) && (S.. |~ increased(addr))` is not established
+LeanerE2ETests/Check/Specifications/StateLabels.lean:50:7: error: leaner verification failed: the automatic verification of `bump_once` failed; provide a proof: `verify bump_once by …` in the module (`verify bump_once by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/StateLabels.lean:72:4: error: the specification clause `ensures ∃ (S : StateDomain), (..S |~ grew(old(c), c)) && (S.. |~ grew(old(c), c))` is not established
+LeanerE2ETests/Check/Specifications/StateLabels.lean:70:7: error: leaner verification failed: the automatic verification of `inc_once` failed; provide a proof: `verify inc_once by …` in the module (`verify inc_once by skip` shows the obligations it leaves)

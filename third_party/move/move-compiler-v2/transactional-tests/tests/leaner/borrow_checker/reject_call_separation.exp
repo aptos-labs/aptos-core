@@ -1,11 +1,11 @@
 processed 1 task
-task 0 lines 1-25:  publish [import Move]
+task 0 lines 3-17:  publish [import LeanerMove]
 Error: compilation errors:
- error: borrow safety error `writer`: call summary is incompatible with its reference argument (conflicts with `reader`)
-   ┌─ TEMPFILE:16:5
+ error: LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+   ┌─ TEMPFILE:13:19
    │
-16 │     write_and_observe writer reader
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 │     let reader := &mut owner
+   │                   ^^^^^^^^^^
 
 
 exiting with Leaner elaboration errors

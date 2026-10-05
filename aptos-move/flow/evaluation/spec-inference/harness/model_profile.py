@@ -7,6 +7,7 @@ from dataclasses import asdict, replace
 import json
 import os
 from pathlib import Path
+import platform
 import shutil
 import subprocess
 
@@ -24,8 +25,21 @@ PROFILES = {
 SUBSCRIPTION_PROFILES = {PROFILES["opus"], PROFILES["sonnet"]}
 CODEX_PROFILES = {PROFILES["sol56"], PROFILES["terra56"]}
 CODEX_CLI_VERSION = "0.153.2"
-CODEX_CODE_MODE_HOST_SHA256 = "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1"
+#: The code-mode host published with the pinned CLI release, by machine: the
+#: `codex-code-mode-host-<machine>-unknown-linux-musl` asset of `rust-v0.153.2`.
+CODEX_CODE_MODE_HOST_SHA256 = {
+    "aarch64": "bb157e504d1d192fdff345d8d67edc3cb44507e92cf6e8435e1f930661b7286c",
+    "x86_64": "f9dc99ef253919b4b48b53a346b1ebec76589eb854a1ab1a64afb4ff51cfbb61",
+}
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def codex_code_mode_host_sha256() -> str:
+    """The pinned code-mode host digest for this machine."""
+    machine = platform.machine()
+    if machine not in CODEX_CODE_MODE_HOST_SHA256:
+        raise ValueError(f"no pinned Codex code-mode host for machine `{machine}`")
+    return CODEX_CODE_MODE_HOST_SHA256[machine]
 
 
 def select_model(
@@ -50,7 +64,7 @@ def select_model(
         agent_runtime="codex" if codex_profile else "claude",
         codex_cli_version=CODEX_CLI_VERSION if codex_profile else None,
         codex_code_mode_host_sha256=(
-            CODEX_CODE_MODE_HOST_SHA256 if codex_profile else None
+            codex_code_mode_host_sha256() if codex_profile else None
         ),
         source_commit=source_commit or base_config.source_commit,
         infrastructure_retries=(

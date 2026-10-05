@@ -2,7 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.compatibility import _failure_kind, _find_untrusted_inferred_conditions
+from harness.compatibility import (
+    _failure_kind,
+    _find_untrusted_inferred_conditions,
+    strip_function_specs,
+)
 from harness.judge import CommandResult
 
 
@@ -111,3 +115,37 @@ class CompatibilityFailureKindTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StripFunctionSpecsTest(unittest.TestCase):
+    def test_removes_only_the_target_module_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            sources = Path(temporary) / "sources"
+            sources.mkdir()
+            (sources / "m.move").write_text(
+                "module 0x1::m {\n"
+                "    fun f(): u64 { 1 }\n"
+                "    spec f { ensures result == 1; } proof { assert true; }\n"
+                "    fun g(): u64 { f() }\n"
+                "    spec g { ensures result == 1; }\n"
+                "}\n"
+            )
+            (sources / "n.move").write_text(
+                "module 0x1::n {\n"
+                "    fun f(): u64 { 2 }\n"
+                "    spec f { ensures result == 2; }\n"
+                "}\n"
+            )
+            self.assertEqual(strip_function_specs(Path(temporary), "0x1::m", "f"), 1)
+            m = (sources / "m.move").read_text()
+            self.assertNotIn("spec f", m)
+            self.assertNotIn("proof", m)
+            self.assertIn("spec g { ensures result == 1; }", m)
+            self.assertIn("spec f { ensures result == 2; }", (sources / "n.move").read_text())
+
+    def test_a_missing_contract_removes_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            sources = Path(temporary) / "sources"
+            sources.mkdir()
+            (sources / "m.move").write_text("module 0x1::m {\n    fun f() {}\n}\n")
+            self.assertEqual(strip_function_specs(Path(temporary), "0x1::m", "f"), 0)

@@ -1,0 +1,107 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:103:9
+    │
+103 │         ensures R[a].v == 0 ==> result;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:95: opaque_post_state_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:101: opaque_post_state_fails (spec)
+    =     at tests/sources/regression/closure_requires_guarded.move:102: opaque_post_state_fails (spec)
+    =     at tests/sources/regression/closure_requires_guarded.move:95: opaque_post_state_fails
+    =         a = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:96: opaque_post_state_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:97: opaque_post_state_fails
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:103: opaque_post_state_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:121:33
+    │
+121 │     spec opaque_ensures_fails { ensures result == false; }
+    │                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:118: opaque_ensures_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:119: opaque_ensures_fails
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:121: opaque_ensures_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:149:26
+    │
+149 │     spec mut_ref_fails { ensures result == 0; }
+    │                          ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:144: mut_ref_fails
+    =         v = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:145: mut_ref_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:146: mut_ref_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:42: add
+    =         r = <redacted>
+    =         x = <redacted>
+    =         r = <redacted>
+    =         v = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:147: mut_ref_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:143: mut_ref_fails
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:149: mut_ref_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:163:30
+    │
+163 │     spec transparent_fails { ensures result == 0; }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:160: transparent_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:161: transparent_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:11: g
+    =         x = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:163: transparent_fails (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:174:30
+    │
+174 │     spec through_hof_fails { ensures result == 0; }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:172: through_hof_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:49: apply
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:11: g
+    =         x = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:174: through_hof_fails (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/regression/closure_requires_guarded.move:185:5
+    │
+183 │         f(100)
+    │         ------ abort happened here with code 0x3
+184 │     }
+185 │     spec opaque_abort_fails { aborts_if false; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:182: opaque_abort_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:183: opaque_abort_fails
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/regression/closure_requires_guarded.move:203:9
+    │
+203 │         ensures R[a] == old(R[a]);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/regression/closure_requires_guarded.move:196: opaque_frame_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:202: opaque_frame_fails (spec)
+    =     at tests/sources/regression/closure_requires_guarded.move:196: opaque_frame_fails
+    =         a = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:197: opaque_frame_fails
+    =         f = <redacted>
+    =     at tests/sources/regression/closure_requires_guarded.move:198: opaque_frame_fails
+    =     at tests/sources/regression/closure_requires_guarded.move:203: opaque_frame_fails (spec)

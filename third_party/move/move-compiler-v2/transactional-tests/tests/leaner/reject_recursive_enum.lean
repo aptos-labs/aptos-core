@@ -1,22 +1,10 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-namespace LeanerTxnRejectRecursiveEnum
-
-open Move
-open scoped Move Move.Compiler
-
-/-! ## Functions -/
-
-@[move_enum]
-inductive Chain where
-  | end_
-  | link (next : Chain)
-  deriving Copy, Drop, Store
-
-/-! ## Tests -/
-
-#export_leaner "LeanerRejectRecursiveEnum" structs [Chain] functions []
-
-end LeanerTxnRejectRecursiveEnum
+leaner module 0x0::LeanerRejectRecursiveEnum where
+  enum Chain has Copy, Drop, Store where
+    | End
+    | Link (next : Chain)

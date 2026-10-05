@@ -77,6 +77,8 @@ impl FlowSession {
         let telemetry_filter = filter.clone();
         let evidence_depth = Some(LOOP_INVARIANT_EVIDENCE_DEPTH);
         let uninvariant_loop_is_error = self.evaluation().uninvariant_loop_is_error();
+        let aborts_if_is_strict = self.evaluation().aborts_if_is_strict;
+        let infer_unspecified_helpers = self.evaluation().infer_unspecified_helpers;
 
         let tool_timeout = self.tool_timeout();
         let wrote_files = Arc::new(AtomicBool::new(false));
@@ -126,6 +128,8 @@ impl FlowSession {
                 // than yield an empty contract that verifies; see
                 // `EvaluationConfig::uninvariant_loop_is_error`.
                 options.prover.uninvariant_loop_is_error = uninvariant_loop_is_error;
+                options.prover.aborts_if_is_strict = aborts_if_is_strict;
+                options.prover.infer_unspecified_helpers = infer_unspecified_helpers;
                 options.output_path = temp_dir
                     .path()
                     .join("output.bpl")

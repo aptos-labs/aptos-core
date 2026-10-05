@@ -7,7 +7,7 @@ import LeanerLang
 Defines a fixed-point numeric type with a 32-bit integer part and
 a 32-bit fractional part.
 -/
-leaner module 0x1::fixed_point32 where
+leaner module std::fixed_point32 where
   pragma aborts_if_is_strict
 
   /--
@@ -128,8 +128,10 @@ leaner module 0x1::fixed_point32 where
 
   spec create_from_rational where
     pragma opaque
-    let_pre scaled_numerator := numerator << 64
-    let_pre scaled_denominator := denominator << 32
+    let_pre scaled_numerator := (numerator << 64)
+        % 340282366920938463463374607431768211456
+    let_pre scaled_denominator := (denominator << 32)
+        % 340282366920938463463374607431768211456
     let_pre quotient := scaled_numerator / scaled_denominator
     aborts_if scaled_denominator == 0 with EDENOMINATOR
     aborts_if quotient == 0 && scaled_numerator != 0 with ERATIO_OUT_OF_RANGE
@@ -208,7 +210,8 @@ leaner module 0x1::fixed_point32 where
 
   spec create_from_u64 where
     pragma opaque
-    let_pre scaled_value := val << 32
+    let_pre scaled_value := (val << 32)
+        % 340282366920938463463374607431768211456
     aborts_if scaled_value > MAX_U64
     ensures result == spec_create_from_u64(val)
 
@@ -233,6 +236,7 @@ leaner module 0x1::fixed_point32 where
   Rounds up the given FixedPoint32 to the next largest integer.
   -/
   public fun ceil(self : FixedPoint32) -> u64 := do
+    proof split self.value == self.value >> 32 << 32
     let floored_num := self.floor() << 32u8
     if self.value == floored_num then return floored_num >> 32u8;
     let val := floored_num as u128 + (1u128 << 32u8)
@@ -265,7 +269,11 @@ leaner module 0x1::fixed_point32 where
 
   spec fun spec_round(self : FixedPoint32) : Int := do
     let floor_val := self.value >> 32
-    if self.value < (floor_val << 32) + (1 << 31) then floor_val
+    if self.value
+      < (floor_val << 32)
+        + (1 << 31)
+          % 115792089237316195423570985008687907853269984665640564039457584007913129639936 then
+      floor_val
     else floor_val + 1
 
   -- Expressed in terms of floor_val to avoid modulo: both result branches

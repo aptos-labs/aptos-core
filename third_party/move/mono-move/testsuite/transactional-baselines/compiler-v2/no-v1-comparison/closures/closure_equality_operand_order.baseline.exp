@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 1-43:  publish [module 0xc0ffee::m {]
+task 1 lines 45-45:  run 0xc0ffee::m::main
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_RUNTIME_STATUS,
+    sub_status: None,
+    location: 0xc0ffee::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 7)],
+}

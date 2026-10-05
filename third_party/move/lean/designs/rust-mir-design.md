@@ -1,6 +1,7 @@
 # Leaner Rust frontend through the shared Leaner IR
 
-Status: living design and frontend decision
+Status: living design and frontend decision; open work is listed in
+[`roadmap.md`](roadmap.md), section 7.
 
 ## Decision
 

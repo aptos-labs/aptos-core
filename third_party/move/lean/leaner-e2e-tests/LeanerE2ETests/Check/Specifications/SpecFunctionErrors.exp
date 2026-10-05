@@ -1,10 +1,18 @@
 LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:53:4: error: the specification clause `ensures result == bump(coin)` is not established
-LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:51:7: error: leaner verification failed
-LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:55:0: error: `host_value` has no specification version: it has no body (a native); `spec fun host_value` can declare one
-LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:69:0: error: LIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `is_empty`
-LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:92:0: error: LIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `balance`
-LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:110:0: error: the recursive specification function `loops` needs a `decreases` measure
-LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:118:0: error: the recursive call of `grows` does not decrease its measure under the conditions on its path: omega could not prove the goal:
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:51:7: error: leaner verification failed: the automatic verification of `use_bump_exit` failed; provide a proof: `verify use_bump_exit by …` in the module (`verify use_bump_exit by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:67:4: error: the specification clause `aborts_if false` is not established
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:66:4: error: the specification clause `ensures result == host_value(coin)` is not established
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:65:7: error: leaner verification failed: the automatic verification of `use_host` failed; provide a proof: `verify use_host by …` in the module (`verify use_host by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:75:2: error: LIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `is_empty`
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:97:2: error: LIR-DECLARATION-NAME-DUPLICATE: duplicate specification function declaration `balance`
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:110:0: error: no measure of the recursive specification function `loops` decreases at every recursive call: the recursive call of `loops` does not decrease its measure under the conditions on its path: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  a ≤ 0
+where
+ a := bundle.fst
+goal: bundle.fst.toNat < bundle.fst.toNat
+conditions: []
+LeanerE2ETests/Check/Specifications/SpecFunctionErrors.lean:118:0: error: no measure of the recursive specification function `grows` decreases at every recursive call: the recursive call of `grows` does not decrease its measure under the conditions on its path: omega could not prove the goal:
 a possible counterexample may satisfy the constraints
   a ≥ 1
 where

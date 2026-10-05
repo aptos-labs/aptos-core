@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/strong_edges.move:54:9: error: the specification clause `ensures global<S>(addr).x == 3` is not established
+tests/sources/functional/strong_edges.move:52:5: error: leaner verification failed: the automatic verification of `glob_and_field_edges_incorrect` failed; provide a proof: `verify glob_and_field_edges_incorrect by …` in `tests/sources/functional/strong_edges.proof.lean` (`verify glob_and_field_edges_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/strong_edges.move:64:13: error: the assertion `r == 5` does not hold
+tests/sources/functional/strong_edges.move:59:5: error: leaner verification failed: the automatic verification of `loc__edge_incorrect` failed; provide a proof: `verify loc__edge_incorrect by …` in `tests/sources/functional/strong_edges.proof.lean` (`verify loc__edge_incorrect by skip` shows the obligations it leaves)

@@ -1,0 +1,21 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_bulk_order_utils",
+  "reference_proved": true,
+  "reference_sha256": "046dec9dcfabc70371c09afc30d875eba84b0ed60c6cf9d657138b75644cd125",
+  "schema_version": 2,
+  "target": "aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes",
+  "task_id": "TR-nonzero-031",
+  "threshold_seconds": 20,
+  "wall_seconds": 4.6,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

@@ -1,6 +1,6 @@
 {
   "schema": "move-xast-module",
-  "version": 4,
+  "version": 9,
   "address": "0x42",
   "address_alias": null,
   "name": "generics",
@@ -72,7 +72,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       }
     },
     {
@@ -105,7 +107,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       }
     }
   ],
@@ -296,7 +300,9 @@
             "update_target": null
           }
         ],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 3,
@@ -393,7 +399,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 4,
@@ -450,7 +458,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 9,
@@ -516,7 +526,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 11,
@@ -688,7 +700,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       }
     },
     {
@@ -783,12 +797,16 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       }
     }
   ],
   "spec_vars": [],
   "invariants": [],
+  "lemmas": [],
+  "labels": [],
   "skipped": [],
   "comments": [],
   "sources": [

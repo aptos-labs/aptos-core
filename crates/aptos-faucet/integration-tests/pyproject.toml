@@ -1,5 +1,6 @@
 [tool.poetry]
 name = "aptos-faucet-e2e-tests"
+package-mode = false
 version = "0.1.0"
 description = "Aptos Faucet E2E tests"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]

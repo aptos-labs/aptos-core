@@ -109,21 +109,21 @@ private def fixture : RawUnit where
           loc := ⟨16⟩ }]
       }] }]
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 private def handle (functionId : Nat) : FunctionHandle := {
   namespaceId := ⟨0⟩, functionId := ⟨functionId⟩ }
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 0) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 0) #[] with
       | .ok (_, { value := .returned #[.bool true], .. }) => true
       | _ => false
   | none => false
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 32 (handle 1) #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 32 (handle 1) #[] with
       | .ok (_, { value := .returned #[.bool false], .. }) => true
       | _ => false
   | none => false
@@ -164,7 +164,7 @@ private def missingVariantFixture : RawUnit :=
 
 #guard validationHasDiagnosticAt missingVariantFixture "LIR-SEMANTIC-TARGET" ⟨9⟩
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
 private theorem successfulRunHasDerivation (function : FunctionHandle)
     (success : (Interpreter.run prepared 32 function #[]).isOk) :

@@ -1,19 +1,12 @@
+-- Copyright © Aptos Foundation
+
 --# publish
 
-import Move
+import LeanerMove
 
-open scoped Move
+leaner module 0x0::LeanerRejectInvalidAbility where
+  struct Resource has Key where
+    value : u64
 
-module LeanerRejectInvalidAbility where
-
-  /-! ## Functions -/
-
-  @[move_struct]
-  structure Resource where
-    value : U64
-    deriving Key
-
-  @[move_struct]
-  structure InvalidCopy where
+  struct InvalidCopy has Copy where
     resource : Resource
-    deriving Copy

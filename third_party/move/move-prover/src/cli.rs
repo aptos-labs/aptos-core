@@ -137,6 +137,18 @@ pub struct Options {
     #[command(flatten)]
     #[serde(skip)]
     pub inference: InferenceOptions,
+    /// Verifies the one Move source file with the Lean-based Leaner verifier
+    /// instead of Boogie (see `leaner`); the rendering in Lean is written
+    /// beside the output path, with extension `lean`.
+    #[arg(long)]
+    #[serde(skip)]
+    pub lean: bool,
+    /// The default heartbeat budget of a function's verification with
+    /// `--lean`, in thousands of Lean `maxHeartbeats` units; `pragma
+    /// heartbeats` overrides it. The last occurrence counts.
+    #[arg(long, value_name = "THOUSANDS", overrides_with = "heartbeats")]
+    #[serde(skip)]
+    pub heartbeats: Option<u64>,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the prover.
@@ -169,6 +181,8 @@ impl Default for Options {
             verify_only: None,
             z3_trace: None,
             inference: InferenceOptions::default(),
+            lean: false,
+            heartbeats: None,
         }
     }
 }

@@ -1,6 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import LeanerIR.Proofs.Denote.Closures
 import LeanerIR.Proofs.Denote.Compile
 
 /-!
@@ -22,212 +23,332 @@ namespace LeanerIR.Proofs.Denote
 
 open LeanerIR.Validation
 
-variable [Skolems]
+section Frames
+variable {unit : Validation.ValidatedUnit} [Skolems unit]
 
-/-- Exact agreement of a compiled function's denotation with its prophetic
-big-step meaning (`propheticMeaning`): the big-step run from any admissible
-start with the same globals, the argument references lent under loans, and
-each reference's prophecy its resolved export, at every skolem family and
-type instantiation.  To be proved by induction on the fuel of
+/-- Agreement of a compiled function's prophetic big-step meaning
+(`propheticMeaning`) with its denotation: every outcome of the big-step run
+from an admissible start whose globals encode the memory, with the argument
+references lent under loans and each reference's prophecy its resolved
+export, is an outcome of the denotation, at every frame and type
+instantiation.  Where the frame and the instantiation disagree on a type
+the callee reads the prophetic meaning has no outcome; at a coherent frame
+the compiler's types agree with the runtime's, so a coherent caller's calls
+and closures have coherent frames.  To be proved by induction on the fuel of
 `compileExpr`, one case per term constructor. -/
-axiom compileFunction_agrees (unit : ExecutableUnit) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f)
+axiom compileFunction_agrees {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit] (handle : FunctionHandle)
+    (f : Function unit) (compiled : compileFunction unit handle = .ok f)
     (typeInstantiation : Array (TypeId × TypeId)) (args : HList f.params) :
-    Spec.Equiv (f.denote unit typeInstantiation args)
-      (propheticMeaning unit typeInstantiation handle f.params f.result args)
+    Spec.Refines (propheticMeaning executable typeInstantiation handle f.params f.result args)
+      (f.denote executable typeInstantiation args)
 
-/-- The prophetic meanings of the compiled members of a cycle of calls are
-the least fixed point of their bodies, with the calls to the members routed
-to the argument: every outcome is one of a finite unfolding, since a
-big-step derivation nests finitely many calls.  Assumed with the agreement
-above (`designs/denotation.md`, D6). -/
-axiom compileFunction_least_cycle (unit : ExecutableUnit)
-    (members : List (FunctionHandle × Function))
+/-- The prophetic meanings of the compiled members of a cycle of calls, at
+every slot (the runtime family, or a skolem family and type instantiation),
+are the least fixed point of their bodies over all slots, with every call to
+a member routed to the argument at the slot it reaches (at the runtime
+family, calls with type arguments stay closed): every outcome is one of a finite unfolding, since a big-step
+derivation nests finitely many calls. A function calling itself is a cycle
+of one. Assumed with the agreement above (`designs/denotation.md`, D6). -/
+axiom compileFunction_least_cycle {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit]
+    (members : List (FunctionHandle × Function unit))
     (compiled : ∀ index : CycleIndex members,
-      compileFunction unit.unit index.member.1 = .ok index.member.2)
-    (typeInstantiation : Array (TypeId × TypeId)) (index : CycleIndex members)
-    (args : HList index.member.2.params) :
+      compileFunction unit index.member.1 = .ok index.member.2)
+    (typeInstantiation : Array (TypeId × TypeId)) (slot : CycleSlot unit members)
+    (args : @HList (familySkolems slot.family).toCarriers slot.position.member.2.params) :
     Spec.Refines
-      (propheticMeaning unit typeInstantiation index.member.1 index.member.2.params
-        index.member.2.result args)
-      (Spec.fixFamily (Index := CycleIndex members)
-        (Args := fun index => HList index.member.2.params)
-        (Result := fun index => index.member.2.result.carrier)
-        (fun self index => index.member.2.denoteWith
-          ⟨cycleMeaning unit members self, closedGeneric unit typeInstantiation,
-            typeInstantiation⟩)
-        index args)
+      (@propheticMeaning _ executable (familySkolems slot.family)
+        (familyInstantiation typeInstantiation slot.family) slot.position.member.1
+        slot.position.member.2.params slot.position.member.2.result args)
+      (Spec.fixFamily (Index := CycleSlot unit members)
+        (Args := fun slot => @HList (familySkolems slot.family).toCarriers slot.position.member.2.params)
+        (Result := fun slot =>
+          @ResultShape.carrier (familySkolems slot.family).toCarriers slot.position.member.2.result)
+        (fun self slot => @Function.denoteWith _ _ (familySkolems slot.family)
+          (cycleMeanings executable members typeInstantiation self slot) slot.position.member.2)
+        slot args)
 
-/-- The prophetic meaning of a compiled generic function, at every skolem
-family and type instantiation, is the least fixed point of its body over
-all of them, with its own calls, with or without type arguments, routed
-to the argument at the family and instantiation the call induces.
-Assumed with the agreement above (`designs/denotation.md`, D6). -/
-axiom compileFunction_least_generic (unit : ExecutableUnit) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f)
-    (typeInstantiation : Array (TypeId × TypeId)) (args : HList f.params) :
-    Spec.Refines (propheticMeaning unit typeInstantiation handle f.params f.result args)
-      (Spec.fixFamily (Index := Skolems × Array (TypeId × TypeId))
-        (Args := fun index => @HList index.1 f.params)
-        (Result := fun index => @ResultShape.carrier index.1 f.result)
-        (fun self index => @Function.denoteWith index.1
-          (@Meanings.mk index.1 (@recursiveMeaning index.1 unit handle f.params f.result (self index))
-            (@recursiveGeneric index.1 unit handle f.params f.result
-              (fun Θ instantiation => self (Θ, instantiation)) index.2)
-            index.2) f)
-        (‹Skolems›, typeInstantiation) args)
-
-omit [Skolems] in
-/-- Equivalent computations have the same weakest precondition. -/
-theorem wp_congr_equiv {σ ε α : Type} {a b : Spec σ ε α} (equiv : Spec.Equiv a b)
-    (ensures : α → σ → Prop) (aborts : ε → Prop) (initial : σ) :
-    wp a ensures aborts initial ↔ wp b ensures aborts initial := by
-  simp only [wp]
-  rw [(equiv.undefined initial)]
-  constructor
-  · rintro ⟨normal, failing, defined⟩
-    exact ⟨fun r f step => normal r f ((equiv.ok _ _ _).mpr step),
-      fun e step => failing e ((equiv.aborts _ _).mpr step), defined⟩
-  · rintro ⟨normal, failing, defined⟩
-    exact ⟨fun r f step => normal r f ((equiv.ok _ _ _).mp step),
-      fun e step => failing e ((equiv.aborts _ _).mp step), defined⟩
+omit [Skolems unit] in
+/-- A refinement keeps every weakest precondition of what it refines. -/
+theorem wp_of_refines {σ ε α : Type} {a b : Spec σ ε α} (refines : Spec.Refines a b)
+    {ensures : α → σ → Prop} {aborts : ε → Prop} {initial : σ}
+    (established : wp b ensures aborts initial) : wp a ensures aborts initial :=
+  ⟨fun result final step => established.1 result final (refines.ok _ _ _ step),
+    fun error step => established.2.1 error (refines.aborts _ _ step),
+    fun undefined => established.2.2 (refines.undefined _ undefined)⟩
 
 /-- A call to a compiled callee reasons over the callee's denotation: an
 unspecified callee, or one returning a reference, is inlined by the
 agreement theorem. -/
-theorem wp_propheticMeaning_of_compiled (unit : ExecutableUnit)
+theorem wp_propheticMeaning_of_compiled {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f) (values : HList f.params)
-    (ensures : f.result.carrier → RuntimeState → Prop) (aborts : Failure → Prop)
-    (initial : RuntimeState) :
-    wp (propheticMeaning unit typeInstantiation handle f.params f.result values) ensures aborts
-        initial ↔
-      wp (f.denote unit typeInstantiation values) ensures aborts initial :=
-  (wp_congr_equiv (compileFunction_agrees unit handle f compiled typeInstantiation values)
-    ensures aborts initial).symm
+    (f : Function unit) (compiled : compileFunction unit handle = .ok f) (values : HList f.params)
+    (ensures : f.result.carrier → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit)
+    (established : wp (f.denote executable typeInstantiation values) ensures aborts initial) :
+    wp (propheticMeaning executable typeInstantiation handle f.params f.result values) ensures aborts
+      initial :=
+  wp_of_refines (compileFunction_agrees executable handle f compiled typeInstantiation values) established
 
 /-- A contract established over the denotation holds of the prophetic
 meaning, which is what a caller's call denotes. -/
-theorem satisfies_propheticMeaning (unit : ExecutableUnit)
+theorem satisfies_propheticMeaning {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f)
-    (contract : Contract RuntimeState Failure (HList f.params) f.result.carrier)
-    (verified : Satisfies (f.denote unit typeInstantiation) contract) :
-    Satisfies (propheticMeaning unit typeInstantiation handle f.params f.result) contract :=
-  (satisfies_congr (compileFunction_agrees unit handle f compiled typeInstantiation) contract).mp
-    verified
+    (f : Function unit) (compiled : compileFunction unit handle = .ok f)
+    (contract : Contract (Memory unit) Failure (HList f.params) f.result.carrier)
+    (verified : Satisfies (f.denote executable typeInstantiation) contract) :
+    Satisfies (propheticMeaning executable typeInstantiation handle f.params f.result) contract :=
+  satisfies_of_refines (compileFunction_agrees executable handle f compiled typeInstantiation) verified
 
-/-- Contracts established over the bodies of a cycle's members, each
-assuming every member's contract of the calls to the members, hold of their
-prophetic meanings. -/
-theorem satisfies_cycle (unit : ExecutableUnit) (typeInstantiation : Array (TypeId × TypeId))
-    (members : List (FunctionHandle × Function))
+/-- Contracts established over the bodies of a cycle's members at every
+slot, each assuming every slot's contract of the calls to the members, hold
+of their prophetic meanings. -/
+theorem satisfies_cycle {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId))
+    (members : List (FunctionHandle × Function unit))
     (compiled : ∀ index : CycleIndex members,
-      compileFunction unit.unit index.member.1 = .ok index.member.2)
+      compileFunction unit index.member.1 = .ok index.member.2)
+    (contracts : (slot : CycleSlot unit members) →
+      Contract (Memory unit) Failure (@HList (familySkolems slot.family).toCarriers slot.position.member.2.params)
+        (@ResultShape.carrier (familySkolems slot.family).toCarriers slot.position.member.2.result))
+    (verified : ∀ self : CycleFamilySelves members,
+      (∀ slot, Satisfies (self slot) (contracts slot)) →
+      ∀ slot, Satisfies
+        (@Function.denoteWith _ _ (familySkolems slot.family)
+          (cycleMeanings executable members typeInstantiation self slot) slot.position.member.2)
+        (contracts slot))
+    (slot : CycleSlot unit members) :
+    Satisfies
+      (@propheticMeaning _ executable (familySkolems slot.family)
+        (familyInstantiation typeInstantiation slot.family) slot.position.member.1
+        slot.position.member.2.params slot.position.member.2.result)
+      (contracts slot) :=
+  satisfies_of_refines (compileFunction_least_cycle executable members compiled typeInstantiation slot)
+    (satisfies_fixFamily _ contracts verified slot)
+
+/-- `satisfies_cycle` at the runtime family: contracts established over the
+members' bodies at the runtime slots, assuming them of the calls to members
+there, hold of their prophetic meanings. The other slots stand vacuous. -/
+theorem satisfies_cycle_runtime {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId)) (members : List (FunctionHandle × Function unit))
+    (compiled : ∀ index : CycleIndex members,
+      compileFunction unit index.member.1 = .ok index.member.2)
     (contracts : (index : CycleIndex members) →
-      Contract RuntimeState Failure (HList index.member.2.params) index.member.2.result.carrier)
-    (verified : ∀ self : CycleSelves members, (∀ index, Satisfies (self index) (contracts index)) →
+      Contract (Memory unit) Failure (HList index.member.2.params) index.member.2.result.carrier)
+    (verified : ∀ self : CycleFamilySelves members,
+      (∀ index, Satisfies (self ⟨index, none⟩) (contracts index)) →
       ∀ index, Satisfies
-        (index.member.2.denoteWith
-          ⟨cycleMeaning unit members self, closedGeneric unit typeInstantiation,
-            typeInstantiation⟩)
+        (index.member.2.denoteWith (cycleMeanings executable members typeInstantiation self ⟨index, none⟩))
         (contracts index))
     (index : CycleIndex members) :
     Satisfies
-      (propheticMeaning unit typeInstantiation index.member.1 index.member.2.params
+      (propheticMeaning executable typeInstantiation index.member.1 index.member.2.params
         index.member.2.result)
       (contracts index) :=
-  satisfies_of_refines (compileFunction_least_cycle unit members compiled typeInstantiation index)
-    (satisfies_fixFamily _ contracts verified index)
+  satisfies_cycle executable typeInstantiation members compiled
+    (fun | ⟨index, none⟩ => contracts index | ⟨_, some _⟩ => Contract.vacuous)
+    (fun self hypothesis => fun
+      | ⟨index, none⟩ => verified self (fun index => hypothesis ⟨index, none⟩) index
+      | ⟨_, some _⟩ => satisfies_vacuous _)
+    ⟨index, none⟩
 
-/-- A contract established over the body of a generic function calling
-itself, at every family and instantiation, assuming it of the calls to
-itself at the family and instantiation each induces, holds of its
-prophetic meaning. -/
-theorem satisfies_recursive_generic (unit : ExecutableUnit) (handle : FunctionHandle)
-    (f : Function) (compiled : compileFunction unit.unit handle = .ok f)
-    (contract : (Θ : Skolems) → (instantiation : Array (TypeId × TypeId)) →
-      Contract RuntimeState Failure (@HList Θ f.params) (@ResultShape.carrier Θ f.result))
-    (verified : ∀ self : SelfFamily f.params f.result,
-      (∀ Θ instantiation, Satisfies (self Θ instantiation) (contract Θ instantiation)) →
-      ∀ (Θ : Skolems) (instantiation : Array (TypeId × TypeId)),
-        Satisfies (@Function.denoteWith Θ
-          (@Meanings.mk Θ (@recursiveMeaning Θ unit handle f.params f.result (self Θ instantiation))
-            (@recursiveGeneric Θ unit handle f.params f.result self instantiation)
-            instantiation) f)
-          (contract Θ instantiation))
-    (typeInstantiation : Array (TypeId × TypeId)) :
-    Satisfies (propheticMeaning unit typeInstantiation handle f.params f.result)
-      (contract ‹Skolems› typeInstantiation) :=
-  satisfies_of_refines (compileFunction_least_generic unit handle f compiled typeInstantiation)
-    (satisfies_fixFamily _ (fun index => contract index.1 index.2)
-      (fun recursive hypothesis index =>
-        verified (fun Θ instantiation => recursive (Θ, instantiation))
-          (fun Θ instantiation => hypothesis (Θ, instantiation)) index.1 index.2)
-      (‹Skolems›, typeInstantiation))
+omit [Skolems unit] in
+/-- `satisfies_cycle` at every skolem family and type instantiation:
+contracts established over the members' bodies at every family, assuming
+them of the calls to members at every family, hold of their prophetic
+meanings. The runtime slots stand vacuous. -/
+theorem satisfies_cycle_family {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [root : Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId)) (members : List (FunctionHandle × Function unit))
+    (compiled : ∀ index : CycleIndex members,
+      compileFunction unit index.member.1 = .ok index.member.2)
+    (contracts : (index : CycleIndex members) → (Θ : Skolems unit) → Array (TypeId × TypeId) →
+      Contract (Memory unit) Failure (@HList Θ.toCarriers index.member.2.params)
+        (@ResultShape.carrier Θ.toCarriers index.member.2.result))
+    (verified : ∀ self : @CycleFamilySelves _ root members,
+      (∀ index Θ instantiation,
+        Satisfies (self ⟨index, some (Θ, instantiation)⟩) (contracts index Θ instantiation)) →
+      ∀ index Θ instantiation, Satisfies
+        (@Function.denoteWith _ _ Θ
+          (@cycleMeanings _ executable root members typeInstantiation self ⟨index, some (Θ, instantiation)⟩)
+          index.member.2)
+        (contracts index Θ instantiation))
+    (index : CycleIndex members) (Θ : Skolems unit) (instantiation : Array (TypeId × TypeId)) :
+    Satisfies
+      (@propheticMeaning _ executable Θ instantiation index.member.1 index.member.2.params
+        index.member.2.result)
+      (contracts index Θ instantiation) :=
+  @satisfies_cycle _ executable root typeInstantiation members compiled
+    (fun | ⟨_, none⟩ => Contract.vacuous
+         | ⟨index, some (Θ, instantiation)⟩ => contracts index Θ instantiation)
+    (fun self hypothesis => fun
+      | ⟨_, none⟩ => satisfies_vacuous _
+      | ⟨index, some (Θ, instantiation)⟩ =>
+          verified self (fun index Θ instantiation => hypothesis ⟨index, some (Θ, instantiation)⟩)
+            index Θ instantiation)
+    ⟨index, some (Θ, instantiation)⟩
 
-/-- The runtime form of a contract over native arguments.  A runtime call
-lends the argument references under admissible loans, and the contract
-holds for every prophecy of theirs.  A successful execution satisfies it at
-the value view: each returned reference's prophecy is its current value,
-and each argument reference's prophecy is its export with the returned
-references' holes filled by their current values. -/
-def _root_.LeanerIR.Proofs.Contract.prophetic (σs : NRow) (shape : ResultShape)
-    (contract : Contract RuntimeState Failure (HList σs) shape.carrier) : FunctionContract where
+omit [Skolems unit] in
+/-- Runs of a unit keep global memory encoding a typed memory: from globals
+encoding a memory, every successful run ends in globals encoding one that
+agrees with it where no runtime key reaches.  A property of the unit's
+semantics that static typing establishes (`designs/static-memory.md`); the
+public theorem states it as a hypothesis. -/
+def GlobalsPreserved {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
+  ∀ handle typeInstantiation start arguments results exit memory,
+    Encodes unit memory start.globals →
+    (functionSpecAt executable handle typeInstantiation arguments).ok start results exit →
+    ∃ final, Encodes unit final exit.globals ∧ AgreeUnnamed unit final memory
+
+end Frames
+
+section Public
+
+/-- The runtime form of a contract over native arguments and typed memory.
+A runtime call lends the argument references under admissible loans from a
+state whose globals encode a memory, and the contract holds for every
+prophecy of theirs and every memory the globals encode.  A successful
+execution satisfies it at the value view: each returned reference's
+prophecy is its current value, and each argument reference's prophecy is
+its export with the returned references' holes filled by their current
+values. -/
+def _root_.LeanerIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [Skolems unit] (σs : NRow)
+    (shape : ResultShape) (contract : Contract (Memory unit) Failure (HList σs) shape.carrier) :
+    FunctionContract where
   requires := fun arguments initial =>
     (∃ loans args, Admissible initial loans ∧ lendArguments σs args loans = some arguments) ∧
-      ∀ loans args, lendArguments σs args loans = some arguments → contract.requires args initial
+      (∃ memory, Encodes unit memory initial.globals) ∧
+      ∀ memory, Encodes unit memory initial.globals →
+        ∀ loans args, lendArguments σs args loans = some arguments → contract.requires args memory
+  assumes := fun arguments initial =>
+    ∀ memory, Encodes unit memory initial.globals →
+      ∀ loans args, lendArguments σs args loans = some arguments → contract.assumes args memory
   ensures := fun arguments initial results final =>
-    ∃ loans args result returnedLoans,
+    ∃ memory memory' loans args result returnedLoans,
+      Encodes unit memory initial.globals ∧ Encodes unit memory' final.globals ∧
       lendArguments σs args loans = some arguments ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some results ∧
       argumentsResolve σs args loans results (exportsAfter initial.pending final.pending) ∧
-      contract.ensures args initial result (final.withLoansOf initial)
+      contract.ensures args memory result memory'
   aborts := fun arguments initial error =>
-    ∃ loans args, lendArguments σs args loans = some arguments ∧ contract.aborts args initial error
+    ∃ memory loans args, Encodes unit memory initial.globals ∧
+      lendArguments σs args loans = some arguments ∧ contract.aborts args memory error
   mayAbort := fun arguments initial =>
-    ∃ loans args, lendArguments σs args loans = some arguments ∧ contract.mayAbort args initial
+    ∃ memory loans args, Encodes unit memory initial.globals ∧
+      lendArguments σs args loans = some arguments ∧ contract.mayAbort args memory
   mustAbort := fun arguments initial =>
-    ∀ loans args, lendArguments σs args loans = some arguments → contract.mustAbort args initial
+    ∀ memory, Encodes unit memory initial.globals →
+      ∀ loans args, lendArguments σs args loans = some arguments → contract.mustAbort args memory
   frame := fun arguments initial final =>
-    ∃ loans args, lendArguments σs args loans = some arguments ∧
-      contract.frame args initial (final.withLoansOf initial)
+    ∃ memory memory' loans args, Encodes unit memory initial.globals ∧
+      Encodes unit memory' final.globals ∧
+      lendArguments σs args loans = some arguments ∧ contract.frame args memory memory'
 
-/-- A contract satisfied by the prophetic meaning holds of the big-step
-meaning in its runtime form.  Every runtime execution from an admissible
-start is a prophetic outcome at the value view, whose existence the
-contract's definedness guarantees. -/
-theorem satisfies_prophetic (unit : ExecutableUnit) (handle : FunctionHandle) (σs : NRow)
-    (shape : ResultShape) (contract : Contract RuntimeState Failure (HList σs) shape.carrier)
-    (verified : Satisfies (propheticMeaning unit #[] handle σs shape) contract) :
-    SatisfiesFunction unit handle (contract.prophetic σs shape) := by
-  intro arguments initial permitted
-  obtain ⟨⟨loans, args, admissible, lent⟩, required⟩ := permitted
-  have established := verified args initial (required loans args lent)
+/-- A contract satisfied by the prophetic run at a runtime type instantiation
+holds of the big-step meaning there in its runtime form, for a unit whose
+runs keep global memory typed.  Every runtime execution from an admissible
+start is a prophetic outcome at the value view from a memory its globals
+encode, whose existence the contract's definedness guarantees. -/
+theorem satisfies_run_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (preserved : GlobalsPreserved executable)
+    (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
+    (shape : ResultShape)
+    (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
+      (@ResultShape.carrier (Carriers.runtime unit) shape))
+    (verified : letI : Skolems unit := Skolems.runtime unit
+      Satisfies (propheticRun executable typeInstantiation handle σs shape) contract) :
+    letI : Skolems unit := Skolems.runtime unit
+    SatisfiesFunctionAt executable handle typeInstantiation
+      (contract.prophetic unit σs shape) := by
+  letI : Skolems unit := Skolems.runtime unit
+  intro arguments initial assumed permitted
+  obtain ⟨⟨loans, args, admissible, lent⟩, ⟨memory, encoded⟩, required⟩ := permitted
+  have established := verified args memory (assumed memory encoded loans args lent)
+    (required memory encoded loans args lent)
   refine ⟨?_, ?_, fun obligation => obligation⟩
   · intro results final execution
+    obtain ⟨memory', encoded', agree⟩ :=
+      preserved handle typeInstantiation initial arguments results final memory encoded execution
     have view : ∃ result returnedLoans, ∃ resolved : HList σs,
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some arguments ∧
         argumentsResolve σs resolved loans results (exportsAfter initial.pending final.pending) := by
       refine Classical.byContradiction fun none => established.2.2 ?_
-      exact ⟨initial, loans, arguments, results, final, rfl, admissible, lent, execution, none⟩
+      exact ⟨initial, loans, arguments, results, final, encoded, admissible, lent, execution,
+        none⟩
     obtain ⟨result, returnedLoans, resolved, lentCurrent, lentProphecy, lentResolved, resolves⟩ :=
       view
-    have outcome : (propheticMeaning unit #[] handle σs shape resolved).ok initial result
-        (final.withLoansOf initial) :=
-      ⟨initial, loans, arguments, results, final, returnedLoans, results, rfl, admissible,
-        lentResolved, execution, lentCurrent, lentProphecy, resolves, rfl⟩
+    have outcome :
+        (propheticRun executable typeInstantiation handle σs shape resolved).ok memory result
+          memory' :=
+      ⟨initial, loans, arguments, results, final, returnedLoans, results, encoded, admissible,
+        lentResolved, execution, lentCurrent, lentProphecy, resolves, encoded', agree⟩
     obtain ⟨ensured, framed, notMust⟩ :=
-      (verified resolved initial (required loans resolved lentResolved)).1 result _ outcome
-    refine ⟨fun notMay => ?_, ⟨loans, resolved, lentResolved, framed⟩,
-      fun must => notMust (must loans resolved lentResolved)⟩
-    exact ⟨loans, resolved, result, returnedLoans, lentResolved, lentCurrent, lentProphecy,
-      resolves, ensured fun may => notMay ⟨loans, resolved, lentResolved, may⟩⟩
+      (verified resolved memory (assumed memory encoded loans resolved lentResolved)
+        (required memory encoded loans resolved lentResolved)).1 result _ outcome
+    refine ⟨fun notMay => ?_, ⟨memory, memory', loans, resolved, encoded, encoded', lentResolved,
+        framed⟩, fun must => notMust (must memory encoded loans resolved lentResolved)⟩
+    exact ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
+      lentCurrent, lentProphecy, resolves,
+      ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩
   · intro error failed
-    exact ⟨loans, args, lent,
-      established.2.1 error ⟨initial, loans, arguments, rfl, admissible, lent, failed⟩⟩
+    exact ⟨memory, loans, args, encoded, lent,
+      established.2.1 error ⟨initial, loans, arguments, encoded, admissible, lent, failed⟩⟩
+
+/-- A contract satisfied by the prophetic meaning at the runtime frame and
+the empty instantiation holds of the big-step meaning in its runtime form,
+for a unit whose runs keep global memory typed. -/
+theorem satisfies_prophetic {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (preserved : GlobalsPreserved executable)
+    (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
+    (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
+      (@ResultShape.carrier (Carriers.runtime unit) shape))
+    (verified : letI : Skolems unit := Skolems.runtime unit
+      Satisfies (propheticMeaning executable #[] handle σs shape) contract) :
+    letI : Skolems unit := Skolems.runtime unit
+    SatisfiesFunction executable handle (contract.prophetic unit σs shape) := by
+  letI : Skolems unit := Skolems.runtime unit
+  refine satisfies_run_at executable preserved handle #[] σs shape contract ?_
+  have meaning : propheticMeaning executable #[] handle σs shape =
+      propheticRun executable #[] handle σs shape :=
+    funext (propheticMeaning_of_coherent (coherent_runtime unit handle) σs shape)
+  rwa [meaning] at verified
+
+/-- A generic function's contract, satisfied by its prophetic meaning at the
+frame type arguments induce over the runtime family, holds, read at the
+arguments' types, of its big-step meaning at every runtime type
+instantiation coherent with that frame. -/
+theorem satisfies_generic_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (preserved : GlobalsPreserved executable) (handle : FunctionHandle) (θ : TypeArgs)
+    (free : θ.1.refFree = true) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
+    (shape : ResultShape)
+    (contract : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      Contract (Memory unit) Failure (HList σs) shape.carrier)
+    (coherent : @Coherent unit (Skolems.instantiate θ (Skolems.runtime unit)) handle
+      typeInstantiation)
+    (verified : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      Satisfies (propheticMeaning executable typeInstantiation handle σs shape) contract) :
+    letI : Skolems unit := Skolems.runtime unit
+    SatisfiesFunctionAt executable handle typeInstantiation
+      ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) := by
+  letI : Skolems unit := Skolems.runtime unit
+  refine satisfies_run_at executable preserved handle typeInstantiation _ _ _ ?_
+  have meaning : @propheticMeaning _ executable (Skolems.instantiate θ (Skolems.runtime unit))
+        typeInstantiation handle σs shape =
+      @propheticRun _ executable (Skolems.instantiate θ (Skolems.runtime unit)) typeInstantiation
+        handle σs shape :=
+    funext (@propheticMeaning_of_coherent _ _ (Skolems.instantiate θ (Skolems.runtime unit)) _ _
+      coherent σs shape)
+  rw [meaning] at verified
+  exact satisfies_run_ofSkolem executable θ free typeInstantiation handle σs shape contract
+    verified
+
+end Public
 
 end LeanerIR.Proofs.Denote

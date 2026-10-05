@@ -1,0 +1,21 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_multisig_account",
+  "reference_proved": true,
+  "reference_sha256": "a1a4cf5672b0bbd55af239a1a9cd175f5eff3cbdefc6d090e78c01adc8dbdb1b",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_multisig_account::available_transaction_queue_capacity",
+  "task_id": "MS-capacity-048",
+  "threshold_seconds": 20,
+  "wall_seconds": 5.7,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

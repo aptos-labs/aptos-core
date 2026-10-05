@@ -406,7 +406,7 @@ private def checkOperation {β : Type} (registry : ProfileRegistry) (unit : RawU
       | .profile value => base ++ checkProfileValue registry unit value ProfileSchema.checkOperation
       | _ => base
   | .call kind => match kind with
-      | .function callee | .constructor callee _ | .destructor callee _ | .closure callee =>
+      | .function callee | .constructor callee _ | .destructor callee _ | .closure callee _ =>
           checkQualifiedRef unit unit.tables callee (some loc)
       | .invoke => #[]
       | .extension value targets =>
@@ -429,14 +429,11 @@ private def checkOperation {β : Type} (registry : ProfileRegistry) (unit : RawU
       checkProfileValue registry unit value ProfileSchema.checkOperation
   | .reference (.borrow (.profile value)) =>
       checkProfileValue registry unit value ProfileSchema.checkOperation
-  | .reference (.endLoan _) =>
-      #[.error "LIR-SEMANTIC-LOAN-MARKER"
-        "endLoan is synthesized by validation and may not appear in frontend input" (some loc)]
   | .data (.select reference _) | .data (.selectVariants reference _) |
       .data (.testVariants reference _) | .data (.discriminant reference) |
       .data (.updateField reference _) =>
       checkQualifiedRef unit unit.tables reference (some loc)
-  | .specification (.functionCall reference _) =>
+  | .specification (.functionCall reference _) | .specification (.lemma reference _) =>
       checkQualifiedRef unit unit.tables reference (some loc)
   | _ => #[]
 
@@ -460,6 +457,36 @@ private def checkAttributes (registry : ProfileRegistry) (unit : RawUnit)
   attributes.foldl (fun ds attr =>
     ds ++ checkAttribute registry unit tables attr) #[]
 
+/-- The profile, properties, and attributes of the function a reference names,
+in the unit's namespaces or its dependencies' interfaces. -/
+private def functionTraits? (unit : RawUnit) (reference : QualifiedRef) :
+    Option (Profile × Array ProfileValue × Array Attribute) :=
+  let traits {β : Type} (functions : Array (FunctionDecl β)) :=
+    (functions.find? (·.name == reference.name)).map fun function =>
+      (function.profile, function.profileData, function.attributes)
+  (unit.namespaces.findSome? fun ns =>
+      if ns.identity == reference.namespaceId then traits ns.functions else none).orElse
+    fun _ => unit.dependencies.findSome? fun dependency =>
+      if dependency.namespaceId == reference.namespaceId then traits dependency.functions
+      else none
+
+/-- A closure with `store` must target a function its profile lets a stored
+closure name. -/
+private def closureStoreErrors (registry : ProfileRegistry) (unit : RawUnit) (expr : Expr) :
+    Array Diagnostic :=
+  match expr.kind with
+  | .operation (.call (.closure target _)) _ _ _ =>
+      match unit.tables.types[expr.typeId.index]?, functionTraits? unit target with
+      | some (.function _ _ abilities), some (profile, properties, attributes) =>
+          if abilities.contains .store &&
+              !(profileSchema? registry profile).all (·.storableTarget properties attributes) then
+            #[.error "LIR-CLOSURE-STORE"
+              "a closure with `store` must target a function its profile lets a stored \
+                closure name" (some expr.loc)]
+          else #[]
+      | _, _ => #[]
+  | _ => #[]
+
 private def checkExprKind {β : Type} (registry : ProfileRegistry) (unit : RawUnit) (ns : Namespace β)
     (expr : Expr) : Array Diagnostic :=
   let childErrors := (expressionChildren expr.kind).foldl
@@ -473,6 +500,7 @@ private def checkExprKind {β : Type} (registry : ProfileRegistry) (unit : RawUn
               checkProfileValue registry unit value ProfileSchema.checkSurface
           | _ => #[]
         checkOperation registry unit ns expr.loc op ++ surfaceErrors ++
+          closureStoreErrors registry unit expr ++
           instantiations.foldl (fun ds argument =>
             ds ++ checkGenericArgument registry unit unit.tables argument) #[]
     | .letDecl pattern _ _ => checkPatternId ns pattern (some expr.loc)
@@ -549,6 +577,38 @@ private def checkContract (registry : ProfileRegistry) (unit : RawUnit) (ns : Ra
     contract.reads.foldl (fun ds ty => ds ++ checkTypeUse unit.tables ty ++
       checkScopedTypeUse registry unit unit.tables binders ty) #[] ++
     checkAttributes registry unit unit.tables contract.pragmas
+
+/-- The parameter frames of a function: each of a function-typed parameter,
+at most one per parameter, its formals locals beyond the parameters, one per
+argument of the parameter's function type, and `modifiesAll` without
+targets or formals. A structure or specification function declares none. -/
+private def checkParameterFrames (unit : RawUnit) (ns : RawNamespace)
+    (parameters : Array Parameter) (locals : Array LocalDecl)
+    (frames : Array ParameterFrame) : Array Diagnostic :=
+  frames.zipIdx.foldl (init := #[]) fun ds (frame, index) =>
+    let ds := ds ++ checkLoc unit.tables frame.loc ++
+      frame.modifies.foldl (fun ds expr => ds ++ checkExprId ns expr (some frame.loc)) #[]
+    let ds := if frames.toList.take index |>.any (·.parameter == frame.parameter) then
+        ds.push <| .at "LIR-PARAMETER-FRAME" "a parameter has two frames" frame.loc
+      else ds
+    let ds := if frame.modifiesAll && !frame.modifies.isEmpty then
+        ds.push <| .at "LIR-PARAMETER-FRAME" "a frame with `modifiesAll` names targets" frame.loc
+      else ds
+    match parameters[frame.parameter.index]? with
+    | none => ds.push <| .at "LIR-PARAMETER-FRAME" "a frame names no parameter" frame.loc
+    | some parameter =>
+        match unit.tables.types[parameter.typeUse.typeId.index]? with
+        | some (.function arguments _ _) =>
+            let ds := if frame.formals.size == arguments.size ||
+                frame.modifiesAll && frame.formals.isEmpty then ds else
+              ds.push <| .at "LIR-PARAMETER-FRAME"
+                s!"a frame binds {frame.formals.size} formals of {arguments.size} arguments" frame.loc
+            frame.formals.foldl (init := ds) fun ds formal =>
+              if parameters.size ≤ formal.index && formal.index < locals.size then ds
+              else ds.push <| .at "LIR-PARAMETER-FRAME"
+                "a formal is not a local beyond the parameters" frame.loc
+        | _ => ds.push <| .at "LIR-PARAMETER-FRAME"
+            "a frame names a parameter that is not a function value" frame.loc
 
 private def checkGenericBinders (registry : ProfileRegistry) (unit : RawUnit) (tables : Tables)
     (associatedItemCount : Nat) (binders : Array GenericBinder) : Array Diagnostic :=
@@ -837,7 +897,9 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     checkDeclarationNames unit.tables ns.identity "specification function"
       (ns.specFunctions.map fun declaration => (declaration.name, declaration.loc)) ++
     checkDeclarationNames unit.tables ns.identity "specification variable"
-      (ns.specVars.map fun declaration => (declaration.name, declaration.loc))
+      (ns.specVars.map fun declaration => (declaration.name, declaration.loc)) ++
+    checkDeclarationNames unit.tables ns.identity "lemma"
+      (ns.lemmas.map fun declaration => (declaration.name, declaration.loc))
   let exprErrors := ns.expressions.foldl (fun ds expr =>
     ds ++ checkLoc unit.tables expr.loc ++ checkTypeId unit.tables expr.typeId (some expr.loc) ++
       checkExprKind registry unit ns expr) #[]
@@ -875,6 +937,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       checkIndex "origin" function.origin.index unit.tables.origins.size (some function.loc) ++
       checkIndex "alignment" function.alignment.index unit.tables.alignments.size (some function.loc) ++
       checkContract registry unit ns function.contract functionBinders ++
+      checkParameterFrames unit ns function.signature.parameters function.locals
+        function.contract.parameterFrames ++
       checkLocals unit.tables function.locals ++
       checkParametersMatchLocals function.signature.parameters function.locals ++
       checkAttributes registry unit unit.tables function.pragmas ++
@@ -905,6 +969,7 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
         ds ++ checkProfileValue registry unit property ProfileSchema.checkProperty) #[] ++
       checkLocals unit.tables struct.locals ++
       checkContract registry unit ns struct.contract structBinders ++
+      checkParameterFrames unit ns #[] #[] struct.contract.parameterFrames ++
       checkAttributes registry unit unit.tables struct.attributes
     let ds := if !struct.fields.isEmpty && !struct.variants.isEmpty then
         ds.push <| .at "LIR-NOMINAL-SHAPE"
@@ -1042,6 +1107,7 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
       checkLocals unit.tables function.locals ++
       checkParametersMatchLocals function.signature.parameters function.locals ++
       checkContract registry unit ns function.contract functionBinders ++
+      checkParameterFrames unit ns #[] #[] function.contract.parameterFrames ++
       function.profileData.foldl (fun ds value =>
         ds ++ checkProfileValue registry unit value ProfileSchema.checkProperty) #[] ++
       (match ns.profile with
@@ -1068,6 +1134,21 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
            #[.at "LIR-PROFILE-MISMATCH"
              "specification variable profile differs from its namespace profile" specVar.loc]
        | none => #[])) #[]
+  let lemmaErrors := ns.lemmas.foldl (fun ds lemma =>
+    ds ++ checkLoc unit.tables lemma.loc ++ checkName unit.tables lemma.name (some lemma.loc) ++
+      checkProfile unit lemma.profile (some lemma.loc) ++
+      checkSignature registry unit unit.tables ns.associatedItems.size lemma.signature ++
+      checkIndex "origin" lemma.origin.index unit.tables.origins.size (some lemma.loc) ++
+      checkLocals unit.tables lemma.locals ++
+      checkParametersMatchLocals lemma.signature.parameters lemma.locals ++
+      checkContract registry unit ns lemma.contract (binderKinds lemma.signature.generics) ++
+      lemma.proof.foldl (fun ds condition => ds ++ checkCondition registry unit ns condition) #[] ++
+      lemma.profileData.foldl (fun ds value =>
+        ds ++ checkProfileValue registry unit value ProfileSchema.checkProperty) #[] ++
+      (match ns.profile with
+       | some profile => if profile == lemma.profile then #[] else
+           #[.at "LIR-PROFILE-MISMATCH" "lemma profile differs from its namespace profile" lemma.loc]
+       | none => #[])) #[]
   let invariantErrors := ns.invariants.foldl (fun ds invariant =>
     ds ++ checkLoc unit.tables invariant.loc ++ checkCondition registry unit ns invariant.condition ++
       checkLocals unit.tables invariant.locals) #[]
@@ -1080,70 +1161,8 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
     ns.comments.foldl (fun ds comment => ds ++ checkLoc unit.tables comment.loc) #[]
   headerErrors ++ declarationNameErrors ++ exprErrors ++ patternErrors ++ placeErrors ++ arenaErrors ++
     declErrors ++ constantErrors ++ structErrors ++ associatedItemErrors ++ traitErrors ++
-    implementationErrors ++ specFunctionErrors ++ specVarErrors ++ invariantErrors ++
+    implementationErrors ++ specFunctionErrors ++ specVarErrors ++ lemmaErrors ++ invariantErrors ++
     intrinsicErrors ++ traitCycleErrors ++ metadataErrors ++ surfaceErrors
-
-/-- Reuse an authored place node when possible and otherwise append it without
-disturbing any producer-authored place identity. -/
-private def internNormalizedPlace (places : Array Place) (place : Place) : PlaceId × Array Place :=
-  match places.findIdx? (· == place) with
-  | some index => (⟨index⟩, places)
-  | none => (⟨places.size⟩, places.push place)
-
-/-- Recover the storage path represented by the value-shaped trees emitted by
-legacy frontends. In particular, Move's `borrow_field` arrives as
-`borrow(select(referenceLocal))`; the reference-local base denotes a
-dereferenced place before its field projection. -/
-private partial def normalizedExpressionPlace? (tables : Tables) (ns : RawNamespace)
-    (id : ExprId) (places : Array Place) (fuel : Nat := 0) : Option (PlaceId × Array Place) := do
-  let fuel := if fuel == 0 then ns.expressions.size + 1 else fuel
-  if fuel == 0 then none else
-    let expression ← ns.expressions[id.index]?
-    match expression.kind with
-    | .localVar localId => some (internNormalizedPlace places (.localVar localId))
-    | .operation (.reference .dereference) instantiations arguments _ => do
-        if !instantiations.isEmpty then none else
-        let [baseExpression] := arguments.toList | none
-        let (base, places) ←
-          normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
-        -- Dereferencing a reference-typed field select cancels: the select's
-        -- normalized place already denotes the referent's storage path.
-        let selectReference := (ns.expressions[baseExpression.index]?).any fun node =>
-          (node.kind matches .operation (.data _) _ _ _) &&
-            ((tables.types[node.typeId.index]?).any fun ty => ty matches .reference _)
-        if selectReference then some (base, places)
-        else some (internNormalizedPlace places (.deref base))
-    | .operation (.data (.select reference field)) _ arguments _ => do
-        let [baseExpression] := arguments.toList | none
-        let (base, places) ← normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
-        let baseNode ← ns.expressions[baseExpression.index]?
-        let (base, places) := match tables.types[baseNode.typeId.index]? with
-          | some (.reference _) => internNormalizedPlace places (.deref base)
-          | _ => (base, places)
-        let fieldIndex ← tables.names.findIdx? fun name =>
-          name.namespaceId == reference.namespaceId && name.name == field
-        some (internNormalizedPlace places (.field base reference ⟨fieldIndex⟩))
-    | .operation (.data (.selectVariants reference fields)) _ arguments _ => do
-        let field ← fields[0]?
-        if !fields.all (· == field) then none else
-        let [baseExpression] := arguments.toList | none
-        let (base, places) ← normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
-        let baseNode ← ns.expressions[baseExpression.index]?
-        let (base, places) := match tables.types[baseNode.typeId.index]? with
-          | some (.reference _) => internNormalizedPlace places (.deref base)
-          | _ => (base, places)
-        let fieldIndex ← tables.names.findIdx? fun name =>
-          name.namespaceId == reference.namespaceId && name.name == field
-        some (internNormalizedPlace places (.field base reference ⟨fieldIndex⟩))
-    | .operation (.primitive .index) _ arguments _ => do
-        let [baseExpression, index] := arguments.toList | none
-        let (base, places) ← normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
-        let baseNode ← ns.expressions[baseExpression.index]?
-        let (base, places) := match tables.types[baseNode.typeId.index]? with
-          | some (.reference _) => internNormalizedPlace places (.deref base)
-          | _ => (base, places)
-        some (internNormalizedPlace places (.index base index))
-    | _ => none
 
 /-- Rewrite lossless value-level borrows of recoverable storage paths to the
 stronger place-based core operation. Other computed-value borrows stay
@@ -1280,9 +1299,11 @@ private def checkProfiles (registry : ProfileRegistry) (unit : RawUnit) : Array 
   positionErrors ++ duplicateErrors ++ registryDuplicateErrors ++ registrationErrors
 
 private def checkVersion (version : Version) : Array Diagnostic :=
-  if version.major == 1 && version.minor == 1 then #[] else
+  let current : Version := {}
+  if version == current then #[] else
     #[.error "LIR-SCHEMA-VERSION"
-      s!"unsupported raw LIR schema version {version.major}.{version.minor}; expected 1.1"]
+      s!"unsupported raw LIR schema version {version.major}.{version.minor}; expected \
+        {current.major}.{current.minor}"]
 
 /-- Check one nominal declaration a dependency interface exports. An interface
 carries the declaration's shape — its binders, abilities, fields, and variants —
@@ -1512,11 +1533,9 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
     rawUnit.namespaces.size structuredNamespaces
   if resolutionDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics resolutionDiagnostics)
-  let variantOrders := structuredNamespaces.map fun ns => ns.structs.map fun declaration =>
-    declaration.variants.map fun variant =>
-      ((rawUnit.tables.names[variant.name.index]?).map (·.name)).getD ""
+  let orders := valueOrdersOf rawUnit.tables structuredNamespaces
   let namespaces := structurized.map fun s =>
-    ({ toNamespace := s.ns, tables := rawUnit.tables, variantOrders } : ValidatedNamespace)
+    ({ toNamespace := s.ns, tables := rawUnit.tables, orders } : ValidatedNamespace)
   let unit := Internal.mkValidatedUnit rawUnit.tables rawUnit.profiles namespaces
     (rawUnit.dependencies.map fun dep => {
       namespaceId := dep.namespaceId
@@ -1535,9 +1554,15 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
       functionCounts := namespaces.map (·.functions.size) }
     (structurized.flatMap (·.witnesses))
     resolution
+  let unit := Internal.mkValidatedUnit unit.tables unit.profiles
+    (unit.namespaces.map (inferLocalAccess unit)) unit.dependencies unit.evidence unit.indexes
+    unit.structurizationWitnesses unit.resolution
   let typingErrors := typingDiagnostics unit
   if typingErrors.any (·.severity == .error) then
     throw (dedupDiagnostics typingErrors)
+  let unit := Internal.mkValidatedUnit unit.tables unit.profiles
+    (unit.namespaces.map (inferInstantiations unit)) unit.dependencies unit.evidence unit.indexes
+    unit.structurizationWitnesses unit.resolution
   -- Definite initialization and the borrow analysis run exactly once here;
   -- preparation copies the certificates instead of re-running the analyses.
   -- Initialization failures are validate errors. Borrow-analysis rejections
@@ -1555,8 +1580,11 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
             borrowOutcome ns.identity ⟨index⟩ unit ns function
           (initDs ++ functionInitDs,
             match initCert with | some c => inits.push c | none => inits,
-            match borrowCert with | some c => borrows.push c | none => borrows,
-            borrowDs ++ functionBorrowDs)
+            match borrowCert with
+            | some c => borrows.push
+                { c with sharedDereferences := sharedDereferenceSites unit ns function }
+            | none => borrows,
+            borrowDs ++ functionBorrowDs.map ({ namespaceId := ns.identity, diagnostic := · }))
   if initializationErrors.any (·.severity == .error) then
     throw (dedupDiagnostics initializationErrors)
   return Internal.mkValidatedUnit unit.tables unit.profiles unit.namespaces

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 65,
+        "offset": 2654,
+        "sha256": "1dadd343bf1f17ec27bc11fa01277a01c12820a30ba3a22bd5071bf926fb3503"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 37,
+        "to": "multipliers_percent[i], min_stakes[i]"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-build-039-arguments-swapped",
+      "obligation_category": "normal-result",
+      "rationale": "Each tier takes its stake from the multipliers and vice versa.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 32,
+        "offset": 2751,
+        "sha256": "322da1c78aba73ffaf7ecf16caebbfef71a582247b5b3e873491f0996f5c1ba3"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 32,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-build-039-order-unchecked",
+      "obligation_category": "abort",
+      "rationale": "Tiers that are not ordered are accepted.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 2397,
+        "sha256": "701213eeb34c3638a5d1c39788de1c79710dc5df2d65ee489611f0137bae282d"
+      },
+      "edit": {
+        "at": 10,
+        "kind": "substitute",
+        "length": 10,
+        "to": "multipliers_percent"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-build-039-length-from-multipliers",
+      "obligation_category": "abort",
+      "rationale": "The length check compares the multipliers with themselves, so surplus stakes are silently dropped.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-build-039"
+}

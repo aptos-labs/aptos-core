@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/mut_ref.move:126:13
+    │
+126 │             assume [trusted] true;
+    │             ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/sources/functional/proof/mut_ref.move:152:14: error: the assertion `c.value == old(c.value)` does not hold
+tests/sources/functional/proof/mut_ref.move:149:5: error: leaner verification failed: the automatic verification of `set_to_zero` failed; provide a proof: `verify set_to_zero by …` in `tests/sources/functional/proof/mut_ref.proof.lean` (`verify set_to_zero by skip` shows the obligations it leaves)

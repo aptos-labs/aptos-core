@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/fun_type_arity_injectivity.move:23:5: error: no denotation for `both_arities`: a closure whose rows are not its target's is not carried by the denotation

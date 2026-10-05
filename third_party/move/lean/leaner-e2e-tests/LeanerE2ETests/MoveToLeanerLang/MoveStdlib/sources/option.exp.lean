@@ -4,11 +4,9 @@
 import LeanerLang
 
 /-! This module defines the Option type and its methods to represent and handle an optional value. -/
-leaner module 0x1::option where
-  use 0x1::std::mem::replace
-  use 0x1::std::vector
-  use 0x1::std::vector::empty
-  use 0x1::std::vector::singleton
+leaner module std::option where
+  use std::mem::replace
+  use std::vector::singleton
 
   pragma aborts_if_is_strict
 
@@ -67,12 +65,18 @@ leaner module 0x1::option where
     mut vec : Vector<Element>
   ) -> Option<Element> := do
     assert!(vec.length <= 1, EOPTION_VEC_TOO_LONG)
-    if vec.is_empty() then
-      vec.destroy_empty()
+    if vec.length == 0 then
+      core.prim.destroyEmptyVector(vec)
       new Option<Element>::None {}
     else
-      let e := vec.pop_back()
-      vec.destroy_empty()
+      let e :=
+        do
+          let _t0 := &mut vec
+          if _t0.length == 0 then moveVectorError(2)
+          let (_t1, _t2) := core.prim.removeVector(*_t0, _t0.length - 1)
+          *_t0 := _t2
+          _t1
+      core.prim.destroyEmptyVector(vec)
       new Option<Element>::Some { e }
 
   spec from_vec where
@@ -143,7 +147,10 @@ leaner module 0x1::option where
   public fun borrow_with_default {Element}(
     self : &Option<Element>, default_ref : &Element
   ) -> &Element :=
-    if self is None then default_ref else self.e
+    if self is None then default_ref
+    else
+      let e := &self.e
+      e
 
   spec borrow_with_default where
     pragma opaque
@@ -157,7 +164,10 @@ leaner module 0x1::option where
   public fun get_with_default {Element has Copy, Drop}(
     self : &Option<Element>, default : Element
   ) -> Element :=
-    if self is None then default else self.e
+    if self is None then default
+    else
+      let e := &self.e
+      *e
 
   spec get_with_default where
     pragma opaque
@@ -293,6 +303,6 @@ leaner module 0x1::option where
     aborts_if false
     ensures result
         == (if self.is_some() then vector<Element>[self.borrow()]
-        else empty::<Element>())
+        else vector<Element>[])
 
   -- switch documentation context back to module level

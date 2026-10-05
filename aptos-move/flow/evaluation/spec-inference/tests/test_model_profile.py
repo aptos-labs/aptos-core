@@ -8,7 +8,13 @@ from unittest.mock import patch
 
 from harness.config import ExperimentConfig
 from harness.credentials import redact, redact_tree, require_provider_auth
-from harness.model_profile import PROFILES, select_model, subscription_environment
+from harness.model_profile import (
+    CODEX_CODE_MODE_HOST_SHA256,
+    PROFILES,
+    codex_code_mode_host_sha256,
+    select_model,
+    subscription_environment,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -82,8 +88,7 @@ class ModelProfileTest(unittest.TestCase):
             self.assertEqual(config.agent_runtime, "codex")
             self.assertEqual(config.codex_cli_version, "0.153.2")
             self.assertEqual(
-                config.codex_code_mode_host_sha256,
-                "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1",
+                config.codex_code_mode_host_sha256, codex_code_mode_host_sha256()
             )
 
     def test_select_terra56_uses_codex_with_high_effort_and_no_retries(self) -> None:
@@ -103,9 +108,17 @@ class ModelProfileTest(unittest.TestCase):
             self.assertEqual(config.infrastructure_retries, 0)
             self.assertEqual(config.codex_cli_version, "0.153.2")
             self.assertEqual(
-                config.codex_code_mode_host_sha256,
-                "883f2506d12f319aec6f16b3e04d73ee882a8c86270ea5644ef4be6257b069e1",
+                config.codex_code_mode_host_sha256, codex_code_mode_host_sha256()
             )
+
+    def test_code_mode_host_is_pinned_per_linux_machine(self) -> None:
+        self.assertEqual(set(CODEX_CODE_MODE_HOST_SHA256), {"aarch64", "x86_64"})
+        for machine, digest in CODEX_CODE_MODE_HOST_SHA256.items():
+            with patch("harness.model_profile.platform.machine", return_value=machine):
+                self.assertEqual(codex_code_mode_host_sha256(), digest)
+        with patch("harness.model_profile.platform.machine", return_value="riscv64"):
+            with self.assertRaisesRegex(ValueError, "no pinned Codex code-mode host"):
+                codex_code_mode_host_sha256()
 
     def test_select_rejects_negative_infrastructure_retries(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

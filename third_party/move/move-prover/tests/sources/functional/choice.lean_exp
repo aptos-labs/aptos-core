@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/choice.move:28:10: error: this quantifier kind is outside the current LeanerLang parser

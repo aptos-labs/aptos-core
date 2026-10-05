@@ -1,0 +1,28 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/opaque_call_fun_arg_writes.move:27:9
+   │
+27 │         ensures R[a].value == old(R[a].value);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:21: forwarded_at
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:26: forwarded_at (spec)
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:21: forwarded_at
+   =         fv = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:22: forwarded_at
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:27: forwarded_at (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/opaque_call_fun_arg_writes.move:47:9
+   │
+47 │         ensures R[a].value == old(R[a].value);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:41: addressed
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:46: addressed (spec)
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:41: addressed
+   =         fv = <redacted>
+   =         a = <redacted>
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:42: addressed
+   =     at tests/sources/regression/opaque_call_fun_arg_writes.move:47: addressed (spec)

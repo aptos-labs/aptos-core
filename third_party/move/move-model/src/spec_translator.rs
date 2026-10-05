@@ -24,6 +24,7 @@ use crate::{
         ABORTS_IF_IS_STRICT_PRAGMA, CONDITION_ABSTRACT_PROP, CONDITION_CONCRETE_PROP,
         CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
     },
+    spec_derivation,
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE},
     well_known,
@@ -71,6 +72,10 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     /// function entry (`saved_params`), `Some(label)` the matching
     /// `SaveStateAnchor` marker (`anchored_saved_params`).
     current_anchor: Option<MemoryLabel>,
+    /// Whether we translate an inline property (an assertion or loop invariant in the
+    /// function body), where a parameter denotes its current value, which the body may
+    /// have reassigned, rather than its value at entry.
+    in_inline_property: bool,
 }
 
 /// A flattened proof action produced by translating a structured `Proof` tree.
@@ -371,6 +376,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             in_old: false,
             shared_old_label: None,
             current_anchor: None,
+            in_inline_property: false,
         };
         translator.translate_spec(for_call);
         translator.result
@@ -398,6 +404,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             in_old: false,
             shared_old_label: None,
             current_anchor: None,
+            in_inline_property: false,
         };
         // Clone invariants so `inst` lives for the entire loop
         let invariants = invariants.collect_vec();
@@ -435,6 +442,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             in_old: false,
             shared_old_label: None,
             current_anchor: None,
+            in_inline_property: true,
         };
 
         // Handle updating of global spec variables
@@ -626,6 +634,86 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             self.result
                 .emits
                 .push((cond.loc.clone(), event_exp, handle_exp, cond_exp));
+        }
+
+        self.save_labeled_memory_at_entry();
+    }
+
+    /// A state label is defined by the memories its defining condition
+    /// changes; any other memory at that label is the one of the label's
+    /// pre-state, which for an unlabeled start is the entry snapshot. So each
+    /// memory read at a state label is also saved in the entry snapshot.
+    fn save_labeled_memory_at_entry(&mut self) {
+        let Some(old_label) = self.shared_old_label else {
+            return;
+        };
+        let env = self.builder.global_env();
+        let mut memories = BTreeSet::new();
+        let result = &self.result;
+        let exps = result
+            .pre
+            .iter()
+            .chain(&result.post)
+            .chain(&result.modifies)
+            .map(|(_, e)| e)
+            .chain(
+                result
+                    .aborts
+                    .iter()
+                    .flat_map(|(_, e, c)| std::iter::once(e).chain(c)),
+            )
+            .chain(result.lets.iter().map(|(_, _, _, e)| e))
+            .chain(result.updates.iter().flat_map(|(_, l, r)| [l, r]))
+            .chain(
+                result
+                    .emits
+                    .iter()
+                    .flat_map(|(_, e, h, c)| [e, h].into_iter().chain(c)),
+            );
+        for exp in exps {
+            exp.visit_pre_order(&mut |e| {
+                let ExpData::Call(id, oper, args) = e else {
+                    return true;
+                };
+                let labeled = |range: &MemoryRange| range.labels().any(|l| l != old_label);
+                match oper {
+                    Operation::Global(Some(l)) | Operation::Exists(Some(l)) if *l != old_label => {
+                        memories.insert(self.builder.get_memory_of_node(*id));
+                    },
+                    Operation::SpecPublish(range)
+                    | Operation::SpecRemove(range)
+                    | Operation::SpecUpdate(range)
+                        if labeled(range) =>
+                    {
+                        memories.insert(self.builder.get_memory_of_node(*id));
+                    },
+                    Operation::SpecFunction(mid, fid, range) if labeled(range) => {
+                        let inst = env.get_node_instantiation(*id);
+                        memories.extend(
+                            env.get_module(*mid)
+                                .get_spec_fun(*fid)
+                                .used_memory_instantiated(&inst),
+                        );
+                    },
+                    Operation::Behavior(_, range) if labeled(range) => {
+                        if let Some(ExpData::Call(cid, Operation::Closure(mid, fid, _), _)) =
+                            args.first().map(|a| a.as_ref())
+                        {
+                            let inst = env.get_node_instantiation(*cid);
+                            memories.extend(spec_derivation::behavioral_target_memory(
+                                env,
+                                mid.qualified(*fid),
+                                &inst,
+                            ));
+                        }
+                    },
+                    _ => {},
+                }
+                true
+            });
+        }
+        for memory in memories {
+            self.result.saved_memory.insert((memory, old_label));
         }
     }
 
@@ -1133,6 +1221,15 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     }
 
     /// Returns the temporary's old-state snapshot in the current anchor scope.
+    /// Whether `exp` reads a parameter of the function. In an inline property the body may
+    /// have reassigned it, so `old` of it is the entry value rather than a no-op.
+    fn mentions_parameter(&self, exp: &Exp) -> bool {
+        let param_count = self.fun_env.get_parameter_count();
+        exp.used_temporaries()
+            .into_iter()
+            .any(|idx| idx < param_count)
+    }
+
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {
         let saved_opt = match self.current_anchor {
             None => self.result.saved_params.get(&idx),
@@ -1365,6 +1462,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 if self.current_anchor.is_none()
                     && arg.is_pure(self.builder.global_env())
                     && !is_behavior
+                    && !(self.in_inline_property && self.mentions_parameter(arg))
                 {
                     let loc = self.builder.global_env().get_node_loc(*id);
                     // Compute labels for any sub-expressions which are included into this

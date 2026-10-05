@@ -21,7 +21,7 @@ this pair indexes the already validated unit directly. -/
 structure FunctionHandle where
   namespaceId : NamespaceId
   functionId : FunctionId
-  deriving Repr, BEq, DecidableEq, Inhabited
+  deriving Repr, DecidableEq, Inhabited
 
 /-- Runtime identity of a constant declaration in a validated unit. -/
 structure ConstantHandle where
@@ -54,8 +54,8 @@ across namespace-local `NameId` tables.
 References follow the prophetic ownership model
 (`designs/prophetic-references.md`): a mutable borrow owns the current value
 of its loan and leaves `loanHole` where the value was taken. `loan` is the
-dynamic loan instance minted at the borrow; the lexically recorded `endLoan`
-markers reunite hole and current at loan death. A shared reference is not a
+dynamic loan instance minted at the borrow; the lexically recorded loan
+deaths reunite hole and current (`settleLoans`). A shared reference is not a
 runtime value at all — certified exclusivity makes the observed value itself
 the reference, so `borrow` is always a mutable loan. -/
 inductive RuntimeValue where
@@ -71,7 +71,11 @@ inductive RuntimeValue where
   | tuple (elements : Array RuntimeValue)
   | nominal (source : StructHandle) (variant : Option String)
       (fields : Array RuntimeValue)
-  | closure (function : FunctionHandle) (captures : Array RuntimeValue)
+  /-- A function value: its target, the mask of the parameters it
+  captures, the type instantiation its construction fixed, and the
+  captured values. -/
+  | closure (function : FunctionHandle) (mask : Nat)
+      (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue)
   | borrow (loan : Nat) (current : RuntimeValue)
   | loanHole (loan : Nat)
   deriving Repr, Inhabited
@@ -83,7 +87,7 @@ well-founded recursion over the value, so each constructor's equation is
 a theorem. -/
 
 /-- An array's size measure is one more than its list's. -/
-private theorem Array.sizeOf_eq_toList {α : Type} [SizeOf α] (array : Array α) :
+theorem Array.sizeOf_eq_toList {α : Type} [SizeOf α] (array : Array α) :
     sizeOf array = 1 + sizeOf array.toList := by
   cases array
   simp
@@ -106,8 +110,10 @@ def RuntimeValue.beq : RuntimeValue → RuntimeValue → Bool
       .nominal rightSource rightVariant rightFields =>
       leftSource == rightSource && leftVariant == rightVariant &&
         RuntimeValue.beqList leftFields.toList rightFields.toList
-  | .closure leftFunction leftCaptures, .closure rightFunction rightCaptures =>
-      leftFunction == rightFunction &&
+  | .closure leftFunction leftMask leftInstantiation leftCaptures,
+      .closure rightFunction rightMask rightInstantiation rightCaptures =>
+      leftFunction == rightFunction && leftMask == rightMask &&
+        leftInstantiation == rightInstantiation &&
         RuntimeValue.beqList leftCaptures.toList rightCaptures.toList
   | .borrow leftLoan leftCurrent, .borrow rightLoan rightCurrent =>
       leftLoan == rightLoan && RuntimeValue.beq leftCurrent rightCurrent
@@ -128,6 +134,99 @@ decreasing_by all_goals (simp_wf; omega)
 end
 
 instance : BEq RuntimeValue := ⟨RuntimeValue.beq⟩
+
+/-- Structural equality below a size bound is equality; by induction on the
+bound, so that the recursion needs no termination argument. -/
+private theorem RuntimeValue.eq_of_beq_below : (bound : Nat) →
+    (∀ left right : RuntimeValue, sizeOf left + sizeOf right < bound →
+      RuntimeValue.beq left right = true → left = right) ∧
+    (∀ lefts rights : List RuntimeValue, sizeOf lefts + sizeOf rights < bound →
+      RuntimeValue.beqList lefts rights = true → lefts = rights)
+  | 0 => ⟨fun _ _ small => absurd small (Nat.not_lt_zero _),
+      fun _ _ small => absurd small (Nat.not_lt_zero _)⟩
+  | bound + 1 => by
+      obtain ⟨values, lists⟩ := RuntimeValue.eq_of_beq_below bound
+      constructor
+      · intro left right small h
+        cases left <;> cases right
+        all_goals (try (simp [RuntimeValue.beq] at h; done))
+        all_goals (try (simp_all [RuntimeValue.beq]; done))
+        case vector.vector left right | tuple.tuple left right =>
+          simp only [RuntimeValue.beq] at h
+          simp only [RuntimeValue.vector.sizeOf_spec, RuntimeValue.tuple.sizeOf_spec,
+            Array.sizeOf_eq_toList] at small
+          rw [Array.ext' (lists _ _ (by omega) h)]
+        case nominal.nominal source variant left rightSource rightVariant right =>
+          simp only [RuntimeValue.beq, Bool.and_eq_true, beq_iff_eq] at h
+          obtain ⟨⟨rfl, rfl⟩, fields⟩ := h
+          simp only [RuntimeValue.nominal.sizeOf_spec, Array.sizeOf_eq_toList] at small
+          rw [Array.ext' (lists _ _ (by omega) fields)]
+        case closure.closure function mask instantiation left rightFunction rightMask
+            rightInstantiation right =>
+          simp only [RuntimeValue.beq, Bool.and_eq_true, beq_iff_eq] at h
+          obtain ⟨⟨⟨rfl, rfl⟩, rfl⟩, captures⟩ := h
+          simp only [RuntimeValue.closure.sizeOf_spec, Array.sizeOf_eq_toList] at small
+          rw [Array.ext' (lists _ _ (by omega) captures)]
+        case borrow.borrow loan left rightLoan right =>
+          simp only [RuntimeValue.beq, Bool.and_eq_true, beq_iff_eq] at h
+          obtain ⟨rfl, current⟩ := h
+          simp only [RuntimeValue.borrow.sizeOf_spec] at small
+          rw [values _ _ (by omega) current]
+      · intro lefts rights small h
+        cases lefts <;> cases rights
+        case nil.nil => rfl
+        case cons.cons left lefts right rights =>
+          simp only [RuntimeValue.beqList, Bool.and_eq_true] at h
+          simp only [List.cons.sizeOf_spec] at small
+          rw [values _ _ (by omega) h.1, lists _ _ (by omega) h.2]
+        all_goals simp [RuntimeValue.beqList] at h
+
+/-- Every value is structurally equal to itself. -/
+private theorem RuntimeValue.beq_self_below : (bound : Nat) →
+    (∀ value : RuntimeValue, sizeOf value < bound → RuntimeValue.beq value value = true) ∧
+    (∀ values : List RuntimeValue, sizeOf values < bound →
+      RuntimeValue.beqList values values = true)
+  | 0 => ⟨fun _ small => absurd small (Nat.not_lt_zero _),
+      fun _ small => absurd small (Nat.not_lt_zero _)⟩
+  | bound + 1 => by
+      obtain ⟨values, lists⟩ := RuntimeValue.beq_self_below bound
+      constructor
+      · intro value small
+        cases value
+        all_goals (try (simp [RuntimeValue.beq]; done))
+        case vector elements | tuple elements =>
+          simp only [RuntimeValue.vector.sizeOf_spec, RuntimeValue.tuple.sizeOf_spec,
+            Array.sizeOf_eq_toList] at small
+          simp only [RuntimeValue.beq]
+          exact lists _ (by omega)
+        case nominal source variant fields =>
+          simp only [RuntimeValue.nominal.sizeOf_spec, Array.sizeOf_eq_toList] at small
+          simp only [RuntimeValue.beq, beq_self_eq_true, Bool.true_and]
+          exact lists _ (by omega)
+        case closure function mask instantiation captures =>
+          simp only [RuntimeValue.closure.sizeOf_spec, Array.sizeOf_eq_toList] at small
+          simp only [RuntimeValue.beq, beq_self_eq_true, Bool.true_and]
+          exact lists _ (by omega)
+        case borrow loan current =>
+          simp only [RuntimeValue.borrow.sizeOf_spec] at small
+          simp only [RuntimeValue.beq, beq_self_eq_true, Bool.true_and]
+          exact values _ (by omega)
+      · intro list small
+        cases list
+        case nil => simp [RuntimeValue.beqList]
+        case cons value rest =>
+          simp only [List.cons.sizeOf_spec] at small
+          simp only [RuntimeValue.beqList, Bool.and_eq_true]
+          exact ⟨values _ (by omega), lists _ (by omega)⟩
+
+instance : LawfulBEq RuntimeValue where
+  eq_of_beq {left right} :=
+    (RuntimeValue.eq_of_beq_below (sizeOf left + sizeOf right + 1)).1 left right (by omega)
+  rfl {value} := (RuntimeValue.beq_self_below (sizeOf value + 1)).1 value (by omega)
+
+/-- Equality of runtime values, decided by their structural equality. -/
+instance : DecidableEq RuntimeValue := fun left right =>
+  decidable_of_iff (left == right) beq_iff_eq
 
 /-- A lawful `==` on a decidable type is the decision of equality. -/
 private theorem beq_eq_decide {α : Type} [BEq α] [LawfulBEq α] [DecidableEq α]
@@ -184,46 +283,43 @@ def RuntimeValue.kindRank : RuntimeValue → Nat
   | .borrow .. => 12
   | .loanHole _ => 13
 
-/-- The value of one hexadecimal digit. -/
-def hexDigitValue? (digit : Char) : Option Nat :=
-  if '0' ≤ digit ∧ digit ≤ '9' then some (digit.toNat - '0'.toNat)
-  else if 'a' ≤ digit ∧ digit ≤ 'f' then some (digit.toNat - 'a'.toNat + 10)
-  else if 'A' ≤ digit ∧ digit ≤ 'F' then some (digit.toNat - 'A'.toNat + 10)
-  else none
-
-/-- The number an address spells in hexadecimal, when it spells one. -/
-def addressNumber? (address : String) : Option Nat :=
-  match address.toList with
-  | '0' :: 'x' :: digit :: digits =>
-      (digit :: digits).foldl (fun number digit => do
-        pure (16 * (← number) + (← hexDigitValue? digit))) (some 0)
-  | _ => none
-
-/-- Addresses order by the number they spell, then by spelling. -/
-def compareAddress (left right : String) : Ordering :=
-  (compare (addressNumber? left) (addressNumber? right)).then (compare left right)
+/-- What the order of runtime values reads from the unit: each enum
+variant's declaration position, and each function's position in the order
+of qualified names. -/
+structure ValueRanks where
+  variant : StructHandle → String → Nat
+  function : FunctionHandle → Nat
 
 /-- Variants order by declaration position, then by name; a plain struct
 value precedes a variant. -/
-def compareVariant (rank : StructHandle → String → Nat) (leftSource rightSource : StructHandle) :
+def compareVariant (rank : ValueRanks) (leftSource rightSource : StructHandle) :
     Option String → Option String → Ordering
   | none, none => .eq
   | none, some _ => .lt
   | some _, none => .gt
   | some left, some right =>
-      (compare (rank leftSource left) (rank rightSource right)).then (compare left right)
+      (compare (rank.variant leftSource left) (rank.variant rightSource right)).then
+        (compare left right)
+
+/-- A type instantiation as the numbers of its type identifiers, pairwise. -/
+def instantiationKey (instantiation : Array (TypeId × TypeId)) : List Nat :=
+  instantiation.toList.flatMap fun (source, target) => [source.index, target.index]
+
+/-- Type instantiations in the order of their type identifiers. -/
+def compareInstantiation (left right : Array (TypeId × TypeId)) : Ordering :=
+  compare (instantiationKey left) (instantiationKey right)
 
 mutual
 
 /-- The structural order of two runtime values, given each declaration's
-variant positions. -/
-def RuntimeValue.order (rank : StructHandle → String → Nat) (left right : RuntimeValue) :
+variant positions and each function's position by name. -/
+def RuntimeValue.order (rank : ValueRanks) (left right : RuntimeValue) :
     Ordering :=
   (compare left.kindRank right.kindRank).then (RuntimeValue.orderPayload rank left right)
 termination_by sizeOf left + sizeOf right + 1
 
 /-- The order of two values of the same kind. -/
-def RuntimeValue.orderPayload (rank : StructHandle → String → Nat) :
+def RuntimeValue.orderPayload (rank : ValueRanks) :
     RuntimeValue → RuntimeValue → Ordering
   | .bool left, .bool right => compare left right
   | .character left, .character right => compare left right
@@ -240,10 +336,17 @@ def RuntimeValue.orderPayload (rank : StructHandle → String → Nat) :
         (compare leftSource.structId rightSource.structId)).then
       ((compareVariant rank leftSource rightSource leftVariant rightVariant).then
         (RuntimeValue.orderList rank leftFields.toList rightFields.toList))
-  | .closure leftFunction leftCaptures, .closure rightFunction rightCaptures =>
-      ((compare leftFunction.namespaceId.index rightFunction.namespaceId.index).then
-        (compare leftFunction.functionId.index rightFunction.functionId.index)).then
-      (RuntimeValue.orderList rank leftCaptures.toList rightCaptures.toList)
+  -- As Move compares function values: by the function's name, its type
+  -- arguments, the mask, then the captured values. The handle breaks the
+  -- ties a rank leaves.
+  | .closure leftFunction leftMask leftInstantiation leftCaptures,
+      .closure rightFunction rightMask rightInstantiation rightCaptures =>
+      ((compare (rank.function leftFunction) (rank.function rightFunction)).then
+        ((compare leftFunction.namespaceId.index rightFunction.namespaceId.index).then
+          (compare leftFunction.functionId.index rightFunction.functionId.index))).then
+      ((compareInstantiation leftInstantiation rightInstantiation).then
+        ((compare leftMask rightMask).then
+          (RuntimeValue.orderList rank leftCaptures.toList rightCaptures.toList)))
   | .borrow leftLoan leftCurrent, .borrow rightLoan rightCurrent =>
       (compare leftLoan rightLoan).then (RuntimeValue.order rank leftCurrent rightCurrent)
   | .loanHole left, .loanHole right => compare left right
@@ -252,7 +355,7 @@ termination_by left right => sizeOf left + sizeOf right
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
 /-- The lexicographic order of two value lists. -/
-def RuntimeValue.orderList (rank : StructHandle → String → Nat) :
+def RuntimeValue.orderList (rank : ValueRanks) :
     List RuntimeValue → List RuntimeValue → Ordering
   | [], [] => .eq
   | [], _ :: _ => .lt
@@ -395,12 +498,75 @@ structure GlobalSlot where
   value : RuntimeValue
   deriving Repr, BEq, Inhabited
 
-/-- Global memory: at most one resource per key. -/
+/-- A code of a storage key, injective, which orders keys. -/
+def StorageKey.rank : StorageKey → List Nat
+  | .unit => [0]
+  | .bool value => [1, if value then 1 else 0]
+  | .character value => [2, value]
+  | .integer value => [3, if 0 ≤ value then 2 * value.toNat else 2 * (-value).toNat - 1]
+  | .address value => 4 :: value.toList.map Char.toNat
+  | .signer value => 5 :: value.toList.map Char.toNat
+  | .string value => 6 :: value.toList.map Char.toNat
+  | .bytes value => 7 :: value.toList.map UInt8.toNat
+
+/-- A code of a global key, injective, which orders global memory. -/
+def GlobalKey.rank (key : GlobalKey) : List Nat :=
+  key.namespaceId.index :: key.typeId.index :: key.key.rank
+
+private theorem chars_rank_inj {left right : String}
+    (equal : left.toList.map Char.toNat = right.toList.map Char.toNat) : left = right :=
+  String.ext ((List.map_inj_right fun _ _ same => Char.toNat_inj.mp same).mp equal)
+
+private theorem bytes_rank_inj {left right : Array UInt8}
+    (equal : left.toList.map UInt8.toNat = right.toList.map UInt8.toNat) : left = right :=
+  Array.toList_inj.mp ((List.map_inj_right fun _ _ same => UInt8.toNat_inj.mp same).mp equal)
+
+theorem StorageKey.rank_inj {left right : StorageKey} (equal : left.rank = right.rank) :
+    left = right := by
+  cases left <;> cases right <;>
+    simp only [StorageKey.rank, List.cons.injEq, reduceCtorEq, false_and, and_false,
+      and_true, true_and, Nat.reduceEqDiff] at equal
+  case unit.unit => rfl
+  case bool.bool left right => cases left <;> cases right <;> simp_all
+  case character.character => rw [equal]
+  case integer.integer left right =>
+    congr 1
+    split at equal <;> split at equal <;> omega
+  case address.address => rw [chars_rank_inj equal]
+  case signer.signer => rw [chars_rank_inj equal]
+  case string.string => rw [chars_rank_inj equal]
+  case bytes.bytes => rw [bytes_rank_inj equal]
+
+theorem GlobalKey.rank_inj {left right : GlobalKey} (equal : left.rank = right.rank) :
+    left = right := by
+  obtain ⟨⟨leftNs⟩, ⟨leftType⟩, leftKey⟩ := left
+  obtain ⟨⟨rightNs⟩, ⟨rightType⟩, rightKey⟩ := right
+  simp only [GlobalKey.rank, List.cons.injEq] at equal
+  obtain ⟨rfl, rfl, keys⟩ := equal
+  rw [StorageKey.rank_inj keys]
+
+/-- Codes are ordered totally. -/
+theorem rank_trichotomy (left right : List Nat) : left < right ∨ left = right ∨ right < left := by
+  by_cases less : left < right
+  · exact .inl less
+  by_cases greater : right < left
+  · exact .inr (.inr greater)
+  exact .inr (.inl (List.le_antisymm greater less))
+
+/-- Global memory: at most one resource per key, in the order of the keys'
+codes, so that two maps with the same lookups are equal (`ext`). -/
 structure GlobalMap where
   entries : Array GlobalSlot := #[]
   deriving Repr, BEq, Inhabited
 
 namespace GlobalMap
+
+/-- The slot placed before the first slot of a higher key. -/
+def insertSlot (slot : GlobalSlot) : List GlobalSlot → List GlobalSlot
+  | [] => [slot]
+  | head :: rest =>
+      if slot.key.rank < head.key.rank then slot :: head :: rest
+      else head :: insertSlot slot rest
 
 /-- The resource published at a key. -/
 def lookup (globals : GlobalMap) (key : GlobalKey) : Option RuntimeValue :=
@@ -416,7 +582,74 @@ def erase (globals : GlobalMap) (key : GlobalKey) : GlobalMap :=
 
 /-- Publish a resource at a key, replacing whatever the key held. -/
 def insert (globals : GlobalMap) (key : GlobalKey) (value : RuntimeValue) : GlobalMap :=
-  ⟨(globals.erase key).entries.push ⟨key, value⟩⟩
+  ⟨(insertSlot ⟨key, value⟩ (globals.erase key).entries.toList).toArray⟩
+
+/-- Entries in strictly increasing order of their keys' codes. -/
+def Sorted (globals : GlobalMap) : Prop :=
+  (globals.entries.toList.map (·.key.rank)).Pairwise (· < ·)
+
+theorem mem_insertSlot {slot : GlobalSlot} {entries : List GlobalSlot} {member : GlobalSlot} :
+    member ∈ insertSlot slot entries ↔ member = slot ∨ member ∈ entries := by
+  induction entries with
+  | nil => simp [insertSlot]
+  | cons head rest ih =>
+      unfold insertSlot
+      split <;> simp only [List.mem_cons, ih, or_left_comm]
+
+theorem find?_insertSlot_other {slot : GlobalSlot} {p : GlobalSlot → Bool}
+    (missed : p slot = false) (entries : List GlobalSlot) :
+    (insertSlot slot entries).find? p = entries.find? p := by
+  induction entries with
+  | nil => simp [insertSlot, missed]
+  | cons head rest ih =>
+      unfold insertSlot
+      split
+      · simp [missed]
+      · by_cases hit : p head = true
+        · simp [hit]
+        · simp [hit, ih]
+
+theorem find?_insertSlot_self {slot : GlobalSlot} {p : GlobalSlot → Bool} (hit : p slot = true)
+    {entries : List GlobalSlot} (none : ∀ member ∈ entries, p member = false) :
+    (insertSlot slot entries).find? p = some slot := by
+  induction entries with
+  | nil => simp [insertSlot, hit]
+  | cons head rest ih =>
+      unfold insertSlot
+      split
+      · simp [hit]
+      · simp [none head List.mem_cons_self,
+          ih fun member member_in => none member (List.mem_cons_of_mem _ member_in)]
+
+theorem insertSlot_sorted {slot : GlobalSlot} :
+    {entries : List GlobalSlot} → (entries.map (·.key.rank)).Pairwise (· < ·) →
+    (∀ member ∈ entries, member.key ≠ slot.key) →
+    ((insertSlot slot entries).map (·.key.rank)).Pairwise (· < ·)
+  | [], _, _ => by simp [insertSlot]
+  | head :: rest, sorted, distinct => by
+      simp only [List.map_cons, List.pairwise_cons, List.mem_map] at sorted
+      unfold insertSlot
+      split
+      · rename_i less
+        simp only [List.map_cons, List.pairwise_cons, List.mem_cons, List.mem_map]
+        refine ⟨?_, sorted.1, sorted.2⟩
+        rintro rank (rfl | ⟨member, member_in, rfl⟩)
+        · exact less
+        · exact List.lt_trans less (sorted.1 _ ⟨member, member_in, rfl⟩)
+      · rename_i notLess
+        have greater : head.key.rank < slot.key.rank := by
+          rcases rank_trichotomy slot.key.rank head.key.rank with less | same | greater
+          · exact absurd less notLess
+          · exact absurd (GlobalKey.rank_inj same).symm (distinct head List.mem_cons_self)
+          · exact greater
+        simp only [List.map_cons, List.pairwise_cons]
+        refine ⟨?_, insertSlot_sorted sorted.2
+          (fun member member_in => distinct member (List.mem_cons_of_mem _ member_in))⟩
+        intro rank rank_in
+        obtain ⟨member, member_in, rfl⟩ := List.mem_map.mp rank_in
+        rcases mem_insertSlot.mp member_in with rfl | member_in
+        · exact greater
+        · exact sorted.1 _ ⟨member, member_in, rfl⟩
 
 /-! The map laws.  Distinct keys are disjoint locations, which is what lets a
 contract frame the global memory it does not modify. -/
@@ -463,15 +696,28 @@ private theorem find?_filter_self {entries : Array GlobalSlot} {key : GlobalKey}
 
 @[simp] theorem lookup_insert_self (globals : GlobalMap) (key : GlobalKey)
     (value : RuntimeValue) : (globals.insert key value).lookup key = some value := by
-  simp only [lookup, insert, erase, Array.find?_push, find?_filter_self, Option.none_or,
-    decide_true, ↓reduceIte, Option.map_some]
+  simp only [lookup, insert, erase, ← Array.find?_toList]
+  rw [find?_insertSlot_self (by simp)]
+  · rfl
+  · intro member member_in
+    simp only [Array.toList_filter, List.mem_filter, decide_eq_true_eq] at member_in
+    simpa using member_in.2
 
 @[simp] theorem lookup_insert_other (globals : GlobalMap) (written query : GlobalKey)
     (value : RuntimeValue) (distinct : query ≠ written) :
     (globals.insert written value).lookup query = globals.lookup query := by
-  simp only [lookup, insert, erase, Array.find?_push, find?_filter_ne distinct,
-    decide_eq_false (fun equal : written = query => distinct equal.symm),
-    Bool.false_eq_true, ↓reduceIte, Option.or_none]
+  simp only [lookup, insert, erase, ← Array.find?_toList]
+  rw [find?_insertSlot_other (by simpa using fun equal : written = query => distinct equal.symm),
+    Array.toList_filter, listFind?_filter_ne distinct]
+
+/-- What an inserted map holds: the inserted slot, and every other key's. -/
+theorem mem_insert {globals : GlobalMap} {key : GlobalKey} {value : RuntimeValue}
+    {slot : GlobalSlot} :
+    slot ∈ (globals.insert key value).entries ↔
+      (slot ∈ globals.entries ∧ slot.key ≠ key) ∨ slot = ⟨key, value⟩ := by
+  simp only [insert, erase, List.mem_toArray, mem_insertSlot, Array.mem_toList_iff,
+    Array.mem_filter, decide_eq_true_eq]
+  exact or_comm
 
 @[simp] theorem lookup_erase_self (globals : GlobalMap) (key : GlobalKey) :
     (globals.erase key).lookup key = none := by
@@ -486,6 +732,112 @@ private theorem find?_filter_self {entries : Array GlobalSlot} {key : GlobalKey}
   show ((#[] : Array GlobalSlot).find? (·.key = key)).map (·.value) = none
   rw [← Array.find?_toList]
   rfl
+
+theorem sorted_empty : Sorted {} := by simp [Sorted]
+
+theorem Sorted.erase {globals : GlobalMap} (sorted : globals.Sorted) (key : GlobalKey) :
+    (globals.erase key).Sorted := by
+  unfold Sorted GlobalMap.erase at *
+  simp only [Array.toList_filter]
+  exact List.Pairwise.sublist (List.Sublist.map _ List.filter_sublist) sorted
+
+theorem Sorted.insert {globals : GlobalMap} (sorted : globals.Sorted) (key : GlobalKey)
+    (value : RuntimeValue) : (globals.insert key value).Sorted := by
+  unfold Sorted GlobalMap.insert
+  apply insertSlot_sorted (Sorted.erase sorted key)
+  intro member member_in
+  simp only [GlobalMap.erase, Array.toList_filter, List.mem_filter, decide_eq_true_eq] at member_in
+  exact member_in.2
+
+private theorem find?_sorted_absent {key : GlobalKey} :
+    {entries : List GlobalSlot} → (∀ member ∈ entries, key.rank < member.key.rank) →
+    entries.find? (·.key = key) = none
+  | [], _ => rfl
+  | head :: rest, above => by
+      have ne : head.key ≠ key := fun same =>
+        List.lt_irrefl _ (same ▸ above head List.mem_cons_self)
+      simp only [List.find?_cons, ne, decide_false]
+      exact find?_sorted_absent fun member member_in => above member (List.mem_cons_of_mem _ member_in)
+
+private theorem list_ext :
+    {left right : List GlobalSlot} → (left.map (·.key.rank)).Pairwise (· < ·) →
+    (right.map (·.key.rank)).Pairwise (· < ·) →
+    (∀ key, (left.find? (·.key = key)).map (·.value) = (right.find? (·.key = key)).map (·.value)) →
+    left = right
+  | [], [], _, _, _ => rfl
+  | [], head :: _, _, _, same => by
+      have := same head.key
+      simp at this
+  | head :: _, [], _, _, same => by
+      have := same head.key
+      simp at this
+  | head :: rest, head' :: rest', sorted, sorted', same => by
+      simp only [List.map_cons, List.pairwise_cons, List.mem_map] at sorted sorted'
+      have above : ∀ member ∈ rest, head.key.rank < member.key.rank :=
+        fun member member_in => sorted.1 _ ⟨member, member_in, rfl⟩
+      have above' : ∀ member ∈ rest', head'.key.rank < member.key.rank :=
+        fun member member_in => sorted'.1 _ ⟨member, member_in, rfl⟩
+      have keys : head.key = head'.key := by
+        rcases rank_trichotomy head.key.rank head'.key.rank with less | equal | greater
+        · have := same head.key
+          simp only [List.find?_cons, decide_true] at this
+          have missing : (head'.key = head.key) = False :=
+            eq_false fun eq => List.lt_irrefl _ (eq ▸ less)
+          simp only [missing, decide_false,
+            find?_sorted_absent fun member member_in =>
+              List.lt_trans less (above' member member_in)] at this
+          simp at this
+        · exact GlobalKey.rank_inj equal
+        · have := same head'.key
+          simp only [List.find?_cons, decide_true] at this
+          have missing : (head.key = head'.key) = False :=
+            eq_false fun eq => List.lt_irrefl _ (eq ▸ greater)
+          simp only [missing, decide_false,
+            find?_sorted_absent fun member member_in =>
+              List.lt_trans greater (above member member_in)] at this
+          simp at this
+      have values : head.value = head'.value := by
+        have := same head.key
+        simp only [List.find?_cons, decide_true, keys] at this
+        simpa using this
+      have heads : head = head' := by
+        cases head; cases head'; simp only at keys values; rw [keys, values]
+      subst heads
+      rw [list_ext sorted.2 sorted'.2 fun key => ?_]
+      by_cases at_head : head.key = key
+      · subst at_head
+        rw [find?_sorted_absent above, find?_sorted_absent above']
+      · have := same key
+        simpa [List.find?_cons, at_head] using this
+
+private theorem find?_sorted_mem {slot : GlobalSlot} :
+    {entries : List GlobalSlot} → (entries.map (·.key.rank)).Pairwise (· < ·) →
+    slot ∈ entries → entries.find? (·.key = slot.key) = some slot
+  | [], _, member => nomatch member
+  | head :: rest, sorted, member => by
+      simp only [List.map_cons, List.pairwise_cons, List.mem_map] at sorted
+      rcases List.mem_cons.mp member with rfl | member
+      · simp
+      · have ne : head.key ≠ slot.key := fun same =>
+          List.lt_irrefl _ (same ▸ sorted.1 _ ⟨slot, member, rfl⟩)
+        simp only [List.find?_cons, ne, decide_false]
+        exact find?_sorted_mem sorted.2 member
+
+/-- In a sorted map, a slot is what its key looks up. -/
+theorem Sorted.lookup_of_mem {globals : GlobalMap} (sorted : globals.Sorted) {slot : GlobalSlot}
+    (member : slot ∈ globals.entries) : globals.lookup slot.key = some slot.value := by
+  simp only [lookup, ← Array.find?_toList,
+    find?_sorted_mem sorted (Array.mem_toList_iff.mpr member), Option.map_some]
+
+/-- Sorted maps with the same lookups are equal. -/
+theorem ext {left right : GlobalMap} (sorted : left.Sorted) (sorted' : right.Sorted)
+    (same : ∀ key, left.lookup key = right.lookup key) : left = right := by
+  obtain ⟨left⟩ := left
+  obtain ⟨right⟩ := right
+  congr 1
+  apply Array.toList_inj.mp
+  exact list_ext sorted sorted' fun key => by
+    simpa only [lookup, ← Array.find?_toList] using same key
 
 /-! The map is an abstraction, and these laws are its whole interface.
 Sealing the operations keeps it that way: against a state a contract
@@ -517,7 +869,7 @@ structure RuntimePlace where
 /-- Function-local storage.  `none` is a declared but not yet initialized
 local, which lets the interpreter diagnose reads before initialization.
 `activeLoans` maps a lexical loan site to its live dynamic instance, so
-the site's `endLoan` marker finds the loan it ends; a site borrowed again
+the site's recorded death finds the loan it ends; a site borrowed again
 in a later loop iteration overwrites its entry.  `loanLocations` is the
 native address cache for dynamic loans visible in this frame.  It lets
 mutation and callee write-back revisit the already resolved place instead
@@ -596,6 +948,11 @@ inductive Control where
 
 abbrev LocatedControl := Located Control
 
+/-- The throw a pattern mismatch makes (`patternMismatch?`), its arguments
+as runtime values. -/
+def patternMismatchThrow? (profile : Option Profile) : Option (ThrowKind × Array RuntimeValue) :=
+  (patternMismatch? profile).map fun (kind, codes) => (kind, codes.map .integer)
+
 /-- Observable completion of a function.  A language-level throw is an
 ordinary semantic result, not an interpreter error. -/
 inductive Outcome where
@@ -605,6 +962,34 @@ inductive Outcome where
 
 abbrev LocatedOutcome := Located Outcome
 
+mutual
+/-- Whether a value holds no loan hole outside a borrow. A borrow's current
+belongs to its lender. -/
+def RuntimeValue.holeFree? : RuntimeValue → Bool
+  | .vector elements | .tuple elements | .nominal _ _ elements | .closure _ _ _ elements =>
+      RuntimeValue.holeFreeList? elements.toList
+  | .loanHole _ => false
+  | .borrow .. | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _
+  | .string _ | .bytes _ => true
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+
+/-- Whether no value of a list holds a loan hole outside a borrow. -/
+def RuntimeValue.holeFreeList? : List RuntimeValue → Bool
+  | [] => true
+  | value :: values => value.holeFree? && RuntimeValue.holeFreeList? values
+termination_by values => sizeOf values
+decreasing_by all_goals (simp_wf; omega)
+end
+
+/-- Whether an outcome is one a function may return: results that hold no
+loan hole outside a borrow. Reading a mutably borrowed place yields its
+hole, which only the borrow checker forbids, so a run returning one is
+stuck. -/
+def Outcome.holeFree : Outcome → Bool
+  | .returned values => values.all (·.holeFree?)
+  | .threw _ _ => true
+
 /-- Stable reasons why execution cannot derive a language result. -/
 inductive InterpreterError where
   | outOfFuel
@@ -613,10 +998,15 @@ inductive InterpreterError where
   | functionHasNoBody (function : FunctionHandle)
   | argumentArity (expected actual : Nat)
   | resultArity (expected actual : Nat)
+  /-- A function's results hold a loan hole outside a borrow. -/
+  | returnedLoanHole
   | uninitializedLocal (localId : LocalId)
   | expectedBoolean (actual : RuntimeValue)
   | expectedTuple (actual : RuntimeValue)
   | expectedClosure (actual : RuntimeValue)
+  /-- The supplied arguments do not fill the parameters a closure's mask
+  leaves open. -/
+  | closureArguments (mask captured supplied : Nat)
   | invalidConstructor (reference : QualifiedRef) (variant : Option String)
   | invalidDataOperation (operation : DataOperation)
   | invalidProfileOperation (value : ProfileValue)
@@ -637,10 +1027,12 @@ def InterpreterError.code : InterpreterError → String
   | .functionHasNoBody _ => "LIR-EXEC-NO-BODY"
   | .argumentArity .. => "LIR-EXEC-ARGUMENT-ARITY"
   | .resultArity .. => "LIR-EXEC-RESULT-ARITY"
+  | .returnedLoanHole => "LIR-EXEC-RETURNED-HOLE"
   | .uninitializedLocal _ => "LIR-EXEC-UNINITIALIZED-LOCAL"
   | .expectedBoolean _ => "LIR-EXEC-EXPECTED-BOOL"
   | .expectedTuple _ => "LIR-EXEC-EXPECTED-TUPLE"
   | .expectedClosure _ => "LIR-EXEC-EXPECTED-CLOSURE"
+  | .closureArguments .. => "LIR-EXEC-CLOSURE-ARGUMENTS"
   | .invalidConstructor .. => "LIR-EXEC-CONSTRUCTOR"
   | .invalidDataOperation _ => "LIR-EXEC-DATA-OPERATION"
   | .invalidProfileOperation _ => "LIR-EXEC-PROFILE-OPERATION"

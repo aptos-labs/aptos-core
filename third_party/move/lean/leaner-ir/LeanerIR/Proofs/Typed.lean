@@ -37,7 +37,7 @@ variable {Native Runtime : Type}
   codec.decode_encode value
 
 /-- A certified encoder cannot identify two native values. -/
-theorem encode_injective (codec : Codec Native Runtime) :
+@[grind inj] theorem encode_injective (codec : Codec Native Runtime) :
     Function.Injective codec.encode := by
   intro left right equal
   have decoded := congrArg codec.decode? equal
@@ -51,6 +51,12 @@ theorem encode_injective (codec : Codec Native Runtime) :
     exact codec.encode_injective equal
   · intro equal
     exact congrArg codec.encode equal
+
+/-- Nor two arrays of native values, element by element. -/
+@[simp, grind =] theorem map_encode_eq_map_encode (codec : Codec Native Runtime)
+    (left right : Array Native) :
+    left.map codec.encode = right.map codec.encode ↔ left = right :=
+  Array.map_inj_right fun _ _ equal => codec.encode_injective equal
 
 /-- Runtime values themselves form the representation used for an abstract
 storage-parametric carrier. -/
@@ -318,6 +324,7 @@ def typed (arguments : Codec NativeArgs RuntimeArgs)
     (contract : Contract State Error RuntimeArgs RuntimeResult) :
     Contract State Error NativeArgs NativeResult where
   requires := fun args initial => contract.requires (arguments.encode args) initial
+  assumes := fun args initial => contract.assumes (arguments.encode args) initial
   ensures := fun args initial result final =>
     contract.ensures (arguments.encode args) initial (results.encode result) final
   aborts := fun args initial error =>
@@ -336,6 +343,8 @@ def runtime (arguments : Codec NativeArgs RuntimeArgs)
     Contract State Error RuntimeArgs RuntimeResult where
   requires := fun runtimeArgs initial =>
     ∃ args, arguments.encode args = runtimeArgs ∧ contract.requires args initial
+  assumes := fun runtimeArgs initial =>
+    ∀ args, arguments.encode args = runtimeArgs → contract.assumes args initial
   ensures := fun runtimeArgs initial runtimeResult final =>
     ∃ args result,
       arguments.encode args = runtimeArgs ∧
@@ -421,10 +430,10 @@ theorem satisfies_runtime
     (contract : Contract State Error NativeArgs NativeResult)
     (verified : Satisfies (typedFunction arguments results function) contract) :
     Satisfies function (contract.runtime arguments results) := by
-  intro runtimeArgs initial permitted
+  intro runtimeArgs initial assumed permitted
   obtain ⟨args, encodedArgs, typedPermitted⟩ := permitted
   subst runtimeArgs
-  have established := verified args initial typedPermitted
+  have established := verified args initial (assumed args rfl) typedPermitted
   refine ⟨?_, ?_, ?_⟩
   · intro runtimeResult final execution
     have decoded : ∃ result, results.decode? runtimeResult = some result := by

@@ -5,7 +5,8 @@ import LeanerE2ETests.CheckSupport
 
 /-! Rejections at the source/LIR boundary.
 Host definitions cannot masquerade as source callees; metadata cannot replace
-an authored body. Move recursive nominal types and continue operands reject.
+an authored body. Move recursive nominal types, enums without variants, and
+continue operands reject.
 Vector operations, specifications mentioning additional resource families,
 and mutual calls have positive coverage.
 These are source semantics checks, not a compiler-correctness theorem. -/
@@ -25,7 +26,8 @@ run_cmd do
       ("omitted", "  fun calls(value : u64) -> u64 := omittedHelper(value)\n",
         "frontend", "LEANER-CALL-NAME"),
       ("host_helper", "  fun calls(value : u64) -> u64 := ordinaryHelper(value)\n",
-        "frontend", "LEANER-CALL-NAME")] do
+        "frontend", "LEANER-CALL-NAME"),
+      ("empty_enum", "  enum Empty has Drop where\n", "frontend", "LEANER-ENUM-EMPTY")] do
     let source := "leaner module 0x42::" ++ name ++ " where\n" ++ body
     let stx ← match Parser.runParserCategory env `command source with
       | .ok stx => pure stx

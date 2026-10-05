@@ -8,8 +8,10 @@ module 0x42::deferred_modifies_check {
     }
     spec initialize(account: &signer) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies R[signer::address_of(account)];
+        ensures [inferred] publish<R>(signer::address_of(account), R{value: 0});
+        aborts_if [inferred] exists<R>(signer::address_of(account));
     }
 
 
@@ -36,15 +38,5 @@ module 0x42::deferred_modifies_check {
     }
 }
 /*
-Inference diagnostics:
-warning: WP could not characterize the aborts of `deferred_modifies_check::initialize` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-  ┌─ tests/inference/deferred_modifies_check.move:6:5
-  │
-6 │ ╭     public fun initialize(account: &signer) {
-7 │ │         move_to(account, R { value: 0 });
-8 │ │     }
-  │ ╰─────^
-
 Verification: Succeeded.
 */

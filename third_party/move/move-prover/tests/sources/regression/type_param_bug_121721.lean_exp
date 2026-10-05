@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/type_param_bug_121721.move:146:10: error: this quantifier kind is outside the current LeanerLang parser

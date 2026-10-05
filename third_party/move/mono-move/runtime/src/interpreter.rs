@@ -39,15 +39,17 @@ use mono_move_core::{
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
+    strip_ref,
     types::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    CallClosureOp, ClosureFuncRef, CmpKind, CodeOffset, ConstantPoolIndex, ErrorLocation,
-    FrameOffset, Function, FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
-    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    BytecodeOffset, CallClosureOp, CallFrame, ClosureFuncRef, CmpKind, CodeOffset,
+    ConstantPoolIndex, ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef,
+    GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
+    PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult,
+    VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
@@ -65,6 +67,7 @@ use move_value_view::MoveValueView;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     cell::Ref,
+    fmt,
     ptr::{null, NonNull},
 };
 
@@ -208,15 +211,34 @@ impl SessionEffects {
     }
 }
 
-/// Places one call's arguments, in parameter order. Every value is checked
-/// against its parameter's declared type.
+/// Places one call's arguments in parameter order, checking each value against
+/// its declared type. `signer` writes the address into a by-value `signer`
+/// slot, or points a `&signer` slot at the caller's address, which must then
+/// outlive the call. Other reference parameters are refused.
 pub struct CallBuilder<'a, 'guard> {
     interp: &'a mut InterpreterContext<'guard>,
     func: &'a Function,
+    /// Index of the parameter the next placement fills.
     next_param: usize,
 }
 
-impl<'a> CallBuilder<'a, '_> {
+/// A call that returned or aborted. Holds the interpreter until dropped, so
+/// the return values or the abort's stack trace stay readable and no other
+/// call can be built over them.
+pub struct CompletedCall<'a, 'guard> {
+    interp: &'a InterpreterContext<'guard>,
+    func: &'a Function,
+    status: RuntimeStatus,
+}
+
+/// A call that failed with a VM error. Holds the interpreter until dropped,
+/// so the error's stack trace stays readable.
+pub struct CallError<'a, 'guard> {
+    interp: &'a InterpreterContext<'guard>,
+    error: VMInternalError,
+}
+
+impl<'a, 'guard> CallBuilder<'a, 'guard> {
     /// The parameter types of the called function.
     pub fn param_tys(&self) -> &[InternedType] {
         &self.func.param_tys
@@ -248,6 +270,15 @@ impl<'a> CallBuilder<'a, '_> {
         Ok((dst, *ty))
     }
 
+    /// Advances to the next parameter, failing if it is a reference.
+    fn next_value_slot(&mut self) -> VMResult<(*mut u8, InternedType)> {
+        let (dst, ty) = self.next_slot()?;
+        if strip_ref(ty).is_some() {
+            return Err(RuntimeError::Unsupported("reference parameters").into());
+        }
+        Ok((dst, ty))
+    }
+
     /// Fills the next parameter with `signer`, by value or by reference as
     /// the parameter declares. The address must outlive the call and sit
     /// outside the VM heap, out of the GC's reach.
@@ -277,7 +308,7 @@ impl<'a> CallBuilder<'a, '_> {
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
     pub fn arg<T: MoveValueView + ?Sized>(&mut self, value: &T) -> VMResult<()> {
-        let (dst, ty) = self.next_slot()?;
+        let (dst, ty) = self.next_value_slot()?;
         let guard = self.interp.loader.guard();
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
@@ -291,15 +322,29 @@ impl<'a> CallBuilder<'a, '_> {
     /// On error, the parameter slot is left partially written and the call
     /// must be abandoned.
     pub fn arg_bcs(&mut self, bytes: &[u8]) -> VMResult<()> {
-        let (dst, ty) = self.next_slot()?;
+        let (dst, ty) = self.next_value_slot()?;
         let guard = self.interp.loader.guard();
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
         unsafe { value_conv::bcs::deserialize_into(guard, &mut self.interp.heap, ty, bytes, dst) }
     }
 
-    /// Runs the call once all parameters have been filled.
-    pub fn run(self) -> VMResult<RuntimeStatus> {
+    /// Runs the call. Returns a [`CompletedCall`] if it returns or aborts, or
+    /// a [`CallError`] on a VM error.
+    pub fn run(mut self) -> Result<CompletedCall<'a, 'guard>, CallError<'a, 'guard>> {
+        let result = self.run_to_status();
+        let CallBuilder { interp, func, .. } = self;
+        match result {
+            Ok(status) => Ok(CompletedCall {
+                interp,
+                func,
+                status,
+            }),
+            Err(error) => Err(CallError { interp, error }),
+        }
+    }
+
+    fn run_to_status(&mut self) -> VMResult<RuntimeStatus> {
         if self.next_param != self.func.param_slots.len() {
             invariant_violation!(Unreachable(
                 "not enough arguments for the function".to_string()
@@ -310,12 +355,114 @@ impl<'a> CallBuilder<'a, '_> {
     }
 }
 
+impl<'guard> CompletedCall<'_, 'guard> {
+    /// How the call ended.
+    pub fn status(&self) -> &RuntimeStatus {
+        &self.status
+    }
+
+    /// Consumes the call and returns its status.
+    pub fn into_status(self) -> RuntimeStatus {
+        self.status
+    }
+
+    /// The interpreter the call ran on.
+    pub fn interpreter(&self) -> &InterpreterContext<'guard> {
+        self.interp
+    }
+
+    /// Returns the stack trace of an aborted call: the callers of the aborting
+    /// frame, most recent first. Empty for a successful call or an abort in
+    /// the root frame.
+    pub fn stack_trace(&self) -> VMResult<Vec<CallFrame>> {
+        self.interp.stack_trace()
+    }
+
+    /// BCS-serializes the return values in declaration order, pairing each value
+    /// with its type. Call only after the call succeeded: otherwise the return
+    /// slots hold no values and this is an invariant violation. Fails if any
+    /// return type is a reference.
+    pub fn bcs_serialize_return_values(&self) -> VMResult<Vec<(InternedType, Vec<u8>)>> {
+        let RuntimeStatus::Success = self.status else {
+            invariant_violation!(Unreachable(
+                "return values of a call that did not succeed".to_string()
+            ));
+        };
+        let return_tys = view_type_list(self.func.return_tys);
+        if return_tys.iter().any(|&ty| strip_ref(ty).is_some()) {
+            return Err(RuntimeError::Unsupported("reference return values").into());
+        }
+        let guard = self.interp.loader.guard();
+        // SAFETY: after a successful run, the root frame's return slots hold
+        // values of their declared types, none of them a reference (checked
+        // above); the interpreter's heap still owns every reachable object,
+        // and the guard outlives the interpreter.
+        unsafe {
+            let base = root_frame_base(&self.interp.stack);
+            self.func
+                .return_slots
+                .iter()
+                .zip(return_tys)
+                .map(|(slot, &ty)| {
+                    value_conv::bcs::serialize(guard, base.add(usize::from(slot.offset)), ty)
+                        .map(|bytes| (ty, bytes))
+                })
+                .collect()
+        }
+    }
+}
+
+impl CallError<'_, '_> {
+    /// Returns the stack trace of the failed call: the callers of the failing
+    /// frame, most recent first. Empty for an error in the root frame.
+    pub fn stack_trace(&self) -> VMResult<Vec<CallFrame>> {
+        self.interp.stack_trace()
+    }
+
+    /// Consumes the call and returns its error.
+    pub fn into_error(self) -> VMInternalError {
+        self.error
+    }
+}
+
+impl From<CallError<'_, '_>> for VMInternalError {
+    fn from(err: CallError<'_, '_>) -> Self {
+        err.error
+    }
+}
+
+impl fmt::Debug for CallError<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.error, f)
+    }
+}
+
+impl fmt::Display for CallError<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.error, f)
+    }
+}
+
+/// The [`ModuleId`] naming a frame's module, or [`None`] for a script frame.
+fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
+    (!is_script_module_id(module_id)).then(|| module_id_of(module_id))
+}
+
 /// Materializes the [`AbortLocation`] naming the module that raised an abort.
 fn abort_location(module_id: InternedModuleId) -> AbortLocation {
-    if is_script_module_id(module_id) {
-        return AbortLocation::Script;
-    }
-    AbortLocation::Module(module_id_of(module_id))
+    frame_module(module_id).map_or(AbortLocation::Script, AbortLocation::Module)
+}
+
+/// The bytecode instruction the micro-op at `pc` originates from, or `None`
+/// when `pc` is past the end of the code.
+fn bytecode_origin(
+    func: &Function,
+    pc: usize,
+) -> Option<(FunctionDefinitionIndex, BytecodeOffset)> {
+    func.code
+        .origins()
+        .get(pc)
+        .map(|&offset| (func.def_idx, offset))
 }
 
 /// Materializes the [`AbortLocation`] naming a native's own module from its
@@ -339,23 +486,80 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     // execution guard keeps alive.
     let func = unsafe { regs.func.as_ref() };
     let offset = func.code.origins().get(regs.pc).copied();
-    let location = if is_script_module_id(func.module_id) {
-        match offset {
-            Some(offset) => ErrorLocation::ScriptInstruction { offset },
-            None => ErrorLocation::Script,
-        }
-    } else {
-        let module = module_id_of(func.module_id);
-        match offset {
-            Some(offset) => ErrorLocation::Instruction {
-                module,
-                function: func.def_idx,
-                offset,
-            },
-            None => ErrorLocation::Module(module),
-        }
+    let location = match (frame_module(func.module_id), offset) {
+        (None, Some(offset)) => ErrorLocation::ScriptInstruction { offset },
+        (None, None) => ErrorLocation::Script,
+        (Some(module), Some(offset)) => ErrorLocation::Instruction {
+            module,
+            function: func.def_idx,
+            offset,
+        },
+        (Some(module), None) => ErrorLocation::Module(module),
     };
     err.at(location)
+}
+
+/// Returns the callers of the frame identified by `regs`, most recent caller
+/// first, each at its call instruction. Excludes the current frame, so the
+/// root frame has an empty trace.
+///
+/// Each callee frame starts at a higher address than its caller. Bounds and
+/// ordering checks require each caller's frame pointer to be lower than its
+/// callee's and within the stack, preventing an unbounded walk through a
+/// corrupted chain.
+///
+/// # Safety
+///
+/// `regs.fp` must point to the root frame of `stack`, or to a frame from its
+/// last run with the stack unchanged since. The metadata chain must be the one
+/// written by the call protocol, and every function it references must still
+/// be alive.
+// TODO(completeness): consider including the current frame. It is excluded to
+// match V1, and because the error or abort location already records it.
+#[cold]
+unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<Vec<CallFrame>> {
+    let lowest = root_frame_base(stack);
+    let highest = stack.as_ptr().wrapping_add(stack.len());
+    let mut frames = Vec::new();
+    let mut fp = regs.fp;
+    loop {
+        if !(lowest..highest).contains(&fp) {
+            invariant_violation!(Unreachable(
+                "stack trace: a frame pointer is outside the stack".to_string()
+            ));
+        }
+        // SAFETY: `fp` is at or above the root frame, so the metadata below
+        // it is inside the stack; per the contract, a non-null saved function
+        // pointer there names a live function.
+        let caller = unsafe { saved_caller_ptr(fp).as_ref() };
+        let Some(caller) = caller else {
+            return Ok(frames);
+        };
+        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
+        // The saved pc is the return address, one past the call micro-op.
+        let return_pc = unsafe { read_u64(meta, META_SAVED_PC_OFFSET) } as usize;
+        let Some((function, offset)) = return_pc
+            .checked_sub(1)
+            .and_then(|call_pc| bytecode_origin(caller, call_pc))
+        else {
+            invariant_violation!(Unreachable(format!(
+                "stack trace: no bytecode origin for the call returning to micro-op {return_pc} of `{}`",
+                caller.name()
+            )));
+        };
+        frames.push(CallFrame {
+            module: frame_module(caller.module_id),
+            function,
+            offset,
+        });
+        let caller_fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
+        if caller_fp >= fp {
+            invariant_violation!(Unreachable(
+                "stack trace: a caller's frame pointer is not below its callee's".to_string()
+            ));
+        }
+        fp = caller_fp;
+    }
 }
 
 /// Per-transaction interpreter context with a unified call stack and a
@@ -533,6 +737,24 @@ impl<'guard> InterpreterContext<'guard> {
                 .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref),
             Some(_) => self.read_set.get_loaded(arena_ref),
         }
+    }
+
+    /// The resource of type `ty` stored at `address`, or `None` if there is
+    /// none. The read is recorded like one made by Move code, and the modules
+    /// defining `ty` are loaded and charged.
+    pub fn read_resource(
+        &mut self,
+        address: AccountAddress,
+        ty: InternedType,
+    ) -> VMResult<Option<NonNull<u8>>> {
+        self.loader
+            .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
+        let group = self.resource_group_of(ty)?;
+        Ok(self.read_write_set.read(
+            self.resource_provider,
+            &InMemoryStorageKey::resource(address, ty),
+            group,
+        )?)
     }
 
     /// A module some loaded function came from. Loading the function loaded
@@ -737,20 +959,6 @@ impl<'guard> InterpreterContext<'guard> {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE) }
     }
 
-    /// BCS-serializes the value a successfully completed root call returned.
-    /// Call only after a successful run, with `ty` that call's return type;
-    /// the result lives at the start of the root frame's shared
-    /// parameter/return region. For tests.
-    pub fn serialize_root_result_for_test(&self, ty: InternedType) -> VMResult<Vec<u8>> {
-        // SAFETY: the caller guarantees a completed call whose return value
-        // of type `ty` sits at the region start; the context's heap still
-        // owns every reachable object, and the guard outlives the context.
-        unsafe {
-            let base = self.stack.as_ptr().add(FRAME_METADATA_SIZE);
-            value_conv::bcs::serialize(self.loader.guard(), base, ty)
-        }
-    }
-
     /// Read `size` raw bytes from the root frame at the given byte offset. For
     /// tests inspecting an entry/native function's raw return slots.
     pub fn root_result_bytes_for_test(&self, offset: u32, size: u32) -> &[u8] {
@@ -765,44 +973,19 @@ impl<'guard> InterpreterContext<'guard> {
         }
     }
 
-    /// Reads a heap `vector<u8>` (or a `String`, same slot layout) from the root
-    /// result slot at `offset`; empty if the pointer is null. For tests.
-    pub fn root_result_byte_vector_for_test(&self, offset: u32) -> Vec<u8> {
-        // SAFETY: the slot holds a live pointer to a heap vector<u8>; the heap
-        // is still owned by this context, so the read stays in bounds.
-        unsafe {
-            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
-            if ptr.is_null() {
-                return vec![];
-            }
-            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
-            std::slice::from_raw_parts(ptr.add(VEC_DATA_OFFSET), len).to_vec()
-        }
-    }
-
-    /// Reads a heap `vector<u64>` from the root result slot at `offset`; empty if
-    /// the pointer is null. For tests.
-    pub fn root_result_u64_vector_for_test(&self, offset: u32) -> Vec<u64> {
-        // SAFETY: the slot holds a live pointer to a heap vector<u64>; the heap is
-        // still owned by this context, so the reads stay in bounds.
-        unsafe {
-            let ptr = read_ptr(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize);
-            if ptr.is_null() {
-                return vec![];
-            }
-            let len = read_u64(ptr, VEC_LENGTH_OFFSET) as usize;
-            (0..len)
-                .map(|i| read_u64(ptr, VEC_DATA_OFFSET + i * 8))
-                .collect()
-        }
-    }
-
     /// Starts a call to `func`. Fails if the function's frame does not fit on
-    /// the stack.
-    pub fn build_call<'a>(&'a mut self, func: &'a Function) -> VMResult<CallBuilder<'a, 'guard>> {
+    /// the stack. `func` must live as long as the execution guard because
+    /// callee frames keep its address for later stack traces.
+    pub fn build_call<'a>(
+        &'a mut self,
+        func: &'guard Function,
+    ) -> VMResult<CallBuilder<'a, 'guard>> {
         if FRAME_METADATA_SIZE + func.extended_frame_size > self.stack.len() {
             return Err(VMInternalError::new(RuntimeError::StackOverflow));
         }
+        // Reset the trace before argument placement can overwrite frame
+        // metadata from the previous run.
+        self.registers = VMRegisters::idle(&self.stack);
         Ok(CallBuilder {
             interp: self,
             func,
@@ -1407,6 +1590,19 @@ impl InterpreterContext<'_> {
         Ok(())
     }
 
+    /// Returns the stack trace of the last run: the callers of the frame where
+    /// execution stopped, most recent first. Empty after a successful run or a
+    /// failure in the root frame. Read through [`CompletedCall`] or
+    /// [`CallError`], whose borrow keeps the stack unchanged.
+    fn stack_trace(&self) -> VMResult<Vec<CallFrame>> {
+        // SAFETY: `self.registers` are idle (the root frame) or name the frame
+        // the last run ended in, and nothing writes the stack between the end
+        // of a run and the next `build_call`, which resets them. Every function
+        // the chain names lives as long as the execution guard: the root by
+        // `build_call`'s signature, callees because the loader owns them.
+        unsafe { walk_stack_trace(&self.stack, self.registers) }
+    }
+
     fn run(&mut self) -> VMResult<RuntimeStatus> {
         if self.registers.is_idle() {
             invariant_violation!(Unreachable(
@@ -1416,20 +1612,17 @@ impl InterpreterContext<'_> {
 
         // Hoist the VM registers into a local so the dispatch loop keeps
         // them in CPU registers rather than reloading from `self.registers`
-        // each iteration. Only sync back to `self` on success.
+        // each iteration.
         let mut regs = self.registers;
-
-        match self.dispatch_loop(&mut regs) {
-            Ok(outcome) => {
-                self.registers = regs;
-                Ok(outcome)
-            },
-            // A failing micro-op leaves `regs.pc` on itself, so `regs` names
-            // the instruction that failed. An error keeps the first location
-            // attached to it, so this fills in only the errors that were not
-            // already located.
-            Err(err) => Err(locate_bytecode_failure(err, regs)),
-        }
+        let result = self.dispatch_loop(&mut regs);
+        // Save the final registers on every outcome so `stack_trace` can
+        // traverse the caller frames after execution stops.
+        self.registers = regs;
+        // A failing micro-op leaves `regs.pc` on itself, so `regs` names the
+        // instruction that failed. An error keeps the first location attached
+        // to it, so this fills in only the errors that were not already
+        // located.
+        result.map_err(|err| locate_bytecode_failure(err, regs))
     }
 
     /// The instruction dispatch loop.
@@ -1524,6 +1717,7 @@ impl InterpreterContext<'_> {
                                 code,
                                 message,
                                 location,
+                                offset: None,
                             };
                         }
                     },
@@ -1774,6 +1968,7 @@ impl InterpreterContext<'_> {
                             code,
                             message: None,
                             location: abort_location(func.module_id),
+                            offset: bytecode_origin(func, regs.pc),
                         };
                     },
 
@@ -1806,6 +2001,7 @@ impl InterpreterContext<'_> {
                             code,
                             message: Some(message),
                             location: abort_location(func.module_id),
+                            offset: bytecode_origin(func, regs.pc),
                         };
                     },
 
@@ -1889,28 +2085,20 @@ impl InterpreterContext<'_> {
                         checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div)
                             .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Div })?
                     },
-                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
-                    // cannot trigger Rust's div-by-zero panic. Asserted below in
-                    // debug builds as a defensive check.
+                    // INVARIANT: lowering guarantees `imm != 0`; zero divisors
+                    // use the checked `IntDiv`.
                     MicroOp::DivU64Imm { dst, src, imm } => {
-                        debug_assert!(
-                            imm != 0,
-                            "DivU64Imm: imm must be non-zero (verifier invariant)"
-                        );
+                        debug_assert!(imm != 0, "DivU64Imm: imm must be non-zero");
                         imm_op_u64(fp, dst, src, imm, |s, i| s / i)
                     },
                     MicroOp::ModU64 { dst, lhs, rhs } => {
                         checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem)
                             .ok_or(RuntimeError::DivisionByZero { op: ArithOp::Mod })?
                     },
-                    // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
-                    // cannot trigger Rust's div-by-zero panic. Asserted below in
-                    // debug builds as a defensive check.
+                    // INVARIANT: lowering guarantees `imm != 0`; zero divisors
+                    // use the checked `IntMod`.
                     MicroOp::ModU64Imm { dst, src, imm } => {
-                        debug_assert!(
-                            imm != 0,
-                            "ModU64Imm: imm must be non-zero (verifier invariant)"
-                        );
+                        debug_assert!(imm != 0, "ModU64Imm: imm must be non-zero");
                         imm_op_u64(fp, dst, src, imm, |s, i| s % i)
                     },
 
@@ -1935,11 +2123,10 @@ impl InterpreterContext<'_> {
                         shift_amount,
                         bit_width: 64,
                     })?,
-                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
-                    // cannot wrap or trigger UB. Asserted below in debug builds as a
-                    // defensive check.
+                    // INVARIANT: lowering guarantees `imm < 64`; larger shift
+                    // amounts use the checked `IntShl`.
                     MicroOp::ShlU64Imm { dst, src, imm } => {
-                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
+                        debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64");
                         imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                     },
                     MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| {
@@ -1951,11 +2138,10 @@ impl InterpreterContext<'_> {
                         shift_amount,
                         bit_width: 64,
                     })?,
-                    // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
-                    // cannot wrap or trigger UB. Asserted below in debug builds as a
-                    // defensive check.
+                    // INVARIANT: lowering guarantees `imm < 64`; larger shift
+                    // amounts use the checked `IntShr`.
                     MicroOp::ShrU64Imm { dst, src, imm } => {
-                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
+                        debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64");
                         imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
                     },
 
@@ -3033,8 +3219,10 @@ impl InterpreterContext<'_> {
                     }
                     let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
                     if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
-                        // TODO(completeness): only the Materialized captured-data tag is supported.
-                        todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported now)", cap_tag);
+                        // TODO(completeness): handle `CAPTURED_DATA_TAG_RAW` here once
+                        // that tag has a writer. Until then only `Materialized` is ever
+                        // written, so any other tag is corruption.
+                        invariant_violation!(InvalidCapturedDataTag { tag: cap_tag });
                     }
                     // The resolved callee's captured `values_size` must equal the
                     // one the object was packed with (persisted exactly, not the
@@ -3238,6 +3426,9 @@ impl InterpreterContext<'_> {
             // switching `regs` to the callee.
             self.write_frame_metadata(caller, regs);
         }
+        // TODO(correctness): track calls and returns for V1's resource-lock
+        // and `#[module_lock]` reentrancy checks. Without these checks, MonoMove
+        // can commit reentrant writes that V1 rejects with `RUNTIME_DISPATCH_ERROR`.
         regs.fp = new_fp;
         regs.pc = 0;
         regs.func = NonNull::from(callee);

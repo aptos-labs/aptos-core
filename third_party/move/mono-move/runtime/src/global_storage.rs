@@ -263,6 +263,17 @@ impl ResourceReadWriteSet {
         Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.exists())
     }
 
+    /// Returns the pointer to the resource, or `None` if it does not exist or
+    /// was deleted.
+    pub(crate) fn read(
+        &mut self,
+        provider: &dyn ResourceProvider,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<Option<NonNull<u8>>, RuntimeError> {
+        Ok(get_or_create_resource_entry(&mut self.entries, provider, key, group)?.as_ptr())
+    }
+
     /// Returns the pointer to the resource. Returns an error if the resource
     /// does not exist or was deleted.
     pub(crate) fn borrow_global(

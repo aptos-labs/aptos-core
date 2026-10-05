@@ -6,14 +6,14 @@ Status: current verification design, decided 2026-09-08. It replaces
 [`historical/generic-route.md`](historical/generic-route.md) (normalization,
 then the native route), and executes milestone V5 of
 [`historical/verification-v2.md`](historical/verification-v2.md). Progress
-is measured by the check ledger of
-[`test-organization.md`](test-organization.md).
+is measured by the check ledger, and open work is listed, in
+[`roadmap.md`](roadmap.md).
 
-## Status (checkpoint 2026-09-23)
+## Status (checkpoint 2026-09-27)
 
-Implemented in `leaner-ir`: builds, the `DenotePerformance` gate, and the
-check ledger of [`test-organization.md`](test-organization.md) (65 of 65
-files exact on 2026-09-23) are as recorded there. The agreement theorem is **assumed**, by the user's
+Implemented in `leaner-ir`: D0–D6 are done; builds, the `DenotePerformance`
+gate, and the check ledger (76 of 76 files exact) are as recorded in
+[`roadmap.md`](roadmap.md#tests). The agreement theorem is **assumed**, by the user's
 decision, until its induction is done.
 
 ### Modules
@@ -21,11 +21,11 @@ decision, until its induction is done.
 - `LeanerIR/Proofs/Denote/`: `Types` (native carriers, rows, codecs, the
   state operations and their wp rules), `Term` (typed terms and
   `Term.denote`), `Compile` (`compileFunction`, structural on fuel),
-  `Agreement` (the named axioms `compileFunction_agrees`,
-  `compileFunction_least_cycle`, and `compileFunction_least_generic`, and
-  the transport
+  `Agreement` (the named axioms `compileFunction_agrees` and
+  `compileFunction_least_cycle`, and the transport
   to `SatisfiesFunction`), `Close` (the closer, the `lir_denote` and
-  `lir_denote_norm` simp sets, the state-fact and leaf tactics).
+  `lir_denote_norm` simp sets, the state-fact and leaf tactics), `BitLift`
+(the restatement of a leaf over bit vectors under `pragma bv`).
 - `LeanerLang/Verify.lean` owns `verify` (in a module and at top level),
   which audits each target's artifacts (the denotation route, approved
   axioms only). Per target it publishes the quoted term,
@@ -54,21 +54,43 @@ no call, and the loan discipline from the entry state, so a body that
 mints loans still closes; a reference local the body only writes through
 keeps its loan. In a loop invariant, `old(p)` reads the parameter at the
 function's start: the proof records the arguments and state as a
-`FunctionStart` hypothesis, which the closer passes to the invariant when
-a clause reads `old`. A mutable loan the body declares dies at a
-`continue` of its own loop, as at the end of an iteration. An invariant
+`FunctionStart` hypothesis keyed by the function, which the closer passes
+to the invariant when a clause reads `old`; an inlined callee's start is
+recorded at its call, and a loop reads its own function's latest start.
+Loop sites pair the namespace with the expression (`loopSite`), so the
+loops of callees from several namespaces stay distinct. A mutable loan the body declares dies at a
+`continue` of its own loop, as at the end of an iteration. The data
+invariants of a struct-typed local the body modifies are conjoined to the
+loop's invariant, as the Move Prover assumes well-formedness of a havocked
+value: the loop owes them at entry and after each iteration, and each
+iteration assumes them. A local read under `old` in a loop invariant, or
+any local inside a state anchor (`with_state_anchor!`, which the compiler's
+`for_each` expansion emits before its loop), is read at the loop's entry;
+a parameter read under `old` outside an anchor is read at the function's
+start. An invariant
 reads structs and enums through their typed twins, and a variant test of
 an encoded enum value normalizes to the variant it holds
 (`testVariants_encode_enum`, `NTy.variantName_of_encode_enum`).
 
-An unspecified callee (no `spec` block) is inlined: the caller's proof
-reasons over the callee's compiled body through the agreement theorem
-(`wp_calleeMeaning_of_compiled`), never over a summary; a callee with a
-contract must be verified first. Structural equality of a vector against
+Calls follow the Move Prover's discipline: a callee is inlined, specified
+or not, and the caller's proof reasons over its compiled body through the
+agreement theorem (`wp_calleeMeaning_of_compiled`), meeting its loops with
+their invariants. Only a native, an `opaque` callee, and a member of a
+cycle of calls, whose body no inlining exhausts, are used through their
+contracts (`usedThroughContract`); such a callee with a body must be
+verified first. A contract has two views: a function's body is proved
+against its unmarked and `[concrete]` clauses, and its callers see its
+unmarked and `[abstract]` ones. Where the views differ, callers assume the
+abstract view, as they assume a native's contract, and the assumption is a
+hypothesis of their theorems. Structural equality of a vector against
 a spec literal is carried: the codecs are tight (`NTy.encode_eq_iff`, by
 induction over the type family), so an encoding equation is a decoding
 equation in both directions, and `eqb` decides equality on reference-free
-types (`NTy.eqb_iff`).
+types (`NTy.eqb_iff`). Under `pragma bv` a leaf the integer deciders leave is restated over bit
+vectors (`BitLift`): each certified unsigned value becomes a vector of the
+leaf's widest width, bit operations, shifts, and remainders become vector
+operations, a part that does not lift becomes a boolean atom, and
+`bv_decide` decides the result.
 
 Scalars and checked arithmetic, comparisons, Boolean operations, unsigned
 `&`, checked shifts and casts, constants, `if`, `let`, blocks, `abort`,
@@ -83,8 +105,12 @@ cheap deciders close what they can without rewriting the context),
 direct monomorphic calls through the callee's published theorem, the Rust profile's modular
 `+`/`-`/`*` (`Term.modular`, wrapping as the runtime's `modularInteger`),
 tuples, structs, enums with
-variant tests and payload selection (a `match` arrives as those), shared
-borrows of locals, mutable references (`NTy.ref`: a loan with the native
+variant tests and payload selection (a field of another variant, selected
+or reached by a place, makes the profile's mismatch throw), matches and destructuring bindings over
+values (`Term.caseOf`: typed patterns `Pat`, arms with guards, and the
+profile's mismatch throw where no arm is taken; a binding by a row of
+binders stays a direct destructuring, any other one is a match of one arm),
+shared borrows of locals, mutable references (`NTy.ref`: a loan with the native
 current value; parameters, in-place mutation, typed projection paths,
 local lenders, reborrowed call arguments settled from the callee's
 exports), and storage over the runtime's keyed global map (`globalRead`,
@@ -96,11 +122,10 @@ writing back by key), and the vector primitives `push`, `insert`, `remove`,
 
 ### Not carried
 
-`|`, `^`, signed bitwise, `bytes` and fixed-length vectors, a cycle of
-calls through a generic function other than one calling itself (D6), the
+Signed bitwise operations, `bytes` and fixed-length vectors, the
 generic residuals listed under D3, unspecified pure
 callees used as summaries (`plus_one`), references inside an aggregate,
-and nested destructuring patterns.
+and range patterns over characters.
 
 ### Rules the implementation settled
 
@@ -109,11 +134,44 @@ and nested destructuring patterns.
   definition `f.spec` over its bundled arguments, by well-founded recursion
   on the measure: each recursive call's decrease is proved by `omega` from
   the conditions on its path (its conditionals are dependent), and
-  `f.spec.unfold` unfolds it once. A recursive call is never expanded, so a
-  proof about it is authored, with lemmas about `f.spec` that are items of
-  the module (see module items below). A Boolean
+  `f.spec.unfold` unfolds it once. A recursive call is never expanded in a
+  contract. A leaf instantiates `f.spec.unfold` once at each application it
+  holds, as a solver instantiates a definitional axiom at its trigger terms,
+  and keeps the instances whose guards the context decides
+  (`leaner_denote_unfold_specs`, again after `prepare`); `grind` relates the
+  applications by congruence. A proof needing induction is authored, with
+  lemmas about `f.spec` that are items of the module (see module items
+  below). A Boolean
   result is a proposition; a type-parameter argument or result is a runtime
   value.
+
+- Mutually recursive `spec fun`s (a strongly connected component of the
+  call graph) are defined together: one well-founded fixpoint over the sum
+  of their bundles (`PSum`, nested), whose measure is each member's
+  measure on its own summand, and each member `f.spec` is the fixpoint at
+  its injection. A call between members is a recursive call: its decrease,
+  the callee's measure at the arguments below the caller's at its own, is
+  proved (or guarded) as a call to itself is. Each member's measure is
+  chosen as a single function's, among the combinations of the members'
+  candidates, and each member unfolds once by `f.spec.unfold`, its body
+  with the members' calls to their definitions.
+
+- A recursive `spec fun` or a lemma whose statement reads storage takes
+  the memory and, before it, the family (`Skolems`) its reads resolve
+  resource types at; an application passes its own frame. A Boolean
+  parameter is a `Bool`, as the body reads it; a Boolean result is a
+  proposition.
+
+- A lemma's parameter, and a quantifier's binder over a type, of an
+  aggregate type with a native type τ ranges over the values of τ, as the
+  Move Prover assumes of it. A quantifier binds the native values, and the
+  pattern's local is their encoding. A lemma's premise states that the
+  parameter encodes a native value (`∃ x, NTy.encode τ x = v`), as it
+  states an integer parameter's bounds, at the family the lemma takes; an
+  application owes it, and the closer witnesses such an existential by the
+  value its body's equations assemble. A proof obtains the native value,
+  whose reads carry their types' bounds: the elements a leaf compares,
+  and those a definition it unfolds reads, are bounded so.
 
 - `compare` (`std::cmp::compare`) is the structural order of runtime values
   (`RuntimeValue.order`): primitives by their natural order, vectors,
@@ -133,9 +191,9 @@ and nested destructuring patterns.
   its specification or its module sets `pragma verify = false`; a `verify
   f` item states a target explicitly (with `by`, an authored proof, which
   sees the module's theorems by their short names), and verifies `f` even
-  under the pragma. Targets are verified callees first: a target's
-  specified callees, found through the unspecified callees it inlines, are
-  verified before it, whatever their source order. Theorems are the only
+  under the pragma. Targets are verified callees first: the callees a
+  target uses through their contracts, found through the callees it
+  inlines, are verified before it, whatever their source order. Theorems are the only
   Lean items: the module is parsed as one command before any item is
   elaborated, so a syntax extension (a tactic macro) declared among its
   items could not be used by them. A
@@ -175,8 +233,8 @@ and nested destructuring patterns.
   stays live and is resolved where its holder dies. A loop frame releases the
   current value of a reference the body writes through, and keeps the
   global store unchanged unless the body reaches a global operation, a
-  callee whose contract may modify storage, or an inlined callee whose body
-  does. A specification local (a quantifier binder of a logical type) keeps
+  callee used through a contract that may modify storage, or an inlined
+  callee whose body does. A specification local (a quantifier binder of a logical type) keeps
   an empty slot, and a quantifier over a bounded integer type ranges over
   that type's values.
 
@@ -185,7 +243,10 @@ and nested destructuring patterns.
   type the translator consults). A derived reading rebinds an assigned
   local and drops statements without logical effect; an abort or an
   opaque specification function denotes a fixed unknown value
-  (`Contract.opaqueSpec`, keyed by the qualified name and instantiation).
+  (`Contract.opaqueSpec`, keyed by the qualified name and applied to its
+  type arguments as native types under the contract's family,
+  `τ.substWith Θ.type`, which an instantiation of the contract resolves to
+  the caller's types — `Skolems.type`).
   A resource read through a specification function belongs to the
   contract's families as a direct read does.
 
@@ -227,12 +288,95 @@ and nested destructuring patterns.
   `Vectors/VectorOperations`, invisible to heartbeats and surfacing as a
   stall inside the first `simp` that had to wait for the kernel. Roles are
   now collected by a traversal from the function root.
+- The kernel reads an array through its list: `a[i]?` walks `i` cells,
+  `size` the whole list, and an indexed `foldl` or `find?` is quadratic.
+  Kernel-evaluated certificates (`compiled_eq`, the frame instantiations)
+  therefore iterate lists, read arenas through an
+  `IndexedArena` built in one pass, and count sizes once; an `_eq` lemma
+  ties each indexed form to the native array traversal (2026-09-27: Check
+  kernel checking −19%, `ReturnedMutRefs` 68s to 31s). Measurement notes:
+  [`perf-notes.md`](perf-notes.md).
+- Every computation of the runtime over the prepared unit that a proof
+  cites is a kernel decision of the same kind: the frame instantiation of a
+  generic call at the runtime family (`frameInstantiation_i.decided`) is
+  `Eq.refl` of the elaborator's value, stated through the callee
+  namespace's view (`frameInstantiationIn`, tied to the runtime's
+  definition by `frameInstantiation_of_view`), never a Meta-level `rfl`,
+  whose unfolding of the unit is recursion-bounded and diverged once a
+  callee's module carried a generic cross-module call (2026-09-28).
+- **Instantiation certificates by witness** (landed 2026-09-29). The
+  runtime's `invocationTypeInstantiation` instantiates every type of the
+  callee's namespace and locates each instantiated compound type by a
+  search over the whole table (`findIdx?`), which the kernel replayed per
+  certificate at N² type comparisons: 25–30 s each on `ristretto255`. The
+  search is replaced by a check, in two layers:
+  1. *Once per namespace*, a **key map** (`KeyMap`, a search tree from the
+     fingerprint of every erased type to the least index carrying it;
+     `Ty.eraseLocs` erases type-argument locations, which the nominal
+     search ignores, so every search is one equality of erased types;
+     `Ty.fingerprint` packs a prefix-free encoding of the erased type into
+     one natural). The map is only read: its correctness
+     (`Validation.Correct`: for every entry `k`, the index the map answers
+     for `k`'s fingerprint is at or before `k` and holds an equal erased
+     type) is decided by the kernel with one lookup and one comparison
+     per entry, and soundness uses only that `lookup` is a function of the
+     key — equal erasures have equal fingerprints by congruence, so an
+     earlier match would be answered by the same index (`search_eq`).
+     Nothing is proved about the tree's order or about injectivity; the
+     encoding is injective anyway, so a certificate never fails on a
+     collision.
+  2. *Per certificate*, a **witness** per type index — the instantiated
+     type's index, or that the type has none — and a depth per index
+     bounding the instantiation's recursion; a checker verifies each
+     witness by reading the types and the witnesses through balanced
+     indexes (`IndexedArena.get?`, the witnesses published as an array and
+     as its index with an `ofArray` certificate), one map lookup and one
+     erasure comparison, linear in the table. The soundness theorem,
+     `check … = true → ∀ i, ∀ fuel > depth[i], instantiatePlaceFieldTypeFuel?
+     … fuel ⟨i⟩ = witness[i]`, is proved by induction on the fuel with the
+     search lemma at each compound case; the fold of
+     `invocationTypeInstantiation` then equals the elaborator's pair array
+     by a fold over the witnesses' index (`foldWitnesses`).
+  Every kernel-evaluated read is logarithmic: the kernel walks a list or an
+  `Array` literal at 10–25 µs per element, so any indexed read of a
+  351-entry table costs milliseconds and a quadratic checker seconds
+  (`perf-notes.md`, kernel calibration).
+  The certificate the elaborator adds is `check … = true` by `Eq.refl`; the
+  closer-facing theorem composes it with the soundness theorem and
+  `frameInstantiation_of_view`. Module:
+  `LeanerIR/Validation/InstantiationCertificate.lean`. Every generated
+  theorem is elaborated with `Elab.async` off: an asynchronous proof that
+  fails is committed as `sorry` and reported at the module's end, which the
+  artifact audit catches only after the target has been counted as verified.
 - The closer is a worklist: a `wp` over a marked loop takes the loop rule,
   over a callee the callee's theorem, over the recursive iteration the loop
   hypothesis; a syntactic binder, conjunction, or conditional splits; only
   a goal whose head is `wp` is renormalized; a call's post hypotheses are
   consumed before renormalizing (specialize decided implications, split
   existentials, substitute witnesses, rewrite with state equations).
+- Normalization is head-only: a simproc normalizes a bind's action and
+  leaves its continuation untouched, and the bind rules are not simp
+  lemmas. The closer takes a `wp` over a bind by its rule; when the action
+  can branch it binds the continuation as a local definition, as it does a
+  loop's, unfolding it when the action completes, so no branch
+  renormalizes the rest of the program (2026-09-26: Quicksort −32%,
+  ReturnedMutRefs −9%, the cost benchmark −8.7%; the smallest straight-line
+  targets pay a step per bind).
+  A binder or conjunct of a normalized goal is not renormalized.
+  Every goal the closer holds is normalized, so a step normalizes only the
+  structure it creates: the action, conditions, and state a bind rule
+  rearranges, the values a continuation is applied to, and the conditions
+  a folded continuation passes on are taken as they are, and the
+  continuation a bind rule builds is normalized where it is applied to the
+  action's result (2026-09-27: Check binds −55%, exits −18%, closer −19%).
+- `Term.denote` and `Args.denote` rewrite by their equations, taken before
+  the term's arguments are visited, so a proof carries each step as an
+  equation instance the kernel checks by instantiation; unfolding them left
+  no trace, and the kernel re-derived every step by reducing the compiled
+  61-way recursion (its matcher alone some 27k nodes). Unfolding remains
+  the fallback where an equation's type indices do not match at reducible
+  transparency, as a call's result type does (2026-09-27: Check kernel
+  checking −14%, closer −20%).
 - A leaf clears every computation hypothesis first (`contradiction` had
   reduced the whole unit through the preparation hypothesis), adds the
   bounds of every range certificate in context as separate facts (never
@@ -241,6 +385,51 @@ and nested destructuring patterns.
   splits the range-check conditionals, and decides by `omega`/`decide`.
   Signed quotients and remainders use width-specific range facts, not
   magnitudes.
+- A leaf whose deciders fail on a goal that states binders or premises
+  (a quantified clause, an implication) is retried at an arbitrary
+  instance: the binders are introduced through the `Obligation` markers
+  and the deciders run again. Only a failed leaf pays for the retry, since
+  `decide` needs the closed goal and every other leaf keeps its path, and
+  the retry runs within its own heartbeat budget
+  (`instanceAttemptHeartbeats`), so an undecided leaf is still reported
+  rather than exhausting the target's budget. A saturation round whose
+  context holds an array write resolves the lookups after it, with omega
+  discharging that the positions differ or coincide within bounds
+  (2026-09-27: `bit_vector::set` and `unset` verify; Check unchanged).
+- A goal one position past the range of a quantified hypothesis (a range
+  invariant extended by one iteration) splits on the one range premise
+  omega does not prove: where it holds the goal is the hypothesis's
+  instance, where it fails omega pins the position to the bound and the
+  normalized context decides it (`leaner_denote_range_instance`, tried
+  after `leaner_denote_instance` in the residual deciders and the
+  budgeted retry). `ResultShape.bodyType` is reducible, like
+  `ResultShape.carrier`: a callee's result type reaches instance
+  arguments, which simp matches at instance transparency only
+  (2026-09-27: Quicksort's `partition` loses an authored case; the
+  composition benchmark −6% heartbeats).
+- Vector membership and search results share one normal form, the
+  position of the element (`mem_iff_exists_int_index`;
+  `findIndex?_eq_none_iff`, `findIndex?_isSome_iff`, and
+  `forall_imp_ne_iff`, which collapses `∀ x, q x → ¬x = a` to `¬q a`). A
+  leaf that reads a search result splits it into `none` and `some found`,
+  the latter with its bound, the element there, and the elements before it
+  (`findIndex?_eq_some_iff`). A lookup into an array with an element
+  removed or inserted splits on which side of that position it reads, at
+  integer positions, so a shifted position stays `Int.toNat` of an integer
+  (`getElem?_eraseIdx_toNat_of_lt`/`of_ge`, `getElem?_insertIdx_toNat_of_lt`/`of_gt`).
+  An in-bounds lookup the context does not state names its element, and
+  the hypotheses quantified over positions that read an array are
+  instantiated at every position the context reads, the bounds closed by a
+  hypothesis or omega and the equations left as premises, then rewritten
+  by the context (2026-09-28: `acl` verifies, its injectivity invariant
+  through `push` and `eraseIdx`).
+- Saturation ends at a fixed point up to the order of the hypotheses (the
+  rewriting pass restates a hypothesis it changes after the others), and a
+  bound is asserted once per leaf: the closer records, by goal content, the
+  bounds asserted on a goal and its ancestors, which the rewriting pass has
+  restated or dropped as known, and does not assert them again
+  (2026-09-27: Check leaves −17%, GlobalInv −21%, the composition
+  benchmark −25%).
 - The equation lemmas of `Term.denote` (some seventy cases in a mutual
   structural recursion) are realized under the package's default heartbeat
   budget, which no `set_option` in the file reaches; the `LeanerIR`
@@ -268,6 +457,30 @@ and nested destructuring patterns.
   rewritten before the next decision; state facts are retried after every
   round. A literal integer decoding is decided outright by a pre-simproc
   (`decodeIntegerLiteral`), so no conditional is left for a split.
+- A concrete state is computed rather than reasoned about (2026-10-03,
+  the OrderedMap scenarios once data invariants are owed where mutations
+  end). Substitution reaches what an equation fixes besides a local: an
+  integer local the context bounds above and below by one literal
+  (`pinnedInteger?`), a vector local whose elements an equation states,
+  destructured (`vectorEquation?`), and a caller's value an inlined generic
+  callee's equation fixes, `x = toSkolem θ τ v` restated in the caller's
+  view as `ofSkolem θ τ x = v` (`NTy.eq_toSkolem_iff`), whose types the
+  family canonicalization spells as the caller does, `NTy.subst` evaluated
+  at literal type arguments. Where a contract call returns a result its
+  contract fixes to a few literal values (a lower bound over a literal
+  vector), the traversal decides it there, once for every leaf after it:
+  pinned, or split on its values with the cases closed whose instantiated
+  facts the normalization refutes (`leaner_denote_call_result_cases`). A
+  leaf whose positions range over a few literal values, such as a
+  quantified goal's binders, is decided value by value
+  (`leaner_denote_split_range`), the hypotheses quantified over a literal
+  range expanded into their instances (`leaner_denote_expand_ranges`). The
+  normalization evaluates what these leave: lists updated at positions
+  not known literally, integer and boolean order, literal comparisons, and
+  transport round trips. The discharger proves a side condition from the
+  hypotheses connected to it through shared variables, the negated
+  condition included (2026-10-03: OrderedMap 82 s → 51 s, its scenarios
+  verified with every mutation end checked).
 - Rows are a mutual family `NTy`/`NRow`/`NRows` (a nested inductive cannot
   derive decidable equality); an enum carries the distinctness of its
   variant names. Aggregate arguments are introduced destructured, one goal
@@ -275,19 +488,28 @@ and nested destructuring patterns.
 
 Assumption ledger: `LeanerIR.Proofs.Denote.compileFunction_agrees` is an
 axiom; every `verified` theorem names it under `#print axioms`. A member
-of a cycle of calls also names `compileFunction_least_cycle`, a generic
-function calling itself `compileFunction_least_generic` (D6). Nothing else
-is admitted.
+of a cycle of calls, a function calling itself included, also names
+`compileFunction_least_cycle` (D6). A function selecting `pragma bv` may
+also name `bv_decide`'s certificate axioms (`_native.bv_decide.ax_*`), each
+stating that the native evaluation of the verified checker
+`Std.Tactic.BVDecide.Reflect.verifyBVExpr` on its certificate is `true`:
+such a proof trusts the Lean compiler for that evaluation, as the Move
+Prover trusts its SMT solver. The audit accepts them for such a function
+only. Nothing else is admitted. The public theorem states two assumptions
+as hypotheses that no proof discharges: `GlobalsPreserved`, which static
+typing is to establish, and, for a function whose proof reads `result_of`
+of a known function value, `Terminating`: runs of the unit's functions
+end, as the Move Prover assumes of every function (decided 2026-10-02).
+A function stating an in-body `assume` is verified of the reading in which
+its runs pass each assumption only where its condition holds
+(`Meanings.assumption`, `Term.assume`), and its theorems take that its
+assumptions hold, `AssumptionsHold`: every outcome of a run of it is an
+outcome of that reading (decided 2026-10-02). A caller using its theorem
+takes the same hypothesis; a caller inlining it assumes nothing of it.
 
 ### Next
 
-In order: the missing v0 fixtures (see the ledger in
-[`test-organization.md`](test-organization.md)), then the retirement of the
-previous routes' generators, tests, and `Performance.exp` (D4). Cost: a storage target with
-two global borrows and invariants costs 100M heartbeats, three quarters of
-it one `simp_all` pass per leaf over the shared context; sharing that
-pass across the leaves of one target is the next cost item. Discharging
-the axiom blocks nothing else and is scheduled with D4.
+Open work is listed in [`roadmap.md`](roadmap.md), sections 1–3.
 
 ## What does not change
 
@@ -329,7 +551,8 @@ measured number.
 1. **The goal contains the mathematics, not the machinery.** The term a
    `verify` reasons over mentions only what the source mentions: values of
    native carriers, Lean binders for locals, prophecy values for `&mut`,
-   the typed family store for globals. No `RuntimeFrame`, row, loan
+   the typed family store for globals ([`static-memory.md`](static-memory.md)).
+   No `RuntimeFrame`, row, loan
    registry, arena, expression id, or string occurs in it. *Evidence:*
    `deposit` was term-bound because the focused loan, the registry, and the
    keyed hole rode through every goal (audit F4, F7); v0's goals carried
@@ -362,12 +585,13 @@ measured number.
    the whole context per residual goal (audit F1, F1c). *Check:* heartbeats
    per proof object in `DenotePerformance.exp`, gated per target.
 
-5. **Modularity by contract.** A call contributes its callee's contract as
-   a native equation at the boundary, never the callee's body, and a
-   generic body is proved once and instantiated. *Evidence:* the generic
+5. **Modularity where declared.** A call to an `opaque` callee contributes
+   its contract as a native equation at the boundary, never the callee's
+   body, and a generic body is proved once and instantiated; every other
+   call is inlined, as the Move Prover does. *Evidence:* the generic
    language checkpoint cut a caller from over 50M heartbeats to 14M by not
-   re-verifying its callee. *Check:* a caller's cost is independent of its
-   callee's body size.
+   re-verifying its callee. *Check:* a caller's cost is independent of an
+   opaque callee's body size.
 
 6. **Decidable leaves, structural everything else.** Leaf goals are linear
    arithmetic over `Int` with range certificates, closed by `omega`, or
@@ -438,7 +662,7 @@ one of the three per-construct pieces. The proof-facing `Proofs/` tree is
 Two definitions and one theorem, all written once:
 
 ```
-denote : ExecutableUnit → FunctionHandle →
+denote : ExecutableUnit unit → FunctionHandle →
   Array RuntimeValue → Spec RuntimeState Failure (Array RuntimeValue)
 
 denote_agrees : ∀ unit function arguments,
@@ -637,7 +861,8 @@ What the implementation settled:
 
 ## Recursion (D6, decided 2026-09-23)
 
-**Status: DONE 2026-09-23; cycles of calls 2026-09-24.** `recursive_choose`,
+**Status: DONE 2026-09-23; cycles of calls 2026-09-24; one fixed point for
+every cycle, generic members included, 2026-09-25.** `recursive_choose`,
 `drain`, the caller `call_drain`, and the mutually recursive
 `mutual_return_left` and `mutual_return_right` verify; a cycle through an
 unspecified function is rejected with a diagnostic.
@@ -651,51 +876,57 @@ big-step derivations are finite.
 - The denotation takes the meaning of calls as a parameter
   (`CalleeMeaning`). The closed denotation passes `closedMeaning unit`, the
   prophetic meaning of each callee; the body of a member of a cycle of
-  calls passes `cycleMeaning unit members self`, which answers each
-  member's handle with its `self` (`routeMeaning`) and every other handle
-  closed. A function calling itself is a cycle of one. The routing casts
-  the arguments along an equality of signatures that reduces on concrete
-  ones.
+  calls at a slot passes `cycleMeanings unit members typeInstantiation self
+  slot`. A slot (`CycleSlot`) is a member at the runtime family, or at a
+  skolem family and type instantiation; `self` gives a meaning per slot
+  (`CycleFamilySelves`). A call to a member without type arguments means
+  `self` at the caller's slot (`routeMeaning`), one with type arguments
+  `self` at the family and frame instantiation the call induces
+  (`routeGeneric`), and every other call is closed. At the runtime family
+  calls with type arguments stay closed: a proof covers the runtime slots
+  only when no member is generic. A function calling
+  itself is a cycle of one. The routing casts the arguments along an
+  equality of signatures that reduces on concrete ones.
 - Assumed, beside the closed agreement: `compileFunction_least_cycle`, the
-  closed prophetic meanings of a cycle's compiled members refine the least
-  fixed point (`Spec.fixFamily`, indexed by `CycleIndex members`) of their
-  denotations with the calls to members routed to the argument.
+  closed prophetic meanings of a cycle's compiled members at every slot
+  refine the least fixed point (`Spec.fixFamily`, indexed by the slots) of
+  their denotations with the calls to members routed to the argument.
   Refinement, not equivalence: partial correctness needs only that every
   outcome of the closed meaning is a finite unfolding. The statement stays
   at the prophetic level; a statement over arbitrary runtime oracles could
   be false for oracles that read loan bookkeeping.
-- Proved: `satisfies_cycle`, contracts that hold of the members' bodies
-  under the hypothesis that they hold of the calls to members hold of the
-  closed meanings, by induction on the unfolding depth and the refinement.
+- Proved: `satisfies_cycle`, contracts per slot that hold of the members'
+  bodies under the hypothesis that they hold of the calls to members hold
+  of the closed meanings, by induction on the unfolding depth and the
+  refinement. A slot a proof does not cover carries `Contract.vacuous`,
+  which requires `False` and so holds of every body;
+  `satisfies_cycle_runtime` and `satisfies_cycle_family` state the two
+  coverings over member positions alone.
 - The cycle of a function is every function it reaches by calls that
   reaches it again. `verify` of any member verifies all of them together:
   each member's typed theorem is stated over an arbitrary meaning per
-  member satisfying that member's contract, and the closer consumes a call
-  to a member through that hypothesis as it consumes a verified callee.
+  member satisfying its contract, and the closer consumes a call to a
+  member through that hypothesis as it consumes a verified callee. Without
+  a generic member every member is proved at the runtime family, the
+  closed term the normalizer's caches keep; with one, every member is
+  proved at every family and instantiation (its meaning a `SelfFamily`),
+  and the runtime slots are the vacuous ones.
   The members' theorems then follow from `satisfies_cycle`, and they
   succeed or fail together. Every member is used through its contract, so
   each must be specified and not set `pragma verify = false`, and all must
   be in one module; a member returning `&mut` without `final` is used
   through its value view, which suffices when its callers return the
   reference.
-- A generic function calling itself (2026-09-24): its calls to itself carry
-  type arguments, so `self` is a family — its meaning at every skolem
-  family and instantiation (`SelfFamily`) — and `recursiveGeneric` answers
-  the own handle at the family and frame instantiation the call induces
-  with `self` there, every other generic call closed. Assumed beside the
-  monomorphic statement: `compileFunction_least_generic`, the prophetic
-  meaning at every family and instantiation refines `Spec.fixFamily` of
-  the body over all of them. `satisfies_recursive_generic` proves a
-  contract from the body at every family under the hypothesis at every
-  family; the typed theorem takes `selfVerified` quantified over families,
-  which the closer instantiates as it does a generic callee's theorem.
-  `Examples/Quicksort`'s `quick_sort_range` is the first such target.
+- Generic recursion: calls to a generic member carry type arguments, so
+  its hypothesis is quantified over families and instantiations, which the
+  closer instantiates as it does a generic callee's theorem.
+  `Examples/Quicksort`'s `quick_sort_range` calls itself;
+  `Generics/GenericCycles` covers generic mutual recursion and a cycle
+  through a generic and a non-generic member.
 - The semantics and public theorems are elaborated synchronously, as the
   typed one is: an error in an asynchronously elaborated proof is logged
   after the error count is taken and leaves a `sorry` that only the
   artifact audit then reports.
-- A cycle of calls through a generic function is carried only when the
-  function calls itself alone.
 - Open: deriving the closed agreement from the fixed point needs a
   continuity proof over the denotation (a meaning's outcomes use finitely
   many calls); until then both statements are assumed.
@@ -812,6 +1043,8 @@ restated over the current ones.
 | D2 | **DONE 2026-09-23**: references, storage, resource invariants, loops over live borrows, and vectors carried (`Account`, `Storage`, `GlobalInv` at the driver cap, `GlobalBorrows`, `Loans`, `LoopInvariants` pass); returned references by D5, recursion by D6 | Storage and references: typed global family, scoped borrows, prophecies, returned references. | `Account`, `GlobalBorrows`, `GlobalInv`, `References`, `Loans`, `Prophecies`, `Storage` pass. |
 | D3 | **DONE 2026-09-23** for Move generics (D3a, D3b); aliasing instances and the Rust profile open | Generics (V4, carried) and the Rust profile denotations. | `Generics/Generics`, `Generics/GenericFunctions`, `GenericScalarCalls`, Rust-profile fixtures pass. |
 | D4 | **DONE 2026-09-21** except the axiom | Retirement: the per-target `computationRepresents` generation, the `LeanerLang/Native*` generators, the `Proofs/*Agreement.lean` modules, and `Certify.lean` are deleted (78 modules, 45 test roots, 43k lines); `Contract.lean` keeps only the clause translator, preparation, and the cost commands. | Full Check audit at the unchanged caps; `DenotePerformance.exp` unchanged; the `leaner-ir` suite is red only on `Frontend` (`replace`, a mutable enum payload place) and `CompositionPerformance` (its own 50k cap). |
+| D5 | **DONE 2026-09-23** | References as prophecies: a `&mut` is a prophecy pair, returned references included. | `References`, `ReturnedMutRefs`, `ReturnedMutRefErrors`, `Freeze` pass. |
+| D6 | **DONE 2026-09-25** | Recursion and cycles of calls, generic members included, by one fixed point per cycle. | `Callees`, `Calls`, `GenericCycles`, `ReturnedMutRefs` pass. |
 
 D0 is a feasibility gate as much as a milestone: if the induction for the
 straight-line subset cannot be closed, or definitional unfolding costs

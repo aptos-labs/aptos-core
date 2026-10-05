@@ -1,0 +1,24 @@
+--- a/sources/framework/extracted_ethereum_derivable_account.move
++++ b/sources/framework/extracted_ethereum_derivable_account.move
+@@ -26,0 +27,4 @@
++        } spec {
++            invariant len == std::vector::length(scheme);
++            invariant 1 <= i && i <= len;
++            invariant forall k in 1..i: allowed(scheme[k]);
+@@ -27,0 +32,16 @@
++    }
++
++    spec module {
++        /// The characters allowed after the first: letters, digits, `+`, `-`, `.`.
++        fun allowed(c: u8): bool {
++            is_alpha(c) || (c >= 0x30 && c <= 0x39) || c == 0x2b || c == 0x2d || c == 0x2e
++        }
++    }
++
++    spec validate_scheme {
++        pragma opaque;
++        aborts_if len(scheme) == 0 || len(scheme) > MAX_SCHEME_LEN;
++        // The first character must be a letter; the rest may also be a digit
++        // or one of three punctuation marks.
++        aborts_if !is_alpha(scheme[0]);
++        aborts_if exists k in 1..len(scheme): !allowed(scheme[k]);

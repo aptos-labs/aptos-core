@@ -1,6 +1,6 @@
 {
   "schema": "move-xast-module",
-  "version": 4,
+  "version": 9,
   "address": "0x42",
   "address_alias": null,
   "name": "loops",
@@ -55,7 +55,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 1,
@@ -304,7 +306,9 @@
             "update_target": null
           }
         ],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -441,7 +445,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -748,7 +754,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -977,7 +985,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -1142,7 +1152,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -1332,6 +1344,8 @@
   "spec_funs": [],
   "spec_vars": [],
   "invariants": [],
+  "lemmas": [],
+  "labels": [],
   "skipped": [],
   "comments": [],
   "sources": [

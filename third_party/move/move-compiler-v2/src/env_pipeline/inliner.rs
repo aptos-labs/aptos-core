@@ -53,16 +53,17 @@ use move_core_types::ability::AbilitySet;
 use move_model::{
     ast::{
         BehaviorKind, Condition, ConditionKind, Exp, ExpData, LambdaCaptureKind, MemoryLabel,
-        MemoryRange, Operation, Pattern, QuantKind, Spec, SpecBlockTarget, SpecFunDecl, TempIndex,
-        Value, VisitorPosition,
+        MemoryRange, Operation, Pattern, PropertyValue, QuantKind, Spec, SpecBlockTarget,
+        SpecFunDecl, TempIndex, Value, VisitorPosition,
     },
     exp_generator::FunExpGenerator,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget as ExpRewriteTarget},
+    lambda_specialization::LambdaSpecialization,
     model::{
         FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId,
         TypeParameter, TypeParameterKind,
     },
-    pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP},
+    pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, WEIGHT_PROP},
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     spec_derivation::{self, DerivedSpec},
     symbol::Symbol,
@@ -2920,7 +2921,8 @@ fn move_fun_behavior_is_underivable(
                     && env
                         .get_intrinsics()
                         .get_abort_spec_fun_for_move_fun(&qid)
-                        .is_none())
+                        .is_none()
+                    && !env.get_intrinsics().is_non_aborting_move_fun(&qid))
         },
         _ => false,
     }
@@ -5183,6 +5185,12 @@ fn replace_capture_pre_states(exp: &Exp, map: &BTreeMap<Symbol, Exp>) -> Exp {
 /// Boogie's tuple encoding bounds.
 const MAX_FOLD_CAPTURES: usize = 8;
 
+/// The weight of the defining axiom of a generated fold. The axiom recurses on
+/// a symbolic length, so unweighted it is unfolded without bound; under the
+/// prover's eager instantiation threshold of 100 this weight admits about two
+/// unfoldings, which the loop invariants over the fold need.
+const GENERATED_FOLD_WEIGHT: u32 = 50;
+
 /// Generates (or reuses) the bespoke fold recursion of a multi-capture
 /// `folds_of` resolution over captures `c1..ck` with accumulator value
 /// types `A1..Ak`:
@@ -5350,7 +5358,7 @@ fn generate_multi_capture_recursion(
     }
     let mut taken: BTreeSet<Symbol> = capture_values
         .iter()
-        .flat_map(|(_, value)| binder_syms(value))
+        .flat_map(|(_, value)| value.binder_syms())
         .collect();
     let mut ctx_renames: BTreeMap<Symbol, Symbol> = BTreeMap::new();
     for ctx in ctx_args.iter_mut() {
@@ -5446,7 +5454,13 @@ fn generate_multi_capture_recursion(
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
         insts_using_generic_type_reflection: RefCell::new(BTreeMap::new()),
-        spec: RefCell::new(Spec::default()),
+        spec: RefCell::new(Spec {
+            properties: BTreeMap::from([(
+                pool.make(WEIGHT_PROP),
+                PropertyValue::Value(Value::Number(BigInt::from(GENERATED_FOLD_WEIGHT))),
+            )]),
+            ..Spec::default()
+        }),
         uses_old: false,
         frame_spec: None,
     });
@@ -5589,7 +5603,7 @@ fn generate_multi_capture_recursion(
     };
     // Remap the body — built in the enclosing context's type parameter
     // space — to the declaration's compact type parameters.
-    let body = instantiate_exp_with_patterns(env, body, &type_param_remap);
+    let body = body.instantiate_with_patterns(env, &type_param_remap);
     // Internal invariant: every free variable of the generated body is a
     // parameter.
     let param_set: BTreeSet<Symbol> = env
@@ -6328,68 +6342,6 @@ fn compact_type_param_mapping(
     (type_params, type_args, remap)
 }
 
-/// Instantiates type parameters in an expression, covering pattern node
-/// types and struct pattern instantiations in addition to the expression
-/// nodes `ExpRewriter::set_type_args` handles.
-fn instantiate_exp_with_patterns(env: &GlobalEnv, exp: Exp, type_args: &[Type]) -> Exp {
-    struct Instantiator<'a> {
-        env: &'a GlobalEnv,
-        type_args: &'a [Type],
-    }
-    impl Instantiator<'_> {
-        fn instantiate_pattern_id(&self, id: NodeId) -> Option<NodeId> {
-            ExpData::instantiate_node(self.env, id, self.type_args)
-        }
-    }
-    impl ExpRewriterFunctions for Instantiator<'_> {
-        fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
-            ExpData::instantiate_node(self.env, id, self.type_args)
-        }
-
-        fn rewrite_pattern(&mut self, pat: &Pattern, _creating_scope: bool) -> Option<Pattern> {
-            // Sub-patterns have already been rewritten when this is called;
-            // only the pattern's own node (and struct instantiation) is
-            // handled here.
-            match pat {
-                Pattern::Var(id, sym) => self
-                    .instantiate_pattern_id(*id)
-                    .map(|new_id| Pattern::Var(new_id, *sym)),
-                Pattern::Wildcard(id) => self.instantiate_pattern_id(*id).map(Pattern::Wildcard),
-                Pattern::Tuple(id, pats) => self
-                    .instantiate_pattern_id(*id)
-                    .map(|new_id| Pattern::Tuple(new_id, pats.clone())),
-                Pattern::Struct(id, sid, variant, pats) => {
-                    let new_id = self.instantiate_pattern_id(*id);
-                    let new_inst = Type::instantiate_slice(&sid.inst, self.type_args);
-                    if new_id.is_none() && new_inst == sid.inst {
-                        None
-                    } else {
-                        let mut new_sid = sid.clone();
-                        new_sid.inst = new_inst;
-                        Some(Pattern::Struct(
-                            new_id.unwrap_or(*id),
-                            new_sid,
-                            *variant,
-                            pats.clone(),
-                        ))
-                    }
-                },
-                Pattern::LiteralValue(id, value) => self
-                    .instantiate_pattern_id(*id)
-                    .map(|new_id| Pattern::LiteralValue(new_id, value.clone())),
-                Pattern::Range(id, lo, hi, inclusive) => self
-                    .instantiate_pattern_id(*id)
-                    .map(|new_id| Pattern::Range(new_id, lo.clone(), hi.clone(), *inclusive)),
-                Pattern::Error(id) => self.instantiate_pattern_id(*id).map(Pattern::Error),
-            }
-        }
-    }
-    if type_args.is_empty() {
-        return exp;
-    }
-    Instantiator { env, type_args }.rewrite_exp(exp)
-}
-
 /// Key of a spec function specialization within one context: the function,
 /// its type instantiation, and the argument positions bound to lambdas,
 /// each identified by the function parameter supplying the lambda — within
@@ -6735,7 +6687,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         let mut taken: BTreeSet<Symbol> = retained
             .iter()
             .map(|pos| decl.params[*pos].0)
-            .chain(binder_syms(&orig_body))
+            .chain(orig_body.binder_syms())
             .collect();
         let mut ctx_renames: BTreeMap<Symbol, Symbol> = BTreeMap::new();
         for ctx in ctx_args.iter_mut() {
@@ -6829,7 +6781,10 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             callees: BTreeSet::new(),
             is_recursive: RefCell::new(None),
             insts_using_generic_type_reflection: RefCell::new(BTreeMap::new()),
-            spec: RefCell::new(Spec::default()),
+            spec: RefCell::new(Spec {
+                properties: decl.spec.borrow().properties.clone(),
+                ..Spec::default()
+            }),
             uses_old: false,
             frame_spec: None,
         });
@@ -6852,7 +6807,7 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         }
 
         // Instantiate and rewrite the body.
-        let inst_body = instantiate_exp_with_patterns(self.env, orig_body, &inst);
+        let inst_body = orig_body.instantiate_with_patterns(self.env, &inst);
         // The lambdas are spliced into the specialized body with their free
         // variables renamed to the (possibly freshened) context parameters.
         let eliminated: BTreeMap<Symbol, Exp> = bindings
@@ -6905,23 +6860,35 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
             .iter()
             .filter_map(|c| c.temp.map(|idx| (idx, (c.param_sym, c.ty.clone()))))
             .collect();
-        let new_body = if temp_map.is_empty() {
-            new_body
-        } else {
-            let env: &GlobalEnv = self.env;
-            let mut replacer = |_id: NodeId, target: ExpRewriteTarget| match target {
-                ExpRewriteTarget::Temporary(idx) => temp_map.get(&idx).map(|(sym, ty)| {
-                    ExpData::LocalVar(env.new_node(loc.clone(), ty.clone()), *sym).into_exp()
-                }),
-                _ => None,
+        // Then remap from the enclosing context's type parameter space to the
+        // declaration's compact type parameters. Calls to (nested or
+        // recursive) specializations inside the body carry their type
+        // arguments in context space and are remapped alongside.
+        let env: &GlobalEnv = self.env;
+        let to_declaration_space = |exp: Exp| -> Exp {
+            let exp = if temp_map.is_empty() {
+                exp
+            } else {
+                let mut replacer = |_id: NodeId, target: ExpRewriteTarget| match target {
+                    ExpRewriteTarget::Temporary(idx) => temp_map.get(&idx).map(|(sym, ty)| {
+                        ExpData::LocalVar(env.new_node(loc.clone(), ty.clone()), *sym).into_exp()
+                    }),
+                    _ => None,
+                };
+                ExpRewriter::new(env, &mut replacer).rewrite_exp(exp)
             };
-            ExpRewriter::new(env, &mut replacer).rewrite_exp(new_body)
+            exp.instantiate_with_patterns(env, &type_param_remap)
         };
-        // Remap the body — built in the enclosing context's type parameter
-        // space — to the declaration's compact type parameters. Calls to
-        // (nested or recursive) specializations inside the body carry their
-        // type arguments in context space and are remapped alongside.
-        let new_body = instantiate_exp_with_patterns(self.env, new_body, &type_param_remap);
+        let new_body = to_declaration_space(new_body);
+        let origin_bindings: Vec<(usize, Exp)> = bindings
+            .iter()
+            .map(|(pos, lambda)| {
+                (
+                    *pos,
+                    to_declaration_space(rename_free_vars(lambda, &ctx_renames)),
+                )
+            })
+            .collect();
         specialization
             .underivable_behavior
             .set(underivable_concrete_behavior(self.env, &new_body));
@@ -6949,6 +6916,13 @@ impl<'env, 'unifier> SpecFunSpecializer<'env, 'unifier> {
         let new_decl = self.env.get_spec_fun_mut(new_qid);
         new_decl.body = Some(new_body);
         new_decl.callees = callees;
+        self.env
+            .add_lambda_specialization(new_qid, LambdaSpecialization {
+                original: qid,
+                inst: inst.into_iter().map(remap_ty).collect(),
+                bindings: origin_bindings,
+                ctx_params: ctx_args.iter().map(|c| c.param_sym).collect(),
+            });
         Some(specialization)
     }
 }
@@ -7149,23 +7123,6 @@ impl ExpRewriterFunctions for SpecFunBodyRewriter<'_, '_, '_, '_> {
         }
         None
     }
-}
-
-/// Collects the symbols bound by any binder (let, lambda, quantifier range,
-/// match arm) within the expression.
-fn binder_syms(exp: &Exp) -> BTreeSet<Symbol> {
-    let mut bound = BTreeSet::new();
-    exp.visit_pre_order(&mut |e| {
-        let mut add = |pat: &Pattern| bound.extend(pat.vars().into_iter().map(|(_, sym)| sym));
-        match e {
-            ExpData::Block(_, pat, ..) | ExpData::Lambda(_, pat, ..) => add(pat),
-            ExpData::Quant(_, _, ranges, ..) => ranges.iter().for_each(|(pat, _)| add(pat)),
-            ExpData::Match(_, _, arms) => arms.iter().for_each(|arm| add(&arm.pattern)),
-            _ => {},
-        }
-        true
-    });
-    bound
 }
 
 /// Renames free occurrences of local variables in `exp` (including

@@ -1,0 +1,8 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/trace.move:19:9: error: the specification clause `ensures result == a + b` is not established
+tests/sources/functional/trace.move:18:5: error: leaner verification failed: the automatic verification of `add_invalid` failed; provide a proof: `verify add_invalid by …` in `tests/sources/functional/trace.proof.lean` (`verify add_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/trace.move:26:9: error: the specification clause `ensures a == old(a) + b` is not established
+tests/sources/functional/trace.move:25:5: error: leaner verification failed: the automatic verification of `update_invalid` failed; provide a proof: `verify update_invalid by …` in `tests/sources/functional/trace.proof.lean` (`verify update_invalid by skip` shows the obligations it leaves)
+tests/sources/functional/trace.move:38:5: error: the module invariant `invariant ∀ (addr : Address), exists<R>(addr) ==> global<R>(addr).x < 5` does not hold after a write of memory it reads
+tests/sources/functional/trace.move:34:9: error: the specification clause `ensures exists<R>(addr) ==> global<R>(addr).x == x` is not established
+tests/sources/functional/trace.move:32:5: error: leaner verification failed: the automatic verification of `publish_invalid` failed; provide a proof: `verify publish_invalid by …` in `tests/sources/functional/trace.proof.lean` (`verify publish_invalid by skip` shows the obligations it leaves)

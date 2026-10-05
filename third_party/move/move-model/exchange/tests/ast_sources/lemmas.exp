@@ -1,0 +1,2328 @@
+{
+  "schema": "move-xast-module",
+  "version": 9,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "lemmas",
+  "doc": " Lemmas and proof blocks: every proof statement, a recursive lemma with a\n declared measure, and a generic lemma whose type argument an application\n determines.",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [],
+  "functions": [
+    {
+      "name": "first",
+      "doc": "",
+      "loc": 29,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "copy"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "v",
+          "ty": 2
+        }
+      ],
+      "result": 3,
+      "pragmas": [],
+      "spec": {
+        "loc": 8,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "ensures",
+            "loc": 3,
+            "properties": [],
+            "exp": {
+              "ty": 5,
+              "loc": 7,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                3
+              ],
+              "args": [
+                {
+                  "ty": 3,
+                  "loc": 4,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 4,
+                  "loc": 6,
+                  "kind": "call",
+                  "op": "len",
+                  "inst": [
+                    0
+                  ],
+                  "args": [
+                    {
+                      "ty": 2,
+                      "loc": 5,
+                      "kind": "param",
+                      "index": 0
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null,
+        "access_of": [],
+        "proof": {
+          "kind": "block",
+          "loc": 9,
+          "proofs": [
+            {
+              "kind": "let",
+              "loc": 10,
+              "name": "n",
+              "exp": {
+                "ty": 4,
+                "loc": 12,
+                "kind": "call",
+                "op": "len",
+                "inst": [
+                  0
+                ],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 11,
+                    "kind": "param",
+                    "index": 0
+                  }
+                ],
+                "surface": null
+              }
+            },
+            {
+              "kind": "apply",
+              "loc": 13,
+              "application": {
+                "lemma": 1,
+                "inst": [
+                  0
+                ],
+                "args": [
+                  {
+                    "ty": 2,
+                    "loc": 14,
+                    "kind": "param",
+                    "index": 0
+                  }
+                ]
+              }
+            },
+            {
+              "kind": "calc",
+              "loc": 15,
+              "steps": [
+                {
+                  "ty": 5,
+                  "loc": 15,
+                  "kind": "call",
+                  "op": "le",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 6,
+                      "loc": 16,
+                      "kind": "value",
+                      "value": {
+                        "number": "0"
+                      },
+                      "constant": null
+                    },
+                    {
+                      "ty": 4,
+                      "loc": 17,
+                      "kind": "local",
+                      "name": "n"
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 5,
+                  "loc": 15,
+                  "kind": "call",
+                  "op": "eq",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 4,
+                      "loc": 17,
+                      "kind": "local",
+                      "name": "n"
+                    },
+                    {
+                      "ty": 4,
+                      "loc": 19,
+                      "kind": "call",
+                      "op": "len",
+                      "inst": [
+                        0
+                      ],
+                      "args": [
+                        {
+                          "ty": 2,
+                          "loc": 18,
+                          "kind": "param",
+                          "index": 0
+                        }
+                      ],
+                      "surface": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ]
+            },
+            {
+              "kind": "split",
+              "loc": 20,
+              "exp": {
+                "ty": 5,
+                "loc": 23,
+                "kind": "call",
+                "op": "gt",
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 4,
+                    "loc": 21,
+                    "kind": "local",
+                    "name": "n"
+                  },
+                  {
+                    "ty": 6,
+                    "loc": 22,
+                    "kind": "value",
+                    "value": {
+                      "number": "0"
+                    },
+                    "constant": null
+                  }
+                ],
+                "surface": null
+              }
+            },
+            {
+              "kind": "post",
+              "loc": 24,
+              "proof": {
+                "kind": "assert",
+                "loc": 25,
+                "exp": {
+                  "ty": 5,
+                  "loc": 28,
+                  "kind": "call",
+                  "op": "eq",
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 26,
+                      "kind": "call",
+                      "op": {
+                        "result": 0
+                      },
+                      "inst": [],
+                      "args": [],
+                      "surface": null
+                    },
+                    {
+                      "ty": 4,
+                      "loc": 27,
+                      "kind": "local",
+                      "name": "n"
+                    }
+                  ],
+                  "surface": null
+                }
+              }
+            }
+          ]
+        }
+      },
+      "body": {
+        "ty": 3,
+        "loc": 2,
+        "kind": "call",
+        "op": {
+          "move_function": 0
+        },
+        "inst": [
+          0
+        ],
+        "args": [
+          {
+            "ty": 2,
+            "loc": 1,
+            "kind": "param",
+            "index": 0
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "sum_up_to",
+      "doc": "",
+      "loc": 60,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 3
+        }
+      ],
+      "result": 3,
+      "pragmas": [],
+      "spec": {
+        "loc": 51,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "aborts_if",
+            "loc": 41,
+            "properties": [],
+            "exp": {
+              "ty": 5,
+              "loc": 45,
+              "kind": "call",
+              "op": "gt",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 4,
+                  "loc": 43,
+                  "kind": "call",
+                  "op": {
+                    "spec_function": {
+                      "name": 3,
+                      "range": {
+                        "pre": null,
+                        "post": null
+                      }
+                    }
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 42,
+                      "kind": "param",
+                      "index": 0
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 3,
+                  "loc": 44,
+                  "kind": "value",
+                  "value": {
+                    "number": "18446744073709551615"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 46,
+            "properties": [],
+            "exp": {
+              "ty": 5,
+              "loc": 50,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                3
+              ],
+              "args": [
+                {
+                  "ty": 3,
+                  "loc": 47,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 4,
+                  "loc": 49,
+                  "kind": "call",
+                  "op": {
+                    "spec_function": {
+                      "name": 3,
+                      "range": {
+                        "pre": null,
+                        "post": null
+                      }
+                    }
+                  },
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 48,
+                      "kind": "param",
+                      "index": 0
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null,
+        "access_of": [],
+        "proof": {
+          "kind": "block",
+          "loc": 52,
+          "proofs": [
+            {
+              "kind": "forall_apply",
+              "loc": 59,
+              "binders": [
+                {
+                  "name": "x",
+                  "ty": 4
+                },
+                {
+                  "name": "y",
+                  "ty": 4
+                }
+              ],
+              "triggers": [
+                [
+                  {
+                    "ty": 4,
+                    "loc": 54,
+                    "kind": "call",
+                    "op": {
+                      "spec_function": {
+                        "name": 3,
+                        "range": {
+                          "pre": null,
+                          "post": null
+                        }
+                      }
+                    },
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 53,
+                        "kind": "local",
+                        "name": "x"
+                      }
+                    ],
+                    "surface": null
+                  },
+                  {
+                    "ty": 4,
+                    "loc": 56,
+                    "kind": "call",
+                    "op": {
+                      "spec_function": {
+                        "name": 3,
+                        "range": {
+                          "pre": null,
+                          "post": null
+                        }
+                      }
+                    },
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 55,
+                        "kind": "local",
+                        "name": "y"
+                      }
+                    ],
+                    "surface": null
+                  }
+                ]
+              ],
+              "weight": 2,
+              "application": {
+                "lemma": 4,
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 4,
+                    "loc": 57,
+                    "kind": "local",
+                    "name": "x"
+                  },
+                  {
+                    "ty": 4,
+                    "loc": 58,
+                    "kind": "local",
+                    "name": "y"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "body": {
+        "ty": 3,
+        "loc": 40,
+        "kind": "if",
+        "cond": {
+          "ty": 5,
+          "loc": 32,
+          "kind": "call",
+          "op": "eq",
+          "inst": [
+            3
+          ],
+          "args": [
+            {
+              "ty": 3,
+              "loc": 30,
+              "kind": "param",
+              "index": 0
+            },
+            {
+              "ty": 3,
+              "loc": 31,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        },
+        "then_branch": {
+          "ty": 3,
+          "loc": 33,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "else_branch": {
+          "ty": 3,
+          "loc": 39,
+          "kind": "call",
+          "op": "add",
+          "inst": [
+            3
+          ],
+          "args": [
+            {
+              "ty": 3,
+              "loc": 34,
+              "kind": "param",
+              "index": 0
+            },
+            {
+              "ty": 3,
+              "loc": 38,
+              "kind": "call",
+              "op": {
+                "move_function": 2
+              },
+              "inst": [],
+              "args": [
+                {
+                  "ty": 3,
+                  "loc": 37,
+                  "kind": "call",
+                  "op": "sub",
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 35,
+                      "kind": "param",
+                      "index": 0
+                    },
+                    {
+                      "ty": 3,
+                      "loc": 36,
+                      "kind": "value",
+                      "value": {
+                        "number": "1"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        }
+      }
+    }
+  ],
+  "spec_funs": [
+    {
+      "name": "sum",
+      "doc": "",
+      "loc": 72,
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 4
+        }
+      ],
+      "result": 4,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": false,
+      "uses_old": false,
+      "body": {
+        "ty": 4,
+        "loc": 71,
+        "kind": "if",
+        "cond": {
+          "ty": 5,
+          "loc": 63,
+          "kind": "call",
+          "op": "le",
+          "inst": [],
+          "args": [
+            {
+              "ty": 4,
+              "loc": 61,
+              "kind": "local",
+              "name": "n"
+            },
+            {
+              "ty": 6,
+              "loc": 62,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        },
+        "then_branch": {
+          "ty": 4,
+          "loc": 64,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "else_branch": {
+          "ty": 4,
+          "loc": 70,
+          "kind": "call",
+          "op": "add",
+          "inst": [],
+          "args": [
+            {
+              "ty": 4,
+              "loc": 65,
+              "kind": "local",
+              "name": "n"
+            },
+            {
+              "ty": 4,
+              "loc": 69,
+              "kind": "call",
+              "op": {
+                "spec_function": {
+                  "name": 3,
+                  "range": {
+                    "pre": null,
+                    "post": null
+                  }
+                }
+              },
+              "inst": [],
+              "args": [
+                {
+                  "ty": 4,
+                  "loc": 68,
+                  "kind": "call",
+                  "op": "sub",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 4,
+                      "loc": 66,
+                      "kind": "local",
+                      "name": "n"
+                    },
+                    {
+                      "ty": 6,
+                      "loc": 67,
+                      "kind": "value",
+                      "value": {
+                        "number": "1"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        }
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    },
+    {
+      "name": "$first",
+      "doc": "",
+      "loc": 29,
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [
+            "copy"
+          ],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "v",
+          "ty": 1
+        }
+      ],
+      "result": 3,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 3,
+        "loc": 2,
+        "kind": "call",
+        "op": {
+          "spec_function": {
+            "name": 5,
+            "range": {
+              "pre": null,
+              "post": null
+            }
+          }
+        },
+        "inst": [
+          0
+        ],
+        "args": [
+          {
+            "ty": 2,
+            "loc": 1,
+            "kind": "local",
+            "name": "v"
+          }
+        ],
+        "surface": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    },
+    {
+      "name": "$sum_up_to",
+      "doc": "",
+      "loc": 60,
+      "type_params": [],
+      "params": [
+        {
+          "name": "n",
+          "ty": 3
+        }
+      ],
+      "result": 3,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 3,
+        "loc": 40,
+        "kind": "if",
+        "cond": {
+          "ty": 5,
+          "loc": 32,
+          "kind": "call",
+          "op": "eq",
+          "inst": [
+            3
+          ],
+          "args": [
+            {
+              "ty": 3,
+              "loc": 30,
+              "kind": "local",
+              "name": "n"
+            },
+            {
+              "ty": 3,
+              "loc": 31,
+              "kind": "value",
+              "value": {
+                "number": "0"
+              },
+              "constant": null
+            }
+          ],
+          "surface": null
+        },
+        "then_branch": {
+          "ty": 3,
+          "loc": 33,
+          "kind": "value",
+          "value": {
+            "number": "0"
+          },
+          "constant": null
+        },
+        "else_branch": {
+          "ty": 3,
+          "loc": 39,
+          "kind": "call",
+          "op": "add",
+          "inst": [
+            3
+          ],
+          "args": [
+            {
+              "ty": 3,
+              "loc": 34,
+              "kind": "local",
+              "name": "n"
+            },
+            {
+              "ty": 3,
+              "loc": 38,
+              "kind": "call",
+              "op": {
+                "spec_function": {
+                  "name": 6,
+                  "range": {
+                    "pre": null,
+                    "post": null
+                  }
+                }
+              },
+              "inst": [],
+              "args": [
+                {
+                  "ty": 3,
+                  "loc": 37,
+                  "kind": "call",
+                  "op": "sub",
+                  "inst": [
+                    3
+                  ],
+                  "args": [
+                    {
+                      "ty": 3,
+                      "loc": 35,
+                      "kind": "local",
+                      "name": "n"
+                    },
+                    {
+                      "ty": 3,
+                      "loc": 36,
+                      "kind": "value",
+                      "value": {
+                        "number": "1"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            }
+          ],
+          "surface": null
+        }
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [],
+  "lemmas": [
+    {
+      "name": "monotonicity",
+      "loc": 106,
+      "type_params": [],
+      "params": [
+        {
+          "name": "x",
+          "ty": 4
+        },
+        {
+          "name": "y",
+          "ty": 4
+        }
+      ],
+      "conditions": [
+        {
+          "kind": "requires",
+          "loc": 73,
+          "properties": [],
+          "exp": {
+            "ty": 5,
+            "loc": 76,
+            "kind": "call",
+            "op": "le",
+            "inst": [],
+            "args": [
+              {
+                "ty": 6,
+                "loc": 74,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              },
+              {
+                "ty": 4,
+                "loc": 75,
+                "kind": "param",
+                "index": 0
+              }
+            ],
+            "surface": null
+          },
+          "abort_code": null,
+          "additional_codes": [],
+          "emits_handle": null,
+          "emits_condition": null,
+          "update_target": null
+        },
+        {
+          "kind": "requires",
+          "loc": 77,
+          "properties": [],
+          "exp": {
+            "ty": 5,
+            "loc": 80,
+            "kind": "call",
+            "op": "le",
+            "inst": [],
+            "args": [
+              {
+                "ty": 4,
+                "loc": 78,
+                "kind": "param",
+                "index": 0
+              },
+              {
+                "ty": 4,
+                "loc": 79,
+                "kind": "param",
+                "index": 1
+              }
+            ],
+            "surface": null
+          },
+          "abort_code": null,
+          "additional_codes": [],
+          "emits_handle": null,
+          "emits_condition": null,
+          "update_target": null
+        },
+        {
+          "kind": "ensures",
+          "loc": 81,
+          "properties": [],
+          "exp": {
+            "ty": 5,
+            "loc": 86,
+            "kind": "call",
+            "op": "le",
+            "inst": [],
+            "args": [
+              {
+                "ty": 4,
+                "loc": 83,
+                "kind": "call",
+                "op": {
+                  "spec_function": {
+                    "name": 3,
+                    "range": {
+                      "pre": null,
+                      "post": null
+                    }
+                  }
+                },
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 4,
+                    "loc": 82,
+                    "kind": "param",
+                    "index": 0
+                  }
+                ],
+                "surface": null
+              },
+              {
+                "ty": 4,
+                "loc": 85,
+                "kind": "call",
+                "op": {
+                  "spec_function": {
+                    "name": 3,
+                    "range": {
+                      "pre": null,
+                      "post": null
+                    }
+                  }
+                },
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 4,
+                    "loc": 84,
+                    "kind": "param",
+                    "index": 1
+                  }
+                ],
+                "surface": null
+              }
+            ],
+            "surface": null
+          },
+          "abort_code": null,
+          "additional_codes": [],
+          "emits_handle": null,
+          "emits_condition": null,
+          "update_target": null
+        }
+      ],
+      "decreases": null,
+      "proof": {
+        "kind": "block",
+        "loc": 87,
+        "proofs": [
+          {
+            "kind": "if",
+            "loc": 88,
+            "cond": {
+              "ty": 5,
+              "loc": 91,
+              "kind": "call",
+              "op": "lt",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 4,
+                  "loc": 89,
+                  "kind": "param",
+                  "index": 0
+                },
+                {
+                  "ty": 4,
+                  "loc": 90,
+                  "kind": "param",
+                  "index": 1
+                }
+              ],
+              "surface": null
+            },
+            "then_proof": {
+              "kind": "block",
+              "loc": 92,
+              "proofs": [
+                {
+                  "kind": "assert",
+                  "loc": 93,
+                  "exp": {
+                    "ty": 5,
+                    "loc": 100,
+                    "kind": "call",
+                    "op": "le",
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 97,
+                        "kind": "call",
+                        "op": {
+                          "spec_function": {
+                            "name": 3,
+                            "range": {
+                              "pre": null,
+                              "post": null
+                            }
+                          }
+                        },
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 4,
+                            "loc": 96,
+                            "kind": "call",
+                            "op": "sub",
+                            "inst": [],
+                            "args": [
+                              {
+                                "ty": 4,
+                                "loc": 94,
+                                "kind": "param",
+                                "index": 1
+                              },
+                              {
+                                "ty": 6,
+                                "loc": 95,
+                                "kind": "value",
+                                "value": {
+                                  "number": "1"
+                                },
+                                "constant": null
+                              }
+                            ],
+                            "surface": null
+                          }
+                        ],
+                        "surface": null
+                      },
+                      {
+                        "ty": 4,
+                        "loc": 99,
+                        "kind": "call",
+                        "op": {
+                          "spec_function": {
+                            "name": 3,
+                            "range": {
+                              "pre": null,
+                              "post": null
+                            }
+                          }
+                        },
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 4,
+                            "loc": 98,
+                            "kind": "param",
+                            "index": 1
+                          }
+                        ],
+                        "surface": null
+                      }
+                    ],
+                    "surface": null
+                  }
+                },
+                {
+                  "kind": "apply",
+                  "loc": 101,
+                  "application": {
+                    "lemma": 4,
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 102,
+                        "kind": "param",
+                        "index": 0
+                      },
+                      {
+                        "ty": 4,
+                        "loc": 105,
+                        "kind": "call",
+                        "op": "sub",
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 4,
+                            "loc": 103,
+                            "kind": "param",
+                            "index": 1
+                          },
+                          {
+                            "ty": 6,
+                            "loc": 104,
+                            "kind": "value",
+                            "value": {
+                              "number": "1"
+                            },
+                            "constant": null
+                          }
+                        ],
+                        "surface": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "else_proof": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "bounded",
+      "loc": 130,
+      "type_params": [],
+      "params": [
+        {
+          "name": "x",
+          "ty": 4
+        }
+      ],
+      "conditions": [
+        {
+          "kind": "requires",
+          "loc": 107,
+          "properties": [],
+          "exp": {
+            "ty": 5,
+            "loc": 110,
+            "kind": "call",
+            "op": "ge",
+            "inst": [],
+            "args": [
+              {
+                "ty": 4,
+                "loc": 108,
+                "kind": "param",
+                "index": 0
+              },
+              {
+                "ty": 6,
+                "loc": 109,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              }
+            ],
+            "surface": null
+          },
+          "abort_code": null,
+          "additional_codes": [],
+          "emits_handle": null,
+          "emits_condition": null,
+          "update_target": null
+        },
+        {
+          "kind": "ensures",
+          "loc": 111,
+          "properties": [],
+          "exp": {
+            "ty": 5,
+            "loc": 115,
+            "kind": "call",
+            "op": "ge",
+            "inst": [],
+            "args": [
+              {
+                "ty": 4,
+                "loc": 113,
+                "kind": "call",
+                "op": {
+                  "spec_function": {
+                    "name": 3,
+                    "range": {
+                      "pre": null,
+                      "post": null
+                    }
+                  }
+                },
+                "inst": [],
+                "args": [
+                  {
+                    "ty": 4,
+                    "loc": 112,
+                    "kind": "param",
+                    "index": 0
+                  }
+                ],
+                "surface": null
+              },
+              {
+                "ty": 6,
+                "loc": 114,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              }
+            ],
+            "surface": null
+          },
+          "abort_code": null,
+          "additional_codes": [],
+          "emits_handle": null,
+          "emits_condition": null,
+          "update_target": null
+        }
+      ],
+      "decreases": [
+        {
+          "ty": 4,
+          "loc": 116,
+          "kind": "param",
+          "index": 0
+        }
+      ],
+      "proof": {
+        "kind": "block",
+        "loc": 117,
+        "proofs": [
+          {
+            "kind": "if",
+            "loc": 118,
+            "cond": {
+              "ty": 5,
+              "loc": 121,
+              "kind": "call",
+              "op": "gt",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 4,
+                  "loc": 119,
+                  "kind": "param",
+                  "index": 0
+                },
+                {
+                  "ty": 6,
+                  "loc": 120,
+                  "kind": "value",
+                  "value": {
+                    "number": "0"
+                  },
+                  "constant": null
+                }
+              ],
+              "surface": null
+            },
+            "then_proof": {
+              "kind": "block",
+              "loc": 122,
+              "proofs": [
+                {
+                  "kind": "apply",
+                  "loc": 123,
+                  "application": {
+                    "lemma": 7,
+                    "inst": [],
+                    "args": [
+                      {
+                        "ty": 4,
+                        "loc": 126,
+                        "kind": "call",
+                        "op": "sub",
+                        "inst": [],
+                        "args": [
+                          {
+                            "ty": 4,
+                            "loc": 124,
+                            "kind": "param",
+                            "index": 0
+                          },
+                          {
+                            "ty": 6,
+                            "loc": 125,
+                            "kind": "value",
+                            "value": {
+                              "number": "1"
+                            },
+                            "constant": null
+                          }
+                        ],
+                        "surface": null
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "else_proof": {
+              "kind": "block",
+              "loc": 127,
+              "proofs": [
+                {
+                  "kind": "assume",
+                  "loc": 128,
+                  "exp": {
+                    "ty": 5,
+                    "loc": 129,
+                    "kind": "value",
+                    "value": {
+                      "bool": true
+                    },
+                    "constant": null
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "length_nonneg",
+      "loc": 136,
+      "type_params": [
+        {
+          "name": "T",
+          "abilities": [],
+          "is_phantom": false
+        }
+      ],
+      "params": [
+        {
+          "name": "v",
+          "ty": 1
+        }
+      ],
+      "conditions": [
+        {
+          "kind": "ensures",
+          "loc": 131,
+          "properties": [],
+          "exp": {
+            "ty": 5,
+            "loc": 135,
+            "kind": "call",
+            "op": "ge",
+            "inst": [],
+            "args": [
+              {
+                "ty": 4,
+                "loc": 133,
+                "kind": "call",
+                "op": "len",
+                "inst": [
+                  0
+                ],
+                "args": [
+                  {
+                    "ty": 1,
+                    "loc": 132,
+                    "kind": "param",
+                    "index": 0
+                  }
+                ],
+                "surface": null
+              },
+              {
+                "ty": 6,
+                "loc": 134,
+                "kind": "value",
+                "value": {
+                  "number": "0"
+                },
+                "constant": null
+              }
+            ],
+            "surface": null
+          },
+          "abort_code": null,
+          "additional_codes": [],
+          "emits_handle": null,
+          "emits_condition": null,
+          "update_target": null
+        }
+      ],
+      "decreases": null,
+      "proof": null
+    }
+  ],
+  "labels": [],
+  "skipped": [],
+  "comments": [
+    {
+      "loc": 137,
+      "text": "// Copyright © Aptos Foundation",
+      "own_line": true
+    },
+    {
+      "loc": 138,
+      "text": "// SPDX-License-Identifier: Apache-2.0",
+      "own_line": true
+    }
+  ],
+  "sources": [
+    "lemmas.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 243,
+      "end": 1643
+    },
+    {
+      "file": 0,
+      "start": 1420,
+      "end": 1421
+    },
+    {
+      "file": 0,
+      "start": 1400,
+      "end": 1422
+    },
+    {
+      "file": 0,
+      "start": 1454,
+      "end": 1479
+    },
+    {
+      "file": 0,
+      "start": 1462,
+      "end": 1468
+    },
+    {
+      "file": 0,
+      "start": 1476,
+      "end": 1477
+    },
+    {
+      "file": 0,
+      "start": 1472,
+      "end": 1478
+    },
+    {
+      "file": 0,
+      "start": 1462,
+      "end": 1478
+    },
+    {
+      "file": 0,
+      "start": 1433,
+      "end": 1641
+    },
+    {
+      "file": 0,
+      "start": 1492,
+      "end": 1641
+    },
+    {
+      "file": 0,
+      "start": 1502,
+      "end": 1517
+    },
+    {
+      "file": 0,
+      "start": 1514,
+      "end": 1515
+    },
+    {
+      "file": 0,
+      "start": 1510,
+      "end": 1516
+    },
+    {
+      "file": 0,
+      "start": 1526,
+      "end": 1549
+    },
+    {
+      "file": 0,
+      "start": 1546,
+      "end": 1547
+    },
+    {
+      "file": 0,
+      "start": 1558,
+      "end": 1581
+    },
+    {
+      "file": 0,
+      "start": 1563,
+      "end": 1564
+    },
+    {
+      "file": 0,
+      "start": 1568,
+      "end": 1569
+    },
+    {
+      "file": 0,
+      "start": 1577,
+      "end": 1578
+    },
+    {
+      "file": 0,
+      "start": 1573,
+      "end": 1579
+    },
+    {
+      "file": 0,
+      "start": 1590,
+      "end": 1602
+    },
+    {
+      "file": 0,
+      "start": 1596,
+      "end": 1597
+    },
+    {
+      "file": 0,
+      "start": 1600,
+      "end": 1601
+    },
+    {
+      "file": 0,
+      "start": 1596,
+      "end": 1601
+    },
+    {
+      "file": 0,
+      "start": 1611,
+      "end": 1635
+    },
+    {
+      "file": 0,
+      "start": 1616,
+      "end": 1635
+    },
+    {
+      "file": 0,
+      "start": 1623,
+      "end": 1629
+    },
+    {
+      "file": 0,
+      "start": 1633,
+      "end": 1634
+    },
+    {
+      "file": 0,
+      "start": 1623,
+      "end": 1634
+    },
+    {
+      "file": 0,
+      "start": 1351,
+      "end": 1428
+    },
+    {
+      "file": 0,
+      "start": 1099,
+      "end": 1100
+    },
+    {
+      "file": 0,
+      "start": 1104,
+      "end": 1105
+    },
+    {
+      "file": 0,
+      "start": 1099,
+      "end": 1105
+    },
+    {
+      "file": 0,
+      "start": 1109,
+      "end": 1110
+    },
+    {
+      "file": 0,
+      "start": 1120,
+      "end": 1121
+    },
+    {
+      "file": 0,
+      "start": 1134,
+      "end": 1135
+    },
+    {
+      "file": 0,
+      "start": 1138,
+      "end": 1139
+    },
+    {
+      "file": 0,
+      "start": 1134,
+      "end": 1139
+    },
+    {
+      "file": 0,
+      "start": 1124,
+      "end": 1140
+    },
+    {
+      "file": 0,
+      "start": 1120,
+      "end": 1140
+    },
+    {
+      "file": 0,
+      "start": 1095,
+      "end": 1142
+    },
+    {
+      "file": 0,
+      "start": 1178,
+      "end": 1205
+    },
+    {
+      "file": 0,
+      "start": 1192,
+      "end": 1193
+    },
+    {
+      "file": 0,
+      "start": 1188,
+      "end": 1194
+    },
+    {
+      "file": 0,
+      "start": 1197,
+      "end": 1204
+    },
+    {
+      "file": 0,
+      "start": 1188,
+      "end": 1204
+    },
+    {
+      "file": 0,
+      "start": 1214,
+      "end": 1239
+    },
+    {
+      "file": 0,
+      "start": 1222,
+      "end": 1228
+    },
+    {
+      "file": 0,
+      "start": 1236,
+      "end": 1237
+    },
+    {
+      "file": 0,
+      "start": 1232,
+      "end": 1238
+    },
+    {
+      "file": 0,
+      "start": 1222,
+      "end": 1238
+    },
+    {
+      "file": 0,
+      "start": 1153,
+      "end": 1345
+    },
+    {
+      "file": 0,
+      "start": 1252,
+      "end": 1345
+    },
+    {
+      "file": 0,
+      "start": 1289,
+      "end": 1290
+    },
+    {
+      "file": 0,
+      "start": 1285,
+      "end": 1291
+    },
+    {
+      "file": 0,
+      "start": 1297,
+      "end": 1298
+    },
+    {
+      "file": 0,
+      "start": 1293,
+      "end": 1299
+    },
+    {
+      "file": 0,
+      "start": 1333,
+      "end": 1334
+    },
+    {
+      "file": 0,
+      "start": 1336,
+      "end": 1337
+    },
+    {
+      "file": 0,
+      "start": 1262,
+      "end": 1339
+    },
+    {
+      "file": 0,
+      "start": 1058,
+      "end": 1148
+    },
+    {
+      "file": 0,
+      "start": 309,
+      "end": 310
+    },
+    {
+      "file": 0,
+      "start": 314,
+      "end": 315
+    },
+    {
+      "file": 0,
+      "start": 309,
+      "end": 315
+    },
+    {
+      "file": 0,
+      "start": 319,
+      "end": 320
+    },
+    {
+      "file": 0,
+      "start": 330,
+      "end": 331
+    },
+    {
+      "file": 0,
+      "start": 338,
+      "end": 339
+    },
+    {
+      "file": 0,
+      "start": 342,
+      "end": 343
+    },
+    {
+      "file": 0,
+      "start": 338,
+      "end": 343
+    },
+    {
+      "file": 0,
+      "start": 334,
+      "end": 344
+    },
+    {
+      "file": 0,
+      "start": 330,
+      "end": 344
+    },
+    {
+      "file": 0,
+      "start": 305,
+      "end": 346
+    },
+    {
+      "file": 0,
+      "start": 274,
+      "end": 352
+    },
+    {
+      "file": 0,
+      "start": 429,
+      "end": 445
+    },
+    {
+      "file": 0,
+      "start": 438,
+      "end": 439
+    },
+    {
+      "file": 0,
+      "start": 443,
+      "end": 444
+    },
+    {
+      "file": 0,
+      "start": 438,
+      "end": 444
+    },
+    {
+      "file": 0,
+      "start": 458,
+      "end": 474
+    },
+    {
+      "file": 0,
+      "start": 467,
+      "end": 468
+    },
+    {
+      "file": 0,
+      "start": 472,
+      "end": 473
+    },
+    {
+      "file": 0,
+      "start": 467,
+      "end": 473
+    },
+    {
+      "file": 0,
+      "start": 487,
+      "end": 512
+    },
+    {
+      "file": 0,
+      "start": 499,
+      "end": 500
+    },
+    {
+      "file": 0,
+      "start": 495,
+      "end": 501
+    },
+    {
+      "file": 0,
+      "start": 509,
+      "end": 510
+    },
+    {
+      "file": 0,
+      "start": 505,
+      "end": 511
+    },
+    {
+      "file": 0,
+      "start": 495,
+      "end": 511
+    },
+    {
+      "file": 0,
+      "start": 529,
+      "end": 670
+    },
+    {
+      "file": 0,
+      "start": 543,
+      "end": 660
+    },
+    {
+      "file": 0,
+      "start": 547,
+      "end": 548
+    },
+    {
+      "file": 0,
+      "start": 551,
+      "end": 552
+    },
+    {
+      "file": 0,
+      "start": 547,
+      "end": 552
+    },
+    {
+      "file": 0,
+      "start": 554,
+      "end": 660
+    },
+    {
+      "file": 0,
+      "start": 572,
+      "end": 600
+    },
+    {
+      "file": 0,
+      "start": 583,
+      "end": 584
+    },
+    {
+      "file": 0,
+      "start": 587,
+      "end": 588
+    },
+    {
+      "file": 0,
+      "start": 583,
+      "end": 588
+    },
+    {
+      "file": 0,
+      "start": 579,
+      "end": 589
+    },
+    {
+      "file": 0,
+      "start": 597,
+      "end": 598
+    },
+    {
+      "file": 0,
+      "start": 593,
+      "end": 599
+    },
+    {
+      "file": 0,
+      "start": 579,
+      "end": 599
+    },
+    {
+      "file": 0,
+      "start": 617,
+      "end": 646
+    },
+    {
+      "file": 0,
+      "start": 636,
+      "end": 637
+    },
+    {
+      "file": 0,
+      "start": 639,
+      "end": 640
+    },
+    {
+      "file": 0,
+      "start": 643,
+      "end": 644
+    },
+    {
+      "file": 0,
+      "start": 639,
+      "end": 644
+    },
+    {
+      "file": 0,
+      "start": 380,
+      "end": 670
+    },
+    {
+      "file": 0,
+      "start": 716,
+      "end": 732
+    },
+    {
+      "file": 0,
+      "start": 725,
+      "end": 726
+    },
+    {
+      "file": 0,
+      "start": 730,
+      "end": 731
+    },
+    {
+      "file": 0,
+      "start": 725,
+      "end": 731
+    },
+    {
+      "file": 0,
+      "start": 745,
+      "end": 765
+    },
+    {
+      "file": 0,
+      "start": 757,
+      "end": 758
+    },
+    {
+      "file": 0,
+      "start": 753,
+      "end": 759
+    },
+    {
+      "file": 0,
+      "start": 763,
+      "end": 764
+    },
+    {
+      "file": 0,
+      "start": 753,
+      "end": 764
+    },
+    {
+      "file": 0,
+      "start": 788,
+      "end": 789
+    },
+    {
+      "file": 0,
+      "start": 807,
+      "end": 955
+    },
+    {
+      "file": 0,
+      "start": 821,
+      "end": 945
+    },
+    {
+      "file": 0,
+      "start": 825,
+      "end": 826
+    },
+    {
+      "file": 0,
+      "start": 829,
+      "end": 830
+    },
+    {
+      "file": 0,
+      "start": 825,
+      "end": 830
+    },
+    {
+      "file": 0,
+      "start": 832,
+      "end": 885
+    },
+    {
+      "file": 0,
+      "start": 850,
+      "end": 871
+    },
+    {
+      "file": 0,
+      "start": 864,
+      "end": 865
+    },
+    {
+      "file": 0,
+      "start": 868,
+      "end": 869
+    },
+    {
+      "file": 0,
+      "start": 864,
+      "end": 869
+    },
+    {
+      "file": 0,
+      "start": 891,
+      "end": 945
+    },
+    {
+      "file": 0,
+      "start": 909,
+      "end": 931
+    },
+    {
+      "file": 0,
+      "start": 926,
+      "end": 930
+    },
+    {
+      "file": 0,
+      "start": 680,
+      "end": 955
+    },
+    {
+      "file": 0,
+      "start": 1016,
+      "end": 1036
+    },
+    {
+      "file": 0,
+      "start": 1028,
+      "end": 1029
+    },
+    {
+      "file": 0,
+      "start": 1024,
+      "end": 1030
+    },
+    {
+      "file": 0,
+      "start": 1034,
+      "end": 1035
+    },
+    {
+      "file": 0,
+      "start": 1024,
+      "end": 1035
+    },
+    {
+      "file": 0,
+      "start": 965,
+      "end": 1046
+    },
+    {
+      "file": 0,
+      "start": 0,
+      "end": 32
+    },
+    {
+      "file": 0,
+      "start": 33,
+      "end": 71
+    }
+  ],
+  "types": [
+    {
+      "type_param": 0
+    },
+    {
+      "vector": 0
+    },
+    {
+      "reference": {
+        "mutable": false,
+        "ty": 1
+      }
+    },
+    "u64",
+    "num",
+    "bool",
+    "u256"
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "lemmas"
+    },
+    {
+      "address": "0x1",
+      "address_alias": "std",
+      "name": "vector"
+    }
+  ],
+  "names": [
+    {
+      "module": 1,
+      "name": "length"
+    },
+    {
+      "module": 0,
+      "name": "length_nonneg"
+    },
+    {
+      "module": 0,
+      "name": "sum_up_to"
+    },
+    {
+      "module": 0,
+      "name": "sum"
+    },
+    {
+      "module": 0,
+      "name": "monotonicity"
+    },
+    {
+      "module": 1,
+      "name": "$length"
+    },
+    {
+      "module": 0,
+      "name": "$sum_up_to"
+    },
+    {
+      "module": 0,
+      "name": "bounded"
+    }
+  ]
+}

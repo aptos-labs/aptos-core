@@ -1,0 +1,14 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_iter_preserved` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_iter_preserved` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:6:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried

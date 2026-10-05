@@ -2,10 +2,10 @@
 \Section{Evaluation}
 \label{sec:evaluation}
 
-The evaluation compares along two dimensions.
+The evaluation asks what the mechanical component adds to an agent, in completeness and in cost, and whether it changes which model is needed.
 \emph{Arm against arm} (Sec.~\ref{sec:eval-arms}) holds the model fixed and varies the tactic: \textit{agent-only}, \textit{hybrid-guided}, and \textit{hybrid-flexible}, run under the same conditions.
-\emph{Model against model} (Sec.~\ref{sec:eval-models}) repeats the design with two further models and asks how the contribution of \WP changes with the model.
-All rounds share the corpus, the scoring, and the cost accounting described first.
+\emph{Model against model} (Sec.~\ref{sec:eval-models}) repeats the design under a frontier model and a mid-tier model of the same family and asks whether, with \WP, the cheaper model reaches the results of the frontier model.
+Both rounds share the corpus, the protocol, the scoring, and the cost accounting described first.
 
 \SubSection{Setup}
 \label{sec:eval-setup}
@@ -20,70 +20,108 @@ With 3 arms and 4 replicates, a model round has \textbf{240 cells}.
 
 \Paragraph{Arms and models}
 The three tactics of Sec.~\ref{sec:skills} run as arms that differ only in the rendered plugin: the reference material is byte-identical, and in agent-only the \WP tool is absent rather than discouraged.
-Three rounds use three models: Opus~5 at the highest effort setting through the Claude Code SDK, and Sol~5.6 and Terra~5.6 at high effort through the Codex CLI, with the same plugin rendered for each.
-\TODO{wg}{The Terra~5.6 round is pending; its rows and table currently hold GLM~5.3 data (maximum effort, Claude Code SDK against an Anthropic-compatible endpoint) as a placeholder, marked $^\dagger$.}
+Two rounds use two models of one family through the same runtime, the Codex CLI at high effort: Sol~5.6, the frontier model, and Terra~5.6, the mid-tier model priced at about half of Sol's list.
 Each session has a budget of 100--180k output tokens, one hour of wall time, and 40 seconds of solver time per verification condition.
 
 \Paragraph{Scoring}
 A cell reaches \emph{operational success} when a judge outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present --- |pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions --- the bytecode is unchanged, and the required contract categories are present.
-The agent's own claim is never a score.
-In some rounds the controller also applied a visible set of mutants after the agent's first attempt and, if one survived, handed the contract back for strengthening; whether it did so varied between rounds, and the agent was never told a second attempt might follow.
-Every round is therefore read the same way: a cell's outcome is the judge's verdict at the end of the agent's \emph{first attempt}, and its cost is what the agent spent up to then; later strengthening turns are not counted anywhere, and a contract that survived a visible mutant at the first attempt is a \emph{weak contract}, a failure.
+The agent's own claim is never a score, and the agent receives only this acceptance feedback: the mutants are withheld until generation has ended, and a contract is never handed back for strengthening.
 Operational success is necessary but weak: a vaguer contract passes it more easily.
 Completeness --- postconditions as strong as the behavior --- has no deductive check in general; \WP guarantees it only given complete loop invariants and callee contracts, and warns when it cannot, a mechanism the agent-only arm lacks.
-The second level is therefore \emph{mutation adequacy}: after the round, each held-out mutant is applied to the implementation and the prover rerun against the inferred specification.
-A mutant that still verifies has survived; a cell is \emph{complete} when its first attempt succeeded and killed every held-out mutant.
-Held-out scoring has finished for the Opus~5 round and is in progress for the other two.
+The second level is therefore \emph{mutation adequacy}: after the round, each withheld mutant is applied to the implementation and the prover rerun against the inferred specification.
+A cell is \emph{complete} when it killed every mutant and \emph{failed} when one survived it; a cell whose scoring stayed inconclusive after one infrastructure retry is \emph{unmeasured} and counts in neither.
+Every one of the 480 cells reached operational success, so the outcome of a cell is decided by the withheld mutants alone.
 
 \Paragraph{Cost}
-Costs are in US dollars at each model's published prices at the time of its round, recomputed from the recorded token counters rather than taken from the harness's estimate.
-Per million tokens, Opus~5 is \$5 uncached input, \$0.50 cache read, \$10 or \$6.25 cache write, and \$25 output; Sol~5.6 is \$4 uncached input, \$0.40 cached input, \$5 cache write, and \$20 output; Terra~5.6 is \$2, \$0.20, \$2.50, and \$12.
-Thinking counts as output for all three.
+Costs are in US dollars at each model's published list prices, recomputed from the recorded token counters of every model request rather than taken from the harness's estimate; startup requests that do no task work are excluded.
+Per million tokens, Sol~5.6 is \$4 uncached input, \$0.40 cached input, and \$20 output; Terra~5.6 is \$2, \$0.20, and \$12.
+Thinking counts as output for both.
+Means are task-weighted, and the 95\% intervals are percentile bootstraps that hold the 20 tasks fixed and resample the four replicate blocks within each task with the three arms kept together (100,000 draws); they describe this corpus, not a population of tasks.
 
 \SubSection{Arm against Arm}
 \label{sec:eval-arms}
 
-Table~\ref{tab:summary} summarizes all rounds; Tables~\ref{tab:opus}--\ref{tab:terra} in the appendix give every target.
-Under Opus~5, the hybrids succeeded at the first attempt in all 80 cells each and every one of those killed every held-out mutant.
-Agent-only failed 4 of its 80: all four replicates of |QP-part-025|, the in-place permutation, produced at the first attempt a contract that pinned where the partition point lands but not what the vector contains, and a visible mutant survived it.
-That is the completeness effect the mechanical baseline is meant to buy, and it lands on the one target whose contract has to characterize a whole data structure.
-
-Cost goes the other way.
-In the task-weighted mean, hybrid-guided costs 1.29$\times$ agent-only and hybrid-flexible 1.27$\times$; 95\% percentile bootstrap intervals, holding the 20 tasks fixed and resampling four replicate blocks within each task with the three arms kept together (100,000 draws), are [1.22, 1.37] and [1.20, 1.35].
-The hybrids are cheaper on only 5 and 1 of the 20 targets --- |TS-trial-019| under hybrid-guided at 54\% is the largest saving --- and cost most on the function-value target |SM-select-022| (2.0$\times$ and 1.5$\times$) and the lemma target |BA-base-012| (1.5$\times$ and 1.3$\times$).
-The |QP-part-025| comparison is not a cost comparison: agent-only's cheap cells there are failed first attempts.
+Table~\ref{tab:summary} summarizes both rounds, Fig.~\ref{fig:cells} shows every cell, and Tables~\ref{tab:sol} and~\ref{tab:terra} in the appendix give every target.
+Under both models the hybrids complete more cells than agent-only: 77 and 77 against 74 under Sol~5.6, and 79 and 78 against 74 under Terra~5.6.
+All 16 failures occur on two targets.
+|QP-part-025|, the in-place partition, is the one target whose contract has to characterize a whole data structure --- that the result is a rearrangement of the input --- and it defeats every arm under both models, hybrid-guided least under Terra~5.6 (1 cell) and most under Sol~5.6 (3 cells).
+|OV-order-006| is the control that never aborts, because its |&&| short-circuits past the guards that would; agent-only stated an abort condition anyway in all four Sol~5.6 cells and two Terra~5.6 cells, and no hybrid cell missed it, since \WP derives the absence of an abort exactly.
 
 \begin{table}[t]
 \centering
-\caption{All rounds, per arm: mean cost in US dollars per cell, the hybrid/agent-only cost ratio with its 95\% bootstrap interval, cells that failed at the first attempt, cells that killed every held-out mutant over cells scored ($^\ast$: scoring in progress; ---: not yet scored), mean input/output tokens in thousands, and Edit, verify, and \WP calls summed over the arm's cells, all counted up to the end of the first attempt. $^\dagger$Placeholder: GLM~5.3 data until the Terra~5.6 round completes.}
+\caption{Both rounds, per arm: mean cost in US dollars per cell, the hybrid/agent-only cost ratio with its 95\% bootstrap interval, cells that killed every withheld mutant, cells a mutant survived, cells whose scoring stayed inconclusive, mean input/output tokens in thousands, and mean wall time per cell in seconds.}
 \label{tab:summary}
-\footnotesize
-\setlength{\tabcolsep}{3pt}
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
 \input{tables/summary}
 \end{table}
 
-The mechanism is visible in the token and tool counts.
-The hybrids process two thirds more input (546k and 502k against 328k per cell) and emit a fifth more output (10.6k and 10.8k against 9.0k): the \WP output and its simplification enter the context and are re-read on every turn, and at cache-read prices that is where the extra cost lies.
-They also make more verify calls (160 and 174 against 105) on top of their 150 and 108 \WP calls, and more edits (182 and 177 against 131).
+\begin{figure}[t]
+\centering
+% scatter/classes must sit on the plot, not in an axis style: applied through a
+% style it accumulates per point and exhausts TeX's memory.
+\newcommand{\cellplot}[1]{%
+  \addplot[only marks, scatter, scatter src=explicit symbolic, mark size=1.25pt,
+    scatter/classes={
+      ok0={mark=*, ModelSol}, fail0={mark=o, ModelSol, thick}, unm0={mark=x, CellMuted, thick, mark size=1.8pt},
+      ok1={mark=*, ModelTerra}, fail1={mark=o, ModelTerra, thick}, unm1={mark=x, CellMuted, thick, mark size=1.8pt}}]
+    table[x index=1, y expr={\thisrowno{0} + (\thisrowno{2} - 0.5) * 0.36}, meta index=3] {#1};}
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=3 by 1, horizontal sep=2.5mm, yticklabels at=edge left},
+  scale only axis, width=2.85cm, height=8.4cm,
+  xmode=log, xmin=0.05, xmax=1.6, log ticks with fixed point,
+  xtick={0.1,0.3,1}, xticklabels={0.1,0.3,1},
+  minor xtick={0.05,0.2,0.5}, minor tick style={draw=none},
+  ymin=-0.6, ymax=19.6, ytick={0,...,19}, y dir=reverse,
+  ymajorgrids, grid style={CellGrid, thin},
+  axis line style={CellAxis}, tick style={CellAxis},
+  tick label style={font=\scriptsize},
+  title style={font=\small, yshift=-1ex}]
+\nextgroupplot[title=agent-only, yticklabels/.expanded={\CellTaskLabels}, yticklabel style={font=\ttfamily\scriptsize}]
+\cellplot{tables/agent_only-cells.dat}
+\nextgroupplot[title=hybrid-guided, xlabel={cost per cell (US\$)}, xlabel style={font=\scriptsize},
+  legend style={at={(0.5,-0.11)}, anchor=north, font=\scriptsize, legend columns=-1, draw=none, /tikz/every even column/.append style={column sep=0.6em}},
+  legend image post style={mark size=1.4pt}]
+\cellplot{tables/hybrid_guided-cells.dat}
+\addlegendimage{only marks, mark=*, ModelSol} \addlegendentry{Sol~5.6}
+\addlegendimage{only marks, mark=*, ModelTerra} \addlegendentry{Terra~5.6}
+\addlegendimage{only marks, mark=o, black, thick} \addlegendentry{mutant survived}
+\addlegendimage{only marks, mark=x, CellMuted, thick, mark size=2pt} \addlegendentry{unmeasured}
+\nextgroupplot[title=hybrid-flexible]
+\cellplot{tables/hybrid_flexible-cells.dat}
+\end{groupplot}
+\end{tikzpicture}
+\caption{Every cell of both rounds: cost in US dollars on a log scale, one panel per tactic, one row per target, and within each row the four Sol~5.6 replicates above the four Terra~5.6 replicates. A filled dot is a complete cell, a hollow one a cell a withheld mutant survived, a cross a cell whose scoring stayed inconclusive.}
+\label{fig:cells}
+\end{figure}
+
+The effect on cost differs between the models.
+Under Sol~5.6, hybrid-guided costs 1.03$\times$ agent-only [0.94, 1.14] and hybrid-flexible 1.09$\times$ [1.00, 1.18] in the task-weighted mean; both intervals reach parity, and the hybrids are cheaper on only 8 and 9 of the 20 targets.
+The hybrids are cheaper on the small arithmetic contracts --- |VS-contrib-003|, |VS-shares-002|, |PM-curve-027| at about 0.6$\times$ --- where \WP's contract is already complete and the agent only has to simplify it, and more expensive on the targets that need invention beyond the loop invariant: |SM-select-022| at 1.75$\times$ under hybrid-guided, whose contract needs a recursive specification function over a function value, and the quantified-abort target |TL-lev-020| at 1.3--1.6$\times$.
+On those targets the derived \WP output is large and is re-read on every turn.
+The hybrids process a twentieth to a sixth more input per cell (263k and 292k against 250k) at similar output, and this additional input, billed at cache-read prices, accounts for the difference.
+
+Under Terra~5.6 the hybrids are cheaper: hybrid-guided costs 0.80$\times$ agent-only [0.73, 0.87] and hybrid-flexible 0.88$\times$ [0.78, 0.99], cheaper on 14 of the 20 targets each, and both hybrids also finish faster (102 and 103 seconds against 124).
+The direction of the token counts reverses: the hybrids read \emph{less} than agent-only (281k and 342k against 372k) and write less (5.0k and 5.2k against 6.4k), because the unaided model searches --- more verification calls, more repair rounds --- where the hybrids start from an exact contract.
+The most expensive hybrid targets are the same three as under Sol~5.6, |SM-select-022|, |QP-part-025|, and |TL-lev-020|, at 1.2--1.3$\times$.
 
 \SubSection{Model against Model}
 \label{sec:eval-models}
 
-Under Sol~5.6 the picture shifts.
-The hybrids again succeeded at the first attempt in all 80 cells each, and agent-only failed 3 with a weak contract.
-At a near-identical price list, Sol~5.6 spends less per cell than Opus~5 in every arm (\$0.52 against \$0.69 for agent-only), because it emits two thirds of the output tokens; and here \WP pays: hybrid-guided and hybrid-flexible cost 0.95$\times$ and 0.94$\times$ agent-only, [0.85, 1.05] and [0.84, 1.04], and are cheaper on 13 and 15 of the 20 targets.
-The saving is spread rather than concentrated --- a third to a half off on the small arithmetic contracts (|VS-shares-002|, |VS-contrib-003|, |PM-curve-027|, |BK-bucket-016|) --- and the two targets that cost the hybrids most under Opus~5 cost them most here too: |QP-part-025| at 1.5$\times$ and 1.2$\times$, |BA-base-012| at 1.4$\times$ under hybrid-guided.
-The hybrids' input volume is no longer higher than agent-only's (450k and 444k against 479k), because the unaided model reads more of the package instead.
+Fig.~\ref{fig:cells} puts the two models side by side within each row, and the comparison is uniform: Terra~5.6 is cheaper than Sol~5.6 on 19 of the 20 targets in every arm, by 0.71$\times$ under agent-only and 0.55$\times$ and 0.57$\times$ under the hybrids in the task-weighted mean, at 231 against 228 complete cells over the round.
+The exception is |BA-base-012|, the lemma target, where Terra~5.6 costs 1.2--1.5$\times$ Sol~5.6 because it needs more attempts to find the monotonicity lemma.
+Since Terra's price list is about half of Sol's, the agent-only ratio of 0.71 implies that Terra spends about 40\% \emph{more} tokens per cell to reach the same result, while the hybrid ratios near 0.55 imply that with \WP it spends about the same: the tool closes the token gap between the two models.
+In the figure, the replicate spread is about the same for both models in every arm, a factor of about 1.6 between the cheapest and the most expensive replicate of a typical target.
+What changes with the tactic is how far the Terra replicates lie to the left of the Sol replicates: little under agent-only, and clearly on nearly every row under hybrid-guided.
 
-Terra~5.6, the mid-tier model of the same family at a third of Sol's price list, is expected to lean on \WP most: hybrid-guided costs 0.X$\times$ agent-only [0.X, 0.X] and hybrid-flexible 0.X$\times$ [0.X, 0.X], cheaper on X and X of the 20 targets, and agent-only fails X cells at the first attempt against none for the hybrids.
-\TODO{wg}{Terra~5.6 round pending; the rows marked $^\dagger$ in Table~\ref{tab:summary} and Table~\ref{tab:terra} hold GLM~5.3 data as a placeholder. Fill in the 0.X figures, then refresh the Sol~5.6 scoring.}
-
-Since each model is priced at its own schedule, the comparison across models is between the within-model ratios, not the dollars.
-Read together, the rounds separate two contributions of \WP.
-The first is completeness, and it does not depend on the model: in every round the success rate with \WP is higher.
-Agent-only left a weak contract at the first attempt in 7 of 160 cells under Opus~5 and Sol~5.6 and X under Terra~5.6, the hybrids in none, and the failures sit on the targets whose contract has to pin down a data structure.
-The second is cost, and there different models make different use of the tool: \WP is not a fixed saving but a trade of exact contracts for context, and a model that writes the invariant unaided and re-reads a large context pays for it (Opus~5, 1.3$\times$), a model that reads more and writes less recovers it (Sol~5.6, 0.95$\times$), and a smaller model that would otherwise search recovers more (Terra~5.6, 0.X$\times$).
-The Sol~5.6 intervals include parity, so its size is indicative; the spread across the three models is the finding.
+Together, the two rounds show two effects of \WP.
+The first is on completeness and does not depend on the model: under both, the hybrids complete more cells, never miss the control whose abort condition \WP derives exactly, and fail only on the one target whose contract needs a permutation argument that \WP cannot supply either.
+The second is on cost and depends on the model.
+\WP supplies exact contracts, but its output also enlarges the context the model re-reads on every turn.
+Sol~5.6 finds the invariants unaided, so it pays for the additional context without saving elsewhere (1.03--1.09$\times$, parity within the intervals).
+Terra~5.6 would otherwise search, and the savings outweigh the context (0.80$\times$); with \WP, it completes as many cells as Sol~5.6 at 55\% of its cost.
+With four replicates and failures concentrated on two targets, the completeness differences are descriptive; the Terra~5.6 cost intervals exclude parity, the Sol~5.6 ones include it.
 
 %%% Local Variables:
 %%% mode: latex

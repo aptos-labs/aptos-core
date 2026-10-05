@@ -22,23 +22,22 @@ use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
 use mono_move_aptos_transaction_executor::production_natives;
 use mono_move_core::{
-    interner::InternedIdentifier,
-    types::{view_type_list, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    ExecutionErrorKind, GasMeter, Interner, IntoExecutionError, NoResourceProvider,
-    VMInternalError, VMResult,
+    interner::{InternedIdentifier, InternedModuleId},
+    types::EMPTY_TYPE_LIST,
+    ExecutionErrorKind, GasMeter, Interner, NoResourceProvider, VMInternalError, VMResult,
 };
-use mono_move_global_context::{ExecutionGuard, FunctionIrLookup, GlobalContext, LoadedModule};
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleProvider};
 use mono_move_runtime::{
-    error::RuntimeError, InterpreterContext, InterpreterOptions, ProductionNativeRegistry,
-    RuntimeStatus,
+    error::RuntimeError, CompletedCall, InterpreterContext, InterpreterOptions,
+    ProductionNativeRegistry, RuntimeStatus,
 };
-use move_binary_format::CompiledModule;
+use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
+use move_bytecode_verifier::VerifierConfig;
 use move_compiler_v2::Options;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_model::metadata::LanguageVersion;
 use std::{collections::HashMap, path::Path};
-use thiserror::Error;
 
 /// The adapter's build identity, stamped by `build.rs`.
 pub fn identity(abi: u32) -> Identity {
@@ -56,16 +55,6 @@ pub fn identity(abi: u32) -> Identity {
 /// addressable.
 pub struct InMemoryModuleProvider {
     module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
-}
-
-#[derive(Debug, Error)]
-#[error("deserialization failed: {0}")]
-struct DeserializationError(move_binary_format::errors::PartialVMError);
-
-impl IntoExecutionError for DeserializationError {
-    fn kind(&self) -> ExecutionErrorKind {
-        ExecutionErrorKind::Placeholder
-    }
 }
 
 impl InMemoryModuleProvider {
@@ -96,15 +85,18 @@ impl ModuleProvider for InMemoryModuleProvider {
         Ok(self.module_bytes.get(&(*address, identifier)).cloned())
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> VMResult<CompiledModule> {
-        CompiledModule::deserialize(bytes)
-            .map_err(|e| VMInternalError::new(DeserializationError(e)))
-    }
-
     fn verify_module(&self, _module: &CompiledModule) -> VMResult<()> {
         // Modules come from the in-process compiler, which produces valid
         // bytecode; the loader still runs its own lowering checks.
         Ok(())
+    }
+
+    fn deserializer_config(&self) -> &DeserializerConfig {
+        &DeserializerConfig::DEFAULT
+    }
+
+    fn verifier_config(&self) -> &VerifierConfig {
+        &VerifierConfig::DEFAULT
     }
 
     fn get_same_package_modules(
@@ -229,126 +221,84 @@ fn run_call<'guard>(
 
     let module_id = guard.module_id_of(&address, module_name.as_ident_str());
     let function_id = guard.identifier_of(function_name.as_ident_str());
-    let result = (|| {
-        let func = interp.load_function(module_id, function_id, EMPTY_TYPE_LIST)?;
-        let mut call = interp.build_call(func)?;
-        for signer in &signers {
-            call.signer(signer)?;
-        }
-        for arg in &args {
-            call.arg_bcs(arg)?;
-        }
-        call.run()
-    })();
-    let gas_used = limits.gas.saturating_sub(interp.gas_balance());
-    let gc_count = interp.gc_count();
-
-    match result {
-        Ok(RuntimeStatus::Success) => {
-            // Resolve the callee's return types through the read set the
-            // call left behind.
-            let returns = match interp
-                .read_set()
-                .get_loaded(guard.arena_ref_for_module_id(module_id))
-            {
-                Ok(loaded) => match return_types(guard, loaded, function_id, EMPTY_TYPE_LIST) {
-                    Ok(returns) => returns,
-                    Err(error) => {
-                        return Outcome::Error {
-                            stage: Stage::Run,
-                            message: format!("failed to derive return types: {error:#}"),
-                        }
-                    },
-                },
-                Err(error) => {
-                    return Outcome::Error {
-                        stage: Stage::Run,
-                        message: format!("failed to look up the loaded module: {error}"),
-                    }
-                },
-            };
-            match read_root_results(&interp, &returns) {
+    match place_and_run(&mut interp, module_id, function_id, &signers, &args) {
+        Ok(call) => match call.status().clone() {
+            RuntimeStatus::Success => match read_root_results(&call) {
                 Ok(values) => Outcome::Returned {
                     values,
-                    gas_used,
-                    gc_count,
+                    gas_used: limits.gas.saturating_sub(call.interpreter().gas_balance()),
+                    gc_count: call.interpreter().gc_count(),
                 },
                 Err(message) => Outcome::Error {
                     stage: Stage::Run,
                     message,
                 },
-            }
+            },
+            RuntimeStatus::Aborted {
+                code,
+                message,
+                location,
+                ..
+            } => Outcome::Aborted {
+                code,
+                location: Some(location.to_string()),
+                message,
+            },
         },
-        Ok(RuntimeStatus::Aborted {
-            code,
-            message,
-            location,
-        }) => Outcome::Aborted {
-            code,
-            location: Some(location.to_string()),
-            message,
-        },
-        Err(error) => {
-            if let Some(RuntimeError::OutOfHeapMemory { .. }) = error.downcast_ref::<RuntimeError>()
-            {
-                return Outcome::Exhausted {
-                    resource: ExhaustedResource::Heap,
-                };
-            }
-            // Split MonoVM's execution errors by what they say about the
-            // program, following the documented meaning of each kind. The
-            // harness compares program outcomes, so collapsing all of them
-            // into an adapter error would claim no outcome was obtained for
-            // failures the program genuinely produced.
-            match error.kind() {
-                ExecutionErrorKind::OutOfGas => Outcome::Exhausted {
-                    resource: ExhaustedResource::Gas,
-                },
-                // Outcomes of the program. MonoVM reports arithmetic
-                // overflow, an out-of-bounds index, a missing resource, or a
-                // structural limit this way rather than as an abort, so they
-                // are propagated with the kind a caller branches on.
-                kind @ (ExecutionErrorKind::InvalidOperation
-                | ExecutionErrorKind::RuntimeLimitExceeded) => Outcome::Failed {
-                    failure: kind.to_string(),
-                    message: format!("{error}"),
-                },
-                // Not outcomes of the program. An unresolvable callee means
-                // the request itself is wrong, and an invariant violation is
-                // a VM bug that must stay loud instead of becoming something
-                // to compare; an untyped placeholder is classified with them
-                // because it carries no claim either way.
-                ExecutionErrorKind::LinkingError
-                | ExecutionErrorKind::InvariantViolation
-                | ExecutionErrorKind::Placeholder => Outcome::Error {
-                    stage: Stage::Run,
-                    message: format!("{error}"),
-                },
-            }
-        },
+        Err(error) => run_error_outcome(&error),
     }
 }
 
-/// The return types of a loaded module's function, instantiated with
-/// `ty_args`.
-fn return_types(
-    guard: &ExecutionGuard<'_>,
-    loaded: &LoadedModule,
-    function: InternedIdentifier,
-    ty_args: InternedTypeList,
-) -> Result<Vec<InternedType>, String> {
-    let FunctionIrLookup::Ir(ir) = loaded.get_function_ir(function) else {
-        return Err("function has no IR in its loaded module".to_string());
-    };
-    let returns = loaded
-        .ir()
-        .module
-        .function_signature_at(ir.handle_idx)
-        .returns;
-    let returns = guard
-        .subst_type_list(returns, ty_args)
-        .map_err(|error| error.to_string())?;
-    Ok(view_type_list(returns).to_vec())
+/// Loads `module_id::function_id`, places `signers` and the BCS `args`, and
+/// runs it.
+fn place_and_run<'a, 'guard>(
+    interp: &'a mut InterpreterContext<'guard>,
+    module_id: InternedModuleId,
+    function_id: InternedIdentifier,
+    signers: &'a [AccountAddress],
+    args: &[Vec<u8>],
+) -> VMResult<CompletedCall<'a, 'guard>> {
+    let func = interp.load_function(module_id, function_id, EMPTY_TYPE_LIST)?;
+    let mut call = interp.build_call(func)?;
+    for signer in signers {
+        call.signer(signer)?;
+    }
+    for arg in args {
+        call.arg_bcs(arg)?;
+    }
+    Ok(call.run()?)
+}
+
+/// Classifies a failed MonoVM run by whether its error is a program outcome.
+fn run_error_outcome(error: &VMInternalError) -> Outcome {
+    if let Some(RuntimeError::OutOfHeapMemory { .. }) = error.downcast_ref::<RuntimeError>() {
+        return Outcome::Exhausted {
+            resource: ExhaustedResource::Heap,
+        };
+    }
+    // Preserve errors that describe program behavior as comparable outcomes.
+    match error.kind() {
+        ExecutionErrorKind::OutOfGas => Outcome::Exhausted {
+            resource: ExhaustedResource::Gas,
+        },
+        // These kinds cover program failures such as invalid arithmetic,
+        // invalid indexing, missing resources, and structural limits.
+        kind
+        @ (ExecutionErrorKind::InvalidOperation | ExecutionErrorKind::RuntimeLimitExceeded) => {
+            Outcome::Failed {
+                failure: kind.to_string(),
+                message: format!("{error}"),
+            }
+        },
+        // Linking failures are invalid requests, invariant violations are VM
+        // bugs, and placeholders make no claim about program behavior.
+        ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::InvariantViolation
+        | ExecutionErrorKind::Placeholder => Outcome::Error {
+            stage: Stage::Run,
+            message: format!("{error}"),
+        },
+    }
 }
 
 /// Parses `0x…::module::function`.

@@ -4,7 +4,8 @@
 //! Loader subsystem error types.
 
 use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
-use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_binary_format::errors::VMError;
+use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -34,13 +35,18 @@ pub enum LoaderError {
     #[error("Failed to lower function: {reason}")]
     LoweringSkipped { reason: &'static str },
 
+    /// The layout of a resource type read outside lowered code could not be
+    /// derived.
+    #[error("Resource type layout is not derivable")]
+    ResourceLayoutNotDerivable,
+
     #[error("Script does not deserialize: {message}")]
     ScriptDeserializationFailed { message: String },
 
-    /// The script failed bytecode verification or linking against its
-    /// dependencies; `status` is the verifier's status code.
-    #[error("Script failed verification: {status:?}")]
-    ScriptVerificationFailed { status: StatusCode },
+    /// The script failed bytecode verification or dependency linking.
+    /// Preserves the original verifier error.
+    #[error("Script failed verification: {:?}", .error.major_status())]
+    ScriptVerificationFailed { error: VMError },
 
     /// TODO(cleanup): replace once the global context has its own error type.
     #[error(transparent)]
@@ -59,7 +65,9 @@ impl IntoExecutionError for LoaderError {
             },
 
             // TODO(cleanup): delegate once GlobalContext has its own error type.
-            GlobalContext(_) | LoweringSkipped { .. } => ExecutionErrorKind::Placeholder,
+            GlobalContext(_) | LoweringSkipped { .. } | ResourceLayoutNotDerivable => {
+                ExecutionErrorKind::Placeholder
+            },
 
             // TODO(cleanup): needs deserialization and verification categories.
             ScriptDeserializationFailed { .. } | ScriptVerificationFailed { .. } => {

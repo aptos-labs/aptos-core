@@ -1,11 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! The user-transaction execution flow: pre-execution checks, then one
-//! session hosting the prologue, the payload, and the epilogue.
+//! The user-transaction execution flow: one session hosting the pre-execution
+//! checks, the prologue, the payload, and the epilogue.
 
 use super::{
     entry_func::call_entry_function,
+    keyless::validate_keyless_authenticators,
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
@@ -16,9 +17,11 @@ use crate::{
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
+    providers::read_config,
 };
 use aptos_types::{
     fee_statement::FeeStatement,
+    on_chain_config::ApprovedExecutionHashes,
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{
         AuxiliaryInfo, EntryFunction, Script, SignedTransaction, TransactionExecutableRef,
@@ -43,59 +46,12 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         txn: &SignedTransaction,
         aux_info: &AuxiliaryInfo,
     ) -> TxnOutcome {
-        match self.execute_user_transaction_impl(txn, aux_info) {
-            Ok(outcome) => outcome,
-            // Rejected before a session existed, so there is nothing to finish.
-            Err(reason) => TxnOutcome::Discarded {
-                reason,
-                effects: None,
-            },
-        }
-    }
-
-    /// Actual implementation of the transaction execution flow.
-    fn execute_user_transaction_impl(
-        &self,
-        txn: &SignedTransaction,
-        aux_info: &AuxiliaryInfo,
-    ) -> Result<TxnOutcome, DiscardReason> {
         let guard = self.guard;
-
-        // ======================== Pre-execution checks ========================
-        // Reject what this executor cannot execute, before touching any state.
         let txn_data = TxnMetadata::new(txn, aux_info);
-        let gas_params = self.env.gas_params().as_ref().map_err(|e| {
-            DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
-        })?;
-        PreExecutionChecker::new(gas_params, self.env.gas_feature_version(), &txn_data)
-            .run_checks()
-            .map_err(DiscardReason::PreExecutionCheck)?;
-
-        // TODO(completeness): multisig payloads. Refused for now, since the
-        // inner executable must run as the multisig account, not the sender.
-        if txn.multisig_address().is_some() {
-            return Err(DiscardReason::Unsupported("multisig payloads"));
-        }
-        let executable = match txn.payload().executable_ref() {
-            Ok(TransactionExecutableRef::EntryFunction(entry)) => Executable::EntryFunction(entry),
-            Ok(TransactionExecutableRef::Script(script)) => Executable::Script(script),
-            Ok(TransactionExecutableRef::Encrypted) => Executable::Encrypted,
-            // Only a multisig transaction may leave the executable out.
-            Ok(TransactionExecutableRef::Empty) => return Err(DiscardReason::EmptyPayload),
-            Err(_) => return Err(DiscardReason::Deprecated("module-bundle payload")),
-        };
-        // TODO(security): these type arguments are user supplied, so interning
-        // them can pollute the global caches. Needs a bound.
-        let interned_ty_args = executable
-            .ty_args()
-            .iter()
-            .map(|tag| intern_type_tag(tag, guard))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| DiscardReason::InvalidTypeArgument(format!("{e:#}")))?;
-        let ty_args = guard.type_list_of(&interned_ty_args);
 
         // ========================== Session setup ===========================
-        // One session hosts the whole transaction: prologue, payload, epilogue.
+        // One session hosts the whole transaction: pre-execution checks,
+        // prologue, payload, epilogue.
         // TODO(completeness): make the loading policy configurable.
         let loader = Loader::new_with_policy(
             guard,
@@ -124,8 +80,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // transaction against, so a discard that skipped it would drop the
         // transaction's dependencies. Finishing also parks the worker's stack
         // and heap for reuse.
-        let result = self.run_session(&mut interp, &txn_data, &executable, ty_args);
-        Ok(match (result, interp.finish()) {
+        let result = self.run_session(&mut interp, txn, &txn_data);
+        match (result, interp.finish()) {
             (_, Err(e)) => TxnOutcome::Panic(e),
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
                 status,
@@ -136,27 +92,91 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 reason,
                 effects: Some(effects),
             },
-        })
+        }
     }
 
-    /// Runs the prologue, the payload, and the epilogue in one session.
+    /// Runs the pre-execution checks, the prologue, the payload, and the
+    /// epilogue in one session.
     ///
     /// Returns the transaction's status and fee on any path that commits, and a
     /// discard reason on any path that does not. The caller closes the session.
     fn run_session(
         &self,
         interp: &mut InterpreterContext<'guard>,
+        txn: &SignedTransaction,
         txn_data: &TxnMetadata,
-        executable: &Executable<'_>,
-        ty_args: InternedTypeList,
     ) -> Result<(ExecutionStatus, FeeStatement), DiscardReason> {
         let guard = self.guard;
         let max_gas = txn_data.max_gas_amount;
+
+        // ======================== Pre-execution checks ========================
+        // Reject what this executor cannot execute, before any Move code runs.
+        //
+        // A keyless authenticator is proved here, in Rust: the Move prologue
+        // only ever sees the auth key it resolves to. The reads are unmetered,
+        // like V1's.
+        interp.unmetered(|interp| {
+            validate_keyless_authenticators(txn, self.env, interp, guard, self.symbols)
+        })?;
+        let gas_params = self.env.gas_params().as_ref().map_err(|e| {
+            DiscardReason::InvariantViolation(format!("the gas schedule is unavailable: {e}"))
+        })?;
+        // Only a script can be one governance has approved. The read is
+        // unmetered, like V1's config reads.
+        let approved_gov_scripts = if txn_data.script_hash.is_empty() {
+            None
+        } else {
+            interp
+                .unmetered(|interp| {
+                    read_config::<ApprovedExecutionHashes>(
+                        interp,
+                        guard,
+                        self.symbols.approved_execution_hashes,
+                    )
+                })
+                .map_err(|e| {
+                    DiscardReason::InvariantViolation(format!(
+                        "the approved script hashes are unreadable: {e}"
+                    ))
+                })?
+        };
+        PreExecutionChecker::new(
+            gas_params,
+            self.env.gas_feature_version(),
+            approved_gov_scripts.as_ref(),
+            txn_data,
+        )
+        .run_checks()
+        .map_err(DiscardReason::PreExecutionCheck)?;
+
+        // TODO(completeness): multisig payloads. Refused for now, since the
+        // inner executable must run as the multisig account, not the sender.
+        if txn.multisig_address().is_some() {
+            return Err(DiscardReason::Unsupported("multisig payloads"));
+        }
+        let executable = match txn.payload().executable_ref() {
+            Ok(TransactionExecutableRef::EntryFunction(entry)) => Executable::EntryFunction(entry),
+            Ok(TransactionExecutableRef::Script(script)) => Executable::Script(script),
+            Ok(TransactionExecutableRef::Encrypted) => Executable::Encrypted,
+            // Only a multisig transaction may leave the executable out.
+            Ok(TransactionExecutableRef::Empty) => return Err(DiscardReason::EmptyPayload),
+            Err(_) => return Err(DiscardReason::Deprecated("module-bundle payload")),
+        };
+        // TODO(security): these type arguments are user supplied, so interning
+        // them can pollute the global caches. Needs a bound.
+        let interned_ty_args = executable
+            .ty_args()
+            .iter()
+            .map(|tag| intern_type_tag(tag, guard))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| DiscardReason::InvalidTypeArgument(format!("{e:#}")))?;
+        let ty_args = guard.type_list_of(&interned_ty_args);
+
         let signers = ValidationSigners::new(txn_data);
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(interp, guard, &signers, txn_data).map_err(|failure| {
+        run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
             DiscardReason::Failure {
                 stage: ExecutionStage::Prologue,
                 failure,
@@ -169,9 +189,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
         let payload_result = if self.unmetered {
-            interp.unmetered(|interp| self.execute_payload(interp, txn_data, executable, ty_args))
+            interp.unmetered(|interp| self.execute_payload(interp, txn_data, &executable, ty_args))
         } else {
-            self.execute_payload(interp, txn_data, executable, ty_args)
+            self.execute_payload(interp, txn_data, &executable, ty_args)
         };
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
@@ -198,7 +218,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let epilogue = |interp: &mut InterpreterContext<'guard>| {
             run_epilogue(
                 interp,
-                guard,
+                self.symbols,
                 &signers,
                 txn_data,
                 fee_statement,

@@ -3,7 +3,7 @@
 
 import LeanerLang
 
-leaner module 0x1::signer where
+leaner module std::signer where
   /--
   signer is a builtin move type that represents an address that has been verfied by the VM.
 

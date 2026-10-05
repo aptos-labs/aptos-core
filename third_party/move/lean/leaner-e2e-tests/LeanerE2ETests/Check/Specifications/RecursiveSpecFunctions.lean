@@ -11,7 +11,15 @@ definition over its bundled arguments (`count.spec`), with the unfolding
 theorem `count.spec.unfold`. Lemmas about it are items of the module:
 they are elaborated once the module is registered, and `verify` after them.
 Termination is proved at definition time from the conditions on the path
-to each recursive call.
+to each recursive call. Without a proof, the verifier unfolds a definition
+once at each application a leaf holds whose guard the context decides, as
+a solver instantiates a definitional axiom: a loop summing a vector keeps
+an invariant over the sum up to its index (`sum_probe`). Mutually recursive
+functions are defined together, and lemmas about them recurse through
+each other (`mutual_spec`). Boolean parameters are Booleans, of a function
+and of a lemma alike (`boolean_parameters`). A definition reading storage
+takes the memory and the family its reads resolve types at
+(`stateful_recursion`).
 -/
 
 leaner module 0x42::recursive_spec where
@@ -49,3 +57,77 @@ leaner module 0x42::recursive_spec where
     intro first
     refine count_first _ _ _ _ rfl (by omega) ?_
     simp [LeanerIR.RuntimeValue.field, ‹values.values[0]? = some _›, first]
+
+leaner module 0x42::sum_probe where
+  spec fun sum_upto(v : Vector<u64>, n : Int) : Int :=
+    if n <= 0 then 0 else sum_upto(v, n - 1) + v[n - 1]
+
+  fun total(v : Vector<u64>) -> u64 := do
+    let sum := 0
+    let i := 0
+    while i < v.length do
+      sum := sum + v[i]
+      i := i + 1
+    where
+      invariant i <= v.length
+      invariant sum == sum_upto(v, i)
+    sum
+  spec total where
+    ensures result == sum_upto(v, v.length)
+
+leaner module 0x42::mutual_spec where
+  spec fun f(n : Int) : Int := if n <= 0 then 1 else f(n - 1) + g(n - 1)
+  spec fun g(n : Int) : Int := if n <= 0 then 0 else f(n - 1)
+
+  spec lemma f_pos(n : Int) where
+    requires 0 <= n
+    ensures f(n) >= 1
+    proof
+      split n > 0
+      apply n > 0 ==> f_pos(n - 1)
+      apply n > 0 ==> g_nonneg(n - 1)
+
+  spec lemma g_nonneg(n : Int) where
+    requires 0 <= n
+    ensures g(n) >= 0
+    proof
+      split n > 0
+      apply n > 0 ==> f_pos(n - 1)
+
+  fun one() -> u64 := 1
+  spec one where
+    ensures result == f(0)
+    ensures g(1) == result
+
+leaner module 0x42::boolean_parameters where
+  spec fun count_if(n : Int, p : Bool, q : Bool) : Int :=
+    if n <= 0 then 0 else (if p == q then 1 else 0) + count_if(n - 1, p, q)
+
+  spec lemma same_counts(n : Int, p : Bool) where
+    requires 0 <= n
+    ensures count_if(n, p, p) == n
+    proof
+      split n > 0
+      apply n > 0 ==> same_counts(n - 1, p)
+
+  fun one(b : Bool) -> u64 := 1
+  spec one where
+    ensures count_if(1, b, b) == result
+
+leaner module 0x42::stateful_recursion where
+  struct R has Key where
+    v : u64
+
+  spec fun get_v(a : Address) : Int := global<R>(a).v
+
+  spec fun rf(a : Address, n : Int) : Bool :=
+    if n <= 0 then false else rg(a, n - 1) || get_v(a) == 1
+
+  spec fun rg(a : Address, n : Int) : Bool :=
+    if n <= 0 then false else rf(a, n - 1)
+
+  fun read_v(a : Address) -> u64 := R[a].v
+  spec read_v where
+    requires exists<R>(a)
+    requires !rf(a, 1)
+    ensures result != 1

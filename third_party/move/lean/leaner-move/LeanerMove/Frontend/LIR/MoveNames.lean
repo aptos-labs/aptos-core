@@ -28,10 +28,8 @@ def moduleRef (tables : LeanerIR.Tables) (id : LeanerIR.NamespaceId) :
   let reference ← requireSome tables.namespaces[id.index]?
     s!"invalid namespace reference {id.index}"
   match reference.segments with
-  | #[address, alias, name] =>
-      return { address, addressAlias := if alias.isEmpty then none else some alias, name }
-  | #[address, name] => return { address, addressAlias := none, name }
-  | _ => throw "Move namespace reference does not have address/name or address/alias/name segments"
+  | #[address, name] => return { address, addressAlias := reference.alias, name }
+  | _ => throw "Move namespace reference does not have address/name segments"
 
 def qualifiedName (tables : LeanerIR.Tables) (id : LeanerIR.NameId) :
     Except String LeanerMove.Frontend.Xast.QualifiedName := do

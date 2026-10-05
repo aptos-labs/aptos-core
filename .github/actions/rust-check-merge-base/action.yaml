@@ -4,6 +4,9 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  BASE_REF:
+    description: "Comparison branch or commit (merge base with HEAD)"
+    default: origin/main
 
 runs:
   using: composite
@@ -15,5 +18,7 @@ runs:
 
     # Check the freshness of the merge base
     - name: Check the freshness of the merge base
-      run: cargo x check-merge-base -vvv
+      run: cargo x --base "$TEST_BASE_REF" check-merge-base -vvv
       shell: bash
+      env:
+        TEST_BASE_REF: ${{ inputs.BASE_REF }}

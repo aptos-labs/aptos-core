@@ -1,0 +1,41 @@
+processed 15 tasks
+task 0 lines 3-60:  publish [import LeanerMove]
+task 1 lines 62-62:  run 0x0::LeanerClosures::leading --args 3u64 4u64
+return values: 7
+task 2 lines 64-64:  run 0x0::LeanerClosures::trailing --args 10u64 4u64
+return values: 6
+task 3 lines 66-66:  run 0x0::LeanerClosures::generic --args true 1u64 2u64
+return values: 1
+task 4 lines 68-68:  run 0x0::LeanerClosures::generic --args false 1u64 2u64
+return values: 2
+task 5 lines 70-70:  run 0x0::LeanerClosures::returned --args 5u64 6u64
+return values: 11
+task 6 lines 72-72:  run 0x0::LeanerClosures::field --args 7u64 8u64
+return values: 15
+task 7 lines 74-74:  run 0x0::LeanerClosures::higher_order --args 2u64 9u64
+return values: 7
+task 8 lines 76-76:  run 0x0::LeanerClosures::higher_order --args 9u64 2u64
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x0::LeanerClosures,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 2)],
+}
+task 9 lines 78-78:  run 0x0::LeanerClosures::checked --args 10u64 3u64
+return values: 3
+task 10 lines 80-80:  run 0x0::LeanerClosures::checked --args 10u64 30u64
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(7),
+    location: 0x0::LeanerClosures,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 7)],
+}
+task 11 lines 82-82:  run 0x0::LeanerClosures::same --args 4u64 4u64
+return values: true
+task 12 lines 84-84:  run 0x0::LeanerClosures::same --args 4u64 5u64
+return values: false
+task 13 lines 86-86:  run --args 6u64 --signers 0x42 -- 0x0::LeanerClosures::publish
+task 14 lines 88-88:  run 0x0::LeanerClosures::take --args @0x42 7u64
+return values: 42

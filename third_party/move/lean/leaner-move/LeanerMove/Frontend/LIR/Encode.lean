@@ -3,6 +3,9 @@
 
 import LeanerMove.Profile
 import LeanerMove.Frontend.Effects
+import LeanerMove.Frontend.Frames
+import LeanerMove.Frontend.Proofs
+import LeanerLang.AddressAlias
 import LeanerMove.Frontend.LIR.Codec
 
 /-!
@@ -40,6 +43,32 @@ structure BuildState where
   /-- Hidden temporaries the encoder introduced, named `$t<n>` like the
   LeanerLang lowering's, so the two lowerings of one element access agree. -/
   temporaryLocals : Nat := 0
+  /-- Whether the module being built is not a verification target: its
+  pragmas then resolve `verify` to false. -/
+  nonTarget : Bool := false
+  /-- The package's functions that may write global memory. -/
+  globalWriters : List QualifiedName := []
+  /-- The state labels of the module being built, by the exchange's numbers:
+  the names they are in LIR. -/
+  stateLabels : Array (Nat × LeanerIR.NameId) := #[]
+  /-- The package's and its dependencies' structs declaring `copy`, with
+  their phantom-free type parameter positions. -/
+  copyableStructs : List (QualifiedName × List Bool) := []
+  /-- Whether each type parameter of the function being built has `copy`. -/
+  typeParameterCopy : Array Bool := #[]
+  /-- The package's and its dependencies' specification functions with
+  `&mut` parameters, by position. The model passes such a parameter as its
+  value before and after: `old(p)`, then `p`. -/
+  mutableSpecParameters : List (QualifiedName × List Bool) := []
+  /-- In the body of a specification function, its `&mut` parameters, each
+  with the local holding its value before. -/
+  oldParameters : Array (String × String) := #[]
+  /-- The local of each source parameter position, where a specification
+  function's `&mut` parameters shift them; empty where positions are the
+  locals. -/
+  parameterLocals : Array LeanerIR.LocalId := #[]
+  /-- The steps of the function's proof the Move Prover runs at each return. -/
+  exitSteps : Array Proofs.Step := #[]
 
 abbrev BuildM := StateT BuildState (Except String)
 
@@ -50,6 +79,22 @@ private def logically (act : BuildM α) : BuildM α := do
   let result ← act
   modify fun state => { state with logical := saved }
   return result
+
+/-- Whether values of a type are copyable: primitives and references are, a
+vector or tuple when its elements are, a struct declaring `copy` when its
+non-phantom arguments are, a type parameter when it declares `copy`. -/
+private partial def copyable (ty : Xast.Ty) : BuildM Bool := do
+  match ty with
+  | .signer => pure false
+  | .vector element => copyable element
+  | .tuple elements => elements.allM copyable
+  | .struct name arguments =>
+      let some (_, relevant) := (← get).copyableStructs.find? (·.1 == name) | pure false
+      (arguments.zip relevant).allM fun (argument, counts) =>
+        if counts then copyable argument else pure true
+  | .function _ _ abilities => pure (abilities.contains .copy)
+  | .typeParam index => pure ((← get).typeParameterCopy[index]?.getD false)
+  | _ => pure true
 
 private def addLocation (loc : Loc) : BuildM LeanerIR.LocId := do
   let state ← get
@@ -69,9 +114,19 @@ private def addGeneratedLocation (parent : LeanerIR.LocId) : BuildM LeanerIR.Loc
     parent := some parent } }
   return id
 
+/-- A module's address in its canonical spelling. -/
+private def canonicalModuleAddress (module : ModuleRef) : String :=
+  (LeanerLang.addressValue? module.address).map LeanerLang.canonicalAddress |>.getD module.address
+
+/-- The namespace of a module: one per address and name, however a reference
+spells the address; the first reference naming an alias gives it. -/
 private def addModuleRef (module : ModuleRef) : BuildM LeanerIR.NamespaceId := do
   let state ← get
-  if let some index := state.sourceNamespaces.findIdx? (· == module) then
+  let module := { module with address := canonicalModuleAddress module }
+  if let some index := state.sourceNamespaces.findIdx? fun candidate =>
+      candidate.address == module.address && candidate.name == module.name then
+    if state.sourceNamespaces[index]!.addressAlias.isNone && module.addressAlias.isSome then
+      set { state with sourceNamespaces := state.sourceNamespaces.set! index module }
     return ⟨index⟩
   let id : LeanerIR.NamespaceId := ⟨state.sourceNamespaces.size⟩
   set { state with sourceNamespaces := state.sourceNamespaces.push module }
@@ -95,6 +150,17 @@ private def addQualifiedRef (name : QualifiedName) : BuildM LeanerIR.QualifiedRe
   let sourceName := state.sourceNames[nameId.index]!
   let namespaceId ← addModuleRef sourceName.module
   return { namespaceId, name := nameId }
+
+private def pragmaName : LeanerIR.Attribute → String
+  | .assign name .. | .call name .. => name
+
+/-- The pragmas of a declaration that is not a verification target: any
+`verify` it sets gives way, and a namespace states `verify = false` last,
+which its functions inherit. -/
+private def nonTargetPragmas (pragmas : Array LeanerIR.Attribute) (namespace_ : Bool) :
+    Array LeanerIR.Attribute :=
+  let kept := pragmas.filter (pragmaName · != "verify")
+  if namespace_ then kept.push (.assign "verify" (.constant (.bool false))) else kept
 
 private def lirAbility : Ability → LeanerIR.Ability
   | .copy => .copy
@@ -225,22 +291,30 @@ private def specificationType : Xast.Ty → Xast.Ty
       .i8 | .i16 | .i32 | .i64 | .i128 | .i256 | .num => .num
   | ty => ty
 
-private def localId (name : String) (ty : Xast.Ty) (loc : LeanerIR.LocId) : BuildM LeanerIR.LocalId := do
-  let state ← get
-  -- Exact identity first: distinct executable locals must never unify, or a
-  -- use site's annotated type contradicts the shared declaration.
-  if let some (_, _, id) := state.sourceLocals.find? fun entry =>
-      entry.1 == name && entry.2.1 == ty then
-    return id
-  -- A specification occurrence arrives already projected (dereferenced, with
-  -- mathematical integers) and may refer to the executable local it names.
-  -- The fallback is specification-only: an executable pattern binding that
-  -- shadows a reference parameter by name must get a fresh local, not the
-  -- parameter's slot.
-  if (← get).logical && specificationType ty == ty then
-    if let some (_, _, id) := state.sourceLocals.find? fun entry =>
-        entry.1 == name && specificationType entry.2.1 == ty then
-      return id
+/-- A type with its references removed, as specifications read it. -/
+private def referent : Xast.Ty → Xast.Ty
+  | .reference _ ty => referent ty
+  | ty => ty
+
+private def isMutableReference : Xast.Ty → Bool
+  | .reference true _ => true
+  | _ => false
+
+/-- The name of the parameter holding a `&mut` parameter's value before. -/
+private def oldParameterName (name : String) : String := s!"old_{name}"
+
+/-- A specification function's parameters, a `&mut` parameter as its value
+before and after: `old_p`, then `p`. -/
+private def specificationParams (params : List Param) : List Param :=
+  params.flatMap fun parameter =>
+    if isMutableReference parameter.ty then
+      [{ parameter with name := oldParameterName parameter.name }, parameter]
+    else [parameter]
+
+/-- A fresh local for a binding occurrence of a source name, visible until
+the scope it is bound in closes. -/
+private def bindLocal (name : String) (ty : Xast.Ty) (loc : LeanerIR.LocId) :
+    BuildM LeanerIR.LocalId := do
   let type ← typeUse loc ty
   let state ← get
   let id : LeanerIR.LocalId := ⟨state.locals.size⟩
@@ -249,9 +323,33 @@ private def localId (name : String) (ty : Xast.Ty) (loc : LeanerIR.LocId) : Buil
     locals := state.locals.push { id, name, type, loc } }
   return id
 
+/-- The local a use of a source name denotes: the innermost visible binding
+of the name at the use's type. Source names shadow, so a binding in a nested
+scope is a local of its own. -/
+private def localId (name : String) (ty : Xast.Ty) (loc : LeanerIR.LocId) : BuildM LeanerIR.LocalId := do
+  let state ← get
+  if let some (_, _, id) := state.sourceLocals.findRev? fun entry =>
+      entry.1 == name && entry.2.1 == ty then
+    return id
+  -- A specification occurrence names the local its projection (dereferenced,
+  -- with mathematical integers) is bound at.
+  if (← get).logical then
+    if let some (_, _, id) := state.sourceLocals.findRev? fun entry =>
+        entry.1 == name && specificationType entry.2.1 == specificationType ty then
+      return id
+  bindLocal name ty loc
+
+/-- Run a step in a nested scope: the names it binds are not visible after
+it. -/
+private def inScope (step : BuildM α) : BuildM α := do
+  let outer := (← get).sourceLocals
+  let result ← step
+  modify fun state => { state with sourceLocals := outer }
+  return result
+
 private def addParameter (parameter : Param) (loc : LeanerIR.LocId) : BuildM LeanerIR.Parameter := do
   let loc ← addGeneratedLocation loc
-  let id ← localId parameter.name parameter.ty loc
+  let id ← bindLocal parameter.name parameter.ty loc
   let state ← get
   let some declaration := state.locals[id.index]?
     | throw s!"parameter `{parameter.name}` has no local declaration"
@@ -325,34 +423,72 @@ stackless bytecode they are instructions, and the logical bytecode model
 likewise makes them operations rather than callable functions. Lowering them
 to the LIR operations that already mean the same thing is what makes vector
 code executable at all — left as calls they resolve to absent bodies. The
-remaining natives are deliberately not listed, so they stay ordinary calls and
-surface as absent bodies rather than as silently wrong semantics: `pop_back`,
-`swap`, `move_range` and `destroy_empty` have no LIR counterpart yet, and
-`borrow`/`borrow_mut` need the place normalization that turns a value borrow
-into a place borrow. Element access is already available through Move's index
-notation. -/
+remaining native, `move_range`, has no LIR counterpart yet and is deliberately
+not listed, so it stays an ordinary call and surfaces as an absent body rather
+than as silently wrong semantics. The functions the Move Prover treats as
+intrinsic although they have bodies are LIR operations too, as its prelude
+defines them: their bodies are loops whose invariants the standard library
+does not state, or move ranges LIR has no counterpart for, and the
+operations, with the library's abort codes, mean the same thing. The
+intrinsic functions whose bodies are free of loops over these
+(`swap_remove`, `rotate`, `rotate_slice`) keep their bodies. -/
 private def vectorNative? (name : Xast.QualifiedName) : Option String :=
   let inVectorModule :=
-    name.module.name == "vector" &&
-      (name.module.address == "0x1" || name.module.addressAlias == some "std")
+    name.module.name == "vector" && canonicalModuleAddress name.module == "0x1"
   if inVectorModule &&
-      ["empty", "length", "push_back", "swap", "borrow", "borrow_mut"].contains name.name then
+      ["empty", "length", "push_back", "pop_back", "swap", "destroy_empty", "borrow",
+        "borrow_mut", "contains", "index_of", "remove", "is_empty", "reverse",
+        "reverse_slice", "append", "reverse_append", "trim", "trim_reverse", "insert",
+        "remove_value"].contains name.name then
     some name.name
   else
     none
+
+/-- Names the specification version of a value-level `std::vector` native
+or intrinsic function, which means the same LIR operation as the function.
+The compiler derives no specification version from an intrinsic function's
+body, so a specification names one only through this mapping. -/
+private def vectorSpecNative? (name : Xast.QualifiedName) : Option String :=
+  if name.module.name == "vector" && canonicalModuleAddress name.module == "0x1" &&
+      ["$empty", "$length", "$is_empty", "$contains", "$index_of"].contains name.name then
+    some (name.name.drop 1).toString
+  else
+    none
+
+/-- The width of an unsigned fixed-width integer type. -/
+private def unsignedBits? : Option Xast.Ty → Option Nat
+  | some .u8 => some 8 | some .u16 => some 16 | some .u32 => some 32
+  | some .u64 => some 64 | some .u128 => some 128 | some .u256 => some 256
+  | _ => none
 
 /-- `std::signer::address_of` is LIR's signer-address primitive, which takes
 the signer by reference as the native does. A specification applies it
 through its specification version, `$address_of`, with the same meaning. -/
 private def isSignerAddressOf (name : Xast.QualifiedName) : Bool :=
-  name.module.name == "signer" &&
-    (name.module.address == "0x1" || name.module.addressAlias == some "std") &&
+  name.module.name == "signer" && canonicalModuleAddress name.module == "0x1" &&
     (name.name == "address_of" || name.name == "$address_of")
+
+/-- The name a state label of the exchange is in LIR. -/
+private def lirLabel (label : Nat) : BuildM Nat := do
+  let some (_, name) := (← get).stateLabels.find? (·.1 == label)
+    | throw s!"state label {label} has no name"
+  return name.index
+
+private def lirRange (range : Xast.MemoryRange) : BuildM LeanerIR.MemoryRange := do
+  return { pre := ← range.pre.mapM lirLabel, post := ← range.post.mapM lirLabel }
 
 private def lirOperation : Xast.Operation → BuildM LeanerIR.Operation
   | .moveFunction name => return .call (.function (← addQualifiedRef name))
+  | .closure name mask => return .call (.closure (← addQualifiedRef name) mask)
   | .pack name variant => return .call (.constructor (← addQualifiedRef name) variant)
-  | .exists _ => return .global .contains
+  | .exists none => return .global .contains
+  | .exists (some label) => return .specification (.exists (some (← lirLabel label)))
+  | .global (some label) => return .specification (.global (some (← lirLabel label)))
+  | .behavior kind range =>
+      return .specification (.behavior (Codec.lirBehaviorKind kind) (← lirRange range))
+  | .specPublish range => return .specification (.publish (← lirRange range))
+  | .specRemove range => return .specification (.remove (← lirRange range))
+  | .specUpdate range => return .specification (.update (← lirRange range))
   | .borrowGlobal kind => return .global (.borrow (lirBorrowKind kind))
   | .moveFrom => return .global .take
   | .moveTo => return .global .publish
@@ -366,8 +502,7 @@ private def lirOperation : Xast.Operation → BuildM LeanerIR.Operation
       return .data (.testVariants (← addQualifiedRef name) variants.toArray)
   | .updateField name field => return .data (.updateField (← addQualifiedRef name) field)
   | .specFunction name range =>
-      return .specification (.functionCall (← addQualifiedRef name) {
-        pre := range.pre, post := range.post })
+      return .specification (.functionCall (← addQualifiedRef name) (← lirRange range))
   | operation => do
       match Codec.primitiveOperation? operation with
       | some primitive => return .primitive primitive
@@ -398,15 +533,29 @@ private def toPragma (pragma : Xast.Pragma) : LeanerIR.Attribute :=
     | .name name => .name none name
     | .qualifiedName name => .qualifiedName name)
 
+/-- The `proof_file` pragma naming the proof file beside a module's source,
+which every function of the module inherits. -/
+private def proofFilePragma (module : Xast.Module) : Array LeanerIR.Attribute :=
+  (module.proofFile.map fun path =>
+    LeanerIR.Attribute.assign "proof_file" (.constant (.string path))).toArray
+
+/-- A module's pragmas: its own, and the proof file named on it. -/
+private def modulePragmas (module : Xast.Module) : Array LeanerIR.Attribute :=
+  module.pragmas.toArray.map toPragma ++ proofFilePragma module
+
 mutual
   private partial def addExpr : Exp → BuildM LeanerIR.ExprId
     | .mk ty sourceLoc node => do
         let loc ← addLocation sourceLoc
         let typeId ← addType loc ty
+        -- A `&mut` parameter's value before is a parameter of its own.
+        if let .call .old _ [.mk _ _ (.«local» name)] _ := node then
+          if let some (_, before) := (← get).oldParameters.find? (·.1 == name) then
+            return ← addExprNode loc typeId (.localVar (← localId before ty loc))
         let kind ← match node with
           | .value value constant => pure <| .value (constValue value) constant
           | .«local» name => .localVar <$> localId name ty loc
-          | .param index => pure <| .localVar ⟨index⟩
+          | .param index => pure <| .localVar ((← get).parameterLocals[index]?.getD ⟨index⟩)
           | .call operation inst arguments surface => do
               let inst := if inst.isEmpty then
                   match operation, ty, arguments with
@@ -450,6 +599,10 @@ mutual
                     dereferenceFirst referent first
                 | .testVariants .., _, .mk (.reference _ referent) _ _ :: _, some first =>
                     dereferenceFirst referent first
+                -- A slice reads the vector a reference points to, as a
+                -- length does.
+                | .slice, _, .mk (.reference _ referent) _ _ :: _, some first =>
+                    dereferenceFirst referent first
                 | _, _, _, _ => pure arguments
               -- A `std::vector` native is an LIR operation, not a call. Its
               -- vector operand arrives as a reference, so it is dereferenced
@@ -467,7 +620,17 @@ mutual
                     -- the printer's fixed point depend on this lowering.
                     let vectorOperand : BuildM LeanerIR.ExprId := do
                       match sourceArguments.head? with
-                      | some (.mk _ _ (.call (.borrow _) _ [borrowed] _)) => addExpr borrowed
+                      | some (.mk _ _ (.call (.borrow _) _ [borrowed@(.mk ty _ _)] _)) =>
+                          -- Only a copyable value is read bare; a value that is
+                          -- not stays read through its borrow, since spelled
+                          -- bare it would be moved.
+                          if ← copyable ty then addExpr borrowed else
+                            let some first := arguments[0]?
+                              | throw s!"`vector::{native}` has no vector operand"
+                            let dereferenceLoc ← addGeneratedLocation loc
+                            let referentType ← addType dereferenceLoc ty
+                            addExprNode dereferenceLoc referentType <|
+                              .operation (.reference .dereference) #[] #[first]
                       | some (.mk (.reference _ referent) _ _) => do
                           let some first := arguments[0]?
                             | throw s!"`vector::{native}` has no vector operand"
@@ -479,6 +642,122 @@ mutual
                           match arguments[0]? with
                           | some first => pure first
                           | none => throw s!"`vector::{native}` has no vector operand"
+                    -- An element operand arrives as a reference too, and is
+                    -- read through it the way the vector is.
+                    let elementOperand (position : Nat) : BuildM LeanerIR.ExprId := do
+                      match (sourceArguments[position]? : Option Xast.Exp), arguments[position]? with
+                      | some (.mk _ _ (.call (.borrow _) _ [borrowed@(.mk ty _ _)] _)), some operand =>
+                          if ← copyable ty then addExpr borrowed else
+                            let dereferenceLoc ← addGeneratedLocation loc
+                            let referentType ← addType dereferenceLoc ty
+                            addExprNode dereferenceLoc referentType <|
+                              .operation (.reference .dereference) #[] #[operand]
+                      | some (.mk (.reference _ referent) _ _), some operand => do
+                          let dereferenceLoc ← addGeneratedLocation loc
+                          let referentType ← addType dereferenceLoc referent
+                          addExprNode dereferenceLoc referentType <|
+                            .operation (.reference .dereference) #[] #[operand]
+                      | _, some operand => pure operand
+                      | _, none => throw s!"`vector::{native}` has no element operand"
+                    -- The library's abort with `code` unless `condition` holds.
+                    let abortUnless (nativeLoc : LeanerIR.LocId) (condition : LeanerIR.ExprId)
+                        (code : Int) : BuildM LeanerIR.ExprId := do
+                      let unitType ← unitTypeId
+                      let codeType ← addType nativeLoc .u64
+                      let codeValue ← addExprNode nativeLoc codeType (.value (.integer code))
+                      let failure ← addExprNode nativeLoc unitType <| .throw_ .abort #[codeValue]
+                      let skip ← addExprNode nativeLoc unitType (.block #[] none)
+                      addExprNode nativeLoc unitType (.ifElse condition skip (some failure))
+                    -- `body` with `value` bound to a temporary it reads.
+                    let letIn (nativeLoc : LeanerIR.LocId) (valueType : LeanerIR.TypeId)
+                        (value : LeanerIR.ExprId)
+                        (body : BuildM LeanerIR.ExprId → BuildM LeanerIR.ExprId) :
+                        BuildM LeanerIR.ExprId := do
+                      let temporary ← temporaryLocal valueType nativeLoc
+                      let inner ← body (addExprNode nativeLoc valueType (.localVar temporary))
+                      let pattern ← addPatternNode nativeLoc valueType (.variable temporary)
+                      addExprNode nativeLoc typeId (.letDecl pattern (some value) inner)
+                    -- A native updating the vector its first operand points
+                    -- to. The reference and the operands at `bound`, which
+                    -- `body` reads more than once, are evaluated first, in
+                    -- order, into temporaries; `body` reads the vector
+                    -- through the reference and writes it back. A borrow of
+                    -- a local, which every Move call takes, is not held:
+                    -- the local is read through a transient borrow and
+                    -- assigned, so that no borrow outlives the call.
+                    let throughReference (bound : List Nat)
+                        (body : (current : BuildM LeanerIR.ExprId) →
+                          (write : LeanerIR.ExprId → BuildM LeanerIR.ExprId) →
+                          (operand : Nat → BuildM LeanerIR.ExprId) →
+                          (nativeLoc : LeanerIR.LocId) → (vectorType : LeanerIR.TypeId) →
+                          BuildM LeanerIR.ExprId) : BuildM (Option LeanerIR.ExprKind) := do
+                      let some reference := arguments[0]?
+                        | throw s!"`vector::{native}` has no vector operand"
+                      let some (.mk referenceTy@(.reference _ referent) _ _) := sourceArguments.head?
+                        | throw s!"`vector::{native}` does not take a reference"
+                      let nativeLoc ← addGeneratedLocation loc
+                      let referenceType ← addType nativeLoc referenceTy
+                      let vectorType ← addType nativeLoc referent
+                      let unitType ← unitTypeId
+                      let borrowedLocal? : Option Xast.Exp := match sourceArguments.head? with
+                        | some (.mk _ _ (.call (.borrow _) _ [target@(.mk _ _ (.«local» _))] _)) =>
+                            some target
+                        | some (.mk _ _ (.call (.borrow _) _ [target@(.mk _ _ (.param _))] _)) =>
+                            some target
+                        | _ => none
+                      let slot? ← if borrowedLocal?.isSome then pure none
+                        else some <$> temporaryLocal referenceType nativeLoc
+                      let mut temporaries : Array (Nat × LeanerIR.LocalId × LeanerIR.TypeId) := #[]
+                      for position in bound do
+                        let some (.mk operandTy _ _) := (sourceArguments[position]? : Option Xast.Exp)
+                          | throw s!"`vector::{native}` has no operand {position}"
+                        let operandType ← addType nativeLoc operandTy
+                        temporaries := temporaries.push
+                          (position, ← temporaryLocal operandType nativeLoc, operandType)
+                      let place (target : Xast.Exp) : BuildM LeanerIR.PlaceId := do
+                        let some place ← placeOf? target
+                          | throw s!"`vector::{native}` borrows no place"
+                        pure place
+                      let current : BuildM LeanerIR.ExprId := do
+                        match borrowedLocal?, slot? with
+                        | some target, _ =>
+                            let sharedType ← addType nativeLoc (.reference false referent)
+                            let shared ← addExprNode nativeLoc sharedType <|
+                              .operation (.borrow .immutable (← place target)) #[] #[]
+                            addExprNode nativeLoc vectorType <|
+                              .operation (.reference .dereference) #[] #[shared]
+                        | none, some slot =>
+                            let read ← addExprNode nativeLoc referenceType (.localVar slot)
+                            addExprNode nativeLoc vectorType <|
+                              .operation (.reference .dereference) #[] #[read]
+                        | none, none => throw s!"`vector::{native}` has no reference"
+                      let write (value : LeanerIR.ExprId) : BuildM LeanerIR.ExprId := do
+                        match borrowedLocal?, slot? with
+                        | some target, _ =>
+                            addExprNode nativeLoc unitType (.assign (← place target) value)
+                        | none, some slot =>
+                            let target ← addExprNode nativeLoc referenceType (.localVar slot)
+                            addExprNode nativeLoc unitType <|
+                              .operation (.reference .mutate) #[] #[target, value]
+                        | none, none => throw s!"`vector::{native}` has no reference"
+                      let operand (position : Nat) : BuildM LeanerIR.ExprId := do
+                        match temporaries.find? (·.1 == position) with
+                        | some (_, temporary, operandType) =>
+                            addExprNode nativeLoc operandType (.localVar temporary)
+                        | none =>
+                            match arguments[position]? with
+                            | some argument => pure argument
+                            | none => throw s!"`vector::{native}` has no operand {position}"
+                      let mut expression ← body current write operand nativeLoc vectorType
+                      for (position, temporary, operandType) in temporaries.reverse do
+                        let some argument := arguments[position]?
+                          | throw s!"`vector::{native}` has no operand {position}"
+                        let pattern ← addPatternNode nativeLoc operandType (.variable temporary)
+                        expression ← addExprNode nativeLoc typeId
+                          (.letDecl pattern (some argument) expression)
+                      let some slot := slot? | return some (.block #[] (some expression))
+                      let slotPattern ← addPatternNode nativeLoc referenceType (.variable slot)
+                      pure <| some <| .letDecl slotPattern (some reference) expression
                     match native with
                     | "empty" =>
                         pure <| some <| .operation (.primitive .vector) instantiations #[]
@@ -488,23 +767,289 @@ mutual
                           #[← vectorOperand] (surfaceSyntax surface)
                     | "swap" => do
                         -- Exchanging two elements is the value-level swap
-                        -- stored back into the path it came from, the same
-                        -- shape as `push_back`.
-                        let some (.mk _ _ (.call (.borrow _) _
-                            [target@(.mk targetTy _ _)] _)) := sourceArguments.head?
-                          | pure none
-                        let some place ← placeOf? target
-                          | pure none
+                        -- stored back where it came from, the same shape as
+                        -- `push_back`.
                         let some left := arguments[1]?
                           | throw "`vector::swap` has no first index operand"
                         let some right := arguments[2]?
                           | throw "`vector::swap` has no second index operand"
+                        if let some (.mk _ _ (.call (.borrow _) _
+                            [target@(.mk targetTy _ _)] _)) := sourceArguments.head? then
+                          if let some place ← placeOf? target then
+                            let swapLoc ← addGeneratedLocation loc
+                            let vectorType ← addType swapLoc targetTy
+                            let current ← addExpr target
+                            let swapped ← addExprNode swapLoc vectorType <|
+                              .operation (.primitive .swapVector) #[] #[current, left, right]
+                            return some (.assign place swapped)
+                        let some reference := arguments[0]?
+                          | throw "`vector::swap` has no vector operand"
+                        let some (.mk (.reference _ referent) _ _) := sourceArguments.head?
+                          | throw "`vector::swap` does not take a reference"
                         let swapLoc ← addGeneratedLocation loc
-                        let vectorType ← addType swapLoc targetTy
-                        let current ← addExpr target
+                        let vectorType ← addType swapLoc referent
+                        let current ← addExprNode swapLoc vectorType <|
+                          .operation (.reference .dereference) #[] #[reference]
                         let swapped ← addExprNode swapLoc vectorType <|
                           .operation (.primitive .swapVector) #[] #[current, left, right]
-                        return some (.assign place swapped)
+                        pure <| some <| .operation (.reference .mutate) #[]
+                          #[reference, swapped] (surfaceSyntax surface)
+                    | "pop_back" => do
+                        -- Removing the last element is the value-level
+                        -- removal at the last index, the rest written back
+                        -- through the reference; an empty vector aborts with
+                        -- the VM's vector error 2.
+                        let some reference := arguments[0]?
+                          | throw "`vector::pop_back` has no vector operand"
+                        let some (.mk referenceTy@(.reference _ referent) _ _) :=
+                            sourceArguments.head?
+                          | throw "`vector::pop_back` does not take a reference"
+                        let popLoc ← addGeneratedLocation loc
+                        let referenceType ← addType popLoc referenceTy
+                        let vectorType ← addType popLoc referent
+                        let indexType ← addType popLoc .u64
+                        let boolType ← addType popLoc .bool
+                        let pairType ← addType popLoc (.tuple [ty, referent])
+                        let unitType ← unitTypeId
+                        let slot ← temporaryLocal referenceType popLoc
+                        let current : BuildM LeanerIR.ExprId := do
+                          let read ← addExprNode popLoc referenceType (.localVar slot)
+                          addExprNode popLoc vectorType <|
+                            .operation (.reference .dereference) #[] #[read]
+                        let length : BuildM LeanerIR.ExprId := do
+                          addExprNode popLoc indexType <|
+                            .operation (.primitive .length) #[] #[← current]
+                        let zero ← addExprNode popLoc indexType (.value (.integer 0))
+                        let empty ← addExprNode popLoc boolType <|
+                          .operation (.primitive .equal) #[] #[← length, zero]
+                        let code ← addExprNode popLoc indexType (.value (.integer 2))
+                        let failure ← addExprNode popLoc unitType <|
+                          .throw_ (.profile { profile := .move, tag := "runtime.vector_error" })
+                            #[code]
+                        let check ← addExprNode popLoc unitType (.ifElse empty failure none)
+                        let one ← addExprNode popLoc indexType (.value (.integer 1))
+                        let last ← addExprNode popLoc indexType <|
+                          .operation (.primitive (.checkedSubtract .abort)) #[] #[← length, one]
+                        let removal ← addExprNode popLoc pairType <|
+                          .operation (.primitive .removeVector) #[] #[← current, last]
+                        let removed ← temporaryLocal typeId popLoc
+                        let rest ← temporaryLocal vectorType popLoc
+                        let removedPattern ← addPatternNode popLoc typeId (.variable removed)
+                        let restPattern ← addPatternNode popLoc vectorType (.variable rest)
+                        let pairPattern ← addPatternNode popLoc pairType
+                          (.tuple #[removedPattern, restPattern])
+                        let restRead ← addExprNode popLoc vectorType (.localVar rest)
+                        let writeReference ← addExprNode popLoc referenceType (.localVar slot)
+                        let write ← addExprNode popLoc unitType <|
+                          .operation (.reference .mutate) #[] #[writeReference, restRead]
+                        let result ← addExprNode popLoc typeId (.localVar removed)
+                        let written ← addExprNode popLoc typeId (.block #[write] (some result))
+                        let popped ← addExprNode popLoc typeId
+                          (.letDecl pairPattern (some removal) written)
+                        let checked ← addExprNode popLoc typeId (.block #[check] (some popped))
+                        let slotPattern ← addPatternNode popLoc referenceType (.variable slot)
+                        pure <| some <| .letDecl slotPattern (some reference) checked
+                    | "destroy_empty" =>
+                        pure <| some <| .operation (.primitive .destroyEmptyVector) #[]
+                          arguments (surfaceSyntax surface)
+                    | "contains" | "index_of" => do
+                        let operation := if native == "contains" then LeanerIR.PrimitiveOperation.containsVector
+                          else .indexOfVector
+                        pure <| some <| .operation (.primitive operation) #[]
+                          #[← vectorOperand, ← elementOperand 1] (surfaceSyntax surface)
+                    | "is_empty" => do
+                        -- Emptiness is a zero length.
+                        let emptyLoc ← addGeneratedLocation loc
+                        let indexType ← addType emptyLoc .u64
+                        let length ← addExprNode emptyLoc indexType <|
+                          .operation (.primitive .length) #[] #[← vectorOperand]
+                        let zero ← addExprNode emptyLoc indexType (.value (.integer 0))
+                        pure <| some <| .operation (.primitive .equal) #[] #[length, zero]
+                    | "reverse" =>
+                        throughReference [] fun current write _ nativeLoc vectorType => do
+                          let indexType ← addType nativeLoc .u64
+                          let zero ← addExprNode nativeLoc indexType (.value (.integer 0))
+                          let length ← addExprNode nativeLoc indexType <|
+                            .operation (.primitive .length) #[] #[← current]
+                          let reversed ← write (← addExprNode nativeLoc vectorType <|
+                            .operation (.primitive .reverseSliceVector) #[] #[← current, zero, length])
+                          addExprNode nativeLoc typeId (.block #[reversed] none)
+                    | "reverse_slice" =>
+                        -- A range of two or more elements is the library's
+                        -- first exchange, which checks the range's end, and
+                        -- the reversal inside it; a reversed range aborts
+                        -- with `EINVALID_RANGE`.
+                        throughReference [1, 2] fun current write operand nativeLoc vectorType => do
+                          let indexType ← addType nativeLoc .u64
+                          let boolType ← addType nativeLoc .bool
+                          let unitType ← unitTypeId
+                          let compare (operation : LeanerIR.PrimitiveOperation)
+                              (left right : LeanerIR.ExprId) : BuildM LeanerIR.ExprId :=
+                            addExprNode nativeLoc boolType (.operation (.primitive operation) #[] #[left, right])
+                          let shift (operation : LeanerIR.PrimitiveOperation)
+                              (operand : LeanerIR.ExprId) : BuildM LeanerIR.ExprId := do
+                            let one ← addExprNode nativeLoc indexType (.value (.integer 1))
+                            addExprNode nativeLoc indexType (.operation (.primitive operation) #[] #[operand, one])
+                          let last : BuildM LeanerIR.ExprId := do
+                            shift (.checkedSubtract .abort) (← operand 2)
+                          let check ← abortUnless nativeLoc
+                            (← compare .lessEqual (← operand 1) (← operand 2)) 131073
+                          let exchanged ← addExprNode nativeLoc vectorType <|
+                            .operation (.primitive .swapVector) #[] #[← current, ← operand 1, ← last]
+                          let reversed ← addExprNode nativeLoc vectorType <|
+                            .operation (.primitive .reverseSliceVector) #[]
+                              #[exchanged, ← shift (.checkedAdd .abort) (← operand 1), ← last]
+                          let wide ← addExprNode nativeLoc unitType <|
+                            .ifElse (← compare .less (← operand 1) (← last)) (← write reversed) none
+                          let nonempty ← addExprNode nativeLoc unitType <|
+                            .ifElse (← compare .less (← operand 1) (← operand 2)) wide none
+                          addExprNode nativeLoc typeId (.block #[check, nonempty] none)
+                    | "append" =>
+                        throughReference [] fun current write operand nativeLoc vectorType => do
+                          let appended ← write (← addExprNode nativeLoc vectorType <|
+                            .operation (.primitive .concatVector) #[] #[← current, ← operand 1])
+                          addExprNode nativeLoc typeId (.block #[appended] none)
+                    | "reverse_append" =>
+                        -- The other vector appended, then reversed in place.
+                        throughReference [] fun current write operand nativeLoc vectorType => do
+                          let indexType ← addType nativeLoc .u64
+                          let start ← addExprNode nativeLoc indexType <|
+                            .operation (.primitive .length) #[] #[← current]
+                          letIn nativeLoc indexType start fun start => do
+                            let appended ← write (← addExprNode nativeLoc vectorType <|
+                              .operation (.primitive .concatVector) #[] #[← current, ← operand 1])
+                            let stop ← addExprNode nativeLoc indexType <|
+                              .operation (.primitive .length) #[] #[← current]
+                            let reversed ← write (← addExprNode nativeLoc vectorType <|
+                              .operation (.primitive .reverseSliceVector) #[] #[← current, ← start, stop])
+                            addExprNode nativeLoc typeId (.block #[appended, reversed] none)
+                    | "trim" | "trim_reverse" =>
+                        -- The elements from the new length on are taken off,
+                        -- reversed by `trim_reverse`; a new length past the
+                        -- end aborts with `EINDEX_OUT_OF_BOUNDS`.
+                        throughReference [1] fun current write operand nativeLoc vectorType => do
+                          let indexType ← addType nativeLoc .u64
+                          let boolType ← addType nativeLoc .bool
+                          let length : BuildM LeanerIR.ExprId := do
+                            addExprNode nativeLoc indexType <|
+                              .operation (.primitive .length) #[] #[← current]
+                          let within ← addExprNode nativeLoc boolType <|
+                            .operation (.primitive .lessEqual) #[] #[← operand 1, ← length]
+                          let check ← abortUnless nativeLoc within 131072
+                          let tail ← if native == "trim" then current else
+                            addExprNode nativeLoc vectorType <| .operation
+                              (.primitive .reverseSliceVector) #[] #[← current, ← operand 1, ← length]
+                          let taken ← addExprNode nativeLoc vectorType <|
+                            .operation (.primitive .slice) #[] #[tail, ← operand 1, ← length]
+                          let kept ← letIn nativeLoc vectorType taken fun rest => do
+                            let zero ← addExprNode nativeLoc indexType (.value (.integer 0))
+                            let written ← write (← addExprNode nativeLoc vectorType <|
+                              .operation (.primitive .slice) #[] #[← current, zero, ← operand 1])
+                            addExprNode nativeLoc typeId (.block #[written] (some (← rest)))
+                          addExprNode nativeLoc typeId (.block #[check] (some kept))
+                    | "insert" =>
+                        -- An index past the end aborts with
+                        -- `EINDEX_OUT_OF_BOUNDS`.
+                        throughReference [1, 2] fun current write operand nativeLoc vectorType => do
+                          let indexType ← addType nativeLoc .u64
+                          let boolType ← addType nativeLoc .bool
+                          let length ← addExprNode nativeLoc indexType <|
+                            .operation (.primitive .length) #[] #[← current]
+                          let within ← addExprNode nativeLoc boolType <|
+                            .operation (.primitive .lessEqual) #[] #[← operand 1, length]
+                          let check ← abortUnless nativeLoc within 131072
+                          let inserted ← write (← addExprNode nativeLoc vectorType <|
+                            .operation (.primitive .insertVector) #[] #[← current, ← operand 1, ← operand 2])
+                          addExprNode nativeLoc typeId (.block #[check, inserted] none)
+                    | "remove_value" => do
+                        -- The first element equal to the value is removed and
+                        -- returned in a vector, which is empty without one.
+                        let .vector elementTy := ty
+                          | throw "`vector::remove_value` does not return a vector"
+                        throughReference [] fun current write _ nativeLoc vectorType => do
+                          let indexType ← addType nativeLoc .u64
+                          let boolType ← addType nativeLoc .bool
+                          let elementType ← addType nativeLoc elementTy
+                          let searchType ← addType nativeLoc (.tuple [.bool, .u64])
+                          let pairType ← addType nativeLoc (.tuple [elementTy, .vector elementTy])
+                          let search ← addExprNode nativeLoc searchType <| .operation
+                            (.primitive .indexOfVector) #[] #[← current, ← elementOperand 1]
+                          let found ← temporaryLocal boolType nativeLoc
+                          let index ← temporaryLocal indexType nativeLoc
+                          let removed ← temporaryLocal elementType nativeLoc
+                          let rest ← temporaryLocal vectorType nativeLoc
+                          let removal ← addExprNode nativeLoc pairType <| .operation
+                            (.primitive .removeVector) #[] #[← current,
+                              ← addExprNode nativeLoc indexType (.localVar index)]
+                          let written ← write (← addExprNode nativeLoc vectorType (.localVar rest))
+                          let single ← addExprNode nativeLoc typeId <| .operation
+                            (.primitive .vector) instantiations
+                            #[← addExprNode nativeLoc elementType (.localVar removed)]
+                          let taken ← addExprNode nativeLoc typeId (.block #[written] (some single))
+                          let pairPattern ← addPatternNode nativeLoc pairType (.tuple
+                            #[← addPatternNode nativeLoc elementType (.variable removed),
+                              ← addPatternNode nativeLoc vectorType (.variable rest)])
+                          let present ← addExprNode nativeLoc typeId
+                            (.letDecl pairPattern (some removal) taken)
+                          let absent ← addExprNode nativeLoc typeId <|
+                            .operation (.primitive .vector) instantiations #[]
+                          let chosen ← addExprNode nativeLoc typeId <| .ifElse
+                            (← addExprNode nativeLoc boolType (.localVar found)) present (some absent)
+                          let searchPattern ← addPatternNode nativeLoc searchType (.tuple
+                            #[← addPatternNode nativeLoc boolType (.variable found),
+                              ← addPatternNode nativeLoc indexType (.variable index)])
+                          addExprNode nativeLoc typeId (.letDecl searchPattern (some search) chosen)
+                    | "remove" => do
+                        -- Removing at an index is the value-level removal, the
+                        -- rest written back through the reference; an index
+                        -- past the end aborts with the library's
+                        -- `EINDEX_OUT_OF_BOUNDS`.
+                        let some reference := arguments[0]?
+                          | throw "`vector::remove` has no vector operand"
+                        let some index := arguments[1]?
+                          | throw "`vector::remove` has no index operand"
+                        let some (.mk referenceTy@(.reference _ referent) _ _) :=
+                            sourceArguments.head?
+                          | throw "`vector::remove` does not take a reference"
+                        let removeLoc ← addGeneratedLocation loc
+                        let referenceType ← addType removeLoc referenceTy
+                        let vectorType ← addType removeLoc referent
+                        let indexType ← addType removeLoc .u64
+                        let boolType ← addType removeLoc .bool
+                        let pairType ← addType removeLoc (.tuple [ty, referent])
+                        let unitType ← unitTypeId
+                        let slot ← temporaryLocal referenceType removeLoc
+                        let current : BuildM LeanerIR.ExprId := do
+                          let read ← addExprNode removeLoc referenceType (.localVar slot)
+                          addExprNode removeLoc vectorType <|
+                            .operation (.reference .dereference) #[] #[read]
+                        let length ← addExprNode removeLoc indexType <|
+                          .operation (.primitive .length) #[] #[← current]
+                        let inBounds ← addExprNode removeLoc boolType <|
+                          .operation (.primitive .less) #[] #[index, length]
+                        let code ← addExprNode removeLoc indexType (.value (.integer 131072))
+                        let failure ← addExprNode removeLoc unitType <| .throw_ .abort #[code]
+                        let skip ← addExprNode removeLoc unitType (.block #[] none)
+                        let check ← addExprNode removeLoc unitType (.ifElse inBounds skip (some failure))
+                        let removal ← addExprNode removeLoc pairType <|
+                          .operation (.primitive .removeVector) #[] #[← current, index]
+                        let removed ← temporaryLocal typeId removeLoc
+                        let rest ← temporaryLocal vectorType removeLoc
+                        let removedPattern ← addPatternNode removeLoc typeId (.variable removed)
+                        let restPattern ← addPatternNode removeLoc vectorType (.variable rest)
+                        let pairPattern ← addPatternNode removeLoc pairType
+                          (.tuple #[removedPattern, restPattern])
+                        let restRead ← addExprNode removeLoc vectorType (.localVar rest)
+                        let writeReference ← addExprNode removeLoc referenceType (.localVar slot)
+                        let write ← addExprNode removeLoc unitType <|
+                          .operation (.reference .mutate) #[] #[writeReference, restRead]
+                        let result ← addExprNode removeLoc typeId (.localVar removed)
+                        let written ← addExprNode removeLoc typeId (.block #[write] (some result))
+                        let taken ← addExprNode removeLoc typeId
+                          (.letDecl pairPattern (some removal) written)
+                        let checked ← addExprNode removeLoc typeId (.block #[check] (some taken))
+                        let slotPattern ← addPatternNode removeLoc referenceType (.variable slot)
+                        pure <| some <| .letDecl slotPattern (some reference) checked
                     | "push_back" => do
                         -- Growing a vector in place is the value-level push
                         -- stored back where it came from. When the native's
@@ -590,9 +1135,39 @@ mutual
                   if isSignerAddressOf name then
                     pure <| .operation (.primitive .signerAddress) #[] arguments
                       (surfaceSyntax surface)
-                  else
-                    pure <| .operation (← lirOperation operation) instantiations arguments
-                      (surfaceSyntax surface)
+                  else match ← vectorNativeNode (vectorSpecNative? name) with
+                    | some node => pure node
+                    | none =>
+                        -- A `&mut` parameter receives the argument's value
+                        -- before, then after.
+                        let mutable := ((← get).mutableSpecParameters.find? (·.1 == name)).map (·.2)
+                        let arguments ← match mutable with
+                          | none => pure arguments
+                          | some flags =>
+                              (sourceArguments.zip arguments.toList).zip flags |>.toArray.foldlM
+                                (init := #[]) fun passed ((source, argument), isMutable) => do
+                                  unless isMutable do return passed.push argument
+                                  let .mk argumentTy argumentLoc _ := source
+                                  let valueTy := specificationType argumentTy
+                                  let before ← addExpr
+                                    (.mk valueTy argumentLoc (.call .old [valueTy] [source] none))
+                                  return passed.push before |>.push argument
+                        pure <| .operation (← lirOperation operation) instantiations arguments
+                          (surfaceSyntax surface)
+              | .shl =>
+                  -- A specification's shift of a fixed-width value wraps at
+                  -- its width, as the Move Prover reads it.
+                  match (← get).logical, unsignedBits? (sourceArguments.head?.map (·.ty)) with
+                  | true, some bits => do
+                      -- The unbounded shift, reduced modulo the width.
+                      let numType ← addType loc .num
+                      let shifted ← addExprNode loc numType <|
+                        .operation (.primitive .shiftLeft) #[] arguments (surfaceSyntax surface)
+                      let modulus ← addExprNode loc numType (.value (.integer (2 ^ bits)))
+                      pure <| .operation (.primitive .modulo) #[] #[shifted, modulus]
+                  | _, _ =>
+                      pure <| .operation (← lirOperation operation) instantiations arguments
+                        (surfaceSyntax surface)
               | .and | .or =>
                   -- Move's `&&` and `||` short-circuit. In executable code
                   -- they are the conditional the LeanerLang lowering also
@@ -615,14 +1190,17 @@ mutual
               let arguments ← (function :: arguments).toArray.mapM addExpr
               pure <| .operation (.call .invoke) #[] arguments
           | .block pattern binding body => do
-              pure <| .letDecl (← addPattern pattern) (← binding.mapM addExpr) (← addExpr body)
+              -- The initializer reads the names visible before the binding.
+              let binding ← binding.mapM addExpr
+              inScope do
+                pure <| .letDecl (← addPattern true pattern) binding (← addExpr body)
           | .ite condition thenBranch elseBranch =>
               pure <| .ifElse (← addExpr condition) (← addExpr thenBranch) (some (← addExpr elseBranch))
           | .«match» scrutinee arms => do
               let scrutinee ← addExpr scrutinee
               let arms ← arms.toArray.mapM fun arm => match arm with
-                | .mk _ pattern guard body => do
-                    let pattern ← addPattern pattern
+                | .mk _ pattern guard body => inScope do
+                    let pattern ← addPattern true pattern
                     let guard ← guard.mapM addExpr
                     let body ← addExpr body
                     return { pattern, guard, body }
@@ -635,23 +1213,72 @@ mutual
           | .loop body => pure <| .loop none (← addExpr body)
           | .loopCont nest isContinue =>
               pure <| if isContinue then .continue_ nest else .break_ nest none
-          | .«return» value => pure <| .return_ #[← addExpr value]
-          | .assign pattern value => pure <| .assignPattern (← addPattern pattern) (← addExpr value)
+          | .«return» value =>
+              if (← get).exitSteps.isEmpty then pure <| .return_ #[← addExpr value]
+              else atExit loc typeId value true
+          | .assign pattern value => pure <| .assignPattern (← addPattern false pattern) (← addExpr value)
           | .mutate target value =>
               pure <| .operation (.reference .mutate)
                 #[] #[← addMutationTarget target, ← addExpr value]
-          | .specBlock spec => .spec <$> addSpecBlock spec loc
+          | .specBlock (.mk specLoc pragmas conditions frame accessOf proof) => do
+              -- An `update x = e` of a spec variable is a write of the ghost
+              -- resource backing `x`; the other conditions stay a
+              -- specification block.
+              let writes ← conditions.toArray.filterMapM (ghostUpdate loc typeId)
+              if writes.isEmpty then .spec <$> addSpecBlock (.mk specLoc pragmas conditions frame accessOf proof) loc
+              else
+                let rest := conditions.filter fun
+                  | .mk .update .. => false
+                  | _ => true
+                let statements ← if rest.isEmpty then pure writes else do
+                  let block ← addSpecBlock (.mk specLoc pragmas rest frame accessOf proof) loc
+                  pure (writes.push (← addExprNode loc typeId (.spec block)))
+                pure <| .block statements.pop (some statements.back!)
           | .quant kind ranges triggers condition body => do
               let kind := match kind with
                 | .forall => LeanerIR.QuantifierKind.forall
                 | .exists => .exists
                 | .choose => .choose
                 | .chooseMin => .chooseMin
-              let binders ← ranges.toArray.mapM fun range => match range with
-                | .mk pattern domain => return { pattern := ← addPattern pattern, domain := ← addExpr domain }
-              let triggers ← triggers.toArray.mapM fun trigger => trigger.toArray.mapM addExpr
-              pure <| .quantifier kind binders triggers (← condition.mapM addExpr) (← addExpr body)
+              inScope do
+                -- A range's domain reads the binders of the ranges before it.
+                let binders ← ranges.toArray.mapM fun range => match range with
+                  | .mk pattern domain label => do
+                      let domain ← addExpr domain
+                      let pattern ← addPattern true pattern
+                      let label ← label.mapM lirLabel
+                      return { pattern, domain, label }
+                let triggers ← triggers.toArray.mapM fun trigger => trigger.toArray.mapM addExpr
+                pure <| .quantifier kind binders triggers (← condition.mapM addExpr) (← addExpr body)
         addExprNode loc typeId kind
+
+  /-- The write an `update x = e` condition denotes: the model states the
+  target as the field `v` of the ghost resource `global<Ghost$x>(@0)`
+  backing the spec variable, and the write replaces that resource, whose
+  only field it is. -/
+  private partial def ghostUpdate (loc : LeanerIR.LocId) (typeId : LeanerIR.TypeId) :
+      Xast.Condition → BuildM (Option LeanerIR.ExprId)
+    | .mk .update _ _ value _ _ _ _
+        (some (.mk _ _ (.call (.select ghostName "v") _
+          [.mk ghostType _ (.call (.global _) _ [address] _)] _))) => do
+        let .struct _ arguments := ghostType
+          | throw s!"the ghost memory of `{ghostName.name}` is not a struct type"
+        let writeLoc ← addGeneratedLocation loc
+        let ghostTypeId ← addType writeLoc ghostType
+        let referenceTypeId ← addType writeLoc (.reference true ghostType)
+        let address ← addExpr address
+        let ghostArgument := LeanerIR.GenericArgument.typeArg (← generatedTypeUse writeLoc ghostType)
+        let instantiations ← arguments.toArray.mapM fun argument =>
+          return LeanerIR.GenericArgument.typeArg (← generatedTypeUse writeLoc argument)
+        let reference ← addExprNode writeLoc referenceTypeId <|
+          .operation (.global (.borrow .mutable)) #[ghostArgument] #[address]
+        let packed ← addExprNode writeLoc ghostTypeId <|
+          .operation (.call (.constructor (← addQualifiedRef ghostName))) instantiations
+            #[← addExpr value]
+        return some (← addExprNode writeLoc typeId <|
+          .operation (.reference .mutate) #[] #[reference, packed])
+    | .mk .update .. => throw "an `update` condition must target a spec variable"
+    | _ => pure none
 
   /-- A hidden temporary holding a computed element index, named like the
   LeanerLang lowering's `$t<n>`. -/
@@ -713,7 +1340,8 @@ mutual
     | .mk ty sourceLoc (.«local» name) => do
         let loc ← addLocation sourceLoc
         some <$> addPlaceNode (.localVar (← localId name ty loc))
-    | .mk _ _ (.param index) => some <$> addPlaceNode (.localVar ⟨index⟩)
+    | .mk _ _ (.param index) => do
+        some <$> addPlaceNode (.localVar ((← get).parameterLocals[index]?.getD ⟨index⟩))
     | .mk _ _ (.call .deref _ [reference] _) => do
         match ← placeOf? reference with
         | some base => some <$> addPlaceNode (.deref base)
@@ -764,19 +1392,21 @@ mutual
               (.reference (.borrow .mutable)) #[] #[value]
     | source => addExpr source
 
-  private partial def addPattern : Pattern → BuildM LeanerIR.PatternId
+  /-- A pattern; `bind` when its names are bound by it, rather than naming
+  the locals an assignment writes. -/
+  private partial def addPattern (bind : Bool) : Pattern → BuildM LeanerIR.PatternId
     | .mk ty sourceLoc node => do
         let loc ← addLocation sourceLoc
         let typeId ← addType loc ty
         let kind ← match node with
-          | .var name => .variable <$> localId name ty loc
+          | .var name => .variable <$> (if bind then bindLocal else localId) name ty loc
           | .wildcard => pure .wildcard
-          | .tuple elements => .tuple <$> elements.toArray.mapM addPattern
+          | .tuple elements => .tuple <$> elements.toArray.mapM (addPattern bind)
           | .struct name inst variant fields => do
               let name ← addName name
               let instantiations ← inst.toArray.mapM fun ty =>
                 return LeanerIR.GenericArgument.typeArg (← generatedTypeUse loc ty)
-              pure <| .constructor name instantiations variant (← fields.toArray.mapM addPattern)
+              pure <| .constructor name instantiations variant (← fields.toArray.mapM (addPattern bind))
           | .literal value => pure <| .literal (constValue value)
           | .range lower upper inclusive =>
               pure <| .range (lower.map constValue) (upper.map constValue) inclusive
@@ -792,11 +1422,18 @@ mutual
         if let some value := emitsHandle then auxiliary := auxiliary.push ("emitsHandle", ← addExpr value)
         if let some value := emitsCondition then auxiliary := auxiliary.push ("emitsCondition", ← addExpr value)
         if let some value := updateTarget then auxiliary := auxiliary.push ("updateTarget", ← addExpr value)
+        let encoded ← addExpr expression
+        -- A specification `let` binds its name for the conditions after it.
+        match kind with
+        | .letPre name | .letPost name =>
+            let .mk ty _ _ := expression
+            discard <| bindLocal name ty loc
+        | _ => pure ()
         return {
           loc
           kind := Codec.lirConditionKind kind
           properties := properties.toArray.map toPragma
-          expression := ← addExpr expression
+          expression := encoded
           auxiliary }
 
   private partial def addFrame (frame : Xast.Frame) (loc : LeanerIR.LocId) : BuildM LeanerIR.Frame :=
@@ -808,15 +1445,104 @@ mutual
           modifiesAll
           readsAll }
 
+  /-- A lemma instance: the lemma at its arguments. -/
+  private partial def addLemmaInstance (loc : LeanerIR.LocId)
+      (application : LemmaApplication) : BuildM LeanerIR.ExprId := do
+    let reference ← addQualifiedRef application.lemma
+    let instantiations ← application.inst.toArray.mapM fun ty =>
+      return LeanerIR.GenericArgument.typeArg (← generatedTypeUse loc ty)
+    let arguments ← application.args.toArray.mapM addExpr
+    addExprNode loc (← addType loc .bool) <|
+      .operation (.specification (.lemma reference {})) instantiations arguments
+
+  /-- A proof step as an in-body condition: an assertion or assumption under
+  its path conditions; a lemma application, under its path conditions and
+  universally over the binders of a `forall … apply`; a split, unguarded,
+  since it only directs the proof. -/
+  private partial def addStep (step : Proofs.Step) : BuildM LeanerIR.Condition := logically do
+    let loc ← addLocation step.loc
+    match step.action with
+    | .assert exp =>
+        return { loc, kind := .assertion, expression := ← addExpr (Proofs.guarded step.guards exp) }
+    | .assume exp =>
+        return { loc, kind := .assumption, expression := ← addExpr (Proofs.guarded step.guards exp) }
+    | .split exp => return { loc, kind := .split, expression := ← addExpr exp }
+    | .apply binders application =>
+        let boolType ← addType loc .bool
+        let fact ← if binders.isEmpty then addLemmaInstance loc application else inScope do
+          let quantified ← binders.toArray.mapM fun binder => do
+            let domain ← addExpr (.mk (.typeDomain binder.ty) step.loc
+              (.call .typeDomain [binder.ty] [] none))
+            let pattern ← addPattern true (.mk binder.ty step.loc (.var binder.name))
+            return ({ pattern, domain } : LeanerIR.QuantifierBinder)
+          let body ← addLemmaInstance loc application
+          addExprNode loc boolType (.quantifier .forall quantified #[] none body)
+        let expression ← step.guards.foldrM (init := fact) fun guard body => do
+          addExprNode loc boolType (.operation (.primitive .implies) #[] #[← addExpr guard, body])
+        return { loc, kind := .apply, expression }
+
+  /-- A value leaving the function, with the proof's steps at the return
+  before it: the value is bound to locals the steps read as `result`, then
+  returned, or, at the end of the body, the block's value. -/
+  private partial def atExit (loc : LeanerIR.LocId) (typeId : LeanerIR.TypeId)
+      (value : Exp) (returns : Bool) : BuildM LeanerIR.ExprKind := do
+    let steps := (← get).exitSteps
+    let valueId ← addExpr value
+    -- The steps of a nested return are not those of this one.
+    modify fun state => { state with exitSteps := #[] }
+    let kind ← inScope do
+      let components : List (String × Ty) := match value.ty with
+        | .tuple elements => elements.zipIdx.map fun (ty, index) => (s!"$result_{index}", ty)
+        | ty => [("$result", ty)]
+      let pattern : Pattern := match value.ty, components with
+        | .tuple _, _ => .mk value.ty value.loc
+            (.tuple (components.map fun (name, ty) => .mk ty value.loc (.var name)))
+        | _, _ => .mk value.ty value.loc (.var "$result")
+      -- A unit value binds nothing; the steps follow it.
+      let patternId ← if components.isEmpty then pure none
+        else some <$> addPattern true pattern
+      let resultLocal (name : String) (ty : Ty) : Exp := .mk ty value.loc (.«local» name)
+      let result (index : Nat) : Option Exp :=
+        (components[index]?).map fun (name, ty) => resultLocal name ty
+      let conditions ← steps.mapM fun step => addStep { step with
+        guards := step.guards.map (Proofs.substitute (fun _ => none) result)
+        action := match step.action with
+          | .assert exp => .assert (Proofs.substitute (fun _ => none) result exp)
+          | .assume exp => .assume (Proofs.substitute (fun _ => none) result exp)
+          | .split exp => .split (Proofs.substitute (fun _ => none) result exp)
+          | .apply binders (.mk lemma inst args) =>
+              .apply binders (.mk lemma inst (args.map (Proofs.substitute (fun _ => none)
+                result))) }
+      -- Each step is a block of its own: what it gives holds for the next.
+      let unitType ← addType loc (.tuple [])
+      let specifications ← conditions.mapM fun condition =>
+        addExprNode loc unitType
+          (.spec { loc, conditions := #[condition], pragmas := #[LeanerIR.SpecBlock.proofPragma] })
+      let returned := match value.ty with
+        | .tuple _ => Exp.mk value.ty value.loc
+            (.call .tuple [] (components.map fun (name, ty) => resultLocal name ty) none)
+        | ty => resultLocal "$result" ty
+      let returnedId ← addExpr returned
+      let tail ← if returns then addExprNode loc typeId (.return_ #[returnedId])
+        else pure returnedId
+      match patternId with
+      | some patternId =>
+          let block ← addExprNode loc typeId (.block specifications (some tail))
+          pure (LeanerIR.ExprKind.letDecl patternId (some valueId) block)
+      | none => pure (.block (#[valueId] ++ specifications) (some tail))
+    modify fun state => { state with exitSteps := steps }
+    return kind
+
   private partial def addSpecBlock (spec : Xast.Spec) (fallback : LeanerIR.LocId) : BuildM LeanerIR.SpecBlock :=
     match spec with
-    | .mk sourceLoc pragmas conditions frame => logically do
+    | .mk sourceLoc pragmas conditions frame _ _ => logically do
         let sourceLoc ← sourceLoc.mapM addLocation
         let loc := sourceLoc.getD fallback
+        let pragmas := pragmas.toArray.map toPragma
         return {
           loc
           sourceLoc
-          pragmas := pragmas.toArray.map toPragma
+          pragmas := if (← get).nonTarget then nonTargetPragmas pragmas false else pragmas
           conditions := ← conditions.toArray.mapM addCondition
           frame := ← frame.mapM (addFrame · loc) }
 end
@@ -924,6 +1650,41 @@ private def addContract (spec : Xast.Spec) (fallback : LeanerIR.LocId) : BuildM 
 private def ownName (module : Xast.Module) (name : String) : QualifiedName :=
   { module := module.ref, name }
 
+/-- The frames of a function's function-typed parameters that declare
+modifications (`modifies_of`): its formals fresh locals, which its targets
+read before any local of the same name. A declaration of reads alone leaves
+the parameter keeping memory. -/
+private def addParameterFrames (params : List Param) (accessOf : List Xast.AccessOf) :
+    BuildM (Array LeanerIR.ParameterFrame) := logically do
+  let mut frames := #[]
+  for access in accessOf do
+    unless access.modifiesAll || !access.modifies.isEmpty do continue
+    let some index := params.findIdx? (·.name == access.name)
+      | throw s!"`modifies_of` names `{access.name}`, which is not a parameter"
+    let loc ← addLocation access.loc
+    let mut formals := #[]
+    for formal in access.formals do
+      let type ← typeUse loc formal.ty
+      let state ← get
+      let id : LeanerIR.LocalId := ⟨state.locals.size⟩
+      set { state with locals := state.locals.push { id, name := formal.name, type, loc } }
+      formals := formals.push (formal, id)
+    let outer := (← get).sourceLocals
+    modify fun state => { state with
+      sourceLocals := state.sourceLocals ++
+        formals.map (fun (formal, id) => (formal.name, formal.ty, id)) }
+    -- A target names a resource at a key; the model types one written in
+    -- index notation as a reference to the resource.
+    let targets := access.modifies.map fun
+      | .mk (.reference _ ty) targetLoc node@(.call ..) => .mk ty targetLoc node
+      | target => target
+    let modifies ← targets.toArray.mapM addExpr
+    modify fun state => { state with sourceLocals := outer }
+    frames := frames.push {
+      loc, parameter := ⟨index⟩, formals := formals.map (·.2), modifies
+      modifiesAll := access.modifiesAll }
+  return frames
+
 /-- Encode one nominal declaration: its binders, abilities, fields, variants,
 and its own specification contract. The result is what both an owned namespace
 and a dependency interface record, the latter without contract or locals. -/
@@ -945,6 +1706,26 @@ private def buildStructDecl (module : Module) (structDecl : Xast.Struct) :
     let name ← addName (ownName module variant.name)
     return { loc := variantLoc, name, fields }
   let owner ← addName (ownName module structDecl.name)
+  -- An invariant reads the whole value as `this` after a local per field, as
+  -- LeanerLang lays a nominal invariant out (an enum's has no field locals);
+  -- Move names the value `self`.
+  if structDecl.spec.conditions.any (·.kind == .structInvariant) then
+    if structDecl.variants.isNone then
+      for field in structDecl.fields do
+        let fieldLoc ← addGeneratedLocation structLoc
+        let type ← typeUse fieldLoc (specificationType field.ty)
+        let state ← get
+        set { state with locals := state.locals.push {
+          id := ⟨state.locals.size⟩, name := field.name, type, loc := fieldLoc } }
+    let selfTy : Xast.Ty := .struct (ownName module structDecl.name)
+      (structDecl.typeParams.zipIdx.map fun (_, index) => .typeParam index)
+    let thisLoc ← addGeneratedLocation structLoc
+    let type ← typeUse thisLoc selfTy
+    let state ← get
+    let id : LeanerIR.LocalId := ⟨state.locals.size⟩
+    set { state with
+      sourceLocals := state.sourceLocals.push ("self", selfTy, id)
+      locals := state.locals.push { id, name := "this", type, loc := thisLoc } }
   let structContract ← addContract structDecl.spec structLoc
   let locals := (← get).locals
   let attributes ← structDecl.attributes.toArray
@@ -1023,7 +1804,8 @@ private def buildInterface (module : Module) :
     if function.isMoveFun && inlineFunctions.contains function.name then continue
     resetLocals
     let functionLoc ← addLocation function.loc
-    let parameters ← function.params.toArray.mapM (addSpecificationParameter · functionLoc)
+    let parameters ← (specificationParams function.params).toArray.mapM
+      (addSpecificationParameter · functionLoc)
     let resultLoc ← addGeneratedLocation functionLoc
     let result ← typeUse resultLoc (specificationType function.result)
     let (origin, _) ← addImportedOrigin functionLoc module.sources.head?
@@ -1062,11 +1844,15 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
     set { state with
       files := state.files ++ moduleFiles
       fileOffset
+      nonTarget := !module.isTarget
       expressions := #[]
       patterns := #[]
       places := #[]
       locals := #[] }
     let _ ← addModuleRef module.ref
+    let stateLabels ← module.labels.toArray.mapM fun label =>
+      return (label.id, ← addName (ownName module label.name))
+    modify fun state => { state with stateLabels }
     let loc ← addLocation module.loc
     let state ← get
     let origin : LeanerIR.OriginId := ⟨state.origins.size⟩
@@ -1124,9 +1910,36 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
       let resultLoc ← addGeneratedLocation functionLoc
       let result ← typeUse resultLoc function.result
       let expressionsBefore := (← get).expressions.size
-      let body ← function.body.mapM addExpr
+      modify fun state => { state with
+        typeParameterCopy := function.typeParams.toArray.map (·.abilities.contains .copy) }
+      -- A proof's steps run at the entry and at each return, where the Move
+      -- Prover places them.
+      let (entrySteps, exitSteps) := match function.spec.proof with
+        | some proof => Proofs.steps proof
+        | none => (#[], #[])
+      let body ← function.body.mapM fun body => do
+        let bodyLoc ← addLocation body.loc
+        let bodyType ← addType bodyLoc body.ty
+        modify fun state => { state with exitSteps }
+        let encoded ← if exitSteps.isEmpty then addExpr body
+          else addExprNode bodyLoc bodyType (← atExit bodyLoc bodyType body false)
+        modify fun state => { state with exitSteps := #[] }
+        if entrySteps.isEmpty then pure encoded else do
+          -- Each step is a block of its own: what it gives holds for the next.
+          let unitType ← addType bodyLoc (.tuple [])
+          let specifications ← entrySteps.mapM fun step => do
+            let condition ← addStep step
+            let block : LeanerIR.SpecBlock :=
+              { loc := bodyLoc, conditions := #[condition],
+                pragmas := #[LeanerIR.SpecBlock.proofPragma] }
+            addExprNode bodyLoc unitType (.spec block)
+          addExprNode bodyLoc bodyType (.block specifications (some encoded))
       let parameters ← withMutablyBorrowedLocals expressionsBefore parameters
-      let functionContract ← addContract function.spec functionLoc
+      let functionContract := Frames.explicit (← addContract function.spec functionLoc)
+        ((← get).globalWriters.contains (ownName module function.name))
+        (pragmaTrue function.pragmas "opaque")
+      let functionContract := { functionContract with
+        parameterFrames := ← addParameterFrames function.params function.spec.accessOf }
       let locals := (← get).locals
       let attributes ← function.attributes.toArray
         |>.filter (!isResolvedBuildSelectionAttribute ·) |>.mapM addAttribute
@@ -1147,7 +1960,16 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
         alignment
         locals
         contract := functionContract
-        pragmas := function.pragmas.toArray.map toPragma
+        -- A function's pragmas resolve its contract's, the explicit frame's
+        -- included; a dependency's resolve `verify = false` from its namespace.
+        pragmas := if module.isTarget then
+            function.pragmas.toArray.map toPragma ++
+              (if LeanerLang.hasLooseFrame functionContract then #[Frames.loosePragma] else #[]) ++
+              proofFilePragma module
+          else
+            let contractNames := functionContract.pragmas.map pragmaName
+            functionContract.pragmas ++ (nonTargetPragmas (modulePragmas module) true
+              |>.filter fun pragma => !contractNames.contains (pragmaName pragma))
         profileData
         attributes }
     let mut specFunctions : Array LeanerIR.SpecFunctionDecl := #[]
@@ -1155,11 +1977,22 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
       if function.isMoveFun && inlineFunctions.contains function.name then continue
       resetLocals
       let functionLoc ← addLocation function.loc
-      let parameters ← function.params.toArray.mapM (addSpecificationParameter · functionLoc)
+      let parameters ← (specificationParams function.params).toArray.mapM
+        (addSpecificationParameter · functionLoc)
       let resultLoc ← addGeneratedLocation functionLoc
       let result ← typeUse resultLoc (specificationType function.result)
       let expressionsBefore := (← get).expressions.size
+      -- A `&mut` parameter's position names its value after; `old` of it, the
+      -- parameter before it.
+      let mutable := function.params.filter (isMutableReference ·.ty)
+      let positions := (specificationParams function.params).zipIdx.filterMap fun (parameter, index) =>
+        if mutable.any (oldParameterName ·.name == parameter.name) then none else some ⟨index⟩
+      modify fun state => { state with
+        oldParameters := mutable.toArray.map fun parameter =>
+          (parameter.name, oldParameterName parameter.name)
+        parameterLocals := positions.toArray }
       let body ← logically (function.body.mapM addExpr)
+      modify fun state => { state with oldParameters := #[], parameterLocals := #[] }
       let parameters ← withMutablyBorrowedLocals expressionsBefore parameters
       let functionContract ← addContract function.spec functionLoc
       let locals := (← get).locals
@@ -1182,21 +2015,39 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
         locals
         contract := functionContract
         profileData }
-    let mut specVars : Array LeanerIR.SpecVarDecl := #[]
-    for specVar in module.specVars do
+    let mut lemmas : Array LeanerIR.LemmaDecl := #[]
+    for lemma in module.lemmas do
       resetLocals
-      let variableLoc ← addLocation specVar.loc
-      let init ← logically (specVar.init.mapM addExpr)
-      let locals := (← get).locals
-      let typeLoc ← addGeneratedLocation variableLoc
-      specVars := specVars.push {
-        loc := variableLoc
-        name := ← addName (ownName module specVar.name)
-        generics := ← specVar.typeParams.toArray.mapM (addGenericBinder variableLoc)
-        type := ← typeUse typeLoc specVar.ty
+      let lemmaLoc ← addLocation lemma.loc
+      -- A lemma's parameters keep their integer types, which its proof
+      -- assumes and an application owes; references are transparent.
+      let parameters ← lemma.params.toArray.mapM fun parameter =>
+        addParameter { parameter with ty := referent parameter.ty } lemmaLoc
+      let contract ← addContract (.mk none [] lemma.conditions none [] none) lemmaLoc
+      let decreases ← (lemma.decreases.getD []).toArray.mapM fun measure => logically do
+        let loc ← addLocation measure.loc
+        let expression ← addExpr measure
+        return ({ loc, kind := .decreases, expression } : LeanerIR.Condition)
+      -- A lemma has no body: the steps at its return follow those at its entry.
+      let (entrySteps, exitSteps) := match lemma.proof with
+        | some proof => Proofs.steps proof (splitBranches := true)
+        | none => (#[], #[])
+      let proof ← (entrySteps ++ exitSteps).mapM addStep
+      let (origin, _) ← addImportedOrigin lemmaLoc module.sources.head?
+      lemmas := lemmas.push {
+        loc := lemmaLoc
+        name := ← addName (ownName module lemma.name)
         profile := .move
-        init
-        locals }
+        signature := {
+          generics := ← lemma.typeParams.toArray.mapM (addGenericBinder lemmaLoc)
+          parameters }
+        origin
+        locals := (← get).locals
+        contract := { contract with conditions := contract.conditions ++ decreases }
+        proof }
+    -- A spec variable is carried by the ghost resource the model backs it
+    -- with (the exported `Ghost$x` struct) and the axiom below; it declares
+    -- nothing of its own.
     let mut invariants : Array LeanerIR.NamespaceInvariant := #[]
     for invariant in module.invariants do
       resetLocals
@@ -1215,6 +2066,28 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
           properties := invariant.properties.toArray.map toPragma
           expression }
         locals }
+    -- The ghost resource backing a spec variable exists throughout, at
+    -- address 0: the assumption the Move Prover's well-formedness
+    -- instrumentation makes, stated as an axiom of the namespace.
+    for specVar in module.specVars do
+      if specVar.init.isSome then
+        throw s!"spec variable `{specVar.name}` has an initializer, which is not supported"
+      unless specVar.typeParams.isEmpty do
+        throw s!"spec variable `{specVar.name}` is generic, which is not supported"
+      resetLocals
+      let variableLoc ← addLocation specVar.loc
+      let axiomLoc ← addGeneratedLocation variableLoc
+      let ghostType : Xast.Ty := .struct (ownName module s!"Ghost${specVar.name}") []
+      let boolType ← addType axiomLoc .bool
+      let addressType ← addType axiomLoc .address
+      let address ← addExprNode axiomLoc addressType (.value (.address "0x0"))
+      let ghostArgument := LeanerIR.GenericArgument.typeArg (← generatedTypeUse axiomLoc ghostType)
+      let expression ← addExprNode axiomLoc boolType <|
+        .operation (.global .contains) #[ghostArgument] #[address]
+      invariants := invariants.push {
+        loc := axiomLoc
+        condition := { loc := axiomLoc, kind := .axiom_ #[], expression }
+        locals := (← get).locals }
     let mut profileMetadata := #[]
     if let some alias := module.addressAlias then
       profileMetadata := profileMetadata.push (LeanerIR.Move.propertyValue "metadata.addressAlias" alias)
@@ -1224,13 +2097,7 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
     for friend in module.friends do
       profileMetadata := profileMetadata.push
         (LeanerIR.Move.propertyValue "metadata.friend" (Codec.encodeModuleRef friend))
-    for skipped in module.skipped do
-      -- Compiler-v2 has already expanded retained inline functions at their
-      -- call sites. Their retained declarations and companion diagnostics are
-      -- producer bookkeeping, not unsupported declarations in target LIR.
-      let expandedInlineDiagnostic :=
-        skipped.reason.startsWith s!"in function `{module.name}::{skipped.name}`:"
-      if inlineFunctions.contains skipped.name || expandedInlineDiagnostic then continue
+    for skipped in module.omitted do
       profileMetadata := profileMetadata.push
         (LeanerIR.Move.propertyValue "metadata.skipped" (Codec.pack #[skipped.name, skipped.reason]))
     let comments : Array LeanerIR.Comment ←
@@ -1247,21 +2114,37 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
       patterns := state.patterns
       places := state.places
       profileMetadata
-      pragmas := module.pragmas.toArray.map toPragma
+      pragmas := if module.isTarget then modulePragmas module
+        else nonTargetPragmas (modulePragmas module) true
       constants
       structs
       functions
       specFunctions
-      specVars
+      specVars := #[]
       invariants
       intrinsics
+      lemmas
       comments }
 
 /-- Translate a complete compiler-v2 package into the only public LIR input
 boundary. -/
 def package (package : Package) : Except String LeanerIR.Import.RawUnit := do
   let ownedNamespaces := package.modules.toArray.map (·.ref)
-  let initial : BuildState := { sourceNamespaces := ownedNamespaces }
+  let copyableStructs := (package.modules ++ package.dependencies).flatMap fun module =>
+    module.structs.filterMap fun structDecl =>
+      if structDecl.abilities.contains .copy then
+        some ({ module := module.ref, name := structDecl.name },
+          structDecl.typeParams.map fun parameter => !parameter.isPhantom)
+      else none
+  let mutableSpecParameters := (package.modules ++ package.dependencies).flatMap fun module =>
+    module.specFuns.filterMap fun function =>
+      let flags := function.params.map (isMutableReference ·.ty)
+      if flags.any id then some ({ module := module.ref, name := function.name }, flags) else none
+  let initial : BuildState := {
+    sourceNamespaces := ownedNamespaces
+    globalWriters := Frames.globalWriters package
+    copyableStructs
+    mutableSpecParameters }
   -- Dependency interfaces are built after the owned namespaces, so their
   -- namespace identities follow the ones this unit declares.
   let build : BuildM (Array LeanerIR.Import.RawNamespace ×
@@ -1272,14 +2155,11 @@ def package (package : Package) : Except String LeanerIR.Import.RawUnit := do
     return (namespaces, dependencies)
   let ((namespaces, dependencies), finalState) ← build.run initial
   let namespaceRefs := finalState.sourceNamespaces.map fun ref =>
-    let segments := match ref.addressAlias with
-      | some alias => #[ref.address, alias, ref.name]
-      | none => #[ref.address, ref.name]
-    { segments }
+    ({ segments := #[ref.address, ref.name], alias := ref.addressAlias } : LeanerIR.NamespaceRef)
   let evidence : Array LeanerIR.Import.ImportEvidence := #[{
     producer := "move exchange --format ast"
     description := "typed XAST v3 imported into neutral LIR" }]
-  return {
+  LeanerIR.Import.elaborateReferencePatterns {
     tables := {
       files := finalState.files
       locations := finalState.locations

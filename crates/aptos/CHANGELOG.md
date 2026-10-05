@@ -16,6 +16,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
   session without mutating it (also supports `--sponsor-gas`,
   `--fee-payer-account`, and `--secondary-signer-accounts`). Mutually
   exclusive with `--local`.
+- Deprecate macOS x86_64 (Intel) CLI builds. This release still publishes an Intel binary and prints a deprecation warning on startup. The next macOS CLI release will be Apple Silicon (arm64) only.
 
 ## [9.6.0]
 - Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.

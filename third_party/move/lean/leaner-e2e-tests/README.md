@@ -49,7 +49,8 @@ accepted aliases. Review the resulting source diff before committing it.
 `LeanerE2ETests/Check/` holds LeanerLang checks: every `.lean` file below it,
 at any depth, is a LeanerLang source — modules with specifications, `verify`
 commands, proof scripts where real mathematics lives — that the driver
-elaborates in its own `lean` process under a heartbeat cap. What `lean`
+elaborates in its own `lean` process under a heartbeat cap, several at once
+(`LEANER_E2E_JOBS`, by default half the hardware threads). What `lean`
 prints is the baseline, verbatim, beside the source as `<name>.exp`,
 following compiler-v2's baseline convention: a clean check has no
 expectation file, a check that prints anything has exactly that output as
@@ -58,18 +59,28 @@ negative tests are the same kind of file. Checks are grouped by language
 feature (`Scalars/`, `Structs/`, `Enums/`, `Vectors/`, `Control/`,
 `References/`, `Storage/`, `Calls/`, `Generics/`, `Specifications/`,
 `Modules/`), with larger programs under `Examples/`; a file whose name ends
-in `Errors` holds negative cases. The ledger is
-[`designs/test-organization.md`](../designs/test-organization.md). Everything
+in `Errors` holds negative cases. The ledger is the
+[roadmap's test section](../designs/roadmap.md#tests). Everything
 under `Check/` is LeanerLang; the frontend paths keep their own directories.
 
+`LeanerE2ETests/SourceVerify/` verifies Move and Rust sources as
+`leaner-move verify` and `leaner-rust verify` do
+([`designs/source-verification.md`](../designs/source-verification.md)): every
+`.move` and `.rs` file there, a Rust file with the `.spec.lean` items beside
+it, is rendered as LeanerLang and elaborated, and its messages, in the
+coordinates of the Move, Rust, or specification file, are the baseline
+`<name>.exp` — none when the source verifies.
+
 The `LEANER_E2E_SUITE` environment variable selects one suite: `move`, `rust`,
-`check`, `monovm`, or `monodiff`. The `monovm` suite is the linked MonoVM smoke check: it calls the
+`verify`, `check`, `monovm`, or `monodiff`. The `monovm` suite is the linked MonoVM smoke check: it calls the
 `mono-move-lean-link` adapter staticlib through the C shim that only the
 `LeanerE2ETestDriver` executable links (`moreLinkObjs` in the `lakefile.lean`;
 the package libraries and the language server stay free of the native
 dependency). Lake owns the native build — the `monovm_staticlib` target runs
-Cargo in the explicitly selected release profile from this checkout, and
-`monovm_shim` compiles the shim with `leanc`. The suite runs the whole
+Cargo in the explicitly selected release profile from this checkout on each
+build, letting Cargo check all transitive dependencies. The resulting archive
+trace controls relinking of the driver. The `monovm_shim` target compiles the
+shim with `leanc`. The suite runs the whole
 differential story only through the linked executable; `LeanerE2ETests.MonoVM`
 modules elaborate under `lake env lean` but do not evaluate there.
 

@@ -29,6 +29,19 @@ use async_trait::async_trait;
 use clap::Parser;
 use std::{collections::BTreeMap, sync::Arc};
 
+/// Printed on every invocation of an Intel macOS build. This release still
+/// publishes that binary; the next macOS CLI release will not.
+pub const MACOS_X86_64_DEPRECATION_MESSAGE: &str = "\
+Warning: Aptos CLI support for Intel (x86_64) macOS is deprecated. \
+This is the last release that includes an Intel macOS build. \
+Future macOS releases will support Apple Silicon (arm64) only.";
+
+/// Warn when this binary is the deprecated Intel macOS build.
+pub fn warn_macos_x86_64_deprecation() {
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    eprintln!("{}", MACOS_X86_64_DEPRECATION_MESSAGE);
+}
+
 /// Create a fully wired `MoveEnv` with `RealAptosContext` and debugger support.
 ///
 /// Use this when constructing move CLI commands (e.g., `RunScript`, `RunFunction`)
@@ -121,4 +134,12 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
 fn verify_tool() {
     use clap::CommandFactory;
     Tool::command().debug_assert()
+}
+
+#[test]
+fn macos_x86_64_deprecation_message_names_the_last_intel_release() {
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("x86_64"));
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("deprecated"));
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("last release"));
+    assert!(MACOS_X86_64_DEPRECATION_MESSAGE.contains("arm64"));
 }

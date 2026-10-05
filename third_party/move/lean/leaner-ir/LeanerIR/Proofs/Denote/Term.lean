@@ -1,7 +1,8 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import LeanerIR.Proofs.Denote.Types
+import LeanerIR.Proofs.Denote.Resources
+import LeanerIR.Semantics.Frames
 
 /-!
 # Typed terms and their denotation
@@ -22,7 +23,7 @@ is one the compiler rejects, never one it approximates.
 
 namespace LeanerIR.Proofs.Denote
 
-variable [Skolems]
+variable {unit : Validation.ValidatedUnit} [Skolems unit]
 
 /-- The outcome of a body: a value, or a control transfer.  `break_` and
 `continue_` count the loops they still have to leave, as the runtime's
@@ -36,8 +37,8 @@ inductive Flow (ρ : ResultShape) (Γ : NRow) (α : Type) : Type where
 /-- Sequence a value-producing computation into a continuation; control
 transfers pass through. -/
 def Flow.bind {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (action : Comp (Flow ρ Γ α)) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
-    Comp (Flow ρ Γ β) :=
+    (action : Comp unit (Flow ρ Γ α)) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
+    Comp unit (Flow ρ Γ β) :=
   Spec.bind action fun (flow : Flow ρ Γ α) =>
     match flow with
     | .value v env => next v env
@@ -125,22 +126,96 @@ theorem variantEncode_nominal (source : StructHandle) : (names : List String) �
   | _ :: names, .cons _ rest, (_, codecs), .inr later =>
       variantEncode_nominal source names rest codecs later
 
-theorem NTy.encode_enum_nominal (source : StructHandle) (names : List String) (rows : NRows)
-    (distinct : names.Nodup) (value : variantCarrier names rows) :
-    ∃ fields, NTy.encode (.enum source names rows distinct) value =
+theorem NTy.encode_enum_nominal (source : StructHandle) (arguments : NRow) (names : List String)
+    (rows : NRows) (distinct : names.Nodup) (value : variantCarrier names rows) :
+    ∃ fields, NTy.encode (.enum source arguments names rows distinct) value =
       .nominal source (some (variantName names rows value)) fields :=
   variantEncode_nominal source names rows _ value
 
+/-- The encoded fields of the variant a value holds. -/
+def variantPayload : (names : List String) → (rows : NRows) → variantCarrier names rows →
+    Array RuntimeValue
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons _ _, .inl values => (HList.encode values).toArray
+  | _ :: names, .cons _ rest, .inr value => variantPayload names rest value
+
+@[simp] theorem variantPayload_inl (name : String) (names : List String) (fields : NRow)
+    (rest : NRows) (values : HList fields) :
+    variantPayload (name :: names) (.cons fields rest) (.inl values) =
+      (HList.encode values).toArray := rfl
+@[simp] theorem variantPayload_inr (name : String) (names : List String) (fields : NRow)
+    (rest : NRows) (value : variantCarrier names rest) :
+    variantPayload (name :: names) (.cons fields rest) (.inr value) =
+      variantPayload names rest value := rfl
+
+theorem variantEncode_payload (source : StructHandle) : (names : List String) → (rows : NRows) →
+    (value : variantCarrier names rows) →
+    variantEncode source names rows (rowCodecs rows) value =
+      .nominal source (some (variantName names rows value)) (variantPayload names rows value)
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons _ _, .inl _ => rfl
+  | _ :: names, .cons _ rest, .inr later => variantEncode_payload source names rest later
+
+/-- An encoded enum value is a nominal value of its declaration, tagged with
+the variant it holds and carrying that variant's encoded fields. -/
+theorem NTy.encode_enum_payload (source : StructHandle) (arguments : NRow) (names : List String)
+    (rows : NRows) (distinct : names.Nodup) (value : variantCarrier names rows) :
+    NTy.encode (.enum source arguments names rows distinct) value =
+      .nominal source (some (variantName names rows value)) (variantPayload names rows value) :=
+  variantEncode_payload source names rows value
+
 /-- An encoded enum value equated to a nominal value holds that variant. -/
-theorem NTy.variantName_of_encode_enum {source owner : StructHandle} {names : List String}
-    {rows : NRows} {distinct : names.Nodup} {value : variantCarrier names rows} {name : String}
-    {fields : Array RuntimeValue}
-    (encoded : NTy.encode (.enum source names rows distinct) value = .nominal owner (some name) fields) :
+theorem NTy.variantName_of_encode_enum {source owner : StructHandle} {arguments : NRow}
+    {names : List String} {rows : NRows} {distinct : names.Nodup}
+    {value : variantCarrier names rows} {name : String} {fields : Array RuntimeValue}
+    (encoded : NTy.encode (.enum source arguments names rows distinct) value =
+      .nominal owner (some name) fields) :
     variantName names rows value = name := by
-  obtain ⟨_, nominal⟩ := NTy.encode_enum_nominal source names rows distinct value
+  obtain ⟨_, nominal⟩ := NTy.encode_enum_nominal source arguments names rows distinct value
   rw [nominal] at encoded
   injection encoded with _ variant
   exact Option.some.inj variant
+
+/-- The variant a runtime value names; empty off a variant. -/
+def variantOf : RuntimeValue → String
+  | .nominal _ (some name) _ => name
+  | _ => ""
+
+omit [Skolems unit] in
+@[lir_denote_norm] theorem variantOf_nominal (source : StructHandle) (name : String)
+    (fields : Array RuntimeValue) : variantOf (.nominal source (some name) fields) = name := rfl
+
+omit [Skolems unit] in
+@[lir_denote_norm] theorem variantOf_ite (condition : Prop) [Decidable condition]
+    (left right : RuntimeValue) :
+    variantOf (if condition then left else right) =
+      if condition then variantOf left else variantOf right := by
+  split <;> rfl
+
+/-- An encoded enum value equated to a runtime value holds the variant that
+value names. -/
+theorem NTy.variantName_of_encode_eq {source : StructHandle} {arguments : NRow}
+    {names : List String} {rows : NRows} {distinct : names.Nodup}
+    {value : variantCarrier names rows} {encoded : RuntimeValue}
+    (equation : NTy.encode (.enum source arguments names rows distinct) value = encoded) :
+    variantName names rows value = variantOf encoded := by
+  obtain ⟨_, nominal⟩ := NTy.encode_enum_nominal source arguments names rows distinct value
+  rw [← equation, nominal]
+  rfl
+
+omit [Skolems unit] in
+/-- A callee's value in the caller's view holds the variant it holds at the
+callee's family. -/
+theorem variantName_ofSkolem [Θ : Skolems unit] (θ : TypeArgs) : (names : List String) →
+    (rows : NRows) → (value : @variantCarrier (Skolems.instantiate θ Θ).toCarriers names rows) →
+    variantName names (rows.subst θ.1) (variantCarrier.ofSkolem θ names rows value) =
+      @variantName _ (Skolems.instantiate θ Θ) names rows value
+  | _, .nil, value => nomatch value
+  | [], .cons _ _, value => nomatch value
+  | _ :: _, .cons _ _, .inl _ => rfl
+  | _ :: names, .cons _ rest, .inr value => variantName_ofSkolem θ names rest value
 
 /-- The payload choices of a variant-field selection: for each variant that
 has the field, its position in that variant's row. -/
@@ -198,13 +273,13 @@ what a place names once its base local is known. -/
 inductive Proj : NTy → NTy → Type where
   | nil {τ : NTy} : Proj τ τ
   | deref {τ σ : NTy} (rest : Proj τ σ) : Proj (.ref τ) σ
-  | field {source : StructHandle} {fields : NRow} {σ τ : NTy} (x : Var fields σ)
-      (rest : Proj σ τ) : Proj (.struct source fields) τ
+  | field {source : StructHandle} {arguments fields : NRow} {σ τ : NTy} (x : Var fields σ)
+      (rest : Proj σ τ) : Proj (.struct source arguments fields) τ
   | index {τ σ : NTy} (position : PlaceIndex) (rest : Proj τ σ) : Proj (.vector τ) σ
   /-- The field the variants of an enum share at their chosen positions. -/
-  | variant {source : StructHandle} {names : List String} {rows : NRows}
+  | variant {source : StructHandle} {arguments : NRow} {names : List String} {rows : NRows}
       {distinct : names.Nodup} {σ τ : NTy} (choices : Choices names rows σ) (rest : Proj σ τ) :
-      Proj (.enum source names rows distinct) τ
+      Proj (.enum source arguments names rows distinct) τ
 
 /-- Replace the component of a row at a position. -/
 def Var.update : {Γ : NRow} → {τ : NTy} → Var Γ τ → τ.carrier → HList Γ → HList Γ
@@ -308,7 +383,8 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
 @[simp] theorem Proj.get?_deref {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (rest : Proj τ σ)
     (value : (NTy.ref τ).carrier) : (Proj.deref rest).get? env value = rest.get? env value.1 := rfl
 @[simp] theorem Proj.get?_field {Γ : NRow} (env : HEnv Γ) {source : StructHandle} {fields : NRow}
-    {σ τ : NTy} (x : Var fields σ) (rest : Proj σ τ) (value : (NTy.struct source fields).carrier) :
+    {σ τ : NTy} (x : Var fields σ) (rest : Proj σ τ)
+    (value : (NTy.struct source arguments fields).carrier) :
     (Proj.field x rest).get? env value = rest.get? env (x.select value) := rfl
 @[simp] theorem Proj.get?_index {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (position : PlaceIndex)
     (rest : Proj τ σ) (value : (NTy.vector τ).carrier) :
@@ -318,7 +394,7 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
 @[simp] theorem Proj.get?_variant {Γ : NRow} (env : HEnv Γ) {source : StructHandle}
     {names : List String} {rows : NRows} {distinct : names.Nodup} {σ τ : NTy}
     (choices : Choices names rows σ) (rest : Proj σ τ)
-    (value : (NTy.enum source names rows distinct).carrier) :
+    (value : (NTy.enum source arguments names rows distinct).carrier) :
     (Proj.variant choices rest).get? env value =
       (choices.select? value).bind fun field => rest.get? env field := rfl
 @[simp] theorem Proj.set?_nil {Γ : NRow} (env : HEnv Γ) {τ : NTy} (replacement value : τ.carrier) :
@@ -329,7 +405,7 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
       (rest.set? env replacement value.1).map fun current => (current, value.2) := rfl
 @[simp] theorem Proj.set?_field {Γ : NRow} (env : HEnv Γ) {source : StructHandle} {fields : NRow}
     {σ τ : NTy} (x : Var fields σ) (rest : Proj σ τ) (replacement : τ.carrier)
-    (value : (NTy.struct source fields).carrier) :
+    (value : (NTy.struct source arguments fields).carrier) :
     (Proj.field x rest).set? env replacement value =
       (rest.set? env replacement (x.select value)).map fun component => x.update component value := rfl
 @[simp] theorem Proj.set?_index {Γ : NRow} (env : HEnv Γ) {τ σ : NTy} (position : PlaceIndex)
@@ -341,7 +417,7 @@ def Proj.set? {Γ : NRow} (env : HEnv Γ) : {τ σ : NTy} → Proj τ σ → σ.
 @[simp] theorem Proj.set?_variant {Γ : NRow} (env : HEnv Γ) {source : StructHandle}
     {names : List String} {rows : NRows} {distinct : names.Nodup} {σ τ : NTy}
     (choices : Choices names rows σ) (rest : Proj σ τ) (replacement : τ.carrier)
-    (value : (NTy.enum source names rows distinct).carrier) :
+    (value : (NTy.enum source arguments names rows distinct).carrier) :
     (Proj.variant choices rest).set? env replacement value =
       (choices.select? value).bind fun field =>
         (rest.set? env replacement field).bind fun updated => choices.update? updated value := rfl
@@ -396,196 +472,405 @@ def Vars.set {Γ : NRow} : {σs : NRow} → Vars Γ σs → HList σs → HEnv �
     (rest : Vars Γ σs) (values : HList (.cons σ σs)) (env : HEnv Γ) :
     (Vars.cons (some x) rest).set values env = rest.set values.2 (x.set values.1 env) := rfl
 
+mutual
+/-- A pattern over values of one type, binding slots of a row: the typed
+form of a validated LIR pattern. -/
+inductive Pat (Γ : NRow) : NTy → Type where
+  | wildcard {τ : NTy} : Pat Γ τ
+  | var {τ : NTy} (x : Var Γ τ) : Pat Γ τ
+  /-- A value structurally equal to a closed one. -/
+  | literal {τ : NTy} (value : τ.groundCarrier) : Pat Γ τ
+  /-- An integer within optional bounds, the upper one inclusive or not. -/
+  | range {width : Nat} {signed : Bool} (lower upper : Option Int) (inclusive : Bool) :
+      Pat Γ (.int width signed)
+  | tuple {σs : NRow} (elements : Pats Γ σs) : Pat Γ (.tuple σs)
+  | struct {source : StructHandle} {arguments σs : NRow} (fields : Pats Γ σs) :
+      Pat Γ (.struct source arguments σs)
+  | variant {source : StructHandle} {arguments : NRow} {names : List String} {rows : NRows}
+      {distinct : names.Nodup} {σs : NRow} (choice : Which names rows σs) (fields : Pats Γ σs) :
+      Pat Γ (.enum source arguments names rows distinct)
+
+/-- Patterns over the components of a row. -/
+inductive Pats (Γ : NRow) : NRow → Type where
+  | nil : Pats Γ .nil
+  | cons {σ : NTy} {σs : NRow} (head : Pat Γ σ) (tail : Pats Γ σs) : Pats Γ (.cons σ σs)
+end
+
+/-- Whether an integer lies within a range pattern's bounds. -/
+def inRange (lower upper : Option Int) (inclusive : Bool) (value : Int) : Bool :=
+  lower.all (· ≤ value) && upper.all fun upper => if inclusive then value ≤ upper else value < upper
+
+mutual
+/-- Match a value against a pattern, binding its slots; `none` where it does
+not match, with no slot bound, as the runtime's `bindPattern` fails
+atomically. -/
+def Pat.bindValue {Γ : NRow} : {τ : NTy} → Pat Γ τ → τ.carrier → HEnv Γ → Option (HEnv Γ)
+  | _, .wildcard, _, env => some env
+  | _, .var x, value, env => some (x.set value env)
+  | τ, .literal expected, value, env =>
+      if NTy.eqb τ (NTy.ofGround τ expected) value then some env else none
+  | _, .range lower upper inclusive, value, env =>
+      if inRange lower upper inclusive value.val then some env else none
+  | _, .tuple elements, values, env => elements.bindValues values env
+  | _, .struct fields, values, env => fields.bindValues values env
+  | _, .variant choice fields, value, env =>
+      (choice.project? value).bind fun values => fields.bindValues values env
+
+/-- Match a row of values component by component. -/
+def Pats.bindValues {Γ : NRow} : {σs : NRow} → Pats Γ σs → HList σs → HEnv Γ → Option (HEnv Γ)
+  | _, .nil, _, env => some env
+  | _, .cons head tail, values, env =>
+      (head.bindValue values.1 env).bind fun env => tail.bindValues values.2 env
+end
+
+@[simp] theorem Pat.bindValue_wildcard {Γ : NRow} {τ : NTy} (value : τ.carrier) (env : HEnv Γ) :
+    (Pat.wildcard : Pat Γ τ).bindValue value env = some env := by
+  rw [Pat.bindValue]
+@[simp] theorem Pat.bindValue_var {Γ : NRow} {τ : NTy} (x : Var Γ τ) (value : τ.carrier)
+    (env : HEnv Γ) : (Pat.var x).bindValue value env = some (x.set value env) := by
+  rw [Pat.bindValue]
+@[simp] theorem Pat.bindValue_literal {Γ : NRow} {τ : NTy} (expected : τ.groundCarrier)
+    (value : τ.carrier) (env : HEnv Γ) :
+    (Pat.literal expected : Pat Γ τ).bindValue value env =
+      if NTy.eqb τ (NTy.ofGround τ expected) value then some env else none := by
+  rw [Pat.bindValue]
+@[simp] theorem Pat.bindValue_range {Γ : NRow} {width : Nat} {signed : Bool}
+    (lower upper : Option Int) (inclusive : Bool) (value : (NTy.int width signed).carrier)
+    (env : HEnv Γ) :
+    (Pat.range lower upper inclusive : Pat Γ (.int width signed)).bindValue value env =
+      if inRange lower upper inclusive value.val then some env else none := by
+  rw [Pat.bindValue]
+@[simp] theorem Pat.bindValue_tuple {Γ σs : NRow} (elements : Pats Γ σs) (values : HList σs)
+    (env : HEnv Γ) : (Pat.tuple elements).bindValue values env = elements.bindValues values env := by
+  rw [Pat.bindValue]
+@[simp] theorem Pat.bindValue_struct {Γ σs : NRow} {source : StructHandle} {arguments : NRow}
+    (fields : Pats Γ σs) (values : HList σs) (env : HEnv Γ) :
+    (Pat.struct (source := source) (arguments := arguments) fields).bindValue values env =
+      fields.bindValues values env := by
+  rw [Pat.bindValue]
+@[simp] theorem Pat.bindValue_variant {Γ σs : NRow} {source : StructHandle} {arguments : NRow}
+    {names : List String} {rows : NRows} {distinct : names.Nodup} (choice : Which names rows σs)
+    (fields : Pats Γ σs) (value : variantCarrier names rows) (env : HEnv Γ) :
+    (Pat.variant (source := source) (arguments := arguments) (distinct := distinct) choice
+      fields).bindValue value env =
+      (choice.project? value).bind fun values => fields.bindValues values env := by
+  rw [Pat.bindValue]
+@[simp] theorem Pats.bindValues_nil {Γ : NRow} (values : HList .nil) (env : HEnv Γ) :
+    (Pats.nil : Pats Γ .nil).bindValues values env = some env := by
+  rw [Pats.bindValues]
+@[simp] theorem Pats.bindValues_cons {Γ : NRow} {σ : NTy} {σs : NRow} (head : Pat Γ σ)
+    (tail : Pats Γ σs) (values : HList (.cons σ σs)) (env : HEnv Γ) :
+    (Pats.cons head tail).bindValues values env =
+      (head.bindValue values.1 env).bind fun env => tail.bindValues values.2 env := by
+  rw [Pats.bindValues]
+
 /-- The body value a declared result denotes. -/
 def ResultShape.toBody : (shape : ResultShape) → shape.carrier → shape.bodyType.carrier
   | .none, _ => ()
   | .one _, value => value
 
+/-- How a closure's mask weaves the parameters it captures and those an
+invocation supplies into its target's parameter row, position by position. -/
+inductive Weave : NRow → NRow → NRow → Type where
+  | nil : Weave .nil .nil .nil
+  | captured {τ : NTy} {full captured supplied : NRow} (rest : Weave full captured supplied) :
+      Weave (.cons τ full) (.cons τ captured) supplied
+  | supplied {τ : NTy} {full captured supplied : NRow} (rest : Weave full captured supplied) :
+      Weave (.cons τ full) captured (.cons τ supplied)
+
+omit [Skolems unit] in
+/-- The mask of a weave: bit `i` set when parameter `i` is captured. -/
+def Weave.mask : {full captured supplied : NRow} → Weave full captured supplied → Nat
+  | _, _, _, .nil => 0
+  | _, _, _, .captured rest => 2 * rest.mask + 1
+  | _, _, _, .supplied rest => 2 * rest.mask
+
+omit [Skolems unit] in
+/-- The weave of a mask over a parameter row. -/
+def Weave.ofMask : Nat → (full : List NTy) →
+    Σ captured supplied : NRow, Weave (NRow.ofList full) captured supplied
+  | _, [] => ⟨.nil, .nil, .nil⟩
+  | mask, τ :: rest =>
+      let ⟨taken, given, weave⟩ := Weave.ofMask (mask / 2) rest
+      if mask % 2 == 1 then ⟨.cons τ taken, given, .captured weave⟩
+      else ⟨taken, .cons τ given, .supplied weave⟩
+
+omit [Skolems unit] in
+/-- Whether a type parameter is a closure target's own and has a node, as its
+frames' coherence reads it. -/
+def closureParameter (unit : Validation.ValidatedUnit) (handle : FunctionHandle)
+    (index : Nat) : Bool :=
+  decide (index < typeArity unit handle) && (paramNodeIn? unit handle.namespaceId index).isSome
+
+omit [Skolems unit] in
+/-- Whether every type parameter a closure target's own signature mentions
+is its own and has a node. -/
+def closureSignatureBelow (unit : Validation.ValidatedUnit) (handle : FunctionHandle) : Bool :=
+  match closureSignature? unit handle with
+  | some (parameters, results) =>
+      parameters.all (·.paramsAll (closureParameter unit handle)) &&
+        results.all (·.paramsAll (closureParameter unit handle))
+  | none => true
+
 mutual
 /-- Shallow typed terms over a local row, in a function returning `ρ`. -/
-inductive Term (ρ : ResultShape) : NRow → NTy → Type where
+inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → NTy → Type where
   /-- A literal. -/
-  | lit {Γ : NRow} {τ : NTy} (value : τ.groundCarrier) : Term ρ Γ τ
+  | lit {Γ : NRow} {τ : NTy} (value : τ.groundCarrier) : Term unit ρ Γ τ
   /-- A read of a local slot. -/
-  | var {Γ : NRow} {τ : NTy} (x : Var Γ τ) : Term ρ Γ τ
+  | var {Γ : NRow} {τ : NTy} (x : Var Γ τ) : Term unit ρ Γ τ
   /-- Checked integer arithmetic. -/
   | checked {Γ : NRow} {width : Nat} {signed : Bool} (op : CheckedOp)
-      (failure : ThrowKind) (left right : Term ρ Γ (.int width signed)) :
-      Term ρ Γ (.int width signed)
+      (failure : ThrowKind) (left right : Term unit ρ Γ (.int width signed)) :
+      Term unit ρ Γ (.int width signed)
   /-- Modular integer arithmetic, wrapped into the width. -/
   | modular {Γ : NRow} {width : Nat} {signed : Bool} (op : ModularOp)
-      (left right : Term ρ Γ (.int width signed)) : Term ρ Γ (.int width signed)
+      (left right : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.int width signed)
   /-- An ordered comparison of integers. -/
   | compare {Γ : NRow} {width : Nat} {signed : Bool} (op : CompareOp)
-      (left right : Term ρ Γ (.int width signed)) : Term ρ Γ .bool
+      (left right : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ .bool
   /-- Structural equality, or its negation. -/
-  | equal {Γ : NRow} {τ : NTy} (negated : Bool) (left right : Term ρ Γ τ) : Term ρ Γ .bool
-  | not {Γ : NRow} (operand : Term ρ Γ .bool) : Term ρ Γ .bool
+  | equal {Γ : NRow} {τ : NTy} (negated : Bool) (left right : Term unit ρ Γ τ) : Term unit ρ Γ .bool
+  | not {Γ : NRow} (operand : Term unit ρ Γ .bool) : Term unit ρ Γ .bool
   /-- Boolean conjunction (`true`) or disjunction (`false`) of evaluated operands. -/
-  | logical {Γ : NRow} (conjunction : Bool) (left right : Term ρ Γ .bool) : Term ρ Γ .bool
+  | logical {Γ : NRow} (conjunction : Bool) (left right : Term unit ρ Γ .bool) : Term unit ρ Γ .bool
   /-- Bitwise operation on unsigned integers. -/
   | bitwise {Γ : NRow} {width : Nat} (op : BitOp)
-      (left right : Term ρ Γ (.int width false)) : Term ρ Γ (.int width false)
+      (left right : Term unit ρ Γ (.int width false)) : Term unit ρ Γ (.int width false)
   /-- Checked shift of an unsigned integer, left (`true`) or right. -/
   | shift {Γ : NRow} {width distanceWidth : Nat} (left : Bool) (failure : ThrowKind)
-      (value : Term ρ Γ (.int width false)) (distance : Term ρ Γ (.int distanceWidth false)) :
-      Term ρ Γ (.int width false)
+      (value : Term unit ρ Γ (.int width false))
+      (distance : Term unit ρ Γ (.int distanceWidth false)) :
+      Term unit ρ Γ (.int width false)
   /-- Checked conversion between integer types. -/
   | cast {Γ : NRow} {width : Nat} {signed : Bool} {width' : Nat} {signed' : Bool}
-      (failure : ThrowKind) (value : Term ρ Γ (.int width signed)) : Term ρ Γ (.int width' signed')
-  | ite {Γ : NRow} {τ : NTy} (condition : Term ρ Γ .bool)
-      (thenBranch elseBranch : Term ρ Γ τ) : Term ρ Γ τ
+      (failure : ThrowKind)
+      (value : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.int width' signed')
+  | ite {Γ : NRow} {τ : NTy} (condition : Term unit ρ Γ .bool)
+      (thenBranch elseBranch : Term unit ρ Γ τ) : Term unit ρ Γ τ
   /-- Bind a slot, then continue.  The slot stays written afterwards, as
   the runtime frame's does. -/
-  | let_ {Γ : NRow} {σ τ : NTy} (x : Var Γ σ) (value : Term ρ Γ σ) (body : Term ρ Γ τ) :
-      Term ρ Γ τ
+  | let_ {Γ : NRow} {σ τ : NTy} (x : Var Γ σ) (value : Term unit ρ Γ σ) (body : Term unit ρ Γ τ) :
+      Term unit ρ Γ τ
   /-- Evaluate for effect, discard the value, then continue. -/
-  | drop {Γ : NRow} {σ τ : NTy} (value : Term ρ Γ σ) (body : Term ρ Γ τ) : Term ρ Γ τ
+  | drop {Γ : NRow} {σ τ : NTy} (value : Term unit ρ Γ σ) (body : Term unit ρ Γ τ) : Term unit ρ Γ τ
   /-- Write a slot. -/
-  | assign {Γ : NRow} {σ : NTy} (x : Var Γ σ) (value : Term ρ Γ σ) : Term ρ Γ .unit
+  | assign {Γ : NRow} {σ : NTy} (x : Var Γ σ) (value : Term unit ρ Γ σ) : Term unit ρ Γ .unit
   /-- A named constant: its closed initializer. -/
-  | const {Γ : NRow} {τ : NTy} (value : Term ρ .nil τ) : Term ρ Γ τ
+  | const {Γ : NRow} {τ : NTy} (value : Term unit ρ .nil τ) : Term unit ρ Γ τ
   /-- Throw with no argument.  A throw has every type. -/
-  | throw0 {Γ : NRow} {τ : NTy} (kind : ThrowKind) : Term ρ Γ τ
+  | throw0 {Γ : NRow} {τ : NTy} (kind : ThrowKind) : Term unit ρ Γ τ
   /-- Throw with one evaluated argument, such as an abort code. -/
-  | throw1 {Γ : NRow} {σ τ : NTy} (kind : ThrowKind) (code : Term ρ Γ σ) : Term ρ Γ τ
+  | throw1 {Γ : NRow} {σ τ : NTy} (kind : ThrowKind) (code : Term unit ρ Γ σ) : Term unit ρ Γ τ
   /-- Return the function's result.  A return has every type. -/
-  | return_ {Γ : NRow} {τ : NTy} (value : Term ρ Γ ρ.bodyType) : Term ρ Γ τ
+  | return_ {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ ρ.bodyType) : Term unit ρ Γ τ
   /-- Leave `nest + 1` enclosing loops. -/
-  | break_ {Γ : NRow} {τ : NTy} (nest : Nat) : Term ρ Γ τ
+  | break_ {Γ : NRow} {τ : NTy} (nest : Nat) : Term unit ρ Γ τ
   /-- Restart the `nest + 1`-th enclosing loop. -/
-  | continue_ {Γ : NRow} {τ : NTy} (nest : Nat) : Term ρ Γ τ
+  | continue_ {Γ : NRow} {τ : NTy} (nest : Nat) : Term unit ρ Γ τ
   /-- Repeat a body until it breaks; the loop's value is unit.  `site` is
   the loop's expression index, which names its invariant. -/
-  | loop {Γ : NRow} (site : Nat) (body : Term ρ Γ .unit) : Term ρ Γ .unit
+  | loop {Γ : NRow} (site : Nat) (body : Term unit ρ Γ .unit) : Term unit ρ Γ .unit
   /-- A direct call of a monomorphic function on evaluated arguments; its
-  value is the callee's declared result. -/
-  | call {Γ : NRow} {σs : NRow} (handle : FunctionHandle) (shape : ResultShape)
-      (arguments : Args ρ Γ σs) : Term ρ Γ shape.bodyType
+  value is the callee's declared result. `site` is the call's expression
+  index, which names the invariants owed after it. -/
+  | call {Γ : NRow} {σs : NRow} (site : Nat) (handle : FunctionHandle) (shape : ResultShape)
+      (arguments : Args unit ρ Γ σs) : Term unit ρ Γ shape.bodyType
   /-- A call with type arguments: the callee's own signature `σs` and
   `shape`, the arguments `θ` in the caller's types, and the LIR type
   arguments that instantiate the callee's frame. -/
-  | callGeneric {Γ : NRow} {σs : NRow} (handle : FunctionHandle) (typeArgs : Array TypeUse)
-      (θ : TypeArgs) (shape : ResultShape) (arguments : Args ρ Γ (NRow.subst θ.1 σs)) :
-      Term ρ Γ (shape.subst θ.1).bodyType
+  | callGeneric {Γ : NRow} {σs : NRow} (site : Nat) (handle : FunctionHandle)
+      (typeArgs : Array TypeUse)
+      (θ : TypeArgs) (shape : ResultShape) (arguments : Args unit ρ Γ (NRow.subst θ.1 σs)) :
+      Term unit ρ Γ (shape.subst θ.1).bodyType
+  /-- A closure of a function without type arguments over evaluated
+  captures: the target and how its parameters are captured or supplied. -/
+  | closure {Γ full captured supplied : NRow} (handle : FunctionHandle)
+      (weave : Weave full captured supplied) (results : NRow) (shared : List Bool)
+      (rows : closureRows? unit handle weave.mask = some (captured, supplied, results))
+      (sharing : closureShared unit handle weave.mask = shared)
+      (closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true)
+      (faithful : closureFaithful unit handle #[] = true)
+      (captures : Args unit ρ Γ captured) :
+      Term unit ρ Γ (.function supplied shared results)
+  /-- A closure with type arguments: the weave of the target's own
+  parameters, its own result shape, the arguments `θ` in the caller's types,
+  and the LIR type arguments that instantiate its frame. -/
+  | closureGeneric {Γ full captured supplied : NRow} (handle : FunctionHandle)
+      (weave : Weave full captured supplied) (typeArgs : Array TypeUse) (θ : TypeArgs)
+      (shape : ResultShape) (shared : List Bool)
+      (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
+      (sharing : closureShared unit handle weave.mask = shared)
+      (below : closureSignatureBelow unit handle = true)
+      (captures : Args unit ρ Γ (NRow.subst θ.1 captured)) :
+      Term unit ρ Γ (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
+  /-- An invocation of a function value on evaluated arguments, after the
+  value itself; its value is the function's result. -/
+  | invoke {Γ σs : NRow} {shared : List Bool} (shape : ResultShape)
+      (function : Term unit ρ Γ (.function σs shared shape.row))
+      (arguments : Args unit ρ Γ σs) : Term unit ρ Γ shape.bodyType
   /-- A tuple of evaluated elements. -/
-  | tuple {Γ σs : NRow} (elements : Args ρ Γ σs) : Term ρ Γ (.tuple σs)
+  | tuple {Γ σs : NRow} (elements : Args unit ρ Γ σs) : Term unit ρ Γ (.tuple σs)
   /-- A struct value from its evaluated fields. -/
-  | pack {Γ σs : NRow} (source : StructHandle) (fields : Args ρ Γ σs) :
-      Term ρ Γ (.struct source σs)
+  | pack {Γ σs : NRow} (source : StructHandle) (arguments : NRow) (fields : Args unit ρ Γ σs) :
+      Term unit ρ Γ (.struct source arguments σs)
   /-- An enum value of the chosen variant from its evaluated fields. -/
   | variant {Γ σs : NRow} {names : List String} {rows : NRows} (source : StructHandle)
-      (distinct : names.Nodup) (choice : Which names rows σs) (fields : Args ρ Γ σs) :
-      Term ρ Γ (.enum source names rows distinct)
+      (arguments : NRow) (distinct : names.Nodup) (choice : Which names rows σs)
+      (fields : Args unit ρ Γ σs) : Term unit ρ Γ (.enum source arguments names rows distinct)
   /-- A field of a struct value. -/
-  | field {Γ σs : NRow} {τ : NTy} {source : StructHandle} (x : Var σs τ)
-      (value : Term ρ Γ (.struct source σs)) : Term ρ Γ τ
+  | field {Γ σs : NRow} {τ : NTy} {source : StructHandle} {arguments : NRow} (x : Var σs τ)
+      (value : Term unit ρ Γ (.struct source arguments σs)) : Term unit ρ Γ τ
   /-- Whether an enum value holds one of the named variants. -/
   | isVariant {Γ : NRow} {names : List String} {rows : NRows} {source : StructHandle}
-      {distinct : names.Nodup} (tests : List String)
-      (value : Term ρ Γ (.enum source names rows distinct)) : Term ρ Γ .bool
-  /-- A field of an enum value under the chosen variant; undefined under
-  any other, as the runtime's is. -/
+      {arguments : NRow} {distinct : names.Nodup} (tests : List String)
+      (value : Term unit ρ Γ (.enum source arguments names rows distinct)) : Term unit ρ Γ .bool
+  /-- A field of an enum value under the chosen variant; under any other,
+  the profile's mismatch throw, as the runtime's, and without one no
+  outcome. -/
   | payload {Γ : NRow} {τ : NTy} {names : List String} {rows : NRows} {source : StructHandle}
-      {distinct : names.Nodup} (choices : Choices names rows τ)
-      (value : Term ρ Γ (.enum source names rows distinct)) : Term ρ Γ τ
+      {arguments : NRow} {distinct : names.Nodup} (mismatch : Option Failure)
+      (choices : Choices names rows τ)
+      (value : Term unit ρ Γ (.enum source arguments names rows distinct)) : Term unit ρ Γ τ
   /-- Bind the elements of a tuple to slots, then continue. -/
-  | letRow {Γ σs : NRow} {τ : NTy} (targets : Vars Γ σs) (value : Term ρ Γ (.tuple σs))
-      (body : Term ρ Γ τ) : Term ρ Γ τ
+  | letRow {Γ σs : NRow} {τ : NTy} (targets : Vars Γ σs) (value : Term unit ρ Γ (.tuple σs))
+      (body : Term unit ρ Γ τ) : Term unit ρ Γ τ
   /-- Bind the fields of a struct to slots, then continue. -/
-  | letFields {Γ σs : NRow} {τ : NTy} {source : StructHandle} (targets : Vars Γ σs)
-      (value : Term ρ Γ (.struct source σs)) (body : Term ρ Γ τ) : Term ρ Γ τ
+  | letFields {Γ σs : NRow} {τ : NTy} {source : StructHandle} {arguments : NRow}
+      (targets : Vars Γ σs) (value : Term unit ρ Γ (.struct source arguments σs))
+      (body : Term unit ρ Γ τ) : Term unit ρ Γ τ
+  /-- The first arm whose pattern matches the value and whose guard holds. -/
+  | caseOf {Γ : NRow} {σ τ : NTy} (scrutinee : Term unit ρ Γ σ) (arms : Arms unit ρ Γ σ τ) : Term unit ρ Γ τ
   /-- The current value of a mutable reference. -/
-  | deref {Γ : NRow} {τ : NTy} (value : Term ρ Γ (.ref τ)) : Term ρ Γ τ
+  | deref {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ (.ref τ)) : Term unit ρ Γ τ
   /-- Move a local's value out: read it and empty the slot.  A mutable
   reference used as a value moves, so a function's exit and a loan's death
   resolve only the references a slot still holds. -/
-  | take {Γ : NRow} {τ : NTy} (x : Var Γ τ) : Term ρ Γ τ
+  | take {Γ : NRow} {τ : NTy} (x : Var Γ τ) : Term unit ρ Γ τ
   /-- The death of the reference a local holds: execution continues only
   where its current value is its prophecy.  An empty slot resolves
   nothing; the reference moved on and resolves where it dies. -/
-  | resolve {Γ : NRow} {τ : NTy} (x : Var Γ (.ref τ)) : Term ρ Γ .unit
+  | resolve {Γ : NRow} {τ : NTy} (x : Var Γ (.ref τ)) : Term unit ρ Γ .unit
   /-- Replace the current value of the mutable reference a local holds. -/
-  | mutate {Γ : NRow} {τ : NTy} (x : Var Γ (.ref τ)) (value : Term ρ Γ τ) : Term ρ Γ .unit
+  | mutate {Γ : NRow} {τ : NTy} (x : Var Γ (.ref τ)) (value : Term unit ρ Γ τ) : Term unit ρ Γ .unit
   /-- Read the component of a local a path reaches. -/
-  | readPlace {Γ : NRow} {τ σ : NTy} (x : Var Γ τ) (path : Proj τ σ) : Term ρ Γ σ
+  | readPlace {Γ : NRow} {τ σ : NTy} (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ σ) :
+      Term unit ρ Γ σ
   /-- Write the component of a local a path reaches. -/
-  | writePlace {Γ : NRow} {τ σ : NTy} (x : Var Γ τ) (path : Proj τ σ) (value : Term ρ Γ σ) :
-      Term ρ Γ .unit
+  | writePlace {Γ : NRow} {τ σ : NTy} (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ σ)
+      (value : Term unit ρ Γ σ) : Term unit ρ Γ .unit
   /-- Borrow the component of a local a path reaches: a prophecy is
   chosen, the reference is the component with that prophecy, and the lender
   holds the prophecy at the path from then on. -/
-  | borrowPlace {Γ : NRow} {τ σ : NTy} (x : Var Γ τ) (path : Proj τ σ) : Term ρ Γ (.ref σ)
+  | borrowPlace {Γ : NRow} {τ σ : NTy} (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ σ) :
+      Term unit ρ Γ (.ref σ)
   /-- A vector of listed elements. -/
-  | vectorLit {Γ : NRow} {τ : NTy} (count : Nat) (elements : Args ρ Γ (NRow.replicate count τ)) :
-      Term ρ Γ (.vector τ)
+  | vectorLit {Γ : NRow} {τ : NTy} (count : Nat) (elements : Args unit ρ Γ (NRow.replicate count τ)) :
+      Term unit ρ Γ (.vector τ)
   /-- The length of a vector, which its bound fits in `u64`. -/
-  | length {Γ : NRow} {τ : NTy} (vector : Term ρ Γ (.vector τ)) : Term ρ Γ (.int 64 false)
+  | length {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) : Term unit ρ Γ (.int 64 false)
   /-- The address a signer holds. -/
-  | signerAddress {Γ : NRow} (signer : Term ρ Γ .signer) : Term ρ Γ .address
+  | signerAddress {Γ : NRow} (signer : Term unit ρ Γ .signer) : Term unit ρ Γ .address
   /-- An element by position; aborts outside the vector. -/
-  | index {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term ρ Γ (.vector τ))
-      (position : Term ρ Γ (.int width signed)) : Term ρ Γ τ
+  | index {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+      (position : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ τ
   /-- The bounds check of an element place. -/
   | checkIndex {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (failure : ThrowKind)
-      (vector : Term ρ Γ (.vector τ)) (position : Term ρ Γ (.int width signed)) : Term ρ Γ .unit
+      (vector : Term unit ρ Γ (.vector τ))
+      (position : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ .unit
   /-- A vector with one more element at its back, as a value. -/
-  | push {Γ : NRow} {τ : NTy} (vector : Term ρ Γ (.vector τ)) (element : Term ρ Γ τ) :
-      Term ρ Γ (.vector τ)
+  | push {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) (element : Term unit ρ Γ τ) :
+      Term unit ρ Γ (.vector τ)
   /-- A vector with an element inserted at a position; aborts past its end. -/
-  | insert {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term ρ Γ (.vector τ))
-      (position : Term ρ Γ (.int width signed)) (element : Term ρ Γ τ) : Term ρ Γ (.vector τ)
+  | insert {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+      (position : Term unit ρ Γ (.int width signed))
+      (element : Term unit ρ Γ τ) : Term unit ρ Γ (.vector τ)
   /-- The element at a position with the vector without it; aborts outside
   the vector. -/
-  | remove {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term ρ Γ (.vector τ))
-      (position : Term ρ Γ (.int width signed)) :
-      Term ρ Γ (.tuple (.cons τ (.cons (.vector τ) .nil)))
+  | remove {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+      (position : Term unit ρ Γ (.int width signed)) :
+      Term unit ρ Γ (.tuple (.cons τ (.cons (.vector τ) .nil)))
   /-- A vector with two elements exchanged; aborts outside the vector. -/
-  | swap {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term ρ Γ (.vector τ))
-      (left right : Term ρ Γ (.int width signed)) : Term ρ Γ (.vector τ)
+  | swap {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+      (left right : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.vector τ)
   /-- The concatenation of two vectors. -/
-  | concat {Γ : NRow} {τ : NTy} (left right : Term ρ Γ (.vector τ)) : Term ρ Γ (.vector τ)
+  | concat {Γ : NRow} {τ : NTy} (left right : Term unit ρ Γ (.vector τ)) : Term unit ρ Γ (.vector τ)
   /-- The half-open slice of a vector; aborts on an invalid range. -/
-  | slice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term ρ Γ (.vector τ))
-      (start stop : Term ρ Γ (.int width signed)) : Term ρ Γ (.vector τ)
+  | slice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+      (start stop : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.vector τ)
   /-- A vector with a half-open range reversed; aborts on an invalid range. -/
-  | reverseSlice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term ρ Γ (.vector τ))
-      (start stop : Term ρ Γ (.int width signed)) : Term ρ Γ (.vector τ)
+  | reverseSlice {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (vector : Term unit ρ Γ (.vector τ))
+      (start stop : Term unit ρ Γ (.int width signed)) : Term unit ρ Γ (.vector τ)
   /-- Consume an empty vector; aborts on a nonempty one. -/
-  | destroyEmpty {Γ : NRow} {τ : NTy} (vector : Term ρ Γ (.vector τ)) : Term ρ Γ .unit
+  | destroyEmpty {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) : Term unit ρ Γ .unit
   /-- Whether some element equals the needle. -/
-  | contains {Γ : NRow} {τ : NTy} (vector : Term ρ Γ (.vector τ)) (needle : Term ρ Γ τ) :
-      Term ρ Γ .bool
+  | contains {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) (needle : Term unit ρ Γ τ) :
+      Term unit ρ Γ .bool
   /-- Whether some element equals the needle, and the first such position. -/
-  | indexOf {Γ : NRow} {τ : NTy} (vector : Term ρ Γ (.vector τ)) (needle : Term ρ Γ τ) :
-      Term ρ Γ (.tuple (.cons .bool (.cons (.int 64 false) .nil)))
+  | indexOf {Γ : NRow} {τ : NTy} (vector : Term unit ρ Γ (.vector τ)) (needle : Term unit ρ Γ τ) :
+      Term unit ρ Γ (.tuple (.cons .bool (.cons (.int 64 false) .nil)))
   /-- The structural order of two values (`-1`, `0`, `1`), enum variants
   by the unit's declaration order. -/
-  | order {Γ : NRow} {τ : NTy} (orders : Array (Array (Array String)))
-      (left right : Term ρ Γ τ) : Term ρ Γ (.int 8 true)
+  | order {Γ : NRow} {τ : NTy} (orders : Validation.ValueOrders)
+      (left right : Term unit ρ Γ τ) : Term unit ρ Γ (.int 8 true)
   /-- Evaluate a value, then an effect, and keep the value. -/
-  | seqAfter {Γ : NRow} {τ : NTy} (value : Term ρ Γ τ) (effect : Term ρ Γ .unit) : Term ρ Γ τ
-  /-- The resource of a family at a key; aborts when none is published. -/
-  | globalRead {Γ : NRow} {κ τ : NTy} (family : Family) (key : Term ρ Γ κ) : Term ρ Γ τ
-  /-- Whether a resource of a family is published at a key. -/
-  | globalContains {Γ : NRow} {κ : NTy} (family : Family) (key : Term ρ Γ κ) : Term ρ Γ .bool
+  | seqAfter {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ τ) (effect : Term unit ρ Γ .unit) : Term unit ρ Γ τ
+  /-- An in-body assertion, at its site: no effect, so that verification can
+  name and check the asserted condition there. -/
+  | assertion {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
+  /-- A state anchor, at its site: no effect, so that verification can
+  record the locals and state an assertion reads there. -/
+  | anchor {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
+  /-- An in-body assumption, at its site: a run continues where the
+  condition the meanings read for the site holds (`Meanings.assumption`). -/
+  | assume {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
+  /-- The end of a mutation of a local whose type carries a data invariant,
+  at its site: no effect, so that verification can owe the invariant there. -/
+  | mutationEnd {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
+  /-- A value constructed at a site whose type carries a data invariant: the
+  value itself, so that verification can owe the invariant of it there. -/
+  | constructed {Γ : NRow} {τ : NTy} (site : Nat) (value : Term unit ρ Γ τ) : Term unit ρ Γ τ
+  /-- The resource of type `τ`, with its declaration's type arguments, at a
+  key; aborts when none is published. -/
+  | globalRead {Γ : NRow} {κ τ : NTy} (arguments : NRow) (key : Term unit ρ Γ κ) : Term unit ρ Γ τ
+  /-- Whether a resource of type `τ` is published at a key. -/
+  | globalContains {Γ : NRow} {κ : NTy} (τ : NTy) (arguments : NRow) (key : Term unit ρ Γ κ) :
+      Term unit ρ Γ .bool
   /-- A mutable borrow of a published resource: a prophecy is chosen, the
-  reference is the resource with that prophecy, and the store holds the
-  prophecy at the key from then on. -/
-  | globalBorrow {Γ : NRow} {κ τ : NTy} (family : Family) (key : Term ρ Γ κ) : Term ρ Γ (.ref τ)
-  /-- Publish a resource at a key; aborts when one is already there. -/
-  | globalPublish {Γ : NRow} {κ τ : NTy} (family : Family) (key : Term ρ Γ κ)
-      (value : Term ρ Γ τ) : Term ρ Γ .unit
-  /-- Take a resource from a key; aborts when none is published. -/
-  | globalTake {Γ : NRow} {κ τ : NTy} (family : Family) (key : Term ρ Γ κ) : Term ρ Γ τ
+  reference is the resource with that prophecy, and memory holds the
+  prophecy at the key from then on. The memory before the write is
+  anchored at `site`, once the key is evaluated. -/
+  | globalBorrow {Γ : NRow} {κ τ : NTy} (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ) :
+      Term unit ρ Γ (.ref τ)
+  /-- Publish a resource at a key; aborts when one is already there. The
+  memory before the write is anchored at `site`. -/
+  | globalPublish {Γ : NRow} {κ τ : NTy} (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ)
+      (value : Term unit ρ Γ τ) : Term unit ρ Γ .unit
+  /-- Take a resource from a key; aborts when none is published. The memory
+  before the write is anchored at `site`. -/
+  | globalTake {Γ : NRow} {κ τ : NTy} (site : Nat) (arguments : NRow) (key : Term unit ρ Γ κ) :
+      Term unit ρ Γ τ
+  /-- A write of global memory has ended at its site: no effect, so that
+  verification can owe there the invariants of the memory written. -/
+  | memoryWritten {Γ : NRow} (site : Nat) : Term unit ρ Γ .unit
 
 /-- An argument row, evaluated left to right.  A reborrowed argument is a
 borrow like any other: the callee receives the reference and resolves its
 prophecy, which the lender already holds. -/
-inductive Args (ρ : ResultShape) : NRow → NRow → Type where
-  | nil {Γ : NRow} : Args ρ Γ .nil
-  | cons {Γ : NRow} {σ : NTy} {σs : NRow} (head : Term ρ Γ σ) (tail : Args ρ Γ σs) :
-      Args ρ Γ (.cons σ σs)
+inductive Args (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → NRow → Type where
+  | nil {Γ : NRow} : Args unit ρ Γ .nil
+  | cons {Γ : NRow} {σ : NTy} {σs : NRow} (head : Term unit ρ Γ σ) (tail : Args unit ρ Γ σs) :
+      Args unit ρ Γ (.cons σ σs)
+
+/-- The arms of a match over values of `σ`, in order, ending in the throw
+a value no arm takes makes, if its profile has one (`patternMismatchThrow?`). -/
+inductive Arms (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → NTy → NTy → Type where
+  | nil {Γ : NRow} {σ τ : NTy} (mismatch : Option Failure) : Arms unit ρ Γ σ τ
+  | cons {Γ : NRow} {σ τ : NTy} (pattern : Pat Γ σ) (body : Term unit ρ Γ τ) (rest : Arms unit ρ Γ σ τ) :
+      Arms unit ρ Γ σ τ
+  /-- An arm taken only where its guard, evaluated after the binding, holds. -/
+  | guarded {Γ : NRow} {σ τ : NTy} (pattern : Pat Γ σ) (guard : Term unit ρ Γ .bool)
+      (body : Term unit ρ Γ τ) (rest : Arms unit ρ Γ σ τ) : Arms unit ρ Γ σ τ
 end
 
 /-- The mutable-reference parameters of a function, in parameter order: the
@@ -594,9 +879,10 @@ inductive Mutables (Γ : NRow) : Type where
   | nil : Mutables Γ
   | cons {τ : NTy} (x : Var Γ (.ref τ)) (rest : Mutables Γ) : Mutables Γ
 
-/-- Resolve every mutable-reference parameter the function still holds,
-then continue.  A parameter moved into the result resolves at the caller. -/
-def Mutables.resolve {Γ : NRow} {α : Type} : Mutables Γ → HEnv Γ → Comp α → Comp α
+/-- Resolve every mutable reference the function still holds where it
+leaves, a parameter's in its slot or in a local it was moved into, then
+continue.  A reference moved into the result resolves at the caller. -/
+def Mutables.resolve {Γ : NRow} {α : Type} : Mutables Γ → HEnv Γ → Comp unit α → Comp unit α
   | .nil, _, next => next
   | .cons x rest, env, next =>
       match x.get env with
@@ -604,10 +890,10 @@ def Mutables.resolve {Γ : NRow} {α : Type} : Mutables Γ → HEnv Γ → Comp 
           rest.resolve env next
       | none => rest.resolve env next
 
-@[simp] theorem Mutables.resolve_nil {Γ : NRow} {α : Type} (env : HEnv Γ) (next : Comp α) :
+@[simp] theorem Mutables.resolve_nil {Γ : NRow} {α : Type} (env : HEnv Γ) (next : Comp unit α) :
     (Mutables.nil : Mutables Γ).resolve env next = next := rfl
 @[simp] theorem Mutables.resolve_cons {Γ : NRow} {α : Type} {τ : NTy} (x : Var Γ (.ref τ))
-    (rest : Mutables Γ) (env : HEnv Γ) (next : Comp α) :
+    (rest : Mutables Γ) (env : HEnv Γ) (next : Comp unit α) :
     (Mutables.cons x rest).resolve env next =
       match x.get env with
       | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
@@ -641,11 +927,14 @@ def NTy.lend : (τ : NTy) → Bool → τ.carrier → List Nat → Option (Runti
   | .signer, _, value, loans => some (NTy.encode .signer value, loans)
   | .string, _, value, loans => some (NTy.encode .string value, loans)
   | .bytes, _, value, loans => some (NTy.encode .bytes value, loans)
-  | .struct source fields, _, value, loans => some (NTy.encode (.struct source fields) value, loans)
-  | .enum source names rows distinct, _, value, loans =>
-      some (NTy.encode (.enum source names rows distinct) value, loans)
+  | .struct source arguments fields, _, value, loans =>
+      some (NTy.encode (.struct source arguments fields) value, loans)
+  | .enum source arguments names rows distinct, _, value, loans =>
+      some (NTy.encode (.enum source arguments names rows distinct) value, loans)
   | .vector element, _, value, loans => some (NTy.encode (.vector element) value, loans)
   | .param index, _, value, loans => some (NTy.encode (.param index) value, loans)
+  | .function parameters shared results, _, value, loans =>
+      some (NTy.encode (.function parameters shared results) value, loans)
 
 /-- The runtime values of a row lent under loans taken in order. -/
 def NRow.lend : (row : NRow) → Bool → HList row → List Nat →
@@ -708,101 +997,341 @@ def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array Runtime
       argumentsResolve rest values.2 loans returned exports
   | .cons (.tuple _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
-  | .cons (.struct _ _) rest, values, loans, returned, exports =>
+  | .cons (.struct _ _ _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
-  | .cons (.enum _ _ _ _) rest, values, loans, returned, exports =>
+  | .cons (.enum _ _ _ _ _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.vector _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.param _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
+  | .cons (.function _ _ _) rest, values, loans, returned, exports =>
+      argumentsResolve rest values.2 loans returned exports
 
 /-- A start state for a call lending references under loans: distinct
 loans below the allocation frontier, none registered to a global, and fresh
 identifiers beyond the frontier. -/
-def Admissible (state : RuntimeState) (loans : List Nat) : Prop :=
+def Admissible (state : LeanerIR.RuntimeState) (loans : List Nat) : Prop :=
   loans.Nodup ∧
     (∀ loan ∈ loans, loan < state.nextLoan ∧
       LeanerIR.SemanticOperations.globalLoanKeyIn? state.globalLoans loan = none) ∧
     LeanerIR.SemanticOperations.FreshGlobalLoanIds state
 
-/-- A state with the loan bookkeeping of another: the prophetic meaning
-never touches loans, so a call leaves them as they were. -/
-def _root_.LeanerIR.RuntimeState.withLoansOf (state other : RuntimeState) : RuntimeState :=
-  { state with globalLoans := other.globalLoans, nextLoan := other.nextLoan, pending := other.pending }
-
 /-- What a call denotes, for every callee handle and signature. -/
 abbrev CalleeMeaning : Type :=
-  FunctionHandle → (σs : NRow) → (shape : ResultShape) → HList σs → Comp shape.carrier
+  FunctionHandle → (σs : NRow) → (shape : ResultShape) → HList σs → Comp unit shape.carrier
 
 /-- What a call with type arguments denotes, at the callee's own signature
 under the family its type arguments induce. -/
-abbrev GenericMeaning [Θ : Skolems] : Type :=
+abbrev GenericMeaning [Θ : Skolems unit] : Type :=
   FunctionHandle → Array TypeUse → (θ : TypeArgs) → (σs : NRow) → (shape : ResultShape) →
-    @HList (Skolems.instantiate θ Θ) σs → Comp (@ResultShape.carrier (Skolems.instantiate θ Θ) shape)
+    @HList (Skolems.instantiate θ Θ).toCarriers σs → Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
 
-/-- The prophetic meaning of a callee: its big-step meaning from any
-admissible start with the caller's globals, with references as
-`(current, prophecy)`.  A call denotes exactly this; a caller reasons about
-it through the callee's published contract, or, for a callee returning a
-reference, through its denotation. -/
-def propheticMeaning (unit : LeanerIR.Validation.ExecutableUnit)
+/-- The big-step run of a callee: from any admissible start whose globals
+encode the caller's memory, with references as `(current, prophecy)`,
+ending in the memory its exit globals encode.  What invoking a function
+value denotes. -/
+def propheticRun {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle)
-    (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp shape.carrier where
+    (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans arguments results exit returnedLoans prophecyRow,
-      start.globals = initial.globals ∧ Admissible start loans ∧
+      Encodes unit initial start.globals ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
-      (functionSpecAt unit handle typeInstantiation arguments).ok start results exit ∧
+      (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      final = exit.withLoansOf initial
+      Encodes unit final exit.globals ∧ AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans arguments,
-      start.globals = initial.globals ∧ Admissible start loans ∧
+      Encodes unit initial start.globals ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
-      (functionSpecAt unit handle typeInstantiation arguments).aborts start error
+      (functionSpecAt executable handle typeInstantiation arguments).aborts start error
   undefined := fun initial =>
     ∃ start loans arguments results exit,
-      start.globals = initial.globals ∧ Admissible start loans ∧
+      Encodes unit initial start.globals ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
-      (functionSpecAt unit handle typeInstantiation arguments).ok start results exit ∧
+      (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       ¬∃ result, ∃ returnedLoans, ∃ resolved : HList σs,
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some arguments ∧
         argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending)
 
-omit [Skolems] in
+/-- The prophetic meaning of a callee at a frame: its run, where the frame
+agrees with the runtime type instantiation on the types the callee reads
+(`Coherent`), and no outcome where they disagree.  A call denotes
+exactly this; a caller reasons about it through the callee's published
+contract, or, for a callee returning a reference, through its
+denotation. -/
+def propheticMeaning {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId)) (handle : FunctionHandle)
+    (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
+  ok := fun initial result final =>
+    Coherent unit handle typeInstantiation ∧
+      (propheticRun executable typeInstantiation handle σs shape args).ok initial result final
+  aborts := fun initial error =>
+    Coherent unit handle typeInstantiation ∧
+      (propheticRun executable typeInstantiation handle σs shape args).aborts initial error
+  undefined := fun initial =>
+    Coherent unit handle typeInstantiation ∧
+      (propheticRun executable typeInstantiation handle σs shape args).undefined initial
+
+/-- At a coherent frame the prophetic meaning is the run. -/
+theorem propheticMeaning_of_coherent {unit : LeanerIR.Validation.ValidatedUnit}
+    {executable : LeanerIR.Validation.ExecutableUnit unit} [Skolems unit]
+    {typeInstantiation : Array (TypeId × TypeId)} {handle : FunctionHandle}
+    (coherent : Coherent unit handle typeInstantiation) (σs : NRow) (shape : ResultShape)
+    (args : HList σs) :
+    propheticMeaning executable typeInstantiation handle σs shape args =
+      propheticRun executable typeInstantiation handle σs shape args := by
+  simp only [propheticMeaning, coherent, true_and]
+
+/-- The function value of a closure: its target, mask, and type
+instantiation, with the captures' encodings. -/
+def closureOf (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array (TypeId × TypeId))
+    {σs : NRow} (captures : HList σs) : ClosureValue :=
+  ⟨handle, mask, typeInstantiation, (HList.encode captures).toArray,
+    fun capture member => rowCodec_plain _ captures capture (by simpa [HList.encode] using member)⟩
+
+/-- A frame's values of a row encode as runtime values of the row's
+resolution, which admit it. -/
+theorem HList.admits_resolved (row : NRow) (values : HList row) :
+    NRow.admits unit row.resolved (HList.encode values) = true := by
+  have encoded := HList.encode_toRuntime row values
+  simp only [HList.encode] at encoded ⊢
+  rw [← encoded]
+  exact NRow.admits_encode unit row.resolved (HList.toRuntime row values)
+
+/-- A closure of a target without type parameters, at its own rows
+(`closureRows?`), is typed there: its captures are typed by their
+carriers. -/
+theorem closureOf_typed {handle : FunctionHandle} {mask : Nat} {captured supplied results : NRow}
+    {shared : List Bool}
+    (rows : closureRows? unit handle mask = some (captured, supplied, results))
+    (sharing : closureShared unit handle mask = shared)
+    (closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true)
+    (faithful : closureFaithful unit handle #[] = true)
+    (captures : HList captured) :
+    Carriers.closureTyped supplied shared results (closureOf handle mask #[] captures) := by
+  simp only [Bool.and_eq_true] at closed
+  obtain ⟨⟨capturedFree, suppliedFree⟩, resultsFree⟩ := closed
+  apply Skolems.closureTyped_of_runtime
+  rw [NRow.substWith_paramFree _ supplied suppliedFree,
+    NRow.substWith_paramFree _ results resultsFree]
+  show NTy.admits unit (.function supplied shared results)
+    (closureOf handle mask #[] captures).encode = true
+  simp only [ClosureValue.encode, closureOf]
+  unfold NTy.admits
+  simp only [closureRowsIn?, rows, sharing, faithful, Option.map_some,
+    NRow.substWith_paramFree _ _ capturedFree, NRow.substWith_paramFree _ _ suppliedFree,
+    NRow.substWith_paramFree _ _ resultsFree, beq_self_eq_true, Bool.true_and]
+  have admitted := HList.admits_resolved captured captures
+  rwa [NRow.resolved_paramFree captured capturedFree] at admitted
+
+omit [Skolems unit] in
+private theorem all_paramsAll {allowed : Nat → Bool} :
+    (types : List NTy) → types.all (·.paramsAll allowed) = true →
+      (NRow.ofList types).paramsAll allowed = true
+  | [], _ => rfl
+  | τ :: types, mentioned => by
+      simp only [List.all_cons, Bool.and_eq_true] at mentioned
+      simp only [NRow.ofList, NRow.paramsAll, mentioned.1, all_paramsAll types mentioned.2,
+        Bool.and_self]
+
+omit [Skolems unit] in
+private theorem extract_all {α : Type} {keep : α → Bool} :
+    (mask : Nat) → (captured : Bool) → (items : List α) → items.all keep = true →
+      (ClosureMask.extract mask captured items).all keep = true
+  | _, _, [], _ => rfl
+  | mask, captured, item :: items, kept => by
+      simp only [List.all_cons, Bool.and_eq_true] at kept
+      simp only [ClosureMask.extract]
+      split
+      · simp only [List.all_cons, kept.1, extract_all (mask / 2) captured items kept.2,
+          Bool.and_self]
+      · exact extract_all (mask / 2) captured items kept.2
+
+/-- At a frame coherent with a runtime type instantiation, a closure's rows
+there are the frame's resolution of its target's own rows: the
+instantiation gives each parameter the frame's type for it. -/
+theorem closureRowsIn?_coherent {handle : FunctionHandle} {mask : Nat}
+    {typeInstantiation : Array (TypeId × TypeId)} {captured supplied results : NRow}
+    (rows : closureRows? unit handle mask = some (captured, supplied, results))
+    (below : closureSignatureBelow unit handle = true)
+    (coherent : Coherent unit handle typeInstantiation) :
+    closureRowsIn? unit handle mask typeInstantiation =
+      some (captured.resolved, supplied.resolved, results.resolved) := by
+  have agree : ∀ index, closureParameter unit handle index = true →
+      closureArgument unit handle typeInstantiation index = Skolems.type ‹_› index := by
+    intro index parameter
+    simp only [closureParameter, Bool.and_eq_true, decide_eq_true_eq, Option.isSome_iff_exists]
+      at parameter
+    obtain ⟨bounded, node, found⟩ := parameter
+    simp only [closureArgument, found, coherent.params index bounded node found, Option.getD_some]
+  obtain ⟨parameters, returned, signature, _, _, rfl, rfl, rfl⟩ := closureRows?_eq_some.mp rows
+  simp only [closureSignatureBelow, signature, Bool.and_eq_true] at below
+  have mentioned := fun captured => all_paramsAll _ (extract_all mask captured _ below.1)
+  simp only [closureRowsIn?, rows, Option.map_some, NRow.resolved_eq_substWith,
+    NRow.substWith_congr agree _ (mentioned true), NRow.substWith_congr agree _ (mentioned false),
+    NRow.substWith_congr agree _ (all_paramsAll _ below.2)]
+
+/-- A closure at a function type, typed as its creation shows. -/
+def typedClosure (parameters : NRow) (shared : List Bool) (results : NRow)
+    (closure : ClosureValue) (typed : Carriers.closureTyped parameters shared results closure) :
+    (NTy.function parameters shared results).carrier :=
+  ⟨closure, typed⟩
+
+@[simp] theorem typedClosure_val (parameters : NRow) (shared : List Bool) (results : NRow)
+    (closure : ClosureValue) (typed : Carriers.closureTyped parameters shared results closure) :
+    (typedClosure parameters shared results closure typed).val = closure := rfl
+
+/-- The prophetic meaning of a function value: its target's big-step meaning
+under the closure's type instantiation, with the captures composed into the
+lent arguments by the closure's mask, as an invocation runs it. -/
+def closureMeaning {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit] (closure : ClosureValue)
+    (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
+  ok := fun initial result final =>
+    ∃ start loans supplied arguments results exit returnedLoans prophecyRow,
+      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      lendArguments σs args loans = some supplied ∧
+      ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
+        some arguments ∧
+      (functionSpecAt executable closure.function closure.typeInstantiation arguments.toArray).ok
+        start results exit ∧
+      shape.lend false result returnedLoans = some results ∧
+      shape.lend true result returnedLoans = some prophecyRow ∧
+      argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
+      Encodes unit final exit.globals ∧ AgreeUnnamed unit final initial
+  aborts := fun initial error =>
+    ∃ start loans supplied arguments,
+      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      lendArguments σs args loans = some supplied ∧
+      ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
+        some arguments ∧
+      (functionSpecAt executable closure.function closure.typeInstantiation arguments.toArray).aborts
+        start error
+  undefined := fun initial =>
+    ∃ start loans supplied arguments results exit,
+      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      lendArguments σs args loans = some supplied ∧
+      ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
+        some arguments ∧
+      (functionSpecAt executable closure.function closure.typeInstantiation arguments.toArray).ok
+        start results exit ∧
+      ¬∃ result, ∃ returnedLoans, ∃ resolved : HList σs,
+        shape.lend false result returnedLoans = some results ∧
+        shape.lend true result returnedLoans = some results ∧
+        lendArguments σs resolved loans = some supplied ∧
+        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending)
+
+omit [Skolems unit] in
 /-- The type instantiation of a callee's frame, computed from the caller's
 and the call's type arguments as the runtime does. -/
 def frameInstantiation (unit : LeanerIR.Validation.ValidatedUnit) (handle : FunctionHandle)
     (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) : Array (TypeId × TypeId) :=
   LeanerIR.SemanticOperations.callTypeInstantiation unit handle outer (typeArgs.map .typeArg)
 
+omit [Skolems unit] in
+/-- Calls whose type arguments name the same types, wherever they occur,
+share a frame. -/
+theorem frameInstantiation_congr {unit : LeanerIR.Validation.ValidatedUnit}
+    {handle : FunctionHandle} {outer : Array (TypeId × TypeId)} {left right : Array TypeUse}
+    (same : left.toList.map (·.typeId) = right.toList.map (·.typeId)) :
+    frameInstantiation unit handle outer left = frameInstantiation unit handle outer right := by
+  have same : left.map (·.typeId) = right.map (·.typeId) := by
+    apply Array.ext'
+    simpa only [Array.toList_map] using same
+  have erase (typeArgs : Array TypeUse) :
+      (typeArgs.map GenericArgument.typeArg).map GenericArgument.eraseLoc =
+        (typeArgs.map (·.typeId)).map fun typeId => .typeArg ⟨typeId, ⟨0⟩⟩ := by
+    simp only [Array.map_map]
+    rfl
+  unfold frameInstantiation
+  rw [← LeanerIR.SemanticOperations.callTypeInstantiation_eraseLoc, erase, same, ← erase,
+    LeanerIR.SemanticOperations.callTypeInstantiation_eraseLoc]
+
+omit [Skolems unit] in
+/-- The instantiations a generic function runs in: the empty one, where it
+runs on its own, or a call's frame, from the caller's frame and one type
+argument per type parameter. -/
+def FrameOf (unit : LeanerIR.Validation.ValidatedUnit) (handle : FunctionHandle) (arity : Nat)
+    (typeInstantiation : Array (TypeId × TypeId)) : Prop :=
+  typeInstantiation = #[] ∨ ∃ outer typeArgs, typeArgs.size = arity ∧
+    typeInstantiation = frameInstantiation unit handle outer typeArgs
+
+omit [Skolems unit] in
+theorem FrameOf.empty {unit : LeanerIR.Validation.ValidatedUnit} {handle : FunctionHandle}
+    {arity : Nat} : FrameOf unit handle arity #[] := .inl rfl
+
+omit [Skolems unit] in
+theorem FrameOf.frame {unit : LeanerIR.Validation.ValidatedUnit} {handle : FunctionHandle}
+    {arity : Nat} {outer : Array (TypeId × TypeId)} {typeArgs : Array TypeUse}
+    (sizes : typeArgs.size = arity) :
+    FrameOf unit handle arity (frameInstantiation unit handle outer typeArgs) :=
+  .inr ⟨outer, typeArgs, sizes, rfl⟩
+
+omit [Skolems unit] in
+theorem FrameOf.rewrite {unit : LeanerIR.Validation.ValidatedUnit} {handle : FunctionHandle}
+    {arity : Nat} {left right : Array (TypeId × TypeId)} (frame : FrameOf unit handle arity left)
+    (same : left = right) : FrameOf unit handle arity right :=
+  same ▸ frame
+
+omit [Skolems unit] in
+/-- A call passing its caller's own type parameters, in order, from the
+caller's namespace, runs in the caller's frame; at the empty frame as the
+runtime computes it for the call (`empty`). -/
+theorem frameInstantiation_own {unit : LeanerIR.Validation.ValidatedUnit}
+    {caller callee : FunctionHandle} {arity : Nat}
+    {own : Array TypeUse} {typeInstantiation : Array (TypeId × TypeId)}
+    (same : callee.namespaceId = caller.namespaceId) (sizes : own.size = arity)
+    (parameters : LeanerIR.SemanticOperations.ownParametersIn unit caller own = true)
+    (empty : frameInstantiation unit callee #[] own = #[])
+    (frame : FrameOf unit caller arity typeInstantiation) :
+    frameInstantiation unit callee typeInstantiation own = typeInstantiation := by
+  rcases frame with rfl | ⟨outer, typeArgs, size, rfl⟩
+  · exact empty
+  · unfold LeanerIR.SemanticOperations.ownParametersIn at parameters
+    split at parameters
+    · rename_i ns namespaceOf
+      exact LeanerIR.SemanticOperations.callTypeInstantiation_own_parameters unit ns caller callee
+        outer typeArgs own namespaceOf same (by omega)
+        (LeanerIR.SemanticOperations.ownParameters_spec parameters)
+    · cases parameters
+
 /-- The closed meaning of calls with type arguments: the callee's
 prophetic meaning under its frame's instantiation, computed from the
 caller's as the runtime does. -/
-def closedGeneric (unit : LeanerIR.Validation.ExecutableUnit)
+def closedGeneric {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit]
     (typeInstantiation : Array (TypeId × TypeId)) : GenericMeaning :=
   fun handle typeArgs θ σs shape args =>
-    @propheticMeaning (Skolems.instantiate θ ‹_›) unit
-      (frameInstantiation unit.unit handle typeInstantiation typeArgs) handle σs shape args
+    @propheticMeaning _ executable (Skolems.instantiate θ ‹_›)
+      (frameInstantiation unit handle typeInstantiation typeArgs) handle σs shape args
 
 /-- What calls denote: a call without type arguments, and a call with them
 at the family they induce. -/
-structure Meanings [Skolems] where
+structure Meanings {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit] where
   call : CalleeMeaning
   generic : GenericMeaning
   /-- The frame's type instantiation, which keys its generic families. -/
   typeInstantiation : Array (TypeId × TypeId)
+  /-- The condition of the in-body assumption at a site, over the locals of
+  its function and the state: none where a run assumes nothing there. -/
+  assumption : Nat → Option ((Γ : NRow) × (HEnv Γ → Memory unit → Prop))
 
 /-- Every call its callee's prophetic meaning, a call with type arguments
 under the instantiation its frame computes from `typeInstantiation`. -/
-@[reducible] def closedMeanings (unit : LeanerIR.Validation.ExecutableUnit)
-    (typeInstantiation : Array (TypeId × TypeId)) : Meanings :=
-  ⟨propheticMeaning unit #[], closedGeneric unit typeInstantiation, typeInstantiation⟩
+@[reducible] def closedMeanings {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId)) : Meanings executable :=
+  ⟨propheticMeaning executable #[], closedGeneric executable typeInstantiation, typeInstantiation,
+    fun _ => none⟩
 
 /-- The outcome of a closed computation, back in the enclosing locals. -/
 def Flow.rebase {ρ : ResultShape} {Γ : NRow} {α : Type} (env : HEnv Γ) :
@@ -820,7 +1349,7 @@ def ResultShape.ofBody : (shape : ResultShape) → shape.bodyType.carrier → sh
 /-- What one iteration's outcome means for the loop: continue looping,
 finish, or transfer control past the loop. -/
 def Flow.iterate {ρ : ResultShape} {Γ : NRow}
-    (recurse : HEnv Γ → Comp (Flow ρ Γ Unit)) : Flow ρ Γ Unit → Comp (Flow ρ Γ Unit)
+    (recurse : HEnv Γ → Comp unit (Flow ρ Γ Unit)) : Flow ρ Γ Unit → Comp unit (Flow ρ Γ Unit)
   | .value _ env => recurse env
   | .continue_ 0 env => recurse env
   | .continue_ (nest + 1) env => Spec.pure (.continue_ nest env)
@@ -831,14 +1360,129 @@ def Flow.iterate {ρ : ResultShape} {Γ : NRow}
 /-- The least fixed point of a loop body, marked with the loop's site so
 that verification can name its invariant.  Semantically `Spec.fix`. -/
 def loopAt {ρ : ResultShape} {Γ : NRow} (_site : Nat)
-    (iteration : (HEnv Γ → Comp (Flow ρ Γ Unit)) → HEnv Γ → Comp (Flow ρ Γ Unit))
-    (entry : HEnv Γ) : Comp (Flow ρ Γ Unit) :=
+    (iteration : (HEnv Γ → Comp unit (Flow ρ Γ Unit)) → HEnv Γ → Comp unit (Flow ρ Γ Unit))
+    (entry : HEnv Γ) : Comp unit (Flow ρ Γ Unit) :=
   Spec.fix iteration entry
+
+/-- An in-body assertion, marked with its site so that verification can name
+the asserted condition.  Semantically no step. -/
+def assertAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (entry : HEnv Γ) :
+    Comp unit (Flow ρ Γ Unit) :=
+  Spec.pure (.value () entry)
+
+/-- A state anchor, marked with its site so that verification can record
+the locals and state there.  Semantically no step. -/
+def anchorAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (entry : HEnv Γ) :
+    Comp unit (Flow ρ Γ Unit) :=
+  Spec.pure (.value () entry)
+
+/-- The condition an assumption entry states of locals of a row: its own
+where the rows agree, none otherwise. -/
+def assumptionOf {Γ : NRow} (entry : Option ((Γ' : NRow) × (HEnv Γ' → Memory unit → Prop)))
+    (env : HEnv Γ) : Memory unit → Prop :=
+  match entry with
+  | some ⟨Γ', holds⟩ => if same : Γ = Γ' then holds (same ▸ env) else fun _ => True
+  | none => fun _ => True
+
+@[simp] theorem assumptionOf_none {Γ : NRow} (env : HEnv Γ) :
+    assumptionOf none env = fun _ => True := rfl
+
+@[simp] theorem assumptionOf_same {Γ : NRow} (holds : HEnv Γ → Memory unit → Prop) (env : HEnv Γ) :
+    assumptionOf (some ⟨Γ, holds⟩) env = holds env := by
+  simp [assumptionOf]
+
+/-- An in-body assumption, marked with its site: the runs on which the
+condition holds there. -/
+def assumeAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (holds : Memory unit → Prop)
+    (entry : HEnv Γ) : Comp unit (Flow ρ Γ Unit) where
+  ok := fun initial result final => holds initial ∧ result = .value () entry ∧ final = initial
+  aborts := fun _ _ => False
+
+/-- The end of a mutation of a local, marked with its site so that
+verification can name the invariant owed there. Semantically no step. -/
+def mutationEndAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (entry : HEnv Γ) :
+    Comp unit (Flow ρ Γ Unit) :=
+  Spec.pure (.value () entry)
+
+/-- The end of a write of global memory, marked with its site so that
+verification can name the invariants owed there. Semantically no step. -/
+def memoryWrittenAt {ρ : ResultShape} {Γ : NRow} (_site : Nat) (entry : HEnv Γ) :
+    Comp unit (Flow ρ Γ Unit) :=
+  Spec.pure (.value () entry)
+
+/-- A call's meaning, marked with the call's site so that verification can
+name the invariants owed after it. Semantically the meaning itself. -/
+def callAt [Skolems unit] {α : Type} (_site : Nat) (meaning : Comp unit α) : Comp unit α :=
+  meaning
+
+/-- A value constructed at a site, marked so that verification can name the
+invariant owed of it. Semantically no step. -/
+def constructedAt {ρ : ResultShape} {Γ : NRow} {α : Type} (_site : Nat) (value : α)
+    (entry : HEnv Γ) : Comp unit (Flow ρ Γ α) :=
+  Spec.pure (.value value entry)
+
+/-- The locals and memory an anchor at a site records. -/
+def AnchorOf (_site : Nat) (Γ : NRow) : Type := HEnv Γ × (Memory unit)
+
+/-- The function value of a closure with type arguments: `closureOf` in the
+instantiation its frame computes, carrying the target's own weave and result
+shape and the type arguments, which name the meaning of its invocation at the
+family they induce. -/
+def closureOfGeneric (unit : LeanerIR.Validation.ValidatedUnit) [Skolems unit]
+    (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) (θ : TypeArgs)
+    {full captured supplied : NRow} (weave : Weave full captured supplied) (_shape : ResultShape)
+    (handle : FunctionHandle) (captures : HList (NRow.subst θ.1 captured)) : ClosureValue :=
+  closureOf handle weave.mask (frameInstantiation unit handle outer typeArgs) captures
+
+/-- A closure's target frame as its creation takes it: coherent with the
+closure's instantiation, which is faithful to the target's frame. -/
+def ClosureFrame (unit : LeanerIR.Validation.ValidatedUnit) [Skolems unit]
+    (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) : Prop :=
+  Coherent unit handle typeInstantiation ∧ closureFaithful unit handle typeInstantiation = true
+
+/-- A closure of a target with type parameters, at a frame coherent with the
+instantiation its caller's frame computes, is typed at the caller's rows: the
+frame's resolution of its target's own rows (`closureRowsIn?_coherent`). -/
+theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Array TypeUse)
+    (θ : TypeArgs) {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (shape : ResultShape) {handle : FunctionHandle} {shared : List Bool}
+    (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
+    (sharing : closureShared unit handle weave.mask = shared)
+    (below : closureSignatureBelow unit handle = true)
+    (frame : @ClosureFrame unit (Skolems.instantiate θ ‹_›) handle
+      (frameInstantiation unit handle outer typeArgs))
+    (captures : HList (NRow.subst θ.1 captured)) :
+    Carriers.closureTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      (closureOfGeneric unit outer typeArgs θ weave shape handle captures) := by
+  have atFrame := @closureRowsIn?_coherent unit (Skolems.instantiate θ ‹_›) handle weave.mask
+    (frameInstantiation unit handle outer typeArgs) captured supplied shape.row rows below frame.1
+  simp only [NRow.resolved_instantiate] at atFrame
+  apply Skolems.closureTyped_of_runtime
+  rw [← NRow.resolved_eq_substWith, ← NRow.resolved_eq_substWith, ResultShape.row_subst]
+  show NTy.admits unit _ (closureOfGeneric unit outer typeArgs θ weave shape handle captures).encode
+    = true
+  simp only [closureOfGeneric, ClosureValue.encode, closureOf]
+  unfold NTy.admits
+  rw [atFrame]
+  simp only [frame.2, sharing, beq_self_eq_true, Bool.true_and]
+  exact HList.admits_resolved (NRow.subst θ.1 captured) captures
+
+/-- The outcome of a variant mismatch: the profile's throw, or none. -/
+def mismatchOutcome {α : Type} : Option Failure → Comp unit α
+  | some failure => Spec.abort failure
+  | none => Spec.bottom
+
+@[simp] theorem mismatchOutcome_some {α : Type} (failure : Failure) :
+    (mismatchOutcome (some failure) : Comp unit α) = Spec.abort failure := rfl
+@[simp] theorem mismatchOutcome_none {α : Type} :
+    (mismatchOutcome none : Comp unit α) = Spec.bottom := rfl
 
 mutual
 /-- The denotation of a term: its outcome with the locals after it. -/
-def Term.denote (meanings : Meanings) {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} →
-    Term ρ Γ τ → HEnv Γ → Comp (Flow ρ Γ τ.carrier)
+def Term.denote {unit : LeanerIR.Validation.ValidatedUnit}
+    {executable : LeanerIR.Validation.ExecutableUnit unit} [Skolems unit]
+    (meanings : Meanings executable) {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} →
+    Term unit ρ Γ τ → HEnv Γ → Comp unit (Flow ρ Γ τ.carrier)
   | _, _, .lit value, env => Spec.pure (.value (NTy.ofGround _ value) env)
   | _, _, .var x, env =>
       match x.get env with
@@ -898,19 +1542,41 @@ def Term.denote (meanings : Meanings) {ρ : ResultShape} : {Γ : NRow} → {τ :
   | _, _, .continue_ nest, env => Spec.pure (.continue_ nest env)
   | _, _, .loop site body, env =>
       loopAt site (fun recurse env => Spec.bind (body.denote meanings env) (Flow.iterate recurse)) env
-  | _, _, .call handle shape arguments, env =>
+  | _, _, .call site handle shape arguments, env =>
       Flow.bind (arguments.denote meanings env) fun values env =>
-        Spec.bind (meanings.call handle _ shape values) fun result =>
+        Spec.bind (callAt site (meanings.call handle _ shape values)) fun result =>
           Spec.pure (.value (shape.toBody result) env)
-  | _, _, .callGeneric handle typeArgs θ shape arguments, env =>
+  | _, _, .callGeneric site handle typeArgs θ shape arguments, env =>
       Flow.bind (arguments.denote meanings env) fun values env =>
-        Spec.bind (meanings.generic handle typeArgs θ _ shape (HList.toSkolem θ _ values)) fun result =>
+        Spec.bind (callAt site (meanings.generic handle typeArgs θ _ shape
+            (HList.toSkolem θ _ values))) fun result =>
           Spec.pure (.value ((shape.subst θ.1).toBody (ResultShape.ofSkolem θ shape result)) env)
+  | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
+      captures, env =>
+      Flow.bind (captures.denote meanings env) fun values env =>
+        Spec.pure (.value (typedClosure supplied shared results
+          (closureOf handle weave.mask #[] values)
+          (closureOf_typed rows sharing closed faithful values)) env)
+  | _, _, .closureGeneric (supplied := supplied) handle weave typeArgs θ shape shared rows sharing
+      below captures, env =>
+      Flow.bind (captures.denote meanings env) fun values env =>
+        Spec.given (@ClosureFrame unit (Skolems.instantiate θ ‹_›) handle
+            (frameInstantiation unit handle meanings.typeInstantiation typeArgs)) fun frame =>
+          Spec.pure (.value (typedClosure (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+              (closureOfGeneric unit meanings.typeInstantiation typeArgs θ weave shape handle
+                values)
+              (closureOfGeneric_typed meanings.typeInstantiation typeArgs θ weave shape rows
+                sharing below frame values)) env)
+  | _, _, .invoke shape function arguments, env =>
+      Flow.bind (function.denote meanings env) fun closure env =>
+        Flow.bind (arguments.denote meanings env) fun values env =>
+          Spec.bind (closureMeaning executable closure.val _ shape values) fun result =>
+            Spec.pure (.value (shape.toBody result) env)
   | _, _, .tuple elements, env =>
       Flow.bind (elements.denote meanings env) fun values env => Spec.pure (.value values env)
-  | _, _, .pack _ fields, env =>
+  | _, _, .pack _ _ fields, env =>
       Flow.bind (fields.denote meanings env) fun values env => Spec.pure (.value values env)
-  | _, _, .variant _ _ choice fields, env =>
+  | _, _, .variant _ _ _ choice fields, env =>
       Flow.bind (fields.denote meanings env) fun values env =>
         Spec.pure (.value (choice.inject values) env)
   | _, _, .field x value, env =>
@@ -918,15 +1584,17 @@ def Term.denote (meanings : Meanings) {ρ : ResultShape} : {Γ : NRow} → {τ :
   | _, _, .isVariant tests value, env =>
       Flow.bind (value.denote meanings env) fun v env =>
         Spec.pure (.value (namedIn (variantName _ _ v) tests) env)
-  | _, _, .payload choices value, env =>
+  | _, _, .payload mismatch choices value, env =>
       Flow.bind (value.denote meanings env) fun v env =>
         match choices.select? v with
         | some field => Spec.pure (.value field env)
-        | none => Spec.bottom
+        | none => mismatchOutcome mismatch
   | _, _, .letRow targets value body, env =>
       Flow.bind (value.denote meanings env) fun values env => body.denote meanings (targets.set values env)
   | _, _, .letFields targets value body, env =>
       Flow.bind (value.denote meanings env) fun values env => body.denote meanings (targets.set values env)
+  | _, _, .caseOf scrutinee arms, env =>
+      Flow.bind (scrutinee.denote meanings env) fun value env => arms.denote meanings value env
   | _, _, .deref value, env =>
       Flow.bind (value.denote meanings env) fun v env => Spec.pure (.value v.1 env)
   | _, _, .take x, env =>
@@ -943,22 +1611,22 @@ def Term.denote (meanings : Meanings) {ρ : ResultShape} : {Γ : NRow} → {τ :
         match x.get env with
         | some current => Spec.pure (.value () (x.set (v, current.2) env))
         | none => Spec.bottom
-  | _, _, .readPlace x path, env =>
+  | _, _, .readPlace mismatch x path, env =>
       match x.get env with
       | some value =>
           match path.get? env value with
           | some component => Spec.pure (.value component env)
-          | none => Spec.bottom
+          | none => mismatchOutcome mismatch
       | none => Spec.bottom
-  | _, _, .writePlace x path value, env =>
+  | _, _, .writePlace mismatch x path value, env =>
       Flow.bind (value.denote meanings env) fun v env =>
         match x.get env with
         | some current =>
             match path.set? env v current with
             | some updated => Spec.pure (.value () (x.set updated env))
-            | none => Spec.bottom
+            | none => mismatchOutcome mismatch
         | none => Spec.bottom
-  | _, _, .borrowPlace x path, env =>
+  | _, _, .borrowPlace mismatch x path, env =>
       match x.get env with
       | some value =>
           match path.get? env value with
@@ -967,7 +1635,7 @@ def Term.denote (meanings : Meanings) {ρ : ResultShape} : {Γ : NRow} → {τ :
                 match path.set? env prophecy value with
                 | some lent => Spec.pure (.value (component, prophecy) (x.set lent env))
                 | none => Spec.bottom
-          | none => Spec.bottom
+          | none => mismatchOutcome mismatch
       | none => Spec.bottom
   | _, _, .vectorLit count elements, env =>
       Flow.bind (elements.denote meanings env) fun values env =>
@@ -1055,92 +1723,123 @@ def Term.denote (meanings : Meanings) {ρ : ResultShape} : {Γ : NRow} → {τ :
           Flow.bind (stop.denote meanings env) fun b env =>
             if a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat then
               Spec.abort (.abort, #[.integer a.val, .integer b.val])
-            else match SpecVector.ofArray? (reverseRange ((b.val.toNat - a.val.toNat) / 2)
-                a.val.toNat (b.val.toNat - 1) values.values) with
+            else match SpecVector.ofArray? (reverseSlice values.values a.val.toNat b.val.toNat) with
               | some vector => Spec.pure (.value vector env)
               | none => Spec.bottom
   | _, _, .destroyEmpty vector, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         if values.values.isEmpty then Spec.pure (.value () env) else Spec.abort (.abort, #[])
-  | _, _, @Term.contains _ _ τ vector needle, env =>
+  | _, _, @Term.contains _ _ _ τ vector needle, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (needle.denote meanings env) fun n env =>
           Spec.pure (.value
             (findIndex? (NTy.eqb τ) values.values n values.values.size 0).isSome env)
-  | _, _, @Term.indexOf _ _ τ vector needle, env =>
+  | _, _, @Term.indexOf _ _ _ τ vector needle, env =>
       Flow.bind (vector.denote meanings env) fun values env =>
         Flow.bind (needle.denote meanings env) fun n env =>
           Spec.pure (.value
             (((findIndex? (NTy.eqb τ) values.values n values.values.size 0).isSome,
               (foundIndexOf (NTy.eqb τ) values n, ())) :
               HList (.cons .bool (.cons (.int 64 false) .nil))) env)
-  | _, _, @Term.order _ _ τ orders left right, env =>
+  | _, _, @Term.order _ _ _ τ orders left right, env =>
       Flow.bind (left.denote meanings env) fun a env =>
         Flow.bind (right.denote meanings env) fun b env =>
           Spec.pure (.value (compareResult orders (NTy.encode τ a) (NTy.encode τ b)) env)
   | _, _, .seqAfter value effect, env =>
       Flow.bind (value.denote meanings env) fun v env =>
         Flow.bind (effect.denote meanings env) fun _ env => Spec.pure (.value v env)
-  | _, τ, @Term.globalRead _ _ κ _ family key, env =>
+  | _, _, .assertion site, env => assertAt site env
+  | _, _, .anchor site, env => anchorAt site env
+  | _, _, .assume site, env => assumeAt site (assumptionOf (meanings.assumption site) env) env
+  | _, _, .mutationEnd site, env => mutationEndAt site env
+  | _, _, .memoryWritten site, env => memoryWrittenAt site env
+  | _, _, .constructed site value, env =>
+      Flow.bind (value.denote meanings env) fun v env => constructedAt site v env
+  | _, τ, @Term.globalRead _ _ _ κ _ arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
-        Spec.bind Spec.get fun state =>
-          match state.globals.lookup ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) with
+        Spec.bind Spec.get fun memory =>
+          match memory (Skolems.resource τ arguments) (κ.encode k).storageKey with
           | none => Spec.abort (.abort, #[])
-          | some raw => Spec.bind (decodeOr τ.codec raw) fun value => Spec.pure (.value value env)
-  | _, _, @Term.globalContains _ _ κ family key, env =>
+          | some value => Spec.pure (.value (Skolems.ofRuntime τ value) env)
+  | _, _, @Term.globalContains _ _ _ κ τ arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
-        Spec.bind Spec.get fun state =>
-          Spec.pure (.value (state.globals.lookup ((family.instantiate meanings.typeInstantiation).key (κ.encode k))).isSome env)
-  | _, .ref τ, @Term.globalBorrow _ _ κ _ family key, env =>
+        Spec.bind Spec.get fun memory =>
+          Spec.pure (.value (memory (Skolems.resource τ arguments) (κ.encode k).storageKey).isSome env)
+  | _, .ref τ, @Term.globalBorrow _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
-        Spec.bind Spec.get fun state =>
-          match state.globals.lookup ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) with
+      Flow.bind (anchorAt site env) fun _ env =>
+        Spec.bind Spec.get fun memory =>
+          match memory (Skolems.resource τ arguments) (κ.encode k).storageKey with
           | none => Spec.abort (.abort, #[])
-          | some raw =>
-              Spec.bind (decodeOr τ.codec raw) fun value =>
-                Spec.bind Spec.choose fun prophecy =>
-                  Spec.bind (Spec.modify fun state =>
-                    { state with
-                      globals := state.globals.insert ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) (τ.encode prophecy) })
-                    fun _ => Spec.pure (.value (value, prophecy) env)
-  | _, _, @Term.globalPublish _ _ κ τ family key value, env =>
+          | some value =>
+              Spec.bind Spec.choose fun prophecy =>
+                Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
+                    (κ.encode k).storageKey (some (Skolems.toRuntime τ prophecy))))
+                  fun _ => Spec.pure (.value (Skolems.ofRuntime τ value, prophecy) env)
+  | _, _, @Term.globalPublish _ _ _ κ τ site arguments key value, env =>
       Flow.bind (key.denote meanings env) fun k env =>
         Flow.bind (value.denote meanings env) fun v env =>
-          Spec.bind Spec.get fun state =>
-            match state.globals.lookup ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) with
+        Flow.bind (anchorAt site env) fun _ env =>
+          Spec.bind Spec.get fun memory =>
+            match memory (Skolems.resource τ arguments) (κ.encode k).storageKey with
             | some _ => Spec.abort (.abort, #[])
             | none =>
-                Spec.bind (Spec.modify fun state =>
-                  { state with globals := state.globals.insert ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) (τ.encode v) })
+                Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
+                    (κ.encode k).storageKey (some (Skolems.toRuntime τ v))))
                   fun _ => Spec.pure (.value () env)
-  | _, τ, @Term.globalTake _ _ κ _ family key, env =>
+  | _, τ, @Term.globalTake _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denote meanings env) fun k env =>
-        Spec.bind Spec.get fun state =>
-          match state.globals.lookup ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) with
+      Flow.bind (anchorAt site env) fun _ env =>
+        Spec.bind Spec.get fun memory =>
+          match memory (Skolems.resource τ arguments) (κ.encode k).storageKey with
           | none => Spec.abort (.abort, #[])
-          | some raw =>
-              Spec.bind (decodeOr τ.codec raw) fun value =>
-                Spec.bind (Spec.modify fun state =>
-                  { state with globals := state.globals.erase ((family.instantiate meanings.typeInstantiation).key (κ.encode k)) })
-                  fun _ => Spec.pure (.value value env)
+          | some value =>
+              Spec.bind (Spec.set (memory.set (Skolems.resource τ arguments)
+                  (κ.encode k).storageKey none))
+                fun _ => Spec.pure (.value (Skolems.ofRuntime τ value) env)
 
 /-- The denotation of an argument row: its values with the locals after it. -/
-def Args.denote (meanings : Meanings) {ρ : ResultShape} : {Γ σs : NRow} → Args ρ Γ σs →
-    HEnv Γ → Comp (Flow ρ Γ (HList σs))
+def Args.denote {unit : LeanerIR.Validation.ValidatedUnit}
+    {executable : LeanerIR.Validation.ExecutableUnit unit} [Skolems unit]
+    (meanings : Meanings executable) {ρ : ResultShape} : {Γ σs : NRow} → Args unit ρ Γ σs →
+    HEnv Γ → Comp unit (Flow ρ Γ (HList σs))
   | _, _, .nil, env => Spec.pure (.value () env)
   | _, _, .cons head tail, env =>
       Flow.bind (head.denote meanings env) fun value env =>
         Flow.bind (tail.denote meanings env) fun values env =>
           Spec.pure (.value (value, values) env)
+
+/-- The denotation of match arms at a value: the first arm that matches and
+whose guard holds. A guard that fails continues with the locals and memory
+before the arm, as the runtime's does. Where no arm is taken, the profile's
+mismatch throw is the outcome, and without one there is none. -/
+def Arms.denote {unit : LeanerIR.Validation.ValidatedUnit}
+    {executable : LeanerIR.Validation.ExecutableUnit unit} [Skolems unit]
+    (meanings : Meanings executable) {ρ : ResultShape} : {Γ : NRow} → {σ τ : NTy} →
+    Arms unit ρ Γ σ τ → σ.carrier → HEnv Γ → Comp unit (Flow ρ Γ τ.carrier)
+  | _, _, _, .nil (some failure), _, _ => Spec.abort failure
+  | _, _, _, .nil none, _, _ => Spec.bottom
+  | _, _, _, .cons pattern body rest, value, env =>
+      match pattern.bindValue value env with
+      | some bound => body.denote meanings bound
+      | none => rest.denote meanings value env
+  | _, _, _, .guarded pattern guard body rest, value, env =>
+      match pattern.bindValue value env with
+      | some bound =>
+          Spec.bind Spec.get fun memory =>
+            Flow.bind (guard.denote meanings bound) fun holds guarded =>
+              if holds then body.denote meanings guarded
+              else Spec.bind (Spec.set memory) fun _ => rest.denote meanings value env
+      | none => rest.denote meanings value env
 end
 
 /-- A compiled function: its parameter and remaining local types, its
 declared result shape, and its body over the complete local row. -/
-structure Function where
+structure Function (unit : Validation.ValidatedUnit) where
   params : NRow
   locals : NRow
   result : ResultShape
-  body : Term result (params ++ locals) result.bodyType
+  body : Term unit result (params ++ locals) result.bodyType
   /-- The mutable-reference parameters, resolved at exit. -/
   mutables : Mutables (params ++ locals)
 
@@ -1148,7 +1847,7 @@ structure Function where
 parameters it still holds are resolved.  Loop control that escapes the body
 has no meaning, as the runtime's `finishControl?` has none. -/
 def ResultShape.finish {Γ : NRow} (mutables : Mutables Γ) (shape : ResultShape) :
-    Flow shape Γ shape.bodyType.carrier → Comp shape.carrier
+    Flow shape Γ shape.bodyType.carrier → Comp unit shape.carrier
   | .value value env => mutables.resolve env (Spec.pure (shape.ofBody value))
   | .return_ result env => mutables.resolve env (Spec.pure result)
   | .break_ _ _ => Spec.bottom
@@ -1156,140 +1855,196 @@ def ResultShape.finish {Γ : NRow} (mutables : Mutables Γ) (shape : ResultShape
 
 /-- The denotation of a function on native arguments, with calls meaning
 what `meaning` says. -/
-def Function.denoteWith (meanings : Meanings) (f : Function) (args : HList f.params) :
-    Comp f.result.carrier :=
+def Function.denoteWith {unit : LeanerIR.Validation.ValidatedUnit}
+    {executable : LeanerIR.Validation.ExecutableUnit unit} [Skolems unit]
+    (meanings : Meanings executable) (f : Function unit) (args : HList f.params) :
+    Comp unit f.result.carrier :=
   Spec.bind (f.body.denote meanings (initialEnv f.params f.locals args))
     (f.result.finish f.mutables)
 
 /-- The denotation of a function on native arguments, every call meaning
 its callee's prophetic meaning.  Stated directly: every transport unifies
 against it. -/
-def Function.denote (unit : LeanerIR.Validation.ExecutableUnit)
-    (typeInstantiation : Array (TypeId × TypeId)) (f : Function) (args : HList f.params) :
-    Comp f.result.carrier :=
-  Spec.bind (f.body.denote (closedMeanings unit typeInstantiation)
+def Function.denote {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit]
+    (typeInstantiation : Array (TypeId × TypeId)) (f : Function unit) (args : HList f.params) :
+    Comp unit f.result.carrier :=
+  Spec.bind (f.body.denote (closedMeanings executable typeInstantiation)
       (initialEnv f.params f.locals args))
     (f.result.finish f.mutables)
 
 /-- The meaning of calls routing one function to `self`: its handle at its
 own signature means `self`, every other call `rest`. -/
 def routeMeaning (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
-    (self : HList π → Comp ρ.carrier) (rest : CalleeMeaning) : CalleeMeaning :=
+    (self : HList π → Comp unit ρ.carrier) (rest : CalleeMeaning) : CalleeMeaning :=
   fun callee σs shape args =>
     if routed : callee = handle ∧ σs = π ∧ shape = ρ then
       routed.2.2 ▸ self (routed.2.1 ▸ args)
     else rest callee σs shape args
 
 @[simp] theorem routeMeaning_self (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
-    (self : HList π → Comp ρ.carrier) (rest : CalleeMeaning) (args : HList π) :
+    (self : HList π → Comp unit ρ.carrier) (rest : CalleeMeaning) (args : HList π) :
     routeMeaning handle π ρ self rest handle π ρ args = self args := by
   simp [routeMeaning]
 
 theorem routeMeaning_other {handle callee : FunctionHandle} {π σs : NRow} {ρ shape : ResultShape}
-    (self : HList π → Comp ρ.carrier) (rest : CalleeMeaning) (args : HList σs)
+    (self : HList π → Comp unit ρ.carrier) (rest : CalleeMeaning) (args : HList σs)
     (other : callee ≠ handle) :
     routeMeaning handle π ρ self rest callee σs shape args = rest callee σs shape args := by
   simp [routeMeaning, other]
 
-/-- The meaning of calls in the body of a generic function calling itself:
-its own handle at its own signature means `self`, every other call its
-callee's prophetic meaning. -/
-def recursiveMeaning (unit : LeanerIR.Validation.ExecutableUnit) (handle : FunctionHandle)
-    (π : NRow) (ρ : ResultShape) (self : HList π → Comp ρ.carrier) : CalleeMeaning :=
-  routeMeaning handle π ρ self (propheticMeaning unit #[])
-
-@[simp] theorem recursiveMeaning_self (unit : LeanerIR.Validation.ExecutableUnit)
-    (handle : FunctionHandle) (π : NRow) (ρ : ResultShape) (self : HList π → Comp ρ.carrier)
-    (args : HList π) :
-    recursiveMeaning unit handle π ρ self handle π ρ args = self args :=
-  routeMeaning_self handle π ρ self _ args
-
-theorem recursiveMeaning_other (unit : LeanerIR.Validation.ExecutableUnit)
-    {handle callee : FunctionHandle} {π σs : NRow} {ρ shape : ResultShape}
-    (self : HList π → Comp ρ.carrier) (args : HList σs) (other : callee ≠ handle) :
-    recursiveMeaning unit handle π ρ self callee σs shape args =
-      propheticMeaning unit #[] callee σs shape args :=
-  routeMeaning_other self _ args other
-
 /-- A position among the members of a cycle of calls, each a handle with
 its compiled function. -/
-inductive CycleIndex : List (FunctionHandle × Function) → Type where
-  | here {member : FunctionHandle × Function} {others : List (FunctionHandle × Function)} :
+inductive CycleIndex : List (FunctionHandle × Function unit) → Type where
+  | here {member : FunctionHandle × Function unit} {others : List (FunctionHandle × Function unit)} :
       CycleIndex (member :: others)
-  | there {member : FunctionHandle × Function} {others : List (FunctionHandle × Function)} :
+  | there {member : FunctionHandle × Function unit} {others : List (FunctionHandle × Function unit)} :
       CycleIndex others → CycleIndex (member :: others)
 
 /-- The member a position names. -/
-def CycleIndex.member : {members : List (FunctionHandle × Function)} → CycleIndex members →
-    FunctionHandle × Function
+def CycleIndex.member : {members : List (FunctionHandle × Function unit)} → CycleIndex members →
+    FunctionHandle × Function unit
   | member :: _, .here => member
   | _ :: _, .there later => later.member
 
-/-- The meanings standing for a cycle's members, by position. -/
-abbrev CycleSelves (members : List (FunctionHandle × Function)) : Type :=
-  (index : CycleIndex members) → HList index.member.2.params → Comp index.member.2.result.carrier
+/-- A function's meaning at every skolem family and type instantiation, so
+that a call to it with type arguments means it at the family and frame
+instantiation the call induces. -/
+abbrev SelfFamily (unit : Validation.ValidatedUnit) (π : NRow) (ρ : ResultShape) : Type 1 :=
+  (Θ : Skolems unit) → Array (TypeId × TypeId) → @HList Θ.toCarriers π → Comp unit (@ResultShape.carrier Θ.toCarriers ρ)
 
-/-- Route each of a cycle's members to its meaning, every other call to `rest`. -/
-def cycleRoutes (rest : CalleeMeaning) :
-    (members : List (FunctionHandle × Function)) → CycleSelves members → CalleeMeaning
-  | [], _ => rest
-  | member :: others, self =>
-      routeMeaning member.1 member.2.params member.2.result (self .here)
-        (cycleRoutes rest others fun index => self (.there index))
+omit [Skolems unit] in
+/-- A slot of a cycle's fixed point: a member at the runtime family
+(`none`), or at a skolem family and a type instantiation. -/
+structure CycleSlot (unit : Validation.ValidatedUnit)
+    (members : List (FunctionHandle × Function unit)) where
+  position : CycleIndex members
+  family : Option (Skolems unit × Array (TypeId × TypeId))
 
-/-- The meaning of calls in the bodies of a cycle's members: each member's
-handle at its own signature means its `self`, every other call its callee's
-prophetic meaning. -/
-def cycleMeaning (unit : LeanerIR.Validation.ExecutableUnit)
-    (members : List (FunctionHandle × Function)) (self : CycleSelves members) : CalleeMeaning :=
-  cycleRoutes (propheticMeaning unit #[]) members self
+omit [Skolems unit] in
+/-- The skolem family a slot's family names: the ambient one at the runtime
+family. -/
+@[reducible] def familySkolems [Θ : Skolems unit] : Option (Skolems unit × Array (TypeId × TypeId)) → Skolems unit
+  | none => Θ
+  | some (family, _) => family
 
-/-- The recursion hypothesis of a generic function: its meaning at every
-skolem family and type instantiation, so that a call to itself with type
-arguments is the hypothesis at the family and frame instantiation the call
-induces. -/
-abbrev SelfFamily (π : NRow) (ρ : ResultShape) : Type 1 :=
-  (Θ : Skolems) → Array (TypeId × TypeId) → @HList Θ π → Comp (@ResultShape.carrier Θ ρ)
+omit [Skolems unit] in
+/-- The type instantiation a slot's family names: the frame's own at the
+runtime family. -/
+def familyInstantiation (typeInstantiation : Array (TypeId × TypeId)) :
+    Option (Skolems unit × Array (TypeId × TypeId)) → Array (TypeId × TypeId)
+  | none => typeInstantiation
+  | some (_, instantiation) => instantiation
 
-/-- The meaning of calls with type arguments in the body of a generic
-function calling itself: its own handle at its own signature means `self`
-at the induced family and the callee's frame instantiation, every other
-call its closed meaning. -/
-def recursiveGeneric (unit : LeanerIR.Validation.ExecutableUnit) (handle : FunctionHandle)
-    (π : NRow) (ρ : ResultShape) (self : SelfFamily π ρ)
-    (typeInstantiation : Array (TypeId × TypeId)) : GenericMeaning :=
+omit [Skolems unit] in
+/-- The meanings standing for a cycle's members, one per slot. -/
+abbrev CycleFamilySelves [Θ : Skolems unit]
+    (members : List (FunctionHandle × Function unit)) : Type 1 :=
+  (slot : CycleSlot unit members) → @HList (familySkolems slot.family).toCarriers slot.position.member.2.params →
+    Comp unit (@ResultShape.carrier (familySkolems slot.family).toCarriers slot.position.member.2.result)
+
+omit [Skolems unit] in
+/-- Route calls with type arguments to one function: its handle at its own
+signature means `self` at the family the call induces and the callee's frame
+instantiation, every other call `rest`. -/
+def routeGeneric [Θ : Skolems unit] (handle : FunctionHandle) (π : NRow) (ρ : ResultShape)
+    (self : SelfFamily unit π ρ) (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId))
+    (rest : GenericMeaning) : GenericMeaning :=
   fun callee typeArgs θ σs shape args =>
     if routed : callee = handle ∧ σs = π ∧ shape = ρ then
-      routed.2.2 ▸ self (Skolems.instantiate θ ‹Skolems›)
-        (frameInstantiation unit.unit callee typeInstantiation typeArgs) (routed.2.1 ▸ args)
-    else closedGeneric unit typeInstantiation callee typeArgs θ σs shape args
+      routed.2.2 ▸ self (Skolems.instantiate θ Θ) (frame callee typeArgs) (routed.2.1 ▸ args)
+    else rest callee typeArgs θ σs shape args
 
-@[simp] theorem recursiveGeneric_self (unit : LeanerIR.Validation.ExecutableUnit)
-    (handle : FunctionHandle) (π : NRow) (ρ : ResultShape) (self : SelfFamily π ρ)
-    (typeInstantiation : Array (TypeId × TypeId)) (typeArgs : Array TypeUse) (θ : TypeArgs)
-    (args : @HList (Skolems.instantiate θ ‹Skolems›) π) :
-    recursiveGeneric unit handle π ρ self typeInstantiation handle typeArgs θ π ρ args =
-      self (Skolems.instantiate θ ‹Skolems›)
-        (frameInstantiation unit.unit handle typeInstantiation typeArgs) args := by
-  simp [recursiveGeneric]
+omit [Skolems unit] in
+@[simp] theorem routeGeneric_self [Θ : Skolems unit] (handle : FunctionHandle) (π : NRow)
+    (ρ : ResultShape) (self : SelfFamily unit π ρ)
+    (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId)) (rest : GenericMeaning)
+    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers π) :
+    routeGeneric handle π ρ self frame rest handle typeArgs θ π ρ args =
+      self (Skolems.instantiate θ Θ) (frame handle typeArgs) args := by
+  simp [routeGeneric]
 
-theorem recursiveGeneric_other (unit : LeanerIR.Validation.ExecutableUnit)
-    {handle callee : FunctionHandle} {π σs : NRow} {ρ shape : ResultShape}
-    (self : SelfFamily π ρ) (typeInstantiation : Array (TypeId × TypeId))
-    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ ‹Skolems›) σs)
+omit [Skolems unit] in
+theorem routeGeneric_other [Θ : Skolems unit] {handle callee : FunctionHandle} {π σs : NRow}
+    {ρ shape : ResultShape} (self : SelfFamily unit π ρ)
+    (frame : FunctionHandle → Array TypeUse → Array (TypeId × TypeId)) (rest : GenericMeaning)
+    (typeArgs : Array TypeUse) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
     (other : callee ≠ handle) :
-    recursiveGeneric unit handle π ρ self typeInstantiation callee typeArgs θ σs shape args =
-      closedGeneric unit typeInstantiation callee typeArgs θ σs shape args := by
-  simp [recursiveGeneric, other]
+    routeGeneric handle π ρ self frame rest callee typeArgs θ σs shape args =
+      rest callee typeArgs θ σs shape args := by
+  simp [routeGeneric, other]
 
-omit [Skolems] in
-/-- The weakest precondition through a verified callee: its precondition,
-its postcondition and frame under the continuation, and its failures under
-the permitted failures. -/
-theorem wp_call {Args Result : Type} {function : Args → Comp Result}
-    {contract : Contract RuntimeState Failure Args Result} {args : Args}
-    {ensures : Result → RuntimeState → Prop} {aborts : Failure → Prop} {initial : RuntimeState}
+omit [Skolems unit] in
+/-- The meaning of calls without type arguments in a body at a slot's
+family: each member at its own signature means its meaning at that family,
+every other call `rest`. -/
+def cycleCalls [Θ : Skolems unit] (family : Option (Skolems unit × Array (TypeId × TypeId)))
+    (rest : @CalleeMeaning _ (familySkolems family)) :
+    (members : List (FunctionHandle × Function unit)) → CycleFamilySelves members →
+      @CalleeMeaning _ (familySkolems family)
+  | [], _ => rest
+  | member :: others, self =>
+      @routeMeaning _ (familySkolems family) member.1 member.2.params member.2.result
+        (self ⟨.here, family⟩)
+        (cycleCalls family rest others fun slot => self ⟨.there slot.position, slot.family⟩)
+
+omit [Skolems unit] in
+/-- The meaning of calls with type arguments in a body at a family: each
+member at its own signature means its meaning at the family and frame
+instantiation the call induces, every other call `rest`. -/
+def cycleGenerics {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
+    (root : Skolems unit) (instantiation : Array (TypeId × TypeId))
+    (rest : @GenericMeaning _ Θ) :
+    (members : List (FunctionHandle × Function unit)) → CycleFamilySelves (Θ := root) members →
+      @GenericMeaning _ Θ
+  | [], _ => rest
+  | member :: others, self =>
+      routeGeneric (Θ := Θ) member.1 member.2.params member.2.result
+        (fun family instantiation => self ⟨.here, some (family, instantiation)⟩)
+        (fun callee typeArgs => frameInstantiation unit callee instantiation typeArgs)
+        (cycleGenerics executable (Θ := Θ) root instantiation rest others
+          fun slot => self ⟨.there slot.position, slot.family⟩)
+
+omit [Skolems unit] in
+/-- The meaning of calls with type arguments in a body at a family: at the
+runtime family every such call is closed, since a proof covers the runtime
+slots only when no member is generic; at a skolem family each member is
+routed as `cycleGenerics` does. -/
+def cycleGenericsAt {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
+    (members : List (FunctionHandle × Function unit)) (typeInstantiation : Array (TypeId × TypeId))
+    (self : CycleFamilySelves (Θ := Θ) members) :
+    (family : Option (Skolems unit × Array (TypeId × TypeId))) →
+      @GenericMeaning _ (familySkolems family)
+  | none => closedGeneric executable typeInstantiation
+  | some (family, instantiation) =>
+      cycleGenerics executable (Θ := family) Θ instantiation (@closedGeneric _ executable family instantiation)
+        members self
+
+omit [Skolems unit] in
+/-- What calls denote in the body of a cycle's member at a slot: a call to a
+member its meaning at the slot the call reaches, every other call its
+callee's prophetic meaning. -/
+def cycleMeanings {unit : LeanerIR.Validation.ValidatedUnit}
+    (executable : LeanerIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
+    (members : List (FunctionHandle × Function unit)) (typeInstantiation : Array (TypeId × TypeId))
+    (self : CycleFamilySelves (Θ := Θ) members) (slot : CycleSlot unit members) :
+    @Meanings _ executable (familySkolems slot.family) :=
+  @Meanings.mk _ executable (familySkolems slot.family)
+    (cycleCalls slot.family (@propheticMeaning _ executable (familySkolems slot.family) #[]) members self)
+    (cycleGenericsAt executable members typeInstantiation self slot.family)
+    (familyInstantiation typeInstantiation slot.family) (fun _ => none)
+
+omit [Skolems unit] in
+/-- The weakest precondition through a verified callee: what its theorem
+assumes and its precondition, its postcondition and frame under the
+continuation, and its failures under the permitted failures. -/
+theorem wp_call {Args Result : Type} {function : Args → Comp unit Result}
+    {contract : Contract (Memory unit) Failure Args Result} {args : Args}
+    {ensures : Result → Memory unit → Prop} {aborts : Failure → Prop} {initial : Memory unit}
     (verified : Satisfies function contract)
+    (assumed : contract.assumes args initial)
     (permitted : contract.requires args initial)
     (post : ∀ result final,
       (¬contract.mayAbort args initial → contract.ensures args initial result final) →
@@ -1298,10 +2053,11 @@ theorem wp_call {Args Result : Type} {function : Args → Comp Result}
     (failing : ∀ error, contract.aborts args initial error → aborts error) :
     wp (function args) ensures aborts initial :=
   ⟨fun result final execution =>
-      let established := (verified args initial permitted).1 result final execution
+      let established := (verified args initial assumed permitted).1 result final execution
       post result final established.1 established.2.1 established.2.2,
-    fun error execution => failing error ((verified args initial permitted).2.1 error execution),
-    (verified args initial permitted).2.2⟩
+    fun error execution =>
+      failing error ((verified args initial assumed permitted).2.1 error execution),
+    (verified args initial assumed permitted).2.2⟩
 
 /-! ## Weakest preconditions of the flow combinators
 
@@ -1309,31 +2065,31 @@ A bind on a literal outcome reduces directly; only a symbolic outcome goes
 through the weakest-precondition rule. -/
 
 @[simp] theorem Flow.bind_pure_value {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (value : α) (env : HEnv Γ) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
+    (value : α) (env : HEnv Γ) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.pure (.value value env)) next = next value env := by
   simp [Flow.bind]
 @[simp] theorem Flow.bind_pure_return {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (result : ρ.carrier) (env : HEnv Γ) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
+    (result : ρ.carrier) (env : HEnv Γ) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.pure (.return_ result env)) next = Spec.pure (.return_ result env) := by
   simp [Flow.bind]
 @[simp] theorem Flow.bind_pure_break {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (nest : Nat) (env : HEnv Γ) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
+    (nest : Nat) (env : HEnv Γ) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.pure (.break_ nest env)) next = Spec.pure (.break_ nest env) := by
   simp [Flow.bind]
 @[simp] theorem Flow.bind_pure_continue {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (nest : Nat) (env : HEnv Γ) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
+    (nest : Nat) (env : HEnv Γ) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.pure (.continue_ nest env)) next = Spec.pure (.continue_ nest env) := by
   simp [Flow.bind]
 @[simp] theorem Flow.bind_abort {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (error : Failure) (next : α → HEnv Γ → Comp (Flow ρ Γ β)) :
+    (error : Failure) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.abort error) next = Spec.abort error := by
   simp [Flow.bind]
 
 
 theorem wp_flowBind {ρ : ResultShape} {Γ : NRow} {α β : Type}
-    (action : Comp (Flow ρ Γ α)) (next : α → HEnv Γ → Comp (Flow ρ Γ β))
-    (ensures : Flow ρ Γ β → RuntimeState → Prop) (aborts : Failure → Prop)
-    (state : RuntimeState) :
+    (action : Comp unit (Flow ρ Γ α)) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β))
+    (ensures : Flow ρ Γ β → Memory unit → Prop) (aborts : Failure → Prop)
+    (state : Memory unit) :
     wp (Flow.bind action next) ensures aborts state ↔
       wp action (fun flow state =>
         match flow with
@@ -1352,20 +2108,160 @@ theorem wp_flowBind {ρ : ResultShape} {Γ : NRow} {α β : Type}
     have := h.1 flow final execution
     cases flow <;> simpa [wp_pure] using this
 
+/-- Flows associate: an abrupt flow of the inner action passes both binds
+unchanged, a value reaches the outer continuation through the inner one. -/
+theorem Flow.bind_assoc {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (action : Comp unit (Flow ρ Γ α)) (middle : α → HEnv Γ → Comp unit (Flow ρ Γ β))
+    (next : β → HEnv Γ → Comp unit (Flow ρ Γ γ)) :
+    Flow.bind (Flow.bind action middle) next =
+      Flow.bind action fun value env => Flow.bind (middle value env) next := by
+  simp only [Flow.bind, Spec.bind_assoc]
+  congr 1
+  funext flow
+  cases flow <;> simp [Spec.pure_bind]
+
+/-- The rule for a flow bound after a flow: the binds associate to the right,
+so that the inner action heads the goal and the goal's continuation is not
+copied into the inner bind's arms. -/
+theorem wp_flowBind_flowBind {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (action : Comp unit (Flow ρ Γ α)) (middle : α → HEnv Γ → Comp unit (Flow ρ Γ β))
+    (next : β → HEnv Γ → Comp unit (Flow ρ Γ γ))
+    (ensures : Flow ρ Γ γ → Memory unit → Prop) (aborts : Failure → Prop)
+    (state : Memory unit) :
+    wp (Flow.bind (Flow.bind action middle) next) ensures aborts state ↔
+      wp (Flow.bind action fun value env => Flow.bind (middle value env) next) ensures aborts
+        state := by
+  rw [Flow.bind_assoc]
+
+/-- A flow bound after a bind is bound inside the bind's continuation. -/
+theorem Flow.bind_spec_bind {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (first : Comp unit γ) (middle : γ → Comp unit (Flow ρ Γ α))
+    (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
+    Flow.bind (Spec.bind first middle) next = Spec.bind first fun value => Flow.bind (middle value) next := by
+  simp only [Flow.bind, Spec.bind_assoc]
+
+/-- The rule for a flow bound after a bind, as a call's denotation is: the
+flow's continuation moves into the bind's, where it appears once — taken by
+`wp_flowBind` instead, it would be copied into every flow's arm. -/
+theorem wp_flowBind_specBind {ρ : ResultShape} {Γ : NRow} {α β γ : Type}
+    (first : Comp unit γ) (middle : γ → Comp unit (Flow ρ Γ α))
+    (next : α → HEnv Γ → Comp unit (Flow ρ Γ β))
+    (ensures : Flow ρ Γ β → Memory unit → Prop) (aborts : Failure → Prop)
+    (state : Memory unit) :
+    wp (Flow.bind (Spec.bind first middle) next) ensures aborts state ↔
+      wp first (fun value state => wp (Flow.bind (middle value) next) ensures aborts state)
+        aborts state := by
+  rw [Flow.bind_spec_bind, wp_bind]
+
 /-- Loop verification from an invariant over the locals and the state: it
 holds at entry, and one iteration under it is correct whenever the next
 iteration is assumed correct under it.  Partial correctness. -/
 theorem wp_loopAt {ρ : ResultShape} {Γ : NRow} (site : Nat)
-    (iteration : (HEnv Γ → Comp (Flow ρ Γ Unit)) → HEnv Γ → Comp (Flow ρ Γ Unit))
-    (entry : HEnv Γ) (invariant : HEnv Γ → RuntimeState → Prop)
-    (ensures : Flow ρ Γ Unit → RuntimeState → Prop) (aborts : Failure → Prop)
-    (initial : RuntimeState)
+    (iteration : (HEnv Γ → Comp unit (Flow ρ Γ Unit)) → HEnv Γ → Comp unit (Flow ρ Γ Unit))
+    (entry : HEnv Γ) (invariant : HEnv Γ → Memory unit → Prop)
+    (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit)
     (entryHolds : invariant entry initial)
-    (step : ∀ recursive : HEnv Γ → Comp (Flow ρ Γ Unit),
+    (step : ∀ recursive : HEnv Γ → Comp unit (Flow ρ Γ Unit),
       (∀ env state, invariant env state → wp (recursive env) ensures aborts state) →
       ∀ env state, invariant env state → wp (iteration recursive env) ensures aborts state) :
     wp (loopAt site iteration entry) ensures aborts initial :=
   wp_withInvariant_fix (invariant := invariant) entryHolds step
+
+/-- An in-body assertion as a cut: it holds where it is stated, and what
+follows may assume it. -/
+theorem wp_assertAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ)
+    (assertion : HEnv Γ → Memory unit → Prop)
+    (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (holds : assertion entry initial)
+    (continues : assertion entry initial → ensures (.value () entry) initial) :
+    wp (assertAt site entry) ensures aborts initial := by
+  unfold assertAt
+  exact (wp_pure _ _ _ _).mpr (continues holds)
+
+/-- An in-body assertion verification does not check: no step. -/
+theorem wp_assertAt_unchecked {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ)
+    (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (continues : ensures (.value () entry) initial) :
+    wp (assertAt site entry) ensures aborts initial := by
+  unfold assertAt
+  exact (wp_pure _ _ _ _).mpr continues
+
+/-- An in-body assumption: what follows may assume its condition. -/
+theorem wp_assumeAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (holds : Memory unit → Prop)
+    (entry : HEnv Γ) (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (continues : holds initial → ensures (.value () entry) initial) :
+    wp (assumeAt site holds entry) ensures aborts initial := by
+  refine ⟨?_, fun _ failed => failed.elim, fun undefined => undefined⟩
+  rintro _ _ ⟨assumed, rfl, rfl⟩
+  exact continues assumed
+
+/-- The end of a mutation as a cut: the invariant owed there holds, and
+what follows may assume it. -/
+theorem wp_mutationEndAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ)
+    (invariant : HEnv Γ → Memory unit → Prop)
+    (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (holds : invariant entry initial)
+    (continues : invariant entry initial → ensures (.value () entry) initial) :
+    wp (mutationEndAt site entry) ensures aborts initial := by
+  unfold mutationEndAt
+  exact (wp_pure _ _ _ _).mpr (continues holds)
+
+/-- The end of a write of global memory as a cut: the invariants owed there
+hold, and what follows may assume them. -/
+theorem wp_memoryWrittenAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ)
+    (invariant : HEnv Γ → Memory unit → Prop)
+    (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (holds : invariant entry initial)
+    (continues : invariant entry initial → ensures (.value () entry) initial) :
+    wp (memoryWrittenAt site entry) ensures aborts initial := by
+  unfold memoryWrittenAt
+  exact (wp_pure _ _ _ _).mpr (continues holds)
+
+/-- A call owing nothing after it is its meaning. -/
+theorem wp_callAt {α : Type} (site : Nat) (meaning : Comp unit α) (ensures : α → Memory unit → Prop)
+    (aborts : Failure → Prop) (initial : Memory unit) (runs : wp meaning ensures aborts initial) :
+    wp (callAt site meaning) ensures aborts initial :=
+  runs
+
+/-- What holds where a call returns that owes invariants there: they hold,
+and what follows may assume them. -/
+def CallChecked (owed continues : Prop) : Prop :=
+  owed ∧ (owed → continues)
+
+omit [Skolems unit] in
+theorem CallChecked.intro {owed continues : Prop} (holds : owed)
+    (rest : owed → continues) : CallChecked owed continues :=
+  ⟨holds, rest⟩
+
+/-- A call as a cut where it returns: the invariants owed over the memory
+before and after it hold, and what follows may assume them. -/
+theorem wp_callAt_checked {α : Type} (site : Nat) (meaning : Comp unit α)
+    (owed : Memory unit → Memory unit → Prop) (ensures : α → Memory unit → Prop)
+    (aborts : Failure → Prop) (initial : Memory unit)
+    (runs : wp meaning (fun result final => CallChecked (owed initial final)
+      (ensures result final)) aborts initial) :
+    wp (callAt site meaning) ensures aborts initial :=
+  wp_mono runs (fun _ _ checked => checked.2 checked.1) (fun _ failed => failed)
+
+/-- A construction as a cut: the invariant owed of the value holds, and what
+follows may assume it. -/
+theorem wp_constructedAt {ρ : ResultShape} {Γ : NRow} {α : Type} (site : Nat) (value : α)
+    (entry : HEnv Γ) (invariant : α → Memory unit → Prop)
+    (ensures : Flow ρ Γ α → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (holds : invariant value initial)
+    (continues : invariant value initial → ensures (.value value entry) initial) :
+    wp (constructedAt site value entry) ensures aborts initial := by
+  unfold constructedAt
+  exact (wp_pure _ _ _ _).mpr (continues holds)
+
+/-- A state anchor: no step. -/
+theorem wp_anchorAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ)
+    (ensures : Flow ρ Γ Unit → Memory unit → Prop) (aborts : Failure → Prop)
+    (initial : Memory unit) (continues : ensures (.value () entry) initial) :
+    wp (anchorAt site entry) ensures aborts initial := by
+  unfold anchorAt
+  exact (wp_pure _ _ _ _).mpr continues
 
 @[simp] theorem finish_value {Γ : NRow} (mutables : Mutables Γ) (shape : ResultShape)
     (value : shape.bodyType.carrier) (env : HEnv Γ) :
@@ -1384,12 +2280,16 @@ theorem wp_loopAt {ρ : ResultShape} {Γ : NRow} (site : Nat)
 attribute [lir_denote high] Choices.select?_single Choices.update?_single
 attribute [lir_denote] Which.project?_eq_some_iff
 
-attribute [lir_denote] Term.denote Args.denote Function.denote ResultShape.ofBody NTy.ofGround
+-- The denotation rewrites by its equations; unfolding remains the fallback
+-- where an equation's type indices do not match the term's at reducible
+-- transparency, as a call's result type does.
+lir_denote_equations Term.denote Args.denote Arms.denote
+attribute [lir_denote] Term.denote Args.denote Arms.denote Function.denote ResultShape.ofBody NTy.ofGround
   closedGeneric
   HList.ofGround
   ResultShape.toBody
   ResultShape.finish Flow.iterate Flow.rebase Flow.bind_pure_value Flow.bind_pure_return
-  Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort wp_flowBind finish_value finish_return finish_break
+  Flow.bind_pure_break Flow.bind_pure_continue Flow.bind_abort finish_value finish_return finish_break
   finish_continue Mutables.resolve_nil Mutables.resolve_cons Option.bind_some Option.bind_none
   Proj.get?_nil Proj.get?_deref Proj.get?_field Proj.get?_index Proj.get?_variant
   Proj.set?_nil Proj.set?_deref Proj.set?_field Proj.set?_index Proj.set?_variant
@@ -1400,7 +2300,11 @@ attribute [lir_denote] Term.denote Args.denote Function.denote ResultShape.ofBod
   NTy.decode?_encode NTy.encode_ref Which.inject_here Which.inject_there Which.project?_here_inl
   Which.project?_here_inr Which.project?_there_inl Which.project?_there_inr variantName_inl
   variantName_inr Choices.select?_nil Choices.select?_cons Vars.set_nil Vars.set_cons_none
-  Vars.set_cons_some Var.select_here Var.select_there NTy.eqb_tuple NTy.eqb_struct NTy.eqb_enum
+  Vars.set_cons_some Pat.bindValue_wildcard Pat.bindValue_var Pat.bindValue_literal
+  Pat.bindValue_range Pat.bindValue_tuple Pat.bindValue_struct Pat.bindValue_variant
+  Pats.bindValues_nil Pats.bindValues_cons inRange mismatchOutcome_some mismatchOutcome_none
+  Var.select_here Var.select_there
+  NTy.eqb_tuple NTy.eqb_struct NTy.eqb_enum
   rowEqb_nil rowEqb_cons variantEqb_inl_inl variantEqb_inr_inr variantEqb_inl_inr
   variantEqb_inr_inl namedIn_nil namedIn_cons NTy.encode_tuple NTy.encode_struct
   NTy.encode_enum_inl NTy.encode_enum_inr HList.encode_nil HList.encode_cons
@@ -1417,11 +2321,12 @@ def describeValue : {τ : NTy} → τ.groundCarrier → String
   | .string, value => s!"{repr (value : String)}"
   | .bytes, value => s!"{repr (value : Array UInt8)}"
   | .tuple _, _ => "(..)"
-  | .struct _ _, _ => "{..}"
-  | .enum _ _ _ _, _ => "variant{..}"
+  | .struct _ _ _, _ => "{..}"
+  | .enum _ _ _ _ _, _ => "variant{..}"
   | .vector _, value => s!"[{value.values.size} elements]"
   | .ref _, _ => "&mut(..)"
   | .param index, _ => s!"T{index}"
+  | .function _ _ _, value => s!"closure of function {value.val.function.functionId.index}"
 
 /-- A readable rendering of destructuring targets. -/
 def Vars.describe {Γ : NRow} : {σs : NRow} → Vars Γ σs → String
@@ -1430,8 +2335,26 @@ def Vars.describe {Γ : NRow} : {σs : NRow} → Vars Γ σs → String
   | _, .cons target rest => s!"{target.elim "_" fun x => s!"local{x.index}"}, {rest.describe}"
 
 mutual
+/-- A readable rendering of a pattern. -/
+partial def Pat.describe {Γ : NRow} : {τ : NTy} → Pat Γ τ → String
+  | _, .wildcard => "_"
+  | _, .var x => s!"local{x.index}"
+  | _, .literal value => describeValue value
+  | _, .range lower upper inclusive =>
+      s!"{lower.elim "" toString}..{if inclusive then "=" else ""}{upper.elim "" toString}"
+  | _, .tuple elements => s!"({elements.describe})"
+  | _, .struct fields => s!"\{{fields.describe}}"
+  | _, .variant choice fields => s!"{choice.name}\{{fields.describe}}"
+
+partial def Pats.describe {Γ : NRow} : {σs : NRow} → Pats Γ σs → String
+  | _, .nil => ""
+  | _, .cons head .nil => head.describe
+  | _, .cons head tail => s!"{head.describe}, {tail.describe}"
+end
+
+mutual
 /-- A readable rendering of a term, for diagnostics. -/
-partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Term ρ Γ τ → String
+partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Term unit ρ Γ τ → String
   | _, _, .lit value => describeValue value
   | _, _, .var x => s!"local{x.index}"
   | _, _, .checked op failure left right =>
@@ -1446,7 +2369,7 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .bitwise op left right => s!"({left.describe} {repr op} {right.describe})"
   | _, _, .shift left failure value distance =>
       s!"({value.describe} {if left then "<<" else ">>"} {distance.describe} ! {repr failure})"
-  | _, _, @Term.cast _ _ _ _ width signed failure value =>
+  | _, _, @Term.cast _ _ _ _ _ width signed failure value =>
       s!"({value.describe} as int {width} {signed} ! {repr failure})"
   | _, _, .ite condition thenBranch elseBranch =>
       s!"(if {condition.describe} then {thenBranch.describe} else {elseBranch.describe})"
@@ -1460,26 +2383,35 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .break_ nest => s!"break {nest}"
   | _, _, .continue_ nest => s!"continue {nest}"
   | _, _, .loop site body => s!"loop@{site} {body.describe}"
-  | _, _, .call handle _ arguments =>
+  | _, _, .call _ handle _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}({arguments.describe})"
-  | _, _, .callGeneric handle typeArgs _ _ arguments =>
+  | _, _, .closure handle weave _ _ _ _ _ _ captures =>
+      s!"closure {handle.namespaceId.index}:{handle.functionId.index} mask {weave.mask}\
+        ({captures.describe})"
+  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ captures =>
+      s!"closure {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types> \
+        mask {weave.mask}({captures.describe})"
+  | _, _, .invoke _ function arguments =>
+      s!"invoke {function.describe}({arguments.describe})"
+  | _, _, .callGeneric _ handle typeArgs _ _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types>\
         ({arguments.describe})"
   | _, _, .tuple elements => s!"({elements.describe})"
-  | _, _, .pack source fields => s!"{repr source} \{{fields.describe}}"
-  | _, _, .variant source _ choice fields => s!"{repr source}::{choice.name} \{{fields.describe}}"
+  | _, _, .pack source _ fields => s!"{repr source} \{{fields.describe}}"
+  | _, _, .variant source _ _ choice fields => s!"{repr source}::{choice.name} \{{fields.describe}}"
   | _, _, .field x value => s!"{value.describe}.{x.index}"
   | _, _, .isVariant tests value => s!"({value.describe} is {tests})"
-  | _, _, .payload _ value => s!"{value.describe}.payload"
+  | _, _, .payload _ _ value => s!"{value.describe}.payload"
   | _, _, .letRow targets value body =>
       s!"(let ({targets.describe}) := {value.describe}; {body.describe})"
   | _, _, .letFields targets value body =>
       s!"(let \{{targets.describe}} := {value.describe}; {body.describe})"
+  | _, _, .caseOf scrutinee arms => s!"(match {scrutinee.describe} with {arms.describe})"
   | _, _, .deref value => s!"*{value.describe}"
   | _, _, .mutate x value => s!"(*local{x.index} := {value.describe})"
-  | _, _, .readPlace x _ => s!"local{x.index}.path"
-  | _, _, .writePlace x _ value => s!"(local{x.index}.path := {value.describe})"
-  | _, _, .borrowPlace x _ => s!"&mut local{x.index}.path"
+  | _, _, .readPlace _ x _ => s!"local{x.index}.path"
+  | _, _, .writePlace _ x _ value => s!"(local{x.index}.path := {value.describe})"
+  | _, _, .borrowPlace _ x _ => s!"&mut local{x.index}.path"
   | _, _, .take x => s!"move local{x.index}"
   | _, _, .resolve x => s!"resolve local{x.index}"
   | _, _, .vectorLit _ elements => s!"vector[{elements.describe}]"
@@ -1503,20 +2435,33 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .indexOf vector needle => s!"indexOf({vector.describe}, {needle.describe})"
   | _, _, .order _ left right => s!"order({left.describe}, {right.describe})"
   | _, _, .seqAfter value effect => s!"({value.describe} then {effect.describe})"
-  | _, _, .globalRead family key => s!"global[{repr family}]({key.describe})"
-  | _, _, .globalContains family key => s!"exists[{repr family}]({key.describe})"
-  | _, _, .globalBorrow family key => s!"&mut global[{repr family}]({key.describe})"
-  | _, _, .globalPublish family key value =>
-      s!"publish[{repr family}]({key.describe}, {value.describe})"
-  | _, _, .globalTake family key => s!"take[{repr family}]({key.describe})"
+  | _, _, .assertion site => s!"assert@{site}"
+  | _, _, .anchor site => s!"anchor@{site}"
+  | _, _, .assume site => s!"assume@{site}"
+  | _, _, .mutationEnd site => s!"mutationEnd@{site}"
+  | _, _, .constructed site value => s!"constructed@{site}({value.describe})"
+  | _, τ, .globalRead _ key => s!"global[{repr τ}]({key.describe})"
+  | _, _, .globalContains τ _ key => s!"exists[{repr τ}]({key.describe})"
+  | _, .ref τ, .globalBorrow _ _ key => s!"&mut global[{repr τ}]({key.describe})"
+  | _, _, @Term.globalPublish _ _ _ _ τ _ _ key value =>
+      s!"publish[{repr τ}]({key.describe}, {value.describe})"
+  | _, τ, .globalTake _ _ key => s!"take[{repr τ}]({key.describe})"
+  | _, _, .memoryWritten site => s!"memoryWritten@{site}"
 
-partial def Args.describe {ρ : ResultShape} : {Γ σs : NRow} → Args ρ Γ σs → String
+partial def Args.describe {ρ : ResultShape} : {Γ σs : NRow} → Args unit ρ Γ σs → String
   | _, _, .nil => ""
   | _, _, .cons head .nil => head.describe
   | _, _, .cons head tail => s!"{head.describe}, {tail.describe}"
+
+partial def Arms.describe {ρ : ResultShape} : {Γ : NRow} → {σ τ : NTy} → Arms unit ρ Γ σ τ → String
+  | _, _, _, .nil none => ""
+  | _, _, _, .nil (some failure) => s!"| _ => throw {repr failure.1}"
+  | _, _, _, .cons pattern body rest => s!"| {pattern.describe} => {body.describe} {rest.describe}"
+  | _, _, _, .guarded pattern guard body rest =>
+      s!"| {pattern.describe} if {guard.describe} => {body.describe} {rest.describe}"
 end
 
-def Function.describe (f : Function) : String :=
+def Function.describe (f : Function unit) : String :=
   s!"params={repr f.params} locals={repr f.locals} result={repr f.result} body={f.body.describe}"
 
 end LeanerIR.Proofs.Denote

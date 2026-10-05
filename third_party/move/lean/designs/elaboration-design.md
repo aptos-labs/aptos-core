@@ -25,10 +25,12 @@ at validate with certificates on `ValidatedUnit`) landed 2026-08-27;
 statements below that place authoritative typing in semantic preparation
 describe the superseded arrangement — `validate` now owns typing and the
 initialization/borrow analyses, and preparation filters capability.
-The verification half of M4–M5 is carried since 2026-09-01 by
-[`certifying-execution.md`](historical/certifying-execution.md) (the frame-free row
-route); this document stays authoritative for the runtime model, the
-big-step semantics, the interpreter, and the correctness obligations.
+The verification half of M4–M5 is carried by
+[`denotation.md`](denotation.md) (since 2026-09-08; the earlier routes are
+in [`historical/`](historical/)); this document stays authoritative for the
+runtime model, the big-step semantics, the interpreter, and the
+correctness obligations. Its migration plan below (M0–M7) is kept for
+rationale; open work is listed in [`roadmap.md`](roadmap.md), section 5.
 
 **Implementation status:** M0 and M1 are implemented. The neutral package has an
 exhaustive core semantic inventory, versioned profile-semantic registries,
@@ -245,7 +247,9 @@ logical integers accept every value. Non-consuming local and place reads now
 require the core `Copy` ability. Consequently `moveValue` is executable as an
 identity over its already-evaluated operand: consuming a local is represented
 by the place-based `move`, while a local expression cannot silently duplicate
-a non-`Copy` value. Neither form is delegated to a Move string tag.
+a non-`Copy` value. Validation turns a direct read of a non-`Copy` local in
+executable code into that `move`, a `Copy` place load of a selection from it,
+or a place read under an observer (`lir-design.md`). Neither form is delegated to a Move string tag.
 Value-level borrow, dereference, and freeze are a typed reference-operation
 family. Under the prophetic ownership model
 ([`prophetic-references.md`](prophetic-references.md)) they execute over
@@ -452,8 +456,8 @@ Backend-specific feature selection remains separate. Proposed wrappers with
 private constructors make accidental partial execution impossible:
 
 ```lean
-prepareExecution  : SemanticsRegistry -> ValidatedUnit ->
-  Except (Array Diagnostic) ExecutableUnit
+prepareExecution  : SemanticsRegistry -> (unit : ValidatedUnit) ->
+  Except (Array Diagnostic) (ExecutableUnit unit)
 
 prepareVerification : SemanticsRegistry -> ValidatedUnit ->
   Except (Array Diagnostic) VerifiableUnit
@@ -956,6 +960,11 @@ tests pass solely through LIR semantics.
 > `leaner_drive` replaces the stock repeat combinators with an explicit
 > once-per-goal fixpoint driver. `modifies global<T>(k)` generates the
 > keyed frame (every other key reads the same), discharged by the map laws.
+>
+> Superseded 2026-10-02 by the static memory
+> ([`static-memory.md`](static-memory.md)): the denotation's memory is typed
+> per resource type, and the typed families and their representation are
+> gone.
 >
 > Landed and verified automatically: reads (`balance_of` shapes, existence,
 > boolean fields, `spec.old`), `move_from` with post-state clauses and
