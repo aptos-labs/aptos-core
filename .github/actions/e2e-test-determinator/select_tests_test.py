@@ -132,7 +132,7 @@ class E2eSelectionTest(unittest.TestCase):
     def test_image_flags_match_selected_consumers(self):
         root = Path(__file__).resolve().parents[3]
         consumers = {}
-        for filename in ("docker-build-test.yaml", "lint-test.yaml"):
+        for filename in ("docker-build-test.yaml", "lint-test.yaml", "lean.yaml"):
             workflow = (root / ".github/workflows" / filename).read_text()
             for body in self.workflow_jobs(workflow).values():
                 for name in REGISTRY:
@@ -145,6 +145,26 @@ class E2eSelectionTest(unittest.TestCase):
                     runner["docker_images"],
                     any("rust-images" in needs for needs in consumers[name]),
                 )
+
+    def test_lean_workflow_selects_transitive_dependencies_and_fails_closed(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/lean.yaml").read_text()
+        # A path allowlist would hide Rust dependencies outside the Lean tree.
+        self.assertNotIn("paths:", workflow)
+        jobs = self.workflow_jobs(workflow)
+        self.assertIn("e2e-test-selection.yaml", jobs["e2e-selection"])
+        self.assertIn("inputs.GIT_SHA != ''", jobs["e2e-selection"])
+        runner = jobs["build-and-test"]
+        self.assertIn("e2e-selection", self.job_needs(runner))
+        self.assertIn("known_e2e_tests", runner)  # older trusted registry runs Lean
+        self.assertIn("selected_e2e_tests", runner)
+        self.assertIn("move-compiler-v2 leaner::tests", runner)
+        self.assertIn("working-directory: third_party/move/lean/leaner-e2e-tests", runner)
+        result = jobs["result"]
+        self.assertIn("if: always()", result)
+        self.assertIn('test "$SELECTION_RESULT" = success', result)
+        self.assertIn('test "$TEST_RESULT" = success', result)
+        self.assertIn('test "$TEST_RESULT" = skipped', result)
 
     def test_release_images_skip_only_without_consumers(self):
         root = Path(__file__).resolve().parents[3]

@@ -134,6 +134,8 @@ struct Config {
 struct Subsystem {
     roots: Vec<String>,
     #[serde(default)]
+    excluded_roots: Vec<String>,
+    #[serde(default)]
     ignored_paths: Vec<Glob>,
     selection: Selection,
     #[serde(default)]
@@ -626,7 +628,12 @@ impl Config {
                 !name.is_empty() && !subsystem.roots.is_empty(),
                 "Subsystem must have a name and roots"
             );
-            for root in subsystem.roots.iter().chain(&subsystem.related_test_roots) {
+            for root in subsystem
+                .roots
+                .iter()
+                .chain(&subsystem.related_test_roots)
+                .chain(&subsystem.excluded_roots)
+            {
                 validate_path(root)?;
                 ensure!(
                     !root.contains(['*', '?', '[', ']']),
@@ -716,7 +723,8 @@ fn select(
         let candidates: BTreeSet<_> = current
             .iter()
             .filter(|(_, root)| {
-                under(root.as_str(), &subsystem.roots)
+                (under(root.as_str(), &subsystem.roots)
+                    && !under(root.as_str(), &subsystem.excluded_roots))
                     || under(root.as_str(), &subsystem.related_test_roots)
             })
             .map(|(name, _)| name.clone())
@@ -728,6 +736,9 @@ fn select(
         // additive mappings and bypasses the engine's implicit path ignores.
         let mut rules = DeterminatorRules::parse("use-default-rules = false")?;
         for path in changed.iter().filter(|p| !ignored.contains(*p)) {
+            if under(path, &subsystem.excluded_roots) {
+                continue;
+            }
             let mappings: Vec<_> = subsystem
                 .path_rules
                 .iter()
@@ -767,7 +778,7 @@ fn select(
                 seeds.extend(mapping.affects_packages.iter().cloned());
             }
             report.seeds.extend(seeds.iter().cloned());
-            if old_owner.is_none() && new_owner.is_none() && mappings.is_empty() {
+            if old_owner.is_none() && new_owner.is_none() && mappings.is_empty() && !e2e_input {
                 coarse = true;
                 report
                     .reasons
@@ -1119,6 +1130,7 @@ mod tests {
         ])
         .contains_key("cli-e2e"));
         config.subsystems.insert("other".into(), Subsystem {
+            excluded_roots: vec![],
             ignored_paths: vec![],
             roots: vec!["move".into()],
             selection: Selection::Affected,
@@ -1221,6 +1233,90 @@ mod tests {
             ]),
             set(&["consumer", "related"])
         );
+    }
+
+    #[test]
+    fn lean_subsystem_selects_both_sides_of_cross_language_boundaries() {
+        let fixture = Fixture::new();
+        fixture.package("move/compiler", "move-compiler-v2", &[("core", "../core")]);
+        fixture.package(
+            "move/compiler-tests",
+            "move-compiler-v2-transactional-tests",
+            &[("move-compiler-v2", "../compiler")],
+        );
+        fixture.package("move/framework", "aptos-framework", &[("core", "../core")]);
+        fixture.package("move/cli", "aptos-move-cli", &[(
+            "aptos-framework",
+            "../framework",
+        )]);
+        fixture.package("move/lean-link", "mono-move-lean-link", &[(
+            "bridge",
+            "../../outside/bridge",
+        )]);
+        fixture.package("move/independent", "independent", &[]);
+        // A nested Lake tree is not a Cargo workspace package.
+        fs::create_dir_all(fixture.dir.path().join("move/lean")).unwrap();
+        let manifest = fixture.dir.path().join("Cargo.toml");
+        let text = fs::read_to_string(&manifest).unwrap();
+        fs::write(&manifest, format!("{text}exclude = ['move/lean']\n")).unwrap();
+        let graph = fixture.graph();
+        let mut config: Config = toml::from_str(
+            &include_str!("../../../.config/test-subsystems.toml")
+                .replace("third_party/move", "move"),
+        )
+        .unwrap();
+        config.e2e_tests.retain(|name, _| name == "lean");
+        let move_subsystem = config.subsystems.get_mut("move").unwrap();
+        move_subsystem.roots = vec!["move".into(), "outside".into()];
+        move_subsystem.related_test_packages.clear();
+        move_subsystem.path_rules.clear();
+        for path in [
+            "move/lean/leaner-e2e-tests/LeanerE2ETests/Check/example.lean",
+            "move/lean/leaner-e2e-tests/shim/monovm_shim.c",
+            "move/lean/leaner-rust/rust-exporter/src/main.rs",
+        ] {
+            let selected = run(&config, &graph, &graph, &[path]);
+            assert!(
+                selected.packages.is_empty(),
+                "{path}: {:?}",
+                selected.packages
+            );
+            assert_eq!(selected.e2e_tests.into_keys().collect::<Vec<_>>(), vec![
+                "lean"
+            ]);
+        }
+        // Lean producers activate the mapped Rust consumers as well as Lake.
+        let selected = run(&config, &graph, &graph, &[
+            "move/lean/leaner-move/LeanerMove/Xir/Lower.lean",
+        ]);
+        assert_eq!(
+            selected.packages,
+            set(&[
+                "move-compiler-v2",
+                "move-compiler-v2-transactional-tests",
+                "aptos-framework"
+            ])
+        );
+        assert!(selected.e2e_tests.contains_key("lean"));
+        // A transitive MonoVM dependency and the XAST producer each activate Lake.
+        for path in ["outside/bridge/src/lib.rs", "move/compiler/src/lib.rs"] {
+            let selected = run(&config, &graph, &graph, &[path]);
+            assert_eq!(selected.e2e_tests.into_keys().collect::<Vec<_>>(), vec![
+                "lean"
+            ]);
+            assert!(!selected.packages.contains("independent"));
+        }
+        let selected = run(&config, &graph, &graph, &["move/independent/src/lib.rs"]);
+        assert_eq!(selected.packages, set(&["independent"]));
+        assert!(selected.e2e_tests.is_empty());
+        let mixed = run(&config, &graph, &graph, &[
+            "move/independent/src/lib.rs",
+            "move/lean/leaner-e2e-tests/Main.lean",
+        ]);
+        assert_eq!(mixed.packages, set(&["independent"]));
+        assert_eq!(mixed.e2e_tests.into_keys().collect::<Vec<_>>(), vec![
+            "lean"
+        ]);
     }
 
     #[test]
@@ -1407,6 +1503,7 @@ mod tests {
             .always_test_packages
             .push("unrelated".into());
         config.subsystems.insert("bridge-tests".into(), Subsystem {
+            excluded_roots: vec![],
             roots: vec!["move/core".into()],
             ignored_paths: vec![],
             selection: Selection::Affected,

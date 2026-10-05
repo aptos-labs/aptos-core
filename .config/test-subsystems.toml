@@ -24,6 +24,8 @@ ignored_paths = [
 
 [subsystems.move]
 roots = ["third_party/move", "aptos-move"]
+excluded_roots = ["third_party/move/lean"]
+e2e_tests = ["lean"]
 ignored_paths = [
     "third_party/move/documentation",
     "third_party/move/move-prover/doc",
@@ -61,6 +63,40 @@ paths = [
     "third_party/move/move-prover/doc/inference-paper-26/v2/examples",
 ]
 affects_packages = ["move-prover-e2e-tests"]
+
+# Lean owns its Lake packages, fixtures, standalone Rust exporter, and C shim.
+# The named runner builds both sides of each cross-language boundary.
+[subsystems.lean]
+roots = ["third_party/move/lean"]
+selection = "affected"
+e2e_tests = ["lean"]
+related_test_packages = [
+    "move-compiler-v2",
+    "move-compiler-v2-transactional-tests",
+    "aptos-framework",
+]
+
+# Rust tests consume the Lean frontend/backend and its shared IR by file path.
+[[subsystems.lean.path_rules]]
+paths = ["third_party/move/lean/leaner-ir", "third_party/move/lean/leaner-move"]
+affects_packages = [
+    "move-compiler-v2",
+    "move-compiler-v2-transactional-tests",
+    "aptos-framework",
+]
+
+[e2e_tests.lean]
+affected_packages = [
+    "aptos-move-cli",
+    "move-compiler-v2",
+    "move-compiler-v2-transactional-tests",
+    "mono-move-lean-link",
+]
+input_paths = [
+    "third_party/move/lean",
+    ".github/workflows/lean.yaml",
+    "scripts/dev_setup.sh",
+]
 
 # These packages anchor dependency analysis even though their own Rust tests
 # can be outside the subsystem boundary. Python and Docker inputs need mappings.
