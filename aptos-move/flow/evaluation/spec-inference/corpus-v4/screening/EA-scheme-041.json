@@ -10,7 +10,7 @@
   "task_id": "EA-scheme-041",
   "task_tree_sha256": "c7d76c786d1a0622a2b16937e235149c6a995fd9a81b88d929ce0d619579b40b",
   "threshold_seconds": 20,
-  "wall_seconds": 4.2,
+  "wall_seconds": 5.0,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true,

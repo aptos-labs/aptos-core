@@ -10,7 +10,7 @@
   "task_id": "MS-timelock-047",
   "task_tree_sha256": "19df7da27b49d4d86e054ab206581ffaf466d6ffc8c7cdf3f7021fd143b240aa",
   "threshold_seconds": 20,
-  "wall_seconds": 5.4,
+  "wall_seconds": 5.5,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false,

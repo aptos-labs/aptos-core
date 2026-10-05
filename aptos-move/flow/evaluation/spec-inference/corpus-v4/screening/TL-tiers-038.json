@@ -10,7 +10,7 @@
   "task_id": "TL-tiers-038",
   "task_tree_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
   "threshold_seconds": 20,
-  "wall_seconds": 7.7,
+  "wall_seconds": 9.8,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true,

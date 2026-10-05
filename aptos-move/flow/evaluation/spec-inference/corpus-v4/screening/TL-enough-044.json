@@ -10,7 +10,7 @@
   "task_id": "TL-enough-044",
   "task_tree_sha256": "709edb26990d36e975ac5b2f3cb0d253af09bb68ae01c6036081cd0ac6d6aaea",
   "threshold_seconds": 20,
-  "wall_seconds": 5.6,
+  "wall_seconds": 5.9,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false,

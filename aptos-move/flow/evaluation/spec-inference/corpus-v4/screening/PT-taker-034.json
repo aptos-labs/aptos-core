@@ -10,7 +10,7 @@
   "task_id": "PT-taker-034",
   "task_tree_sha256": "515ccfe791fa8ffd9a80dd2b8799796e65bd875c7b257d3087ad0c273c8cb9c9",
   "threshold_seconds": 20,
-  "wall_seconds": 5.9,
+  "wall_seconds": 6.4,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false,

@@ -10,7 +10,7 @@
   "task_id": "DM-keepalive-035",
   "task_tree_sha256": "cf32d547f0e65233a79b60c11f4df7f0867874095c2160d2d33702d0ee2bb317",
   "threshold_seconds": 20,
-  "wall_seconds": 6.2,
+  "wall_seconds": 6.8,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false,

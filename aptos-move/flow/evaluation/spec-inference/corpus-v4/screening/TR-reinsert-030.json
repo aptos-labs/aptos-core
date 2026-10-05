@@ -10,7 +10,7 @@
   "task_id": "TR-reinsert-030",
   "task_tree_sha256": "69f316cc5a1d702802f48b2f3b9de820bc6ce9d23911b514b41c160916eaa6ee",
   "threshold_seconds": 20,
-  "wall_seconds": 6.8,
+  "wall_seconds": 6.2,
   "well_formed": true,
   "wp_failure_kind": null,
   "wp_hard": false,

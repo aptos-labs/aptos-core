@@ -20,11 +20,13 @@ the workflow and the availability of WP differ:
 | arm | WP available | workflow |
 |---|---|---|
 | `agent_only` | no | the agent specifies unaided |
-| `hybrid_guided` | yes | prescribed: invariants → WP → repair → simplify → check |
+| `hybrid_guided` | yes | prescribed: invariants → WP → repair → (simplify) → check |
 | `hybrid_flexible` | yes | the agent chooses its own workflow |
 
 `agent_only` has no simplification step because it is never given
-mechanically generated conditions. In it the WP router is **absent**, not
+mechanically generated conditions. A round rendered with
+`--no-wp-simplification`, as corpus-v4 round 7 is, drops it from
+`hybrid_guided` as well. In it the WP router is **absent**, not
 discouraged: the tool cannot be listed or called.
 
 Three contrasts are planned:
@@ -391,9 +393,10 @@ whether any task could have produced them.
 
 ## 6. Repetitions and analysis
 
-A full corpus round is five fresh runs for every task and arm. Runs are blocked
-by `(task, replicate)`; the three arm orders are randomized within blocks and
-all six orders are balanced across the schedule. Concurrency is fixed, and
+A full corpus round is four or five fresh runs for every task and arm;
+corpus-v4 rounds use four. Runs are blocked by `(task, replicate)`; the three
+arm orders are randomized within blocks and all six orders are balanced across
+the schedule. Concurrency is fixed, and
 members of one block do not contend on the same local solver lane. Failures
 consume the shared budget and are retained rather than retried away.
 

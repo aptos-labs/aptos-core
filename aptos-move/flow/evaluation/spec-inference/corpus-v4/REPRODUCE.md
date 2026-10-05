@@ -51,8 +51,9 @@ Prompts that work well:
   difference from the committed records.*
 - *Re-score the round in `<archive>` against corpus-v4's mutant sets and compare
   with its published summary, per task and per arm.*
-- *Run a new corpus-v4 round with terra56, four replicates, following
-  corpus-v4/REPRODUCE.md; stop and report after preflight before launching.*
+- *Run a new corpus-v4 round with terra56 (or sol61), four replicates,
+  following corpus-v4/REPRODUCE.md; stop and report after preflight before
+  launching.*
 
 Asking the agent to stop after preflight is worth it: launching spends model
 budget, and preflight is where a missing tool or credential shows up.
@@ -65,7 +66,9 @@ budget, and preflight is where a missing tool or credential shows up.
   `provenance.aptos_core.commit` in [`manifest.json`](manifest.json), from which
   the package is generated, and the apparatus commit a round was scheduled
   against, `source_commit` in its schedule manifest. Check out the apparatus
-  commit.
+  commit. A round scheduled before its apparatus landed names a commit of an
+  aptos-core pull request; fetch it with
+  `git fetch https://github.com/aptos-labs/aptos-core pull/<n>/head`.
 - Boogie and Z3 as installed by `./scripts/dev_setup.sh -y`, exported as
   `BOOGIE_EXE` and `Z3_EXE`. A round's `preflight.json` records the versions and
   digests it ran with.
@@ -124,11 +127,14 @@ python3 corpus-v4/compose.py --task TR-match-029 --output /tmp/corpus-v4-inspect
 
 ## 2. Verify a published round
 
-A round is published in two archives under `results/corpus-v4/`: the aggregate
-reports (`summary.json`, `cells.csv`, `tasks.csv`, `mutation-summary.json`,
-`REPORT.md`), and the round directory itself, holding each cell's final package,
-workspace diff, transcript and token telemetry. Extract the round directory
-under `evaluation-artifacts/`, check out its `source_commit`, rebuild
+A round is published in two archives. The aggregate archive, under
+`results/corpus-v4/`, holds the analysis (`REPORT.md`, `analysis.json`,
+`cells.csv`, `requests.csv`, `pricing.json`) beside the round's
+`mutation-summary.json`, `audit.json`, `config.json`, `plugins.json`,
+`preflight.json` and `pilot-manifest.json`. The round directory itself, with
+each cell's final package, workspace diff, transcript and token telemetry, is
+several hundred megabytes and is archived with the paper's artifact. Extract
+it under `evaluation-artifacts/`, check out its `source_commit`, rebuild
 `move-flow`, and re-score it:
 
 ```text
@@ -148,14 +154,41 @@ match their hashes, so a successful run means the published scores follow from
 the published contracts. Compare the new `mutation-summary.json` with the
 archived one.
 
+The analysis re-derives from the round directory alone:
+
+```text
+python3 -m analysis.codex_round_report --round-dir evaluation-artifacts/ROUND \
+  --output /tmp/ROUND-report
+```
+
+It prices every recorded model request with the archived table in
+[`analysis/pricing.json`](../analysis/pricing.json): input includes the cached
+tokens, output includes the reasoning tokens and is billed once, and the
+long-context rate applies only to a single request above the threshold, never
+to a sum over requests. Startup warmups are priced but reported apart from the
+task cost. The estimands are those of [`DESIGN.md`](../DESIGN.md) section 6: the
+task is the unit, a contrast is the equal-weight mean over tasks of the
+within-task block differences, intervals are 95% task-cluster percentile
+bootstraps, and `C1` and `C2` are tested with a blocked randomization test,
+Holm-adjusted. The seed is fixed, so `analysis.json` must match the archived
+one exactly.
+
 ## 3. Rerun the experiment
 
-This repeats the published protocol: Terra 5.6 (`gpt-5.6-terra`) through the
-Codex CLI at `high` effort, three arms, four replicates of all 26 tasks (312
-cells), concurrency 3, the ordinary mutant set withheld as a disqualification
-gate and the held-out set used for scoring. A full round took about four and a
-half hours and cost about $78 at API-equivalent prices ($2.00 per million input
-tokens, $0.20 cached, $12.00 output), a mean of $0.25 per cell.
+This repeats the protocol of round 7, which runs once per model: Terra 5.6
+(`terra56`, `gpt-5.6-terra`) and Sol 6.1 (`sol61`, `gpt-6.1-sol`), each through
+the Codex CLI at `high` effort, three arms, four replicates of all 26 tasks (312
+cells per model), concurrency 3, the ordinary mutant set withheld as a
+disqualification gate and the held-out set used for scoring. Each task starts
+from its task tree, with complete contracts for the helpers its target calls,
+and WP's output is not simplified. Round 6, Terra under an earlier protocol
+that asked for helper contracts and simplified WP's output, took about four and
+a half hours and cost $82 at API-equivalent prices, a mean of $0.26 per cell, as
+`analysis.codex_round_report` prices it; a four-task pilot of the current
+protocol with Terra cost $0.16 per cell over the agent-only and hybrid-guided
+arms. Prices per million tokens are
+$2.00 input, $0.20 cached and $12.00 output for Terra 5.6, and $2.00, $0.10 and
+$10.00 for Sol 6.1.
 
 **Environment.**
 
@@ -165,11 +198,11 @@ cc -O2 -Wall -Wextra -Werror sandbox/landlock_exec.c -o sandbox/landlock-exec
 codex login
 ```
 
-Install the pinned Codex CLI and its code-mode host as the runbook's
-*Environment* section shows (`rust-v0.153.2` release assets into
-`evaluation-artifacts/tools/codex-0.153.2` for `terra56`; `sol61` pins
-`rust-v0.160.1`), and put that directory first on `PATH`. The harness refuses
-any other version or host.
+Install the Codex CLI release the round's profile pins, with its code-mode
+host, as the runbook's *Environment* section shows: `rust-v0.153.2` for
+`terra56` and `rust-v0.160.1` for `sol61`, each into
+`evaluation-artifacts/tools/codex-<version>`. The round puts that directory
+first on `PATH`; the harness refuses any other version or host.
 
 `codex login` must sign in with a ChatGPT account that has Codex access to the
 round's model (`gpt-5.6-terra`, `gpt-6.1-sol`): the round configuration pins the
@@ -183,9 +216,11 @@ limits; the dollar figures above are API-equivalent estimates.
 its own directory and is never rewritten.
 
 ```text
-ROUND=evaluation-artifacts/corpus4-ROUNDID
+MODEL=terra56 CODEX=0.153.2          # or MODEL=sol61 CODEX=0.160.1
+export PATH=$PWD/evaluation-artifacts/tools/codex-$CODEX:$PATH
+ROUND=evaluation-artifacts/corpus4-ROUNDID-codex-$MODEL-high
 COMMIT=$(git rev-parse HEAD)
-python3 -m harness.model_profile select --model terra56 --config config/default.json \
+python3 -m harness.model_profile select --model $MODEL --config config/default.json \
   --output $ROUND/config.json --source-commit $COMMIT
 for arm in agent-only hybrid-guided hybrid-flexible; do
   move-flow plugin $ROUND/plugins/acceptance/${arm//-/_} --inference-tactic $arm \
@@ -209,12 +244,15 @@ and write `$ROUND/plugins.json`:
 ```
 
 **Screen under the round's configuration, then schedule.** The scheduler only
-admits targets screened with the same configuration and binaries.
+admits targets screened with the same configuration and binaries. The screen
+rewrites `corpus-v4/screening`, and the next round's screen, for another model,
+rewrites it again, so keep the copy the round was scheduled from.
 
 ```text
 python3 -m harness.screen_v3 --manifest corpus-v4/manifest.json \
   --experiment-config $ROUND/config.json --corpus-config config/corpus.json \
   --results-dir corpus-v4/screening --output corpus-v4/screening/summary.json --all-ready
+cp -r corpus-v4/screening $ROUND/screening
 python3 -m harness.pilot --corpus-manifest corpus-v4/manifest.json \
   --mutants-root corpus-v4/mutants-scoring --disqualification-mutants-root corpus-v4/mutants \
   --plugins $ROUND/plugins.json --output-dir $ROUND/schedule --source-commit $COMMIT \
@@ -222,9 +260,12 @@ python3 -m harness.pilot --corpus-manifest corpus-v4/manifest.json \
   --tasks $(python3 -c "import json;print(' '.join(json.load(open('corpus-v4/metadata/selection.json'))['selected']))")
 ```
 
-The scheduler warns when `COMMIT` is not on `main`. A round meant for
-publication must be scheduled against a commit on `main`, so that its apparatus
-can be fetched later.
+The scheduler records whether `COMMIT` is on `main` and warns when it is not.
+A round meant for publication must name a commit that can be fetched later.
+aptos-core squash-merges pull requests, so a commit of a pull request survives
+only through `refs/pull/<n>/head`: schedule against a pushed commit of the
+pull request, add later changes as new commits on top, never rebase or amend
+the branch, and record the pull request with the round.
 
 **Preflight, run, audit, score.**
 
@@ -238,7 +279,18 @@ python3 -m harness.model_profile exec --config $ROUND/config.json -- \
   --report $ROUND/launch-report.json
 ```
 
-then audit and score exactly as in section 2. Preflight checks the sandbox, the
+then audit, score and analyze exactly as in section 2, writing the audit to
+`$ROUND/audit.json` and the analysis to `$ROUND/report`, and build the
+aggregate archive:
+
+```text
+cp $ROUND/config.json $ROUND/plugins.json $ROUND/preflight.json $ROUND/audit.json \
+  $ROUND/mutation-summary.json $ROUND/schedule/pilot-manifest.json $ROUND/report/
+python3 -m harness.publication build --source $ROUND/report \
+  --output results/corpus-v4/$(basename $ROUND).tar.gz --name $(basename $ROUND)
+```
+
+Preflight checks the sandbox, the
 pinned CLI and host, `move-flow`, the solvers, credentials, the endpoint and the
 schedule, and rehearses an outage without spending model budget. A run that is
 interrupted resumes with `--resume`; the runbook's *Interrupted rounds* section

@@ -10,7 +10,7 @@
   "task_id": "TR-nonzero-031",
   "task_tree_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
   "threshold_seconds": 20,
-  "wall_seconds": 5.4,
+  "wall_seconds": 4.4,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
   "wp_hard": true,

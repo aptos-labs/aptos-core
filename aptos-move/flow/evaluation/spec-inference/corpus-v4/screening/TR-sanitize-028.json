@@ -10,7 +10,7 @@
   "task_id": "TR-sanitize-028",
   "task_tree_sha256": "ffca6b7834bab8e4e692226a0afba2a72cb1ae6c59cb0288e3c846654e978492",
   "threshold_seconds": 20,
-  "wall_seconds": 5.8,
+  "wall_seconds": 7.0,
   "well_formed": true,
   "wp_failure_kind": "untrusted_inferred_contract",
   "wp_hard": true,
