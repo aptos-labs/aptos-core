@@ -1,4 +1,14 @@
 Move prover returns: exiting with verification errors
+warning: opaque call to `loop_memory_havoc::rec_bump` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+    ┌─ tests/sources/functional/loop_memory_havoc.move:426:5
+    │
+426 │ ╭     spec rec_bump {
+427 │ │         pragma opaque;
+428 │ │         requires exists<R>(a);
+429 │ │         ensures R[a].x == old(R[a].x);
+430 │ │     }
+    │ ╰─────^
+
 error: post-condition does not hold
    ┌─ tests/sources/functional/loop_memory_havoc.move:19:9
    │
@@ -250,68 +260,34 @@ error: post-condition does not hold
     =     at tests/sources/functional/loop_memory_havoc.move:407: fv_forward_depth2_fails (spec)
 
 error: precondition does not hold at this call
-    ┌─ tests/sources/functional/loop_memory_havoc.move:427:9
-    │
-427 │         requires exists<R>(a);
-    │         ^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
-    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
-    =         a = <redacted>
-    =         n = <redacted>
-    =         depth = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:415: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:420: rec_bump
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:421: rec_bump
-    =     enter loop, variable(s) $t4 havocked and reassigned
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
-    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
-    =         a = <redacted>
-    =         n = <redacted>
-    =         depth = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:415: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:420: rec_bump
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:421: rec_bump
-    =     enter loop, variable(s) $t4 havocked and reassigned
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
-
-error: precondition does not hold at this call
-    ┌─ tests/sources/functional/loop_memory_havoc.move:427:9
-    │
-427 │         requires exists<R>(a);
-    │         ^^^^^^^^^^^^^^^^^^^^^^
-    │
-    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
-    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
-    =         a = <redacted>
-    =         n = <redacted>
-    =         depth = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:415: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:420: rec_bump
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:421: rec_bump
-    =     enter loop, variable(s) $t4 havocked and reassigned
-    =         <redacted> = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
-
-error: post-condition does not hold
     ┌─ tests/sources/functional/loop_memory_havoc.move:428:9
     │
-428 │         ensures R[a].x == old(R[a].x);
+428 │         requires exists<R>(a);
+    │         ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:428: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
+    =         a = <redacted>
+    =         n = <redacted>
+    =         depth = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:415: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:420: rec_bump
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:421: rec_bump
+    =     enter loop, variable(s) $t4 havocked and reassigned
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:422: rec_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:428: rec_bump (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/loop_memory_havoc.move:429:9
+    │
+429 │         ensures R[a].x == old(R[a].x);
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:427: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:428: rec_bump (spec)
     =     at tests/sources/functional/loop_memory_havoc.move:414: rec_bump
     =         a = <redacted>
     =         n = <redacted>
@@ -323,22 +299,22 @@ error: post-condition does not hold
     =     enter loop, variable(s) $t4 havocked and reassigned
     =         <redacted> = <redacted>
     =     at tests/sources/functional/loop_memory_havoc.move:425: rec_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:428: rec_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:429: rec_bump (spec)
 
 error: post-condition does not hold
-    ┌─ tests/sources/functional/loop_memory_havoc.move:445:9
+    ┌─ tests/sources/functional/loop_memory_havoc.move:446:9
     │
-445 │         ensures G<T>[a].v == old(G<T>[a].v);
+446 │         ensures G<T>[a].v == old(G<T>[a].v);
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/loop_memory_havoc.move:435: gen_bump
-    =     at tests/sources/functional/loop_memory_havoc.move:444: gen_bump (spec)
-    =     at tests/sources/functional/loop_memory_havoc.move:435: gen_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:436: gen_bump
+    =     at tests/sources/functional/loop_memory_havoc.move:445: gen_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:436: gen_bump
     =         a = <redacted>
     =         n = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:436: gen_bump
-    =         i = <redacted>
     =     at tests/sources/functional/loop_memory_havoc.move:437: gen_bump
+    =         i = <redacted>
+    =     at tests/sources/functional/loop_memory_havoc.move:438: gen_bump
     =     enter loop, variable(s) i havocked and reassigned
     =         i = <redacted>
-    =     at tests/sources/functional/loop_memory_havoc.move:445: gen_bump (spec)
+    =     at tests/sources/functional/loop_memory_havoc.move:446: gen_bump (spec)

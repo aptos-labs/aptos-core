@@ -1,0 +1,72 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavioral_predicate_cycle.move:26:18
+   │
+26 │     spec use_f { ensures result == 7; }
+   │                  ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:22: use_f
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:23: use_f
+   =         c = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:24: use_f
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:14: f
+   =         cl = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:12: leaf
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:26: use_f (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavioral_predicate_cycle.move:47:18
+   │
+47 │     spec use_f { ensures result == 7; }
+   │                  ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:43: use_f
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:44: use_f
+   =         c = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:45: use_f
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:35: f
+   =         cl = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:33: leaf
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:47: use_f (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavioral_predicate_cycle.move:57:9
+   │
+57 │         ensures ensures_of<f>(x, result) && result != result_of<f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:52: f
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:55: f (spec)
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:57: f (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavioral_predicate_cycle.move:65:18
+   │
+65 │     spec use_f { ensures result == 7; }
+   │                  ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:62: use_f
+   =         c = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:63: use_f
+   =         result = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:65: use_f (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/behavioral_predicate_cycle.move:84:18
+   │
+84 │     spec use_g { ensures result == 7; }
+   │                  ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:81: use_g
+   =         f = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:82: use_g
+   =         result = <redacted>
+   =     at tests/sources/regression/behavioral_predicate_cycle.move:84: use_g (spec)

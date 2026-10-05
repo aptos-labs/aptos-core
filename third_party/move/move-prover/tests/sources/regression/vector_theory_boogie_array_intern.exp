@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+error: boogie rejected the generated code: Function with :inline attribute must have a body
+  ┌─ <unknown>:1:1
+  │
+1 │ <unknown>
+  │ ^^^^^^^^^
