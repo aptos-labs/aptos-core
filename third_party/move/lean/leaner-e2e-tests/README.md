@@ -77,8 +77,10 @@ The `LEANER_E2E_SUITE` environment variable selects one suite: `move`, `rust`,
 `LeanerE2ETestDriver` executable links (`moreLinkObjs` in the `lakefile.lean`;
 the package libraries and the language server stay free of the native
 dependency). Lake owns the native build — the `monovm_staticlib` target runs
-Cargo in the explicitly selected release profile from this checkout, and
-`monovm_shim` compiles the shim with `leanc`. The suite runs the whole
+Cargo in the explicitly selected release profile from this checkout on each
+build, letting Cargo check all transitive dependencies. The resulting archive
+trace controls relinking of the driver. The `monovm_shim` target compiles the
+shim with `leanc`. The suite runs the whole
 differential story only through the linked executable; `LeanerE2ETests.MonoVM`
 modules elaborate under `lake env lean` but do not evaluate there.
 

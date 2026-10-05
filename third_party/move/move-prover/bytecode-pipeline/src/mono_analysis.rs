@@ -1899,13 +1899,30 @@ impl Analyzer<'_> {
                 &fun.inst,
             )
         };
+        // The backend also interprets a spec-less function's ensures from its
+        // body. These expressions can introduce dependencies absent from both
+        // its source specification and its derived abort conditions.
+        let derived_ensures =
+            if spec_derivation::has_derived_behavior(self.env, fun.to_qualified_id(), &fun.inst) {
+                spec_derivation::derive_fun_ensures_conditions(
+                    self.env,
+                    fun.to_qualified_id(),
+                    &fun.inst,
+                )
+            } else {
+                None
+            };
         let saved_inst = self.inst_opt.replace(fun.inst.clone());
         for exp in exps {
             self.analyze_exp(&exp);
         }
         // Derived conditions are already instantiated at `fun.inst`.
         self.inst_opt = None;
-        for exp in derived.into_iter().flatten() {
+        for exp in derived
+            .into_iter()
+            .flatten()
+            .chain(derived_ensures.into_iter().flatten())
+        {
             self.analyze_exp(&exp);
         }
         self.inst_opt = saved_inst;

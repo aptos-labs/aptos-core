@@ -9,8 +9,13 @@
   "target": "aptos_framework::extracted_transaction_limits::validate_tiers",
   "task_id": "TL-tiers-038",
   "threshold_seconds": 20,
-  "wall_seconds": 5.6,
+  "wall_seconds": 7.4,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

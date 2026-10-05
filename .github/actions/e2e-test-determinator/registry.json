@@ -35,6 +35,15 @@
     ],
     "docker_images": true
   },
+  "lean": {
+    "description": "Lean suites, XAST/XIR compiler integration, and linked MonoVM differential tests",
+    "workflow": ".github/workflows/lean.yaml",
+    "job": "build-and-test",
+    "nightly_jobs": [
+      "lean"
+    ],
+    "docker_images": false
+  },
   "node-api-compatibility": {
     "description": "Generated OpenAPI specification compatibility",
     "workflow": ".github/workflows/node-api-compatibility-tests.yaml",

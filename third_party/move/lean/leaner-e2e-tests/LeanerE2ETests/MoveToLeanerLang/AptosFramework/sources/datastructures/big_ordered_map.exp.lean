@@ -598,7 +598,7 @@ leaner module aptos_framework::big_ordered_map where
         some(
           do
             let child := destroy_some(self)
-            spec assume save_state_anchor!(108)
+            spec assume save_state_anchor!(105)
             let Child<V>::Leaf { value := value } := child
             value)
       else
@@ -644,7 +644,7 @@ leaner module aptos_framework::big_ordered_map where
     self' := core.prim.reverseSliceVector(self', 0, self'.length)
     v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
-    spec assume folds_capture_anchor!(104)
+    spec assume folds_capture_anchor!(101)
     let len := self'.length
     assert!(len == v2.length, 131074)
     while len > 0 do
@@ -665,15 +665,15 @@ leaner module aptos_framework::big_ordered_map where
       self.add(key, value)
       len := len - 1
     where
-      invariant with_state_anchor!(104, old(self')).length >= len
+      invariant with_state_anchor!(101, old(self')).length >= len
       invariant len == self'.length
       invariant len == v2.length
-      invariant with_state_anchor!(104, old(self')).length
-        == with_state_anchor!(104, old(v2)).length
+      invariant with_state_anchor!(101, old(self')).length
+        == with_state_anchor!(101, old(v2)).length
       invariant ∀ (j in 0 .. len),
-        self'[j] == with_state_anchor!(104, old(self'))[j]
-      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(104, old(v2))[j]
-      invariant ∀ (j in len .. with_state_anchor!(104, old(self')).length), true
+        self'[j] == with_state_anchor!(101, old(self'))[j]
+      invariant ∀ (j in 0 .. len), v2[j] == with_state_anchor!(101, old(v2))[j]
+      invariant ∀ (j in len .. with_state_anchor!(101, old(self')).length), true
       invariant true
     core.prim.destroyEmptyVector(self')
     core.prim.destroyEmptyVector(v2)

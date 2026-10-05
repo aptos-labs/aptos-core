@@ -807,6 +807,8 @@ mod tests {
             inference_tactic: crate::evaluation::InferenceTactic::HybridGuided,
             evaluation_mode: false,
             feedback_level: crate::evaluation::FeedbackLevel::Acceptance,
+            aborts_if_is_strict: false,
+            infer_unspecified_helpers: false,
         });
         assert!(
             names.iter().any(|n| n == "move_replay_transaction"),

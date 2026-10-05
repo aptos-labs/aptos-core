@@ -204,11 +204,16 @@ jobs:
       SKIP_JOB: false
       POST_TO_SLACK: false
 
+  lean:
+    uses: ./.github/workflows/lean.yaml
+    with:
+      GIT_SHA: ${{ github.sha }}
+
   # Only a job-level `cancelled()` reflects a cancelled run; inside a job that
   # starts after the cancellation, step-level `cancelled()` is false.
   cancellation:
     name: Record a cancelled run
-    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed]
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed, lean]
     if: cancelled()
     runs-on: ubuntu-latest
     steps:
@@ -216,7 +221,7 @@ jobs:
 
   result:
     name: Nightly full-suite result
-    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed, cancellation]
+    needs: [cargo-tests, batch-encryption, smoke-tests, e2e-images, cli-e2e, node-api-compatibility, docker-release-images, ci-helper-tests, forge-baseline, forge-deployed, lean, cancellation]
     if: always()
     runs-on: ubuntu-latest
     permissions:

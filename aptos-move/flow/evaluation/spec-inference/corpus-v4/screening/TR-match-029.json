@@ -9,8 +9,13 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::match_order_and_get_next_from_bulk_order",
   "task_id": "TR-match-029",
   "threshold_seconds": 20,
-  "wall_seconds": 4.9,
+  "wall_seconds": 7.3,
   "well_formed": true,
-  "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

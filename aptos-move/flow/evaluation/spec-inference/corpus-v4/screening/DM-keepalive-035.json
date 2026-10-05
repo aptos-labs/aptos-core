@@ -9,8 +9,13 @@
   "target": "aptos_experimental::extracted_dead_mans_switch_tracker::keep_alive",
   "task_id": "DM-keepalive-035",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 4.7,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

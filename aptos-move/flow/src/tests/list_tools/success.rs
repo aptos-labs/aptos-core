@@ -51,6 +51,8 @@ fn inventory_at(
         inference_tactic: tactic,
         evaluation_mode,
         feedback_level,
+        aborts_if_is_strict: false,
+        infer_unspecified_helpers: false,
     })
 }
 

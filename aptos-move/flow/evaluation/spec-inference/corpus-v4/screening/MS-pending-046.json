@@ -9,8 +9,13 @@
   "target": "aptos_framework::extracted_multisig_account::get_pending_transactions",
   "task_id": "MS-pending-046",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 4.1,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

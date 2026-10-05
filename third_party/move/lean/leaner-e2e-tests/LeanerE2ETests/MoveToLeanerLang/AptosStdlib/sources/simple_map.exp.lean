@@ -465,6 +465,7 @@ leaner module aptos_std::simple_map where
   -- This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
   -- while remove would continue from the identified index to the end of the vector.
   -- We need to reverse the vector to consume it efficiently
+  @[weight = 50]
   spec fun «spec_fold$gen$1» {T0} {T1}(
     «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : Int,
     _fold_anchor_ctx_0 : Vector<Element<T0, T1> >

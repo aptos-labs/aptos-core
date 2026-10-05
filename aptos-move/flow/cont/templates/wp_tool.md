@@ -28,12 +28,19 @@ Interpret the result per function:
   `pragma aborts_if_is_partial`, document the named callee, and do not rewrite
   the caller or remove the pragma to claim totality. The inherited-partiality
   rule below defines which such boundaries the candidate check accepts.
-- **Transparent callee without a complete opaque contract:** WP cannot complete
-  the caller. If the named callee is in the editable scope (for example, in the
-  current module), infer and verify its opaque contract first, then rerun WP on
-  the caller. If it is outside the editable scope, report the dependency as a
+- **Transparent callee without a complete opaque contract:** a callee without
+  any specification is named through `result_of`/`ensures_of`/`aborts_of`,
+  which its body interprets when it has no loops and no global memory access.
+  Otherwise WP cannot complete the caller. If the named callee is in the
+  editable scope (for example, in the current module), complete its opaque
+  contract (or resolve the diagnostics WP reported for it) first, then rerun
+  WP on the caller. If it is outside the editable scope, report the dependency as a
   corpus/package blocker: its owner must provide a complete verified opaque
   contract. Never use this case to justify `aborts_if_is_partial` on the caller.
+- **Write through a reference a callee returns:** when the callee selects the
+  vector element, map entry, or one of several places the reference points
+  to, no contract states that choice, so WP infers nothing for the caller.
+  Write the caller's contract directly from both bodies.
 - **Unmodeled prover intrinsic:** this is a WP tool bug. Intrinsics execute a
   prover builtin rather than their Move body; do not add a source-level spec or
   make them opaque. WP must supply the builtin value, abort, and mutation

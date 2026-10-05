@@ -106,8 +106,8 @@ use move_binary_format::file_format::{Bytecode as MoveBytecode, CodeOffset};
 use move_core_types::function::ClosureMask;
 use move_model::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, MemoryLabel, MemoryRange, Operation as AstOp,
-        Pattern, PropertyValue, QuantKind, RewriteResult, TempIndex, Value,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, MemoryLabel, MemoryRange,
+        Operation as AstOp, Pattern, PropertyValue, QuantKind, RewriteResult, TempIndex, Value,
     },
     exp_generator::{ExpGenerator, RangeCheckKind},
     exp_rewriter::{strip_all_olds, ExpRewriter, ExpRewriterFunctions, RewriteTarget},
@@ -119,12 +119,12 @@ use move_model::{
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, CONDITION_INFERRED_PROP, CONDITION_INFERRED_SATHARD,
-        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, INTRINSIC_FUN_MAP_HAS_KEY, OPAQUE_PRAGMA,
+        CONDITION_INFERRED_VACUOUS, INFERENCE_PRAGMA, OPAQUE_PRAGMA,
     },
     sourcifier::Sourcifier,
     spec_derivation,
     symbol::Symbol,
-    ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
+    ty::{PrimitiveType, Type, BOOL_TYPE},
     well_known,
 };
 use move_stackless_bytecode::{
@@ -134,11 +134,12 @@ use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     graph::{DomRelation, Graph},
     stackless_bytecode::{
-        AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, Label, Operation, PropKind,
+        AbortAction, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind, Label,
+        Operation, PropKind,
     },
     stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
 };
-use num::{BigInt, ToPrimitive, Zero};
+use num::{BigInt, Zero};
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
@@ -154,6 +155,9 @@ const INFERRED_LABEL_PREFIX: &str = "S";
 /// is not rendered into that diagnostic.
 const MAX_INFERRED_CONDITION_SOURCE_BYTES: usize = 8 * 1024;
 const MAX_INFERRED_FUNCTION_SOURCE_BYTES: usize = 32 * 1024;
+
+/// Prefix of the placeholders for the index at which a reference was borrowed.
+const BORROW_INDEX_PREFIX: &str = "$borrow_index";
 
 /// Bounded loop evidence is an agent hint, not a source dump.
 const MAX_LOOP_HEAD_FACT_SOURCE_BYTES: usize = 512;
@@ -189,7 +193,6 @@ struct SpecInferenceRun {
 pub enum PartialAbortReason {
     MemoryHavoc,
     UnknownCallee(QualifiedId<FunId>),
-    DynamicCall,
 }
 
 /// State at a program point during backward WP analysis, also used in bytecode dumps.
@@ -1300,25 +1303,63 @@ fn mark_transparent_result_dependencies_solver_hard(env: &GlobalEnv) {
     }
 }
 
+/// Whether an inferred condition relies on a `result_of` carrier for a
+/// transparent Move function. The carrier is the concrete result witness for
+/// an opaque call summarized by the behavioral-predicate backend. For a
+/// transparent call the prover executes the body instead, so an independently
+/// generated carrier is not related to that runtime result and cannot justify
+/// a caller postcondition such as `result == result_of<f>(args)`.
+///
+/// When the transparent function's own specification determines its results,
+/// the carrier it constrains is the actual result, and the condition relies
+/// on nothing unrelated.
+///
+/// Such clauses are retained for inspection but marked `sathard`; an abort
+/// clause relying on one leaves the contract partial.
 fn condition_depends_on_transparent_result(env: &GlobalEnv, exp: &Exp) -> bool {
     let mut found = false;
     exp.visit_pre_order(&mut |node| {
-        let ExpData::Call(_, AstOp::Behavior(move_model::ast::BehaviorKind::ResultOf, _), args) =
-            node
-        else {
+        let ExpData::Call(_, AstOp::Behavior(BehaviorKind::ResultOf, _), args) = node else {
             return true;
         };
         if let Some(fun_exp) = args.first()
-            && let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref()
+            && let ExpData::Call(closure_id, AstOp::Closure(module_id, fun_id, _), _) =
+                fun_exp.as_ref()
             && !env
                 .get_function((*module_id).qualified(*fun_id))
                 .is_opaque()
+            && !spec_derivation::spec_determines_results(env, (*module_id).qualified(*fun_id))
+            && !spec_derivation::has_derived_behavior(
+                env,
+                (*module_id).qualified(*fun_id),
+                &env.get_node_instantiation(*closure_id),
+            )
         {
             found = true;
         }
         !found
     });
     found
+}
+
+/// Whether `module` depends on `target`, directly or transitively, through code
+/// or specifications.
+fn module_depends_on(
+    env: &GlobalEnv,
+    module: ModuleId,
+    target: ModuleId,
+    visited: &mut BTreeSet<ModuleId>,
+) -> bool {
+    if module == target {
+        return true;
+    }
+    if !visited.insert(module) {
+        return false;
+    }
+    env.get_module(module)
+        .get_used_modules(true)
+        .into_iter()
+        .any(|used| module_depends_on(env, used, target, visited))
 }
 
 fn propagate_inferred_partial_aborts(env: &GlobalEnv) {
@@ -1365,21 +1406,32 @@ fn inferred_abort_depends_on_partial_callee(
     {
         return false;
     }
-    let mut found = false;
-    condition.exp.visit_pre_order(&mut |node| {
-        if let ExpData::Call(_, AstOp::Behavior(move_model::ast::BehaviorKind::AbortsOf, _), args) =
-            node
-            && let Some(fun_exp) = args.first()
-            && let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref()
-            && env
+    // A partial closure taints the condition as the function of an
+    // `aborts_of`, and as an argument anywhere, since a callee's `aborts_of`
+    // includes the aborts of the function values passed to it. As the
+    // function of another predicate it contributes no aborts.
+    fn is_partial_closure(env: &GlobalEnv, exp: &ExpData) -> bool {
+        matches!(exp, ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _)
+            if env
                 .get_function((*module_id).qualified(*fun_id))
-                .is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)
-        {
-            found = true;
-        }
-        !found
-    });
-    found
+                .is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false))
+    }
+    fn depends(env: &GlobalEnv, exp: &Exp) -> bool {
+        let mut found = false;
+        exp.visit_pre_order(&mut |node| {
+            if let ExpData::Call(_, AstOp::Behavior(kind, _), args) = node
+                && let Some((target, call_args)) = args.split_first()
+            {
+                found = (*kind == BehaviorKind::AbortsOf && is_partial_closure(env, target))
+                    || call_args.iter().any(|arg| depends(env, arg));
+                return false;
+            }
+            found = is_partial_closure(env, node);
+            !found
+        });
+        found
+    }
+    depends(env, &condition.exp)
 }
 
 /// Behavioral predicates are currently left uninterpreted when an abort
@@ -1667,6 +1719,47 @@ fn run_spec_inference_analysis(
     let mut analyzer = SpecInferenceAnalyzer::new_with_evidence_seed(fun_env, data, evidence_seed);
     let (wp_map, has_skipped_blocks) = analyzer.analyze();
 
+    // A write WP cannot phrase would be lost from the inferred
+    // post-state, so no specification is inferred at all.
+    if let Some(state) = wp_map.get(&0).or_else(|| wp_map.get(&1)) {
+        let leftover = state.ensures.iter().chain(&state.aborts).any(|exp| {
+            exp.as_ref().any(&mut |e| {
+                matches!(e, ExpData::LocalVar(_, s)
+                    if analyzer.global_env().symbol_pool().string(*s).starts_with(BORROW_INDEX_PREFIX))
+            })
+        });
+        if leftover && analyzer.unsupported_writes.borrow().is_empty() {
+            analyzer.unsupported_writes.borrow_mut().push((
+                fun_env.get_loc(),
+                "the vector element or map entry a reference points to is not known at the \
+                 function's entry"
+                    .to_string(),
+            ));
+        }
+    }
+    let unsupported_writes = analyzer.unsupported_writes.take();
+    if !unsupported_writes.is_empty() {
+        if !silent_on_failure {
+            for (loc, reason) in unsupported_writes {
+                fun_env.module_env.env.diag(
+                    Severity::Error,
+                    &loc,
+                    &format!(
+                        "WP cannot infer a specification for `{}`: {}.",
+                        fun_env.get_full_name_str(),
+                        reason
+                    ),
+                );
+            }
+        }
+        drop(analyzer);
+        return SpecInferenceRun {
+            annotation: annotate.then_some(WPAnnotation(wp_map)),
+            entry_state: None,
+            incomplete: true,
+        };
+    }
+
     if has_skipped_blocks {
         if !silent_on_failure {
             fun_env.module_env.env.diag(
@@ -1799,10 +1892,8 @@ fn run_spec_inference_analysis(
         // so any tautologies it produces are folded away.
         analyzer.eliminate_write_of(&mut state);
 
-        // Call arguments may become constants only after backward substitution
-        // (for example, string::utf8(b"") initially receives a temporary).
-        // Reduce now-known non-aborting behavioral predicates before boolean
-        // simplification so they cannot survive inside path conditions.
+        // Reduce behavioral predicates over callees known not to abort before
+        // boolean simplification so they cannot survive inside path conditions.
         state = state.map(|exp| analyzer.reduce_known_non_aborting_behaviors(exp));
 
         // Simplify conditions: constant folding, arithmetic/boolean
@@ -1939,7 +2030,7 @@ fn update_spec<'env>(
         let is_sathard = !is_vacuous
             && (solver_hard_summary
                 || has_top_level_quantifier(exp)
-                || has_untrusted_transparent_result_of(env, exp));
+                || condition_depends_on_transparent_result(env, exp));
         let inferred_value = if is_vacuous {
             PropertyValue::Symbol(vacuous_sym)
         } else if is_sathard {
@@ -2043,11 +2134,7 @@ fn update_spec<'env>(
                     | AstOp::SpecRemove(r)
                     | AstOp::SpecUpdate(r)
                     | AstOp::SpecFunction(_, _, r) => r.post,
-                    AstOp::Behavior(
-                        move_model::ast::BehaviorKind::EnsuresOf
-                        | move_model::ast::BehaviorKind::ResultOf,
-                        r,
-                    ) => r.post,
+                    AstOp::Behavior(BehaviorKind::EnsuresOf | BehaviorKind::ResultOf, r) => r.post,
                     _ => None,
                 };
                 if let Some(label) = post {
@@ -2187,12 +2274,14 @@ fn update_spec<'env>(
             .iter()
             .filter(|e| !is_trivial_false(e) && (!is_trivial_true(e) || !state.is_normal_return))
             .collect();
+        // A clause WP cannot justify leaves the contract partial. A clause
+        // which holds but is expensive for the solver (`sathard` for its
+        // top-level quantifier) is exact and does not.
         let has_flagged_abort = aborts_conds.iter().any(|exp| {
             has_unconstrained_quant_var(exp)
                 || havoc_unreliable
                 || solver_hard_summary
-                || has_top_level_quantifier(exp)
-                || has_untrusted_transparent_result_of(env, exp)
+                || condition_depends_on_transparent_result(env, exp)
         });
         // A loop invariant can retain `!aborts_of<dynamic_closure>(...)` in an
         // ensures summary after the loop transfer has lost the call's own
@@ -2204,11 +2293,7 @@ fn update_spec<'env>(
                 exp.as_ref().any(&mut |e| {
                     matches!(
                         e,
-                        ExpData::Call(
-                            _,
-                            AstOp::Behavior(move_model::ast::BehaviorKind::AbortsOf, _),
-                            _
-                        )
+                        ExpData::Call(_, AstOp::Behavior(BehaviorKind::AbortsOf, _), _)
                     )
                 })
             });
@@ -2239,14 +2324,16 @@ fn update_spec<'env>(
                             if callee.module_env.is_target() {
                                 format!(
                                     "transparent callee `{callee_name}` is inside the editable WP \
-                                     scope but has no complete opaque contract; infer and verify an \
-                                     opaque specification for that callee first, then rerun WP for \
-                                     the caller"
+                                     scope and has neither a complete opaque contract nor a body \
+                                     which describes its behavior exactly (no loops, no global \
+                                     memory); infer and verify an opaque specification for that \
+                                     callee first, then rerun WP for the caller"
                                 )
                             } else {
                                 format!(
                                     "transparent callee `{callee_name}` is outside the editable WP \
-                                     scope and has no complete opaque contract; WP cannot construct \
+                                     scope and has neither a complete opaque contract nor a body \
+                                     which describes its behavior exactly; WP cannot construct \
                                      a complete caller specification. The package or corpus must \
                                      provide and verify a complete opaque contract for that callee \
                                      before the caller is rerun"
@@ -2258,14 +2345,13 @@ fn update_spec<'env>(
                             )
                         }
                     },
-                    PartialAbortReason::DynamicCall => {
-                        "a dynamic call has no trusted complete abort summary".to_owned()
-                    },
                 });
             }
             if has_flagged_abort {
                 partial_abort_reasons.push(
-                    "an emitted abort condition is flagged `vacuous` or `sathard`".to_owned(),
+                    "an emitted abort condition is `vacuous` or relies on a `result_of` which is \
+                     not related to the callee's actual result"
+                        .to_owned(),
                 );
             }
             if dropped_uninformative_abort {
@@ -2319,6 +2405,7 @@ fn update_spec<'env>(
     // clauses are a lower bound so callers do not assume abort completeness.
     let num_params = fun_env.get_parameter_count();
     let mut dropped_abort_condition = false;
+    let mut dropped_closure_abort_condition = false;
     spec.conditions.retain(|condition| {
         if !condition.properties.contains_key(&inferred_sym) {
             return true;
@@ -2333,7 +2420,14 @@ fn update_spec<'env>(
         if references_only_params && !unsourcifiable_behavior && !unsourcifiable_ghost {
             return true;
         }
-        dropped_abort_condition |= matches!(condition.kind, ConditionKind::AbortsIf);
+        let is_abort = matches!(condition.kind, ConditionKind::AbortsIf);
+        if references_only_params && !unsourcifiable_ghost {
+            // Only the closure has no spelling, which is a limit of the
+            // source syntax rather than of WP.
+            dropped_closure_abort_condition |= is_abort;
+            return false;
+        }
+        dropped_abort_condition |= is_abort;
         if partial_abort_reasons.is_empty() {
             env.diag(
                 Severity::Bug,
@@ -2347,39 +2441,49 @@ fn update_spec<'env>(
         }
         false
     });
+    if dropped_closure_abort_condition {
+        partial_abort_reasons.push(
+            "an abort condition passes a closure to a behavioral predicate, which has no \
+             source-level spelling"
+                .to_owned(),
+        );
+    }
     if dropped_abort_condition {
         partial_abort_reasons
             .push("an abort condition had no representable source-level spelling".to_owned());
+    }
+    if dropped_abort_condition || dropped_closure_abort_condition {
         spec.properties.insert(
             pool.make(ABORTS_IF_IS_PARTIAL_PRAGMA),
             PropertyValue::Value(Value::Bool(true)),
         );
     }
 
-    // A generated companion spec must not introduce a module dependency which
-    // the implementation did not already have.  In particular, ambient
+    // A generated companion spec must not create a module cycle. Ambient
     // assumptions propagated from a caller can mention that caller's resource,
-    // creating a reverse edge and a module cycle when sourcified.  Drop those
-    // conditions as another sound weakening boundary.
+    // and using it here adds an edge back to a module which depends on this
+    // one. Drop those conditions as another sound weakening boundary; a module
+    // which does not depend on this one can be used freely.
+    let this_module = fun_env.module_env.get_id();
     let mut dropped_dependency_abort = false;
     spec.conditions.retain(|condition| {
         if !condition.properties.contains_key(&inferred_sym) {
             return true;
         }
-        let used_modules = expression_module_usage(env, &condition.exp);
-        if used_modules
-            .iter()
-            .all(|module| fun_env.module_env.is_transitive_dependency(*module))
-        {
-            true
-        } else {
+        let creates_cycle = expression_module_usage(env, &condition.exp)
+            .into_iter()
+            .any(|module| {
+                module != this_module
+                    && module_depends_on(env, module, this_module, &mut BTreeSet::new())
+            });
+        if creates_cycle {
             dropped_dependency_abort |= matches!(condition.kind, ConditionKind::AbortsIf);
-            false
         }
+        !creates_cycle
     });
     if dropped_dependency_abort {
         partial_abort_reasons
-            .push("an abort condition would have introduced a new module dependency".to_owned());
+            .push("an abort condition would have created a module cycle".to_owned());
         spec.properties.insert(
             pool.make(ABORTS_IF_IS_PARTIAL_PRAGMA),
             PropertyValue::Value(Value::Bool(true)),
@@ -2694,11 +2798,13 @@ fn update_spec<'env>(
         }
     }
 
+    let strict_violation = ProverOptions::get(env).aborts_if_is_strict;
     report_partial_aborts(
         fun_env,
         &partial_abort_reasons,
         partial_abort_has_transparent_callee,
         partial_abort_has_unmodeled_intrinsic,
+        strict_violation,
     );
 }
 
@@ -2715,6 +2821,7 @@ fn report_partial_aborts(
     reasons: &[String],
     has_transparent_callee: bool,
     has_unmodeled_intrinsic: bool,
+    strict_violation: bool,
 ) {
     if reasons.is_empty() {
         return;
@@ -2730,6 +2837,12 @@ fn report_partial_aborts(
             "WP cannot complete `{}` while a transparent callee lacks a complete opaque \
              contract. Repair the named callee boundary before changing or rerunning the \
              caller. Reasons:",
+            fun_env.get_full_name_str()
+        )
+    } else if strict_violation {
+        format!(
+            "WP could not characterize the aborts of `{}` exactly, and an exact abort \
+             characterization is required. Resolve the reasons below and rerun WP. Reasons:",
             fun_env.get_full_name_str()
         )
     } else {
@@ -2750,7 +2863,7 @@ fn report_partial_aborts(
     }
     let severity = if has_unmodeled_intrinsic {
         Severity::Bug
-    } else if has_transparent_callee {
+    } else if has_transparent_callee || strict_violation {
         Severity::Error
     } else {
         Severity::Warning
@@ -3396,41 +3509,6 @@ fn contains_can_modify(exp: &Exp) -> bool {
     found
 }
 
-/// Evaluate a fully constant byte-vector expression and check UTF-8 validity.
-/// Returns false for both invalid UTF-8 and non-constant expressions; callers
-/// use this only to prove that `string::utf8` cannot abort.
-fn constant_valid_utf8(exp: &Exp) -> bool {
-    fn byte(value: &Value) -> Option<u8> {
-        match value {
-            Value::Number(number) => number.to_u8(),
-            _ => None,
-        }
-    }
-
-    fn bytes(exp: &Exp) -> Option<Vec<u8>> {
-        match exp.as_ref() {
-            ExpData::Call(_, AstOp::EmptyVec, elements) if elements.is_empty() => Some(vec![]),
-            ExpData::Call(_, AstOp::Vector, elements) => elements
-                .iter()
-                .map(|element| match element.as_ref() {
-                    ExpData::Value(_, value) => byte(value),
-                    _ => None,
-                })
-                .collect(),
-            ExpData::Value(_, Value::ByteArray(values)) => Some(values.clone()),
-            ExpData::Value(_, Value::Vector(values)) => values.iter().map(byte).collect(),
-            ExpData::Call(_, AstOp::Old | AstOp::Freeze(_) | AstOp::Copy | AstOp::Move, args)
-                if args.len() == 1 =>
-            {
-                bytes(&args[0])
-            },
-            _ => None,
-        }
-    }
-
-    bytes(exp).is_some_and(|values| std::str::from_utf8(&values).is_ok())
-}
-
 /// Check if an expression is a verification-infrastructure assumption that
 /// should be skipped during inference. Matches:
 /// - Direct `WellFormed(x)`
@@ -3461,7 +3539,6 @@ fn is_well_formed_prop(exp: &Exp) -> bool {
 /// **not** make the cond false — `P || false == P` — so we must keep the
 /// wrapping in that case.
 fn cond_is_false_on_normal_return(exp: &Exp) -> bool {
-    use move_model::ast::BehaviorKind;
     fn is_marker(e: &ExpData) -> bool {
         matches!(
             e,
@@ -3526,7 +3603,6 @@ fn is_trivial_false(exp: &Exp) -> bool {
 /// destructure `lhs == { let (..._t_i...) = result_of<f>(args); _t_i }`.
 /// Returns `(lhs, output_idx, fun_exp, args, range)`.
 fn extract_result_of_clause(exp: &Exp) -> Option<(Exp, usize, Exp, Vec<Exp>, MemoryRange)> {
-    use move_model::ast::BehaviorKind;
     let ExpData::Call(_, AstOp::Eq, eq_args) = exp.as_ref() else {
         return None;
     };
@@ -3580,7 +3656,6 @@ fn extract_result_of_clause(exp: &Exp) -> Option<(Exp, usize, Exp, Vec<Exp>, Mem
 /// `c ==> …` guards (from nested branches); return
 /// `(fun_exp, args_after_fun, range, guards)` with guards outermost-first.
 fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange, Vec<Exp>)> {
-    use move_model::ast::BehaviorKind;
     let mut guards: Vec<Exp> = Vec::new();
     let mut target = exp;
     while let ExpData::Call(_, AstOp::Implies, impl_args) = target.as_ref() {
@@ -3660,9 +3735,9 @@ fn is_procedure_level_path(exp: &Exp) -> bool {
 /// step per layer; on reaching `write_of`, record `(write_of, l)`.
 /// Both the *value* arm (this update's RHS) and the *base* arm (the
 /// remaining struct, which may itself be a nested `update_field` chain
-/// for sibling fields) are searched.
+/// for sibling fields) are searched. A `write_of` which is itself the
+/// base is not bound: it agrees with `l` only on the fields not updated.
 fn decompose_write_of_binding(env: &GlobalEnv, l: &Exp, rhs: &Exp, out: &mut Vec<(Exp, Exp)>) {
-    use move_model::ast::BehaviorKind;
     match rhs.as_ref() {
         ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(_), _), _) => {
             out.push((rhs.clone(), l.clone()));
@@ -3677,54 +3752,126 @@ fn decompose_write_of_binding(env: &GlobalEnv, l: &Exp, rhs: &Exp, out: &mut Vec
                 .into_exp();
             decompose_write_of_binding(env, &new_l, value, out);
             // Sibling-field updates live in the base arm.
-            decompose_write_of_binding(env, l, base, out);
+            if matches!(base.as_ref(), ExpData::Call(_, AstOp::UpdateField(..), _)) {
+                decompose_write_of_binding(env, l, base, out);
+            }
         },
         _ => {},
     }
 }
 
-/// Replace each `write_of<f, j>(args)` with the bound `lhs` from `bindings`;
-/// when no binding matches (body-borrow case), fall back to
-/// `strip_all_olds(args[mut_param_pos(j)])`.
-fn substitute_write_of_with_natural(env: &GlobalEnv, exp: &Exp, bindings: &[(Exp, Exp)]) -> Exp {
-    use move_model::ast::BehaviorKind;
+/// Replace each `write_of<f, j>(args)` with the bound `lhs` from `bindings`.
+fn substitute_bound_write_of(exp: &Exp, bindings: &[(Exp, Exp)]) -> Exp {
     struct Sub<'a> {
-        env: &'a GlobalEnv,
         bindings: &'a [(Exp, Exp)],
     }
     impl ExpRewriterFunctions for Sub<'_> {
-        fn rewrite_call(&mut self, id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
-            let AstOp::Behavior(BehaviorKind::WriteOf(j), _) = oper else {
-                return None;
-            };
-            // Match against the original (pre-recursion) form: bindings come from the same clause-set.
-            let original = ExpData::Call(id, oper.clone(), args.to_vec()).into_exp();
-            for (wo, lhs) in self.bindings {
-                if wo.as_ref().structural_eq(&original) {
-                    return Some(lhs.clone());
+        // Matched before descending: a binding names the carrier as it occurs
+        // in the clauses, with any nested carrier in its arguments unreplaced.
+        fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+            if let ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(_), _), _) = exp.as_ref()
+            {
+                if let Some((_, lhs)) = self.bindings.iter().find(|(wo, _)| wo.structural_eq(&exp))
+                {
+                    return lhs.clone();
                 }
             }
-            let new_args: Vec<Exp> = args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
-            if new_args.is_empty() {
-                return None;
-            }
-            let fun_exp = &new_args[0];
-            let fun_type = self.env.get_node_type(fun_exp.node_id());
-            let Type::Fun(arg_ty, _, _) = fun_type else {
-                return None;
-            };
-            let flat = arg_ty.flatten();
-            let mut_pos = flat
-                .iter()
-                .enumerate()
-                .filter(|(_, t)| t.is_mutable_reference())
-                .nth(*j)
-                .map(|(pos, _)| pos)?;
-            let mut_arg = new_args.get(1 + mut_pos)?;
-            Some(strip_all_olds(mut_arg))
+            self.rewrite_exp_descent(exp)
         }
     }
-    Sub { env, bindings }.rewrite_exp(exp.clone())
+    Sub { bindings }.rewrite_exp(exp.clone())
+}
+
+/// The first `write_of` carrier in `exp`: its function, arguments as
+/// written, and memory range.
+fn first_write_of(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange)> {
+    let mut found = None;
+    exp.visit_pre_order(&mut |e| {
+        if let ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(_), range), args) = e {
+            if let Some((fun_exp, call_args)) = args.split_first() {
+                found = Some((fun_exp.clone(), call_args.to_vec(), range.clone()));
+            }
+        }
+        found.is_none()
+    });
+    found
+}
+
+/// Whether `exp` is a `write_of` carrier of the call site `fun_exp(args)`
+/// over `range`, where `args_natural` are the site's `old`-stripped
+/// arguments; the carrier's post-state slot if so.
+fn write_of_slot_of_site(
+    exp: &Exp,
+    fun_exp: &Exp,
+    args_natural: &[Exp],
+    range: &MemoryRange,
+) -> Option<usize> {
+    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(j), wo_range), bp_args) =
+        exp.as_ref()
+    else {
+        return None;
+    };
+    let (wo_fun, wo_args) = bp_args.split_first()?;
+    let wo_args_natural: Vec<Exp> = wo_args.iter().map(strip_all_olds).collect();
+    (wo_range == range && calls_match(fun_exp, args_natural, wo_fun, &wo_args_natural))
+        .then_some(*j)
+}
+
+/// Replaces the `write_of` carriers of one call site by its post-state
+/// slots and wraps the smallest boolean subterm containing all of them
+/// with `exists vars: canonical && subterm`.
+struct WriteOfCloser<'a, 'env> {
+    analyzer: &'a SpecInferenceAnalyzer<'env>,
+    fun_exp: &'a Exp,
+    args_natural: &'a [Exp],
+    range: &'a MemoryRange,
+    slots: &'a [Exp],
+    vars: &'a [(Symbol, Type)],
+    canonical: &'a Exp,
+    total: usize,
+    replaced: usize,
+    wrapped: bool,
+}
+
+impl WriteOfCloser<'_, '_> {
+    fn wrap(&mut self, body: Exp) -> Exp {
+        self.wrapped = true;
+        let a = self.analyzer;
+        let conj = if body.structural_eq(self.canonical) {
+            body
+        } else {
+            a.mk_and(self.canonical.clone(), body)
+        };
+        if self.vars.is_empty() {
+            return conj;
+        }
+        let ranges = self
+            .vars
+            .iter()
+            .map(|(sym, ty)| (a.mk_decl(*sym, ty.clone()), a.mk_type_domain(ty.clone())))
+            .collect();
+        let id = a.new_node(BOOL_TYPE.clone(), None);
+        ExpData::Quant(id, QuantKind::Exists, ranges, vec![], None, conj).into_exp()
+    }
+}
+
+impl ExpRewriterFunctions for WriteOfCloser<'_, '_> {
+    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        if let Some(j) = write_of_slot_of_site(&exp, self.fun_exp, self.args_natural, self.range) {
+            self.replaced += 1;
+            return self.slots[j].clone();
+        }
+        if self.wrapped {
+            return exp;
+        }
+        let before = self.replaced;
+        let new = self.rewrite_exp_descent(exp);
+        let is_bool = self.analyzer.global_env().get_node_type(new.node_id()) == BOOL_TYPE;
+        if !self.wrapped && is_bool && self.replaced - before == self.total {
+            return self.wrap(new);
+        }
+        new
+    }
 }
 
 /// True for `true`, `Eq(x, x)`, `Implies(_, true_body)`, conjunctions of
@@ -3807,39 +3954,23 @@ fn strip_labels_in_exp(exp: &Exp) -> Exp {
 /// - `exists x: !in_range(0..MAX, x - 1)` — no non-quant vars → unconstrained
 /// - `exists x: x <= n && !in_range(...)` — conjunct `x <= n` has non-quant `n` → constrained
 fn has_unconstrained_quant_var(exp: &Exp) -> bool {
-    match exp.as_ref() {
-        ExpData::Quant(_, QuantKind::Forall, ranges, _, _, body) => {
-            let quant_syms: BTreeSet<Symbol> = ranges
-                .iter()
-                .filter_map(|(pat, _)| {
-                    if let Pattern::Var(_, sym) = pat {
-                        Some(*sym)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            quant_syms
-                .iter()
-                .any(|sym| !sym_constrained_with_external(body, *sym, &quant_syms, true))
-        },
-        ExpData::Quant(_, QuantKind::Exists, ranges, _, _, body) => {
-            let quant_syms: BTreeSet<Symbol> = ranges
-                .iter()
-                .filter_map(|(pat, _)| {
-                    if let Pattern::Var(_, sym) = pat {
-                        Some(*sym)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            quant_syms
-                .iter()
-                .any(|sym| !sym_constrained_with_external(body, *sym, &quant_syms, false))
-        },
-        _ => false,
-    }
+    let (ranges, body, is_forall) = match exp.as_ref() {
+        ExpData::Quant(_, QuantKind::Forall, ranges, _, _, body) => (ranges, body, true),
+        ExpData::Quant(_, QuantKind::Exists, ranges, _, _, body) => (ranges, body, false),
+        _ => return false,
+    };
+    let quant_syms: BTreeSet<Symbol> = ranges
+        .iter()
+        .filter_map(|(pat, _)| {
+            if let Pattern::Var(_, sym) = pat {
+                Some(*sym)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let constrained = constrained_quant_syms(body, &quant_syms, is_forall);
+    quant_syms.iter().any(|sym| !constrained.contains(sym))
 }
 
 /// Checks if the expression has a top-level quantifier (Forall or Exists).
@@ -3864,67 +3995,56 @@ fn has_top_level_quantifier(exp: &Exp) -> bool {
     }
 }
 
-/// Whether an inferred condition relies on a `result_of` carrier for a
-/// transparent Move function. The carrier is the concrete result witness for
-/// an opaque call summarized by the behavioral-predicate backend. For a
-/// transparent call the prover executes the body instead, so an independently
-/// generated carrier is not related to that runtime result and cannot justify
-/// a caller postcondition such as `result == result_of<f>(args)`.
-///
-/// Such clauses are retained for inspection but marked `sathard`, allowing the
-/// deterministic compatibility refinement to remove only the unusable clause.
-fn has_untrusted_transparent_result_of(env: &GlobalEnv, exp: &Exp) -> bool {
-    exp.as_ref().any(&mut |node| {
-        let ExpData::Call(_, AstOp::Behavior(move_model::ast::BehaviorKind::ResultOf, _), args) =
-            node
-        else {
-            return false;
-        };
-        let Some(target) = args.first() else {
-            return true;
-        };
-        let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = target.as_ref() else {
-            return true;
-        };
-        let callee = env.get_function((*module_id).qualified(*fun_id));
-        // Opacity is what makes the carrier the call's result witness; a
-        // `verify = false` opaque callee is a stated boundary whose contract
-        // the caller consumes like any other.
-        !callee.is_opaque()
-    })
-}
-
-/// Check if a quantified variable `sym` is constrained by co-occurring with at least one
-/// non-quantified variable in a constraint context.
+/// The quantified variables constrained through constraint contexts: a
+/// variable is constrained when it co-occurs in a context with a
+/// non-quantified variable (a Temporary, a non-quantified LocalVar, or the
+/// function result), or with a variable already constrained, as in a chain
+/// `exists x, y: P(a, x) && Q(x, y)`.
 ///
 /// For forall (`is_forall=true`): constraint contexts are antecedents of the implication chain.
 /// For exists (`is_forall=false`): constraint contexts are conjuncts of the body.
-///
-/// A non-quantified variable is either a `Temporary` (function parameter/local) or a `LocalVar`
-/// whose symbol is not in `quant_syms`.
-fn sym_constrained_with_external(
+fn constrained_quant_syms(
     body: &Exp,
-    sym: Symbol,
     quant_syms: &BTreeSet<Symbol>,
     is_forall: bool,
-) -> bool {
+) -> BTreeSet<Symbol> {
     let contexts = if is_forall {
         collect_antecedents(body)
     } else {
         flatten_conjunction_owned(body)
     };
-    // The variable is constrained if at least one context contains both `sym`
-    // and a non-quantified variable (either a Temporary or a non-quant LocalVar).
-    contexts.iter().any(|ctx| {
-        let has_sym = ctx
-            .as_ref()
-            .any(&mut |ed| matches!(ed, ExpData::LocalVar(_, s) if *s == sym));
-        let has_external = ctx.as_ref().any(&mut |ed| {
-            matches!(ed, ExpData::Temporary(..))
-                || matches!(ed, ExpData::LocalVar(_, s) if !quant_syms.contains(s))
-        });
-        has_sym && has_external
-    })
+    let contexts: Vec<(BTreeSet<Symbol>, bool)> = contexts
+        .iter()
+        .map(|ctx| {
+            let mut syms = BTreeSet::new();
+            let mut has_external = false;
+            ctx.visit_pre_order(&mut |ed| {
+                match ed {
+                    ExpData::LocalVar(_, s) if quant_syms.contains(s) => {
+                        syms.insert(*s);
+                    },
+                    ExpData::LocalVar(..)
+                    | ExpData::Temporary(..)
+                    | ExpData::Call(_, AstOp::Result(_), _) => has_external = true,
+                    _ => {},
+                }
+                true
+            });
+            (syms, has_external)
+        })
+        .collect();
+    let mut constrained = BTreeSet::new();
+    loop {
+        let before = constrained.len();
+        for (syms, has_external) in &contexts {
+            if *has_external || !syms.is_disjoint(&constrained) {
+                constrained.extend(syms.iter().copied());
+            }
+        }
+        if constrained.len() == before {
+            return constrained;
+        }
+    }
 }
 
 /// Collect all antecedents from a nested implication chain `a ==> b ==> c ==> ...`.
@@ -4325,6 +4445,9 @@ struct SpecInferenceAnalyzer<'env> {
     label_counter: Cell<usize>,
     /// Optional synthetic exit used only by bounded loop-invariant evidence.
     evidence_seed: Option<LoopEvidenceSeed>,
+    /// Writes WP cannot phrase, with their locations. They are reported once
+    /// after the analysis, and no specification is inferred.
+    unsupported_writes: RefCell<Vec<(Loc, String)>>,
 }
 
 // =================================================================================================
@@ -4385,24 +4508,23 @@ impl StateBoundaryAnalysis<'_, '_> {
                 Operation::MoveTo(_, _, _) | Operation::MoveFrom(_, _, _) => true,
                 Operation::HavocGlobal(_, _, _) => true,
                 Operation::Function(module_id, fun_id, type_inst) => {
-                    // Mirror the backward WP's cascade: a function call is only
-                    // non-state-changing if it qualifies for one of the direct-
-                    // substitution branches — pure spec call or native spec exp.
-                    // Either path applies the call's semantics by substitution
-                    // and emits no behavioral predicate, so the memory label
-                    // must not be advanced. Otherwise a vector::length (or
-                    // similar native) before a behavioral call would create a
-                    // spurious label boundary even though the underlying
-                    // memory state is unchanged.
-                    !(dests.len() == 1
-                        && (self
-                            .analyzer
-                            .try_as_pure_spec_call(*module_id, *fun_id, type_inst)
-                            .is_some()
-                            || self
+                    // A pure spec call is applied by substitution and emits no
+                    // behavioral predicate, and `std::vector` has no global
+                    // memory, so neither advances the memory label. Otherwise a
+                    // vector::length (or similar) before a behavioral call would
+                    // create a spurious label boundary even though the
+                    // underlying memory state is unchanged.
+                    let is_vector = self
+                        .analyzer
+                        .global_env()
+                        .get_module(*module_id)
+                        .is_std_vector();
+                    !(is_vector
+                        || dests.len() == 1
+                            && self
                                 .analyzer
-                                .try_as_native_spec_exp(*module_id, *fun_id, type_inst, srcs)
-                                .is_some()))
+                                .try_as_pure_spec_call(*module_id, *fun_id, type_inst)
+                                .is_some())
                 },
                 Operation::Invoke => {
                     // Do not invent an intermediate memory for a value-only
@@ -4462,6 +4584,13 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
     const BACKWARD: bool = true;
 
     fn execute(&self, state: &mut WPState, instr: &Bytecode, offset: CodeOffset) {
+        self.execute_instr(state, instr, offset);
+        self.check_borrow_index_resolved(state, instr);
+    }
+}
+
+impl<'env> SpecInferenceAnalyzer<'env> {
+    fn execute_instr(&self, state: &mut WPState, instr: &Bytecode, offset: CodeOffset) {
         match instr {
             Bytecode::Ret(_, vals) => {
                 if self.evidence_seed.is_some() {
@@ -4554,7 +4683,9 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                         // in the inferred spec. Checked before the pure path
                         // so the rewrite wins for both pure (e.g., `borrow`)
                         // and mutating (e.g., `swap`) vector callees.
-                        if self.try_wp_vector_intrinsic_call(
+                        if self.try_wp_intrinsic_borrow_call(
+                            state, offset, *module_id, *fun_id, type_inst, srcs, dests,
+                        ) || self.try_wp_vector_intrinsic_call(
                             state, offset, *module_id, *fun_id, type_inst, srcs, dests,
                         ) || self.try_wp_map_intrinsic_call(
                             state, offset, *module_id, *fun_id, type_inst, srcs, dests,
@@ -4596,8 +4727,12 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                                 ClosureMask::empty(),
                                 vec![],
                             );
-                            if self.callee_is_known_non_aborting(&fun_exp, &args) {
+                            if self.callee_is_known_non_aborting(&fun_exp) {
                                 // Nothing to add.
+                            } else if let Some(aborts) =
+                                self.map_intrinsic_call_aborts(&fun_exp, &args)
+                            {
+                                state.add_aborts(aborts);
                             } else if self.callee_has_trusted_abort_summary(&fun_exp) {
                                 let aborts = self.mk_aborts_of(fun_exp, args);
                                 state.add_aborts(aborts);
@@ -4606,17 +4741,6 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                                     PartialAbortReason::UnknownCallee(module_id.qualified(*fun_id)),
                                 );
                             }
-                        } else if dests.len() == 1
-                            && let Some(spec_exp) =
-                                self.try_as_native_spec_exp(*module_id, *fun_id, type_inst, srcs)
-                        {
-                            // WP[dest := native_f(args)](Q) = Q[dest ↦ builtin_spec_op(args)]
-                            // Used for native std::vector functions with direct spec-language
-                            // equivalents (empty→[], length→len, borrow→index).  Avoids
-                            // creating an anonymous lambda that gets compiled to an
-                            // uninterpreted behavioral spec function.
-                            *state = self.substitute_exp_state(state, dests[0], &spec_exp);
-                            // Native vector functions cannot abort; no aborts_of needed.
                         } else if dests.len() == 1
                             && let Some(result_exp) = self
                                 .try_as_functional_result_exp(*module_id, *fun_id, type_inst, srcs)
@@ -4631,8 +4755,12 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                                 ClosureMask::empty(),
                                 vec![],
                             );
-                            if self.callee_is_known_non_aborting(&fun_exp, &args) {
+                            if self.callee_is_known_non_aborting(&fun_exp) {
                                 // Nothing to add.
+                            } else if let Some(aborts) =
+                                self.map_intrinsic_call_aborts(&fun_exp, &args)
+                            {
+                                state.add_aborts(aborts);
                             } else if self.callee_has_trusted_abort_summary(&fun_exp) {
                                 state.add_aborts(self.mk_aborts_of(fun_exp, args));
                             } else {
@@ -5191,9 +5319,11 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             BorrowNode::LocalRoot(dest) | BorrowNode::Reference(dest) => {
                                 // WP[write_back[LocalRoot/Reference(x), e] := v](Q) = Q[x => trans[e](x, v)]
                                 let old_exp = self.mk_temporary(*dest);
-                                if let Some(new_exp) =
-                                    self.mk_edge_transform(edge, old_exp.clone(), val_exp)
-                                {
+                                let new_exp = self
+                                    .mk_edge_transform(edge, srcs[0], old_exp.clone(), val_exp)
+                                    .map_err(|reason| self.report_unsupported_write(instr, reason))
+                                    .ok();
+                                if let Some(new_exp) = new_exp {
                                     if self.is_global_or_mut_param(state, *dest) {
                                         // Wrap bare references to the param in new_exp with
                                         // old() since they represent the pre-state value.
@@ -5221,6 +5351,17 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             },
                             BorrowNode::GlobalRoot(_qid) => {
                                 let ref_temp = srcs[0];
+                                if !matches!(edge, BorrowEdge::Direct)
+                                    || !self.borrow_global_info.contains_key(&ref_temp)
+                                {
+                                    self.report_unsupported_write(
+                                        instr,
+                                        "a callee returned a reference into global memory, \
+                                         so WP cannot phrase a write through it"
+                                            .to_string(),
+                                    );
+                                    return;
+                                }
                                 let needs_unresolve = state.captured_globals.contains(&ref_temp)
                                     || self.has_captured_same_global(state, ref_temp);
                                 if needs_unresolve {
@@ -5852,7 +5993,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             }
         }
 
-        Self {
+        let analyzer = Self {
             fun_env,
             target,
             current_loc: fun_env.get_loc(),
@@ -5864,6 +6005,135 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             forward_label_map: RefCell::new(BTreeMap::new()),
             label_counter: Cell::new(0),
             evidence_seed,
+            unsupported_writes: RefCell::new(vec![]),
+        };
+        analyzer.check_callee_selected_parents();
+        analyzer
+    }
+
+    /// A reference which may point into one of several places carries an
+    /// `is_parent` test per place, which WP resolves by where the reference
+    /// was derived in this function. For a reference a call returns, the
+    /// callee makes that choice, and WP cannot tell which write-back applies.
+    fn check_callee_selected_parents(&self) {
+        let code = self.target.get_bytecode();
+        for instr in code {
+            let Bytecode::Call(_, _, Operation::IsParent(..), srcs, _) = instr else {
+                continue;
+            };
+            let Some(operand) = srcs.first() else {
+                continue;
+            };
+            for def in code {
+                if !def.dests().contains(operand) {
+                    continue;
+                }
+                let callee = match def {
+                    Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => {
+                        format!(
+                            "`{}`",
+                            self.global_env()
+                                .get_function(mid.qualified(*fid))
+                                .get_full_name_str()
+                        )
+                    },
+                    Bytecode::Call(_, _, Operation::Invoke, _, _) => "a function value".to_string(),
+                    _ => continue,
+                };
+                self.report_unsupported_write(
+                    def,
+                    format!(
+                        "the reference returned by {} may point into one of several places, \
+                         and the callee decides which one, so WP cannot tell which of them a \
+                         write through it changes",
+                        callee
+                    ),
+                );
+            }
+        }
+    }
+
+    /// Records a write WP cannot phrase, at the location of `instr`.
+    fn report_unsupported_write(&self, instr: &Bytecode, reason: String) {
+        let loc = self.target.get_bytecode_loc(instr.get_attr_id());
+        let mut writes = self.unsupported_writes.borrow_mut();
+        if !writes.iter().any(|(l, r)| *l == loc && *r == reason) {
+            writes.push((loc, reason));
+        }
+    }
+
+    /// The symbol of the placeholder for the index or key at which the
+    /// reference `temp` was borrowed.
+    fn borrow_index_symbol(&self, temp: TempIndex) -> Symbol {
+        self.mk_symbol(&format!("{}{}", BORROW_INDEX_PREFIX, temp))
+    }
+
+    /// Whether a condition still refers to the index at which `temp` was
+    /// borrowed.
+    fn mentions_borrow_index(&self, state: &WPState, temp: TempIndex) -> bool {
+        let sym = self.borrow_index_symbol(temp);
+        state
+            .ensures
+            .iter()
+            .chain(&state.aborts)
+            .chain(&state.direct_modifies)
+            .any(|exp| {
+                exp.as_ref()
+                    .any(&mut |e| matches!(e, ExpData::LocalVar(_, s) if *s == sym))
+            })
+    }
+
+    /// Replaces the placeholder for the index at which `temp` was borrowed.
+    fn substitute_borrow_index(&self, state: &WPState, temp: TempIndex, index: &Exp) -> WPState {
+        let sym = self.borrow_index_symbol(temp);
+        let env = self.global_env();
+        state.map(|exp| {
+            let mut replacer = |_id: NodeId, target: RewriteTarget| match target {
+                RewriteTarget::LocalVar(found) if found == sym => Some(index.clone()),
+                _ => None,
+            };
+            ExpRewriter::new(env, &mut replacer).rewrite_exp(exp.clone())
+        })
+    }
+
+    /// A write-back through an index edge is phrased over the placeholder of
+    /// the reference's index, which the borrowing intrinsic resolves (see
+    /// `try_wp_intrinsic_borrow_call`). Any other definition of the reference
+    /// leaves it open: the callee or function value which returned it chose
+    /// the element. Havocking the referenced value keeps the reference's
+    /// location, and with it the placeholder.
+    fn check_borrow_index_resolved(&self, state: &WPState, instr: &Bytecode) {
+        if matches!(
+            instr,
+            Bytecode::Call(_, _, Operation::Havoc(HavocKind::MutationValue), _, _)
+        ) {
+            return;
+        }
+        for dest in instr.dests() {
+            if !self.mentions_borrow_index(state, dest) {
+                continue;
+            }
+            let source = match instr {
+                Bytecode::Call(_, _, Operation::Function(mid, fid, _), _, _) => format!(
+                    "the reference returned by `{}` points to a vector element or map entry \
+                     which the callee selects",
+                    self.global_env()
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
+                ),
+                Bytecode::Call(_, _, Operation::Invoke, _, _) => {
+                    "the reference returned by a function value points to a vector element or \
+                     map entry which the function selects"
+                        .to_string()
+                },
+                _ => "the vector element or map entry a reference points to is not known \
+                      where the reference is defined"
+                    .to_string(),
+            };
+            self.report_unsupported_write(
+                instr,
+                format!("{}, so WP cannot phrase a write through it", source),
+            );
         }
     }
 
@@ -6116,19 +6386,19 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             state.add_ensures(ensures_of);
         }
 
-        if self.callee_is_known_non_aborting(&fun_exp, &args) {
+        if self.callee_is_known_non_aborting(&fun_exp) {
             // Nothing to add.
+        } else if let Some(aborts) = self.map_intrinsic_call_aborts(&fun_exp, &args) {
+            state.add_aborts(aborts);
         } else if self.callee_has_trusted_abort_summary(&fun_exp) {
             let aborts = self.mk_aborts_of_with_state(fun_exp, args, aborts_pre, aborts_post);
             state.add_aborts(aborts);
-        } else {
-            let reason = match fun_exp.as_ref() {
-                ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) => {
-                    PartialAbortReason::UnknownCallee(module_id.qualified(*fun_id))
-                },
-                _ => PartialAbortReason::DynamicCall,
-            };
-            state.partial_abort_reasons.insert(reason);
+        } else if let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() {
+            state
+                .partial_abort_reasons
+                .insert(PartialAbortReason::UnknownCallee(
+                    module_id.qualified(*fun_id),
+                ));
         }
 
         // Update post-state for predecessor: they see this call's pre-state
@@ -6138,39 +6408,25 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     /// Return whether a call is provably unable to abort from information
     /// available while constructing its WP. This is deliberately narrow: an
     /// absent or partial abort specification never qualifies.
-    fn callee_is_known_non_aborting(&self, fun_exp: &Exp, args: &[Exp]) -> bool {
+    fn callee_is_known_non_aborting(&self, fun_exp: &Exp) -> bool {
         let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() else {
             return false;
         };
         let env = self.global_env();
         let callee = env.get_function((*module_id).qualified(*fun_id));
-        let callee_qid = callee.get_qualified_id();
-        // An intrinsic map membership query is a total read. Its executable
-        // implementation may contain loops (for example BigOrderedMap tree
-        // traversal), but inference substitutes the paired `map_spec_has_key`
-        // function and must not carry the implementation loop's partial-abort
-        // marker into the caller.
-        if env.get_intrinsics().is_intrinsic_of_for_move_fun(
-            env.symbol_pool(),
-            &callee_qid,
-            INTRINSIC_FUN_MAP_HAS_KEY,
-        ) {
+        // An intrinsic is described by its prover model, not its executable
+        // implementation (which may loop, e.g. BigOrderedMap tree traversal).
+        if env
+            .get_intrinsics()
+            .is_non_aborting_move_fun(&callee.get_qualified_id())
+        {
             return true;
         }
         if callee.is_well_known(well_known::TYPE_NAME_MOVE)
             || callee.is_well_known(well_known::TYPE_INFO_MOVE)
             || callee.is_well_known(well_known::TYPE_NAME_GET_MOVE)
+            || well_known::is_non_aborting_prelude_native(&callee)
         {
-            return true;
-        }
-        let module_name = callee
-            .module_env
-            .get_name()
-            .name()
-            .display(env.symbol_pool())
-            .to_string();
-        let function_name = callee.get_name().display(env.symbol_pool()).to_string();
-        if module_name == "simple_map" && function_name == "contains_key" {
             return true;
         }
         if callee.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false) {
@@ -6236,16 +6492,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             return true;
         }
 
-        // A Move byte-string literal is lowered through string::utf8. The
-        // native UTF-8 predicate is intentionally opaque to the prover, but a
-        // fully constant byte vector can be checked exactly here. Without
-        // this reduction, a valid non-empty literal becomes an unprovable
-        // `aborts_of<string::utf8>(vector[...])` in sourcified WP output.
-        let module = env.get_module(*module_id);
-        module.get_name().addr() == &env.get_stdlib_address()
-            && module.get_name().name() == env.symbol_pool().make(well_known::STRING_MODULE)
-            && function_name == well_known::UTF8_FUNCTION_NAME
-            && matches!(args, [arg] if constant_valid_utf8(arg))
+        false
     }
 
     /// Whether `aborts_of<callee>(..)` is an exact summary of the callee's
@@ -6257,17 +6504,44 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     /// still inferring and has not installed yet -- inference adds the
     /// pragma to every target it processes, and a caller analyzed before
     /// its callee would otherwise lose the callee's abort behavior.
+    /// The abort condition of a call to an intrinsic-map function, from the
+    /// prover's map model; `None` for any other callee.
+    fn map_intrinsic_call_aborts(&self, fun_exp: &Exp, args: &[Exp]) -> Option<Exp> {
+        let ExpData::Call(id, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() else {
+            return None;
+        };
+        let type_inst = self.global_env().get_node_instantiation(*id);
+        well_known::map_intrinsic_aborts(
+            self.global_env(),
+            self,
+            module_id.qualified(*fun_id),
+            &type_inst,
+            args,
+        )
+    }
+
     fn callee_has_trusted_abort_summary(&self, fun_exp: &Exp) -> bool {
-        let ExpData::Call(_, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref() else {
-            return false;
+        let ExpData::Call(closure_id, AstOp::Closure(module_id, fun_id, _), _) = fun_exp.as_ref()
+        else {
+            // Invoking a function value aborts exactly when `aborts_of` over
+            // it holds. A closure over a partial contract reaching it is
+            // caught by `propagate_inferred_partial_aborts`.
+            return true;
         };
         let callee_qid = (*module_id).qualified(*fun_id);
         let callee = self.global_env().get_function(callee_qid);
         // `spec_aborts_are_exact` already excludes `aborts_if_is_partial`;
-        // the opaque fallback must exclude it too.
+        // the opaque fallback must exclude it too. A callee without a
+        // specification whose body describes its behavior exactly has its
+        // predicates interpreted by that body.
         (spec_derivation::spec_aborts_are_exact(self.global_env(), callee_qid)
             || (callee.is_pragma_true(OPAQUE_PRAGMA, || false)
-                && !callee.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false)))
+                && !callee.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false))
+            || spec_derivation::has_derived_behavior(
+                self.global_env(),
+                callee_qid,
+                &self.global_env().get_node_instantiation(*closure_id),
+            ))
             && !function_abort_spec_uses_generic_type_reflection(&callee)
     }
 
@@ -6278,13 +6552,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 
         impl ExpRewriterFunctions for Reducer<'_, '_> {
             fn rewrite_call(&mut self, id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
-                if matches!(
-                    oper,
-                    AstOp::Behavior(move_model::ast::BehaviorKind::AbortsOf, _)
-                ) && let Some((fun_exp, call_args)) = args.split_first()
-                    && self
-                        .analyzer
-                        .callee_is_known_non_aborting(fun_exp, call_args)
+                if matches!(oper, AstOp::Behavior(BehaviorKind::AbortsOf, _))
+                    && let Some(fun_exp) = args.first()
+                    && self.analyzer.callee_is_known_non_aborting(fun_exp)
                 {
                     return Some(ExpData::Value(id, Value::Bool(false)).into_exp());
                 }
@@ -6391,6 +6661,63 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         }
 
         state.add_aborts(wp.aborts);
+        state.post = self.forward_label_at(offset);
+        true
+    }
+
+    /// WP for a call to a reference-returning intrinsic (see
+    /// `well_known::intrinsic_borrow_mut`): the result is the borrowed entry's
+    /// value, the container takes its post-call value, and the placeholder for
+    /// the index of the returned reference becomes the actual index.
+    fn try_wp_intrinsic_borrow_call(
+        &self,
+        state: &mut WPState,
+        offset: CodeOffset,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+        srcs: &[TempIndex],
+        dests: &[TempIndex],
+    ) -> bool {
+        let args = self.mk_behavioral_call_args(state, srcs);
+        let Some(borrow) = well_known::intrinsic_borrow_mut(
+            self.global_env(),
+            self,
+            module_id.qualified(fun_id),
+            type_inst,
+            &args,
+        ) else {
+            return false;
+        };
+        let containers: Vec<TempIndex> = srcs
+            .iter()
+            .copied()
+            .filter(|idx| self.get_local_type(*idx).is_mutable_reference())
+            .collect();
+        let ([dest], [container]) = (dests, containers.as_slice()) else {
+            return false;
+        };
+        // As in `try_wp_vector_intrinsic_call`, an already-captured parameter
+        // has its final value fixed; chain its pre-call value instead.
+        let captured =
+            self.is_mut_ref_param(*container) && state.captured_mut_params.contains(container);
+        if captured {
+            *state = self
+                .substitute_old_params_in_state(state, &[(*container, borrow.container.clone())]);
+        }
+        let mut substitutions = vec![(*dest, borrow.value)];
+        if !captured {
+            substitutions.push((*container, borrow.container.clone()));
+        }
+        *state = self.substitute_multiple_temps_in_state(state, &substitutions);
+        if self.is_mut_ref_param(*container) && !captured {
+            if state.is_normal_return {
+                state.add_ensures(self.mk_eq(self.mk_temporary(*container), borrow.container));
+            }
+            state.captured_mut_params.insert(*container);
+        }
+        *state = self.substitute_borrow_index(state, *dest, &borrow.index);
+        state.add_aborts(borrow.aborts);
         state.post = self.forward_label_at(offset);
         true
     }
@@ -6616,74 +6943,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 }
             })
             .collect()
-    }
-
-    /// For `std::vector` functions that have a direct spec-language equivalent
-    /// (built-in operations like `[]`, `len`, index), return the equivalent spec
-    /// expression substituting for the call result. This includes both bytecode
-    /// natives and Move functions whose verification semantics are supplied by the
-    /// Boogie intrinsic implementation. It avoids wrapping the function reference
-    /// in an anonymous lambda that becomes an uninterpreted behavioral spec function.
-    ///
-    /// Returns `Some(exp)` where `exp` is the spec expression for the result, or `None`
-    /// if the function has no direct spec equivalent.
-    fn try_as_native_spec_exp(
-        &self,
-        module_id: ModuleId,
-        fun_id: FunId,
-        type_inst: &[Type],
-        srcs: &[TempIndex],
-    ) -> Option<Exp> {
-        let env = self.global_env();
-        let module = env.get_module(module_id);
-        // Only handle std::vector native functions.
-        if module.get_name().addr() != &env.get_stdlib_address() {
-            return None;
-        }
-        if module.get_name().name() != env.symbol_pool().make(well_known::VECTOR_MODULE) {
-            return None;
-        }
-        let fun_env = env.get_function(module_id.qualified(fun_id));
-        let fun_name = fun_env.get_name().display(env.symbol_pool()).to_string();
-
-        match fun_name.as_str() {
-            // vector::empty<T>() → [] (empty vector literal)
-            "empty" => {
-                // Monomorphized code always provides T; bail to the behavioral
-                // predicate path rather than fabricating a wrong-typed literal.
-                let elem_type = type_inst.first().cloned()?;
-                let result_type = Type::Vector(Box::new(elem_type.clone()));
-                Some(self.mk_call_with_inst(&result_type, vec![elem_type], AstOp::Vector, vec![]))
-            },
-            // vector::length<T>(v) → len(v)
-            "length" if !srcs.is_empty() => {
-                let v = self.mk_temporary(srcs[0]);
-                Some(self.mk_call(&NUM_TYPE, AstOp::Len, vec![v]))
-            },
-            // vector::is_empty<T>(v) -> len(v) == 0. Although the Move
-            // function has a body, `pragma intrinsic` replaces it with a
-            // Boogie prelude implementation during verification. WP needs
-            // the same builtin value meaning without adding a spec block.
-            "is_empty" if !srcs.is_empty() => {
-                let v = self.mk_temporary(srcs[0]);
-                Some(self.mk_eq(self.mk_len(v), self.mk_num_const(BigInt::from(0))))
-            },
-            // vector::borrow<T>(v, i) → v[i]
-            "borrow" if srcs.len() >= 2 => {
-                // Monomorphized code always provides T; bail to the behavioral
-                // predicate path rather than fabricating a wrong-typed index.
-                let elem_type = type_inst.first().cloned()?;
-                let v = self.mk_temporary(srcs[0]);
-                let i = self.mk_temporary(srcs[1]);
-                Some(self.mk_call_with_inst(
-                    &elem_type,
-                    vec![elem_type.clone()],
-                    AstOp::Index,
-                    vec![v, i],
-                ))
-            },
-            _ => None,
-        }
     }
 
     /// Instantiate a caller-visible functional postcondition `result == E`
@@ -6956,6 +7215,155 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     ///   3. Substitute remaining `write_of`s with the bound `lhs` (or
     ///      `strip_olds(args[mut_pos(j)])` as a fallback) and drop
     ///      tautologies.
+    /// Binds the `write_of` carriers no equation names (see
+    /// `collect_write_of_bindings`) existentially, per call site, at the
+    /// smallest boolean subterm containing them: `exists w: ensures_of<f>(args,
+    /// results, w) && subterm[w]`. Move functions are deterministic, so under a
+    /// complete callee contract the witness is the call's actual post-state.
+    fn close_unbound_write_of(&self, exp: &Exp, bindings: &[(Exp, Exp)], fresh: &mut usize) -> Exp {
+        let env = self.global_env();
+        let mut exp = exp.clone();
+        while let Some((fun_exp, args, range)) = first_write_of(&exp) {
+            let Type::Fun(arg_ty, result_ty, _) = env.get_node_type(fun_exp.node_id()) else {
+                break;
+            };
+            let args_natural: Vec<Exp> = args.iter().map(strip_all_olds).collect();
+            let mut vars = vec![];
+            let slots: Vec<Exp> = arg_ty
+                .flatten()
+                .iter()
+                .filter(|ty| ty.is_mutable_reference())
+                .enumerate()
+                .map(|(j, ty)| {
+                    let bound = bindings.iter().find_map(|(wo, lhs)| {
+                        (write_of_slot_of_site(wo, &fun_exp, &args_natural, &range) == Some(j))
+                            .then(|| lhs.clone())
+                    });
+                    bound.unwrap_or_else(|| {
+                        let sym = self.mk_symbol(&format!("$post{}", *fresh));
+                        *fresh += 1;
+                        let value_ty = ty.skip_reference().clone();
+                        vars.push((sym, value_ty.clone()));
+                        self.mk_local_by_sym(sym, value_ty)
+                    })
+                })
+                .collect();
+            let num_results = result_ty.clone().flatten().len();
+            let mut canonical_args = vec![fun_exp.clone()];
+            canonical_args.extend(args.iter().cloned());
+            for i in 0..num_results {
+                canonical_args.push(self.mk_result_of_at_with_state(
+                    fun_exp.clone(),
+                    args.clone(),
+                    &result_ty,
+                    i,
+                    num_results,
+                    range.pre,
+                    range.post,
+                ));
+            }
+            canonical_args.extend(slots.iter().cloned());
+            let canonical = ExpData::Call(
+                self.new_node(BOOL_TYPE.clone(), None),
+                AstOp::Behavior(BehaviorKind::EnsuresOf, range.clone()),
+                canonical_args,
+            )
+            .into_exp();
+            let mut total = 0;
+            exp.visit_pre_order(&mut |e| {
+                if let ExpData::Call(..) = e {
+                    let e = e.clone().into_exp();
+                    if write_of_slot_of_site(&e, &fun_exp, &args_natural, &range).is_some() {
+                        total += 1;
+                    }
+                }
+                true
+            });
+            let mut closer = WriteOfCloser {
+                analyzer: self,
+                fun_exp: &fun_exp,
+                args_natural: &args_natural,
+                range: &range,
+                slots: &slots,
+                vars: &vars,
+                canonical: &canonical,
+                total,
+                replaced: 0,
+                wrapped: false,
+            };
+            let rewritten = closer.rewrite_exp(exp);
+            exp = if closer.wrapped {
+                rewritten
+            } else {
+                closer.wrap(rewritten)
+            };
+        }
+        exp
+    }
+
+    /// Completes a state anchor `ensures_of<f>(inputs)` (possibly with
+    /// results, possibly guarded) of a callee with `&mut` parameters by the
+    /// `write_of` carriers of the call's post-states.
+    fn complete_short_anchor(&self, clause: &Exp) -> Exp {
+        let Some((fun_exp, args, range, guards)) = extract_top_ensures_of_clause(clause) else {
+            return clause.clone();
+        };
+        let Type::Fun(arg_ty, result_ty, _) = self.global_env().get_node_type(fun_exp.node_id())
+        else {
+            return clause.clone();
+        };
+        let param_tys = arg_ty.flatten();
+        let num_inputs = param_tys.len();
+        let mut_tys: Vec<Type> = param_tys
+            .iter()
+            .filter(|ty| ty.is_mutable_reference())
+            .map(|ty| ty.skip_reference().clone())
+            .collect();
+        let num_results = result_ty.clone().flatten().len();
+        if mut_tys.is_empty()
+            || args.len() < num_inputs
+            || args.len() >= num_inputs + num_results + mut_tys.len()
+        {
+            return clause.clone();
+        }
+        let inputs = args[..num_inputs].to_vec();
+        let mut full_args = vec![fun_exp.clone()];
+        full_args.extend(inputs.iter().cloned());
+        for i in 0..num_results {
+            full_args.push(args.get(num_inputs + i).cloned().unwrap_or_else(|| {
+                self.mk_result_of_at_with_state(
+                    fun_exp.clone(),
+                    inputs.clone(),
+                    &result_ty,
+                    i,
+                    num_results,
+                    range.pre,
+                    range.post,
+                )
+            }));
+        }
+        for (j, ty) in mut_tys.iter().enumerate() {
+            full_args.push(self.mk_write_of_with_state(
+                fun_exp.clone(),
+                inputs.clone(),
+                ty,
+                j,
+                range.pre,
+                range.post,
+            ));
+        }
+        let anchor = ExpData::Call(
+            self.new_node(BOOL_TYPE.clone(), None),
+            AstOp::Behavior(BehaviorKind::EnsuresOf, range),
+            full_args,
+        )
+        .into_exp();
+        guards
+            .into_iter()
+            .rev()
+            .fold(anchor, |body, guard| self.mk_implies(guard, body))
+    }
+
     fn eliminate_write_of(&self, state: &mut WPState) {
         let env = self.global_env();
 
@@ -7004,7 +7412,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             let result_type: Type = (*result_ty).clone();
             let declared_result_types: Vec<Type> = result_type.clone().flatten();
             let num_declared_results = declared_result_types.len();
-            let is_void = num_declared_results == 0;
 
             // One binding-LHS per `&mut` slot — otherwise we can't fill
             // the canonical's post-state slots.
@@ -7018,7 +7425,6 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                     .filter(|ty| ty.is_mutable_reference())
                     .count();
                 let lhs = bindings.iter().find_map(|(wo_call, lhs)| {
-                    use move_model::ast::BehaviorKind;
                     let ExpData::Call(
                         _,
                         AstOp::Behavior(BehaviorKind::WriteOf(j), wo_range),
@@ -7086,14 +7492,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 }
             }
 
-            // Build a canonical only when something anchors this site: a
-            // captured `dest`, or an anchor clause — including the
-            // discarded-result shape, which cannot be left in place (its
-            // arity lacks the post-state slots).
-            let has_result_of = !dests_by_idx.is_empty();
-            if !is_void && !has_result_of && anchors_for_site.is_empty() {
-                continue;
-            }
+            // Every site reaching here has a bound post-state, which the
+            // substitution below replaces by its left-hand side: only the
+            // canonical keeps relating it to the call.
 
             // Fill every declared result slot — uncaptured ones become
             // synthesized `result_of<f>(...)` projections so the canonical
@@ -7129,7 +7530,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             let new_id = self.new_node(bool_ty.clone(), None);
             let canonical = ExpData::Call(
                 new_id,
-                AstOp::Behavior(move_model::ast::BehaviorKind::EnsuresOf, range.clone()),
+                AstOp::Behavior(BehaviorKind::EnsuresOf, range.clone()),
                 canonical_args,
             )
             .into_exp();
@@ -7167,20 +7568,59 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         new_ensures.extend(to_add);
         state.ensures = new_ensures;
 
+        // An anchor of a call whose post-states no equation names carries
+        // only the call's inputs. Another clause carrying those post-states
+        // subsumes it, since the closing below states the call's
+        // `ensures_of` there; otherwise complete it with the carriers.
+        let clauses = std::mem::take(&mut state.ensures);
+        for (idx, clause) in clauses.iter().enumerate() {
+            let completed = self.complete_short_anchor(clause);
+            if completed.structural_eq(clause) {
+                state.ensures.push(completed);
+                continue;
+            }
+            let Some((fun_exp, args, range)) = first_write_of(&completed) else {
+                continue;
+            };
+            let args_natural: Vec<Exp> = args.iter().map(strip_all_olds).collect();
+            let carried_elsewhere = clauses.iter().enumerate().any(|(other, e)| {
+                other != idx
+                    && e.as_ref().any(&mut |sub| {
+                        let sub = sub.clone().into_exp();
+                        write_of_slot_of_site(&sub, &fun_exp, &args_natural, &range).is_some()
+                    })
+            });
+            if !carried_elsewhere {
+                state.ensures.push(completed);
+            }
+        }
+        let mut fresh = 0;
         state.ensures = state
             .ensures
             .iter()
-            .map(|e| substitute_write_of_with_natural(env, e, &bindings))
+            .map(|e| {
+                self.close_unbound_write_of(
+                    &substitute_bound_write_of(e, &bindings),
+                    &bindings,
+                    &mut fresh,
+                )
+            })
             .collect();
         state.aborts = state
             .aborts
             .iter()
-            .map(|e| substitute_write_of_with_natural(env, e, &bindings))
+            .map(|e| {
+                self.close_unbound_write_of(
+                    &substitute_bound_write_of(e, &bindings),
+                    &bindings,
+                    &mut fresh,
+                )
+            })
             .collect();
         state.direct_modifies = state
             .direct_modifies
             .iter()
-            .map(|e| substitute_write_of_with_natural(env, e, &bindings))
+            .map(|e| substitute_bound_write_of(e, &bindings))
             .collect();
 
         state.ensures.retain(|e| !is_trivially_true(e));
@@ -8086,26 +8526,90 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     // =================================================================================================
     // Reference Operation Helpers
 
-    /// Build the transformation expression for a BorrowEdge.
-    /// `trans[e](old, new)` applies the edge's transformation to update `old` with `new`.
-    /// Returns None for unsupported edge types.
-    fn mk_edge_transform(&self, edge: &BorrowEdge, old_exp: Exp, new_exp: Exp) -> Option<Exp> {
+    /// `trans[e](old, new)`: `old` with the part which the edge `e` lends to
+    /// the reference `child` replaced by `new`. An index edge is phrased over
+    /// the placeholder for the index at which `child` was borrowed, which the
+    /// borrowing call resolves. An error names what WP cannot phrase.
+    fn mk_edge_transform(
+        &self,
+        edge: &BorrowEdge,
+        child: TempIndex,
+        old_exp: Exp,
+        new_exp: Exp,
+    ) -> Result<Exp, String> {
         match edge {
-            BorrowEdge::Direct => {
-                // Direct: just return the new value
-                Some(new_exp)
+            BorrowEdge::Direct | BorrowEdge::Field(..) | BorrowEdge::Hyper(_) => {
+                self.mk_path_transform(edge.flatten().as_slice(), old_exp, new_exp)
             },
+            BorrowEdge::Index(IndexEdgeKind::Vector | IndexEdgeKind::Table) => {
+                let env = self.global_env();
+                let container_ty = env.get_node_type(old_exp.node_id());
+                let unmodeled = || {
+                    format!(
+                        "WP has no model of writes into a `{}`",
+                        container_ty.display(&env.get_type_display_ctx())
+                    )
+                };
+                let index_ty =
+                    well_known::container_index_type(env, &container_ty).ok_or_else(unmodeled)?;
+                let index = self.mk_local_by_sym(self.borrow_index_symbol(child), index_ty);
+                well_known::container_write(env, self, &container_ty, old_exp, index, new_exp)
+                    .ok_or_else(unmodeled)
+            },
+            BorrowEdge::Index(IndexEdgeKind::Custom(name)) => Err(format!(
+                "WP has no model of the borrow native `{}`, so it cannot phrase a write through \
+                 the reference it returns",
+                name
+            )),
+            BorrowEdge::Invoke => Err("a function value returned this reference, so WP cannot \
+                                       phrase a write through it"
+                .to_string()),
+        }
+    }
+
+    /// The write-back along a borrow path from the parent to the child,
+    /// root first. A path through fields is exact; a vector element or map
+    /// entry on a callee's path is selected inside the callee.
+    fn mk_path_transform(
+        &self,
+        edges: &[&BorrowEdge],
+        old_exp: Exp,
+        new_exp: Exp,
+    ) -> Result<Exp, String> {
+        let Some((first, rest)) = edges.split_first() else {
+            return Ok(new_exp);
+        };
+        match first {
+            BorrowEdge::Direct => self.mk_path_transform(rest, old_exp, new_exp),
             BorrowEdge::Field(qid, variants, offset) => {
-                // Field update: UpdateField(old, new). The variants of a field borrow share
-                // the field's name, which selects the update for all of them.
+                // The variants of a field borrow share the field's name, which
+                // selects the update for all of them.
                 let struct_env = self.global_env().get_struct(qid.to_qualified_id());
                 let variant = variants.as_ref().and_then(|v| v.first().copied());
                 let field_env = struct_env.get_field_by_offset_optional_variant(variant, *offset);
                 let type_args = qid.inst.as_slice();
-                Some(self.mk_field_update(&field_env, type_args, old_exp, new_exp))
+                let inner = if rest.is_empty() {
+                    new_exp
+                } else {
+                    let selected = match variants {
+                        Some(variants) => self.mk_variant_field_select(
+                            &struct_env,
+                            variants,
+                            *offset,
+                            type_args,
+                            old_exp.clone(),
+                        ),
+                        None => self.mk_field_select(&field_env, type_args, old_exp.clone()),
+                    };
+                    self.mk_path_transform(rest, selected, new_exp)?
+                };
+                Ok(self.mk_field_update(&field_env, type_args, old_exp, inner))
             },
-            // Other edge types not yet supported
-            BorrowEdge::Index(_) | BorrowEdge::Invoke | BorrowEdge::Hyper(_) => None,
+            BorrowEdge::Index(_) | BorrowEdge::Invoke | BorrowEdge::Hyper(_) => Err(
+                "the reference returned by a callee points to a vector element or map entry \
+                 which the callee selects, so WP cannot phrase a write through it"
+                    .to_string(),
+            ),
         }
     }
 
@@ -8657,9 +9161,6 @@ mod tests {
         incoming
             .partial_abort_reasons
             .insert(PartialAbortReason::MemoryHavoc);
-        incoming
-            .partial_abort_reasons
-            .insert(PartialAbortReason::DynamicCall);
         assert_eq!(current.join(&incoming), JoinResult::Changed);
         assert_eq!(
             current.partial_abort_reasons,
@@ -8734,37 +9235,5 @@ mod tests {
             inferred_output_budget_violation(&[MAX_INFERRED_CONDITION_SOURCE_BYTES]),
             None
         );
-    }
-
-    #[test]
-    fn recognizes_only_valid_constant_utf8_vectors() {
-        let env = GlobalEnv::new();
-        let vector = |values: &[u8]| {
-            let elements = values
-                .iter()
-                .map(|value| {
-                    let id = env.new_node(Loc::default(), Type::Primitive(PrimitiveType::U8));
-                    ExpData::Value(id, Value::Number(BigInt::from(*value))).into_exp()
-                })
-                .collect();
-            let id = env.new_node(
-                Loc::default(),
-                Type::Vector(Box::new(Type::Primitive(PrimitiveType::U8))),
-            );
-            ExpData::Call(id, AstOp::Vector, elements).into_exp()
-        };
-
-        assert!(constant_valid_utf8(&vector(b"Aptos Coin")));
-        assert!(constant_valid_utf8(&vector(&[])));
-        assert!(!constant_valid_utf8(&vector(&[0xFF])));
-        let non_constant = ExpData::Temporary(
-            env.new_node(
-                Loc::default(),
-                Type::Vector(Box::new(Type::Primitive(PrimitiveType::U8))),
-            ),
-            0,
-        )
-        .into_exp();
-        assert!(!constant_valid_utf8(&non_constant));
     }
 }

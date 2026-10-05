@@ -9,8 +9,13 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::validate_not_zero_sizes",
   "task_id": "TR-nonzero-031",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 4.6,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }
