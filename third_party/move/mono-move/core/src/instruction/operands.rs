@@ -1,15 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Frame-operand schema: for every micro-op, which frame slots it touches and
-//! how the interpreter accesses each one. This is the single source of truth
-//! the well-formedness checker checks against; tools that need the same table (a
-//! disassembler, a runtime access checker, a micro-op fuzzer) should use it
-//! rather than re-deriving it from the interpreter.
+//! For every micro-op, the frame slots it touches and how the interpreter
+//! accesses each one. The well-formedness checker checks accesses against this
+//! table; any other tool that needs it should use it rather than re-derive it
+//! from the interpreter.
 //!
-//! The schema describes the *interpreter's* access, not the layout
-//! convention: `Move8` and the frame side of the 8-byte heap moves are
-//! unaligned loads, so they are `Bytes(8)`, not `U64`.
+//! Kinds follow the interpreter's access, not the layout convention: `Move8`
+//! and the frame side of the 8-byte heap moves are unaligned, so they are
+//! `Bytes(8)`, not `U64`.
 
 use super::{
     CallClosureOp, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntShiftOp,
@@ -67,8 +66,8 @@ impl OperandKind {
 /// Declares the frame operands of each `MicroOp` variant and expands to an
 /// exhaustive `match` that reports them to `$f`. Struct-field variants list
 /// the fields they bind and then `slot: kind` pairs; payload variants
-/// delegate to the payload's own `frame_operands`.
-macro_rules! frame_operands {
+/// delegate to the payload's own `for_each_frame_operand`.
+macro_rules! for_each_frame_operand {
     (
         $op:expr, $f:ident;
         fields: { $( $Variant:ident { $($bind:ident),* } => [ $( $slot:expr => $kind:expr ),* ] ),* $(,)? }
@@ -76,7 +75,7 @@ macro_rules! frame_operands {
     ) => {
         match *$op {
             $( MicroOp::$Variant { $($bind,)* .. } => { $( $f($slot, $kind); )* } )*
-            $( MicroOp::$PVariant(ref op) => op.frame_operands($f), )*
+            $( MicroOp::$PVariant(ref op) => op.for_each_frame_operand($f), )*
         }
     };
 }
@@ -85,9 +84,9 @@ impl MicroOp {
     /// Reports every frame slot this op reads or writes, with the kind of
     /// access. `DeepCopyHeapPtrs` reports `base + off` saturated, so an
     /// overflowing offset still surfaces as an out-of-frame slot.
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         use OperandKind::*;
-        frame_operands! {
+        for_each_frame_operand! {
             self, f;
             fields: {
                 // Data movement: immediates are byte arrays; `Move8` is unaligned.
@@ -208,7 +207,7 @@ impl MicroOp {
 
 impl IntBinaryOp {
     /// `lhs`, `dst`, and a slot `rhs` are all `rhs.byte_width()` wide.
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         let w = self.rhs.byte_width() as u32;
         f(self.lhs, OperandKind::Int(w));
         if let Some(rhs) = self.rhs.slot_offset() {
@@ -220,7 +219,7 @@ impl IntBinaryOp {
 
 impl IntShiftOp {
     /// `lhs` and `dst` are `ty.byte_width()` wide; a slot `rhs` is one byte.
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         let w = self.ty.byte_width() as u32;
         f(self.lhs, OperandKind::Int(w));
         if let ShiftOperand::SlotU8(rhs) = self.rhs {
@@ -231,7 +230,7 @@ impl IntShiftOp {
 }
 
 impl IntNegateOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         let w = self.ty.byte_width() as u32;
         f(self.src, OperandKind::Int(w));
         f(self.dst, OperandKind::Int(w));
@@ -239,14 +238,14 @@ impl IntNegateOp {
 }
 
 impl IntCastOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.src, OperandKind::Int(self.from.byte_width() as u32));
         f(self.dst, OperandKind::Int(self.to.byte_width() as u32));
     }
 }
 
 impl IntCmpOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         let w = self.rhs.byte_width() as u32;
         f(self.lhs, OperandKind::Int(w));
         if let Some(rhs) = self.rhs.slot_offset() {
@@ -257,7 +256,7 @@ impl IntCmpOp {
 }
 
 impl JumpIntCmpOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         let w = self.rhs.byte_width() as u32;
         f(self.lhs, OperandKind::Int(w));
         if let Some(rhs) = self.rhs.slot_offset() {
@@ -267,7 +266,7 @@ impl JumpIntCmpOp {
 }
 
 impl ValueCmpOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.lhs, OperandKind::Value(self.ty));
         f(self.rhs, OperandKind::Value(self.ty));
         f(self.dst, OperandKind::Bool);
@@ -275,7 +274,7 @@ impl ValueCmpOp {
 }
 
 impl ValueRefCmpOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.lhs, OperandKind::FatPtr);
         f(self.rhs, OperandKind::FatPtr);
         f(self.dst, OperandKind::Bool);
@@ -283,21 +282,21 @@ impl ValueRefCmpOp {
 }
 
 impl JumpValueCmpOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.lhs, OperandKind::Value(self.ty));
         f(self.rhs, OperandKind::Value(self.ty));
     }
 }
 
 impl JumpValueRefCmpOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.lhs, OperandKind::FatPtr);
         f(self.rhs, OperandKind::FatPtr);
     }
 }
 
 impl VecPackOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         for &src in &self.srcs {
             f(src, OperandKind::Bytes(self.elem_size));
         }
@@ -306,7 +305,7 @@ impl VecPackOp {
 }
 
 impl VecUnpackOp {
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.src, OperandKind::Ptr);
         for &dst in &self.dsts {
             f(dst, OperandKind::Bytes(self.elem_size));
@@ -316,7 +315,7 @@ impl VecUnpackOp {
 
 impl PackClosureOp {
     /// Captured values are byte-copied into the captured-data object.
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         for slot in &self.captured {
             f(slot.offset, OperandKind::Bytes(slot.size));
         }
@@ -326,7 +325,7 @@ impl PackClosureOp {
 
 impl CallClosureOp {
     /// Provided arguments are byte-copied into the callee frame.
-    pub fn frame_operands(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
+    pub fn for_each_frame_operand(&self, f: &mut dyn FnMut(FrameOffset, OperandKind)) {
         f(self.closure_src, OperandKind::Ptr);
         for slot in &self.provided_args {
             f(slot.offset, OperandKind::Bytes(slot.size));
