@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/write_back_local_type_inst.move:17:9: error: generic module invariants are outside the current LeanerLang parser

@@ -54,6 +54,7 @@ struct BoogieJob {
 
 pub mod cli;
 pub mod inference;
+pub mod leaner;
 pub mod package_prove;
 
 // =================================================================================================
@@ -70,6 +71,9 @@ pub fn run_move_prover_v2<W: WriteColor>(
     mut experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
+    if options.lean {
+        return run_move_prover_lean(error_writer, options, experiments, now);
+    }
     if options.inference.inference {
         // Spec inference benefits from pure-spec-fun rewriting: bodies that call
         // pure user functions then infer cleanly to `result == helper(args)`
@@ -101,15 +105,58 @@ pub fn run_inference_with_bytecode_dump<W: WriteColor>(
     inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }
 
-pub fn create_move_prover_v2_model<W: WriteColor>(
+/// Verifies the one Move source file of `options` with the Leaner verifier.
+/// It reads the typed AST, which stops after the checker and rewriters so
+/// that it keeps its source shape, and inlines dependency code, which the
+/// rewriters prepare for every module of a whole-program compilation.
+fn run_move_prover_lean<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
     experiments: Vec<String>,
-) -> anyhow::Result<GlobalEnv> {
-    let compiler_options = move_compiler_v2::Options {
-        dependencies: options.move_deps,
-        named_address_mapping: options.move_named_address_values,
-        output_dir: options.output_path,
+    start_time: Instant,
+) -> anyhow::Result<()> {
+    let [source] = options.move_sources.as_slice() else {
+        return Err(anyhow!(
+            "`--lean` verifies one Move source file, not {}",
+            options.move_sources.len()
+        ));
+    };
+    let source = Path::new(source);
+    if !source.is_file() {
+        return Err(anyhow!(
+            "`--lean` verifies a Move source file, not `{}`",
+            source.display()
+        ));
+    }
+    let mut compiler_options = move_compiler_options(&options, experiments)
+        .set_experiment(Experiment::SPEC_REWRITE, true)
+        .set_experiment(Experiment::NATIVE_CHECK, false);
+    compiler_options.whole_program = true;
+    let env = move_compiler_v2::run_checker_and_rewriters(compiler_options)?;
+    check_errors(
+        &env,
+        &options,
+        error_writer,
+        "exiting with model building errors",
+    )?;
+    let output = Path::new(&options.output_path).with_extension("lean");
+    leaner::verify(
+        &env,
+        source,
+        None,
+        options.heartbeats,
+        &output,
+        error_writer,
+        start_time,
+    )
+}
+
+/// The compiler options building the model of `options`' sources.
+fn move_compiler_options(options: &Options, experiments: Vec<String>) -> move_compiler_v2::Options {
+    move_compiler_v2::Options {
+        dependencies: options.move_deps.clone(),
+        named_address_mapping: options.move_named_address_values.clone(),
+        output_dir: options.output_path.clone(),
         language_version: options.language_version,
         compiler_version: Some(LATEST_STABLE_COMPILER_VERSION_VALUE),
         skip_attribute_checks: true,
@@ -117,16 +164,25 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         testing: options.backend.stable_test_output,
         experiments,
         experiment_cache: Default::default(),
-        sources: options.move_sources,
+        sources: options.move_sources.clone(),
         sources_deps: vec![],
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
         external_checks: vec![],
         print_errors: true,
-    };
+    }
+}
 
-    move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)
+pub fn create_move_prover_v2_model<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+    experiments: Vec<String>,
+) -> anyhow::Result<GlobalEnv> {
+    move_compiler_v2::run_move_compiler_for_analysis(
+        error_writer,
+        move_compiler_options(&options, experiments),
+    )
 }
 
 /// Create the initial number operation state for each function and struct

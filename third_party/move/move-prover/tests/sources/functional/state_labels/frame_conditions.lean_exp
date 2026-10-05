@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/frame_conditions.move:20:1: error: the continuation after `apply` is not established
+tests/sources/functional/state_labels/frame_conditions.move:154:5: error: leaner verification failed: the automatic verification of `test_aborts_of_wrong` failed; provide a proof: `verify test_aborts_of_wrong by …` in `tests/sources/functional/state_labels/frame_conditions.proof.lean` (`verify test_aborts_of_wrong by skip` shows the obligations it leaves)
+tests/sources/functional/state_labels/frame_conditions.move:171:9: error: the specification clause `ensures result == global<Counter>(addr).value + 1` is not established
+tests/sources/functional/state_labels/frame_conditions.move:169:5: error: leaner verification failed: the automatic verification of `test_reads_frame_wrong_result` failed; provide a proof: `verify test_reads_frame_wrong_result by …` in `tests/sources/functional/state_labels/frame_conditions.proof.lean` (`verify test_reads_frame_wrong_result by skip` shows the obligations it leaves)

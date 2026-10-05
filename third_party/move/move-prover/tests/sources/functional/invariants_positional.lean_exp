@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/invariants_positional.move:10:9: error: the data invariant `invariant this.1 < 10` does not hold where a value is constructed
+tests/sources/functional/invariants_positional.move:9:9: error: the data invariant `invariant this.0 > 10` does not hold where a value is constructed
+tests/sources/functional/invariants_positional.move:17:5: error: leaner verification failed: the automatic verification of `pack_positional_struct_incorrect` failed; provide a proof: `verify pack_positional_struct_incorrect by …` in `tests/sources/functional/invariants_positional.proof.lean` (`verify pack_positional_struct_incorrect by skip` shows the obligations it leaves)

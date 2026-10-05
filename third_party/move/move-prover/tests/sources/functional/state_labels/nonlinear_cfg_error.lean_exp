@@ -1,0 +1,2 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/state_labels/nonlinear_cfg_error.move: LIR-SEMANTIC-STATE-LABEL: in fun branching_with_labels: state label `S` is neither bound by a quantifier over the state domain nor defined by a state-change predicate at [818, 831)

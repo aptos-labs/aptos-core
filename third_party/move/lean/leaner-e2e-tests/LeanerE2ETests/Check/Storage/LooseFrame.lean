@@ -45,12 +45,14 @@ leaner module 0x42::loose_frame where
     aborts_if false
 
 -- The mixed wildcard must not silently turn the listed family fully open.
-example [LeanerIR.Proofs.Denote.Skolems] (initial final : LeanerIR.RuntimeState)
-    (addr other : String)
-    (different : other ≠ addr)
+open LeanerIR.Proofs.Denote in
+example {unit : LeanerIR.Validation.ValidatedUnit} [Skolems unit] (initial final : Memory unit)
+    (addr other : String) (different : other ≠ addr)
     (frame : «0x42».loose_frame.bump.typedContract.frame (addr, ()) initial final) :
-    final.globals.lookup («0x42».loose_frame.Counter.key (.address other)) =
-      initial.globals.lookup («0x42».loose_frame.Counter.key (.address other)) := by
+    final (Skolems.resource (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)) .nil)
+        (.address other) =
+      initial (Skolems.resource (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)) .nil)
+        (.address other) := by
   apply frame (.address other)
   intro same
   exact different (LeanerIR.StorageKey.address.inj same)

@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/specs_in_fun.move:45:13: error: the assertion `x == y` does not hold
+tests/sources/functional/specs_in_fun.move:42:5: error: leaner verification failed: the automatic verification of `simple1_incorrect` failed; provide a proof: `verify simple1_incorrect by …` in `tests/sources/functional/specs_in_fun.proof.lean` (`verify simple1_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/specs_in_fun.move:53:13: error: the assertion `x == y` does not hold
+tests/sources/functional/specs_in_fun.move:49:5: error: leaner verification failed: the automatic verification of `simple2_incorrect` failed; provide a proof: `verify simple2_incorrect by …` in `tests/sources/functional/specs_in_fun.proof.lean` (`verify simple2_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/specs_in_fun.move:60:13: error: the assertion `x > y` does not hold
+tests/sources/functional/specs_in_fun.move:57:5: error: leaner verification failed: the automatic verification of `simple3_incorrect` failed; provide a proof: `verify simple3_incorrect by …` in `tests/sources/functional/specs_in_fun.proof.lean` (`verify simple3_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/specs_in_fun.move:69:13: error: the assertion `z > 2 * x` does not hold
+tests/sources/functional/specs_in_fun.move:64:5: error: leaner verification failed: the automatic verification of `simple4_incorrect` failed; provide a proof: `verify simple4_incorrect by …` in `tests/sources/functional/specs_in_fun.proof.lean` (`verify simple4_incorrect by skip` shows the obligations it leaves)

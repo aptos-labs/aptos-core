@@ -1,0 +1,7 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/data_invariant_for_mut_ref_arg.move:8:9: error: the specification clause `invariant v.length == 0` is not established
+tests/sources/functional/data_invariant_for_mut_ref_arg.move:15:5: error: leaner verification failed: the automatic verification of `push_1` failed; provide a proof: `verify push_1 by …` in `tests/sources/functional/data_invariant_for_mut_ref_arg.proof.lean` (`verify push_1 by skip` shows the obligations it leaves)
+tests/sources/functional/data_invariant_for_mut_ref_arg.move:8:9: error: the specification clause `invariant v.length == 0` is not established
+tests/sources/functional/data_invariant_for_mut_ref_arg.move:22:5: error: leaner verification failed: the automatic verification of `push_2` failed; provide a proof: `verify push_2 by …` in `tests/sources/functional/data_invariant_for_mut_ref_arg.proof.lean` (`verify push_2 by skip` shows the obligations it leaves)
+tests/sources/functional/data_invariant_for_mut_ref_arg.move:8:9: error: the specification clause `invariant v.length == 0` is not established
+tests/sources/functional/data_invariant_for_mut_ref_arg.move:31:5: error: leaner verification failed: the automatic verification of `push_3` failed; provide a proof: `verify push_3 by …` in `tests/sources/functional/data_invariant_for_mut_ref_arg.proof.lean` (`verify push_3 by skip` shows the obligations it leaves)

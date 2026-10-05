@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/bitwise_table_mixed_instances.move:4:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/bitwise_table_mixed_instances.move:4:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/bitwise_table_mixed_instances.move:4:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried

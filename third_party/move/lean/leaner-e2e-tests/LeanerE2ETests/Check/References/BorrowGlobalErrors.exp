@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/References/BorrowGlobalErrors.lean:59:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+LIR-SEMANTIC-BORROW-CONFLICT: global owner write conflicts with an active shared loan

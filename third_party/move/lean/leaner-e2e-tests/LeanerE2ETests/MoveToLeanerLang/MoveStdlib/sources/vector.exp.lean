@@ -153,7 +153,13 @@ leaner module std::vector where
   -/
   public fun reverse {Element}(self : &mut Vector<Element>) -> Unit := do
     let len := self.length
-    self.reverse_slice(0, len)
+    assert!(0 <= len, 131073)
+    if 0 < len then
+      if 0 < len - 1 then
+        *self := core.prim.reverseSliceVector(
+          core.prim.swapVector(*self, 0, len - 1), 0
+            + 1, len - 1
+        )
 
   spec reverse where
     pragma intrinsic
@@ -187,8 +193,10 @@ leaner module std::vector where
       move_range(&mut other, 0, other_length, self, self_length)
       core.prim.destroyEmptyVector(other)
     else
-      other.reverse()
-      self.reverse_append(other)
+      other := core.prim.reverseSliceVector(*&other, 0, other.length)
+      let _t13 := self.length
+      *self := core.prim.concatVector(*self, other)
+      *self := core.prim.reverseSliceVector(*self, _t13, self.length)
 
   spec append where
     pragma intrinsic
@@ -204,11 +212,11 @@ leaner module std::vector where
       *self := core.prim.pushVector(
         *self,
         do
-          let _t15 := &mut other
-          if _t15.length == 0 then moveVectorError(2)
-          let (_t16, _t17) := core.prim.removeVector(*_t15, _t15.length - 1)
-          *_t15 := _t17
-          _t16)
+          let _t20 := &mut other
+          if _t20.length == 0 then moveVectorError(2)
+          let (_t21, _t22) := core.prim.removeVector(*_t20, _t20.length - 1)
+          *_t20 := _t22
+          _t21)
       len := len - 1
     core.prim.destroyEmptyVector(other)
 
@@ -236,11 +244,11 @@ leaner module std::vector where
           other,
           do
             if self.length == 0 then moveVectorError(2)
-            let (_t22, _t23) := core.prim.removeVector(*self, self.length - 1)
-            *self := _t23
-            _t22)
+            let (_t36, _t37) := core.prim.removeVector(*self, self.length - 1)
+            *self := _t37
+            _t36)
         len := len - 1
-      other.reverse()
+      other := core.prim.reverseSliceVector(*&other, 0, other.length)
     other
 
   spec trim where
@@ -260,9 +268,9 @@ leaner module std::vector where
         result,
         do
           if self.length == 0 then moveVectorError(2)
-          let (_t25, _t26) := core.prim.removeVector(*self, self.length - 1)
-          *self := _t26
-          _t25)
+          let (_t39, _t40) := core.prim.removeVector(*self, self.length - 1)
+          *self := _t40
+          _t39)
       len := len - 1
     result
 
@@ -410,9 +418,9 @@ leaner module std::vector where
     if found then
       vector<Element>[do
         assert!(self.length > index, 131072)
-        let (_t13, _t14) := core.prim.removeVector(*self, index)
-        *self := _t14
-        _t13]
+        let (_t15, _t16) := core.prim.removeVector(*self, index)
+        *self := _t16
+        _t15]
     else vector<Element>[]
 
   spec remove_value where
@@ -428,13 +436,13 @@ leaner module std::vector where
   public fun swap_remove {Element}(
     self : &mut Vector<Element>, i : u64
   ) -> Element := do
-    assert!(!self.is_empty(), EINDEX_OUT_OF_BOUNDS)
+    assert!(!(self.length == 0), EINDEX_OUT_OF_BOUNDS)
     let last_idx := self.length - 1
     *self := core.prim.swapVector(*self, i, last_idx)
     if self.length == 0 then moveVectorError(2)
-    let (_t19, _t20) := core.prim.removeVector(*self, self.length - 1)
-    *self := _t20
-    _t19
+    let (_t33, _t34) := core.prim.removeVector(*self, self.length - 1)
+    *self := _t34
+    _t33
 
   spec swap_remove where
     pragma intrinsic
@@ -478,9 +486,27 @@ leaner module std::vector where
   public fun rotate_slice {Element}(
     self : &mut Vector<Element>, left : u64, rot : u64, right : u64
   ) -> u64 := do
-    self.reverse_slice(left, rot)
-    self.reverse_slice(rot, right)
-    self.reverse_slice(left, right)
+    assert!(left <= rot, 131073)
+    if left < rot then
+      if left < rot - 1 then
+        *self := core.prim.reverseSliceVector(
+          core.prim.swapVector(*self, left, rot - 1), left
+            + 1, rot - 1
+        )
+    assert!(rot <= right, 131073)
+    if rot < right then
+      if rot < right - 1 then
+        *self := core.prim.reverseSliceVector(
+          core.prim.swapVector(*self, rot, right - 1), rot
+            + 1, right - 1
+        )
+    assert!(left <= right, 131073)
+    if left < right then
+      if left < right - 1 then
+        *self := core.prim.reverseSliceVector(
+          core.prim.swapVector(*self, left, right - 1), left
+            + 1, right - 1
+        )
     left + (right - rot)
 
   spec rotate_slice where

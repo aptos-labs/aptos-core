@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/fun_type_unused_ctor.move:16:5: error: no denotation for `mk`: a type argument without values is not carried by the denotation

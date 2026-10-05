@@ -23,6 +23,11 @@ permitted, nothing must fail, and nothing is excused. -/
 structure Contract (σ ε Args Result : Type) where
   /-- States in which callers may invoke the function. -/
   requires : Args → σ → Prop
+  /-- What the theorem assumes of an invocation beyond the precondition:
+  the typing of inputs a run of a closure the proof cannot see needs
+  (`designs/static-typing.md`, Phase 5). Generated, never written by hand;
+  callers establish it at each call. -/
+  assumes : Args → σ → Prop := fun _ _ => True
   /-- Relation established by a successful execution. -/
   ensures : Args → σ → Result → σ → Prop
   /-- Failure outcomes the contract permits.  Uninterpreted failure behavior
@@ -51,7 +56,7 @@ These readings are the semantics — not anything written in the clauses. -/
 def Satisfies (function : Args → Spec σ ε Result)
     (contract : Contract σ ε Args Result) : Prop :=
   ∀ args initial,
-    contract.requires args initial →
+    contract.assumes args initial → contract.requires args initial →
       (∀ result final, (function args).ok initial result final →
         (¬contract.mayAbort args initial →
           contract.ensures args initial result final) ∧
@@ -69,16 +74,16 @@ theorem satisfies_congr {left right : Args → Spec σ ε Result}
     (contract : Contract σ ε Args Result) :
     Satisfies left contract ↔ Satisfies right contract := by
   constructor
-  · intro satisfies args initial permitted
-    obtain ⟨normal, failing, defined⟩ := satisfies args initial permitted
+  · intro satisfies args initial assumed permitted
+    obtain ⟨normal, failing, defined⟩ := satisfies args initial assumed permitted
     refine ⟨?_, ?_, ?_⟩
     · intro result final execution
       exact normal result final ((equivalent args).ok _ _ _ |>.mpr execution)
     · intro error execution
       exact failing error ((equivalent args).aborts _ _ |>.mpr execution)
     · exact fun obligation => defined ((equivalent args).undefined _ |>.mpr obligation)
-  · intro satisfies args initial permitted
-    obtain ⟨normal, failing, defined⟩ := satisfies args initial permitted
+  · intro satisfies args initial assumed permitted
+    obtain ⟨normal, failing, defined⟩ := satisfies args initial assumed permitted
     refine ⟨?_, ?_, ?_⟩
     · intro result final execution
       exact normal result final ((equivalent args).ok _ _ _ |>.mp execution)
@@ -105,7 +110,7 @@ def Contract.summary (contract : Contract σ ε Args Result) (args : Args) :
 /-- A summary satisfies the contract it summarizes. -/
 theorem satisfies_summary (contract : Contract σ ε Args Result) :
     Satisfies (fun args => contract.summary args) contract := by
-  intro args initial permitted
+  intro args initial _ permitted
   refine ⟨fun result final h => ⟨h.2.1, h.2.2.1, h.2.2.2⟩, fun error h => h.2, ?_⟩
   simp [Contract.summary, permitted]
 
@@ -125,6 +130,23 @@ theorem Obligation.intro {file : String} {startByte endByte : Nat} {p : Prop} (h
 closing attempt rewrites with this once the goal is down to arithmetic. -/
 theorem Obligation_iff {file : String} {startByte endByte : Nat} {p : Prop} :
     Obligation file startByte endByte p ↔ p := .rfl
+
+/-- A lemma instance an `apply` step owes outside a quantifier: its premise.
+Where the step holds, the lemma's theorem gives the conclusion. -/
+def LemmaApplication (owes _gives : Prop) : Prop := owes
+
+/-- A lemma instance under a quantifier of an `apply` step: its implication,
+which the lemma's theorem proves. -/
+def LemmaInstance (owes gives : Prop) : Prop := owes → gives
+
+/-- A case split a `split` step directs: the proposition or its negation. -/
+def CaseSplit (p : Prop) : Prop := p ∨ ¬p
+
+theorem CaseSplit.intro (p : Prop) : CaseSplit p := Classical.em p
+
+/-- A component of a lemma's measure as a natural number: it descends exactly
+where the Move Prover's condition holds, `n < c ∧ 0 ≤ c`. -/
+def lemmaMeasure (m : Int) : Nat := (m + 1).toNat
 
 /-- The authored source range an `Obligation` names: a file and a half-open
 byte range in it. -/
@@ -178,6 +200,31 @@ theorem wp_total_iff {action : Spec σ ε Result}
       (∀ error, action.aborts initial error → aborts error) := by
   simp [wp, total]
 
+/-- A behavioral fact a proof has read by its target's body: the fact
+itself, marked so that it is read once. -/
+abbrev Denoted (fact : Prop) : Prop := fact
+
+/-- What holds after every run an action may make where its weakest
+precondition holds: a fact about one run becomes that precondition. -/
+theorem forall_ok_of_wp {action : Spec σ ε Result} {ensures : Result → σ → Prop}
+    {initial : σ} (established : wp action ensures (fun _ => True) initial) :
+    ∀ result final, action.ok initial result final → ensures result final :=
+  established.1
+
+/-- What holds of every run of an action that returns nothing, where its
+weakest precondition holds. -/
+theorem forall_ok_unit_of_wp {action : Spec σ ε Unit} {ensures : σ → Prop}
+    {initial : σ} (established : wp action (fun _ final => ensures final) (fun _ => True) initial) :
+    ∀ final, action.ok initial () final → ensures final :=
+  fun final => established.1 () final
+
+/-- What holds where an action aborts and its weakest precondition holds. -/
+theorem of_aborts_of_wp {action : Spec σ ε Result} {initial : σ} {goal : Prop}
+    (established : wp action (fun _ _ => True) (fun _ => goal) initial)
+    (aborted : ∃ error, action.aborts initial error) : goal :=
+  let ⟨error, aborts⟩ := aborted
+  established.2.1 error aborts
+
 @[simp] theorem wp_pure (value : Result) (state : σ)
     (ensures : Result → σ → Prop) (aborts : ε → Prop) :
     wp (Spec.pure value) ensures aborts state ↔ ensures value state := by
@@ -192,6 +239,20 @@ theorem wp_total_iff {action : Spec σ ε Result}
     (aborts : ε → Prop) :
     wp (Spec.choose : Spec σ ε Result) ensures aborts state ↔ ∀ value, ensures value state := by
   simp [wp, Spec.choose]
+
+@[simp] theorem wp_given (proposition : Prop) (continuation : proposition → Spec σ ε Result)
+    (ensures : Result → σ → Prop) (aborts : ε → Prop) (state : σ) :
+    wp (Spec.given proposition continuation) ensures aborts state ↔
+      ∀ holds, wp (continuation holds) ensures aborts state := by
+  constructor
+  · intro h holds
+    exact ⟨fun result final ok => h.1 result final ⟨holds, ok⟩,
+      fun error failed => h.2.1 error ⟨holds, failed⟩,
+      fun undefined => h.2.2 ⟨holds, undefined⟩⟩
+  · intro h
+    exact ⟨fun result final ⟨holds, ok⟩ => (h holds).1 result final ok,
+      fun error ⟨holds, failed⟩ => (h holds).2.1 error failed,
+      fun ⟨holds, undefined⟩ => (h holds).2.2 undefined⟩
 
 @[simp] theorem wp_assume (proposition : Prop) (state : σ)
     (ensures : Unit → σ → Prop) (aborts : ε → Prop) :
@@ -229,6 +290,28 @@ continuation under what the contract guarantees. -/
     refine ⟨fun result final h => hok result final h.2.1 h.2.2.1 h.2.2.2,
       fun error h => habort error h.2, ?_⟩
     simp [Contract.summary, permitted]
+
+/-- Reading the state is the state. -/
+@[simp] theorem wp_bind_get (next : σ → Spec σ ε β) (ensures : β → σ → Prop)
+    (aborts : ε → Prop) (initial : σ) :
+    wp (Spec.bind Spec.get next) ensures aborts initial ↔
+      wp (next initial) ensures aborts initial := by
+  simp only [wp, Spec.bind, Spec.get]
+  constructor
+  · rintro ⟨normal, failing, defined⟩
+    exact ⟨fun result final ran => normal result final ⟨initial, initial, ⟨rfl, rfl⟩, ran⟩,
+      fun error ran => failing error (.inr ⟨initial, initial, ⟨rfl, rfl⟩, ran⟩),
+      fun undefined => defined (.inr ⟨initial, initial, ⟨rfl, rfl⟩, undefined⟩)⟩
+  · rintro ⟨normal, failing, defined⟩
+    refine ⟨?_, ?_, ?_⟩
+    · rintro result final ⟨_, _, ⟨rfl, rfl⟩, ran⟩
+      exact normal result final ran
+    · rintro error (aborted | ⟨_, _, ⟨rfl, rfl⟩, ran⟩)
+      · exact aborted.elim
+      · exact failing error ran
+    · rintro (undefined | ⟨_, _, ⟨rfl, rfl⟩, undefined⟩)
+      · exact undefined.elim
+      · exact defined undefined
 
 theorem wp_bind (action : Spec σ ε α) (next : α → Spec σ ε β)
     (ensures : β → σ → Prop) (aborts : ε → Prop) (initial : σ) :
@@ -269,7 +352,7 @@ theorem wp_bind (action : Spec σ ε α) (next : α → Spec σ ε β)
 
 theorem satisfies_of_wp (function : Args → Spec σ ε Result)
     (contract : Contract σ ε Args Result)
-    (proof : ∀ args initial, contract.requires args initial →
+    (proof : ∀ args initial, contract.assumes args initial → contract.requires args initial →
       wp (function args)
         (fun result final =>
           (¬contract.mayAbort args initial →
@@ -286,17 +369,31 @@ theorem satisfies_of_refines {left right : Args → Spec σ ε Result}
     (refines : ∀ args, Spec.Refines (left args) (right args))
     {contract : Contract σ ε Args Result} (verified : Satisfies right contract) :
     Satisfies left contract := by
-  intro args initial permitted
-  obtain ⟨normal, failing, defined⟩ := verified args initial permitted
+  intro args initial assumed permitted
+  obtain ⟨normal, failing, defined⟩ := verified args initial assumed permitted
   exact ⟨fun result final execution => normal result final ((refines args).ok _ _ _ execution),
     fun error execution => failing error ((refines args).aborts _ _ execution),
     fun obligation => defined ((refines args).undefined _ obligation)⟩
+
+/-- A function's in-body assumptions hold: every outcome of a run of it,
+`plain`, is an outcome of the reading in which each assumption holds where
+the run passes it, `assumed`. -/
+def AssumptionsHold (plain assumed : Args → Spec σ ε Result) : Prop :=
+  ∀ args, Spec.Refines (plain args) (assumed args)
+
+/-- A contract verified of a function's reading under its in-body
+assumptions holds of the function where they hold. -/
+theorem satisfies_of_assumptions {plain assumed : Args → Spec σ ε Result}
+    (holds : AssumptionsHold plain assumed)
+    {contract : Contract σ ε Args Result} (verified : Satisfies assumed contract) :
+    Satisfies plain contract :=
+  satisfies_of_refines holds verified
 
 /-- The empty finite approximation satisfies every partial-correctness
 contract because it has no observable outcome. -/
 theorem satisfies_bottom (contract : Contract σ ε Args Result) :
     Satisfies (fun _ => Spec.bottom) contract := by
-  intro args initial _
+  intro args initial _ _
   simp [Spec.bottom]
 
 /-- The contract no caller can invoke: it requires `False`. A fixed point
@@ -309,7 +406,7 @@ def Contract.vacuous : Contract σ ε Args Result where
 
 theorem satisfies_vacuous (function : Args → Spec σ ε Result) :
     Satisfies function Contract.vacuous := by
-  intro _ _ impossible
+  intro _ _ _ impossible
   exact impossible.elim
 
 /-- Fixed-point induction for recursive functions.  The premise is exactly
@@ -327,16 +424,16 @@ theorem satisfies_fix
     | zero => exact satisfies_bottom contract
     | succ fuel induction =>
         simpa [Spec.fixApprox] using step (Spec.fixApprox body fuel) induction
-  intro args initial permitted
+  intro args initial assumed permitted
   refine ⟨?_, ?_, ?_⟩
   · intro result final execution
     obtain ⟨fuel, execution⟩ := execution
-    exact (approximates fuel args initial permitted).1 result final execution
+    exact (approximates fuel args initial assumed permitted).1 result final execution
   · intro error execution
     obtain ⟨fuel, execution⟩ := execution
-    exact (approximates fuel args initial permitted).2.1 error execution
+    exact (approximates fuel args initial assumed permitted).2.1 error execution
   · rintro ⟨fuel, obligation⟩
-    exact (approximates fuel args initial permitted).2.2 obligation
+    exact (approximates fuel args initial assumed permitted).2.2 obligation
 
 /-- Fixed-point induction for a heterogeneous mutually recursive SCC.  The
 recursive hypothesis supplies every member's contract, so calls across the
@@ -359,16 +456,16 @@ theorem satisfies_fixFamily
     | succ fuel induction =>
         simpa [Spec.fixFamilyApprox] using
           step (Spec.fixFamilyApprox body fuel) induction
-  intro index args initial permitted
+  intro index args initial assumed permitted
   refine ⟨?_, ?_, ?_⟩
   · intro result final execution
     obtain ⟨fuel, execution⟩ := execution
-    exact (approximates fuel index args initial permitted).1 result final execution
+    exact (approximates fuel index args initial assumed permitted).1 result final execution
   · intro error execution
     obtain ⟨fuel, execution⟩ := execution
-    exact (approximates fuel index args initial permitted).2.1 error execution
+    exact (approximates fuel index args initial assumed permitted).2.1 error execution
   · rintro ⟨fuel, obligation⟩
-    exact (approximates fuel index args initial permitted).2.2 obligation
+    exact (approximates fuel index args initial assumed permitted).2.2 obligation
 
 /-- Use an already established contract as the weakest-precondition fact for
 one concrete call. This avoids manually projecting normal and failure halves.
@@ -379,6 +476,7 @@ theorem wp_of_satisfies
     {function : Args → Spec σ ε Result} {contract : Contract σ ε Args Result}
     {args : Args} {initial : σ}
     (verified : Satisfies function contract)
+    (assumed : contract.assumes args initial)
     (permitted : contract.requires args initial)
     (noAbort : ¬contract.mayAbort args initial := by simp) :
     wp (function args)
@@ -388,10 +486,10 @@ theorem wp_of_satisfies
       (contract.aborts args initial)
       initial :=
   ⟨fun result final execution =>
-      let established := (verified args initial permitted).1 result final execution
+      let established := (verified args initial assumed permitted).1 result final execution
       ⟨established.1 noAbort, established.2.1⟩,
-    (verified args initial permitted).2.1,
-    (verified args initial permitted).2.2⟩
+    (verified args initial assumed permitted).2.1,
+    (verified args initial assumed permitted).2.2⟩
 
 /-- The failure half of an established contract, usable without ruling the
 declared failures out. -/
@@ -399,10 +497,11 @@ theorem aborts_of_satisfies
     {function : Args → Spec σ ε Result} {contract : Contract σ ε Args Result}
     {args : Args} {initial : σ}
     (verified : Satisfies function contract)
+    (assumed : contract.assumes args initial)
     (permitted : contract.requires args initial) :
     ∀ error, (function args).aborts initial error →
       contract.aborts args initial error :=
-  (verified args initial permitted).2.1
+  (verified args initial assumed permitted).2.1
 
 /-- Weaken an established weakest-precondition fact to a coarser
 postcondition and failure condition. This adapts a callee's contract to the
@@ -425,7 +524,7 @@ theorem satisfies_fix_of_wp
     (body : (Args → Spec σ ε Result) → Args → Spec σ ε Result)
     (contract : Contract σ ε Args Result)
     (step : ∀ recursive, Satisfies recursive contract →
-      ∀ args initial, contract.requires args initial →
+      ∀ args initial, contract.assumes args initial → contract.requires args initial →
         wp (body recursive args)
           (fun result final =>
             (¬contract.mayAbort args initial →
@@ -465,15 +564,15 @@ theorem wp_withInvariant_fix {Args Result : Type}
     frame := fun _ _ _ => True }
   have verified : Satisfies (Spec.fix body) contract := by
     apply satisfies_fix_of_wp body contract
-    intro recursive recursiveVerified args store permitted
+    intro recursive recursiveVerified args store _ permitted
     have hypothesis : ∀ args store, invariant args store →
         wp (recursive args) ensures aborts store := fun args store holds =>
-      wp_mono (wp_of_satisfies recursiveVerified holds (noAbort := fun h => h))
+      wp_mono (wp_of_satisfies recursiveVerified trivial holds (noAbort := fun h => h))
         (fun _ _ h => h.1) (fun _ h => h)
     exact wp_mono (step recursive hypothesis args store permitted)
       (fun _ _ h => ⟨fun _ => h, trivial, fun h' => h'⟩) (fun _ h => h)
   show wp (Spec.fix body init) ensures aborts initial
-  exact wp_mono (wp_of_satisfies verified entry (noAbort := fun h => h))
+  exact wp_mono (wp_of_satisfies verified trivial entry (noAbort := fun h => h))
     (fun _ _ h => h.1) (fun _ h => h)
 
 /-- Loop verification for a loop that leaves the store as it found it: the
@@ -505,7 +604,8 @@ theorem satisfies_fixFamily_of_wp
     (contracts : (index : Index) → Contract σ ε (Args index) (Result index))
     (step : ∀ recursive,
       (∀ index, Satisfies (recursive index) (contracts index)) →
-      ∀ index args initial, (contracts index).requires args initial →
+      ∀ index args initial, (contracts index).assumes args initial →
+        (contracts index).requires args initial →
         wp (body recursive index args)
           (fun result final =>
             (¬(contracts index).mayAbort args initial →

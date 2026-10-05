@@ -73,16 +73,16 @@ def callResult (namespaceId : NamespaceId) (loc : LocId)
         callers := result.outcome.callers.push here } }
 
 mutual
-  def evalFunction : Nat → ExecutableUnit → FunctionHandle →
+  def evalFunction {unit : ValidatedUnit} : Nat → ExecutableUnit unit → FunctionHandle →
       Array (TypeId × TypeId) → RuntimeState → Array RuntimeValue →
       Except LocatedInterpreterError FunctionEvaluation
     | 0, executable, handle, _, _, _ =>
-        let loc := executable.unit.namespaces[handle.namespaceId.index]?
+        let loc := unit.namespaces[handle.namespaceId.index]?
           |>.map (fun ns => ns.functions[handle.functionId.index]?.map (·.loc))
           |>.join |>.getD ⟨0⟩
         failAt handle.namespaceId loc .outOfFuel
     | fuel + 1, executable, handle, typeInstantiation, state, arguments => do
-        let some ns := executable.unit.namespaces[handle.namespaceId.index]?
+        let some ns := unit.namespaces[handle.namespaceId.index]?
           | failAt handle.namespaceId ⟨0⟩ (.functionHasNoBody handle)
         let some declaration := ns.functions[handle.functionId.index]?
           | failAt handle.namespaceId ns.loc (.functionHasNoBody handle)
@@ -94,6 +94,8 @@ mutual
           let some (finalState, outcome) :=
               BigStep.nativeCall executable handle typeInstantiation state arguments
             | failAt handle.namespaceId declaration.loc (.functionHasNoBody handle)
+          unless outcome.holeFree do
+            failAt handle.namespaceId declaration.loc .returnedLoanHole
           return { state := finalState, outcome := {
             value := outcome, primary := runtimeLocation handle.namespaceId declaration.loc } }
         let some frame := initialFrame? declaration arguments typeInstantiation
@@ -107,6 +109,8 @@ mutual
               | failAt handle.namespaceId evaluation.control.primary.loc
                   (.resultArity declaration.signature.results.size 1)
             let outcome : Outcome := .returned values
+            unless outcome.holeFree do
+              failAt handle.namespaceId evaluation.control.primary.loc .returnedLoanHole
             let finalState := finalizeFunctionState executable declaration.profile
               state evaluation.state evaluation.frame outcome
             return { state := finalState, outcome := {
@@ -118,6 +122,8 @@ mutual
               failAt handle.namespaceId evaluation.control.primary.loc
                 (.resultArity declaration.signature.results.size values.size)
             let outcome : Outcome := .returned values
+            unless outcome.holeFree do
+              failAt handle.namespaceId evaluation.control.primary.loc .returnedLoanHole
             let finalState := finalizeFunctionState executable declaration.profile
               state evaluation.state evaluation.frame outcome
             return { state := finalState, outcome := {
@@ -135,15 +141,33 @@ mutual
         | .break_ .. | .continue_ .. =>
             failAt handle.namespaceId evaluation.control.primary.loc .escapedLoopControl
 
-  def evalExpr : Nat → ExecutableUnit → NamespaceId → RuntimeFrame → RuntimeState →
+  /-- An expression: the loans whose deaths are anchored before it end, its
+  node runs, and the loans anchored after it end once it produced a value. -/
+  def evalExpr {unit : ValidatedUnit} : Nat → ExecutableUnit unit → NamespaceId → RuntimeFrame → RuntimeState →
       ExprId → Except LocatedInterpreterError ExprEvaluation
     | 0, executable, namespaceId, _, _, exprId =>
-        let loc := executable.unit.namespaces[namespaceId.index]?
+        let loc := unit.namespaces[namespaceId.index]?
           |>.map (fun ns => ns.expressions[exprId.index]?.map (·.loc))
           |>.join |>.getD ⟨0⟩
         failAt namespaceId loc .outOfFuel
     | fuel + 1, executable, namespaceId, frame, state, exprId => do
-        let some ns := executable.unit.namespaces[namespaceId.index]?
+        let deaths := loanDeathsAt unit namespaceId exprId
+        let started := settleLoans deaths.before frame state
+        let evaluation ← evalNode fuel executable namespaceId started.1 started.2 exprId
+        let settled := settleAfter deaths.after evaluation.control.value evaluation.frame
+          evaluation.state
+        return { evaluation with frame := settled.1, state := settled.2 }
+
+  /-- One node, the loan deaths at it aside. -/
+  def evalNode {unit : ValidatedUnit} : Nat → ExecutableUnit unit → NamespaceId → RuntimeFrame → RuntimeState →
+      ExprId → Except LocatedInterpreterError ExprEvaluation
+    | 0, executable, namespaceId, _, _, exprId =>
+        let loc := unit.namespaces[namespaceId.index]?
+          |>.map (fun ns => ns.expressions[exprId.index]?.map (·.loc))
+          |>.join |>.getD ⟨0⟩
+        failAt namespaceId loc .outOfFuel
+    | fuel + 1, executable, namespaceId, frame, state, exprId => do
+        let some ns := unit.namespaces[namespaceId.index]?
           | failAt namespaceId ⟨0⟩ .unsupportedPreparedNode
         let some expression := ns.expressions[exprId.index]?
           | failAt namespaceId ns.loc .unsupportedPreparedNode
@@ -157,9 +181,9 @@ mutual
               | failAt namespaceId expression.loc .unsupportedPreparedNode
             return normal state frame runtimeValue
         | .constant reference =>
-            let some handle := resolveConstant? executable.unit namespaceId reference
+            let some handle := resolveConstant? unit namespaceId reference
               | failAt namespaceId expression.loc (.unknownConstant reference)
-            let some targetNs := executable.unit.namespaces[handle.namespaceId.index]?
+            let some targetNs := unit.namespaces[handle.namespaceId.index]?
               | failAt namespaceId expression.loc .unsupportedPreparedNode
             let some declaration := targetNs.constants[handle.constantId]?
               | failAt namespaceId expression.loc .unsupportedPreparedNode
@@ -177,23 +201,23 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                let some handle := resolveFunction? executable.unit namespaceId reference
+                let some handle := resolveFunction? unit namespaceId reference
                   | failAt namespaceId expression.loc (.unknownFunction reference)
-                let typeInstantiation := callTypeInstantiation executable.unit handle
+                let typeInstantiation := callTypeInstantiation unit handle
                   frame.typeInstantiation instantiations
                 let result ← match evalFunction fuel executable handle typeInstantiation
                     state values.toArray with
                   | .ok result => pure result
                   | .error error => throw (error.pushCaller here)
                 return callResult namespaceId expression.loc
-                  (certificateLoanId? executable.unit namespaceId exprId)
+                  (certificateLoanId? unit namespaceId exprId)
                   frame state.pending result
         | .operation (.call (.constructor reference variant)) _ arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                let some value := constructNominal? executable.unit namespaceId reference variant values.toArray
+                let some value := constructNominal? unit namespaceId reference variant values.toArray
                   | failAt namespaceId expression.loc (.invalidConstructor reference variant)
                 return normal state frame value
         | .operation (.call (.destructor reference variant)) _ arguments _ =>
@@ -201,31 +225,37 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame [value] =>
-                let some fields := destructNominal? executable.unit namespaceId reference variant value
+                let some fields := destructNominal? unit namespaceId reference variant value
                   | failAt namespaceId expression.loc (.invalidConstructor reference variant)
                 return normal state frame (packResults fields)
             | .values _ _ _ => failAt namespaceId expression.loc (.invalidConstructor reference variant)
-        | .operation (.call (.closure reference)) _ captures _ =>
+        | .operation (.call (.closure reference mask)) instantiations captures _ =>
             let operands ← evalValues fuel executable namespaceId frame state captures.toList
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                let some handle := resolveFunction? executable.unit namespaceId reference
+                let some handle := resolveFunction? unit namespaceId reference
                   | failAt namespaceId expression.loc (.unknownFunction reference)
-                return normal state frame (.closure handle values.toArray)
+                return normal state frame (.closure handle mask
+                  (callTypeInstantiation unit handle frame.typeInstantiation instantiations)
+                  values.toArray)
         | .operation (.call .invoke) _ arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values _ _ [] => failAt namespaceId expression.loc (.expectedClosure .unit)
             | .values state frame (callable :: arguments) =>
-                let .closure handle captures := callable
+                let .closure handle mask typeInstantiation captures := callable
                   | failAt namespaceId expression.loc (.expectedClosure callable)
-                let result ← match evalFunction fuel executable handle frame.typeInstantiation state
-                    (captures ++ arguments.toArray) with
+                let some composed := ClosureMask.compose mask captures.toList arguments
+                  | failAt namespaceId expression.loc
+                      (.closureArguments mask captures.size arguments.length)
+                let result ← match evalFunction fuel executable handle typeInstantiation state
+                    composed.toArray with
                   | .ok result => pure result
                   | .error error => throw (error.pushCaller here)
-                return callResult namespaceId expression.loc none
+                return callResult namespaceId expression.loc
+                  (certificateLoanId? unit namespaceId exprId)
                   frame state.pending result
         | .operation (.profile operation _) _ arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
@@ -253,15 +283,21 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                match evaluateDataOperation? executable.unit ns.identity operation values.toArray with
+                match evaluateDataOperation? unit ns.identity operation values.toArray with
                 | some value => return normal state frame value
-                | none => failAt namespaceId expression.loc (.invalidDataOperation operation)
+                | none =>
+                    match variantMismatch? unit ns (.data operation) values.toArray frame
+                        state, patternMismatchThrow? ns.profile with
+                    | true, some (kind, thrown) =>
+                        return { state, frame,
+                                 control := located namespaceId expression.loc (.throw_ kind thrown) }
+                    | _, _ => failAt namespaceId expression.loc (.invalidDataOperation operation)
         | .operation (.global kind) instantiations arguments _ =>
             let operands ← evalValues fuel executable namespaceId frame state arguments.toList
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                match evaluateGlobalOperation? executable.unit ns expression.typeId exprId kind
+                match evaluateGlobalOperation? unit ns expression.typeId exprId kind
                     instantiations values.toArray frame state with
                 | some (.value frame state value) => return normal state frame value
                 | some (.throw_ frame state kind thrown) => return {
@@ -281,10 +317,15 @@ mutual
             match operands with
             | .control state frame control => return { state, frame, control }
             | .values state frame values =>
-                let some (frame, state, value) := evaluatePlaceOperation? executable.unit ns
+                let some (frame', state', value) := evaluatePlaceOperation? unit ns
                     expression.typeId exprId operation values.toArray frame state
-                  | failAt namespaceId expression.loc .unsupportedPreparedNode
-                return normal state frame value
+                  | match variantMismatch? unit ns operation values.toArray frame state,
+                        patternMismatchThrow? ns.profile with
+                    | true, some (kind, thrown) =>
+                        return { state, frame,
+                                 control := located namespaceId expression.loc (.throw_ kind thrown) }
+                    | _, _ => failAt namespaceId expression.loc .unsupportedPreparedNode
+                return normal state' frame' value
         | .block statements result =>
             let statementsResult ← evalStatements fuel executable namespaceId frame state statements.toList
             match statementsResult with
@@ -307,9 +348,13 @@ mutual
                 let initialized ← evalExpr fuel executable namespaceId frame state initializer
                 match initialized.control.value with
                 | .value value =>
-                    let some bound := bindPattern executable.unit ns initialized.frame pattern value
+                    let some bound := bindPattern unit ns initialized.frame pattern value
                       | let patternLoc := ns.patterns[pattern.index]?.map (·.loc) |>.getD expression.loc
-                        failAt namespaceId patternLoc .patternMismatch
+                        match patternMismatchThrow? ns.profile with
+                        | some (kind, arguments) =>
+                            return { state := initialized.state, frame := initialized.frame,
+                                     control := located namespaceId patternLoc (.throw_ kind arguments) }
+                        | none => failAt namespaceId patternLoc .patternMismatch
                     let evaluation ← evalExpr fuel executable namespaceId bound initialized.state body
                     match evaluation.control.value with
                     | .value value => return normal evaluation.state evaluation.frame value
@@ -348,7 +393,7 @@ mutual
             let bodyResult ← evalExpr fuel executable namespaceId frame state body
             match bodyResult.control.value with
             | .value _ | .continue_ 0 =>
-                evalExpr fuel executable namespaceId bodyResult.frame bodyResult.state exprId
+                evalNode fuel executable namespaceId bodyResult.frame bodyResult.state exprId
             | .break_ 0 value => return normal bodyResult.state bodyResult.frame (value.getD .unit)
             | .break_ (nest + 1) value => return {
                 bodyResult with control := { bodyResult.control with value := .break_ nest value } }
@@ -387,8 +432,13 @@ mutual
             let result ← evalExpr fuel executable namespaceId frame state value
             match result.control.value with
             | .value value =>
-                let some resolved := resolvePlace? executable.unit ns result.frame result.state place
-                  | failAt namespaceId expression.loc (.invalidPlace place)
+                let some resolved := resolvePlace? unit ns result.frame result.state place
+                  | match placeVariantMismatchFuel? unit ns result.frame result.state
+                        (2 * ns.places.size + 3) place, patternMismatchThrow? ns.profile with
+                    | true, some (kind, thrown) =>
+                        return { state := result.state, frame := result.frame,
+                                 control := located namespaceId expression.loc (.throw_ kind thrown) }
+                    | _, _ => failAt namespaceId expression.loc (.invalidPlace place)
                 let some (nextFrame, nextState) :=
                     writeRuntimePlace? result.frame result.state resolved value
                   | failAt namespaceId expression.loc (.invalidPlace place)
@@ -398,19 +448,23 @@ mutual
             let result ← evalExpr fuel executable namespaceId frame state value
             match result.control.value with
             | .value value =>
-                let some nextFrame := bindPattern executable.unit ns result.frame pattern value
+                let some nextFrame := bindPattern unit ns result.frame pattern value
                   | let patternLoc := ns.patterns[pattern.index]?.map (·.loc) |>.getD expression.loc
-                    failAt namespaceId patternLoc .patternMismatch
+                    match patternMismatchThrow? ns.profile with
+                    | some (kind, arguments) =>
+                        return { state := result.state, frame := result.frame,
+                                 control := located namespaceId patternLoc (.throw_ kind arguments) }
+                    | none => failAt namespaceId patternLoc .patternMismatch
                 return normal result.state nextFrame .unit
             | _ => return propagate result
         | .spec _ => return normal state frame .unit
         | .quantifier .. => failAt namespaceId expression.loc .unsupportedPreparedNode
 
-  def evalValues : Nat → ExecutableUnit → NamespaceId → RuntimeFrame → RuntimeState →
+  def evalValues {unit : ValidatedUnit} : Nat → ExecutableUnit unit → NamespaceId → RuntimeFrame → RuntimeState →
       List ExprId → Except LocatedInterpreterError ValuesEvaluation
     | _, _, _, frame, state, [] => return .values state frame []
     | 0, executable, namespaceId, _, _, expression :: _ =>
-        let loc := executable.unit.namespaces[namespaceId.index]?
+        let loc := unit.namespaces[namespaceId.index]?
           |>.map (fun ns => ns.expressions[expression.index]?.map (·.loc))
           |>.join |>.getD ⟨0⟩
         failAt namespaceId loc .outOfFuel
@@ -424,11 +478,11 @@ mutual
             | .control state frame control => return .control state frame control
         | _ => return .control head.state head.frame head.control
 
-  def evalStatements : Nat → ExecutableUnit → NamespaceId → RuntimeFrame → RuntimeState →
+  def evalStatements {unit : ValidatedUnit} : Nat → ExecutableUnit unit → NamespaceId → RuntimeFrame → RuntimeState →
       List ExprId → Except LocatedInterpreterError StatementsEvaluation
     | _, _, _, frame, state, [] => return .done state frame
     | 0, executable, namespaceId, _, _, statement :: _ =>
-        let loc := executable.unit.namespaces[namespaceId.index]?
+        let loc := unit.namespaces[namespaceId.index]?
           |>.map (fun ns => ns.expressions[statement.index]?.map (·.loc))
           |>.join |>.getD ⟨0⟩
         failAt namespaceId loc .outOfFuel
@@ -438,15 +492,18 @@ mutual
         | .value _ => evalStatements fuel executable namespaceId head.frame head.state statements
         | _ => return .control head.state head.frame head.control
 
-  def evalArms : Nat → ExecutableUnit → NamespaceId → ValidatedNamespace → LocId →
+  def evalArms {unit : ValidatedUnit} : Nat → ExecutableUnit unit → NamespaceId → ValidatedNamespace → LocId →
       RuntimeFrame → RuntimeState → RuntimeValue → List MatchArm →
       Except LocatedInterpreterError ExprEvaluation
-    | _, _, namespaceId, _, ownerLoc, _, _, _, [] =>
-        failAt namespaceId ownerLoc .nonExhaustiveMatch
+    | _, _, namespaceId, ns, ownerLoc, frame, state, _, [] =>
+        match patternMismatchThrow? ns.profile with
+        | some (kind, arguments) =>
+            return { state, frame, control := located namespaceId ownerLoc (.throw_ kind arguments) }
+        | none => failAt namespaceId ownerLoc .nonExhaustiveMatch
     | 0, _, namespaceId, _, ownerLoc, _, _, _, _ :: _ =>
         failAt namespaceId ownerLoc .outOfFuel
     | fuel + 1, executable, namespaceId, ns, ownerLoc, frame, state, value, arm :: arms => do
-        match bindPattern executable.unit ns frame arm.pattern value with
+        match bindPattern unit ns frame arm.pattern value with
         | none => evalArms fuel executable namespaceId ns ownerLoc frame state value arms
         | some armFrame => match arm.guard with
           | none => evalExpr fuel executable namespaceId armFrame state arm.body
@@ -465,7 +522,8 @@ end Internal
 
 /-- Execute a prepared structured-LIR function.  Fuel bounds recursive calls
 and loop iterations; exhaustion is reported at the active LIR source point. -/
-def run (executable : ExecutableUnit) (fuel : Nat) (function : FunctionHandle)
+def run {unit : ValidatedUnit} (executable : ExecutableUnit unit) (fuel : Nat)
+    (function : FunctionHandle)
     (arguments : Array RuntimeValue) (state : RuntimeState := {}) :
     Except LocatedInterpreterError (RuntimeState × LocatedOutcome) := do
   let result ← Internal.evalFunction fuel executable function #[] state arguments

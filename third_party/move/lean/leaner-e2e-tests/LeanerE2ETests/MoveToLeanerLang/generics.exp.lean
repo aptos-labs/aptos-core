@@ -24,6 +24,9 @@ leaner module 0x42::generics where
   fun publish_generic {T has Store}(account : &Signer, value : T) -> Unit := do
     move_to<Vault<T> >(account, new Vault<T> { value })
 
+  spec publish_generic where
+    modifies *
+
   fun has_vault {T has Store}(addr : Address) -> Bool := exists<Vault<T> >(addr)
 
   fun swapped(value : u64) -> Pair<u64, u64> :=

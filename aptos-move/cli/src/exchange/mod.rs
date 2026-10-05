@@ -1241,7 +1241,7 @@ fn collect_loops(
                             },
                             // A call may modify anything; recognized when
                             // spec support lands. For now, reject.
-                            Oper::Function(_) | Oper::FunctionInst(_, _) => bail!(
+                            Oper::Function(_) | Oper::FunctionInst(_, _) | Oper::Invoke => bail!(
                                 "calls inside loops not yet supported by loop-target collection"
                             ),
                             // A reference write may target any borrowed
@@ -1305,7 +1305,9 @@ fn collect_loops(
                             | Oper::TestVariantRef(_)
                             | Oper::TestVariantRefInst(_, _)
                             | Oper::ReadRef
-                            | Oper::FreezeRef => {},
+                            | Oper::FreezeRef
+                            | Oper::Closure(_, _)
+                            | Oper::ClosureInst(_, _, _) => {},
                         }
                     },
                     exchange::Instr::Nop => {},

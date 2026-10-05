@@ -164,15 +164,22 @@ private partial def referencedTypeNames (unit : ValidatedUnit) (fuel : Nat)
     | .reference reference => referencedTypeNames unit (fuel - 1) reference.referent initial
     | _ => initial
 
+/-- A closure's parameter slots up to its last captured one: the captures,
+and `_` for the parameters supplied at invocation. -/
+def closureSlots (mask : Nat) (captures : List String) : Option (List String) :=
+  let width := if mask == 0 then 0 else Nat.log2 mask + 1
+  ClosureMask.compose mask captures (List.replicate (width - captures.length) "_")
+
 private def operationReferencedNames (operation : Operation) : Array NameId :=
   let refs : Array QualifiedRef := match operation with
     | .call (.function reference) | .call (.constructor reference _) |
-        .call (.destructor reference _) | .call (.closure reference) => #[reference]
+        .call (.destructor reference _) | .call (.closure reference _) => #[reference]
     | .call (.extension _ targets) | .profile _ targets => targets
     | .data (.select reference _) | .data (.selectVariants reference _) |
         .data (.testVariants reference _) | .data (.discriminant reference) |
         .data (.updateField reference _) => #[reference]
-    | .specification (.functionCall reference _) => #[reference]
+    | .specification (.functionCall reference _) | .specification (.lemma reference _) =>
+        #[reference]
     | _ => #[]
   refs.foldl (fun names reference => pushReferencedName names reference.name) #[]
 
@@ -264,6 +271,11 @@ private def referencedNames (unit : ValidatedUnit)
       for type in declaration.contract.reads do names := visitTypeUse names type
       expressions := enqueueContract expressions declaration.contract
       if let some root := declaration.body then expressions := expressions.push root
+  for declaration in ns.lemmas do
+    names := visitSignature names declaration.signature
+    names := visitLocals names declaration.locals
+    expressions := enqueueContract expressions declaration.contract
+    expressions := declaration.proof.foldl enqueueCondition expressions
   for declaration in ns.specVars do
     names := visitBinders names declaration.generics
     names := visitTypeUse names declaration.type
@@ -448,7 +460,8 @@ private def PrintNamespace.of (unit : ValidatedUnit) (ns : ValidatedNamespace) :
   let declared := ns.constants.map (·.name) ++
     ns.structs.flatMap (fun declaration =>
       #[declaration.name] ++ declaration.variants.map (·.name)) ++
-    ns.functions.map (·.name) ++ ns.specFunctions.map (·.name) ++ ns.specVars.map (·.name)
+    ns.functions.map (·.name) ++ ns.specFunctions.map (·.name) ++ ns.specVars.map (·.name) ++
+    ns.lemmas.map (·.name)
   let ownedNames := declared.foldl (init := {}) fun names id =>
     match unit.tables.names[id.index]? with
     | some entry => names.insert (executableReferenceName entry.name)
@@ -565,6 +578,7 @@ mutual
     | .integer .unbounded false => pure "Nat"
     | .integer .unbounded true => pure "Int"
     | .range => pure "Range"
+    | .stateDomain => pure "StateDomain"
     | .tuple elements =>
         if elements.isEmpty then pure "Unit" else
           pure s!"({commaSep (← elements.mapM (typeTextFuel unit ns binders · (fuel - 1)))})"
@@ -617,7 +631,7 @@ mutual
                 pure s!"lifetime {value}"
             | .evidence _ => throw "evidence nominal arguments are outside the current parser"
           pure <| name ++ typeArguments (commaSep arguments)
-    | .eventStore | .typeDomain _ | .resourceDomain .. | .stateDomain | .profile _ =>
+    | .eventStore | .typeDomain _ | .resourceDomain .. | .profile _ =>
         throw s!"validated type {id.index} is outside the current LeanerLang parser"
 
   private partial def typeText (unit : ValidatedUnit) (ns : PrintNamespace)
@@ -792,15 +806,6 @@ private def behaviorOperationName : BehaviorKind → String
   | .unchangedOf => "unchanged_of"
   | .foldsOf => "folds_of"
   | .writeOf index => s!"write_of[{index}]"
-
-private def behaviorRangePrefix (kind : BehaviorKind) (range : MemoryRange) : String :=
-  match range.pre, range.post with
-  | none, none => ""
-  | some pre, none =>
-      if kind == .requiresOf || kind == .abortsOf then s!"@{pre} |~ "
-      else s!"@{pre}.. |~ "
-  | none, some post => s!"..@{post} |~ "
-  | some pre, some post => s!"@{pre}..@{post} |~ "
 
 private partial def patternLocalIds (ns : ValidatedNamespace) (id : PatternId)
     (fuel : Nat) : Array LocalId :=
@@ -981,16 +986,32 @@ private def functionBodyRoot? : FunctionBody → Option ExprId
   | .absent => none
 
 /-- Local source names for a declaration whose body is `root`. Parameters are
-the outermost bindings; every other local is bound by the body itself. -/
+the outermost bindings, a later one hiding an earlier one of its name; every
+other local is bound by the body itself. -/
 private def declarationLocalNames (ns : ValidatedNamespace) (locals : Array LocalDecl)
     (parameters : Nat) (root : Option ExprId) : Array String :=
+  let leading := locals.extract 0 parameters
+  let hidingParameters := leading.zipIdx.filterMap fun (declaration, index) =>
+    if (leading.extract 0 index).any (·.name == declaration.name) then some declaration.id
+    else none
   match root with
-  | none => locals.map (·.name)
+  | none => sourceLocalNames locals hidingParameters
   | some root =>
-      let scope := (locals.extract 0 parameters).map fun declaration =>
-        (declaration.name, declaration.id)
+      let scope := leading.map fun declaration => (declaration.name, declaration.id)
       sourceLocalNames locals
-        (shadowingLocals ns locals root scope #[] (ns.expressions.size + 1))
+        (hidingParameters ++ shadowingLocals ns locals root scope #[] (ns.expressions.size + 1))
+
+/-- The local names of a declaration whose expressions have several roots,
+as a lemma's clauses and steps. -/
+private def declarationLocalNamesOf (ns : ValidatedNamespace) (locals : Array LocalDecl)
+    (parameters : Nat) (roots : Array ExprId) : Array String :=
+  let leading := locals.extract 0 parameters
+  let hidingParameters := leading.zipIdx.filterMap fun (declaration, index) =>
+    if (leading.extract 0 index).any (·.name == declaration.name) then some declaration.id
+    else none
+  let scope := leading.map fun declaration => (declaration.name, declaration.id)
+  sourceLocalNames locals (roots.foldl (init := hidingParameters) fun hidden root =>
+    hidden ++ shadowingLocals ns locals root scope #[] (ns.expressions.size + 1))
 
 private structure Context where
   unit : ValidatedUnit
@@ -1026,6 +1047,30 @@ private structure Context where
   itself must carry, as in `let (mut head, tail) := ...`. -/
   mutableBindings : Array LocalId := #[]
 
+/-- The state labels a two-state operation reads, as the prefix of its
+spelling: `S |~ ` where both are `S`, else `S.. |~ `, `..T |~ `, or
+`S..T |~ `; none where the operation reads the clause's own states. A label
+is the name it was interned as. -/
+private def stateRangePrefix (context : Context) (range : MemoryRange) :
+    Except String String := do
+  let labelName (label : Nat) : Except String String :=
+    match context.unit.tables.names[label]? with
+    | some name => pure name.name
+    | none => throw s!"state label {label} is not a name of the unit"
+  match range.pre, range.post with
+  | none, none => pure ""
+  | some pre, some post =>
+      if pre == post then pure s!"{← labelName pre} |~ "
+      else pure s!"{← labelName pre}..{← labelName post} |~ "
+  | some pre, none => pure s!"{← labelName pre}.. |~ "
+  | none, some post => pure s!"..{← labelName post} |~ "
+
+/-- A two-state operation's spelling under its state labels: `|~` binds below
+every operator, so a labeled spelling is parenthesized; the layout stage
+drops the parentheses a position does not need. -/
+private def labeledText (statePrefix body : String) : String :=
+  if statePrefix.isEmpty then body else s!"({statePrefix}{body})"
+
 /-- Whether a statement's value has the unit type. -/
 private def unitValued (context : Context) (statement : ExprId) : Bool :=
   (context.ns.expressions[statement.index]?).any fun node =>
@@ -1051,10 +1096,8 @@ private partial def contextTypeTextFuel (context : Context) (id : TypeId)
       if elements.isEmpty then pure "Unit" else
         pure s!"({commaSep (← elements.mapM
           (contextTypeTextFuel context · (fuel - 1)))})"
-  | .function arguments result abilities =>
-      let arguments ← arguments.mapM (contextTypeTextFuel context · (fuel - 1))
-      let result ← contextTypeTextFuel context result (fuel - 1)
-      pure s!"Fn({commaSep arguments}) -> {result}{abilitiesText abilities}"
+  -- A function type keeps its executable widths: its values are closures,
+  -- typed by their targets' signatures, whatever the context.
   | _ => typeTextFuel context.unit context.ns context.binders id fuel
 
 private def contextTypeText (context : Context) (id : TypeId) : Except String String :=
@@ -1616,7 +1659,17 @@ private partial def placeText (context : Context)
         | some (.localVar _) => baseText
         | _ => s!"({baseText})"
       pure s!"*{baseText}"
-  | .field base _ field =>
+  | .field base owner field =>
+      -- Move names the variant a field several variants give different
+      -- types is reached through.
+      if let (some .move, some (.downcast inner variant)) :=
+          (context.ns.profile, context.ns.places[base.index]?) then
+        let innerText ← match context.ns.places[inner.index]? with
+          | some (.deref reference) => placeText context indexText reference (fuel - 1)
+          | _ => placeText context indexText inner (fuel - 1)
+        let enumText ← qualifiedNameAt context.unit context.ns owner.name
+        return s!"(downcast {innerText} as {enumText}::{← nameAt context.unit variant}).\
+          {← nameAt context.unit field}"
       -- Move reads a field through a reference implicitly, so the dereference
       -- has no spelling; a borrow underneath it cancels with it, which is what
       -- keeps the result a place rather than a borrow expression.
@@ -1646,7 +1699,8 @@ private partial def placeText (context : Context)
   | .downcast base _ =>
       -- A downcast only refines which enum payload is active. Structured MIR
       -- already guards the corresponding arm by the discriminant, while the
-      -- field name carries the source-visible projection.
+      -- field name carries the source-visible projection. Move spells one
+      -- below a field (`.field`).
       placeText context indexText base (fuel - 1)
   | .subslice base start stop fromEnd =>
       let baseText ← placeText context indexText base (fuel - 1)
@@ -2165,6 +2219,12 @@ private def nominalAt? (unit : ValidatedUnit) (name : NameId) :
   -- Owned namespaces are a list, not an array keyed by namespace identity.
   let ns ← unit.namespaces.find? (·.identity == qualified.namespaceId)
   ns.structs.find? (·.name == name)
+
+/-- The variants of an enum that declare a field of this name. -/
+private def declaringVariants? (unit : ValidatedUnit) (reference : QualifiedRef)
+    (field : String) : Option (Array String) := do
+  let declaration ← nominalAt? unit reference.name
+  return LeanerIR.Validation.StaticTyping.declaringVariants unit.tables declaration field
 
 private def standardVectorFunction? (context : Context) (reference : QualifiedRef)
     (functionName : String) : Bool :=
@@ -2759,7 +2819,8 @@ private partial def expressionText (context : Context) (id : ExprId)
           pure s!"({if kind == "mut" then "&mut " else "&"}{
             ← expressionText context arguments[0]! (fuel - 1)})"
       | .reference (.freeze explicit) =>
-          unless instantiations.isEmpty && arguments.size == 1 do
+          -- Move's `freeze<T>` names the referent its operand already has.
+          unless instantiations.size ≤ 1 && arguments.size == 1 do
             throw "a reference freeze must have exactly one operand"
           if !explicit && context.ns.profile == some .move then
             return ← expressionText context arguments[0]! (fuel - 1)
@@ -3023,14 +3084,18 @@ private partial def expressionText (context : Context) (id : ExprId)
           else
             let result ← contextTypeText context expression.typeId
             pure s!"({call} : {result})"
-      | .call (.closure reference) =>
-          unless instantiations.isEmpty do
-            throw "generic closure construction is outside the current LeanerLang parser"
+      | .call (.closure reference mask) =>
+          let some typeIds := typeInstantiationIds? instantiations
+            | throw "a closure's generic arguments contain non-type arguments"
+          let types ← typeIds.mapM (typeText context.unit context.ns context.binders)
+          let typeSuffix := if types.isEmpty then "" else "::" ++ typeArguments (commaSep types)
           let name ← qualifiedNameAt context.unit context.ns reference.name
           let result ← contextTypeText context expression.typeId
           let captures ← arguments.mapM (expressionText context · (fuel - 1))
-          let suffix := if captures.isEmpty then "" else ", " ++ commaSep captures
-          pure s!"function[{result}]({name}{suffix})"
+          let some slots := closureSlots mask captures.toList
+            | throw "a closure's mask does not match its captures"
+          let suffix := if slots.isEmpty then "" else ", " ++ commaSep slots.toArray
+          pure s!"function[{result}]({name}{typeSuffix}{suffix})"
       | .call .invoke =>
           unless instantiations.isEmpty && !arguments.isEmpty do
             throw "core.invoke requires a callable operand and no generic arguments"
@@ -3136,8 +3201,25 @@ private partial def expressionText (context : Context) (id : ExprId)
               inferredDataInstantiations context.unit operandType ownerArguments instantiations do
             throw "variant-field instantiations disagree with its nominal operand type"
           unless !fields.isEmpty do throw "variant-field selection names no fields"
-          if fields.size != 1 then
+          -- The selection names the field once per variant; one name is one
+          -- field access.
+          let names := fields.foldl (fun names (_, field) =>
+            if names.contains field then names else names.push field) #[]
+          if names.size != 1 then
             throw "variant-field selection with multiple source names has no mixin spelling"
+          -- A field access reads the field of whichever variant declares it;
+          -- the field of only some of them is spelled by the core form.
+          let listed := fields.map (·.1)
+          unless (declaringVariants? context.unit reference names[0]!).any
+              (LeanerIR.Validation.StaticTyping.listsDeclaringVariants · listed) do
+            if value.typeId != operandType then
+              throw "a selection of the field of some variants through a reference has no \
+                LeanerLang spelling"
+            let owner ← typeText context.unit context.ns context.binders operandType
+            let fieldsText := ", ".intercalate (fields.map fun (variant, field) =>
+              s!"{sourceIdentifier variant}.{sourceIdentifier field}").toList
+            return s!"core.data.selectVariants[{owner}, {fieldsText}]({
+              ← expressionText context valueId (fuel - 1)})"
           -- Move reads a variant field through a reference implicitly, so its
           -- dereference is spelled by the field access itself; every other
           -- operand keeps the delimiters field access needs.
@@ -3156,7 +3238,7 @@ private partial def expressionText (context : Context) (id : ExprId)
             else expressionText context valueId (fuel - 1)
           let needsParentheses := selectionNeedsParentheses context value
           let valueText := if needsParentheses then s!"({valueText})" else valueText
-          pure s!"{valueText}.{sourceIdentifier fields[0]!}"
+          pure s!"{valueText}.{sourceIdentifier names[0]!}"
       | .data (.testVariants reference variants) =>
           let [valueId] := arguments.toList
             | throw "variant testing expects exactly one operand"
@@ -3196,13 +3278,23 @@ private partial def expressionText (context : Context) (id : ExprId)
             | throw "a behavior predicate requires a function-value target"
           let target ← expressionText context targetId (fuel - 1)
           let values ← (arguments.drop 1).mapM (expressionText context · (fuel - 1))
-          pure s!"{behaviorRangePrefix kind range}{behaviorOperationName kind}<{target}>({
-            commaSep values})"
+          pure <| labeledText (← stateRangePrefix context range)
+            s!"{behaviorOperationName kind}<{target}>({commaSep values})"
+      | .specification (.lemma reference range) =>
+          unless range == {} do
+            throw "state-ranged lemma instances are outside the current LeanerLang parser"
+          let (name, _) ← specificationCallName context reference
+          let arguments ← arguments.mapM (expressionText context · (fuel - 1))
+          let typeSuffix ← if instantiations.isEmpty then pure "" else do
+            let some typeIds := typeInstantiationIds? instantiations
+              | throw "lemma instances contain non-type arguments"
+            let argumentTexts ← typeIds.mapM (typeText context.unit context.ns context.binders)
+            pure <| "::" ++ typeArguments (commaSep argumentTexts)
+          pure s!"{name}{typeSuffix}({commaSep arguments})"
       | .specification (.functionCall reference range) =>
           unless instantiations.all fun | .typeArg _ => true | _ => false do
             throw "non-type specification-function arguments are outside the current LeanerLang parser"
-          unless range == {} do
-            throw "state-ranged specification-function calls are outside the current LeanerLang parser"
+          let statePrefix ← stateRangePrefix context range
           if isArbitrarySpecificationCall context reference then
             unless arguments.isEmpty do
               throw "an arbitrary specification value unexpectedly has arguments"
@@ -3244,9 +3336,10 @@ private partial def expressionText (context : Context) (id : ExprId)
               let rawMethod := if moveCompanion then qualified.name.drop 1 |>.toString
                 else qualified.name
               let method := sourceIdentifier (surfaceReferenceName rawMethod)
-              pure s!"{receiver}.{method}{typeSuffix}({commaSep (arguments.drop 1)})"
+              pure <| labeledText statePrefix
+                s!"{receiver}.{method}{typeSuffix}({commaSep (arguments.drop 1)})"
             else
-              pure s!"{name}{typeSuffix}({commaSep arguments})"
+              pure <| labeledText statePrefix s!"{name}{typeSuffix}({commaSep arguments})"
           -- A signature this unit holds — its own, or one a dependency
           -- interface carries — gives the reader the result type, so only a
           -- call without one is annotated.
@@ -3281,16 +3374,33 @@ private partial def expressionText (context : Context) (id : ExprId)
             throw s!"spec.old must have one matching type argument and one operand"
           let argument ← expressionText context arguments[0]! (fuel - 1)
           pure s!"old({argument})"
-      | .specification (.global label) =>
-          unless label.isNone && arguments.size == 1 do
-            throw "spec.global currently requires one key and no state label"
+      | .specification (.global label) | .specification (.exists label) =>
+          let name := if operation matches .specification (.global _) then "global" else "exists"
+          unless arguments.size == 1 do throw s!"spec.{name} requires one key"
           let some typeIds := typeInstantiationIds? instantiations
-            | throw "spec.global requires one resource type argument"
+            | throw s!"spec.{name} requires one resource type argument"
           unless typeIds.size == 1 do
-            throw "spec.global requires exactly one resource type argument"
+            throw s!"spec.{name} requires exactly one resource type argument"
           let resource ← typeText context.unit context.ns context.binders typeIds[0]!
-          pure <| "global" ++ typeArguments resource ++
+          -- A read at a label reads that state as the current one.
+          let statePrefix ← stateRangePrefix context { post := label }
+          pure <| labeledText statePrefix <| name ++ typeArguments resource ++
             s!"({← expressionText context arguments[0]! (fuel - 1)})"
+      | .specification (.publish range) | .specification (.remove range)
+      | .specification (.update range) =>
+          let name := match operation with
+            | .specification (.publish _) => "publish"
+            | .specification (.remove _) => "remove"
+            | _ => "update"
+          let some typeIds := typeInstantiationIds? instantiations
+            | throw s!"`{name}` requires one resource type argument"
+          unless typeIds.size == 1 do throw s!"`{name}` requires exactly one resource type argument"
+          let resource ← typeText context.unit context.ns context.binders typeIds[0]!
+          let arguments ← arguments.mapM (expressionText context · (fuel - 1))
+          pure <| labeledText (← stateRangePrefix context range)
+            s!"{name}<{resource}>({commaSep arguments})"
+      | .specification .stateDomain =>
+          throw "the state domain is only a quantifier binder's domain"
       | .specification (.saveStateAnchor label) =>
           unless instantiations.isEmpty && arguments.isEmpty do
             throw "spec.saveStateAnchor has unexpected arguments"
@@ -3304,6 +3414,13 @@ private partial def expressionText (context : Context) (id : ExprId)
             throw "spec.withStateAnchor must have exactly one argument"
           let argument ← expressionText context arguments[0]! (fuel - 1)
           pure s!"with_state_anchor!({label}, {argument})"
+      | .specification (.maxValue width) =>
+          unless instantiations.isEmpty && arguments.isEmpty do
+            throw "spec.maxValue takes no operands and no generic arguments"
+          let name := s!"MAX_U{width}"
+          unless (specificationBound? name).isSome do
+            throw s!"spec.maxValue has no bound named for width {width}"
+          pure name
       | .specification .inRange =>
           unless instantiations.isEmpty && arguments.size == 2 do
             throw "spec.inRange requires two operands and no generic arguments"
@@ -3557,7 +3674,13 @@ private partial def expressionText (context : Context) (id : ExprId)
               -- (already spelled `return`) or a diverging result is terminal.
               pure (statements.push <|
                 if terminal then s!"{result}{exitTerminator}" else result)
-          else pure statements
+          else
+            -- A block without a result is unit; after a statement whose own
+            -- value is not unit, that is spelled. Control does not come back
+            -- from a diverging statement, so nothing follows it.
+            let lastIsUnit := originalStatements.back?.all fun statement =>
+              unitValued active statement || isDivergingExpression active.ns statement
+            pure (if lastIsUnit then statements else statements.push "()")
         return blockText entries
   | .letDecl pattern none body =>
       -- Structurization introduces locals before the assignment which gives
@@ -3676,14 +3799,16 @@ private partial def expressionText (context : Context) (id : ExprId)
             -- result behind it is unreachable and has no source spelling.
             if statements.back?.any (isDivergingExpression active.ns) then
               pure (rendered, none) else
+            -- A unit result after a statement whose own value is not unit
+            -- stays spelled: elided, the statement's value would read as the
+            -- block's.
+            let lastIsUnit := statements.back?.all (unitValued active)
             match result with
-            | none => pure (rendered, none)
+            | none =>
+                if !statements.isEmpty && !lastIsUnit then pure (rendered.push "()", none)
+                else pure (rendered, none)
             | some result =>
                 let (entries, value) ← collectTail active result (fuel - 1)
-                -- A unit result after a statement whose own value is not
-                -- unit stays spelled: elided, the statement's value would
-                -- read as the block's.
-                let lastIsUnit := statements.back?.all (unitValued active)
                 match value with
                 | some (_, "()") =>
                     if entries.isEmpty && !statements.isEmpty && !lastIsUnit then
@@ -3784,9 +3909,8 @@ private partial def expressionText (context : Context) (id : ExprId)
             if body.startsWith "do\n" then
               body := s!"do\n{indent (lines declarations)}\n{body.drop 3}"
             else
-              let unitResult := (context.ns.expressions[arm.body.index]?).any fun node =>
-                context.unit.tables.types[node.typeId.index]? == some .unit
-              let result := if isDivergingExpression context.ns arm.body || unitResult then
+              let result := if isDivergingExpression context.ns arm.body ||
+                  unitValued context arm.body then
                   body ++ statementTerminator context.ns arm.body body
                 else s!"return {body}"
               body := blockText (declarations.push result)
@@ -3911,6 +4035,8 @@ private partial def expressionText (context : Context) (id : ExprId)
               match node.kind with
               | .operation (.specification .typeDomain) #[.typeArg element] #[] _ =>
                   pure (some (← typeText context.unit context.ns context.binders element.typeId))
+              -- A binder over the state domain binds a state label.
+              | .operation (.specification .stateDomain) #[] #[] _ => pure (some "StateDomain")
               | _ => pure none
           | none => pure none
         match typeBinder? with
@@ -3931,7 +4057,8 @@ private partial def expressionText (context : Context) (id : ExprId)
       -- alter the source proposition, so canonical LeanerLang omits them.
       pure s!"{kind} ({"; ".intercalate binderTexts.toList}), {body}"
   | .spec block =>
-      unless block.pragmas.isEmpty && block.frame.isNone do
+      unless (block.pragmas.isEmpty || block.pragmas == #[SpecBlock.proofPragma]) &&
+          block.frame.isNone do
         throw "in-body specification pragmas and frames are outside the current LeanerLang parser"
       -- Source-level specification blocks project all enclosing integer
       -- locals into the mathematical integer domain.  Preserve that surface
@@ -3952,10 +4079,13 @@ private partial def expressionText (context : Context) (id : ExprId)
           | .assertion => pure "assert "
           | .assumption => pure "assume "
           | .loopInvariant => pure "invariant "
+          | .apply => pure "apply "
+          | .split => pure "split "
           | kind => throw s!"in-body specification condition `{repr kind}` is outside the \
               current LeanerLang parser"
         pure s!"{memberPrefix}{← expressionText specContext condition.expression (fuel - 1)};"
-      pure s!"spec do\n{indent (lines conditions)}"
+      let keyword := if block.isProof then "proof" else "spec"
+      pure s!"{keyword} do\n{indent (lines conditions)}"
   | .return_ values =>
       let value ← match values.toList with
         | [value] => expressionText context value (fuel - 1)
@@ -3982,6 +4112,7 @@ private def pragmaText : Attribute → Except String String
   | .assign name (.constant (.bool false)) _ => pure s!"{name} = false"
   | .assign name (.constant value) _ => do pure s!"{name} = {← constText value}"
   | .assign name (.name none value) _ => pure s!"{name} = {sourceIdentifier value}"
+  | .assign name (.qualifiedName value) _ => pure s!"{name} = {value}"
   | .call name #[] _ => pure name
   | attr => throw s!"pragma attribute `{repr attr}` has no canonical LeanerLang spelling"
 
@@ -4003,13 +4134,17 @@ private def conditionText (context : Context) (condition : Condition) : Except S
     | .globalInvariantUpdate typeParameters => do
         unless typeParameters.isEmpty do
           throw "generic update module invariants are outside the current LeanerLang parser"
-        pure ("invariant [update]", none)
+        pure ("invariant", none)
     | .axiom_ typeParameters => do
         unless typeParameters.isEmpty do
           throw "generic module axioms are outside the current LeanerLang parser"
         pure ("axiom", none)
     | kind => throw s!"condition kind `{repr kind}` is outside the current LeanerLang parser"
   let properties ← condition.properties.mapM flagAttributeName
+  -- An update invariant is one with the property `update`.
+  let properties := match condition.kind with
+    | .globalInvariantUpdate _ => #["update"] ++ properties
+    | _ => properties
   let properties := if properties.isEmpty then "" else s!"[{commaSep properties}] "
   let expression ← expressionText context condition.expression
     (context.ns.expressions.size + 1)
@@ -4026,21 +4161,37 @@ private def conditionText (context : Context) (condition : Condition) : Except S
 each contract binding. Imported Move LIR retains the binding's physical local
 type, but every following specification expression observes its projected
 logical type. -/
-private def conditionTexts (initial : Context) (conditions : Array Condition) :
-    Except String (Array String) := do
+private def conditionTexts (initial : Context) (conditions : Array Condition)
+    (parameters : Array LocalId := #[]) : Except String (Array String) := do
   let mut context := initial
   let mut entries := #[]
+  -- The locals a binding is in the scope of: the parameters and the
+  -- bindings before it.
+  let mut scope := parameters
   for condition in conditions do
-    entries := entries.push (← conditionText context condition)
     let bindingName? := match condition.kind with
       | .letPre name | .letPost name => some name
       | _ => none
-    if let some name := bindingName? then
-      let localId? := context.locals.foldl (init := none) fun found localDecl =>
-        if localDecl.name == name then some localDecl.id else found
-      let some localId := localId?
-        | throw s!"contract binding `{name}` has no declaration local"
-      context := { context with logicalLocals := context.logicalLocals.push localId }
+    let some name := bindingName? | do
+      entries := entries.push (← conditionText context condition)
+    let localId? := context.locals.foldl (init := none) fun found localDecl =>
+      if localDecl.name == name then some localDecl.id else found
+    let some localId := localId?
+      | throw s!"contract binding `{name}` has no declaration local"
+    -- A binding shadowing a local in its scope is spelled apart, as a
+    -- shadowed body local is.
+    let names := if context.localNames.isEmpty then context.locals.map (·.name)
+      else context.localNames
+    let mut spelled := name
+    if scope.any (fun other => other != localId && names[other.index]? == some name) then
+      while names.contains spelled do spelled := spelled ++ "'"
+    context := { context with localNames := names.set! localId.index spelled }
+    let renamed := match condition.kind with
+      | .letPre _ => { condition with kind := .letPre spelled }
+      | _ => { condition with kind := .letPost spelled }
+    entries := entries.push (← conditionText context renamed)
+    context := { context with logicalLocals := context.logicalLocals.push localId }
+    scope := scope.push localId
   pure entries
 
 private def frameTexts (context : Context) (contract : FunctionContract) :
@@ -4053,6 +4204,24 @@ private def frameTexts (context : Context) (contract : FunctionContract) :
     entries := entries.push s!"reads {← typeText context.unit context.ns context.binders type.typeId};"
   if contract.modifiesAll then entries := entries.push "modifies *;"
   if contract.readsAll then entries := entries.push "reads *;"
+  let nameOf (id : LocalId) : String :=
+    match context.localNames[id.index]? with
+    | some name => name
+    | none => (context.locals[id.index]?.map (·.name)).getD ""
+  for frame in contract.parameterFrames do
+    let parameter := sourceIdentifier (nameOf frame.parameter)
+    if frame.modifiesAll then
+      entries := entries.push s!"modifies_of<{parameter}> *;"
+      continue
+    let formals ← frame.formals.mapM fun formal => do
+      let some localDecl := context.locals[formal.index]?
+        | throw s!"a frame's formal {formal.index} has no local declaration"
+      pure s!"{sourceIdentifier (nameOf formal)} : \
+        {← typeText context.unit context.ns context.binders localDecl.type.typeId}"
+    let targets ← frame.modifies.mapM fun target =>
+      expressionText context target (context.ns.expressions.size + 1)
+    entries := entries.push s!"modifies_of<{parameter}>({", ".intercalate formals.toList}) \
+      {", ".intercalate targets.toList};"
   pure entries
 
 private def isMoveVariantsProperty : ProfileValue → Bool
@@ -4171,7 +4340,8 @@ private def contractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     if condition.kind == .abortsIf && condition.properties.isEmpty &&
         condition.auxiliary.isEmpty && isFalseExpression ns condition.expression then
       conditions := #[]
-  if conditions.isEmpty && contractPragmas.isEmpty then return none
+  if conditions.isEmpty && contractPragmas.isEmpty && !hasFrameClauses contract &&
+      contract.parameterFrames.isEmpty then return none
   let context : Context := {
     unit, ns, locals := declaration.locals
     localNames := declarationLocalNames ns declaration.locals
@@ -4180,6 +4350,7 @@ private def contractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     specification := true
     logicalLocals := declaration.locals.map (fun localDecl => localDecl.id) }
   let entries ← conditionTexts context conditions
+    ((declaration.locals.extract 0 declaration.signature.parameters.size).map (·.id))
   let entries := entries ++ (← frameTexts context contract)
   let printedPragmas := (contract.pragmas.zip contractPragmas).filterMap fun (property, text) =>
     if hasLooseFrame contract && !contract.modifies.isEmpty &&
@@ -4343,9 +4514,11 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
   let binders := " ".intercalate
     (← declaration.signature.generics.mapM (binderText unit)).toList
   let binders := if binders.isEmpty then "" else " " ++ binders
-  let parameters ← declaration.signature.parameters.mapM fun parameter => do
+  let localNames := declarationLocalNames ns declaration.locals
+    declaration.signature.parameters.size (functionBodyRoot? declaration.body)
+  let parameters ← declaration.signature.parameters.zipIdx.mapM fun (parameter, index) => do
     let mutability := if parameter.mutable then "mut " else ""
-    pure s!"{mutability}{sourceIdentifier parameter.name} : \
+    pure s!"{mutability}{sourceIdentifier (localNames[index]?.getD parameter.name)} : \
       {← typeText unit ns declaration.signature.generics parameter.typeUse.typeId}"
   let result ← match declaration.signature.results.toList with
     | [] => pure "Unit"
@@ -4366,9 +4539,7 @@ private def functionText (unit : ValidatedUnit) (ns : PrintNamespace)
     | .absent => pure signature
     | .structured root =>
         let context : Context := {
-          unit, ns, locals := declaration.locals
-          localNames := declarationLocalNames ns declaration.locals
-            declaration.signature.parameters.size (some root)
+          unit, ns, locals := declaration.locals, localNames
           binders := declaration.signature.generics }
         let body ← expressionText context root (ns.expressions.size + 1) true
         let compact := s!"{signature} := {body}"
@@ -4437,6 +4608,57 @@ private def specFunctionText (unit : ValidatedUnit) (ns : PrintNamespace)
       let compact := s!"{signature} := {body}"
       if fitsIndentedLine compact then pure compact
       else pure s!"{signature} :=\n{indent body}"
+
+/-- A lemma: its `requires` and `ensures` clauses, its measure, and the steps
+of its proof. -/
+private def lemmaText (unit : ValidatedUnit) (ns : PrintNamespace)
+    (declaration : LeanerIR.LemmaDecl) : Except String String := do
+  unless ns.profile == some declaration.profile do
+    throw "lemma profile differs from its namespace profile"
+  unless declaration.signature.predicates.isEmpty && declaration.signature.results.isEmpty do
+    throw "lemma predicates and results are outside the current LeanerLang printer"
+  let contract := declaration.contract
+  unless contract.modifies.isEmpty && contract.reads.isEmpty &&
+      !contract.hasFrame && !contract.modifiesAll && !contract.readsAll &&
+      contract.parameterFrames.isEmpty && contract.pragmas.isEmpty do
+    throw "lemma frames and pragmas are outside the current LeanerLang printer"
+  let name ← nameAt unit declaration.name
+  let binders := " ".intercalate
+    (← declaration.signature.generics.mapM (binderText unit)).toList
+  let binders := if binders.isEmpty then "" else " " ++ binders
+  let parameters ← declaration.signature.parameters.mapM fun parameter => do
+    pure s!"{sourceIdentifier parameter.name} : \
+      {← typeText unit ns declaration.signature.generics parameter.typeUse.typeId}"
+  let roots := contract.conditions.map (·.expression) ++ declaration.proof.map (·.expression)
+  let context : Context := {
+    unit, ns, locals := declaration.locals
+    localNames := declarationLocalNamesOf ns declaration.locals
+      declaration.signature.parameters.size roots
+    binders := declaration.signature.generics
+    specification := true
+    logicalLocals := declaration.locals.map (·.id) }
+  let fuel := ns.expressions.size + 1
+  let measures ← (contract.conditions.filter (·.kind == .decreases)).mapM fun condition =>
+    expressionText context condition.expression fuel true
+  let measure := match measures.toList with
+    | [] => ""
+    | [measure] => s!" decreases {measure}"
+    | measures => s!" decreases ({commaSep measures.toArray})"
+  let clauses ← (contract.conditions.filter (·.kind != .decreases)).mapM fun condition => do
+    match condition.kind with
+    | .requires | .ensures => conditionText context condition
+    | kind => throw s!"a lemma clause `{repr kind}` is outside the current LeanerLang printer"
+  let steps ← declaration.proof.mapM fun condition => do
+    let keyword ← match condition.kind with
+      | .assertion => pure "assert"
+      | .assumption => pure "assume"
+      | .apply => pure "apply"
+      | .split => pure "split"
+      | kind => throw s!"a lemma step `{repr kind}` is outside the current LeanerLang printer"
+    pure s!"{keyword} {← expressionText context condition.expression fuel}"
+  let proof := if steps.isEmpty then #[] else #[s!"proof\n{indent (lines steps)}"]
+  pure s!"spec lemma {name}{binders} ({commaSep parameters}){measure} where\n\
+    {indent (lines (clauses ++ proof))}"
 
 private structure SourceOrderedText where
   file : Nat
@@ -4539,6 +4761,13 @@ where
             (← withAttributes declaration.name declaration.contract.pragmas
               (← atLocation unit declaration.loc (specFunctionText unit ns declaration))) }
         fallback := fallback + 1
+    for declaration in ns.lemmas do
+      let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      ordered := ordered.push {
+        file, start, priority := 1, fallback
+        text := documented declaration.doc
+          (← atLocation unit declaration.loc (lemmaText unit ns declaration)) }
+      fallback := fallback + 1
     for declaration in ns.invariants do
       let (file, start, _) := sourceOrderKey unit declaration.loc fallback
       let context : Context := {
@@ -4567,7 +4796,7 @@ where
     -- survive as Leaner items, so their comments have no valid attachment here
     -- (the legacy Move printer dropped the same unmatched pool entries).
     let declarationLocations := #[ns.loc] ++ ns.constants.map (·.loc) ++
-      ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++
+      ns.structs.map (·.loc) ++ ns.specFunctions.map (·.loc) ++ ns.lemmas.map (·.loc) ++
       ns.invariants.map (·.loc) ++ ns.functions.map (·.loc)
     let declarationFiles := declarationLocations.filterMap fun loc =>
       (primaryRange? unit.tables loc (unit.tables.locations.size + 1)).map (·.file.index)
@@ -4713,6 +4942,8 @@ private def dependencyInterfaceItem? : Item → Option Item
       pragmas := #[] }
   | .specFunction declaration => some <| .specFunction {
       declaration with isOpaque := true, body := none }
+  | .lemma declaration => some <| .lemma {
+      declaration with decreases := #[], contract := #[], proof := #[] }
   | .struct declaration => some <| .struct {
       declaration with contract := #[], pragmas := #[] }
   | .enum declaration => some <| .enum {

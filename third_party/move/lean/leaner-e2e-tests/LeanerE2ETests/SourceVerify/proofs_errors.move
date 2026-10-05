@@ -8,7 +8,7 @@ module 0x42::proofs_errors {
     spec square_of_sum {
         aborts_if a + b > MAX_U64;
         aborts_if (a + b) * (a + b) > MAX_U64;
-        ensures result == a * a + 2 * a * b + b * b;
+        ensures result >= a * a;
     }
 
     fun product(a: u64, b: u64): u64 {

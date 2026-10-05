@@ -43,6 +43,12 @@ leaner module 0x42::integers where
 
   fun combined(left : u32, right : u32) -> u32 := (left | right) ^ right
 
+  -- The complement within the width, so the increment cannot overflow.
+  fun twos_complement(value : u16) -> u16 :=
+    if value == 0u16 then 0u16 else (value ^ 65535u16) + 1u16
+  spec twos_complement where
+    aborts_if false
+
   fun shifted(value : u64, amount : u8) -> u64 := value << amount
   spec shifted where
     ensures result == (value << amount) % (MAX_U64 + 1)

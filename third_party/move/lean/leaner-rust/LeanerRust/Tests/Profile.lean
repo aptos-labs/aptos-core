@@ -199,7 +199,7 @@ def checkRustExporterBaseline : IO Unit := do
         .integer 18446744073709551615, .integer 340282366920938463463374607431768211455,
         .integer (-128), .integer (-32768), .integer (-2147483648),
         .integer (-9223372036854775808), .integer (-170141183460469231731687303715884105728)]
-      match Interpreter.run executable 8 { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } arguments with
+      match Interpreter.run executable 16 { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } arguments with
       | .ok (_, { value := .returned #[.integer (-7)], .. }) => pure ()
       | result =>
           throw <| IO.userError s!"Rust exporter baseline {file} did not execute: {repr result}"
@@ -302,7 +302,7 @@ def checkRustExporterFunctionPointerBaseline : IO Unit := do
     | .function #[_] _ abilities => abilities.contains .copy && abilities.contains .drop
     | _ => false
   let hasClosure := raw.namespaces.any fun ns => ns.expressions.any fun expression =>
-    expression.kind matches .operation (.call (.closure _)) _ #[] _
+    expression.kind matches .operation (.call (.closure _ 0)) _ #[] _
   let hasInvoke := raw.namespaces.any fun ns => ns.expressions.any fun expression =>
     expression.kind matches .operation (.call .invoke) _ #[_, _] _
   unless hasFunctionType && hasClosure && hasInvoke do

@@ -1,0 +1,12 @@
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:20:16: error: the assertion `x == y` does not hold
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:21:7: error: leaner verification failed: the automatic verification of `specified` failed; provide a proof: `verify specified by …` in the module (`verify specified by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:27:18: error: the assertion `i + 1 < n` does not hold
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:32:7: error: leaner verification failed: the automatic verification of `count` failed; provide a proof: `verify count by …` in the module (`verify count by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:36:16: error: the assertion `x > 0` does not hold
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:42:7: error: leaner verification failed: the automatic verification of `calls_positive` failed; provide a proof: `verify calls_positive by …` in the module (`verify calls_positive by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:46:16: error: the assertion `value == other` does not hold
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:48:7: error: leaner verification failed: the automatic verification of `same` failed; provide a proof: `verify same by …` in the module (`verify same by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:54:16: error: the assertion `with_state_anchor!(0, global<Counter>(a).value == old(global<Counter>(a).value) + 1)` does not hold
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:55:7: error: leaner verification failed: the automatic verification of `bump_once` failed; provide a proof: `verify bump_once by …` in the module (`verify bump_once by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:16:16: error: the assertion `x == y` does not hold
+LeanerE2ETests/Check/Specifications/AssertionErrors.lean:14:6: error: leaner verification failed: the automatic verification of `unspecified` failed; provide a proof: `verify unspecified by …` in the module (`verify unspecified by skip` shows the obligations it leaves)

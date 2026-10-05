@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/performance_200511.move:3:1: error: a type argument of the specification function `0x1::bcs::serialize` has no native type (LeanerIR.GenericArgument.typeArg
+  { typeId := { index := 2 }, loc := { index := 123 } })
+tests/sources/regression/performance_200511.move:3:1: error: a type argument of the specification function `0x1::bcs::serialize` has no native type (LeanerIR.GenericArgument.typeArg
+  { typeId := { index := 2 }, loc := { index := 203 } })

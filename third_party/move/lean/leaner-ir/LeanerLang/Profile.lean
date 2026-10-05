@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerLang.Lower
+import LeanerLang.Modifiers
 
 /-!
 # Leaner frontend validation profile
@@ -56,6 +57,7 @@ def moveSchema : ProfileSchema where
     else unsupportedExtension "Move" "operation" value
   checkSurface := unsupportedExtension "Move" "surface"
   checkProperty := checkMoveProperty
+  storableTarget := moveStorableTarget
 
 def rustSchema : ProfileSchema where
   profile := .rust
@@ -104,9 +106,12 @@ the latter aborting unless the type is a struct (`spec_is_struct`).
 `cmp::compare`: the structural order, as the translator's per-type
 `$1_cmp_$compare` (`aptos-natives.bpl`), which it refines for type
 parameters with the runtime's order.
-The prelude's injectivity and length axioms of `serialize` and the hashes,
-and the concrete names the Prover computes for concrete types, are not
-mirrored. -/
+A model holds beside what the native's specification states, as the
+prelude defines a native whatever its specification adds. The prelude's
+injectivity of the hashes is contradictory with their fixed length; a
+function assumes it of its parameters instead (`moveCollisionFreeHashes`).
+The prelude's injectivity and length axioms of `serialize`, and the
+concrete names the Prover computes for concrete types, are not mirrored. -/
 def moveNativeModels : List (String × NativeModel) := [
   ("0x1::hash::sha2_256", .uninterpreted (some 32)),
   ("0x1::hash::sha3_256", .uninterpreted (some 32)),
@@ -115,6 +120,13 @@ def moveNativeModels : List (String × NativeModel) := [
   ("0x1::type_info::type_of",
     .uninterpreted (abortsUnless := some "0x1::type_info::spec_is_struct")),
   ("0x1::cmp::compare", .structuralOrder)]
+
+/-- The hashes a Move function that applies them assumes collision-free on
+its byte-vector parameters (decided 2026-10-02). The Move Prover assumes
+them injective,
+which no function with fixed-length results is; stated of the values a
+function takes, the assumption is consistent. -/
+def moveCollisionFreeHashes : List String := ["0x1::hash::sha2_256", "0x1::hash::sha3_256"]
 
 /-- The model of a native of `profile` without a specification, if its
 prelude gives one. -/

@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/aborting_result_definition.move:5:1: error: state label `S` is not bound in this clause; a label a state-change predicate or an invocation defines is not carried yet
+tests/sources/functional/state_labels/aborting_result_definition.move:5:1: error: specification operation LeanerIR.Operation.specification
+  (LeanerIR.SpecOperation.remove { pre := none, post := some 6 }) is not supported in generated contracts

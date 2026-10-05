@@ -306,8 +306,11 @@ mutual
               | [] => fail "invoke call has no callable operand"
           | .call (.destructor ..) =>
               fail "constructor destruction cannot be projected as a Move XAST expression"
-          | .call (.closure ..) =>
-              fail "closure construction cannot be projected as Move XAST"
+          | .call (.closure function mask) =>
+              pure <| Xast.ExpNode.call
+                (.closure (← MoveNames.qualifiedRef context.ns.tables function) mask)
+                (← genericTypeArguments context.ns instantiations) arguments
+                (← surfaceSyntax surface)
           | .global kind =>
               let operation ← match kind with
                 | .contains => pure <| Xast.Operation.exists none
@@ -338,8 +341,6 @@ mutual
                         fail s!"extension borrow `{value.tag}` cannot be projected as Move XAST"
                     | .dereference => pure Xast.Operation.deref
                     | .freeze explicit => pure <| Xast.Operation.freeze explicit
-                    | .endLoan _ =>
-                        fail "loan-death markers live only in prepared units"
                     | .mutate => unreachable!
                   pure <| Xast.ExpNode.call operation
                     (← genericTypeArguments context.ns instantiations) arguments
@@ -435,6 +436,7 @@ mutual
                 | tag => fail s!"unknown extension quantifier tag `{tag}`"
           let ranges ← binders.toList.mapM fun binder =>
             return .mk (← pattern context binder.pattern) (← expression context binder.domain)
+              binder.label
           pure <| Xast.ExpNode.quant kind ranges (← triggers.toList.mapM fun trigger =>
             trigger.toList.mapM (expression context)) (← condition.mapM (expression context))
             (← expression context body)
@@ -467,7 +469,7 @@ mutual
       condition.auxiliary.find? (·.1 == name) |>.mapM fun value => expression context value.2
     let additionalCodes ← condition.auxiliary.toList.filterMap (fun value =>
       if value.1 == "additionalCode" then some value.2 else none) |>.mapM (expression context)
-    return .mk (Codec.xastConditionKind condition.kind)
+    return .mk (← Codec.xastConditionKind condition.kind)
       (← location context.ns condition.loc) (← condition.properties.toList.mapM (pragma context.ns))
       (← expression context condition.expression) (← findOne "abortCode") additionalCodes
       (← findOne "emitsHandle") (← findOne "emitsCondition") (← findOne "updateTarget")
@@ -479,7 +481,7 @@ mutual
       return .mk (← frame.modifies.toList.mapM (expression context))
         (← frame.reads.toList.mapM (typeUse context.ns)) frame.modifiesAll frame.readsAll
     return .mk sourceLoc (← block.pragmas.toList.mapM (pragma context.ns))
-      (← block.conditions.toList.mapM (condition context)) frame
+      (← block.conditions.toList.mapM (condition context)) frame [] none
 end
 
 private def contract (context : ExprContext) (value : LeanerIR.FunctionContract) : Except String Spec := do
@@ -489,8 +491,17 @@ private def contract (context : ExprContext) (value : LeanerIR.FunctionContract)
       (← value.reads.toList.mapM (typeUse context.ns)) value.modifiesAll value.readsAll
   else
     pure none
+  -- A parameter frame names its parameter and binds its formals by name.
+  let accessOf ← value.parameterFrames.toList.mapM fun frame => do
+    let parameter ← requireSome context.parameters[frame.parameter.index]?
+      s!"a frame names no parameter {frame.parameter.index}"
+    let formals ← frame.formals.toList.mapM fun formal => do
+      let localDecl ← requireSome context.locals[formal.index]? s!"invalid local {formal.index}"
+      return ({ name := localDecl.name, ty := ← typeUse context.ns localDecl.type } : Param)
+    return AccessOf.mk (← location context.ns frame.loc) parameter.name formals
+      (← frame.modifies.toList.mapM (expression context)) [] frame.modifiesAll false
   return .mk sourceLoc (← value.pragmas.toList.mapM (pragma context.ns))
-    (← value.conditions.toList.mapM (condition context)) frame
+    (← value.conditions.toList.mapM (condition context)) frame accessOf none
 
 private def has (values : Array LeanerIR.ProfileValue) (tag : String) : Bool :=
   values.any (·.tag == tag)
@@ -637,7 +648,9 @@ private def module (ns : LeanerIR.Validation.ValidatedNamespace) : Except String
   let friends ← (metadata "metadata.friend").mapM fun value => Codec.decodeModuleRef value.payload
   let skipped ← (metadata "metadata.skipped").mapM fun value => do
     match ← Codec.unpack value.payload with
-    | #[name, reason] => return { name, reason }
+    -- Only declarations left out as unsupported are recorded: an inline
+    -- one is expanded where it is called.
+    | #[name, reason] => return { name, reason, inline := false }
     | _ => fail "invalid skipped-declaration metadata"
   return {
     address := self.address

@@ -19,6 +19,7 @@ use move_command_line_common::files::FileHash;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
+    function::ClosureMask,
     identifier::Identifier,
 };
 use move_model::{
@@ -291,6 +292,11 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
         },
+        Ty::Function(params, results, _) => {
+            for ty in params.iter().chain(results) {
+                validate_type_parameters(ty, count, owner)?;
+            }
+        },
         Ty::Bool
         | Ty::U8
         | Ty::U16
@@ -329,6 +335,7 @@ fn validate_operation_type_parameters(
         | Oper::MoveFromInst(_, args)
         | Oper::ExistsInst(_, args)
         | Oper::FunctionInst(_, args)
+        | Oper::ClosureInst(_, _, args)
         | Oper::BorrowFieldInst(_, args)
         | Oper::BorrowGlobalInst(_, args)
         | Oper::BorrowVariantFieldInst(_, _, args)
@@ -729,19 +736,14 @@ fn import_source(
                 )
             })
             .collect();
-        let returns = Type::tuple(
-            decl.returns
-                .iter()
-                .map(|ty| model_type(ty, &scope))
-                .collect::<Result<Vec<_>>>()
-                .with_context(|| format!("return type of `{}`", decl.name))?,
-        );
+        let returns = model_tuple(&decl.returns, &scope)
+            .with_context(|| format!("return type of `{}`", decl.name))?;
         let acquired = decl
             .acquires
             .iter()
             .map(|id| struct_at(&struct_ids, *id, &decl.name))
             .collect::<Result<BTreeSet<_>>>()?;
-        let called = called_functions(env, xir, decl, module_id, &function_ids)?;
+        let (used, called) = used_functions(env, xir, decl, module_id, &function_ids)?;
         functions.push(ModelXirFunctionData {
             name: fun_id.symbol(),
             loc: function_loc.clone(),
@@ -761,6 +763,7 @@ fn import_source(
             params,
             result_type: returns,
             acquired_structs: acquired,
+            used_funs: used,
             called_funs: called,
         });
     }
@@ -788,19 +791,24 @@ fn import_source(
             decl,
             qid,
         )?;
-        // The call graph is what the translated code calls, including the
-        // calls it lowers operations to.
-        let called = data
-            .code
-            .iter()
-            .filter_map(|bytecode| match bytecode {
+        // The call graph is what the translated code uses and calls, including
+        // the calls it lowers operations to; a closure's target is used
+        // without being called.
+        let mut used = BTreeSet::new();
+        let mut called = BTreeSet::new();
+        for bytecode in &data.code {
+            match bytecode {
                 Bytecode::Call(_, _, StacklessOperation::Function(module, fun, _), _, _) => {
-                    Some(module.qualified(*fun))
+                    called.insert(module.qualified(*fun));
                 },
-                _ => None,
-            })
-            .collect();
-        env.set_xir_called_functions(qid, called);
+                Bytecode::Call(_, _, StacklessOperation::Closure(module, fun, _, _), _, _) => {
+                    used.insert(module.qualified(*fun));
+                },
+                _ => {},
+            }
+        }
+        used.extend(called.iter().copied());
+        env.set_xir_used_functions(qid, used, called);
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
     add_transitive_callee_targets(env, module_id, targets);
@@ -957,11 +965,17 @@ fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
             ReferenceKind::Mutable,
             Box::new(model_value_type(referent, scope)?),
         ),
+        Ty::Function(params, results, abilities) => Type::function(
+            model_tuple(params, scope)?,
+            model_tuple(results, scope)?,
+            parse_ability_set(abilities).context("on a function type")?,
+        ),
     })
 }
 
 /// A type that cannot be a reference: a field, or a type nested in another.
-/// Move has references only as the type of a local or a return value.
+/// Move has references only as the type of a local, a return value, or a
+/// function type's parameter or result.
 fn model_value_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
     let model = model_type(ty, scope)?;
     ensure!(
@@ -969,6 +983,17 @@ fn model_value_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
         "`{ty:?}` is a reference, which cannot be a field or nested in a type"
     );
     Ok(model)
+}
+
+/// The types of a function's or function type's parameters or results, as a
+/// tuple; each may be a reference.
+fn model_tuple(types: &[Ty], scope: &StructScope) -> Result<Type> {
+    Ok(Type::tuple(
+        types
+            .iter()
+            .map(|ty| model_type(ty, scope))
+            .collect::<Result<Vec<_>>>()?,
+    ))
 }
 
 fn function_at(
@@ -1009,23 +1034,33 @@ fn function_at(
     Ok(module.get_id().qualified(function.get_id()))
 }
 
-fn called_functions(
+/// The functions a declaration uses and, among them, those it calls; a
+/// closure's target is used without being called.
+fn used_functions(
     env: &GlobalEnv,
     xir: &XirModule,
     decl: &FunctionDecl,
     module_id: ModuleId,
     functions: &[FunId],
-) -> Result<BTreeSet<QualifiedId<FunId>>> {
-    // The explicit calls; the translated code adds the ones it lowers to.
+) -> Result<(BTreeSet<QualifiedId<FunId>>, BTreeSet<QualifiedId<FunId>>)> {
+    // The explicit uses; the translated code adds the calls it lowers to.
+    let mut used = BTreeSet::new();
     let mut called = BTreeSet::new();
     for block in &decl.blocks {
         for instr in &block.instrs {
-            if let Instr::Call(_, Oper::Function(id) | Oper::FunctionInst(id, _), _) = instr {
-                called.insert(function_at(env, xir, module_id, functions, *id)?);
+            match instr {
+                Instr::Call(_, Oper::Function(id) | Oper::FunctionInst(id, _), _) => {
+                    called.insert(function_at(env, xir, module_id, functions, *id)?);
+                },
+                Instr::Call(_, Oper::Closure(id, _) | Oper::ClosureInst(id, _, _), _) => {
+                    used.insert(function_at(env, xir, module_id, functions, *id)?);
+                },
+                _ => {},
             }
         }
     }
-    Ok(called)
+    used.extend(called.iter().copied());
+    Ok((used, called))
 }
 
 /// The XIR width of a model type, if it is a Move integer.
@@ -1951,6 +1986,38 @@ impl FunctionTranslator<'_> {
                     type_args.len()
                 );
                 StacklessOperation::Function(target.module_id, target.id, type_args)
+            },
+            Oper::Closure(id, mask) | Oper::ClosureInst(id, mask, _) => {
+                let target =
+                    function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
+                let type_args = match oper {
+                    Oper::ClosureInst(_, _, args) => self.type_args(args)?,
+                    _ => vec![],
+                };
+                let callee = self.env.get_function(target);
+                ensure!(
+                    callee.get_type_parameter_count() == type_args.len(),
+                    "function `{}` takes {} type arguments, but the closure supplies {}",
+                    callee.get_full_name_str(),
+                    callee.get_type_parameter_count(),
+                    type_args.len()
+                );
+                let mask = ClosureMask::new(*mask);
+                ensure!(
+                    mask.max_captured()
+                        .is_none_or(|index| index < callee.get_parameter_count()),
+                    "closure mask {mask} captures beyond the parameters of `{}`",
+                    callee.get_full_name_str()
+                );
+                arity(dsts, srcs, 1, mask.captured_count() as usize, oper)?;
+                StacklessOperation::Closure(target.module_id, target.id, type_args, mask)
+            },
+            Oper::Invoke => {
+                ensure!(
+                    !srcs.is_empty(),
+                    "invoke expects the function value as its last source"
+                );
+                StacklessOperation::Invoke
             },
             Oper::BorrowLoc => {
                 arity(dsts, srcs, 1, 1, oper)?;

@@ -1,0 +1,5 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/bv_signed_generic.move: LIR-SEMANTIC-TYPE: in spec fun roundtrip: int-to-bit-vector result is not a fixed-width integer at [4093, 4110)
+LIR-SEMANTIC-TYPE: in spec fun roundtrip: int-to-bit-vector operand is not logical num at [4093, 4110)
+LIR-SEMANTIC-TYPE: in spec fun roundtrip: bit-vector-to-int result is not logical num at [4100, 4109)
+LIR-SEMANTIC-TYPE: in spec fun roundtrip: bit-vector-to-int operand is not a fixed-width integer at [4100, 4109)

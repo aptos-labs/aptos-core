@@ -8,6 +8,7 @@ import LeanerIR.Validation.Initialization
 import LeanerIR.Validation.PlaceIndex
 import LeanerIR.Validation.Eliminate
 import LeanerIR.Validation.IndexedArena
+import LeanerIR.Validation.StaticTyping
 
 /-!
 # LIR semantic capability preparation
@@ -99,14 +100,26 @@ abbrev SemanticsRegistry := Array SemanticProfile
 def semanticProfile? (registry : SemanticsRegistry) (profile : Profile) : Option SemanticProfile :=
   registry.find? (·.profile == profile)
 
-/-- Private-constructor wrapper accepted by the future LIR interpreter. -/
-structure ExecutableUnit where
+/-- Resolve the compilation target's Rust pointer width. Validation of the
+Rust profile restricts this option to the widths supported by rustc targets. -/
+def targetPointerWidth? (unit : ValidatedUnit) : Option Nat := do
+  let config ← profileConfig? unit.profiles .rust
+  let option ← config.options.find? (·.1 == "target_pointer_width")
+  supportedTargetPointerWidth? option.2
+
+/-- Private-constructor wrapper accepted by the future LIR interpreter,
+indexed by the validated unit it executes. -/
+structure ExecutableUnit (unit : ValidatedUnit) where
   private mk ::
-  unit : ValidatedUnit
   semantics : SemanticsRegistry
   targetPointerWidth : Option Nat
   initializationCertificates : Array InitializationCertificate
   borrowCertificates : Array BorrowCertificate
+  /-- The unit is statically typed: every node its bodies run satisfies its
+  check (`StaticTyping.checkUnit`). -/
+  typed : StaticTyping.checkUnit unit targetPointerWidth = true
+  /-- The target width is the one the unit's profiles select. -/
+  width_eq : targetPointerWidth = targetPointerWidth? unit
 
 /-- Private-constructor wrapper accepted by the LIR verification layer. -/
 structure VerifiableUnit where
@@ -241,7 +254,7 @@ def coreCallFeature : CallKind → SemanticFeature
   | .function _ => feature "call.function" .executable
   | .constructor _ _ => feature "call.constructor" .executable
   | .destructor _ _ => feature "call.destructor" .executable
-  | .closure _ => feature "call.closure" .executable
+  | .closure _ _ => feature "call.closure" .executable
   | .invoke => feature "call.invoke" .executable
   | .extension _ _ =>
       unsupportedExecutable "call.extension" "extension call requires a registered semantic classification"
@@ -320,7 +333,6 @@ def coreReferenceOperationFeature : ReferenceOperation → SemanticFeature
   | .dereference => feature "reference.dereferenceValue" .executable
   | .freeze _ => feature "reference.freeze" .executable
   | .mutate => feature "reference.mutate" .executable
-  | .endLoan _ => feature "reference.endLoan" .executable
 
 def coreDataOperationFeature : DataOperation → SemanticFeature
   | .select _ _ => feature "data.select" .executable
@@ -334,6 +346,7 @@ private def unsupportedSpecification (name : String) : SemanticFeature :=
 
 def coreSpecOperationFeature : SpecOperation → SemanticFeature
   | .functionCall _ _ => unsupportedSpecification "functionCall"
+  | .lemma _ _ => unsupportedSpecification "lemma"
   | .behavior .requiresOf _ => unsupportedSpecification "behavior.requiresOf"
   | .behavior .abortsOf _ => unsupportedSpecification "behavior.abortsOf"
   | .behavior .ensuresOf _ => unsupportedSpecification "behavior.ensuresOf"
@@ -347,6 +360,7 @@ def coreSpecOperationFeature : SpecOperation → SemanticFeature
   | .resourceDomain => unsupportedSpecification "resourceDomain"
   | .stateDomain => unsupportedSpecification "stateDomain"
   | .global _ => unsupportedSpecification "global"
+  | .exists _ => unsupportedSpecification "exists"
   | .canModify => unsupportedSpecification "canModify"
   | .old => unsupportedSpecification "old"
   | .final => unsupportedSpecification "final"
@@ -465,14 +479,16 @@ def coreConditionFeature : ConditionKind → SemanticFeature
   | .schemaInvariant => unsupportedLogical "condition.schemaInvariant" "conditions require M4 logical semantics"
   | .axiom_ _ => unsupportedLogical "condition.axiom" "conditions require M4 logical semantics"
   | .update => unsupportedLogical "condition.update" "conditions require M4 logical semantics"
+  | .apply => unsupportedLogical "condition.apply" "conditions require M4 logical semantics"
+  | .split => unsupportedLogical "condition.split" "conditions require M4 logical semantics"
 
 /-- Most condition expressions are propositions, but let bindings, decreases
 measures, emitted values, abort-code sets, and update values carry data. -/
 private def conditionExpressionIsProposition : ConditionKind → Bool
   | .assertion | .assumption | .abortsIf | .succeedsIf | .ensures | .requires |
       .structInvariant | .functionInvariant | .loopInvariant | .globalInvariant _ |
-      .globalInvariantUpdate _ | .schemaInvariant | .axiom_ _ => true
-  | .letPost _ | .letPre _ | .decreases | .abortsWith | .emits | .update => false
+      .globalInvariantUpdate _ | .schemaInvariant | .axiom_ _ | .apply => true
+  | .letPost _ | .letPre _ | .decreases | .abortsWith | .emits | .update | .split => false
 
 private def conditionAuxiliaryAllowed (kind : ConditionKind) (name : String) : Bool :=
   match kind, name with
@@ -647,13 +663,6 @@ private def profileDiagnostics (registry : SemanticsRegistry) (unit : ValidatedU
   | _, _ => #[.at "LIR-SEMANTICS-UNREGISTERED"
       s!"profile {repr value.profile} has no matching semantic implementation" loc]
 
-/-- Resolve the compilation target's Rust pointer width. Validation of the
-Rust profile restricts this option to the widths supported by rustc targets. -/
-def targetPointerWidth? (unit : ValidatedUnit) : Option Nat := do
-  let config ← profileConfig? unit.profiles .rust
-  let option ← config.options.find? (·.1 == "target_pointer_width")
-  supportedTargetPointerWidth? option.2
-
 private def genericArgumentsEquivalent? (leftNs : ValidatedNamespace)
     (left : Array GenericArgument) (rightNs : ValidatedNamespace)
     (right : Array GenericArgument) : Bool :=
@@ -682,10 +691,19 @@ private def exprTypeAgrees (ns : ValidatedNamespace) (id : ExprId)
 /-- Agreement between a specification-side type and an executable declaration
 type. The specification projection erases one reference layer, and every
 integer width lives in the mathematical integer domain, so specification
-integers agree regardless of width. -/
+integers agree regardless of width. Tuples agree componentwise. -/
 private def specProjectedAgree (ns : ValidatedNamespace)
-    (specType execType : TypeId) : Bool :=
+    (specType execType : TypeId) (fuel : Nat := ns.tables.types.size) : Bool :=
   typesAgree ns specType execType ||
+    (match fuel, ns.tables.types[specType.index]?, ns.tables.types[execType.index]? with
+     | fuel + 1, some (.tuple specElements), some (.tuple execElements) =>
+         specElements.size == execElements.size &&
+           (specElements.zip execElements).all fun pair =>
+             specProjectedAgree ns pair.1 pair.2 fuel
+     -- A vector reads its elements at projection too.
+     | fuel + 1, some (.vector specElement _), some (.vector execElement _) =>
+         specProjectedAgree ns specElement execElement fuel
+     | _, _, _ => false) ||
     (isAnyIntegerType ns specType && isAnyIntegerType ns execType) ||
     (match ns.tables.types[execType.index]? with
      | some (.reference reference) =>
@@ -710,6 +728,9 @@ private structure ScanContext where
   domain admits mathematical integers and the specification projection of
   executable declarations (one reference layer erased, integers widened). -/
   logical : Bool := false
+  /-- Whether lemma instances may occur: in an `apply` step, whose shape
+  `applyFormulaDiagnostics` checks. -/
+  lemmaInstances : Bool := false
 
 private def arenaGetNative? {α : Type} (values : Array α) (index : Nat) : Option α :=
   values[index]?
@@ -747,6 +768,14 @@ private def isBoolType (ns : ValidatedNamespace) (id : TypeId) : Bool :=
 
 private def isLogicalNumType (ns : ValidatedNamespace) (id : TypeId) : Bool :=
   ns.tables.types[id.index]? == some (.integer .unbounded true)
+
+/-- Whether a specification reads a value of this type as an integer: the
+specification projection erases one reference layer. -/
+private def specReadsInteger (ns : ValidatedNamespace) (id : TypeId) : Bool :=
+  isAnyIntegerType ns id ||
+    match ns.tables.types[id.index]? with
+    | some (.reference reference) => isAnyIntegerType ns reference.referent
+    | _ => false
 
 private def typeMismatch (loc : LocId) (message : String) : Array Diagnostic :=
   #[.at "LIR-SEMANTIC-TYPE" message loc]
@@ -946,133 +975,6 @@ private def typeNeedsSubstitution (tables : Tables) : Nat → TypeId → Bool
 private def fieldTypeNeedsSubstitution (ns : ValidatedNamespace) (typeId : TypeId) : Bool :=
   typeNeedsSubstitution ns.tables (ns.tables.types.size + 1) typeId
 
-def instantiateLifetime? (ns : ValidatedNamespace)
-    (instantiations : Array GenericArgument) (lifetime : LifetimeId) : Option LifetimeId := do
-  let declaration ← ns.tables.lifetimes[lifetime.index]?
-  match declaration.kind with
-  | .parameter index => match instantiations[index]? with
-      | some (.lifetime value) => some value
-      | _ => none
-  | .static | .inference | .local => some lifetime
-
-theorem instantiateLifetime?_eraseLoc (ns : ValidatedNamespace)
-    (instantiations : Array GenericArgument) (lifetime : LifetimeId) :
-    instantiateLifetime? ns (instantiations.map GenericArgument.eraseLoc) lifetime =
-      instantiateLifetime? ns instantiations lifetime := by
-  simp only [instantiateLifetime?, Array.getElem?_map]
-  cases ns.tables.lifetimes[lifetime.index]? with
-  | none => rfl
-  | some declaration =>
-      simp only [Option.bind_eq_bind, Option.bind_some]
-      cases declaration.kind with
-      | parameter index =>
-          dsimp only
-          cases instantiations[index]? with
-          | none => rfl
-          | some argument => cases argument <;> rfl
-      | _ => rfl
-
-/-- Source locations distinguish occurrences, not instantiated nominal
-types.  Structural lookup in the shared type arena therefore compares a
-type argument by its `TypeId` while retaining ordinary equality for the
-other generic-argument kinds. -/
-def sameGenericArgumentValue : GenericArgument → GenericArgument → Bool
-  | .typeArg left, .typeArg right => left.typeId == right.typeId
-  | .const left, .const right => left == right
-  | .lifetime left, .lifetime right => left == right
-  | .evidence left, .evidence right => left == right
-  | _, _ => false
-
-def sameGenericArgumentValues
-    (left right : Array GenericArgument) : Bool :=
-  left.size == right.size &&
-    (left.zip right).all fun (left, right) => sameGenericArgumentValue left right
-
-/-- Resolve a declaration-local generic field type to an already interned
-concrete arena type. RawUnit remains non-monomorphized: this only locates the
-structurally instantiated node emitted for the use site. -/
-def instantiatePlaceFieldTypeFuel? (ns : ValidatedNamespace)
-    (instantiations : Array GenericArgument) : Nat → TypeId → Option TypeId
-  | 0, _ => none
-  | fuel + 1, typeId => do
-      let type ← ns.tables.types[typeId.index]?
-      match type with
-      | .typeParameter index => match instantiations[index]? with
-          | some (.typeArg value) => some value.typeId
-          | _ => none
-      | .tuple elements => do
-          let instantiated ← elements.mapM
-            (instantiatePlaceFieldTypeFuel? ns instantiations fuel)
-          let index ← ns.tables.types.findIdx? (fun candidate => candidate == .tuple instantiated)
-          some ⟨index⟩
-      | .vector element length => do
-          let element ← instantiatePlaceFieldTypeFuel? ns instantiations fuel element
-          let index ← ns.tables.types.findIdx? fun candidate =>
-            candidate == .vector element length
-          some ⟨index⟩
-      | .typeDomain nested => do
-          let nested ← instantiatePlaceFieldTypeFuel? ns instantiations fuel nested
-          let index ← ns.tables.types.findIdx? (fun candidate => candidate == .typeDomain nested)
-          some ⟨index⟩
-      | .resourceDomain resource arguments => do
-          let arguments ← arguments.mapM fun arguments =>
-            arguments.mapM (instantiatePlaceFieldTypeFuel? ns instantiations fuel)
-          let index ← ns.tables.types.findIdx? fun candidate =>
-            candidate == .resourceDomain resource arguments
-          some ⟨index⟩
-      | .nominal name arguments => do
-          let arguments ← arguments.mapM fun argument => match argument with
-            | .typeArg value => do
-                let typeId ← instantiatePlaceFieldTypeFuel? ns instantiations fuel value.typeId
-                some (.typeArg { value with typeId })
-            | .lifetime value => .lifetime <$> instantiateLifetime? ns instantiations value
-            | .const value => some (.const value)
-            | .evidence value => some (.evidence value)
-          let index ← ns.tables.types.findIdx? fun candidate => match candidate with
-            | .nominal candidateName candidateArguments =>
-                candidateName == name &&
-                  sameGenericArgumentValues candidateArguments arguments
-            | _ => false
-          some ⟨index⟩
-      | .function arguments result abilities => do
-          let arguments ← arguments.mapM
-            (instantiatePlaceFieldTypeFuel? ns instantiations fuel)
-          let result ← instantiatePlaceFieldTypeFuel? ns instantiations fuel result
-          let index ← ns.tables.types.findIdx? fun candidate =>
-            candidate == .function arguments result abilities
-          some ⟨index⟩
-      | .reference reference => do
-          let referent ← instantiatePlaceFieldTypeFuel? ns instantiations fuel
-            reference.referent
-          let lifetime ← instantiateLifetime? ns instantiations reference.lifetime
-          let instantiated := .reference { reference with referent, lifetime }
-          let index ← ns.tables.types.findIdx? (fun candidate => candidate == instantiated)
-          some ⟨index⟩
-      | _ => some typeId
-
-/-- An instantiation reads its type arguments' identities, not where they
-occur. -/
-theorem instantiatePlaceFieldTypeFuel?_eraseLoc (ns : ValidatedNamespace)
-    (instantiations : Array GenericArgument) (fuel : Nat) :
-    instantiatePlaceFieldTypeFuel? ns (instantiations.map GenericArgument.eraseLoc) fuel =
-      instantiatePlaceFieldTypeFuel? ns instantiations fuel := by
-  induction fuel with
-  | zero => rfl
-  | succ fuel ih =>
-      funext typeId
-      simp only [instantiatePlaceFieldTypeFuel?, ih, instantiateLifetime?_eraseLoc]
-      cases ns.tables.types[typeId.index]? with
-      | none => rfl
-      | some type =>
-          simp only [Option.bind_eq_bind, Option.bind_some, Array.getElem?_map]
-          cases type with
-          | typeParameter index =>
-              dsimp only
-              cases instantiations[index]? with
-              | none => rfl
-              | some argument => cases argument <;> rfl
-          | _ => rfl
-
 /-- `instantiatePlaceFieldTypeFuel?` reading the types through an index and
 searching them as a list: the form a kernel certificate evaluates, where an
 array is read through its list and an indexed search over it is quadratic. -/
@@ -1153,12 +1055,9 @@ theorem instantiatePlaceFieldTypeFuelIn?_eq (ns : ValidatedNamespace)
       funext typeId
       simp only [instantiatePlaceFieldTypeFuelIn?, instantiatePlaceFieldTypeFuel?,
         IndexedArena.get?_ofArray, ih, findIdx?_toList]
-
-/-- Instantiate a declaration-local field type using the generic arguments of
-its nominal use, locating the already interned concrete type in the arena. -/
-def instantiatePlaceFieldType? (ns : ValidatedNamespace)
-    (instantiations : Array GenericArgument) (typeId : TypeId) : Option TypeId :=
-  instantiatePlaceFieldTypeFuel? ns instantiations (ns.tables.types.size + 1) typeId
+      cases ns.tables.types[typeId.index]? with
+      | none => rfl
+      | some type => cases type <;> rfl
 
 /-- Instantiate several same-named field declarations (for example across enum
 variants) and return their common concrete type when one exists. -/
@@ -1293,7 +1192,7 @@ private def staticPlaceNodeDiagnostics (mode : PreparationMode) (unit : Validate
                     sourceName? targetNs candidate.name == some variantName) then #[] else
                     #[.at "LIR-SEMANTIC-TARGET" "downcast place names an unknown variant" loc]
                 | none => #[]
-  | .field base owner field => match staticPlaceInfo? unit ns context base with
+  | .field base _ field => match staticPlaceInfo? unit ns context base with
       | none => #[]
       | some info => match nominalDeclarationForType? unit ns info.typeId with
           | none => typeMismatch loc "field place base is not a resolved nominal type"
@@ -1401,7 +1300,7 @@ private def fixedIntegerPrimitiveDiagnostics (ns : ValidatedNamespace)
   else if arguments.size != arity then #[]
   else if argumentsHaveType ns arguments resultType ||
       (logical && arguments.all fun argument =>
-        (exprType? ns argument).any (isAnyIntegerType ns)) then #[]
+        (exprType? ns argument).any (specReadsInteger ns)) then #[]
   else typeMismatch loc "integer primitive operand types differ from its result type"
 
 private def booleanPrimitiveDiagnostics (ns : ValidatedNamespace) (loc : LocId)
@@ -1466,8 +1365,8 @@ private def comparisonPrimitiveDiagnostics (ns : ValidatedNamespace)
                   (isFixedIntegerType ns leftType || isBoolType ns leftType ||
                     (logical && isLogicalNumType ns leftType) ||
                     ns.tables.types[leftType.index]? == some .character)) ||
-                (logical && isAnyIntegerType ns leftType &&
-                  isAnyIntegerType ns rightType) then #[]
+                (logical && specReadsInteger ns leftType &&
+                  specReadsInteger ns rightType) then #[]
             else typeMismatch loc
               "comparison operands are not the same Boolean, character, or nonzero fixed-width integer type"
         | _, _ => #[]
@@ -1489,11 +1388,13 @@ private def tuplePrimitiveDiagnostics (ns : ValidatedNamespace) (loc : LocId)
           elements {repr (elements.map fun e => ns.tables.types[e.index]?)}"
   | _ => typeMismatch loc "tuple primitive result is not a tuple type"
 
-private def vectorPrimitiveDiagnostics (ns : ValidatedNamespace) (loc : LocId)
-    (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
+private def vectorPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bool)
+    (loc : LocId) (resultType : TypeId) (arguments : Array ExprId) : Array Diagnostic :=
   match ns.tables.types[resultType.index]? with
   | some (.vector element length) =>
-      let elementErrors := if argumentsHaveType ns arguments element then #[]
+      let elementErrors := if argumentsHaveType ns arguments element ||
+          (logical && arguments.all fun argument =>
+            (exprType? ns argument).any (specProjectedAgree ns · element)) then #[]
         else typeMismatch loc "vector operand type differs from its element type"
       let lengthErrors := match length with
         | none => #[]
@@ -1648,11 +1549,11 @@ private def shiftPrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bool)
   else match arguments.toList with
     | [value, distance] =>
         let valueErrors := if exprTypeAgrees ns value resultType ||
-            (logical && (exprType? ns value).any (isAnyIntegerType ns)) then #[]
+            (logical && (exprType? ns value).any (specReadsInteger ns)) then #[]
           else typeMismatch loc "shifted operand type differs from its result type"
         let distanceErrors := match exprType? ns distance with
           | some distanceType => if isFixedIntegerType ns distanceType ||
-                (logical && isAnyIntegerType ns distanceType) then #[]
+                (logical && specReadsInteger ns distanceType) then #[]
               else typeMismatch loc "shift distance is not a nonzero fixed-width integer"
           | none => #[]
         valueErrors ++ distanceErrors
@@ -1685,7 +1586,7 @@ private def overflowingPrimitiveDiagnostics (ns : ValidatedNamespace) (logical :
           let operandErrors := arguments.foldl (init := #[]) fun errors argument =>
             if exprType? ns argument == some valueType ||
                 (logical && isAnyIntegerType ns valueType &&
-                  (exprType? ns argument).any (isAnyIntegerType ns)) then errors
+                  (exprType? ns argument).any (specReadsInteger ns)) then errors
             else errors ++ typeMismatch loc
               "overflowing arithmetic operand differs from its value result type"
           resultErrors ++ operandErrors
@@ -1702,7 +1603,7 @@ private def rangePrimitiveDiagnostics (ns : ValidatedNamespace) (logical : Bool)
     | [lower, upper] =>
         if (match exprType? ns lower, exprType? ns upper with
             | some lowerType, some upperType => typesAgree ns lowerType upperType ||
-                (logical && isAnyIntegerType ns lowerType && isAnyIntegerType ns upperType)
+                (logical && specReadsInteger ns lowerType && specReadsInteger ns upperType)
             | _, _ => false) then #[]
         else typeMismatch loc "range bound types differ"
     | _ => #[]
@@ -1716,7 +1617,7 @@ private def primitiveTypeDiagnostics (ns : ValidatedNamespace) (logical : Bool)
     (arguments : Array ExprId) : Array Diagnostic :=
   match operation with
   | .tuple => tuplePrimitiveDiagnostics ns loc logical resultType arguments
-  | .vector => vectorPrimitiveDiagnostics ns loc resultType arguments
+  | .vector => vectorPrimitiveDiagnostics ns logical loc resultType arguments
   | .repeatVector => repeatVectorPrimitiveDiagnostics ns loc resultType arguments
   | .pushVector => pushVectorPrimitiveDiagnostics ns loc resultType arguments
   | .concatVector =>
@@ -1856,6 +1757,14 @@ private def resolveSpecFunctionDeclaration? (unit : ValidatedUnit)
   let declaration ← targetNs.specFunctions[declarationId.index]?
   some (targetNs, declaration)
 
+private def resolveLemmaDeclaration? (unit : ValidatedUnit) (source : ValidatedNamespace)
+    (reference : QualifiedRef) : Option (ValidatedNamespace × LemmaDecl) := do
+  let _ ← referencedNameForValidation? source reference
+  let index ← unit.resolution.lemma? reference.name
+  let targetNs ← ownedNamespaceForName? unit reference.name
+  let declaration ← targetNs.lemmas[index]?
+  some (targetNs, declaration)
+
 private def resolveTraitDeclaration? (unit : ValidatedUnit) (source : ValidatedNamespace)
     (reference : QualifiedRef) : Option (ValidatedNamespace × TraitDecl) := do
   let _ ← referencedNameForValidation? source reference
@@ -1900,6 +1809,13 @@ private def typeMatchesInstantiation? (sourceNs : ValidatedNamespace) (source : 
     (targetNs : ValidatedNamespace) (target : TypeId)
     (instantiations : Array GenericArgument) : Bool :=
   typeMatchesSolution? sourceNs source targetNs target (Unify.Solution.bound instantiations)
+
+/-- Whether an operation only observes its first operand: it inspects a tag or
+length without exporting or copying an element of a potentially linear
+aggregate. -/
+def observesOperand (operation : Operation) : Bool :=
+  operation matches .data (.discriminant _) | .data (.testVariants ..) | .primitive .length |
+    .primitive (.checkVectorIndex _)
 
 private def primitiveHasAbility (profile : Profile) (ty : Ty) (ability : Ability) : Bool :=
   let ordinaryScalar := match ty with
@@ -1964,6 +1880,19 @@ def typeHasAbility? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (ability : Ability) : Option Bool :=
   typeHasAbilityFuel (ns.tables.types.size + unit.namespaces.size + 1)
     unit ns profile generics typeId ability
+
+/-- The type parameters as specification content sees them: it quantifies
+over unconstrained type parameters, so a parameter discharges every ability
+obligation there. -/
+private def specificationGenerics (generics : Array GenericBinder) : Array GenericBinder :=
+  generics.map fun binder => { binder with abilities := #[.copy, .drop, .store, .key] }
+
+/-- Whether a resource type has `key` where a global operation names it, with
+the type parameters of specification content unconstrained. -/
+private def globalResourceHasKey (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (generics : Array GenericBinder) (logical : Bool) (resource : TypeId) : Bool :=
+  let generics := if logical then specificationGenerics generics else generics
+  typeHasAbility? unit ns .move generics resource .key == some true
 
 private def contextTypeHasAbility? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (context : ScanContext) (typeId : TypeId) (ability : Ability) : Bool :=
@@ -2226,9 +2155,102 @@ private def specFunctionCallTypeDiagnostics (mode : PreparationMode) (unit : Val
         typeMismatch loc "specification function result differs from the callee signature"
       profileErrors ++ genericErrors ++ argumentErrors ++ resultErrors
 
+/-- A lemma instance: a proposition over the lemma's parameters, at the
+lemma's instantiation of its type parameters. -/
+private def lemmaInstanceTypeDiagnostics (mode : PreparationMode) (unit : ValidatedUnit)
+    (ns : ValidatedNamespace) (context : ScanContext) (loc : LocId)
+    (resultType : TypeId) (reference : QualifiedRef)
+    (instantiations : Array GenericArgument) (arguments : Array ExprId) : Array Diagnostic :=
+  match resolveLemmaDeclaration? unit ns reference with
+  | none => if mode matches .typing then #[] else
+      #[.at "LIR-SEMANTIC-TARGET" "lemma application target does not resolve" loc]
+  | some (targetNs, declaration) =>
+      if mode matches .execution then #[] else
+      let profileErrors := if context.profile == declaration.profile then #[] else
+        #[.at "LIR-PROFILE-MISMATCH"
+          "lemma application crosses profiles without a validated boundary adapter" loc]
+      let genericErrors := genericInstantiationDiagnostics loc
+          "lemma instantiation" declaration.signature.generics instantiations ++
+        genericAbilityDiagnostics unit ns declaration.profile context.generics
+          "lemma instantiation" declaration.signature.generics instantiations
+          (logical := context.logical)
+      let argumentErrors := if arguments.size != declaration.signature.parameters.size then
+          arityMismatch loc "lemma application" declaration.signature.parameters.size
+            arguments.size
+        else if !argumentTypesMatchParameters ns targetNs context.logical instantiations arguments
+            declaration.signature.parameters then
+          typeMismatch loc "lemma argument types differ from the lemma's parameters"
+        else #[]
+      let resultErrors := if isBoolType ns resultType then #[] else
+        typeMismatch loc "a lemma instance is not Bool"
+      profileErrors ++ genericErrors ++ argumentErrors ++ resultErrors
+
+/-- Whether an expression holds a lemma instance. -/
+private def containsLemmaInstance (ns : ValidatedNamespace) : Nat → ExprId → Bool
+  | 0, _ => false
+  | fuel + 1, id => match ns.expressions[id.index]? with
+    | none => false
+    | some expression => match expression.kind with
+      | .operation (.specification (.lemma _ _)) _ _ _ => true
+      | kind => (expressionChildren kind).any (containsLemmaInstance ns fuel)
+
+/-- The shape of an `apply` step: a lemma instance under implications and
+universal quantifiers, with no lemma instance in a premise, a quantifier's
+domain or condition, or an instance's arguments. -/
+private def applyFormulaDiagnostics (ns : ValidatedNamespace) (loc : LocId) :
+    Nat → ExprId → Array Diagnostic
+  | 0, _ => #[]
+  | fuel + 1, id =>
+    let free (ids : Array ExprId) : Array Diagnostic :=
+      if ids.any (containsLemmaInstance ns ns.expressions.size) then
+        #[.at "LIR-SEMANTIC-CONDITION"
+          "a lemma instance occurs in a premise, a domain, or an argument of an `apply` step" loc]
+      else #[]
+    match ns.expressions[id.index]? with
+    | none => #[]
+    | some expression => match expression.kind with
+      | .operation (.specification (.lemma _ _)) _ arguments _ => free arguments
+      | .operation (.primitive .implies) _ #[premise, conclusion] _ =>
+          free #[premise] ++ applyFormulaDiagnostics ns loc fuel conclusion
+      | .quantifier .forall binders _ condition body =>
+          free (binders.map (·.domain) ++ condition.toArray) ++
+            applyFormulaDiagnostics ns loc fuel body
+      | _ => #[.at "LIR-SEMANTIC-CONDITION"
+          "an `apply` step is a lemma instance under implications and universal quantifiers" loc]
+
+/-- Whether a value of a type holds a reference. A function value holds
+none, since its captures cannot; a Move nominal type or type argument is
+never one. -/
+private def valueHoldsReference (ns : ValidatedNamespace) : Nat → TypeId → Bool
+  | 0, _ => true
+  | fuel + 1, typeId =>
+      match ns.tables.types[typeId.index]? with
+      | none => true
+      | some ty => match ty with
+        | .reference _ | .profile _ => true
+        | .tuple elements => elements.any (valueHoldsReference ns fuel)
+        | .vector element _ => valueHoldsReference ns fuel element
+        | .nominal .. | .typeParameter _ => ns.profile != some .move
+        | .function .. => false
+        | .unit | .never | .bool | .character | .string | .bytes | .address | .signer
+        | .integer .. | .range | .eventStore | .typeDomain _ | .resourceDomain .. | .stateDomain =>
+            false
+
+/-- The abilities a closure type may claim: those every capture has. A
+closure without captures may claim any. -/
+private def closureAbilityDiagnostics (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (context : ScanContext) (loc : LocId) (claimed : Array Ability) (captures : Array ExprId) :
+    Array Diagnostic :=
+  claimed.foldl (init := #[]) fun diagnostics ability =>
+    let lacking := captures.any fun capture =>
+      !(exprType? ns capture).any (contextTypeHasAbility? unit ns context · ability)
+    if lacking then diagnostics.push (.at "LIR-CLOSURE-ABILITY"
+      s!"closure type claims {repr ability}, which a capture lacks" loc)
+    else diagnostics
+
 private def closureTypeDiagnostics (mode : PreparationMode) (unit : ValidatedUnit)
     (ns : ValidatedNamespace) (context : ScanContext)
-    (loc : LocId) (resultType : TypeId) (reference : QualifiedRef)
+    (loc : LocId) (resultType : TypeId) (reference : QualifiedRef) (mask : Nat)
     (instantiations : Array GenericArgument) (captures : Array ExprId) : Array Diagnostic :=
   match resolveFunctionDeclaration? unit ns reference with
   | none => if mode matches .typing then #[] else
@@ -2238,54 +2260,53 @@ private def closureTypeDiagnostics (mode : PreparationMode) (unit : ValidatedUni
       let profileErrors := if context.profile == declaration.profile then #[] else
         #[.at "LIR-PROFILE-MISMATCH"
           "closure target crosses profiles without a validated boundary adapter" loc]
-      if instantiations.isEmpty && !declaration.signature.generics.isEmpty then
-        if captures.size > declaration.signature.parameters.size then
-          profileErrors ++ arityMismatch loc "closure captures"
-            declaration.signature.parameters.size captures.size
-        else match ns.tables.types[resultType.index]? with
-          | some (.function functionArguments functionResult _) =>
-              let capturedParameters := declaration.signature.parameters.take captures.size
-              let remaining := declaration.signature.parameters.drop captures.size
-              if functionArguments.size != remaining.size then
-                profileErrors ++ typeMismatch loc
-                  "closure type differs from the uncaptured target signature"
-              else
-                let pairs? := (callOccurrencePairs? ns captures capturedParameters
-                    functionResult declaration.signature.results).map fun pairs =>
-                  pairs ++ functionArguments.zip (remaining.map (·.typeUse.typeId))
-                profileErrors ++ inferredInstantiationDiagnostics unit ns context loc
-                  "closure instantiation" targetNs declaration.profile
-                  declaration.signature.generics pairs?
-          | _ => profileErrors ++
-              typeMismatch loc "closure construction result is not a function type"
-      else
-      let genericErrors := genericInstantiationDiagnostics loc "closure instantiation"
-        declaration.signature.generics instantiations ++
-        genericAbilityDiagnostics unit ns declaration.profile context.generics "closure instantiation"
-          declaration.signature.generics instantiations (logical := context.logical)
-      if captures.size > declaration.signature.parameters.size then
-        profileErrors ++ genericErrors ++ arityMismatch loc "closure captures"
-          declaration.signature.parameters.size captures.size
-      else
-        let capturedParameters := declaration.signature.parameters.take captures.size
-        let captureErrors := if !argumentTypesMatchParameters ns targetNs context.logical instantiations captures
-            capturedParameters then
-          typeMismatch loc "closure capture types differ from the target parameters"
-        else #[]
-        let callableErrors := match ns.tables.types[resultType.index]? with
-          | some (.function arguments result _) =>
-              let remaining := declaration.signature.parameters.drop captures.size
-              let argumentsMatch := arguments.size == remaining.size &&
-                (arguments.zip remaining).all fun pair =>
-                  specMatchesInstantiation ns context.logical pair.1 targetNs
-                    pair.2.typeUse.typeId instantiations
-              if !argumentsMatch ||
-                  !packedResultsMatch ns context.logical result targetNs instantiations
-                    declaration.signature.results then
-                typeMismatch loc "closure type differs from the uncaptured target signature"
-              else #[]
-          | _ => typeMismatch loc "closure construction result is not a function type"
-        profileErrors ++ genericErrors ++ captureErrors ++ callableErrors
+      let parameters := declaration.signature.parameters.toList
+      let capturedParameters := (ClosureMask.extract mask true parameters).toArray
+      let remaining := (ClosureMask.extract mask false parameters).toArray
+      let maskErrors := if mask < 2 ^ parameters.length then #[] else
+        #[.at "LIR-CLOSURE-MASK" "closure mask captures parameters the target lacks" loc]
+      let captureErrors := if captures.size == capturedParameters.size then
+          if captures.any fun capture =>
+              (exprType? ns capture).all (valueHoldsReference ns (ns.tables.types.size + 1))
+          then #[.at "LIR-CLOSURE-CAPTURE" "a closure cannot capture a reference" loc] else #[]
+        else arityMismatch loc "closure captures" capturedParameters.size captures.size
+      let shapeErrors := profileErrors ++ maskErrors ++ captureErrors
+      if !shapeErrors.isEmpty then shapeErrors else
+      match ns.tables.types[resultType.index]? with
+      | some (.function functionArguments functionResult abilities) =>
+          let abilityErrors := closureAbilityDiagnostics unit ns context loc abilities captures
+          if instantiations.isEmpty && !declaration.signature.generics.isEmpty then
+            if functionArguments.size != remaining.size then
+              abilityErrors ++ typeMismatch loc
+                "closure type differs from the uncaptured target signature"
+            else
+              let pairs? := (callOccurrencePairs? ns captures capturedParameters
+                  functionResult declaration.signature.results).map fun pairs =>
+                pairs ++ functionArguments.zip (remaining.map (·.typeUse.typeId))
+              abilityErrors ++ inferredInstantiationDiagnostics unit ns context loc
+                "closure instantiation" targetNs declaration.profile
+                declaration.signature.generics pairs?
+          else
+            let genericErrors := genericInstantiationDiagnostics loc "closure instantiation"
+              declaration.signature.generics instantiations ++
+              genericAbilityDiagnostics unit ns declaration.profile context.generics
+                "closure instantiation" declaration.signature.generics instantiations
+                (logical := context.logical)
+            let captureTypeErrors := if !argumentTypesMatchParameters ns targetNs context.logical
+                instantiations captures capturedParameters then
+              typeMismatch loc "closure capture types differ from the target parameters"
+            else #[]
+            let argumentsMatch := functionArguments.size == remaining.size &&
+              (functionArguments.zip remaining).all fun pair =>
+                specMatchesInstantiation ns context.logical pair.1 targetNs
+                  pair.2.typeUse.typeId instantiations
+            let callableErrors := if !argumentsMatch ||
+                !packedResultsMatch ns context.logical functionResult targetNs instantiations
+                  declaration.signature.results then
+              typeMismatch loc "closure type differs from the uncaptured target signature"
+            else #[]
+            abilityErrors ++ genericErrors ++ captureTypeErrors ++ callableErrors
+      | _ => typeMismatch loc "closure construction result is not a function type"
 
 /-- A function value keeps the signature its construction gave it, so an
 invocation in the logical domain reads its arguments and result through the
@@ -2321,8 +2342,8 @@ private def callTypeDiagnostics (mode : PreparationMode) (unit : ValidatedUnit)
   | .function reference =>
       directCallTypeDiagnostics mode unit ns context loc resultType reference instantiations
         arguments
-  | .closure reference =>
-      closureTypeDiagnostics mode unit ns context loc resultType reference instantiations
+  | .closure reference mask =>
+      closureTypeDiagnostics mode unit ns context loc resultType reference mask instantiations
         arguments
   | .invoke => if mode matches .execution then #[] else
       invokeTypeDiagnostics ns context.logical loc resultType arguments
@@ -2553,12 +2574,12 @@ private def commonFieldTypes? (targetNs : ValidatedNamespace) (logical : Bool)
         else none
 
 private def variantFieldTypes? (targetNs : ValidatedNamespace) (declaration : StructDecl)
-    (fields : Array String) : Option (Array TypeUse) := do
+    (fields : Array (String × String)) : Option (Array TypeUse) := do
   if fields.isEmpty then none else
-  fields.mapM fun field => do
-    let selected ← declaration.variants.findSome? fun variant =>
-      (fieldNamed? targetNs variant.fields field).map (·.type)
-    some selected
+  fields.mapM fun (variant, field) => do
+    let declared ← StaticTyping.fieldsOf targetNs declaration variant
+    let selected ← fieldNamed? targetNs declared field
+    some selected.type
 
 private structure DataOperandInfo where
   instantiations : Array GenericArgument
@@ -2689,10 +2710,19 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
               let resultErrors := if nominalTypeMatchesInstantiation ns resultType reference
                   instantiations then #[]
                 else typeMismatch loc "field update result is not its nominal target type"
+              -- In a specification the replacement is read at its projection.
+              let replaces (replacementType field : TypeId) : Bool :=
+                typeMatchesInstantiation? ns replacementType targetNs field instantiations ||
+                  (context.logical &&
+                    ((match ns.tables.types[replacementType.index]? with
+                      | some (.reference reference) =>
+                          typeMatchesInstantiation? ns reference.referent targetNs field
+                            instantiations
+                      | _ => false) ||
+                     (specReadsInteger ns replacementType && isAnyIntegerType targetNs field)))
               let replacementErrors := match arguments[1]?.bind (exprType? ns) with
                 | some replacementType =>
-                    if selected.all (fun typeUse => typeMatchesInstantiation? ns replacementType
-                        targetNs typeUse.typeId instantiations) then #[]
+                    if selected.all (fun typeUse => replaces replacementType typeUse.typeId) then #[]
                     else typeMismatch loc "field replacement type differs from the selected field"
                 | none => #[]
               operandErrors ++ resultErrors ++ replacementErrors
@@ -2721,7 +2751,7 @@ private def globalOperationTypeDiagnostics (unit : ValidatedUnit) (ns : Validate
   match instantiations.toList with
   | [.typeArg resource] =>
       let moveAbilityErrors := if context.profile != .move ||
-          typeHasAbility? unit ns .move context.generics resource.typeId .key == some true then #[]
+          globalResourceHasKey unit ns context.generics context.logical resource.typeId then #[]
         else #[.at "LIR-SEMANTIC-ABILITY"
           "Move global operation resource does not have Key" loc]
       moveAddressErrors ++ moveAbilityErrors ++ match kind with
@@ -2842,14 +2872,6 @@ private def referenceOperationTypeDiagnostics (ns : ValidatedNamespace) (logical
                   {repr actual}"
         | _ => #[]
       resultErrors ++ operandErrors
-  | .endLoan _ =>
-      -- Synthesized after typing; the wrapper is value-transparent, so its
-      -- operand and result agree by construction and typing never sees it.
-      match arguments.toList with
-      | [argument] =>
-          if exprTypeAgrees ns argument resultType then #[]
-          else typeMismatch loc "loan-death marker operand differs from its result"
-      | _ => typeMismatch loc "loan-death marker takes exactly one operand"
 
 private partial def behaviorProjectedType (ns : ValidatedNamespace) (typeId : TypeId)
     (fuel : Nat := ns.tables.types.size + 1) : TypeId :=
@@ -2911,9 +2933,11 @@ private def behaviorOperationTypeDiagnostics (ns : ValidatedNamespace) (loc : Lo
             | .requiresOf | .abortsOf | .unchangedOf | .writeOf _ => #[inputs]
           let values := values.toArray
           let argumentErrors := if kind == .foldsOf then #[] else
+            -- A value operand is read at the projection of its type, as the
+            -- callable's parameters are.
             let matching := expectedForms.any fun expected =>
               values.size == expected.size && (values.zip expected).all fun pair =>
-                exprType? ns pair.1 == some pair.2
+                (exprType? ns pair.1).map (behaviorProjectedType ns) == some pair.2
             if matching then #[] else
               let expectedArities := " or ".intercalate <|
                 expectedForms.map (toString ·.size) |>.toList
@@ -2925,7 +2949,8 @@ private def behaviorOperationTypeDiagnostics (ns : ValidatedNamespace) (loc : Lo
                 if resultSlots.isEmpty then
                   #[.at "LIR-SEMANTIC-TYPE"
                     "result_of cannot summarize a function with no return value" loc]
-                else if resultType == functionResult then #[] else
+                else if behaviorProjectedType ns resultType ==
+                    behaviorProjectedType ns functionResult then #[] else
                   typeMismatch loc "result_of result differs from the callable result type"
             | .writeOf index => match postSlots[index]? with
                 | some expected => if resultType == expected then #[] else
@@ -3007,7 +3032,7 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
             if ns.tables.types[resultType.index]? == some (.integer .unbounded true) then #[]
             else typeMismatch loc "bit-vector-to-int result is not logical num"
           let operandErrors := match exprType? ns value with
-            | some valueType => if isAnyIntegerType ns valueType then #[] else
+            | some valueType => if specReadsInteger ns valueType then #[] else
                 typeMismatch loc "bit-vector-to-int operand is not a fixed-width integer"
             | none => #[]
           resultErrors ++ operandErrors
@@ -3018,7 +3043,7 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
             typeMismatch loc "int-to-bit-vector result is not a fixed-width integer"
           let operandErrors := match exprType? ns value with
             | some valueType =>
-                if isAnyIntegerType ns valueType then #[]
+                if specReadsInteger ns valueType then #[]
                 else typeMismatch loc "int-to-bit-vector operand is not logical num"
             | none => #[]
           resultErrors ++ operandErrors
@@ -3044,30 +3069,35 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
       if ns.tables.types[resultType.index]? == some (.integer .unbounded true) then #[] else
         typeMismatch loc "abort code result is not logical num"
   | .emptyVector | .singletonVector =>
-      vectorPrimitiveDiagnostics ns loc resultType arguments
+      vectorPrimitiveDiagnostics ns true loc resultType arguments
   | .updateVector => match arguments.toList with
       | [collection, index, value] =>
           let collectionErrors := match exprType? ns collection,
               ns.tables.types[resultType.index]? with
             | some collectionType, some (.vector element _) =>
-                let resultErrors := if collectionType == resultType then #[] else
-                  typeMismatch loc
+                let resultErrors :=
+                  if (specVectorElement? ns collectionType).any (typesAgree ns · element) then #[]
+                  else typeMismatch loc
                     "vector update operand and result are not the same vector type"
-                let valueErrors := if exprType? ns value == some element then #[] else
+                let valueErrors :=
+                  if (exprType? ns value).any (specProjectedAgree ns · element) then #[] else
                   typeMismatch loc "vector update value differs from its element type"
                 resultErrors ++ valueErrors
             | _, _ => typeMismatch loc "vector update result is not a vector type"
           let indexErrors := match exprType? ns index with
             | some indexType =>
-                if ns.tables.types[indexType.index]? == some (.integer .unbounded true) then #[]
-                else typeMismatch loc "specification vector update index is not logical num"
+                if specReadsInteger ns indexType then #[]
+                else typeMismatch loc "specification vector update index is not an integer"
             | none => #[]
           collectionErrors ++ indexErrors
       | _ => #[]
   | .concatVector => match arguments.toList with
       | [left, right] =>
-          if isVectorType ns resultType && exprType? ns left == some resultType &&
-              exprType? ns right == some resultType then #[] else
+          let agrees (operand : ExprId) : Bool := match specVectorElement? ns resultType with
+            | some element => (exprType? ns operand).any fun operandType =>
+                (specVectorElement? ns operandType).any (typesAgree ns · element)
+            | none => false
+          if isVectorType ns resultType && agrees left && agrees right then #[] else
             typeMismatch loc
               "vector concatenation operands and result are not the same vector type"
       | _ => #[]
@@ -3093,15 +3123,19 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
             | none => #[]
           let indexErrors := match exprType? ns index with
             | some indexType =>
-                if isAnyIntegerType ns indexType then #[]
-                else typeMismatch loc "specification vector index is not logical num"
+                if specReadsInteger ns indexType then #[]
+                else typeMismatch loc "specification vector index is not an integer"
             | none => #[]
           collectionErrors ++ indexErrors
       | _ => #[]
   | .sliceVector => match arguments.toList with
       | [collection, range] =>
           let collectionErrors :=
-            if isVectorType ns resultType && exprType? ns collection == some resultType then #[]
+            if isVectorType ns resultType &&
+                (match specVectorElement? ns resultType, exprType? ns collection with
+                 | some element, some collectionType =>
+                     (specVectorElement? ns collectionType).any (typesAgree ns · element)
+                 | _, _ => false) then #[]
             else typeMismatch loc
               "vector slice operand and result are not the same vector type"
           let rangeErrors := match exprType? ns range with
@@ -3115,10 +3149,11 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
           let resultErrors := if isBoolType ns resultType then #[] else
             typeMismatch loc "vector containment result is not Bool"
           let operandErrors := match exprType? ns collection with
-            | some collectionType => match ns.tables.types[collectionType.index]? with
-                | some (.vector element _) => if exprType? ns value == some element then #[] else
+            | some collectionType => match specVectorElement? ns collectionType with
+                | some element =>
+                    if (exprType? ns value).any (specProjectedAgree ns · element) then #[] else
                     typeMismatch loc "vector containment value differs from its element type"
-                | _ => typeMismatch loc "vector containment operand is not a vector"
+                | none => typeMismatch loc "vector containment operand is not a vector"
             | none => #[]
           resultErrors ++ operandErrors
       | _ => #[]
@@ -3128,10 +3163,11 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
             if ns.tables.types[resultType.index]? == some (.integer .unbounded true) then #[] else
               typeMismatch loc "vector index-of result is not an unbounded integer"
           let operandErrors := match exprType? ns collection with
-            | some collectionType => match ns.tables.types[collectionType.index]? with
-                | some (.vector element _) => if exprType? ns value == some element then #[] else
+            | some collectionType => match specVectorElement? ns collectionType with
+                | some element =>
+                    if (exprType? ns value).any (specProjectedAgree ns · element) then #[] else
                     typeMismatch loc "vector index-of value differs from its element type"
-                | _ => typeMismatch loc "vector index-of operand is not a vector"
+                | none => typeMismatch loc "vector index-of operand is not a vector"
             | none => #[]
           resultErrors ++ operandErrors
       | _ => #[]
@@ -3140,13 +3176,13 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
           let resultErrors := if isBoolType ns resultType then #[] else
             typeMismatch loc "vector in-range result is not Bool"
           let collectionErrors := match exprType? ns collection with
-            | some collectionType => if isVectorType ns collectionType then #[] else
+            | some collectionType => if (specVectorElement? ns collectionType).isSome then #[] else
                 typeMismatch loc "vector in-range operand is not a vector"
             | none => #[]
           let indexErrors := match exprType? ns index with
             | some indexType =>
-                if ns.tables.types[indexType.index]? == some (.integer .unbounded true) then #[]
-                else typeMismatch loc "vector in-range index is not logical num"
+                if specReadsInteger ns indexType then #[]
+                else typeMismatch loc "vector in-range index is not an integer"
             | none => #[]
           resultErrors ++ collectionErrors ++ indexErrors
       | _ => #[]
@@ -3160,8 +3196,8 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
             | none => #[]
           let indexErrors := match exprType? ns index with
             | some indexType =>
-                if ns.tables.types[indexType.index]? == some (.integer .unbounded true) then #[]
-                else typeMismatch loc "range-membership index is not logical num"
+                if specReadsInteger ns indexType then #[]
+                else typeMismatch loc "range-membership index is not an integer"
             | none => #[]
           resultErrors ++ rangeErrors ++ indexErrors
       | _ => #[]
@@ -3170,15 +3206,16 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
           let resultErrors := if ns.tables.types[resultType.index]? == some .range then #[] else
             typeMismatch loc "vector range result is not a range"
           let operandErrors := match exprType? ns collection with
-            | some collectionType => if isVectorType ns collectionType then #[] else
+            | some collectionType => if (specVectorElement? ns collectionType).isSome then #[] else
                 typeMismatch loc "vector range operand is not a vector"
             | none => #[]
           resultErrors ++ operandErrors
       | _ => #[]
   | .maxValue width =>
-      if ns.tables.types[resultType.index]? == some (.integer (.bits width) false) then #[] else
+      if ns.tables.types[resultType.index]? == some (.integer (.bits width) false) ||
+          isLogicalNumType ns resultType then #[] else
         typeMismatch loc
-          s!"maximum-value result is not unsigned fixed-width integer u{width}"
+          s!"maximum-value result is neither u{width} nor logical num"
   | .emptyEventStore =>
       if ns.tables.types[resultType.index]? == some .eventStore then #[] else
         typeMismatch loc "empty event-store result is not EventStore"
@@ -3212,7 +3249,7 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
       match instantiations.toList with
       | [.typeArg resource] =>
           let abilityErrors := if context.profile != .move ||
-              typeHasAbility? unit ns .move context.generics resource.typeId .key == some true then #[]
+              globalResourceHasKey unit ns context.generics true resource.typeId then #[]
             else #[.at "LIR-SEMANTIC-ABILITY"
               "Move specification resource type does not have Key" loc]
           let addressErrors := match arguments[0]?.bind (exprType? ns) with
@@ -3233,7 +3270,7 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
   | .global _ => match instantiations.toList with
       | [.typeArg resource] =>
           let abilityErrors := if context.profile != .move ||
-              typeHasAbility? unit ns .move context.generics resource.typeId .key == some true then #[]
+              globalResourceHasKey unit ns context.generics true resource.typeId then #[]
             else #[.at "LIR-SEMANTIC-ABILITY"
               "Move specification global resource does not have Key" loc]
           let addressErrors := if context.profile != .move then #[] else
@@ -3248,13 +3285,31 @@ private def specOperationTypeDiagnostics (unit : ValidatedUnit) (ns : ValidatedN
           "specification global requires a type argument" loc]
       | _ => #[.at "LIR-SEMANTIC-ARITY"
           s!"specification global expects 1 type argument, but has {instantiations.size}" loc]
+  | .exists _ => match instantiations.toList with
+      | [.typeArg resource] =>
+          let abilityErrors := if context.profile != .move ||
+              globalResourceHasKey unit ns context.generics true resource.typeId then #[]
+            else #[.at "LIR-SEMANTIC-ABILITY"
+              "Move specification exists resource does not have Key" loc]
+          let addressErrors := if context.profile != .move then #[] else
+            match arguments[0]?.bind (exprType? ns) with
+            | some addressType => if ns.tables.types[addressType.index]? == some .address then #[]
+                else typeMismatch loc "Move specification exists key is not an address"
+            | none => #[]
+          let resultErrors := if isBoolType ns resultType then #[] else
+            typeMismatch loc "specification exists result is not Bool"
+          abilityErrors ++ addressErrors ++ resultErrors
+      | [_] => #[.at "LIR-SEMANTIC-GENERIC-KIND"
+          "specification exists requires a type argument" loc]
+      | _ => #[.at "LIR-SEMANTIC-ARITY"
+          s!"specification exists expects 1 type argument, but has {instantiations.size}" loc]
   | .canModify =>
       let resultErrors := if isBoolType ns resultType then #[] else
         typeMismatch loc "can-modify result is not Bool"
       match instantiations.toList with
       | [.typeArg resource] =>
           let abilityErrors := if context.profile != .move ||
-              typeHasAbility? unit ns .move context.generics resource.typeId .key == some true then #[]
+              globalResourceHasKey unit ns context.generics true resource.typeId then #[]
             else #[.at "LIR-SEMANTIC-ABILITY"
               "Move can-modify resource does not have Key" loc]
           let addressErrors := match arguments[0]?.bind (exprType? ns) with
@@ -3408,7 +3463,7 @@ mutual
           | .nominal name arguments =>
               let argumentErrors := arguments.foldl
                 (fun ds argument => ds ++ scanGenericArgument registry unit mode ns loc argument
-                  generics) #[]
+                  generics (logical := logical)) #[]
               let targetErrors := match ns.tables.names[name.index]? with
                 | none => #[.at "LIR-SEMANTICS-INTERNAL"
                     "validated nominal type name is missing" loc]
@@ -3446,10 +3501,12 @@ mutual
 
   private partial def scanGenericArgument (registry : SemanticsRegistry) (unit : ValidatedUnit)
       (mode : PreparationMode) (ns : ValidatedNamespace) (loc : LocId)
-      (argument : GenericArgument) (generics : Array GenericBinder := #[]) : Array Diagnostic :=
+      (argument : GenericArgument) (generics : Array GenericBinder := #[])
+      (logical : Bool := false) : Array Diagnostic :=
     let nodeErrors := classificationDiagnostics mode loc (coreGenericArgumentFeature argument)
     let childErrors := match argument with
       | .typeArg value => scanType registry unit mode ns value.loc value.typeId generics
+          (logical := logical)
       | .const value => scanConst registry unit mode ns loc value
       | .lifetime lifetime => scanLifetime mode ns generics loc lifetime
       | .evidence _ => #[]
@@ -3551,7 +3608,7 @@ mutual
                 instantiations variant fields
               let ds := instantiations.foldl (fun ds value =>
                 ds ++ scanGenericArgument registry unit mode ns pattern.loc value
-                  context.generics) ds
+                  context.generics (logical := context.logical)) ds
               fields.foldl (fun ds child =>
                 ds ++ scanPattern registry unit mode ns context child) ds
           | .literal value => scanConst registry unit mode ns pattern.loc value ++
@@ -3732,6 +3789,12 @@ mutual
       | .specification (.functionCall reference _) =>
           specFunctionCallTypeDiagnostics mode unit ns context loc resultType reference
             instantiations arguments
+      | .specification (.lemma reference _) =>
+          if context.lemmaInstances then
+            lemmaInstanceTypeDiagnostics mode unit ns context loc resultType reference
+              instantiations arguments
+          else #[.at "LIR-SEMANTIC-CONDITION"
+            "a lemma instance occurs only in an `apply` step" loc]
       | .specification specification => if mode matches .execution then #[] else
           specOperationTypeDiagnostics unit ns context loc resultType specification instantiations
             arguments ++
@@ -3781,10 +3844,13 @@ mutual
   private partial def scanCondition (registry : SemanticsRegistry) (unit : ValidatedUnit)
       (mode : PreparationMode) (ns : ValidatedNamespace) (context : ScanContext)
       (condition : Condition) : Array Diagnostic :=
-    let context := { context with logical := true }
+    let context := { context with logical := true, lemmaInstances := condition.kind matches .apply }
     let ds := classificationDiagnostics mode condition.loc
       (coreConditionFeature condition.kind) ++
       typingGate mode (conditionAuxiliaryDiagnostics condition) ++
+      (if condition.kind matches .apply then
+        applyFormulaDiagnostics ns condition.loc (ns.expressions.size + 1) condition.expression
+      else #[]) ++
       scanExpr registry unit mode ns context condition.expression
     let ds := if !conditionExpressionIsProposition condition.kind ||
         (exprType? ns condition.expression).any (isBoolType ns) then ds
@@ -3881,17 +3947,13 @@ mutual
                 expression.typeId operation instantiations arguments allowNonCopyPlaceRead
               let ds := instantiations.foldl (fun ds value =>
                 ds ++ scanGenericArgument registry unit mode ns expression.loc value
-                  context.generics) ds
-              -- Both observers inspect metadata without exporting or copying
-              -- an element of a potentially linear aggregate.
-              let allowsDiscriminantRead := operation matches
-                .data (.discriminant _) | .primitive .length | .primitive (.checkVectorIndex _)
+                  context.generics (logical := context.logical)) ds
               let observesProjection := allowNonCopyPlaceRead && (operation matches
                 .data (.select ..) | .primitive .index | .primitive .copyValue |
                 .reference .dereference)
               let ds := arguments.zipIdx.foldl (fun ds pair =>
                 ds ++ scanExpr registry unit mode ns context pair.1
-                  ((allowsDiscriminantRead || observesProjection) && pair.2 == 0)) ds
+                  ((observesOperand operation || observesProjection) && pair.2 == 0)) ds
               match surface with
               | none => ds
               | some (.extension value) =>
@@ -3963,7 +4025,8 @@ mutual
                 let ds := ds ++ scanPattern registry unit mode ns context arm.pattern
                 let ds := if (mode matches .execution) ||
                     (match patternType? ns arm.pattern, exprType? ns scrutinee with
-                     | some patternTy, some scrutineeTy => typesAgree ns patternTy scrutineeTy
+                     | some patternTy, some scrutineeTy => typesAgree ns patternTy scrutineeTy ||
+                         (context.logical && specProjectedAgree ns patternTy scrutineeTy)
                      | _, _ => false) then ds
                   else ds ++ typeMismatch expression.loc "match pattern and scrutinee types differ"
                 let ds := match arm.guard with
@@ -4213,18 +4276,97 @@ private def scanImplementation (registry : SemanticsRegistry) (unit : ValidatedU
     ds ++ valueErrors ++ typeErrors) #[]
   genericErrors ++ traitErrors ++ targetErrors ++ predicateErrors ++ bindingErrors
 
+/-- The state labels a contract's conditions read: a label is a name of the
+unit, bound by a binder over the state domain or defined by a two-state
+operation whose post-state it is (`publish`, `remove`, `update`, or an
+invocation's `ensures_of` or `result_of`), in any clause of the contract; a
+definition may be restated, and a quantified label may be defined in its
+body. A binder over the state domain binds a label, and no other binder
+does. -/
+private def stateLabelDiagnostics (ns : ValidatedNamespace) (contract : FunctionContract) :
+    Array Diagnostic := Id.run do
+  let mut ds : Array Diagnostic := #[]
+  let mut bound : Array Nat := #[]
+  let mut defined : Array Nat := #[]
+  let mut used : Array (Nat × LocId) := #[]
+  let labelName (label : Nat) : String :=
+    (ns.tables.names[label]?.map (·.name)).getD s!"{label}"
+  for condition in contract.conditions do
+    let mut pending := #[condition.expression]
+    let mut fuel := ns.expressions.size + 1
+    while fuel > 0 do
+      fuel := fuel - 1
+      let some id := pending.back? | break
+      pending := pending.pop
+      let some expression := ns.expressions[id.index]? | continue
+      pending := pending ++ expressionChildren expression.kind
+      match expression.kind with
+      | .quantifier _ binders _ _ _ =>
+          for binder in binders do
+            let stateDomain := (ns.expressions[binder.domain.index]?).any fun domain =>
+              domain.kind matches .operation (.specification .stateDomain) _ _ _
+            match binder.label, stateDomain with
+            | some label, true => bound := bound.push label
+            | some _, false =>
+                ds := ds.push (.at "LIR-SEMANTIC-STATE-LABEL"
+                  "a binder not over the state domain binds a state label" expression.loc)
+            | none, true =>
+                ds := ds.push (.at "LIR-SEMANTIC-STATE-LABEL"
+                  "a binder over the state domain binds no state label" expression.loc)
+            | none, false => pure ()
+      | .operation (.specification operation) _ _ _ =>
+          let range? : Option MemoryRange := match operation with
+            | .behavior _ range | .functionCall _ range | .lemma _ range => some range
+            | .publish range | .remove range | .update range => some range
+            | .global (some label) | .exists (some label) => some { pre := none, post := some label }
+            | _ => none
+          if let some range := range? then
+            for label in [range.pre, range.post].filterMap (fun label => label) do
+              used := used.push (label, expression.loc)
+            -- A state-change predicate defines its post-state; so do an
+            -- invocation's `ensures_of` and `result_of`, whose post-state is
+            -- the state after it.
+            if operation matches .publish _ | .remove _ | .update _ | .behavior .ensuresOf _ |
+                .behavior .resultOf _ then
+              if let some label := range.post then defined := defined.push label
+      | _ => pure ()
+  for (label, loc) in used do
+    if label ≥ ns.tables.names.size then
+      ds := ds.push (.at "LIR-SEMANTIC-STATE-LABEL" s!"state label {label} is not a name of the unit" loc)
+    else if !bound.contains label && !defined.contains label then
+      ds := ds.push (.at "LIR-SEMANTIC-STATE-LABEL"
+        s!"state label `{labelName label}` is neither bound by a quantifier over the state domain nor defined by a state-change predicate"
+        loc)
+  return ds
+
 private def scanContract (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace) (context : ScanContext)
     (contract : FunctionContract) : Array Diagnostic :=
   let conditionErrors := contract.conditions.foldl (fun ds condition =>
-    ds ++ scanCondition registry unit mode ns context condition) #[]
+    ds ++ scanCondition registry unit mode ns context condition) (stateLabelDiagnostics ns contract)
   -- A frame target is a specification expression, as in a spec block.
   let modifiesErrors := contract.modifies.foldl (fun ds expression =>
     ds ++ scanExpr registry unit mode ns { context with logical := true } expression)
     conditionErrors
+  -- A parameter frame's targets are specification expressions over its
+  -- formals, which bind an invocation's arguments at their types.
+  let env := StaticTyping.staticEnv context.generics
+  let localType (id : LocalId) : Option SemTy :=
+    context.locals[id.index]?.bind (StaticTyping.resolveIn ns env ·.type.typeId)
+  let frameErrors := contract.parameterFrames.foldl (fun ds frame =>
+    let ds := frame.modifies.foldl (fun ds expression =>
+      ds ++ scanExpr registry unit mode ns { context with logical := true } expression) ds
+    match localType frame.parameter with
+    | some (.function arguments _) =>
+        if frame.formals.toList.map localType == arguments.map some ||
+            frame.modifiesAll && frame.formals.isEmpty then ds
+        else ds.push <| .at "LIR-PARAMETER-FRAME"
+          "a frame's formals differ from its parameter's argument types" frame.loc
+    | _ => ds.push <| .at "LIR-PARAMETER-FRAME"
+        "a frame names a parameter that is not a function value" frame.loc) modifiesErrors
   contract.reads.foldl (fun ds typeUse =>
     ds ++ scanType registry unit mode ns typeUse.loc typeUse.typeId
-      context.generics) modifiesErrors
+      context.generics) frameErrors
 
 private def scanSpecFunction (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace)
@@ -4260,6 +4402,41 @@ private def scanSpecFunction (registry : SemanticsRegistry) (unit : ValidatedUni
               "specification function body type differs from its declared results")
   unsupported ++ signatureErrors ++ localErrors ++ profileErrors ++ bodyErrors ++
     scanContract registry unit mode ns context function.contract
+
+/-- A lemma: its contract states `requires`, `ensures`, and `decreases`;
+its proof asserts, assumes, applies lemmas, and splits cases. -/
+private def scanLemma (registry : SemanticsRegistry) (unit : ValidatedUnit)
+    (mode : PreparationMode) (ns : ValidatedNamespace)
+    (declaration : LemmaDecl) : Array Diagnostic :=
+  let context : ScanContext := {
+    locals := declaration.locals
+    profile := declaration.profile
+    generics := declaration.signature.generics
+    logical := true }
+  let unsupported := if mode matches .typing then #[] else
+    #[.at "LIR-VERIFY-UNSUPPORTED" "lemmas require M4 semantics" declaration.loc]
+  let signatureErrors := scanSignature registry unit mode ns declaration.signature
+    (logical := true)
+  let resultErrors := if declaration.signature.results.isEmpty then #[] else
+    #[.at "LIR-LEMMA" "a lemma has no results" declaration.loc]
+  let localErrors := declaration.locals.foldl (fun ds localDecl =>
+    ds ++ scanType registry unit mode ns localDecl.type.loc localDecl.type.typeId
+      declaration.signature.generics (logical := true)) #[]
+  let profileErrors := declaration.profileData.foldl (fun ds value =>
+    ds ++ profileDiagnostics registry unit mode .property declaration.loc value) #[]
+  let roleErrors := declaration.contract.conditions.foldl (fun ds condition =>
+    match condition.kind with
+    | .requires | .ensures | .decreases => ds
+    | _ => ds.push <| .at "LIR-LEMMA"
+        "a lemma states only `requires`, `ensures`, and `decreases`" condition.loc) #[]
+  let proofErrors := declaration.proof.foldl (fun ds condition =>
+    let ds := match condition.kind with
+      | .assertion | .assumption | .apply | .split => ds
+      | _ => ds.push <| .at "LIR-LEMMA"
+          "a proof step asserts, assumes, applies lemmas, or splits cases" condition.loc
+    ds ++ scanCondition registry unit mode ns context condition) #[]
+  unsupported ++ signatureErrors ++ resultErrors ++ localErrors ++ profileErrors ++ roleErrors ++
+    scanContract registry unit mode ns context declaration.contract ++ proofErrors
 
 private def scanSpecVar (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace)
@@ -4413,6 +4590,9 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
     let ds := ns.specVars.foldl (fun ds declaration =>
       ds ++ ownedBy ns "spec var" declaration.name
         (scanSpecVar registry unit mode ns declaration)) ds
+    let ds := ns.lemmas.foldl (fun ds declaration =>
+      ds ++ ownedBy ns "lemma" declaration.name
+        (scanLemma registry unit mode ns declaration)) ds
     ns.invariants.foldl (fun ds declaration =>
       ds ++ scanNamespaceInvariant registry unit mode ns declaration) ds
   let intrinsicErrors := if ns.intrinsics.isEmpty || (mode matches .typing) then #[] else
@@ -4441,47 +4621,30 @@ def typingDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
   unit.namespaces.foldl (fun ds ns =>
     ds ++ scanNamespace #[] unit .typing ns) #[]
 
-/-! ## Shared-reference erasure
+/-! ## Shared references
 
 Certified exclusivity makes a shared reference the observed value itself
 ([`designs/prophetic-references.md`](../../../designs/prophetic-references.md)
-§2.1), so the semantic view erases the shared vocabulary: a dereference or
-freeze whose operand type is a shared reference becomes `copyValue`, and a
-place dereferencing a shared-typed base collapses to that base. Mutable
-loans keep the full prophetic treatment. A node whose type cannot be
-recovered is left unchanged; the executable semantics reports it stuck
-rather than guessing a reference kind. -/
+§2.1): a dereference or freeze whose operand is a shared reference reads
+the operand, and a place dereferencing a shared-typed base is that base.
+Mutable loans keep the full prophetic treatment. The semantics decides the
+first at the node, from the operand's recorded type (`sharedOperand`); the
+second needs the owning function's local types, so validation records the
+places in the function's borrow certificate (`sharedDereferenceSites`). -/
 
-private def isSharedReferenceType (ns : ValidatedNamespace) (typeId : TypeId)
+def isSharedReferenceType (ns : ValidatedNamespace) (typeId : TypeId)
     (typeAt : Nat → Option Ty := fun index => ns.tables.types[index]?) : Bool :=
   match typeAt typeId.index with
   | some (.reference reference) => reference.kind == .shared
   | _ => false
 
-private def sharedOperand (ns : ValidatedNamespace) (expressionAt : Nat → Option Expr)
+def sharedOperand (ns : ValidatedNamespace) (expressionAt : Nat → Option Expr)
     (typeAt : Nat → Option Ty) (arguments : Array ExprId) : Bool :=
   match arguments[0]? with
   | some id => match expressionAt id.index with
     | some expression => isSharedReferenceType ns expression.typeId typeAt
     | none => false
   | none => false
-
-/-- Rewrite shared dereference and freeze value operations to `copyValue`,
-namespace-wide: the decision reads only the operand's recorded type. -/
-private def eraseSharedValueOperations (ns : ValidatedNamespace)
-    (expressionAt : Nat → Option Expr)
-    (typeAt : Nat → Option Ty := fun index => ns.tables.types[index]?) : Array Expr :=
-  (ns.expressions.toList.map fun node =>
-    match node.kind with
-    | .operation (.reference .dereference) _ arguments surface =>
-        if sharedOperand ns expressionAt typeAt arguments then
-          { node with kind := .operation (.primitive .copyValue) #[] arguments surface }
-        else node
-    | .operation (.reference (.freeze _)) _ arguments surface =>
-        if sharedOperand ns expressionAt typeAt arguments then
-          { node with kind := .operation (.primitive .copyValue) #[] arguments surface }
-        else node
-    | _ => node).toArray
 
 /-- The place identifiers a place-carrying operation mentions. -/
 private def mentionedPlaces : ExprKind → Array PlaceId
@@ -4562,9 +4725,8 @@ private def reachableDereferencesWith (ns : ValidatedNamespace)
 def reachableDereferences (ns : ValidatedNamespace) (root : ExprId) : List (Nat × PlaceId) :=
   reachableDereferencesWith ns (arenaGet? ns.expressions) (arenaGet? ns.places) root
 
-/-- Find each function's shared dereference sites, typing their bases against
-the owning function's locals in the original arena. Sorting and transitive
-copy application are separate from this traversal. -/
+/-- Whether a type may hold a shared reference; a body without such locals
+has no shared dereference. -/
 private def mayContainSharedReference (typeAt : Nat → Option Ty) : Nat → TypeId → Bool
   | 0, _ => true
   | fuel + 1, typeId =>
@@ -4581,223 +4743,310 @@ private def mayContainSharedReference (typeAt : Nat → Option Ty) : Nat → Typ
       -- skipping it. Mutable references may themselves contain shared ones.
       | _ => true
 
-private def sharedNamespacePlaceCopyChunksWith (unit : ValidatedUnit) (ns : ValidatedNamespace)
-    (expressionAt : Nat → Option Expr) (placeAt : Nat → Option Place)
-    (typeAt : Nat → Option Ty) :
-    Array (List (Nat × PlaceId)) :=
-  -- The arenas are read through the given lookups and their sizes taken
-  -- once: the preparation certificates evaluate this in the kernel, which
-  -- walks an array's list for its size and for every element read.
-  let typeFuel := ns.tables.types.size + 1
-  let placeFuel := ns.places.size + 1
-  (ns.functions.toList.map fun declaration =>
-    match declaration.body with
-    | .absent => []
-    | .structured root =>
-        if !declaration.locals.toList.any (fun entry =>
-            mayContainSharedReference typeAt typeFuel entry.type.typeId) then
-          []
+/-- Reuse an authored place node when possible and otherwise append it without
+disturbing any producer-authored place identity. -/
+def internNormalizedPlace (places : Array Place) (place : Place) : PlaceId × Array Place :=
+  match places.findIdx? (· == place) with
+  | some index => (⟨index⟩, places)
+  | none => (⟨places.size⟩, places.push place)
+
+/-- The variants of a nominal declaration of this namespace that declare a
+field of this name. -/
+private def declaringVariants? {β : Type} (tables : Tables) (ns : Namespace β)
+    (reference : QualifiedRef) (field : String) : Option (Array String) := do
+  if reference.namespaceId != ns.identity then none else
+  let declaration ← ns.structs.find? (·.name == reference.name)
+  return StaticTyping.declaringVariants tables declaration field
+
+/-- Recover the storage path represented by the value-shaped trees emitted by
+legacy frontends. In particular, Move's `borrow_field` arrives as
+`borrow(select(referenceLocal))`; the reference-local base denotes a
+dereferenced place before its field projection. -/
+partial def normalizedExpressionPlace? {β : Type} (tables : Tables) (ns : Namespace β)
+    (id : ExprId) (places : Array Place) (fuel : Nat := 0) : Option (PlaceId × Array Place) := do
+  let fuel := if fuel == 0 then ns.expressions.size + 1 else fuel
+  if fuel == 0 then none else
+    let expression ← ns.expressions[id.index]?
+    match expression.kind with
+    | .localVar localId => some (internNormalizedPlace places (.localVar localId))
+    | .operation (.reference .dereference) instantiations arguments _ => do
+        if !instantiations.isEmpty then none else
+        let [baseExpression] := arguments.toList | none
+        let (base, places) ←
+          normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
+        -- Dereferencing a reference-typed field select cancels: the select's
+        -- normalized place already denotes the referent's storage path.
+        let selectReference := (ns.expressions[baseExpression.index]?).any fun node =>
+          (node.kind matches .operation (.data _) _ _ _) &&
+            ((tables.types[node.typeId.index]?).any fun ty => ty matches .reference _)
+        if selectReference then some (base, places)
+        else some (internNormalizedPlace places (.deref base))
+    | .operation (.data (.select reference field)) _ arguments _ => do
+        let [baseExpression] := arguments.toList | none
+        let (base, places) ← normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
+        let baseNode ← ns.expressions[baseExpression.index]?
+        let (base, places) := match tables.types[baseNode.typeId.index]? with
+          | some (.reference _) => internNormalizedPlace places (.deref base)
+          | _ => (base, places)
+        let fieldIndex ← tables.names.findIdx? fun name =>
+          name.namespaceId == reference.namespaceId && name.name == field
+        some (internNormalizedPlace places (.field base reference ⟨fieldIndex⟩))
+    | .operation (.data (.selectVariants reference fields)) _ arguments _ => do
+        let (_, field) ← fields[0]?
+        if !fields.all (·.2 == field) then none else
+        let [baseExpression] := arguments.toList | none
+        let (base, places) ← normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
+        let baseNode ← ns.expressions[baseExpression.index]?
+        let (base, places) := match tables.types[baseNode.typeId.index]? with
+          | some (.reference _) => internNormalizedPlace places (.deref base)
+          | _ => (base, places)
+        let nameIndex (text : String) := tables.names.findIdx? fun name =>
+          name.namespaceId == reference.namespaceId && name.name == text
+        let fieldIndex ← nameIndex field
+        -- A field place reads the field of whichever variant declares it,
+        -- so it is the selection when every such variant is listed; the
+        -- field of one variant is read through a downcast to it.
+        let listed := fields.map (·.1)
+        if (declaringVariants? tables ns reference field).any
+            (StaticTyping.listsDeclaringVariants · listed) then
+          some (internNormalizedPlace places (.field base reference ⟨fieldIndex⟩))
         else
+          let #[variant] := listed | none
+          let (base, places) := internNormalizedPlace places (.downcast base ⟨← nameIndex variant⟩)
+          some (internNormalizedPlace places (.field base reference ⟨fieldIndex⟩))
+    | .operation (.primitive .index) _ arguments _ => do
+        let [baseExpression, index] := arguments.toList | none
+        let (base, places) ← normalizedExpressionPlace? tables ns baseExpression places (fuel - 1)
+        let baseNode ← ns.expressions[baseExpression.index]?
+        let (base, places) := match tables.types[baseNode.typeId.index]? with
+          | some (.reference _) => internNormalizedPlace places (.deref base)
+          | _ => (base, places)
+        some (internNormalizedPlace places (.index base index))
+    | _ => none
+
+/-! ## Local access
+
+A direct local read is non-consuming, which a value type without `Copy` does
+not allow. In executable code the access of such a read follows from the
+checked types: a selection or index of it with `Copy` copies its place, the
+operand of an observer (a discriminant, variant test, length, or index check)
+reads its place without consuming it, and otherwise the value is moved.
+References keep their reads, which the reference operations take at rest, and
+specifications read locals logically. -/
+
+/-- The type of the local a selection or index chain reads by value, when the
+chain is rooted at one. -/
+private def chainLocalType? {β : Type} (ns : Namespace β) : Nat → ExprId → Option TypeId
+  | 0, _ => none
+  | fuel + 1, id => do
+      let expression ← ns.expressions[id.index]?
+      match expression.kind with
+      | .localVar _ => some expression.typeId
+      | .operation (.data (.select ..)) _ arguments _
+      | .operation (.data (.selectVariants ..)) _ arguments _
+      | .operation (.primitive .index) _ arguments _ =>
+          chainLocalType? ns fuel (← arguments[0]?)
+      | _ => none
+
+private partial def inferLocalAccessFrom (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (withoutCopy : TypeId → Bool) (id : ExprId) (observed : Bool)
+    (state : Array Expr × Array Place) : Array Expr × Array Place :=
+  let (expressions, places) := state
+  let children (ids : Array ExprId) (observer : Bool := false) :=
+    ids.zipIdx.foldl (init := state) fun state (child, index) =>
+      inferLocalAccessFrom unit ns withoutCopy child (observer && index == 0) state
+  let load (expression : Expr) (operation : Operation) (places : Array Place) :=
+    (expressions.set! id.index { expression with kind := .operation operation #[] #[] }, places)
+  match ns.expressions[id.index]? with
+  | none => state
+  | some expression => match expression.kind with
+    | .localVar localId =>
+        if !withoutCopy expression.typeId then state else
+        let (place, places) := internNormalizedPlace places (.localVar localId)
+        load expression (if observed then .read place else .move place) places
+    | .operation operation _ arguments _ =>
+        let chain := if operation matches .data (.select ..) | .data (.selectVariants ..) |
+            .primitive .index then do
+          let root ← chainLocalType? ns.toNamespace (ns.expressions.size + 1) id
+          if !withoutCopy root || (!observed && withoutCopy expression.typeId) then none
+          else normalizedExpressionPlace? ns.tables ns.toNamespace id places
+        else none
+        match chain with
+        | some (place, places) =>
+            load expression (if observed then .read place else .copy place) places
+        | none => children arguments (observesOperand operation)
+    | .spec _ | .quantifier .. => state
+    | kind => children (expressionChildren kind)
+
+/-- The expressions a function body runs: its expressions below the root,
+not entering specification blocks or quantifiers, with the index
+expressions of the places it accesses. -/
+private def executableExpressions (ns : ValidatedNamespace) : Array Bool := Id.run do
+  let mut reached := Array.replicate ns.expressions.size false
+  let mut pending : Array ExprId := ns.functions.filterMap fun function =>
+    match function.body with
+    | .structured root => some root
+    | .absent => none
+  let mut places : Array PlaceId := #[]
+  let mut visitedPlaces := Array.replicate ns.places.size false
+  -- Each expression and place is visited once, so the arenas bound the work.
+  for _ in [0:ns.expressions.size + ns.places.size + 1] do
+    while let some place := places.back? do
+      places := places.pop
+      if visitedPlaces[place.index]?.getD true then continue
+      visitedPlaces := visitedPlaces.set! place.index true
+      match ns.places[place.index]? with
+      | some (.deref base) | some (.field base _ _) | some (.subslice base _ _ _)
+      | some (.downcast base _) => places := places.push base
+      | some (.index base index) =>
+          places := places.push base
+          pending := pending.push index
+      | some (.localVar _) | none => pure ()
+    let some id := pending.back? | break
+    pending := pending.pop
+    if reached[id.index]?.getD true then continue
+    reached := reached.set! id.index true
+    let some expression := ns.expressions[id.index]? | continue
+    match expression.kind with
+    | .spec _ | .quantifier .. => continue
+    | .operation operation _ _ _ =>
+        match operation with
+        | .move place | .copy place | .borrow _ place | .read place | .write place
+        | .drop place => places := places.push place
+        | _ => pure ()
+    | .assign place _ => places := places.push place
+    | _ => pure ()
+    pending := pending ++ expressionChildren expression.kind
+  return reached
+
+/-- The instantiation validation solves for an elided generic call or
+closure, the runtime's frame for its target. -/
+private def solvedInstantiation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (loc : LocId) (resultType : TypeId) : Operation → Array ExprId → Option (Array GenericArgument)
+  | .call (.function reference), arguments => do
+      let (targetNs, declaration) ← resolveFunctionDeclaration? unit ns reference
+      if declaration.signature.generics.isEmpty ||
+          arguments.size != declaration.signature.parameters.size then none
+      let pairs ← callOccurrencePairs? ns arguments declaration.signature.parameters resultType
+        declaration.signature.results
+      match Unify.solveCall ns false targetNs declaration.signature.generics loc pairs with
+      | .solved inferred => some inferred
+      | _ => none
+  | .call (.closure reference mask), captures => do
+      let (targetNs, declaration) ← resolveFunctionDeclaration? unit ns reference
+      if declaration.signature.generics.isEmpty then none
+      let .function functionArguments functionResult _ ← ns.tables.types[resultType.index]?
+        | none
+      let parameters := declaration.signature.parameters.toList
+      let capturedParameters := (ClosureMask.extract mask true parameters).toArray
+      let remaining := (ClosureMask.extract mask false parameters).toArray
+      if functionArguments.size != remaining.size then none
+      let pairs ← callOccurrencePairs? ns captures capturedParameters functionResult
+        declaration.signature.results
+      let pairs := pairs ++ functionArguments.zip (remaining.map (·.typeUse.typeId))
+      match Unify.solveCall ns false targetNs declaration.signature.generics loc pairs with
+      | .solved inferred => some inferred
+      | _ => none
+  | _, _ => none
+
+/-- A namespace whose executable generic calls and closures carry the
+instantiations validation solved for them where the source elided them: a
+target runs under its arguments, never in its symbolic frame. -/
+def inferInstantiations (unit : ValidatedUnit) (ns : ValidatedNamespace) : ValidatedNamespace :=
+  let executable := executableExpressions ns
+  let expressions := ns.expressions.zipIdx.map fun (expression, index) =>
+    if !(executable[index]?.getD false) then expression else
+    match expression.kind with
+    | .operation operation instantiations arguments surface =>
+        if !instantiations.isEmpty then expression else
+        match solvedInstantiation? unit ns expression.loc expression.typeId operation arguments with
+        | some inferred => { expression with kind := .operation operation inferred arguments surface }
+        | none => expression
+    | _ => expression
+  { ns with expressions }
+
+/-- A namespace with the access of each direct local read in its executable
+bodies inferred from the checked types. -/
+def inferLocalAccess (unit : ValidatedUnit) (ns : ValidatedNamespace) : ValidatedNamespace :=
+  let (expressions, places) := ns.functions.foldl (init := (ns.expressions, ns.places))
+    fun state function => match function.body with
+      | .absent => state
+      | .structured root =>
+          let withoutCopy := fun typeId =>
+            !(ns.tables.types[typeId.index]? matches some (.reference _)) &&
+              typeHasAbility? unit ns function.profile function.signature.generics typeId
+                .copy == some false
+          inferLocalAccessFrom unit ns withoutCopy root false state
+  { ns with expressions, places }
+
+/-- The places of a function's body that dereference a shared reference,
+ascending: those whose base's static type, against the function's locals,
+is a shared reference. -/
+def sharedDereferenceSites (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : FunctionDecl FunctionBody) : Array PlaceId :=
+  match declaration.body with
+  | .absent => #[]
+  | .structured root =>
+      let typeAt := fun index => ns.tables.types[index]?
+      if !declaration.locals.toList.any (fun entry =>
+          mayContainSharedReference typeAt (ns.tables.types.size + 1) entry.type.typeId) then
+        #[]
+      else
         let context : ScanContext := { locals := declaration.locals }
-        -- Type only sites owned by this body, not every namespace-wide
-        -- dereference against each function's unrelated local declarations.
-        (reachableDereferencesWith ns expressionAt placeAt root).filter fun (_, base) =>
-          (staticPlaceInfoFuel? unit ns context placeFuel base placeAt typeAt).any fun info =>
-            isSharedReferenceType ns info.typeId typeAt).toArray
+        let sites := (reachableDereferences ns root).filter fun (_, base) =>
+          (staticPlaceInfoFuel? unit ns context (ns.places.size + 1) base).any fun info =>
+            isSharedReferenceType ns info.typeId
+        ((sortByIndex sites).map fun (index, _) => (⟨index⟩ : PlaceId)).toArray
 
-/-- Unsorted, type-checked sites grouped by namespace and function. -/
-abbrev SharedReferenceErasureChunks := Array (Array (List (Nat × PlaceId)))
+/-- The places of a namespace that dereference a shared reference, indexed. -/
+def sharedDereferenceIndex (unit : ValidatedUnit) (namespaceId : NamespaceId) : KeyTree Unit :=
+  let places := unit.borrowCertificates.toList.foldl (init := []) fun places certificate =>
+    if certificate.namespaceId != namespaceId then places else
+    certificate.sharedDereferences.toList.foldl (init := places) fun places place =>
+      (place.index, ()) :: places
+  let distinct := (sortByIndex places).foldl (init := []) fun distinct entry =>
+    match distinct with
+    | last :: _ => if last.1 == entry.1 then distinct else entry :: distinct
+    | [] => [entry]
+  KeyTree.ofSorted distinct.reverse
 
-def sharedReferenceErasureChunks (marked : ValidatedUnit) : SharedReferenceErasureChunks :=
-  (marked.namespaces.toList.map fun ns => sharedNamespacePlaceCopyChunksWith marked ns
-    (arenaGet? ns.expressions) (arenaGet? ns.places) (arenaGet? ns.tables.types)).toArray
-
-/-- Proof-facing indexes of each namespace's expressions, places, and types,
-separate from the native array-based traversal. -/
-abbrev SharedReferenceErasureIndexes :=
-  List (IndexedArena Expr × IndexedArena Place × IndexedArena Ty)
-
-def sharedReferenceErasureIndexes (marked : ValidatedUnit) : SharedReferenceErasureIndexes :=
-  marked.namespaces.toList.map fun ns =>
-    (IndexedArena.ofArray ns.expressions, IndexedArena.ofArray ns.places,
-      IndexedArena.ofArray ns.tables.types)
-
-def sharedReferenceErasureChunksIndexed (marked : ValidatedUnit)
-    (indexes : SharedReferenceErasureIndexes) : SharedReferenceErasureChunks :=
-  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, places, types) =>
-    sharedNamespacePlaceCopyChunksWith marked ns expressions.get? places.get?
-      types.get?).toArray
-
-theorem sharedReferenceErasureChunksIndexed_eq (marked : ValidatedUnit) :
-    sharedReferenceErasureChunksIndexed marked (sharedReferenceErasureIndexes marked) =
-      sharedReferenceErasureChunks marked := by
-  unfold sharedReferenceErasureChunksIndexed sharedReferenceErasureIndexes
-    sharedReferenceErasureChunks
-  congr 1
-  induction marked.namespaces.toList with
-  | nil => rfl
-  | cons ns rest ih =>
-      simp only [List.map_cons, List.zip_cons_cons]
-      congr 1
-      · congr 1 <;> funext index <;>
-          simp [IndexedArena.get?_ofArray, arenaGet?_eq, arenaGetNative?]
-
-theorem sharedReferenceErasureChunks_eq_of_indexes {marked : ValidatedUnit}
-    {indexes : SharedReferenceErasureIndexes} {chunks : SharedReferenceErasureChunks}
-    (indexes_eq : sharedReferenceErasureIndexes marked = indexes)
-    (chunks_eq : sharedReferenceErasureChunksIndexed marked indexes = chunks) :
-    sharedReferenceErasureChunks marked = chunks := by
-  rw [← sharedReferenceErasureChunksIndexed_eq, indexes_eq, chunks_eq]
-
-/-- Ordered place-copy instructions, one list per namespace. -/
-abbrev SharedReferenceErasurePlan := Array (List (Nat × PlaceId))
-
-def erasurePlanFromChunks (chunks : SharedReferenceErasureChunks) : SharedReferenceErasurePlan :=
-  (chunks.toList.map fun namespaceChunks =>
-    namespaceChunks.toList.flatMap sortByIndex).toArray
-
-/-- Determine erasure sites before applying their arena updates. Naming this
-plan in certificates prevents traversal/type checking from being replayed
-while the kernel reduces sorting, updates, and final record equality. -/
-def sharedReferenceErasurePlan (marked : ValidatedUnit) : SharedReferenceErasurePlan :=
-  erasurePlanFromChunks (sharedReferenceErasureChunks marked)
-
-theorem sharedReferenceErasurePlan_eq_of_chunks {marked : ValidatedUnit}
-    {chunks : SharedReferenceErasureChunks} {plan : SharedReferenceErasurePlan}
-    (chunks_eq : sharedReferenceErasureChunks marked = chunks)
-    (plan_eq : erasurePlanFromChunks chunks = plan) :
-    sharedReferenceErasurePlan marked = plan := by
-  unfold sharedReferenceErasurePlan
-  rw [chunks_eq, plan_eq]
-
-/-- Erase shared references from a unit whose loan deaths are materialized.
-Keeping the two preparation stages separate lets certificates name the
-intermediate value instead of repeatedly reducing the loan-marking pass. -/
-abbrev ErasedExpressionArenas := Array (Array Expr)
-
-def erasedExpressionArenas (marked : ValidatedUnit) : ErasedExpressionArenas :=
-  (marked.namespaces.toList.map fun ns =>
-    eraseSharedValueOperations ns (arenaGet? ns.expressions)).toArray
-
-def erasedExpressionArenasIndexed (marked : ValidatedUnit)
-    (indexes : SharedReferenceErasureIndexes) : ErasedExpressionArenas :=
-  ((marked.namespaces.toList.zip indexes).map fun (ns, expressions, _, types) =>
-    eraseSharedValueOperations ns expressions.get? types.get?).toArray
-
-theorem erasedExpressionArenasIndexed_eq (marked : ValidatedUnit) :
-    erasedExpressionArenasIndexed marked (sharedReferenceErasureIndexes marked) =
-      erasedExpressionArenas marked := by
-  unfold erasedExpressionArenasIndexed sharedReferenceErasureIndexes erasedExpressionArenas
-  congr 1
-  induction marked.namespaces.toList with
-  | nil => rfl
-  | cons ns rest ih =>
-      simp only [List.map_cons, List.zip_cons_cons]
-      congr 1
-      congr 1 <;> funext index <;>
-        simp [IndexedArena.get?_ofArray, arenaGet?_eq, arenaGetNative?]
-
-theorem erasedExpressionArenas_eq_of_indexes {marked : ValidatedUnit}
-    {indexes : SharedReferenceErasureIndexes} {arenas : ErasedExpressionArenas}
-    (indexes_eq : sharedReferenceErasureIndexes marked = indexes)
-    (arenas_eq : erasedExpressionArenasIndexed marked indexes = arenas) :
-    erasedExpressionArenas marked = arenas := by
-  rw [← erasedExpressionArenasIndexed_eq, indexes_eq, arenas_eq]
-
-def applySharedReferenceErasureArenas (marked : ValidatedUnit)
-    (plan : SharedReferenceErasurePlan) (arenas : ErasedExpressionArenas) : ValidatedUnit :=
-  let namespaces := (marked.namespaces.toList.zipIdx.map fun (ns, index) =>
-    { ns with
-      expressions := arenas[index]?.getD #[]
-      places := applyPlaceCopies ns.places (plan[index]?.getD []) }).toArray
-  Internal.mkValidatedUnit marked.tables marked.profiles namespaces
-    marked.dependencies marked.evidence marked.indexes marked.structurizationWitnesses
-    marked.resolution marked.initializationCertificates marked.borrowCertificates
-    marked.borrowRejections
-
-def applySharedReferenceErasure (marked : ValidatedUnit)
-    (plan : SharedReferenceErasurePlan) : ValidatedUnit :=
-  applySharedReferenceErasureArenas marked plan (erasedExpressionArenas marked)
-
-theorem applySharedReferenceErasure_eq_of_arenas {marked prepared : ValidatedUnit}
-    {plan : SharedReferenceErasurePlan} {arenas : ErasedExpressionArenas}
-    (arenas_eq : erasedExpressionArenas marked = arenas)
-    (applied_eq : applySharedReferenceErasureArenas marked plan arenas = prepared) :
-    applySharedReferenceErasure marked plan = prepared := by
-  rw [applySharedReferenceErasure, arenas_eq, applied_eq]
-
-/-- Erase shared references using the plan computed from the marked unit. -/
-def eraseSharedReferences (marked : ValidatedUnit) : ValidatedUnit :=
-  applySharedReferenceErasure marked (sharedReferenceErasurePlan marked)
-
-theorem eraseSharedReferences_eq_of_plan {marked prepared : ValidatedUnit}
-    {plan : SharedReferenceErasurePlan}
-    (plan_eq : sharedReferenceErasurePlan marked = plan)
-    (apply_eq : applySharedReferenceErasure marked plan = prepared) :
-    eraseSharedReferences marked = prepared := by
-  unfold eraseSharedReferences
-  rw [plan_eq, apply_eq]
-
-/-- The semantic view of a validated unit: loan-death markers materialized
-and the shared-reference vocabulary erased. The validated unit itself stays
-the marker-free, erasure-free surface authority. -/
-def prepareSemantics (unit : ValidatedUnit) : ValidatedUnit × Array Diagnostic :=
-  let (marked, diagnostics) := markLoanDeaths unit
-  (eraseSharedReferences marked, diagnostics)
-
-/-- Compose kernel-checked certificates for the two preparation passes. -/
-theorem prepareSemantics_eq_of_stages {unit marked prepared : ValidatedUnit}
-    (mark_eq : (markLoanDeaths unit).1 = marked)
-    (erase_eq : eraseSharedReferences marked = prepared) :
-    (prepareSemantics unit).1 = prepared := by
-  change eraseSharedReferences (markLoanDeaths unit).1 = prepared
-  rw [mark_eq, erase_eq]
+/-- Whether the operand of the operation at a site is a shared reference. -/
+def sharedOperandAt (ns : ValidatedNamespace) (site : ExprId) : Bool :=
+  match ns.expressions[site.index]? with
+  | some { kind := .operation _ _ arguments _, .. } =>
+      sharedOperand ns (ns.expressions[·]?) (ns.tables.types[·]?) arguments
+  | _ => false
 
 /-- Check that every reachable runtime node has a classified, currently
 supported meaning and return the private interpreter input wrapper. -/
 def prepareExecution (registry : SemanticsRegistry) (unit : ValidatedUnit) :
-    Except (Array Diagnostic) ExecutableUnit :=
-  let diagnostics := prepareDiagnostics registry unit .execution
+    Except (Array Diagnostic) (ExecutableUnit unit) :=
+  let diagnostics := prepareDiagnostics registry unit .execution ++ loanDeathDiagnostics unit
   if diagnostics.any (·.severity == .error) then .error diagnostics
-  else
-    let (prepared, markerDiagnostics) := prepareSemantics unit
-    if markerDiagnostics.any (·.severity == .error) then .error markerDiagnostics
-    else .ok (.mk prepared registry (targetPointerWidth? unit)
-      unit.initializationCertificates unit.borrowCertificates)
+  else if typed : StaticTyping.checkUnit unit (targetPointerWidth? unit) = true then
+    .ok (.mk registry (targetPointerWidth? unit)
+      unit.initializationCertificates unit.borrowCertificates typed rfl)
+  else .error ((StaticTyping.unitFailures unit (targetPointerWidth? unit)).map
+    (Diagnostic.error "LIR-STATIC-TYPE" ·))
 
 /-- Check that every reachable body and specification node has a classified,
 currently supported logical meaning and return the private verifier input
 wrapper. -/
 def prepareVerification (registry : SemanticsRegistry) (unit : ValidatedUnit) :
     Except (Array Diagnostic) VerifiableUnit :=
-  let diagnostics := prepareDiagnostics registry unit .verification
+  let diagnostics := prepareDiagnostics registry unit .verification ++ loanDeathDiagnostics unit
   if diagnostics.any (·.severity == .error) then .error diagnostics
-  else
-    let (prepared, markerDiagnostics) := prepareSemantics unit
-    if markerDiagnostics.any (·.severity == .error) then .error markerDiagnostics
-    else .ok (.mk prepared registry (targetPointerWidth? unit)
-      unit.initializationCertificates unit.borrowCertificates)
+  else .ok (.mk unit registry (targetPointerWidth? unit)
+    unit.initializationCertificates unit.borrowCertificates)
 
 /-! ## Projections of a prepared unit
 
 A verification statement can quantify over the prepared unit and pin only
-what its proof needs: the validated unit it was prepared from, and the
-target pointer width that preparation selected. -/
-
-theorem prepareExecution_unit {registry : SemanticsRegistry} {unit : ValidatedUnit}
-    {executable : ExecutableUnit}
-    (prepared : prepareExecution registry unit = .ok executable) :
-    executable.unit = (prepareSemantics unit).1 := by
-  unfold prepareExecution at prepared
-  simp only [] at prepared
-  split at prepared
-  · cases prepared
-  · split at prepared
-    · cases prepared
-    · cases prepared; rfl
+what its proof needs: the registry it was prepared under, and the target
+pointer width that preparation selected. -/
 
 theorem prepareExecution_semantics {registry : SemanticsRegistry}
-    {unit : ValidatedUnit} {executable : ExecutableUnit}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     (prepared : prepareExecution registry unit = .ok executable) :
     executable.semantics = registry := by
   unfold prepareExecution at prepared
@@ -4805,11 +5054,11 @@ theorem prepareExecution_semantics {registry : SemanticsRegistry}
   split at prepared
   · cases prepared
   · split at prepared
-    · cases prepared
     · cases prepared; rfl
+    · cases prepared
 
 theorem prepareExecution_targetPointerWidth {registry : SemanticsRegistry}
-    {unit : ValidatedUnit} {executable : ExecutableUnit}
+    {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     (prepared : prepareExecution registry unit = .ok executable) :
     executable.targetPointerWidth = targetPointerWidth? unit := by
   unfold prepareExecution at prepared
@@ -4817,7 +5066,7 @@ theorem prepareExecution_targetPointerWidth {registry : SemanticsRegistry}
   split at prepared
   · cases prepared
   · split at prepared
-    · cases prepared
     · cases prepared; rfl
+    · cases prepared
 
 end LeanerIR.Validation

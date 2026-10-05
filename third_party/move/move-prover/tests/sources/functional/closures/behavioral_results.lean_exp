@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+behavioral_results.lean:71:13: error: LEANER-SPEC-ARITY: behavior predicate expects 2 value argument(s), got 1

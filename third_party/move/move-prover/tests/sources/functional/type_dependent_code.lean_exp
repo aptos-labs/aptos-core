@@ -1,0 +1,638 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+case h_2.continues
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+Θ✝ : LeanerIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (LeanerIR.TypeId × LeanerIR.TypeId)
+frame✝ :
+  LeanerIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } } 1
+    typeInstantiation✝
+account : LeanerIR.Proofs.Denote.NTy.signer.carrier
+x : (LeanerIR.Proofs.Denote.NTy.param 0).carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value)
+      (fun result final =>
+        ¬((initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true ∨
+            (initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true))
+      (fun failure =>
+        LeanerIR.Proofs.Obligation "type_dependent_code.lean" 365 405
+            ((initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true) ∨
+          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 410 451
+            ((initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true))
+      state
+leanerAnchor✝ : LeanerIR.Proofs.Denote.AnchorSaved 9 (some account, some x, ()) initialState✝
+leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (LeanerIR.Proofs.Denote.Term.memoryWritten 9) env)
+            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+          fun x env =>
+          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (((LeanerIR.Proofs.Denote.Term.globalPublish 35
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                        LeanerIR.Proofs.Denote.NRow.nil)
+                      (LeanerIR.Proofs.Denote.Term.var LeanerIR.Proofs.Denote.Var.here)
+                      (LeanerIR.Proofs.Denote.Term.pack { namespaceId := { index := 0 }, structId := 0 }
+                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                          LeanerIR.Proofs.Denote.NRow.nil)
+                        (LeanerIR.Proofs.Denote.Args.cons (LeanerIR.Proofs.Denote.Term.lit { val := 0, fits := ⋯ })
+                          LeanerIR.Proofs.Denote.Args.nil))).seqAfter
+                  (LeanerIR.Proofs.Denote.Term.memoryWritten 35)).drop
+              (LeanerIR.Proofs.Denote.Term.lit ()))
+            env)
+        leanerContinuation✝¹
+        (fun failure =>
+          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 365 405
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true) ∨
+            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 410 451
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true))
+        state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+x✝¹ :
+  Option
+    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
+      (LeanerIR.Proofs.Denote.Skolems.resource
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)))
+heq✝¹ :
+  initialState✝
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account) =
+    none
+invariantHolds✝¹ : True
+leanerAnchor :
+  LeanerIR.Proofs.Denote.AnchorSaved 35 (some account, some x, ())
+    (initialState✝.set
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account)
+      (some
+        (LeanerIR.Proofs.Denote.Skolems.toRuntime
+          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+          (x, ()))))
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (LeanerIR.Proofs.Denote.Term.memoryWritten 35) env)
+            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+          fun x env =>
+          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (LeanerIR.Proofs.Denote.Term.lit ()) env)
+        leanerContinuation✝¹
+        (fun failure =>
+          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 365 405
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true) ∨
+            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 410 451
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true))
+        state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+x✝ :
+  Option
+    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
+      (LeanerIR.Proofs.Denote.Skolems.resource
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false) LeanerIR.Proofs.Denote.NRow.nil)
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false) LeanerIR.Proofs.Denote.NRow.nil))
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false) LeanerIR.Proofs.Denote.NRow.nil)))
+heq✝ :
+  initialState✝.set
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account)
+      (some
+        (LeanerIR.Proofs.Denote.Skolems.toRuntime
+          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+          (x, ())))
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons
+            (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account) =
+    none
+invariantHolds✝ : True
+⊢ initialState✝
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
+                LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons
+            (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account) =
+    none
+tests/sources/functional/type_dependent_code.move:11:9: error: the specification clause `aborts_if exists<S<X> >(account.address)` is not established
+tests/sources/functional/type_dependent_code.move:12:9: error: the specification clause `aborts_if exists<S<u8> >(account.address)` is not established
+tests/sources/functional/type_dependent_code.move:10:5: error: leaner verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves)
+tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+case h_2.continues
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+Θ✝ : LeanerIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (LeanerIR.TypeId × LeanerIR.TypeId)
+frame✝ :
+  LeanerIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 1 } } 2
+    typeInstantiation✝
+account : LeanerIR.Proofs.Denote.NTy.signer.carrier
+t1 : (LeanerIR.Proofs.Denote.NTy.param 0).carrier
+t2 : (LeanerIR.Proofs.Denote.NTy.param 1).carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value)
+      (fun result final =>
+        ¬((initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true ∨
+            (initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true))
+      (fun failure =>
+        LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1006 1047
+            ((initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true) ∨
+          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1052 1093
+            ((initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.Skolems.resolve
+                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                            LeanerIR.Proofs.Denote.NRow.nil)
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                            LeanerIR.Proofs.Denote.NRow.nil)),
+                    arguments :=
+                      LeanerIR.Proofs.Denote.NRow.cons
+                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
+                        LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address account)).isSome =
+              true))
+      state
+leanerAnchor✝ : LeanerIR.Proofs.Denote.AnchorSaved 495 (some account, some t1, some t2, ()) initialState✝
+leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (LeanerIR.Proofs.Denote.Term.memoryWritten 495) env)
+            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+          fun x env =>
+          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (((LeanerIR.Proofs.Denote.Term.globalPublish 629
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                        LeanerIR.Proofs.Denote.NRow.nil)
+                      (LeanerIR.Proofs.Denote.Term.var LeanerIR.Proofs.Denote.Var.here)
+                      (LeanerIR.Proofs.Denote.Term.pack { namespaceId := { index := 0 }, structId := 0 }
+                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                          LeanerIR.Proofs.Denote.NRow.nil)
+                        (LeanerIR.Proofs.Denote.Args.cons
+                          (LeanerIR.Proofs.Denote.Term.var LeanerIR.Proofs.Denote.Var.here.there.there)
+                          LeanerIR.Proofs.Denote.Args.nil))).seqAfter
+                  (LeanerIR.Proofs.Denote.Term.memoryWritten 629)).drop
+              (LeanerIR.Proofs.Denote.Term.lit ()))
+            env)
+        leanerContinuation✝¹
+        (fun failure =>
+          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1006 1047
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true) ∨
+            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1052 1093
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true))
+        state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+x✝¹ :
+  Option
+    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
+      (LeanerIR.Proofs.Denote.Skolems.resource
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)))
+heq✝¹ :
+  initialState✝
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account) =
+    none
+invariantHolds✝¹ : True
+leanerAnchor :
+  LeanerIR.Proofs.Denote.AnchorSaved 629 (some account, some t1, some t2, ())
+    (initialState✝.set
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account)
+      (some
+        (LeanerIR.Proofs.Denote.Skolems.toRuntime
+          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+          (t1, ()))))
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | LeanerIR.Proofs.Denote.Flow.value value env =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (LeanerIR.Proofs.Denote.Term.memoryWritten 629) env)
+            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+          fun x env =>
+          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (LeanerIR.Proofs.Denote.Term.lit ()) env)
+        leanerContinuation✝¹
+        (fun failure =>
+          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1006 1047
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true) ∨
+            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1052 1093
+              ((initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.Skolems.resolve
+                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
+                              LeanerIR.Proofs.Denote.NRow.nil)),
+                      arguments :=
+                        LeanerIR.Proofs.Denote.NRow.cons
+                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
+                          LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address account)).isSome =
+                true))
+        state
+    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
+    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
+    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
+      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+x✝ :
+  Option
+    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
+      (LeanerIR.Proofs.Denote.Skolems.resource
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil))
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
+heq✝ :
+  initialState✝.set
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account)
+      (some
+        (LeanerIR.Proofs.Denote.Skolems.toRuntime
+          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+          (t1, ())))
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account) =
+    none
+invariantHolds✝ : True
+⊢ initialState✝
+      {
+        type :=
+          LeanerIR.Proofs.Denote.Skolems.resolve
+            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)),
+        arguments :=
+          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
+            LeanerIR.Proofs.Denote.NRow.nil }
+      (LeanerIR.StorageKey.address account) =
+    none
+tests/sources/functional/type_dependent_code.move:27:9: error: the specification clause `aborts_if exists<S<T1> >(account.address)` is not established
+tests/sources/functional/type_dependent_code.move:28:9: error: the specification clause `aborts_if exists<S<T2> >(account.address)` is not established
+tests/sources/functional/type_dependent_code.move:26:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by skip` shows the obligations it leaves)
+tests/sources/functional/type_dependent_code.move:49:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/type_dependent_code.move:49:5: error: leaner verification failed: the automatic verification of `test1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
+tests/sources/functional/type_dependent_code.move:65:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by skip` shows the obligations it leaves)

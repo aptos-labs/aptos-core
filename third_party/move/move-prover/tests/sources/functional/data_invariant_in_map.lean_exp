@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/data_invariant_in_map.move:15:5: error: `no_violation` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it

@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/References/BorrowErrors.lean:92:0: error: the borrow analysis rejects the unit, so preparation refuses it:
+LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan

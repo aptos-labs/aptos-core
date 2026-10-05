@@ -5,7 +5,8 @@
 # read from the tree at the benchmarked commit. Paths are relative to the
 # repository root. A problem is `move` (modules of an in-tree package),
 # `lean` (a LeanerLang file), or `rust` (a Rust file with its specification).
-# `inputs` lists further paths whose change changes the problem; `repeat`
+# `inputs` lists further paths whose change changes the problem; `dev`
+# compiles a Move package in dev mode (its `[dev-addresses]`); `repeat`
 # runs a small problem several times and keeps the median; `timeout` is in
 # seconds (20 minutes by default).
 
@@ -156,6 +157,58 @@ kind = "move"
 package = "aptos-move/framework/aptos-framework"
 modules = ["aptos_framework::ordered_map"]
 inputs = ["aptos-move/framework/move-stdlib", "aptos-move/framework/aptos-stdlib"]
+
+# ## Benchmark package (bench/package)
+
+[[problem]]
+name = "storage"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::storage"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+[[problem]]
+name = "behavior"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::behavior"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+[[problem]]
+name = "closures"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::closures"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+[[problem]]
+name = "closure_loop"
+kind = "move"
+package = "third_party/move/lean/bench/package"
+modules = ["bench::closure_loop"]
+inputs = ["aptos-move/framework/move-stdlib"]
+repeat = 3
+
+# ## Higher-order paper (move-prover/doc/higher-order-paper-26/examples)
+
+[[problem]]
+name = "amm"
+kind = "move"
+package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
+modules = ["0x42::amm"]
+dev = true
+inputs = ["third_party/move/move-stdlib"]
+
+[[problem]]
+name = "calculator"
+kind = "move"
+package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
+modules = ["0x42::calculator"]
+dev = true
+inputs = ["third_party/move/move-stdlib"]
 
 # ## LeanerLang
 

@@ -37,16 +37,28 @@ leaner module 0x42::move2_index where
   public fun storage_borrow_mut(address : Address) -> &mut Resource :=
     &mut Resource[address]
 
+  spec storage_borrow_mut where
+    modifies *
+
   public fun storage_borrow_field(address : Address) -> &u64 :=
     &Resource[address].value
 
   public fun storage_borrow_mut_field(address : Address) -> &mut u64 :=
     &mut Resource[address].value
 
+  spec storage_borrow_mut_field where
+    modifies *
+
   public fun storage_write(address : Address, value : u64) -> Unit :=
     Resource[address].value := value
+
+  spec storage_write where
+    modifies *
 
   public fun storage_write_resource(
     address : Address, value : Resource
   ) -> Unit :=
     Resource[address] := value
+
+  spec storage_write_resource where
+    modifies *

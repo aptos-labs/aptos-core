@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/behavior_axiom_shared_result.move:24:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/behavior_axiom_shared_result.move:23:5: error: leaner verification failed: the automatic verification of `shared_result` failed; provide a proof: `verify shared_result by …` in `tests/sources/regression/behavior_axiom_shared_result.proof.lean` (`verify shared_result by skip` shows the obligations it leaves)
+tests/sources/regression/behavior_axiom_shared_result.move:42:9: error: the specification clause `ensures result == true` is not established
+tests/sources/regression/behavior_axiom_shared_result.move:41:5: error: leaner verification failed: the automatic verification of `distinct_results` failed; provide a proof: `verify distinct_results by …` in `tests/sources/regression/behavior_axiom_shared_result.proof.lean` (`verify distinct_results by skip` shows the obligations it leaves)

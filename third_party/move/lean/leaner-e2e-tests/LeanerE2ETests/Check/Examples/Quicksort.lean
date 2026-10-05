@@ -213,8 +213,8 @@ leaner module 0x42::quicksort where
       | omega
       | assumption
       | leaner_denote_instance
-      | (rw [‹∀ x : LeanerIR.RuntimeValue, count.spec
-            (LeanerIR.RuntimeValue.vector (Array.map _ _), x, _, _, ()) = _›]
+      | (rw [‹∀ x : (LeanerIR.Proofs.Denote.NTy.param 0).carrier, count.spec
+            (LeanerIR.RuntimeValue.vector (Array.map _ _), _, _, _, ()) = _›]
          symm
          apply count_swap_found <;> first | assumption | omega)
     -- The pivot is the original vector's element at the pivot position.
@@ -362,21 +362,25 @@ leaner module 0x42::quicksort where
   open LeanerIR Classical in
   /-- The counts of a sorted range: partition, then the two recursive sorts. -/
   theorem sort_counts {α : Type} (f : α → RuntimeValue) (v P L R : Array α) (low high p : Int)
-      (cvP : ∀ x, count.spec (.vector (Array.map f v), x, low, high, ()) =
-        count.spec (.vector (Array.map f P), x, low, high, ()))
-      (cPL : ∀ x, count.spec (.vector (Array.map f P), x, low, p, ()) =
-        count.spec (.vector (Array.map f L), x, low, p, ()))
+      (cvP : ∀ a, count.spec (.vector (Array.map f v), f a, low, high, ()) =
+        count.spec (.vector (Array.map f P), f a, low, high, ()))
+      (cPL : ∀ a, count.spec (.vector (Array.map f P), f a, low, p, ()) =
+        count.spec (.vector (Array.map f L), f a, low, p, ()))
       (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
         (Option.map f L[i.toNat]?).getD .unit = (Option.map f P[i.toNat]?).getD .unit)
-      (cLR : ∀ x, count.spec (.vector (Array.map f L), x, p + 1, high, ()) =
-        count.spec (.vector (Array.map f R), x, p + 1, high, ()))
+      (cLR : ∀ a, count.spec (.vector (Array.map f L), f a, p + 1, high, ()) =
+        count.spec (.vector (Array.map f R), f a, p + 1, high, ()))
       (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
         (Option.map f R[i.toNat]?).getD .unit = (Option.map f L[i.toNat]?).getD .unit)
       (sP : (P.size : Int) = v.size) (sL : (L.size : Int) = P.size) (hhigh : high ≤ v.size)
       (hlow : 0 ≤ low) (hp : low ≤ p) (hp2 : p ≤ high - 1) :
-      ∀ x, count.spec (.vector (Array.map f v), x, low, high, ()) =
-        count.spec (.vector (Array.map f R), x, low, high, ()) := by
-    intro x
+      ∀ a, count.spec (.vector (Array.map f v), f a, low, high, ()) =
+        count.spec (.vector (Array.map f R), f a, low, high, ()) := by
+    intro a
+    have cvP := cvP a
+    have cPL := cPL a
+    have cLR := cLR a
+    generalize f a = x at cvP cPL cLR ⊢
     have upper : count.spec (.vector (Array.map f P), x, p, high, ()) =
         count.spec (.vector (Array.map f L), x, p, high, ()) :=
       count_congr _ _ x p _ high rfl fun i h1 h2 => by
@@ -387,25 +391,29 @@ leaner module 0x42::quicksort where
       count_congr _ _ x low _ (p + 1) rfl fun i h1 h2 => by
         simp only [Array.getElem?_map]
         exact hLR i (by omega) (by omega) (Or.inl h2)
-    rw [cvP x, count_split _ x low p _ high rfl hp (by omega),
-      count_split (Array.map f R) x low (p + 1) _ high rfl (by omega) (by omega), cPL x, upper,
-      lower, ← cLR x, ← count_split _ x low p _ high rfl hp (by omega),
+    rw [cvP, count_split _ x low p _ high rfl hp (by omega),
+      count_split (Array.map f R) x low (p + 1) _ high rfl (by omega) (by omega), cPL, upper,
+      lower, ← cLR, ← count_split _ x low p _ high rfl hp (by omega),
       ← count_split _ x low (p + 1) _ high rfl (by omega) (by omega)]
 
   open LeanerIR Classical in
   /-- An element of a range whose counts are those of another range is an
   element of that one. -/
   theorem element_of_counts {α : Type} (f : α → RuntimeValue) (xs ys : Array α) (lo hi i : Int)
-      (counts : ∀ x, count.spec (.vector (Array.map f xs), x, lo, hi, ()) =
-        count.spec (.vector (Array.map f ys), x, lo, hi, ()))
-      (h1 : lo ≤ i) (h2 : i < hi) :
+      (counts : ∀ a, count.spec (.vector (Array.map f xs), f a, lo, hi, ()) =
+        count.spec (.vector (Array.map f ys), f a, lo, hi, ()))
+      (h0 : 0 ≤ lo) (h1 : lo ≤ i) (h2 : i < hi) (hsize : hi ≤ ys.size) :
       ∃ k : Int, lo ≤ k ∧ k < hi ∧
         (Option.map f xs[k.toNat]?).getD .unit = (Option.map f ys[i.toNat]?).getD .unit := by
     have pos := count_pos (Array.map f ys) lo i _ hi rfl h1 h2
-    rw [← counts] at pos
+    -- The element is in range, so it is a value of the element type.
+    have inRange : i.toNat < ys.size := by omega
+    have element : (Array.map f ys)[i.toNat]?.getD .unit = f ys[i.toNat] := by
+      simp [Array.getElem?_eq_getElem inRange]
+    rw [element, ← counts] at pos
     obtain ⟨k, k1, k2, k3⟩ := exists_of_count_pos _ _ lo _ hi rfl pos
     simp only [Array.getElem?_map] at k3
-    exact ⟨k, k1, k2, k3⟩
+    exact ⟨k, k1, k2, k3.trans (by simp [Array.getElem?_eq_getElem inRange])⟩
 
   open LeanerIR Classical in
   /-- The order of a sorted range: partition, then the two recursive sorts. -/
@@ -416,12 +424,12 @@ leaner module 0x42::quicksort where
         order ((Option.map f P[i.toNat]?).getD .unit) pivot = .lt)
       (above : ∀ i : Int, p < i → i ≤ high - 1 →
         ¬order ((Option.map f P[i.toNat]?).getD .unit) pivot = .lt)
-      (cPL : ∀ x, count.spec (.vector (Array.map f P), x, low, p, ()) =
-        count.spec (.vector (Array.map f L), x, low, p, ()))
+      (cPL : ∀ a, count.spec (.vector (Array.map f P), f a, low, p, ()) =
+        count.spec (.vector (Array.map f L), f a, low, p, ()))
       (hPL : ∀ i : Int, 0 ≤ i → i < P.size → i < low ∨ p ≤ i →
         (Option.map f L[i.toNat]?).getD .unit = (Option.map f P[i.toNat]?).getD .unit)
-      (cLR : ∀ x, count.spec (.vector (Array.map f L), x, p + 1, high, ()) =
-        count.spec (.vector (Array.map f R), x, p + 1, high, ()))
+      (cLR : ∀ a, count.spec (.vector (Array.map f L), f a, p + 1, high, ()) =
+        count.spec (.vector (Array.map f R), f a, p + 1, high, ()))
       (hLR : ∀ i : Int, 0 ≤ i → i < L.size → i < p + 1 ∨ high ≤ i →
         (Option.map f R[i.toNat]?).getD .unit = (Option.map f L[i.toNat]?).getD .unit)
       (sortedL : ∀ i j : Int, low ≤ i → i < j → j < p →
@@ -430,8 +438,8 @@ leaner module 0x42::quicksort where
       (sortedR : ∀ i j : Int, p + 1 ≤ i → i < j → j < high →
         ¬order ((Option.map f R[i.toNat]?).getD .unit) ((Option.map f R[j.toNat]?).getD .unit) =
           .gt)
-      (sL : (L.size : Int) = P.size) (sP : high ≤ P.size) (hlow : 0 ≤ low) (hp : low ≤ p)
-      (hp2 : p ≤ high - 1) :
+      (sL : (L.size : Int) = P.size) (sR : (R.size : Int) = L.size) (sP : high ≤ P.size)
+      (hlow : 0 ≤ low) (hp : low ≤ p) (hp2 : p ≤ high - 1) :
       ∀ i j : Int, low ≤ i → i < j → j < high →
         ¬order ((Option.map f R[i.toNat]?).getD .unit) ((Option.map f R[j.toNat]?).getD .unit) =
           .gt := by
@@ -441,7 +449,7 @@ leaner module 0x42::quicksort where
         order ((Option.map f R[k.toNat]?).getD .unit) pivot = .lt := by
       intro k h1 h2
       rw [hLR k (by omega) (by omega) (Or.inl (by omega))]
-      obtain ⟨k', k1, k2, k3⟩ := element_of_counts f P L low p k cPL h1 h2
+      obtain ⟨k', k1, k2, k3⟩ := element_of_counts f P L low p k cPL hlow h1 h2 (by omega)
       rw [← k3]
       exact below k' k1 k2
     have atPivot : (Option.map f R[p.toNat]?).getD .unit = pivot := by
@@ -450,7 +458,7 @@ leaner module 0x42::quicksort where
     have upperPart : ∀ k : Int, p + 1 ≤ k → k < high →
         ¬order pivot ((Option.map f R[k.toNat]?).getD .unit) = .gt := by
       intro k h1 h2
-      obtain ⟨k', k1, k2, k3⟩ := element_of_counts f L R (p + 1) high k cLR h1 h2
+      obtain ⟨k', k1, k2, k3⟩ := element_of_counts f L R (p + 1) high k cLR (by omega) h1 h2 (by omega)
       rw [← k3, hPL k' (by omega) (by omega) (Or.inr (by omega)), Std.OrientedCmp.gt_iff_lt]
       exact above k' (by omega) (by omega)
     intro i j hi hij hj

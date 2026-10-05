@@ -279,6 +279,19 @@ def specMatchFuel : Nat → (sourceNs : ValidatedNamespace) → (logical : Bool)
               (sourceElements.zip targetElements).foldlM (init := solution)
                 fun solution pair =>
                   specMatchFuel fuel sourceNs logical pair.1 targetNs pair.2 bindLoc solution
+          -- A function value is read at the projection of its signature,
+          -- and abilities constrain no specification content.
+          | some (.function sourceArguments sourceResult _),
+              some (.function targetArguments targetResult _) =>
+              if sourceArguments.size != targetArguments.size then none else do
+              let solution ← (sourceArguments.zip targetArguments).foldlM (init := solution)
+                fun solution pair =>
+                  specMatchFuel fuel sourceNs logical pair.1 targetNs pair.2 bindLoc solution
+              specMatchFuel fuel sourceNs logical sourceResult targetNs targetResult bindLoc solution
+          -- So is a vector, at the projection of its elements.
+          | some (.vector sourceElement none), some (.vector targetElement none) =>
+              specMatchFuel fuel sourceNs logical sourceElement targetNs targetElement bindLoc
+                solution
           | _, _ => none) <|>
         (match sourceNs.tables.types[source.index]? with
           | some (.reference reference) =>
@@ -291,14 +304,13 @@ def specMatchFuel : Nat → (sourceNs : ValidatedNamespace) → (logical : Bool)
                 bindLoc solution
           | some (.integer ..) =>
               if isAnyIntegerType sourceNs source then some solution else none
+          -- A bound type parameter matches what its instantiation matches.
           | some (.typeParameter index) =>
-              if isAnyIntegerType sourceNs source &&
-                  ((solution.slots[index]?).any fun slot => slot.any fun
-                    | .typeArg use =>
-                        (sourceNs.tables.types[use.typeId.index]?).any fun ty =>
-                          (ty matches .integer ..)
-                    | _ => false) then some solution
-              else none
+              match (solution.slots[index]?).bind id with
+              | some (.typeArg use) =>
+                  if use.typeId == source then none else
+                  specMatchFuel fuel sourceNs logical source sourceNs use.typeId bindLoc solution
+              | _ => none
           | _ => none))
 
 def specMatch (sourceNs : ValidatedNamespace) (logical : Bool) (source : TypeId)

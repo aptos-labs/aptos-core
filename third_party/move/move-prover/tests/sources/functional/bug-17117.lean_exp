@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/bug-17117.move:65:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/bug-17117.move:65:5: error: leaner verification failed: the automatic verification of `get_s_error` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify get_s_error by …` in `tests/sources/functional/bug-17117.proof.lean` (`verify get_s_error by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/bug-17117.move:72:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/bug-17117.move:72:5: error: leaner verification failed: the automatic verification of `get_s_no_error` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify get_s_no_error by …` in `tests/sources/functional/bug-17117.proof.lean` (`verify get_s_no_error by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/bug-17117.move:82:13: error: the assertion `r.x == y` does not hold
+tests/sources/functional/bug-17117.move:79:5: error: leaner verification failed: the automatic verification of `test_input_param_as_mut_ref` failed; provide a proof: `verify test_input_param_as_mut_ref by …` in `tests/sources/functional/bug-17117.proof.lean` (`verify test_input_param_as_mut_ref by skip` shows the obligations it leaves)

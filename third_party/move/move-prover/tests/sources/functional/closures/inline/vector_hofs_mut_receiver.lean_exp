@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:55:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:55:5: error: leaner verification failed: the automatic verification of `bump_field` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify bump_field by …` in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean` (`verify bump_field by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:71:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:71:5: error: leaner verification failed: the automatic verification of `bump_resource` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify bump_resource by …` in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean` (`verify bump_resource by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/vector_hofs_mut_receiver.move:103:5: error: leaner verification failed: the automatic verification of `bump_field_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify bump_field_wrong by …` in `tests/sources/functional/closures/inline/vector_hofs_mut_receiver.proof.lean` (`verify bump_field_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

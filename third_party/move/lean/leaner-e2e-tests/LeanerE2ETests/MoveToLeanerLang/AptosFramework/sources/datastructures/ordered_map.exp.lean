@@ -140,7 +140,7 @@ leaner module aptos_framework::ordered_map where
   -/
   @[map_is_empty (OrderedMap)]
   public fun is_empty {K} {V}(self : &OrderedMap<K, V>) -> Bool :=
-    self.entries.is_empty()
+    self.entries.length == 0
 
   spec is_empty where
     pragma intrinsic
@@ -159,7 +159,10 @@ leaner module aptos_framework::ordered_map where
       index >= len || &self.entries[index].key != &key,
       invalid_argument(EKEY_ALREADY_EXISTS)
     )
-    self.entries.insert(index, new Entry<K, V> { key, value })
+    let _t9 := &mut self.entries
+    let _t11 := new Entry<K, V> { key, value }
+    assert!(_t9.length >= index, 131072)
+    *_t9 := core.prim.insertVector(*_t9, index, _t11)
 
   spec add where
     pragma intrinsic
@@ -180,7 +183,10 @@ leaner module aptos_framework::ordered_map where
         self.entries.replace(index, new Entry<K, V> { key, value })
       some(old_value)
     else
-      self.entries.insert(index, new Entry<K, V> { key, value })
+      let _t12 := &mut self.entries
+      let _t14 := new Entry<K, V> { key, value }
+      assert!(_t12.length >= index, 131072)
+      *_t12 := core.prim.insertVector(*_t12, index, _t14)
       none::<V>()
 
   spec upsert where
@@ -223,11 +229,11 @@ leaner module aptos_framework::ordered_map where
     if index < len && key == &self.entries[index].key then
       let Entry<K, V> { key := _, value := value } :=
         do
-          let _t27 := &mut self.entries
-          assert!(_t27.length > index, 131072)
-          let (_t28, _t29) := core.prim.removeVector(*_t27, index)
-          *_t27 := _t29
-          _t28
+          let _t45 := &mut self.entries
+          assert!(_t45.length > index, 131072)
+          let (_t46, _t47) := core.prim.removeVector(*_t45, index)
+          *_t45 := _t47
+          _t46
       some(value)
     else none::<V>()
 
@@ -312,8 +318,8 @@ leaner module aptos_framework::ordered_map where
     self : &mut OrderedMap<K, V>, keys : Vector<K>, values : Vector<V>
   ) -> Unit := do
     let mut (self', v2) := (keys, values)
-    self'.reverse()
-    v2.reverse()
+    self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
+    v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
     spec assume folds_capture_anchor!(79)
     let len := self'.length
@@ -321,17 +327,17 @@ leaner module aptos_framework::ordered_map where
     while len > 0 do
       let (e1, e2) :=
         (do
-            let _t6 := &mut self'
-            if _t6.length == 0 then moveVectorError(2)
-            let (_t7, _t8) := core.prim.removeVector(*_t6, _t6.length - 1)
-            *_t6 := _t8
-            _t7,
+            let _t15 := &mut self'
+            if _t15.length == 0 then moveVectorError(2)
+            let (_t16, _t17) := core.prim.removeVector(*_t15, _t15.length - 1)
+            *_t15 := _t17
+            _t16,
           do
-            let _t9 := &mut v2
-            if _t9.length == 0 then moveVectorError(2)
-            let (_t10, _t11) := core.prim.removeVector(*_t9, _t9.length - 1)
-            *_t9 := _t11
-            _t10)
+            let _t18 := &mut v2
+            if _t18.length == 0 then moveVectorError(2)
+            let (_t19, _t20) := core.prim.removeVector(*_t18, _t18.length - 1)
+            *_t18 := _t20
+            _t19)
       let (key, value) := (e1, e2)
       self.add(key, value)
       len := len - 1
@@ -362,8 +368,8 @@ leaner module aptos_framework::ordered_map where
     self : &mut OrderedMap<K, V>, keys : Vector<K>, values : Vector<V>
   ) -> Unit := do
     let mut (self', v2) := (keys, values)
-    self'.reverse()
-    v2.reverse()
+    self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
+    v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
     spec assume folds_capture_anchor!(97)
     let len := self'.length
@@ -371,17 +377,17 @@ leaner module aptos_framework::ordered_map where
     while len > 0 do
       let (e1, e2) :=
         (do
-            let _t33 := &mut self'
-            if _t33.length == 0 then moveVectorError(2)
-            let (_t34, _t35) := core.prim.removeVector(*_t33, _t33.length - 1)
-            *_t33 := _t35
-            _t34,
+            let _t51 := &mut self'
+            if _t51.length == 0 then moveVectorError(2)
+            let (_t52, _t53) := core.prim.removeVector(*_t51, _t51.length - 1)
+            *_t51 := _t53
+            _t52,
           do
-            let _t36 := &mut v2
-            if _t36.length == 0 then moveVectorError(2)
-            let (_t37, _t38) := core.prim.removeVector(*_t36, _t36.length - 1)
-            *_t36 := _t38
-            _t37)
+            let _t54 := &mut v2
+            if _t54.length == 0 then moveVectorError(2)
+            let (_t55, _t56) := core.prim.removeVector(*_t54, _t54.length - 1)
+            *_t54 := _t56
+            _t55)
       let (key, value) := (e1, e2)
       self.upsert(key, value)
       len := len - 1
@@ -412,6 +418,7 @@ leaner module aptos_framework::ordered_map where
     self : &mut OrderedMap<K, V>, other : OrderedMap<K, V>
   ) -> Unit := do
     self.append_impl(other)
+    ()
 
   spec append where
     pragma intrinsic
@@ -440,11 +447,12 @@ leaner module aptos_framework::ordered_map where
     let mut OrderedMap<K, V>::SortedVectorMap { entries := other_entries } :=
       other
     let mut overwritten := vector<Entry<K, V> >[]
-    if other_entries.is_empty() then
+    if other_entries.length == 0 then
       core.prim.destroyEmptyVector(other_entries)
       return overwritten;
-    if self.entries.is_empty() then
-      self.entries.append(other_entries)
+    if self.entries.length == 0 then
+      let _t21 := &mut self.entries
+      *_t21 := core.prim.concatVector(*_t21, other_entries)
       return overwritten;
     if is_lt(
       &compare(
@@ -453,7 +461,8 @@ leaner module aptos_framework::ordered_map where
           let _ := core.prim.checkVectorIndex[moveVectorError](other_entries, 0)
           core.borrowPlace(immutable, other_entries[0])).key)
     ) then
-      self.entries.append(other_entries)
+      let _t22 := &mut self.entries
+      *_t22 := core.prim.concatVector(*_t22, other_entries)
       return overwritten;
     let mut reverse_result := vector<Entry<K, V> >[]
     let cur_i := self.entries.length - 1
@@ -472,13 +481,14 @@ leaner module aptos_framework::ordered_map where
         reverse_result := core.prim.pushVector(
           reverse_result,
           do
-            let _t12 := &mut self.entries
-            if _t12.length == 0 then moveVectorError(2)
-            let (_t13, _t14) := core.prim.removeVector(*_t12, _t12.length - 1)
-            *_t12 := _t14
-            _t13)
+            let _t23 := &mut self.entries
+            if _t23.length == 0 then moveVectorError(2)
+            let (_t24, _t25) := core.prim.removeVector(*_t23, _t23.length - 1)
+            *_t23 := _t25
+            _t24)
         if cur_i == 0 then
-          self.entries.append(other_entries)
+          let _t26 := &mut self.entries
+          *_t26 := core.prim.concatVector(*_t26, other_entries)
           break
         else cur_i := cur_i - 1
       else
@@ -486,28 +496,32 @@ leaner module aptos_framework::ordered_map where
           overwritten := core.prim.pushVector(
             overwritten,
             do
-              let _t15 := &mut self.entries
-              if _t15.length == 0 then moveVectorError(2)
-              let (_t16, _t17) := core.prim.removeVector(*_t15, _t15.length - 1)
-              *_t15 := _t17
-              _t16)
+              let _t27 := &mut self.entries
+              if _t27.length == 0 then moveVectorError(2)
+              let (_t28, _t29) := core.prim.removeVector(*_t27, _t27.length - 1)
+              *_t27 := _t29
+              _t28)
           if cur_i == 0 then
-            self.entries.append(other_entries)
+            let _t30 := &mut self.entries
+            *_t30 := core.prim.concatVector(*_t30, other_entries)
             break
           else cur_i := cur_i - 1
         reverse_result := core.prim.pushVector(
           reverse_result,
           do
-            let _t18 := &mut other_entries
-            if _t18.length == 0 then moveVectorError(2)
-            let (_t19, _t20) := core.prim.removeVector(*_t18, _t18.length - 1)
-            *_t18 := _t20
-            _t19)
+            let _t31 := &mut other_entries
+            if _t31.length == 0 then moveVectorError(2)
+            let (_t32, _t33) := core.prim.removeVector(*_t31, _t31.length - 1)
+            *_t31 := _t33
+            _t32)
         if other_i == 0 then
           core.prim.destroyEmptyVector(other_entries)
           break
         else other_i := other_i - 1
-    self.entries.reverse_append(reverse_result)
+    let _t34 := &mut self.entries
+    let _t35 := _t34.length
+    *_t34 := core.prim.concatVector(*_t34, reverse_result)
+    *_t34 := core.prim.reverseSliceVector(*_t34, _t35, _t34.length)
     overwritten
 
   spec append_impl where
@@ -534,7 +548,13 @@ leaner module aptos_framework::ordered_map where
   public fun trim {K} {V}(
     self : &mut OrderedMap<K, V>, at : u64
   ) -> OrderedMap<K, V> := do
-    let rest := self.entries.trim(at)
+    let rest :=
+      do
+        let _t6 := &mut self.entries
+        assert!(_t6.length >= at, 131072)
+        let _t8 := slice(*_t6, at, _t6.length)
+        *_t6 := slice(*_t6, 0, at)
+        _t8
     new OrderedMap<K, V>::SortedVectorMap { entries := rest }
 
   spec trim where
@@ -560,11 +580,11 @@ leaner module aptos_framework::ordered_map where
   public fun pop_front {K} {V}(self : &mut OrderedMap<K, V>) -> (K, V) := do
     let Entry<K, V> { key := key, value := value } :=
       do
-        let _t24 := &mut self.entries
-        assert!(_t24.length > 0, 131072)
-        let (_t25, _t26) := core.prim.removeVector(*_t24, 0)
-        *_t24 := _t26
-        _t25
+        let _t42 := &mut self.entries
+        assert!(_t42.length > 0, 131072)
+        let (_t43, _t44) := core.prim.removeVector(*_t42, 0)
+        *_t42 := _t44
+        _t43
     (key, value)
 
   spec pop_front where
@@ -853,11 +873,11 @@ leaner module aptos_framework::ordered_map where
     assert!(!(self is End), invalid_argument(EITER_OUT_OF_BOUNDS))
     let Entry<K, V> { key := _, value := value } :=
       do
-        let _t21 := &mut map.entries
-        assert!(_t21.length > self.index, 131072)
-        let (_t22, _t23) := core.prim.removeVector(*_t21, self.index)
-        *_t21 := _t23
-        _t22
+        let _t39 := &mut map.entries
+        assert!(_t39.length > self.index, 131072)
+        let (_t40, _t41) := core.prim.removeVector(*_t39, self.index)
+        *_t39 := _t41
+        _t40
     value
 
   spec iter_remove where
@@ -928,7 +948,10 @@ leaner module aptos_framework::ordered_map where
         is_lt(&compare(&key, &map.entries[insert_index].key)),
         invalid_argument(ENEW_KEY_NOT_IN_ORDER)
       )
-    map.entries.insert(insert_index, new Entry<K, V> { key, value })
+    let _t36 := &mut map.entries
+    let _t38 := new Entry<K, V> { key, value }
+    assert!(_t36.length >= insert_index, 131072)
+    *_t36 := core.prim.insertVector(*_t36, insert_index, _t38)
 
   spec iter_add where
     pragma opaque
@@ -1056,18 +1079,18 @@ leaner module aptos_framework::ordered_map where
     let mut values := vector<V>[]
     let OrderedMap<K, V>::SortedVectorMap { entries := entries } := self
     let mut self := entries
-    self.reverse()
+    self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
     spec assume folds_capture_anchor!(93)
     let len := self.length
     while len > 0 do
       let e :=
         do
-          let _t30 := &mut self
-          if _t30.length == 0 then moveVectorError(2)
-          let (_t31, _t32) := core.prim.removeVector(*_t30, _t30.length - 1)
-          *_t30 := _t32
-          _t31
+          let _t48 := &mut self
+          if _t48.length == 0 then moveVectorError(2)
+          let (_t49, _t50) := core.prim.removeVector(*_t48, _t48.length - 1)
+          *_t48 := _t50
+          _t49
       let e := e
       let Entry<K, V> { key := key, value := value } := e
       keys := core.prim.pushVector(keys, key)
@@ -1226,6 +1249,7 @@ leaner module aptos_framework::ordered_map where
 
   fun test_aborts_if_remove(map : &mut OrderedMap<u64, u64>) -> Unit := do
     map.remove(&1)
+    ()
 
   spec test_aborts_if_remove where
     aborts_if !spec_contains_key(map, 1)
@@ -1367,6 +1391,7 @@ leaner module aptos_framework::ordered_map where
     m : &mut OrderedMap<u64, u64>, k : u64
   ) -> Unit := do
     m.remove(&k)
+    ()
 
   spec test_verify_remove_shift_symbolic where
     requires spec_contains_key(m, k)

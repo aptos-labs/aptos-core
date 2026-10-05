@@ -73,6 +73,40 @@ run_cmd do
   unless (← function "pick").localNames[0]? == some (some "choice") do
     throwError "parameters keep their source names"
 
+-- A closure captures its trailing parameter, and the invocation passes the
+-- function value last, where LIR passes it first.
+leaner module 0x42::xir_closures where
+  fun sub(x : u64, y : u64) -> u64 := x - y
+
+  fun trailing(x : u64, y : u64) -> u64 := do
+    let f := function[Fn(u64) -> u64 has Copy, Drop](sub, _, y)
+    invoke(f, x)
+
+open Lean Elab Command in
+run_cmd do
+  let some unit := LeanerLang.registeredUnit? (← getEnv) `«0x42».xir_closures
+    | throwError "the module was not registered"
+  let module ← match lowerModule unit ⟨0⟩ with
+    | .ok module => pure module
+    | .error failure => throwError failure.message
+  let some function := module.functions.find? (·.name == "trailing")
+    | throwError "no function `trailing`"
+  let instrs := function.blocks.flatMap (·.instrs)
+  let some closure := instrs.findSome? fun
+      | .call #[value] (.closure 0 2 #[]) #[captured] => some (value, captured)
+      | _ => none
+    | throwError s!"no closure of `sub` capturing its second parameter in {repr instrs}"
+  unless function.locals[closure.1]? ==
+      some (.function #[.int .u64] #[.int .u64] #["copy", "drop"]) do
+    throwError s!"unexpected function type {repr function.locals[closure.1]?}"
+  let callable := (instrs.findSome? fun
+      | .assign bound source => if source == closure.1 then some bound else none
+      | _ => none).getD closure.1
+  unless instrs.any (fun
+      | .call #[_] .invoke #[0, value] => value == callable
+      | _ => false) do
+    throwError s!"the invocation does not pass the function value last in {repr instrs}"
+
 -- Source attributes reach the bytecode: the VM takes the module lock of a
 -- `module_lock` function, for example.
 leaner module 0x42::xir_attributes where

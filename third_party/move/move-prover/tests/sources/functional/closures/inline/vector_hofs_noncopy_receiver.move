@@ -28,6 +28,7 @@ module 0x42::vector_hofs_noncopy_receiver {
         });
     }
     spec clear_all {
+        pragma heartbeats = 50;
         aborts_if false;
         ensures forall i in 0..len(h.v): h.v[i].x == 0;
     }

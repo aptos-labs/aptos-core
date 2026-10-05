@@ -50,16 +50,44 @@ inductive FunctionBody where
   | structured (root : ExprId)
   deriving Repr, BEq, DecidableEq, Inhabited
 
+/-- The order `compare` gives the unit's values, by namespace and
+declaration: the variant names of every nominal declaration in declaration
+order, and every function's position in the order of qualified names. -/
+structure ValueOrders where
+  variants : Array (Array (Array String)) := #[]
+  functions : Array (Array Nat) := #[]
+  deriving Repr, BEq, Inhabited
+
 /-- Checked backend input namespace whose functions contain only structured
 bodies (or are explicitly absent). `tables` is an immutable cached view of the
 owning compilation-unit table. -/
 structure ValidatedNamespace extends Namespace FunctionBody where
   tables : Tables
-  /-- The variant names of every nominal declaration of the unit in
-  declaration order, by namespace and declaration: the order `compare` gives
-  enum values. A cached unit view, as `tables` is. -/
-  variantOrders : Array (Array (Array String)) := #[]
+  /-- The unit's value orders. A cached unit view, as `tables` is. -/
+  orders : ValueOrders := {}
   deriving Repr, BEq, Inhabited
+
+private def nameIn (tables : Tables) (id : NameId) : String :=
+  ((tables.names[id.index]?).map (·.name)).getD ""
+
+/-- Two qualified function names in the order Move compares function values:
+namespace path, addresses by the number they spell, then the function name. -/
+private def compareQualified (left right : Array String × String) : Ordering :=
+  (List.compareLex compareAddress left.1.toList right.1.toList).then (compare left.2 right.2)
+
+/-- The value orders of a unit's namespaces. -/
+def valueOrdersOf (tables : Tables) (namespaces : Array (Namespace FunctionBody)) : ValueOrders :=
+  let variants := namespaces.map fun ns => ns.structs.map fun declaration =>
+    declaration.variants.map fun variant => nameIn tables variant.name
+  let keys := namespaces.toList.zipIdx.flatMap fun (ns, namespaceIndex) =>
+    let path := (tables.namespaces[ns.identity.index]?.map (·.segments)).getD #[]
+    ns.functions.toList.zipIdx.map fun (function, functionIndex) =>
+      ((path, nameIn tables function.name), namespaceIndex, functionIndex)
+  let sorted := keys.mergeSort fun left right => compareQualified left.1 right.1 != .gt
+  let functions := sorted.zipIdx.foldl (init := namespaces.map (Array.replicate ·.functions.size 0))
+    fun ranks ((_, namespaceIndex, functionIndex), rank) =>
+      ranks.modify namespaceIndex (·.set! functionIndex rank)
+  { variants, functions }
 
 /-- Checked dependency summary copied into `ValidatedUnit` after unit
 validation. It is intentionally distinct from the frontend-constructible raw
@@ -165,7 +193,7 @@ structure ReferenceParameterFact where
 (`before := true`) or after the anchor expression evaluates. Function-result
 boundaries explicitly record every mutable loan not carried by the returned
 value. A loan may carry several records when its death is branch-dependent;
-loan-death markers are conditional and idempotent, so the over-approximation
+ending a loan is conditional and idempotent, so the over-approximation
 is sound. Only a loan carried by a returned reference remains live for frame
 finalization to transfer across the call boundary. -/
 structure LoanDeath where
@@ -176,8 +204,8 @@ structure LoanDeath where
 /-- Stable identity and lifetime of a loan site accepted by the borrow
 analysis. The validated unit retains its kind and place; keeping those
 canonical facts in one place also avoids copying recursive place data into
-every semantic wrapper. Mutable loans record the death points the loan
-elimination stage materializes as `endLoan` markers. -/
+every semantic wrapper. Mutable loans record their death points, where the
+semantics ends them (`loanDeathsAt`). -/
 structure CheckedLoanFact where
   expression : ExprId
   lifetime : LifetimeId
@@ -203,6 +231,10 @@ structure BorrowCertificate where
   parameters : Array ReferenceParameterFact
   loans : Array CheckedLoanFact
   lifetimeRelations : Array LifetimeRelationFact
+  /-- The body's places that dereference a shared reference, ascending. A
+  shared reference is the observed value itself, so the semantics reads
+  such a place as its base. -/
+  sharedDereferences : Array PlaceId := #[]
   deriving Repr, BEq, Inhabited
 
 /-- A diagnostic of one namespace's function. -/
@@ -237,6 +269,13 @@ structure ValidatedUnit where
 /-- The borrow analysis's rejections. -/
 def ValidatedUnit.borrowDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
   unit.borrowRejections.map (·.diagnostic)
+
+/-- Whether a place of a namespace dereferences a shared reference, as the
+borrow certificate of its function records. -/
+def sharedDereference (unit : ValidatedUnit) (namespaceId : NamespaceId) (place : PlaceId) :
+    Bool :=
+  unit.borrowCertificates.any fun certificate =>
+    certificate.namespaceId == namespaceId && certificate.sharedDereferences.contains place
 
 namespace Internal
 

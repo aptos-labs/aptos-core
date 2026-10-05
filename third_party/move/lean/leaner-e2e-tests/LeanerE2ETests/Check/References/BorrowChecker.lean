@@ -60,6 +60,49 @@ leaner module 0x42::borrow_accepted where
     ensures result == 3
     aborts_if false
 
+  -- ## Overwritten holders
+
+  -- A reference reassigned after the reborrow through it was last used:
+  -- both loans end before the new borrow, and their writes reach the owner.
+  fun reassign_after_reborrow() -> u64 := do
+    let mut owner := new Cell { value := 0 }
+    let mut parent := &mut owner
+    let mut field := &mut parent.value
+    *field := 2
+    parent := &mut owner
+    field := &mut parent.value
+    *field := *field + 1
+    owner.value
+  spec reassign_after_reborrow where
+    ensures result == 3
+    aborts_if false
+
+  -- The owner is written after the last read through its borrow.
+  fun write_after_last_read() -> u64 := do
+    let mut owner : u64 := 20
+    let writer := &mut owner
+    *writer := 10
+    owner := *writer + 1
+    owner
+  spec write_after_last_read where
+    ensures result == 11
+    aborts_if false
+
+  -- A borrow bound anew in each iteration ends with the iteration.
+  fun rebind_in_loop() -> u64 := do
+    let mut owner : u64 := 0
+    let mut remaining : u64 := 2
+    while 0 < remaining do
+      let writer := &mut owner
+      *writer := *writer + 1
+      remaining := remaining - 1
+    where
+      invariant remaining <= 2 && owner + remaining == 2
+    owner
+  spec rebind_in_loop where
+    ensures result == 2
+    aborts_if false
+
   -- ## Loans across control flow
 
   fun loop_carries_mutation() -> u64 := do
@@ -276,6 +319,23 @@ leaner module 0x42::borrow_return_local where
     let owner : u64 := 1
     &owner
 
+-- The owner is read while a reborrow through its reassigned reference is
+-- still used: the reference's loan lives as long as the reborrow.
+leaner module 0x42::borrow_reborrow_keeps_parent where
+  struct Cell has Copy, Drop where
+    value : u64
+
+  fun reborrow_keeps_parent() -> u64 := do
+    let mut owner := new Cell { value := 3 }
+    let mut parent := &mut owner
+    let mut field := &mut parent.value
+    *field := 4
+    parent := &mut owner
+    field := &mut parent.value
+    let observed := owner.value
+    *field := 5
+    observed
+
 leaner module 0x42::borrow_vector_elements where
   fun vector_elements() -> u64 := do
     let mut values := vector<u64>[1, 2]
@@ -300,6 +360,7 @@ run_cmd do
     (`«0x42».borrow_freeze_poisoned, "LIR-SEMANTIC-BORROW-CONFLICT"),
     (`«0x42».borrow_overwrite_owner, "LIR-SEMANTIC-BORROW-CONFLICT"),
     (`«0x42».borrow_return_local, "LIR-SEMANTIC-BORROW-ESCAPE"),
+    (`«0x42».borrow_reborrow_keeps_parent, "LIR-SEMANTIC-BORROW-CONFLICT"),
     (`«0x42».borrow_vector_elements, "LIR-SEMANTIC-BORROW-CONFLICT")]
   for (name, code) in expectations do
     let some unit := LeanerLang.registeredUnit? (← getEnv) name

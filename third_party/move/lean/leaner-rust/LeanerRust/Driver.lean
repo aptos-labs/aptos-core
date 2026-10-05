@@ -57,7 +57,7 @@ location identities with the interpreter-facing view. -/
 structure ExecutionImportResult where
   private mk ::
   validated : LeanerIR.Validation.ValidatedUnit
-  executable : LeanerIR.Validation.ExecutableUnit
+  executable : LeanerIR.Validation.ExecutableUnit validated
   receipt : ImportCacheReceipt
   cacheHit : Bool
 

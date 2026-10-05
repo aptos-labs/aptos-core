@@ -15,10 +15,11 @@ reducible CFG for the shared structurizer. Every raw unit must pass through
 namespace LeanerIR.Import
 
 /-- Version of the raw LIR schema, independent of any semantic-profile
-version. A decoder must validate this value before constructing `RawUnit`. -/
+version. A decoder must validate this value before constructing `RawUnit`.
+The defaults are the current version, which the codec and validation read. -/
 structure Version where
   major : Nat := 1
-  minor : Nat := 1
+  minor : Nat := 5
   deriving Repr, BEq, Inhabited
 
 /-- MIR unwind behavior detached from compiler-local block identities. -/

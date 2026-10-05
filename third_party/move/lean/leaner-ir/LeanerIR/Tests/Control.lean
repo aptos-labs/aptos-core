@@ -53,15 +53,15 @@ private def fixture : RawUnit where
       origin := ⟨0⟩
       alignment := ⟨0⟩ }] }]
 
-private def prepare? (raw : RawUnit) : Option ExecutableUnit := do
+private def prepare? (raw : RawUnit) : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] raw).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
-private def executable? : Option ExecutableUnit := prepare? fixture
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := prepare? fixture
 private def handle : FunctionHandle := { namespaceId := ⟨0⟩, functionId := ⟨0⟩ }
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.bool true], .. }) => true
       | _ => false
   | none => false
@@ -144,7 +144,7 @@ private def nonUnitLoopBodyFixture : RawUnit :=
 #guard validationHasDiagnosticAt nonUnitPatternAssignmentFixture "LIR-SEMANTIC-TYPE" ⟨11⟩
 #guard validationHasDiagnosticAt nonUnitLoopBodyFixture "LIR-SEMANTIC-TYPE" ⟨12⟩
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
 private theorem successfulRunHasDerivation (success :
     (Interpreter.run prepared 16 handle #[]).isOk) :

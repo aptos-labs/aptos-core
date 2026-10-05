@@ -18,7 +18,7 @@ namespace LeanerMove.Frontend.Xast
 /-- Schema identifier of an XAST document. -/
 def schema : String := "move-xast-module"
 /-- The XAST version this consumer reads. -/
-def version : Nat := 4
+def version : Nat := 9
 
 /-- A source location: byte offsets into the module's file table. -/
 structure Loc where
@@ -43,6 +43,12 @@ structure QualifiedName where
 structure NamedAddress where
   name : String
   address : String
+  deriving Repr, BEq, Inhabited
+
+/-- A state label by the number memory ranges refer to and its source name. -/
+structure StateLabel where
+  id : Nat
+  name : String
   deriving Repr, BEq, Inhabited
 
 /-- An ordinary source comment, delimiters included. -/
@@ -170,10 +176,15 @@ inductive BehaviorKind where
 /-- The operation of a call node. -/
 inductive Operation where
   | moveFunction (name : QualifiedName)
+  /-- A closure of a function: the call's arguments are the captured values,
+  bound to the parameters whose bit is set in `mask`. -/
+  | closure (name : QualifiedName) (mask : Nat)
   | pack (name : QualifiedName) (variant : Option String)
   | tuple
   | select (name : QualifiedName) (field : String)
-  | selectVariants (name : QualifiedName) (fields : List String)
+  /-- The field of whichever listed variant the operand holds, as
+  `(variant, field)` pairs. -/
+  | selectVariants (name : QualifiedName) (fields : List (String × String))
   | testVariants (name : QualifiedName) (variants : List String)
   | specFunction (name : QualifiedName) (range : MemoryRange)
   | behavior (kind : BehaviorKind) (range : MemoryRange)
@@ -249,8 +260,10 @@ mutual
   inductive MatchArm where
     | mk (loc : Loc) (pattern : Pattern) (guard : Option Exp) (body : Exp)
 
+  /-- One binder of a quantifier with its domain; a binder over the state
+  domain (`exists S in *`) names the state label it binds. -/
   inductive QuantRange where
-    | mk (pattern : Pattern) (domain : Exp)
+    | mk (pattern : Pattern) (domain : Exp) (label : Option Nat)
 
   /-- A typed pattern node. -/
   inductive Pattern where
@@ -265,10 +278,31 @@ mutual
     | literal (value : Value)
     | range (lower upper : Option Value) (inclusive : Bool)
 
-  /-- A specification block. -/
+  /-- A specification block, with the `proof` block of a function's. -/
   inductive Spec where
     | mk (loc : Option Loc) (pragmas : List Pragma) (conditions : List Condition)
-        (frame : Option Frame)
+        (frame : Option Frame) (accessOf : List AccessOf) (proof : Option Proof)
+
+  /-- A statement of a structured proof (`proof { ... }`). -/
+  inductive Proof where
+    | «let» (loc : Loc) (name : String) (exp : Exp)
+    | ite (loc : Loc) (cond : Exp) (thenProof : Proof) (elseProof : Option Proof)
+    | block (loc : Loc) (proofs : List Proof)
+    | «assert» (loc : Loc) (exp : Exp)
+    | «assume» (loc : Loc) (exp : Exp)
+    | apply (loc : Loc) (application : LemmaApplication)
+    /-- `forall binders [triggers] [weight = n] apply lemma(args)`. -/
+    | forallApply (loc : Loc) (binders : List Param) (triggers : List (List Exp))
+        (weight : Option Nat) (application : LemmaApplication)
+    /-- `calc(e1 op e2 op ...)`: each step as the comparison it asserts. -/
+    | calc (loc : Loc) (steps : List Exp)
+    /-- `post proof`: run at each return instead of at entry. -/
+    | post (loc : Loc) (proof : Proof)
+    | split (loc : Loc) (exp : Exp)
+
+  /-- A lemma applied to arguments, with its type arguments. -/
+  inductive LemmaApplication where
+    | mk (lemma : QualifiedName) (inst : List Ty) (args : List Exp)
 
   inductive Condition where
     | mk (kind : ConditionKind) (loc : Loc) (properties : List Pragma) (exp : Exp)
@@ -277,6 +311,12 @@ mutual
 
   inductive Frame where
     | mk (modifies : List Exp) (reads : List Ty) (modifiesAll : Bool) (readsAll : Bool)
+
+  /-- The access declaration of a function-typed parameter or field `f`:
+  `modifies_of<f>(formals) targets` and `reads_of<f> types`. -/
+  inductive AccessOf where
+    | mk (loc : Loc) (name : String) (formals : List Param) (modifies : List Exp)
+        (reads : List Ty) (modifiesAll : Bool) (readsAll : Bool)
 end
 
 namespace Exp
@@ -299,17 +339,26 @@ def body : MatchArm → Exp | .mk _ _ _ b => b
 end MatchArm
 
 namespace QuantRange
-def pattern : QuantRange → Pattern | .mk p _ => p
-def domain : QuantRange → Exp | .mk _ d => d
+def pattern : QuantRange → Pattern | .mk p _ _ => p
+def domain : QuantRange → Exp | .mk _ d _ => d
+def label : QuantRange → Option Nat | .mk _ _ l => l
 end QuantRange
 
 namespace Spec
-def loc : Spec → Option Loc | .mk l _ _ _ => l
-def pragmas : Spec → List Pragma | .mk _ p _ _ => p
-def conditions : Spec → List Condition | .mk _ _ c _ => c
-def frame : Spec → Option Frame | .mk _ _ _ f => f
-def empty : Spec := .mk none [] [] none
+def loc : Spec → Option Loc | .mk l _ _ _ _ _ => l
+def pragmas : Spec → List Pragma | .mk _ p _ _ _ _ => p
+def conditions : Spec → List Condition | .mk _ _ c _ _ _ => c
+def frame : Spec → Option Frame | .mk _ _ _ f _ _ => f
+def accessOf : Spec → List AccessOf | .mk _ _ _ _ a _ => a
+def proof : Spec → Option Proof | .mk _ _ _ _ _ p => p
+def empty : Spec := .mk none [] [] none [] none
 end Spec
+
+namespace LemmaApplication
+def lemma : LemmaApplication → QualifiedName | .mk l _ _ => l
+def inst : LemmaApplication → List Ty | .mk _ i _ => i
+def args : LemmaApplication → List Exp | .mk _ _ a => a
+end LemmaApplication
 
 namespace Condition
 def kind : Condition → ConditionKind | .mk k _ _ _ _ _ _ _ _ => k
@@ -329,6 +378,16 @@ def reads : Frame → List Ty | .mk _ r _ _ => r
 def modifiesAll : Frame → Bool | .mk _ _ m _ => m
 def readsAll : Frame → Bool | .mk _ _ _ r => r
 end Frame
+
+namespace AccessOf
+def loc : AccessOf → Loc | .mk l _ _ _ _ _ _ => l
+def name : AccessOf → String | .mk _ n _ _ _ _ _ => n
+def formals : AccessOf → List Param | .mk _ _ f _ _ _ _ => f
+def modifies : AccessOf → List Exp | .mk _ _ _ m _ _ _ => m
+def reads : AccessOf → List Ty | .mk _ _ _ _ r _ _ => r
+def modifiesAll : AccessOf → Bool | .mk _ _ _ _ _ m _ => m
+def readsAll : AccessOf → Bool | .mk _ _ _ _ _ _ r => r
+end AccessOf
 
 instance : Inhabited Exp := ⟨.mk .bool ⟨0, 0, 0⟩ (.value (.bool false) none)⟩
 instance : Inhabited Pattern := ⟨.mk .bool ⟨0, 0, 0⟩ .wildcard⟩
@@ -410,6 +469,19 @@ structure SpecVar where
   init : Option Exp
   deriving Inhabited
 
+/-- A lemma: `lemma name<T>(params) { requires ..; ensures ..; } proof { .. }`. -/
+structure Lemma where
+  name : String
+  loc : Loc
+  typeParams : List TypeParam
+  params : List Param
+  /-- The `requires` and `ensures` conditions. -/
+  conditions : List Condition
+  /-- The declared measure (`decreases`), if any. -/
+  decreases : Option (List Exp)
+  proof : Option Proof
+  deriving Inhabited
+
 inductive InvariantKind where
   | global | globalUpdate | «axiom»
   deriving Repr, BEq, Inhabited, DecidableEq
@@ -426,6 +498,9 @@ structure Invariant where
 structure Skipped where
   name : String
   reason : String
+  /-- Whether the declaration is an inline function, or the specification
+  version of one: the compiler has expanded it where it is called. -/
+  inline : Bool
   deriving Repr, Inhabited
 
 /-- A module's typed AST: the top-level object of an XAST document. -/
@@ -444,6 +519,9 @@ structure Module where
   specFuns : List SpecFun
   specVars : List SpecVar
   invariants : List Invariant
+  lemmas : List Lemma := []
+  /-- The state labels the module's specifications name. -/
+  labels : List StateLabel := []
   skipped : List Skipped := []
   sources : List String
   comments : List Comment
@@ -455,6 +533,12 @@ structure Module where
   pragma whether or not the file exists. -/
   proofFile : Option String := none
   deriving Inhabited
+
+/-- The declarations the export lost. Compiler-v2 has already expanded an
+inline function where it is called, so leaving one out loses nothing; any
+other declaration left out is unsupported. -/
+def Module.omitted (m : Module) : List Skipped :=
+  m.skipped.filter (!·.inline)
 
 /-- The module's own reference. -/
 def Module.ref (m : Module) : ModuleRef :=

@@ -100,10 +100,12 @@ cd ../leaner-rust
 lake exe leaner-rust verify <file.rs>                    # specifications in <file>.spec.lean
 ```
 
-From the Move CLI, a package is verified in place:
+From the Move CLI, a package is verified in place; the Move Prover's unit
+tests run with it on request:
 
 ```bash
 move prove --lean --package-dir <package>                # or: aptos move prove --lean
+MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite
 ```
 
 A function the automatic verification leaves open is proved in a proof

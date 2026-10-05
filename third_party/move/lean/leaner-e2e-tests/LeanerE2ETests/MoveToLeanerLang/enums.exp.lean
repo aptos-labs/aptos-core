@@ -38,3 +38,16 @@ leaner module 0x42::enums where
 
   fun make(flag : Bool, amount : u64) -> Action :=
     if flag then new Action::Transfer { amount } else new Action::Idle {}
+
+  enum Slot has Copy, Drop where
+    | Number (0 : u64)
+    | Flag (0 : Bool)
+
+  fun number(slot : Slot) -> u64 :=
+    match slot with
+      | Slot::Number { 0 := value } => value
+      | Slot::Flag { 0 := _ } => 0
+
+  spec number where
+    ensures slot is Number
+        ==> result == core.data.selectVariants[Slot, Number.0](slot)

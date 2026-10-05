@@ -39,6 +39,7 @@ module 0x42::borrow_global_distinct_types {
     }
 
     spec write_zero_and_return_same {
+        pragma heartbeats = 50;
         requires exists<A>(addr) && exists<B>(addr);
         ensures result == 0;
     }

@@ -1,0 +1,5 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/closures/inline/folds_of_wrapper_mut.move: LIR-SEMANTIC-TYPE: in fun mirror_keys: function call result differs from the callee signature at [1668, 1688)
+LIR-SEMANTIC-TYPE: in fun mirror_keys_wrong: function call result differs from the callee signature at [1668, 1688)
+LIR-SEMANTIC-TYPE: in fun set_both: function call result differs from the callee signature at [1668, 1688)
+LIR-SEMANTIC-TYPE: in fun set_both: function call result differs from the callee signature at [1668, 1688)

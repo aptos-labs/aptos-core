@@ -20,6 +20,7 @@ open Lean
 open LeanerIR
 
 deriving instance ToExpr for LeanerIR.Validation.IndexedArena
+deriving instance ToExpr for LeanerIR.Validation.KeyTree
 open LeanerIR.Validation
 
 deriving instance ToExpr for LoanId
@@ -106,6 +107,7 @@ deriving instance ToExpr for GenericBinder
 deriving instance ToExpr for Parameter
 deriving instance ToExpr for LeanerIR.LocalDecl
 deriving instance ToExpr for Signature
+deriving instance ToExpr for ParameterFrame
 deriving instance ToExpr for FunctionContract
 deriving instance ToExpr for ConstantDecl
 deriving instance ToExpr for FieldDecl
@@ -119,6 +121,7 @@ deriving instance ToExpr for AssociatedItemValue
 deriving instance ToExpr for AssociatedItemBinding
 deriving instance ToExpr for ImplDecl
 deriving instance ToExpr for SpecFunctionDecl
+deriving instance ToExpr for LemmaDecl
 deriving instance ToExpr for SpecVarDecl
 deriving instance ToExpr for NamespaceInvariant
 deriving instance ToExpr for IntrinsicBinding
@@ -126,6 +129,7 @@ deriving instance ToExpr for IntrinsicDecl
 deriving instance ToExpr for Namespace
 deriving instance ToExpr for FunctionBody
 deriving instance ToExpr for LoanDeath
+deriving instance ToExpr for ValueOrders
 deriving instance ToExpr for ValidatedNamespace
 deriving instance ToExpr for ValidatedNamespaceInterface
 deriving instance ToExpr for ValidatedImportEvidence
@@ -140,6 +144,7 @@ deriving instance ToExpr for ReferenceParameterFact
 deriving instance ToExpr for CheckedLoanFact
 deriving instance ToExpr for LifetimeRelationFact
 deriving instance ToExpr for BorrowCertificate
+deriving instance ToExpr for AnchorDeaths
 deriving instance ToExpr for LeanerIR.Validation.Severity
 deriving instance ToExpr for LeanerIR.Validation.RelatedLocation
 deriving instance ToExpr for LeanerIR.Validation.Diagnostic

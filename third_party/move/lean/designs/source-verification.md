@@ -30,12 +30,19 @@ lake env .lake/build/bin/leaner-rust verify foo.rs [--spec foo.spec.lean] \
 
 `lake exe` works as well but replays the build log first. The Move command
 needs the exchange frontend (`APTOS_MOVE_CLI`, see the tree's `CLAUDE.md`).
-For a package directory, `--filter <part>` verifies the modules whose
+A package directory is exported with its dependency modules, which are read
+whole and not verified, as from the Move CLI (below), so calls into them
+inline. For a package directory, `--filter <part>` verifies the modules whose
 source file name contains the part, and `--modules <a::m>,…` verifies the
 named modules with only what verifying them reads exported
 (`verification-benchmarks.md`, "Module selection"). A filter or a module
 name that selects nothing is an error rather than a run that verifies
-nothing.
+nothing. `--dev` compiles a package directory in dev mode, with its
+`[dev-addresses]` and `[dev-dependencies]`. `LEANER_OPTIONS=name=value,…`
+sets Lean options for the verification a command or the benchmark runs, for
+debugging: a value `true` or `false` is a Bool, a numeral a Nat, anything
+else a String (for example `LEANER_OPTIONS=leaner.denoteDebug=true` prints
+the closer's steps).
 Each command writes the rendering beside the source (`foo.move.lean`,
 `foo.rs.lean`) for inspection, prints one `file:line:column: severity:
 message` line per message, and exits non-zero when any is an error. Its
@@ -69,9 +76,12 @@ aptos move prove --lean --package-dir <package>                     # full CLI
 
 The flag lives on the framework's `ProverOptions` (`aptos-move/framework/src/prover.rs`),
 the entry point the CLI and the framework's prover tests share, so the
-framework packages are verified the same way from both. With `--lean`, the
-package model is built as for the Prover but without bytecode, its modules
-with source are exported in the typed-AST exchange format to a temporary
+framework packages are verified the same way from both; the backend it calls,
+which exports a model and runs the verifier, is the Move Prover's
+(`third_party/move/move-prover/src/leaner.rs`). With `--lean`, the
+package model is built as for the Prover but without bytecode, the
+package's modules and what verifying them reads are exported in the typed-AST
+exchange format to a temporary
 directory (the producer, `dump_ast_module`, lives in the `move-model-exchange`
 crate), and `leaner-move verify <package> --export <that directory>` runs;
 the rendering goes to `build/leaner-verify.lean` under the package. The
@@ -86,8 +96,7 @@ resource and its existence a `spec module where axiom` of the module. The
 verifier's messages are the command's diagnostics, and a verification error
 fails the command as a Prover error does. The Prover's timing line becomes
 `build, export, leaner-move, total`, beside the verifier's own. `--filter` narrows the targets as
-usual, and the export then carries only the filtered modules and what
-verifying them reads; the Boogie backend's options have no effect. The verifier is found
+usual; the Boogie backend's options have no effect. The verifier is found
 through `LEANER_MOVE_EXE` (its executable, run as is, so the caller supplies
 `LEAN_PATH`), `LEANER_MOVE_HOME` (its Lean package), or the enclosing Aptos
 Core checkout, where `leaner-move/.lake/build/bin/leaner-move` runs through
@@ -96,6 +105,34 @@ Core checkout, where `leaner-move/.lake/build/bin/leaner-move` runs through
 && lake build leaner-move`. The tests (`aptos-move/cli/src/tests/prove/lean_*`
 and `move_stdlib_lean_prover_tests` in `aptos-move/framework/tests`) run only
 where the verifier is available.
+
+### From the Move Prover
+
+The Move Prover's own command verifies one Move file the same way: `mvp
+--lean <file.move>` (with its usual `--dependency` and `--named-addresses`)
+builds the model of the file and its dependencies as one program through
+the checker and rewriters, exports the file's modules and what verifying
+them reads, and runs `leaner-move verify <file.move> --export <that
+directory>`, which verifies the modules the file declares with the others
+linked; the rendering goes beside the output path, with extension `lean`.
+`--heartbeats` sets the default budget.
+
+The Prover's unit tests (`move-prover/tests/sources`) run this way as the
+test feature `lean`, only on request and not in CI:
+
+```bash
+MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite [<path part>]
+```
+
+Its baselines are `foo.lean_exp` beside `foo.move` (`UPBL=1` updates them).
+Each function's verification gets a tight budget (`--heartbeats=25` in the
+feature's flags); a function that verifies but needs more raises its own
+with `pragma heartbeats`, and a function the automation does not prove, where
+the Prover reads a Move `proof` block or proves nonlinear arithmetic, is
+proved in `foo.proof.lean`. The tests are skipped where the verifier is not
+built.
+[`prover-test-problems.md`](prover-test-problems.md) registers the problems
+the run shows.
 
 ## Specifications
 
@@ -129,7 +166,9 @@ The prelude's injectivity and length axioms and the concrete names the
 Prover computes for concrete types are not mirrored. A caller never fails
 on a modelled callee; it fails only on what its own clauses claim.
 
-A recursive specification function unfolds where its measure descends. The
+A recursive specification function unfolds where its measure descends,
+and a leaf holds it unfolded once at each of its applications whose guard
+the context decides. The
 measure is the `decreases` clause or an integer parameter every recursive
 call provably decreases on its path; failing that, one the calls decrease
 on for non-negative parameters (the Move types the specification's `num`
@@ -183,6 +222,13 @@ expressions they stand for. A proof that fails
 reports at its tactic in the proof file, and the function's summary says
 the proof does not establish its specification.
 
+The integer bounds a specification names, `MAX_U8` … `MAX_U256`, `MAX_I8` …
+`MAX_I256`, and `MIN_I8` … `MIN_I256`, are Lean constants of type `Int` as
+well (`LeanerLang/Bounds.lean`), so a proof names the bound an obligation
+states as a literal: `‹x.val ≤ MAX_U64›` finds `x.val ≤
+18446744073709551615`. `omega` reads a constant as an atom; `unfold MAX_U64
+at *` gives it the value.
+
 The package tooling never compiles a proof file as a Lean-authored Move
 module: `.proof.lean` files are not package sources and do not enter the
 package digest (`move-command-line-common::files::is_lean_source`).
@@ -195,6 +241,39 @@ targets for. The Move frontend states Move's reading explicitly
 (`LeanerMove/Frontend/Frames.lean`): no targets and a transitive global write
 become `modifies *`; targets on a non-`opaque` function become
 `modifies <targets>, *`.
+
+### Move signers
+
+The Move Prover assumes of every signer value that it signs the
+transaction. Where the unit declares `std::signer`'s predicates, a Move
+contract states it of the signers a function takes, as preconditions, and
+of those it returns: `is_txn_signer(s)` and `is_txn_signer_addr` of its
+address (decided 2026-10-02). A signer comes from a parameter or a native,
+so a caller establishes it from its own precondition or the native's
+contract; an address no signer in scope holds stays unconstrained.
+
+### Move hashes
+
+The Move Prover assumes `hash::sha2_256` and `hash::sha3_256` injective,
+which contradicts their 32-byte results. A Move contract states instead,
+as preconditions, that no two of the function's byte-vector parameters
+collide under a hash the function applies, in code or in a specification,
+at any depth (decided 2026-10-02). A hash of bytes a function computes is
+not covered, and a caller passing computed bytes to a function that
+assumes it cannot establish it.
+
+### Move vector intrinsics
+
+The Move Prover's prelude defines the `std::vector` functions the library
+marks `pragma intrinsic`, and it verifies none of their bodies. The
+exchange reads them likewise, in code and in specifications, as the LIR
+operations their bodies compute, with the library's abort codes:
+`is_empty`, `contains`, `index_of`, `remove`, `reverse`, `reverse_slice`,
+`append`, `reverse_append`, `trim`, `trim_reverse`, `insert`, and
+`remove_value` (decided 2026-10-02). Their bodies are loops without
+invariants, or move ranges LIR has no operation for. `swap_remove`,
+`rotate`, and `rotate_slice` keep their bodies, which are free of loops
+once these are operations.
 
 ## Mapping messages
 

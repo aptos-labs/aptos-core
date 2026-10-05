@@ -137,6 +137,7 @@ private def predeclareItemNames (tables : Tables) (namespaceId : NamespaceId)
   | .constant declaration => add tables declaration.name
   | .function declaration => add tables declaration.name
   | .specFunction declaration => add tables declaration.name
+  | .lemma declaration => add tables declaration.name
   | .namespaceInvariants _ => tables
   | .struct declaration =>
       declaration.fields.foldl (fun tables field => add tables field.name)
@@ -200,6 +201,11 @@ private structure ExprContext where
   administrative copies for by-value matches and nested runtime loans for
   reference matches. -/
   patternAliases : Array (String × Expr) := #[]
+  /-- Whether a call may name a lemma: in an `apply` step. -/
+  lemmaInstances : Bool := false
+  /-- The states the two-state operations read, from the enclosing `labeled`
+  expression: the clause's own where empty. -/
+  stateRange : LeanerIR.MemoryRange := {}
 
 private structure BuildState where
   source : CompilationUnit
@@ -361,6 +367,7 @@ private partial def lowerTypeId (context : TypeContext) (source : Ty) : LowerM T
   | .nat => internType (.integer .unbounded false)
   | .int => internType (.integer .unbounded true)
   | .range => internType .range
+  | .stateDomain => internType .stateDomain
   | .tuple elements =>
       let elements ← elements.mapM fun element => lowerTypeId context element.value
       internType (.tuple elements)
@@ -442,6 +449,13 @@ private partial def projectSpecTypeIdFuel (id : TypeId) (fuel : Nat) : LowerM Ty
 private def projectSpecTypeId (id : TypeId) : LowerM TypeId := do
   projectSpecTypeIdFuel id ((← get).tables.types.size + 1)
 
+/-- The type a specification binds a parameter of type `id` at: a
+reference's referent, as specifications see through references. -/
+private partial def specReferentTypeId (id : TypeId) : LowerM TypeId := do
+  match (← get).tables.types[id.index]? with
+  | some (.reference reference) => specReferentTypeId reference.referent
+  | _ => return id
+
 private def specificationExprContext (context : ExprContext) : LowerM ExprContext := do
   let locals ← context.locals.mapM fun (name, id, typeId) => do
     pure (name, id, ← projectSpecTypeId typeId)
@@ -508,8 +522,11 @@ private structure SourceBinding where
   mutable : Bool
   pattern : BindingPattern
   type : Option (Located Ty)
-  /-- The initializer; a declaration without one has a type. -/
+  /-- The initializer; a declaration without one has a type. A quantifier
+  binder's is its domain. -/
   value : Option Expr
+  /-- A quantifier binder, which ranges over its domain. -/
+  quantifier : Bool := false
 
 private def forLowerName (span : Span) : String :=
   s!"$for_lb_{span.startByte}"
@@ -525,7 +542,7 @@ mutual
         .appliedConstruct _ _ arguments _ |
         .throw_ _ arguments _ => arguments.flatMap sourceBindings
     | .namedConstruct _ _ fields _ => fields.flatMap (sourceBindings ·.2)
-    | .closure _ _ captures _ => captures.flatMap sourceBindings
+    | .closure _ _ _ captures _ => (captures.filterMap id).flatMap sourceBindings
     | .invoke callable arguments _ =>
         sourceBindings callable ++ arguments.flatMap sourceBindings
     | .genericCall _ _ arguments _ | .typedCall _ _ arguments _ |
@@ -548,7 +565,8 @@ mutual
     | .quantifier _ binders body _ =>
         binders.flatMap (sourceBindings ·.2) ++ sourceBindings body
     | .specification _ _ arguments _ => arguments.flatMap sourceBindings
-    | .specBlock conditions _ => conditions.flatMap fun (kind, value) =>
+    | .labeled _ _ body _ => sourceBindings body
+    | .specBlock conditions _ _ => conditions.flatMap fun (kind, value) =>
         let nested := sourceBindings value
         match kind with
         | .let_ name => nested.push {
@@ -597,7 +615,7 @@ mutual
         .typedGenericCall _ _ _ arguments _ | .global _ _ arguments _ |
         .specification _ _ arguments _ => arguments
     | .namedConstruct _ _ fields _ => fields.map (·.2)
-    | .closure _ _ captures _ => captures
+    | .closure _ _ _ captures _ => captures.filterMap id
     | .invoke callable arguments _ => #[callable] ++ arguments
     | .methodCall _ _ _ receiver arguments _ => #[receiver] ++ arguments
     | .select _ _ value _ | .field value _ _ | .placeOperation _ value _ |
@@ -610,9 +628,10 @@ mutual
         .mutateReference value index _ | .assignExpression value index _ |
         .rawAssignExpression value index _ => #[value, index]
     | .quantifier _ binders body _ => binders.map (·.2) ++ #[body]
-    | .specBlock conditions _ => conditions.map (·.2)
+    | .specBlock conditions _ _ => conditions.map (·.2)
     | .forRange _ lower upper body _ => #[lower, upper, body]
     | .break_ value _ _ => value.toArray
+    | .labeled _ _ body _ => #[body]
     | .block statements result _ =>
         statements.flatMap (fun statement => match statement with
           | .expression value => #[value]
@@ -641,7 +660,7 @@ mutual
                 (collected ++ value.toArray.flatMap (scopedBindings scope) ++ #[(binding, scope)],
                   scope.push binding)
         collected ++ (result.map (scopedBindings scope)).getD #[]
-    | .specBlock conditions _ =>
+    | .specBlock conditions _ _ =>
         (conditions.foldl (init := (#[], scope)) fun (collected, scope) (kind, value) =>
           let nested := scopedBindings scope value
           match kind with
@@ -680,6 +699,15 @@ mutual
           #[(binding, scope)] ++
             guard.toArray.flatMap (scopedBindings armScope) ++
             scopedBindings armScope body
+    | .quantifier _ binders body _ =>
+        -- A binder is in scope for the domains after it and for the body.
+        let (collected, inner) := binders.foldl (init := (#[], scope))
+          fun (collected, scope) (pattern, domain) =>
+            let binding : SourceBinding := {
+              span := pattern.span, mutable := false, pattern, type := none
+              value := some domain, quantifier := true }
+            (collected ++ scopedBindings scope domain ++ #[(binding, scope)], scope.push binding)
+        collected ++ scopedBindings inner body
     | source => (childExpressions source).flatMap (scopedBindings scope)
 
   /-- Does control leave this expression through a `return` written somewhere
@@ -718,6 +746,21 @@ mutual
         value.toArray.flatMap sourceBindings ++ #[{ span, mutable, pattern, type, value }]
 end
 
+/-- Whether a place reaches a field through a downcast. -/
+private def Place.hasDowncast : Place → Bool
+  | .local .. => false
+  | .deref base _ | .field base _ _ => base.hasDowncast
+  | .downcast .. => true
+
+/-- Whether a body names a place through a downcast, which a specification
+reads with no selection: LIR selects a field by its name across the
+variants that have it. -/
+private partial def hasDowncastPlace (source : Expr) : Bool :=
+  match source with
+  | .borrowPlace _ place _ | .dropPlace place _ => place.hasDowncast
+  | .assign place value _ => place.hasDowncast || hasDowncastPlace value
+  | source => (childExpressions source).any hasDowncastPlace
+
 private structure SourceQuantifierBinding where
   pattern : BindingPattern
   domain : Expr
@@ -730,7 +773,8 @@ mutual
         binders.map (fun (pattern, domain) => { pattern, domain }) ++
           binders.flatMap (sourceQuantifierBindings ·.2) ++ sourceQuantifierBindings body
     | .specification _ _ arguments _ => arguments.flatMap sourceQuantifierBindings
-    | .specBlock conditions _ => conditions.flatMap (sourceQuantifierBindings ·.2)
+    | .labeled _ _ body _ => sourceQuantifierBindings body
+    | .specBlock conditions _ _ => conditions.flatMap (sourceQuantifierBindings ·.2)
     | .forRange _ lower upper body _ =>
         sourceQuantifierBindings lower ++ sourceQuantifierBindings upper ++
           sourceQuantifierBindings body
@@ -744,7 +788,7 @@ mutual
         .appliedConstruct _ _ arguments _ |
         .throw_ _ arguments _ => arguments.flatMap sourceQuantifierBindings
     | .namedConstruct _ _ fields _ => fields.flatMap (sourceQuantifierBindings ·.2)
-    | .closure _ _ captures _ => captures.flatMap sourceQuantifierBindings
+    | .closure _ _ _ captures _ => (captures.filterMap id).flatMap sourceQuantifierBindings
     | .invoke callable arguments _ =>
         sourceQuantifierBindings callable ++ arguments.flatMap sourceQuantifierBindings
     | .genericCall _ _ arguments _ | .typedCall _ _ arguments _ |
@@ -798,7 +842,8 @@ mutual
     | .quantifier _ binders body _ =>
         binders.flatMap (sourceMatchBindings ·.2) ++ sourceMatchBindings body
     | .specification _ _ arguments _ => arguments.flatMap sourceMatchBindings
-    | .specBlock conditions _ => conditions.flatMap (sourceMatchBindings ·.2)
+    | .labeled _ _ body _ => sourceMatchBindings body
+    | .specBlock conditions _ _ => conditions.flatMap (sourceMatchBindings ·.2)
     | .forRange _ lower upper body _ =>
         sourceMatchBindings lower ++ sourceMatchBindings upper ++ sourceMatchBindings body
     | .loop body _ _ => sourceMatchBindings body
@@ -811,7 +856,7 @@ mutual
         .appliedConstruct _ _ arguments _ |
         .throw_ _ arguments _ => arguments.flatMap sourceMatchBindings
     | .namedConstruct _ _ fields _ => fields.flatMap (sourceMatchBindings ·.2)
-    | .closure _ _ captures _ => captures.flatMap sourceMatchBindings
+    | .closure _ _ _ captures _ => (captures.filterMap id).flatMap sourceMatchBindings
     | .invoke callable arguments _ =>
         sourceMatchBindings callable ++ arguments.flatMap sourceMatchBindings
     | .genericCall _ _ arguments _ | .typedCall _ _ arguments _ |
@@ -916,7 +961,9 @@ private partial def compatibleType (expected actual : TypeId) (fuel : Nat) : Low
       compatibleType expectedElement actualElement (fuel - 1)
   | some (.function expectedArguments expectedResult expectedAbilities),
       some (.function actualArguments actualResult actualAbilities) =>
-      if expectedAbilities != actualAbilities ||
+      -- Abilities are no part of a function value's representation: one
+      -- with more of them serves where fewer are required.
+      if !expectedAbilities.all actualAbilities.contains ||
           expectedArguments.size != actualArguments.size then
         return false
       if !(← (expectedArguments.zip actualArguments).allM fun (expected, actual) =>
@@ -947,6 +994,26 @@ private def nominalDescription? (typeId : TypeId) : LowerM (Option String) := do
   let some owner := tables.namespaces[qualified.namespaceId.index]? | return none
   return some <| "::".intercalate (owner.segments.push qualified.name).toList
 
+/-- Whether two aggregate types agree at the specification projection: as
+vectors or tuples whose integer components differ only in width, which a
+specification reads alike. -/
+private partial def specAggregatesAgree (expected actual : TypeId) (fuel : Nat) :
+    LowerM Bool := do
+  if fuel == 0 then return false
+  let componentsAgree (expected actual : TypeId) : LowerM Bool := do
+    if ← compatibleType expected actual fuel then return true
+    match ← typeNode? expected, ← typeNode? actual with
+    | some (.integer _ _), some (.integer _ _) => return true
+    | _, _ => specAggregatesAgree expected actual (fuel - 1)
+  match ← typeNode? expected, ← typeNode? actual with
+  | some (.vector expectedElement none), some (.vector actualElement none) =>
+      componentsAgree expectedElement actualElement
+  | some (.tuple expectedElements), some (.tuple actualElements) =>
+      if expectedElements.size != actualElements.size then return false
+      (expectedElements.zip actualElements).allM fun (expected, actual) =>
+        componentsAgree expected actual
+  | _, _ => return false
+
 private def ensureType (expected actual : TypeId) (span : Span) : LowerM Unit := do
   if ← compatibleType expected actual ((← get).tables.types.size + 1) then return
   let never ← internType .never
@@ -970,6 +1037,14 @@ private def ensureType (expected actual : TypeId) (span : Span) : LowerM Unit :=
   failAt "LEANER-TYPE-MISMATCH"
     s!"expression has type {repr actualType}{actualDetail} (arena entry {actual.index}), expected \
       {repr expectedType}{expectedDetail} (arena entry {expected.index})" (some span)
+
+/-- `ensureType`, except that a specification accepts aggregates agreeing at
+its projection. -/
+private def ensureTypeIn (context : ExprContext) (expected actual : TypeId) (span : Span) :
+    LowerM Unit := do
+  unless context.specification &&
+      (← specAggregatesAgree expected actual ((← get).tables.types.size + 1)) do
+    ensureType expected actual span
 
 private def primitiveArity : Primitive → Nat
   | .repeatVector _ | .length | .signerAddress | .destroyEmptyVector | .bitwiseNot |
@@ -1092,6 +1167,22 @@ private def sourceSpecFunction? (sourceNs : Namespace) (name : String) : Option 
   sourceNs.items.findSome? fun
     | .specFunction declaration => if declaration.name == name then some declaration else none
     | _ => none
+
+private def sourceLemma? (sourceNs : Namespace) (name : String) : Option LemmaDecl :=
+  sourceNs.items.findSome? fun
+    | .lemma declaration => if declaration.name == name then some declaration else none
+    | _ => none
+
+/-- The lemma a path names, in whichever namespace of this compilation unit
+declares it. -/
+private def lemmaForPath? (state : BuildState) (segments : Array String) :
+    Option LemmaDecl := do
+  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
+  let localName ← segments.back?
+  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
+  let sourceNs ← state.source.namespaces.find? (·.path == owner)
+  guard (sourceNs.profile == state.sourceNamespace.profile)
+  sourceLemma? sourceNs localName
 
 /-- The specification function a call path names, in whichever namespace of
 this compilation unit declares it. A `use` alias may point at another
@@ -1330,21 +1421,18 @@ private def inferTypeArguments (specification : Bool) (inferred : Array (Option 
   inferTypeArgumentsFuel specification inferred pattern actual
     ((← get).tables.types.size + 1) span
 
-/-- Does this nominal type declare variants? Selecting a field of one reads
-through every variant that has it, which is a different LIR operation. -/
-private def nominalHasVariants (baseType : TypeId) : LowerM Bool := do
-  match ← typeNode? baseType with
-  | some (.nominal owner _) =>
-      let state ← get
-      match state.tables.names[owner.index]? with
-      | some ownerName =>
-          pure ((sourceNominal? state.sourceNamespace ownerName.name).any
-            fun declaration => !declaration.variants.isEmpty)
-      | none => pure false
-  | _ => pure false
+/-- The selection of a field of a nominal type: an enum's field lives in
+each variant that declares it, which `selectVariants` records and `select`
+does not. -/
+private def fieldSelection (declaration : SourceNominal) (reference : QualifiedRef)
+    (field : String) : LeanerIR.DataOperation :=
+  let pairs := declaration.variants.filterMap fun variant =>
+    if variant.fields.any (·.name == field) then some (variant.name, field) else none
+  if pairs.isEmpty then .select reference field else .selectVariants reference pairs
 
-private def resolveNominalField (baseType : TypeId) (field : String) (span : Span) :
-    LowerM (QualifiedRef × NameId × TypeId) := do
+private def resolveNominalField (baseType : TypeId) (field : String) (span : Span)
+    (variant : Option String := none) :
+    LowerM (QualifiedRef × NameId × TypeId × SourceNominal) := do
   let some (.nominal owner instantiations) ← typeNode? baseType
     | failAt "LEANER-PLACE-FIELD" "a field place must have a nominal base" (some span)
   let state ← get
@@ -1362,7 +1450,13 @@ private def resolveNominalField (baseType : TypeId) (field : String) (span : Spa
       "cross-profile field places require a validated boundary adapter" (some span)
   let some declaration := sourceNominal? ownerNs ownerName.name
     | failAt "LEANER-PLACE-FIELD" s!"unknown nominal type `{ownerName.name}`" (some span)
-  let selected := fieldsNamed declaration field
+  let selected ← match variant with
+    | none => pure (fieldsNamed declaration field)
+    | some variant => match declaration.variants.find? (·.name == variant) with
+      | some variantDecl => pure (variantDecl.fields.filter (·.name == field))
+      | none =>
+          failAt "LEANER-PLACE-VARIANT"
+            s!"enum `{declaration.name}` has no variant `{variant}`" (some span)
   if selected.isEmpty then
     failAt "LEANER-PLACE-FIELD"
       s!"nominal type `{declaration.name}` has no field `{field}`" (some span)
@@ -1381,7 +1475,7 @@ private def resolveNominalField (baseType : TypeId) (field : String) (span : Spa
         let (tables, name) := internName current.tables ownerName.namespaceId field
         set { current with tables }
         pure name
-  return ({ namespaceId := ownerName.namespaceId, name := owner }, fieldName, typeId)
+  return ({ namespaceId := ownerName.namespaceId, name := owner }, fieldName, typeId, declaration)
 
 private def nominalPatternDeclaration (typeId : TypeId) (span : Span) :
     LowerM (SourceNominal × Array GenericArgument) := do
@@ -1612,6 +1706,7 @@ private partial def lowerAssignmentPattern (context : ExprContext)
         lowerAssignmentPattern context element elementType
       pushPattern { loc, typeId, kind := .tuple children }
   | .constructor owner variant fields span =>
+      let (owner, variant) ← resolvedPatternConstructor owner variant
       let ownerType := (← lowerTypeUse context.types owner).typeId
       ensureType typeId ownerType span
       let some (.nominal ownerName instantiations) ← typeNode? typeId
@@ -1641,7 +1736,7 @@ private partial def lowerAssignmentPattern (context : ExprContext)
       let mut children := #[]
       for declared in declaredFields do
         let some child := fields.find? (·.1 == declared.name) | unreachable!
-        let (_, _, fieldType) ← resolveNominalField typeId declared.name child.2.span
+        let (_, _, fieldType, _) ← resolveNominalField typeId declared.name child.2.span
         let fieldType ← if context.specification then projectSpecTypeId fieldType
           else pure fieldType
         children := children.push
@@ -1667,13 +1762,43 @@ private partial def lowerPlace (context : ExprContext) (source : Place) :
             (some span)
       return (← pushPlace (.deref base), reference.referent)
   | .field base field _ =>
+      let variant := match base with
+        | .downcast _ _ variant _ => some variant
+        | _ => none
       let (base, baseType) ← lowerPlace context base
       let (base, baseType) ← match ← typeNode? baseType with
         | some (.reference reference) =>
             pure (← pushPlace (.deref base), reference.referent)
         | _ => pure (base, baseType)
-      let (owner, fieldName, typeId) ← resolveNominalField baseType field span
+      let (owner, fieldName, typeId, _) ← resolveNominalField baseType field span variant
       return (← pushPlace (.field base owner fieldName), typeId)
+  | .downcast base enum variant _ =>
+      let (base, baseType) ← lowerPlace context base
+      let (base, baseType) ← match ← typeNode? baseType with
+        | some (.reference reference) =>
+            pure (← pushPlace (.deref base), reference.referent)
+        | _ => pure (base, baseType)
+      let (declaration, _) ← nominalPatternDeclaration baseType span
+      let some (.nominal owner _) ← typeNode? baseType
+        | failAt "LEANER-PLACE-VARIANT" "a downcast place must have an enum base" (some span)
+      let (named, _) ← resolveLocalNominal enum
+      unless named.name == owner do
+        failAt "LEANER-PLACE-VARIANT"
+          s!"a downcast names `{"::".intercalate enum.toList}`, the place holds `{declaration.name}`"
+          (some span)
+      unless declaration.variants.any (·.name == variant) do
+        failAt "LEANER-PLACE-VARIANT"
+          s!"enum `{declaration.name}` has no variant `{variant}`" (some span)
+      let state ← get
+      let some ownerName := state.tables.names[owner.index]?
+        | failAt "LEANER-PLACE-VARIANT" "a downcast place references a missing enum" (some span)
+      let variantName ← match nameId? state.tables ownerName.namespaceId variant with
+        | some name => pure name
+        | none =>
+            let (tables, name) := internName state.tables ownerName.namespaceId variant
+            set { state with tables }
+            pure name
+      return (← pushPlace (.downcast base variantName), baseType)
 
 private partial def lowerSpecificationPlaceValue (context : ExprContext) (source : Place) :
     LowerM (ExprId × TypeId) := do
@@ -1684,16 +1809,13 @@ private partial def lowerSpecificationPlaceValue (context : ExprContext) (source
         | failAt "LEANER-PLACE-LOCAL" s!"unknown local `{name}`" (some span)
       let loc ← addLoc span
       return (← pushExpression loc typeId (.localVar localId), typeId)
-  | .deref base _ => lowerSpecificationPlaceValue context base
+  | .deref base _ | .downcast base _ _ _ => lowerSpecificationPlaceValue context base
   | .field base field _ =>
       let base ← lowerSpecificationPlaceValue context base
-      let (reference, _, selectedType) ← resolveNominalField base.2 field span
+      let (reference, _, selectedType, declaration) ← resolveNominalField base.2 field span
       let selectedType ← projectSpecTypeId selectedType
       let loc ← addLoc span
-      -- An enum's field lives in each variant that shares it.
-      let selection : LeanerIR.DataOperation ←
-        if ← nominalHasVariants base.2 then pure (.selectVariants reference #[field])
-        else pure (.select reference field)
+      let selection := fieldSelection declaration reference field
       let id ← pushExpression loc selectedType <| .operation (.data selection) #[] #[base.1]
       return (id, selectedType)
 
@@ -1719,7 +1841,7 @@ private def borrowFieldOfReference (context : ExprContext) (loc : LocId)
   let pattern ← pushPattern { loc, typeId := base.2, kind := .variable holder }
   let root ← pushPlace (.localVar holder)
   let dereferenced ← pushPlace (.deref root)
-  let (owner, fieldName, _) ← resolveNominalField referent field span
+  let (owner, fieldName, _, _) ← resolveNominalField referent field span
   let place ← pushPlace (.field dereferenced owner fieldName)
   let borrow ← pushExpression loc borrowType <| .operation (.borrow .mutable place) #[] #[]
   pushExpression loc borrowType (.letDecl pattern (some base.1) borrow)
@@ -1837,6 +1959,22 @@ private def resolveLocalSpecRef (segments : Array String) :
         s!"specification function `{localName}` was not interned"
   return ({ namespaceId, name }, declaration)
 
+private def resolveLocalLemmaRef (segments : Array String) (span : Span) :
+    LowerM (QualifiedRef × LemmaDecl) := do
+  let state ← get
+  let segments := (expandedUsePath? state.sourceNamespace segments).getD segments
+  let some localName := segments.back?
+    | failAt "LEANER-LEMMA-NAME" "a lemma application must name a lemma" (some span)
+  let owner := if segments.size == 1 then state.sourceNamespace.path else segments.pop
+  let some declaration := lemmaForPath? state segments
+    | failAt "LEANER-LEMMA-NAME" s!"unknown lemma `{localName}`" (some span)
+  let some namespaceId := namespaceId? state.tables owner
+    | failAt "LEANER-LEMMA-NAME"
+        s!"lemma namespace `{"::".intercalate owner.toList}` was not interned" (some span)
+  let some name := nameId? state.tables namespaceId localName
+    | failAt "LEANER-LEMMA-NAME" s!"lemma `{localName}` was not interned" (some span)
+  return ({ namespaceId, name }, declaration)
+
 private def addOriginAndAlignment (loc : LocId) : LowerM (OriginId × AlignmentId) := do
   let state ← get
   let origin : OriginId := ⟨state.tables.origins.size⟩
@@ -1886,6 +2024,19 @@ private def addArbitrarySpecValue (context : ExprContext) (typeId : TypeId)
     (.specification (.functionCall { namespaceId := state.namespaceId, name } {}))
       instantiations #[]
   return (expression, typeId)
+
+/-- The name a state label is in LIR: interned in the unit's names, under the
+namespace of the specification. -/
+private def labelName (name : String) : LowerM Nat := do
+  let state ← get
+  let (tables, id) := internName state.tables state.namespaceId name
+  set { state with tables }
+  return id.index
+
+/-- The state a one-state read under the enclosing labels reads: the
+post-state's label, else the pre-state's. -/
+private def stateLabel (context : ExprContext) : Option Nat :=
+  context.stateRange.post <|> context.stateRange.pre
 
 private def runtimeIndexType : LowerM TypeId := do
   match (← get).sourceNamespace.profile with
@@ -1985,7 +2136,7 @@ private partial def lowerExpressionPlaceWith
               pushExpression loc reference.referent
                 (.operation (.reference .dereference) #[] #[← observe]))
         | _ => pure (base, baseType, observe)
-      let (owner, fieldName, typeId) ← resolveNominalField baseType field sourceSpan
+      let (owner, fieldName, typeId, _) ← resolveNominalField baseType field sourceSpan
       return (← pushPlace (.field base owner fieldName), typeId, bindings, do
         pushExpression loc typeId (.operation (.data (.select owner field)) #[] #[← observe]))
   | .index base indexSource _ =>
@@ -2067,27 +2218,35 @@ private def bindPlaceIndices (loc : LocId) (typeId : TypeId)
   bindings.foldrM (fun (pattern, value) body =>
     pushExpression loc typeId (.letDecl pattern (some value) body)) body
 
+/-- Move evaluates an assigned value before the target it writes: unless a
+literal, the value rests in a temporary while the target is evaluated and
+borrowed, and `write` writes it. -/
+private def pushValueFirst (loc : LocId) (unitType : TypeId) (value : ExprId)
+    (valueType : TypeId) (write : ExprId → LowerM ExprId) : LowerM ExprId := do
+  if ((← get).output.expressions[value.index]?).any (·.kind matches .value ..) then
+    return ← write value
+  let slot ← pushTemporaryLocal valueType loc
+  let pattern ← pushPattern { loc, typeId := valueType, kind := .variable slot }
+  let source ← pushPlace (.localVar slot)
+  let read ← pushExpression loc valueType (.operation (.move source) #[] #[])
+  let body ← write read
+  pushExpression loc unitType (.letDecl pattern (some value) body)
+
 /-- Move evaluates the assignment value before constructing its destination.
 Freeze a nonliteral value before effectful indexes and bounds checks; literals
 need no temporary because moving them across those effects is unobservable. -/
 private def pushIndexedAssignment (context : ExprContext) (loc : LocId)
     (unitType : TypeId) (place : PlaceId) (value : ExprId) (valueType : TypeId)
     (bindings : Array (PatternId × ExprId)) : LowerM ExprId := do
-  let literal := ((← get).output.expressions[value.index]?).any fun expression =>
-    match expression.kind with | .value .. => true | _ => false
   let expressions := (← get).output.expressions
   let observesDestination := bindings.any fun (_, initializer) =>
     !(expressions[initializer.index]?).any fun expression =>
       match expression.kind with | .value .. => true | _ => false
   if !context.specification && (← get).sourceNamespace.profile == .move &&
-      observesDestination && !literal then
-    let slot ← pushTemporaryLocal valueType loc
-    let pattern ← pushPattern { loc, typeId := valueType, kind := .variable slot }
-    let source ← pushPlace (.localVar slot)
-    let read ← pushExpression loc valueType (.operation (.move source) #[] #[])
-    let assignment ← pushExpression loc unitType (.assign place read)
-    let body ← bindPlaceIndices loc unitType bindings assignment
-    pushExpression loc unitType (.letDecl pattern (some value) body)
+      observesDestination then
+    pushValueFirst loc unitType value valueType fun read => do
+      let assignment ← pushExpression loc unitType (.assign place read)
+      bindPlaceIndices loc unitType bindings assignment
   else
     let assignment ← pushExpression loc unitType (.assign place value)
     bindPlaceIndices loc unitType bindings assignment
@@ -2294,7 +2453,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
         let resultType ← projectSpecTypeId resource.typeId
         if let some expected := expected then ensureType expected resultType span
         let id ← pushExpression loc resultType <| .operation
-          (.specification (.global none)) #[.typeArg resource] #[key.1]
+          (.specification (.global (stateLabel context))) #[.typeArg resource] #[key.1]
         return (id, resultType)
       let referenceType ← inferredReferenceType .shared resource.typeId loc
       let borrowed ← pushExpression loc referenceType <| .operation
@@ -2477,21 +2636,35 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
           | some .range => internType (.integer .unbounded true)
           -- `x : T` ranges over every value of a type.
           | some (.typeDomain element) => projectSpecTypeId element
-          | _ => failAt "LEANER-QUANTIFIER-DOMAIN" "a quantifier domain must be a vector, logical range, or type" (some domain.span)
+          -- `S : StateDomain` binds a state label.
+          | some .stateDomain => internType .stateDomain
+          | _ => failAt "LEANER-QUANTIFIER-DOMAIN" "a quantifier domain must be a vector, logical range, type, or the state domain" (some domain.span)
+        let label ← match ← typeNode? domainValue.2, pattern with
+          | some .stateDomain, .variable name .. => some <$> labelName name
+          | some .stateDomain, _ =>
+              failAt "LEANER-STATE-LABEL" "a binder over the state domain is one label" (some domain.span)
+          | _, _ => pure none
         let loweredPattern ← lowerBindingPattern active pattern patternType
         let boundLocals ← bindingPatternLocals active pattern
         active := withBoundLocals active boundLocals
         loweredBinders := loweredBinders.push {
-          pattern := loweredPattern, domain := domainValue.1 }
+          pattern := loweredPattern, domain := domainValue.1, label }
       let boolType ← internType .bool
       let body ← lowerExpr active (some boolType) body
       if let some expected := expected then ensureType expected boolType span
       let id ← pushExpression loc boolType <| .quantifier kind.toLIR
         loweredBinders #[] none body.1
       return (id, boolType)
+  | .labeled pre post body _ =>
+      unless context.specification do
+        failAt "LEANER-STATE-LABEL"
+          "state labels are only available in specification expressions" (some span)
+      let stateRange : LeanerIR.MemoryRange :=
+        { pre := ← pre.mapM labelName, post := ← post.mapM labelName }
+      lowerExpr { context with stateRange } expected body
   | .specification operation types arguments _ =>
       lowerSpecificationExpr context expected span loc operation types arguments
-  | .specBlock conditions _ =>
+  | .specBlock conditions _ proof =>
       let boolType ← internType .bool
       let unitType ← internType .unit
       if let some expected := expected then ensureType expected unitType span
@@ -2500,8 +2673,8 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let mut loweredConditions := #[]
       for (kind, condition) in conditions do
         let conditionLoc ← addLoc condition.span
-        let expression ← lowerExpr active
-          (if kind matches .let_ _ then none else some boolType) condition
+        let expression ← lowerExpr { active with lemmaInstances := kind matches .apply }
+          (if kind matches .let_ _ | .split then none else some boolType) condition
         loweredConditions := loweredConditions.push ({
           loc := conditionLoc
           kind := match kind with
@@ -2509,6 +2682,8 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
             | .assertion => ConditionKind.assertion
             | .assumption => ConditionKind.assumption
             | .loopInvariant => ConditionKind.loopInvariant
+            | .apply => ConditionKind.apply
+            | .split => ConditionKind.split
           expression := expression.1 } : LeanerIR.Condition)
         if let .let_ name := kind then
           let some declaration := declaredLocal? active condition.span name
@@ -2516,7 +2691,9 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
                 s!"specification binding `{name}` was not predeclared" (some condition.span)
           active := { active with
             locals := #[(name, declaration.id, declaration.typeId)] ++ active.locals }
-      let id ← pushExpression loc unitType <| .spec { loc, conditions := loweredConditions }
+      let pragmas := if proof then #[SpecBlock.proofPragma] else #[]
+      let id ← pushExpression loc unitType <|
+        .spec { loc, conditions := loweredConditions, pragmas }
       return (id, unitType)
   | .global operation resource arguments _ =>
       let resource ← lowerTypeUse context.types resource
@@ -2528,6 +2705,14 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
           s!"global operation expects {arity} argument(s), got {arguments.size}" (some span)
       let key ← lowerExpr context none arguments[0]!
       let mut loweredArguments := #[key.1]
+      -- `exists<R>(a)` under a state label reads that state.
+      if operation matches .contains then
+        if let some label := stateLabel context then
+          let boolType ← internType .bool
+          if let some expected := expected then ensureType expected boolType span
+          let id ← pushExpression loc boolType <| .operation (.specification (.exists (some label)))
+            #[.typeArg resource] loweredArguments
+          return (id, boolType)
       let (lirOperation, resultType) ← match operation with
         | .contains => pure (GlobalKind.contains, ← internType .bool)
         | .take => pure (.take, resource.typeId)
@@ -2546,27 +2731,34 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       return (id, resultType)
   | .methodCall name result types receiver arguments _ =>
       lowerMethodCallExpr context expected source span loc name result types receiver arguments
-  | .closure segments result captures _ =>
+  | .closure segments types result captures _ =>
       let (reference, declaration) ← resolveLocalRef segments span
-      unless declaration.generics.isEmpty do
+      unless declaration.generics.size == types.size &&
+          declaration.generics.all (·.kind == .type) do
         failAt "LEANER-CLOSURE-GENERICS"
-          "generic closure targets require explicit generic arguments" (some span)
+          "a closure's type arguments do not match its target's type binders" (some span)
+      let instantiations ← types.mapM fun argument => do
+        pure <| GenericArgument.typeArg (← lowerTypeUse context.types argument)
       let declarationTypes ← liftM <|
         typeContext declaration.generics (← namespaceOfRef? reference)
       let parameterTypes ← declaration.parameters.mapM fun parameter => do
         let declared := (← lowerTypeUse declarationTypes parameter.type).typeId
-        if context.specification then projectSpecTypeId declared else pure declared
+        let instantiated ← instantiateTypeId instantiations declared span
+        if context.specification then projectSpecTypeId instantiated else pure instantiated
       unless captures.size ≤ parameterTypes.size do
         failAt "LEANER-CLOSURE-ARITY"
-          "a closure captures more values than its target accepts" (some span)
-      let captures ← (captures.zip (parameterTypes.take captures.size)).mapM
-        fun (capture, type) => lowerExpr context (some type) capture
+          "a closure names more parameters than its target accepts" (some span)
+      -- The mask captures the parameters at the positions a value fills.
+      let mask := captures.zipIdx.foldl (init := 0) fun mask (capture, position) =>
+        if capture.isSome then mask + 2 ^ position else mask
+      let lowered ← (captures.zip (parameterTypes.take captures.size)).filterMapM
+        fun (capture, type) => capture.mapM (lowerExpr context (some type))
       let physicalResultType := (← lowerTypeUse context.types result).typeId
       let resultType ← if context.specification then projectSpecTypeId physicalResultType
         else pure physicalResultType
       if let some expected := expected then ensureType expected resultType span
       let id ← pushExpression loc resultType <| .operation
-        (.call (.closure reference)) #[] (captures.map (·.1))
+        (.call (.closure reference mask)) instantiations (lowered.map (·.1))
       return (id, resultType)
   | .invoke callable arguments _ =>
       let callable ← lowerExpr context none callable
@@ -2611,7 +2803,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
                 GenericArgument.typeArg { typeId, loc }) |>.getD #[]
         | _, _ => #[]
       let operation := if context.specification then
-          Operation.specification (.functionCall reference {})
+          Operation.specification (.functionCall reference context.stateRange)
         else Operation.call (.function reference)
       let id ← pushExpression loc resultType <|
         .operation operation instantiations (lowered.map (·.1))
@@ -2628,7 +2820,7 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
         else pure resultType
       let lowered ← arguments.mapM (lowerExpr context none)
       let operation := if context.specification then
-          Operation.specification (.functionCall reference {})
+          Operation.specification (.functionCall reference context.stateRange)
         else Operation.call (.function reference)
       let id ← pushExpression loc resultType <|
         .operation operation instantiations (lowered.map (·.1))
@@ -2812,16 +3004,7 @@ private partial def lowerLocalExpr (context : ExprContext) (expected : Option Ty
       else pure (constant, physicalType)
     if let some expected := expected then ensureType expected value.2 span
     return value
-  let moveTypeParameter := !context.specification &&
-    match ← typeNode? typeId with
-    | some (.typeParameter index) =>
-        !context.generics[index]?.any (·.abilities.contains .copy)
-    | _ => false
-  let localExpr ← if moveTypeParameter then do
-      let place ← pushPlace (.localVar localId)
-      pushExpression loc typeId <| .operation (.move place) #[] #[]
-    else
-      pushExpression loc typeId (.localVar localId)
+  let localExpr ← pushExpression loc typeId (.localVar localId)
   if let some expected := expected then
     if expected == typeId then return (localExpr, typeId)
     match ← typeNode? expected, ← typeNode? typeId with
@@ -2865,7 +3048,7 @@ private partial def lowerTypedPrimitiveExpr (context : ExprContext) (expected : 
       | failAt "LEANER-TYPED-VECTOR"
           "a typed vector literal requires an unfixed vector result type" (some span)
     let lowered ← arguments.mapM (lowerExpr context (some elementType))
-    if let some expected := expected then ensureType expected resultType span
+    if let some expected := expected then ensureTypeIn context expected resultType span
     let id ← pushExpression loc resultType <| .operation
       (.primitive .vector) #[] (lowered.map (·.1))
     return (id, resultType)
@@ -3217,7 +3400,7 @@ private partial def lowerPrimitiveExpr (context : ExprContext) (expected : Optio
   let typeId ← match resultExpected with
     | some type => pure type
     | none => pure first.2
-  if let some expected := expected then ensureType expected typeId span
+  if let some expected := expected then ensureTypeIn context expected typeId span
   let id ← pushExpression loc typeId <| .operation
     (.primitive lirOperation) #[] (lowered.map (·.1))
   return (id, typeId)
@@ -3522,30 +3705,24 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
   let (baseType, sourceReference) ← match ← typeNode? value.2 with
     | some (.reference reference) => pure (reference.referent, some reference)
     | _ => pure (value.2, none)
-  let (reference, _, fieldType) ← resolveNominalField baseType field span
+  let (reference, _, fieldType, declaration) ← resolveNominalField baseType field span
+  -- A specification reads a field in the logical domain, unless the
+  -- consumer asks for its physical value, as a vector element pushed into a
+  -- physically represented vector does.
+  let readType ← if context.specification && expected != some fieldType then
+      projectSpecTypeId fieldType
+    else pure fieldType
+  let selection := fieldSelection declaration reference field
   match sourceReference with
   | none =>
-      let resultType ← if context.specification then projectSpecTypeId fieldType
-        else pure fieldType
+      let resultType := readType
       if let some expected := expected then ensureType expected resultType span
-      -- An enum's field lives in each variant that shares it, which
-      -- `selectVariants` records and `select` does not; the operand being
-      -- a value rather than a reference does not change that.
-      let selection : LeanerIR.DataOperation ←
-        if ← nominalHasVariants baseType then pure (.selectVariants reference #[field])
-        else pure (.select reference field)
       let id ← pushExpression loc resultType <| .operation
         (.data selection) #[] #[value.1]
       return (id, resultType)
   | some sourceReference =>
       let selectedType ← internType
         (.reference { sourceReference with referent := fieldType })
-      -- A field read through a reference names variants when the nominal
-      -- type has them: an enum's field lives in each variant that shares
-      -- it, which `selectVariants` records and `select` does not.
-      let selection : LeanerIR.DataOperation ←
-        if ← nominalHasVariants baseType then pure (.selectVariants reference #[field])
-        else pure (.select reference field)
       let expectedIsReference ← match expected with
         | some expected => pure ((← typeNode? expected).any fun
             | .reference _ => true
@@ -3572,8 +3749,7 @@ private partial def lowerFieldExpr (context : ExprContext) (expected : Option Ty
       if expectedIsReference then
         if let some expected := expected then ensureType expected selectedType span
         return (selected, selectedType)
-      let resultType ← if context.specification then projectSpecTypeId fieldType
-        else pure fieldType
+      let resultType := readType
       if let some expected := expected then ensureType expected resultType span
       let id ← pushExpression loc resultType <| .operation
         (.reference .dereference) #[] #[selected]
@@ -3699,8 +3875,8 @@ private partial def lowerVariantTestExpr (context : ExprContext) (expected : Opt
   return (id, boolType)
 
 private partial def lowerSelectVariantsExpr (context : ExprContext) (expected : Option TypeId)
-    (span : Span) (loc : LocId) (ownerType : Located Ty) (fields : Array String) (value : Expr) :
-    LowerM (ExprId × TypeId) := do
+    (span : Span) (loc : LocId) (ownerType : Located Ty) (fields : Array (String × String))
+    (value : Expr) : LowerM (ExprId × TypeId) := do
   let .named ownerSegments _ := ownerType.value
     | failAt "LEANER-VARIANT-SELECT-TYPE"
         "variant-field selection requires a nominal owner type" (some ownerType.span)
@@ -3725,13 +3901,12 @@ private partial def lowerSelectVariantsExpr (context : ExprContext) (expected : 
         failAt "LEANER-VARIANT-SELECT-TYPE"
           "variant-field owner did not lower to a nominal type" (some ownerType.span)
   let mut selectedFields := #[]
-  for field in fields do
-    let candidates := declaration.variants.filterMap fun variant =>
-      variant.fields.find? (·.name == field)
-    unless !candidates.isEmpty do
-      failAt "LEANER-VARIANT-SELECT-FIELDS"
-        s!"enum `{declaration.name}` has no variant field `{field}`" (some span)
-    selectedFields := selectedFields ++ candidates
+  for (variant, field) in fields do
+    let some selected := (declaration.variants.find? (·.name == variant)).bind
+        (·.fields.find? (·.name == field))
+      | failAt "LEANER-VARIANT-SELECT-FIELDS"
+          s!"enum `{declaration.name}` has no variant field `{variant}.{field}`" (some span)
+    selectedFields := selectedFields.push selected
   let fieldTypes ← selectedFields.mapM fun field => do
     let instantiated ← nominalPatternFieldType declaration instantiations field span
     if context.specification then projectSpecTypeId instantiated else pure instantiated
@@ -3810,7 +3985,7 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
             { loc, typeId := referenceType, kind := .variable holder }
           let mut place ← pushPlace (.deref (← pushPlace (.localVar holder)))
           for field in fields do
-            let (owner, fieldName, fieldType) ←
+            let (owner, fieldName, fieldType, _) ←
               resolveNominalField referent field span
             referent := fieldType
             place ← pushPlace (.field place owner fieldName)
@@ -3823,7 +3998,7 @@ private partial def lowerBorrowValueExpr (context : ExprContext) (expected : Opt
           return (id, referenceType)
         let mut selected := borrowed
         for field in fields do
-          let (owner, _, fieldType) ← resolveNominalField referent field span
+          let (owner, _, fieldType, _) ← resolveNominalField referent field span
           referent := fieldType
           referenceType ← inferredReferenceType expectedKind referent loc
           selected ← pushExpression loc referenceType <| .operation
@@ -3874,7 +4049,7 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
     failAt "LEANER-SPEC-OPERATION"
       "specification operations are only available in specification expressions" (some span)
   match operation with
-  | .behavior kind range =>
+  | .behavior kind =>
       unless types.isEmpty do
         failAt "LEANER-SPEC-GENERICS"
           "behavior predicates do not accept type arguments" (some span)
@@ -3929,12 +4104,12 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
         | .writeOf _ => requireExpected expected span "write_of result"
         | .requiresOf | .abortsOf | .ensuresOf | .unchangedOf | .foldsOf =>
             internType .bool
-      if let some expected := expected then ensureType expected resultType span
-      let lirRange : LeanerIR.MemoryRange := { pre := range.pre, post := range.post }
       let id ← pushExpression loc resultType <| .operation
-        (.specification (.behavior kind.toLIR lirRange)) #[]
+        (.specification (.behavior kind.toLIR context.stateRange)) #[]
         (#[target.1] ++ loweredValues.map (·.1))
-      return (id, resultType)
+      -- The result is logical, as a scalar call's: injected where a
+      -- physical integer is expected.
+      finishCall context expected id resultType loc span
   | .saveStateAnchor label | .foldsCaptureAnchor label =>
       unless types.isEmpty do
         failAt "LEANER-SPEC-GENERICS"
@@ -3948,7 +4123,8 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
       let operation := match operation with
         | .saveStateAnchor _ => SpecOperation.saveStateAnchor label
         | .foldsCaptureAnchor _ => SpecOperation.foldsCaptureAnchor label
-        | .behavior .. | .withStateAnchor _ | .old | .global | .typeDomain |
+        | .behavior .. | .withStateAnchor _ | .old | .global | .typeDomain | .stateDomain |
+            .publish | .remove | .update |
             .result _ | .inlineCallSummary | .emptyVector | .singletonVector |
             .updateVector | .concatVector | .indexOfVector | .containsVector |
             .lengthVector | .indexVector | .sliceVector | .bitVectorToInt |
@@ -3990,6 +4166,37 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
       let id ← pushExpression loc boolType <|
         .operation (.specification .inlineCallSummary) #[] #[result.1, aborts.1]
       return (id, boolType)
+  | .stateDomain =>
+      unless types.isEmpty && arguments.isEmpty do
+        failAt "LEANER-SPEC-ARITY" "the state domain takes no arguments" (some span)
+      let resultType ← internType .stateDomain
+      if let some expected := expected then ensureType expected resultType span
+      let id ← pushExpression loc resultType <| .operation (.specification .stateDomain) #[] #[]
+      return (id, resultType)
+  | .publish | .remove | .update =>
+      let name := match operation with
+        | .publish => "publish" | .remove => "remove" | _ => "update"
+      let resource ← match types.toList with
+        | [resource] => lowerTypeUse context.types resource
+        | _ => failAt "LEANER-SPEC-GENERICS" s!"`{name}` requires exactly one resource type" (some span)
+      let arity := if operation == .remove then 1 else 2
+      unless arguments.size == arity do
+        failAt "LEANER-SPEC-ARITY" s!"`{name}` expects {arity} argument(s), got {arguments.size}" (some span)
+      let addressType ← internType .address
+      let key ← lowerExpr context (some addressType) arguments[0]!
+      let mut operands := #[key.1]
+      if arity == 2 then
+        let value ← lowerExpr context (some resource.typeId) arguments[1]!
+        operands := operands.push value.1
+      let boolType ← internType .bool
+      if let some expected := expected then ensureType expected boolType span
+      let lirOperation := match operation with
+        | .publish => SpecOperation.publish context.stateRange
+        | .remove => .remove context.stateRange
+        | _ => .update context.stateRange
+      let id ← pushExpression loc boolType <| .operation (.specification lirOperation)
+        #[.typeArg resource] operands
+      return (id, boolType)
   | .typeDomain =>
       unless types.size == 1 do
         failAt "LEANER-SPEC-GENERICS" "spec.typeDomain requires one type argument" (some span)
@@ -4022,7 +4229,7 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
       let key ← lowerExpr context none arguments[0]!
       if let some expected := expected then ensureType expected resource.typeId span
       let id ← pushExpression loc resource.typeId <|
-        .operation (.specification (.global none)) #[.typeArg resource] #[key.1]
+        .operation (.specification (.global (stateLabel context))) #[.typeArg resource] #[key.1]
       return (id, resource.typeId)
   | .emptyVector | .singletonVector | .updateVector | .concatVector |
       .indexOfVector | .containsVector | .lengthVector | .indexVector |
@@ -4080,7 +4287,7 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
         | .inVectorRange => (.inVectorRange, #[vectorType, integerType], boolType)
         | .vectorRange => (.vectorRange, #[vectorType], rangeType)
         | .behavior .. | .old | .saveStateAnchor _ | .withStateAnchor _ |
-            .foldsCaptureAnchor _ |
+            .foldsCaptureAnchor _ | .stateDomain | .publish | .remove | .update |
             .global | .typeDomain | .result _ | .inlineCallSummary |
             .bitVectorToInt | .intToBitVector | .inRange => unreachable!
       unless arguments.size == parameterTypes.size do
@@ -4268,7 +4475,7 @@ private partial def lowerMethodCallExpr (context : ExprContext) (expected : Opti
     let instantiations := instantiationTypes.map fun typeId =>
       GenericArgument.typeArg { typeId, loc }
     let operation := if context.specification then
-        Operation.specification (.functionCall reference {})
+        Operation.specification (.functionCall reference context.stateRange)
       else Operation.call (.function reference)
     let id ← pushExpression loc resultType <| .operation
       operation instantiations (allArguments.map (·.1))
@@ -4299,6 +4506,8 @@ private partial def lowerGenericCallExpr (context : ExprContext) (expected : Opt
     (span : Span) (loc : LocId) (segments : Array String) (typeArguments : Array (Located Ty))
     (arguments : Array Expr) :
     LowerM (ExprId × TypeId) := do
+  if context.lemmaInstances && (lemmaForPath? (← get) segments).isSome then
+    return ← lowerLemmaInstance context expected span loc segments (some typeArguments) arguments
   if context.specification then
     if let some declaration := specFunctionForPath? (← get) segments then
       let (reference, _) ← resolveLocalSpecRef segments
@@ -4324,7 +4533,7 @@ private partial def lowerGenericCallExpr (context : ExprContext) (expected : Opt
       let resultType ← projectSpecTypeId
         (← instantiateTypeId instantiations declaredResult span)
       let id ← pushExpression loc resultType <|
-        .operation (.specification (.functionCall reference {})) instantiations
+        .operation (.specification (.functionCall reference context.stateRange)) instantiations
           (lowered.map (·.1))
       return ← finishCall context expected id resultType loc span
   let (reference, declaration) ← resolveLocalRef segments span
@@ -4351,16 +4560,65 @@ private partial def lowerGenericCallExpr (context : ExprContext) (expected : Opt
   let resultType ← if context.specification then projectSpecTypeId instantiatedResult
     else pure instantiatedResult
   let operation := if context.specification then
-      Operation.specification (.functionCall reference {})
+      Operation.specification (.functionCall reference context.stateRange)
     else Operation.call (.function reference)
   let id ← pushExpression loc resultType <|
     .operation operation instantiations (lowered.map (·.1))
   finishCall context expected id resultType loc span
 
+/-- A lemma instance in an `apply` step: the lemma at its arguments, a
+proposition. Its type arguments are given or inferred from the arguments. -/
+private partial def lowerLemmaInstance (context : ExprContext) (expected : Option TypeId)
+    (span : Span) (loc : LocId) (segments : Array String)
+    (typeArguments : Option (Array (Located Ty))) (arguments : Array Expr) :
+    LowerM (ExprId × TypeId) := do
+  let (reference, declaration) ← resolveLocalLemmaRef segments span
+  let argumentContext := { context with lemmaInstances := false }
+  let sourceTypes ← typeContext declaration.generics (← namespaceOfRef? reference)
+  if arguments.size != declaration.parameters.size then
+    failAt "LEANER-LEMMA-ARITY"
+      s!"lemma `{declaration.name}` expects {declaration.parameters.size} argument(s), got {arguments.size}"
+        (some span)
+  unless declaration.generics.all (·.kind == .type) do
+    failAt "LEANER-LEMMA-GENERICS" "a lemma binds types only" (some span)
+  let physicalParameterTypes ← declaration.parameters.mapM fun parameter =>
+    (lowerTypeUse sourceTypes parameter.type).map (·.typeId)
+  let instantiations ← match typeArguments with
+    | some types =>
+        unless declaration.generics.size == types.size do
+          failAt "LEANER-LEMMA-GENERICS"
+            "type arguments do not match the lemma's type binders" (some span)
+        types.mapM fun argument => do
+          pure <| GenericArgument.typeArg (← lowerTypeUse context.types argument)
+    | none =>
+        if declaration.generics.isEmpty then pure #[] else do
+        let parameterTypes ← physicalParameterTypes.mapM projectSpecTypeId
+        let mut inferred : Array (Option TypeId) :=
+          Array.replicate declaration.generics.size none
+        for (argument, parameterType) in arguments.zip parameterTypes do
+          let value ← lowerExpr argumentContext none argument
+          inferred ← inferTypeArguments true inferred parameterType value.2 argument.span
+        unless inferred.all (·.isSome) do
+          failAt "LEANER-LEMMA-INFERENCE"
+            s!"cannot infer every type argument of lemma `{declaration.name}`" (some span)
+        let instantiationLoc ← addLoc span
+        pure <| inferred.map fun type =>
+          GenericArgument.typeArg { typeId := type.get!, loc := instantiationLoc }
+  let lowered ← (arguments.zip physicalParameterTypes).mapM fun (argument, parameterType) => do
+    lowerExpr argumentContext
+      (some (← projectSpecTypeId (← instantiateTypeId instantiations parameterType span)))
+      argument
+  let boolType ← internType .bool
+  let id ← pushExpression loc boolType <|
+    .operation (.specification (.lemma reference {})) instantiations (lowered.map (·.1))
+  finishCall context expected id boolType loc span
+
 private partial def lowerCallExpr (context : ExprContext) (expected : Option TypeId)
     (source : Expr) (span : Span) (loc : LocId) (segments : Array String)
     (arguments : Array Expr) :
     LowerM (ExprId × TypeId) := do
+  if context.lemmaInstances && (lemmaForPath? (← get) segments).isSome then
+    return ← lowerLemmaInstance context expected span loc segments none arguments
   let localName := segments.back?.getD ""
   -- `!` is accepted as part of a source identifier, so the legacy Move
   -- anchor spellings may arrive through the ordinary call node instead
@@ -4471,7 +4729,11 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
       failAt "LEANER-SPEC-ARITY"
         s!"specification builtin `{localName}` expects {expectedArity} operand(s)"
           (some span)
-    let collection ← lowerExpr context none arguments[0]!
+    -- An update or a concatenation is a vector of the operand's type: the
+    -- expected type is the operand's.
+    let collection ← lowerExpr context
+      (if operation == .updateVector || operation == .concatVector then expected else none)
+      arguments[0]!
     let some (.vector elementType _) ← typeNode? collection.2
       | failAt "LEANER-SPEC-VECTOR"
           s!"specification builtin `{localName}` requires a vector operand" (some span)
@@ -4552,7 +4814,7 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
               (← instantiateTypeId instantiations parameterType span))) argument
       let resultType ← projectSpecTypeId
         (← instantiateTypeId instantiations rawResult span)
-      let operation := Operation.specification (.functionCall reference {})
+      let operation := Operation.specification (.functionCall reference context.stateRange)
       let id ← pushExpression loc resultType <|
         .operation operation instantiations (finalLowered.map (·.1))
       finishCall context expected id resultType loc span
@@ -4608,7 +4870,7 @@ private partial def lowerCallExpr (context : ExprContext) (expected : Option Typ
           projectSpecTypeId instantiatedResult
         else pure instantiatedResult
       let operation := if context.specification then
-          Operation.specification (.functionCall reference {})
+          Operation.specification (.functionCall reference context.stateRange)
         else Operation.call (.function reference)
       let id ← pushExpression loc resultType <|
         .operation operation instantiations (finalLowered.map (·.1))
@@ -4633,14 +4895,14 @@ private partial def lowerBlockExpr (context : ExprContext) (expected : Option Ty
   -- A final specification is parsed as the block result. Include it
   -- in the same normalization as statement-position annotations.
   let (statements, result) := match result with
-    | some spec@(.specBlock conditions _) =>
+    | some spec@(.specBlock conditions _ _) =>
         if isLoopSpecification conditions then
           (statements.push (.expression spec), none)
         else (statements, result)
     | _ => (statements, result)
   let rec normalizeLoopSpecifications : List Statement → List Statement
     | .expression loopExpr@(.loop ..) ::
-        .expression specExpr@(.specBlock conditions _) :: rest =>
+        .expression specExpr@(.specBlock conditions _ _) :: rest =>
         if isLoopSpecification conditions then
           .expression specExpr :: .expression loopExpr ::
             normalizeLoopSpecifications rest
@@ -4728,10 +4990,14 @@ private partial def lowerIfElseExpr (context : ExprContext) (expected : Option T
     (thenBranch : Expr) (elseBranch : Option Expr) :
     LowerM (ExprId × TypeId) := do
   let boolType ← internType .bool
-  let condition ← lowerExpr context (some boolType) condition
-  let thenBranch ← lowerExpr { context with functionTail } expected thenBranch
   let neverType ← internType .never
   let unitType ← internType .unit
+  let condition ← lowerExpr context (some boolType) condition
+  -- A branch without an `else` where the `if` supplies no value is a
+  -- statement: its own value is unconstrained and discarded below.
+  let thenExpected := if elseBranch.isNone && (expected.isNone || expected == some unitType)
+    then none else expected
+  let thenBranch ← lowerExpr { context with functionTail } thenExpected thenBranch
   let branchExpected := if thenBranch.2 == neverType then expected else some thenBranch.2
   let elseBranch ← elseBranch.mapM (lowerExpr { context with functionTail } branchExpected)
   let (thenBranch, typeId) ← match elseBranch with
@@ -4849,9 +5115,16 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
       locals enter the native denotation.  A move-only enum retains the
       ordinary match node until V1 has a consuming match combinator. -/
       let (declaration, _) ← nominalPatternDeclaration scrutinee.2 span
+      -- Only unguarded constructor arms binding their payloads directly form
+      -- the decision tree; any other match keeps its match node.
+      let flatArms := arms.all fun (pattern, guard, _) => guard.isNone && match pattern with
+        | .wildcard _ => true
+        | .constructor _ _ fields _ => fields.all fun (_, child) =>
+            (child matches .wildcard _) || (child matches .variable ..)
+        | _ => false
       if declaration.variants.isEmpty ||
           !declaration.abilities.contains .copy ||
-          !(← uniformEnumFieldTypes declaration) then
+          !(← uniformEnumFieldTypes declaration) || !flatArms then
         lowerOrdinary
       else do
         let mut coveredVariants : Array String := #[]
@@ -4920,7 +5193,7 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
                         | failAt "LEANER-LOCAL-DECLARATION"
                             s!"pattern local `{name}` was not predeclared"
                             (some childSpan)
-                      let (_, _, fieldType) ←
+                      let (_, _, fieldType, _) ←
                         resolveNominalField scrutinee.2 declared.name childSpan
                       ensureType localDecl.typeId fieldType childSpan
                       aliases := aliases.push
@@ -5033,7 +5306,7 @@ private partial def lowerMatchExpr (context : ExprContext) (expected : Option Ty
                       | failAt "LEANER-LOCAL-DECLARATION"
                           s!"pattern local `{name}` was not predeclared"
                           (some childSpan)
-                    let (_, _, fieldType) ←
+                    let (_, _, fieldType, _) ←
                       resolveNominalField reference.referent declared.name childSpan
                     let some (.reference localReference) ←
                         typeNode? localDecl.typeId
@@ -5199,7 +5472,8 @@ private partial def lowerAssignExpressionExpr (context : ExprContext) (expected 
           (.global (.borrow .mutable)) #[.typeArg resource] #[key.1]
         if fields.isEmpty then
           let value ← lowerExpr context (some resource.typeId) value
-          let id ← pushReferenceMutation loc unitType referenceType borrow value.1
+          let id ← pushValueFirst loc unitType value.1 value.2 fun value =>
+            pushReferenceMutation loc unitType referenceType borrow value
           return (id, unitType)
         -- The resource is borrowed into a hidden holder and the field is
         -- written as a place through it: a select through a mutable
@@ -5210,12 +5484,13 @@ private partial def lowerAssignExpressionExpr (context : ExprContext) (expected 
         let mut place ← pushPlace (.deref root)
         let mut referent := resource.typeId
         for field in fields do
-          let (owner, fieldName, fieldType) ← resolveNominalField referent field span
+          let (owner, fieldName, fieldType, _) ← resolveNominalField referent field span
           place ← pushPlace (.field place owner fieldName)
           referent := fieldType
         let value ← lowerExpr context (some referent) value
-        let assignment ← pushExpression loc unitType (.assign place value.1)
-        let id ← pushExpression loc unitType (.letDecl pattern (some borrow) assignment)
+        let id ← pushValueFirst loc unitType value.1 value.2 fun value => do
+          let assignment ← pushExpression loc unitType (.assign place value)
+          pushExpression loc unitType (.letDecl pattern (some borrow) assignment)
         return (id, unitType)
   -- Move assigns through a reference a call returns. The target's base is
   -- then an expression rather than a place: the reference rests in a
@@ -5232,7 +5507,7 @@ private partial def lowerAssignExpressionExpr (context : ExprContext) (expected 
         return (← pushExpression loc unitType (.value .unit), unitType)
       let baseValue ← lowerExpr context none base
       if let some (.reference reference) ← typeNode? baseValue.2 then
-        let (owner, fieldName, fieldType) ←
+        let (owner, fieldName, fieldType, _) ←
           resolveNominalField reference.referent field span
         let holder ← pushTemporaryLocal baseValue.2 loc
         let pattern ← pushPattern { loc, typeId := baseValue.2, kind := .variable holder }
@@ -5240,14 +5515,16 @@ private partial def lowerAssignExpressionExpr (context : ExprContext) (expected 
         let dereferenced ← pushPlace (.deref root)
         let place ← pushPlace (.field dereferenced owner fieldName)
         let value ← lowerExpr context (some fieldType) value
-        let assignment ← pushExpression loc unitType (.assign place value.1)
-        let id ← pushExpression loc unitType (.letDecl pattern (some baseValue.1) assignment)
+        let id ← pushValueFirst loc unitType value.1 value.2 fun value => do
+          let assignment ← pushExpression loc unitType (.assign place value)
+          pushExpression loc unitType (.letDecl pattern (some baseValue.1) assignment)
         return (id, unitType)
     if let .dereference base _ := target then
       let baseValue ← lowerExpr context none base
       if let some (.reference reference) ← typeNode? baseValue.2 then
         let value ← lowerExpr context (some reference.referent) value
-        let id ← pushReferenceMutation loc unitType baseValue.2 baseValue.1 value.1
+        let id ← pushValueFirst loc unitType value.1 value.2 fun value =>
+          pushReferenceMutation loc unitType baseValue.2 baseValue.1 value
         return (id, unitType)
   let some placeSource := localStoragePlace? context target
     | failAt "LEANER-PLACE-EXPRESSION"
@@ -5309,9 +5586,11 @@ private def sourceQuantifierPatternType (context : ExprContext) (domain : Expr) 
     | some (.vector element _) => pure element
     | some .range => internType (.integer .unbounded true)
     | some (.typeDomain element) => projectSpecTypeId element
+    | some .stateDomain => internType .stateDomain
     | _ => do
         failAt "LEANER-QUANTIFIER-DOMAIN"
-          "a quantifier domain must be a vector, logical range, or type" (some domain.span)
+          "a quantifier domain must be a vector, logical range, type, or the state domain"
+          (some domain.span)
   return patternType
 
 private def modifierAttributes (modifiers : FunctionModifiers) : Array Attribute :=
@@ -5334,13 +5613,14 @@ private def clauseKind? : ContractClause → Option ConditionKind
   | .ensures .. => some .ensures
   | .abortsIf .. => some .abortsIf
   | .invariant .. => some .structInvariant
-  | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. => none
+  | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
+      .modifiesOfAll .. => none
 
 private def clauseExpression? : ContractClause → Option Expr
   | .letPre _ expression .. | .letPost _ expression .. |
       .requires expression .. | .ensures expression .. | .abortsIf expression .. |
       .invariant expression .. | .modifies expression .. => some expression
-  | .modifiesAll .. | .reads .. | .readsAll .. => none
+  | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. | .modifiesOfAll .. => none
 
 private def clauseAuxiliary (context : ExprContext) : ContractClause →
     LowerM (Array (String × ExprId))
@@ -5353,7 +5633,8 @@ private def clauseProperties : ContractClause → Array String
   | .letPre _ _ properties _ | .letPost _ _ properties _ |
       .requires _ properties _ | .ensures _ properties _ | .abortsIf _ _ properties _ |
       .invariant _ properties _ => properties
-  | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. => #[]
+  | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
+      .modifiesOfAll .. => #[]
 
 private partial def pragmaConstValue (value : Expr) : LowerM ConstValue :=
   match value with
@@ -5372,6 +5653,8 @@ private partial def pragmaConstValue (value : Expr) : LowerM ConstValue :=
       "a pragma value must be a constant literal" (some value.span)
 
 private def pragmaAttribute (pragma : Pragma) : LowerM Attribute := do
+  if let some qualified := pragma.qualified then
+    return .assign pragma.name (.qualifiedName qualified)
   match pragma.value with
   | .local value _ =>
       -- A bare-name pragma value is a declaration reference (for example
@@ -5418,10 +5701,37 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
   let mut readsAll := false
   let mut hasFrame := false
   let mut bindingLocals := #[]
+  let mut parameterFrames := #[]
   let mut context := context
   for clause in clauses do
     let loc ← addLoc clause.span
     match clause with
+    | .modifiesOf parameter formals targets span =>
+        let some (parameterId, _) := lookupLocal? context parameter
+          | failAt "LEANER-MODIFIES-OF" s!"`modifies_of` names `{parameter}`, which is not a \
+              parameter" (some span)
+        -- The formals are locals of the clause alone.
+        let mut formalLocals := #[]
+        for formal in formals do
+          let type ← lowerTypeUse context.types formal.type
+          let id : LocalId := ⟨nextLocalId + bindingLocals.size⟩
+          let formalLoc ← addLoc formal.span
+          bindingLocals := bindingLocals.push
+            ({ id, name := formal.name, type, mutable := false, loc := formalLoc } : LocalDecl)
+          formalLocals := formalLocals.push (formal.name, id, type.typeId)
+        let clauseContext := withBoundLocals context formalLocals
+        let lowered ← targets.mapM fun target => return (← lowerExpr clauseContext none target).1
+        parameterFrames := parameterFrames.push ({
+          loc, parameter := parameterId, formals := formalLocals.map (·.2.1),
+          modifies := lowered } : ParameterFrame)
+        continue
+    | .modifiesOfAll parameter span =>
+        let some (parameterId, _) := lookupLocal? context parameter
+          | failAt "LEANER-MODIFIES-OF" s!"`modifies_of` names `{parameter}`, which is not a \
+              parameter" (some span)
+        parameterFrames := parameterFrames.push
+          ({ loc, parameter := parameterId, modifiesAll := true } : ParameterFrame)
+        continue
     | .modifies expression _ loose =>
         hasFrame := true
         modifies := modifies.push (← lowerExpr context none expression).1
@@ -5482,7 +5792,8 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
     hasFrame
     modifiesAll
     readsAll
-    pragmas }, bindingLocals)
+    pragmas
+    parameterFrames }, bindingLocals)
 
 private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   if declaration.modifiers.isNative && declaration.modifiers.isOpaque then
@@ -5526,6 +5837,9 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   -- the function's own result type.
   let predeclareReturnType := (← lowerTypeUse typeContext declaration.result).typeId
   for (binding, scope) in scopedBindings #[] (declaration.body.getD (.unit {})) do
+    -- A body's quantifier binders are predeclared with the initializers
+    -- that hold them, below, and with the clauses'.
+    if binding.quantifier then continue
     let scopeLocals := scope.reverse.flatMap fun entry =>
       predeclared.filterMap fun (span, name, id, typeId) =>
         if span == entry.span then some (name, id, typeId) else none
@@ -5604,6 +5918,28 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     let visible := scope.reverse.flatMap (fun entry =>
       clausePredeclared.filterMap fun (span, name, id, typeId) =>
         if span == entry.span then some (name, id, typeId) else none) ++ clauseScope
+    -- A quantifier binder at its place, so that the bindings in its body
+    -- see it.
+    if binding.quantifier then
+      let some domain := binding.value | continue
+      let predeclareContext : ExprContext := {
+        types := typeContext
+        locals := visible ++ quantifierLocals
+        declarations
+        returnType := predeclareReturnType
+        resultType := some predeclareResultType
+        specification := true }
+      let patternType ← sourceQuantifierPatternType predeclareContext domain
+      let patternDeclarations ← predeclareBindingPattern typeContext false
+        binding.pattern patternType locals.size
+      for (localInfo, localDecl) in patternDeclarations do
+        locals := locals.push localDecl
+        localTypes := localTypes.push (localInfo.name, localInfo.id, localInfo.typeId)
+        declarations := declarations.push localInfo
+        logicalLocals := logicalLocals.push localInfo.id
+        clausePredeclared := clausePredeclared.push
+          (binding.pattern.span, localInfo.name, localInfo.id, localInfo.typeId)
+      continue
     let typeId ← match binding.type with
       | some type => projectSpecTypeId (← lowerTypeUse typeContext type).typeId
       | none => do
@@ -5757,7 +6093,7 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
     -- function keeps a declared logical symbol with no derived body until the
     -- projection models control flow.
     let externallyModeled := externallyModeled || hasEarlyReturn true sourceBody ||
-      hasLoop sourceBody
+      hasLoop sourceBody || hasDowncastPlace sourceBody
     let specBody ← if externallyModeled then pure none else do
       let specBody ← lowerExpr { specContext with functionTail := true } (some resultSpecType) sourceBody
       ensureType resultSpecType specBody.2 sourceBody.span
@@ -5805,7 +6141,8 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
     parameters := parameters.push { name := parameter.name, typeUse }
     locals := locals.push {
       id := ⟨index⟩, name := parameter.name, type := typeUse, loc := parameterLoc }
-    localTypes := localTypes.push (parameter.name, ⟨index⟩, typeUse.typeId)
+    localTypes := localTypes.push
+      (parameter.name, ⟨index⟩, ← specReferentTypeId typeUse.typeId)
   let parameterLocalTypes := localTypes
   let mut declarations := #[]
   let mut inferenceLocals := localTypes
@@ -5908,6 +6245,107 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
   modify fun state => { state with output := { state.output with
     specFunctions := state.output.specFunctions.push function } }
 
+private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
+  let loc ← addLoc declaration.span
+  let state ← get
+  let some name := nameId? state.tables state.namespaceId declaration.name
+    | failAt "LEANER-LEMMA-NAME" s!"lemma `{declaration.name}` was not interned"
+  let typeContext ← liftM <| typeContext declaration.generics
+  let generics ← declaration.generics.mapM lowerBinder
+  let mut parameters := #[]
+  let mut locals := #[]
+  let mut localTypes := #[]
+  for (parameter, index) in declaration.parameters.zipIdx do
+    if declaration.parameters.take index |>.any (·.name == parameter.name) then
+      failAt "LEANER-LEMMA-PARAMETER-DUPLICATE"
+        s!"parameter `{parameter.name}` is declared more than once" (some parameter.span)
+    if parameter.mutable then
+      failAt "LEANER-LEMMA-PARAMETER-MUTABLE"
+        "a lemma parameter cannot be mutable" (some parameter.span)
+    let typeUse ← lowerTypeUse typeContext parameter.type
+    let parameterLoc ← addLoc parameter.span
+    parameters := parameters.push { name := parameter.name, typeUse }
+    locals := locals.push {
+      id := ⟨index⟩, name := parameter.name, type := typeUse, loc := parameterLoc }
+    localTypes := localTypes.push
+      (parameter.name, ⟨index⟩, ← specReferentTypeId typeUse.typeId)
+  let parameterLocalTypes := localTypes
+  let roots := declaration.contract.filterMap clauseExpression? ++ declaration.decreases ++
+    declaration.proof.map (·.2)
+  let unitType ← internType .unit
+  let mut declarations := #[]
+  let mut quantifierLocals := localTypes
+  for binding in roots.flatMap sourceQuantifierBindings do
+    let predeclareContext : ExprContext := {
+      types := typeContext
+      locals := quantifierLocals
+      declarations
+      returnType := unitType
+      specification := true }
+    let patternType ← sourceQuantifierPatternType predeclareContext binding.domain
+    let patternDeclarations ← predeclareBindingPattern typeContext false
+      binding.pattern patternType locals.size
+    for (localInfo, localDecl) in patternDeclarations do
+      locals := locals.push localDecl
+      quantifierLocals := #[(localInfo.name, localInfo.id, localInfo.typeId)] ++
+        quantifierLocals
+      declarations := declarations.push localInfo
+  for binding in roots.flatMap sourceMatchBindings do
+    let predeclareContext : ExprContext := {
+      types := typeContext
+      locals := localTypes
+      declarations
+      returnType := unitType
+      specification := true }
+    let patternType ← sourceMatchPatternType predeclareContext
+      binding.pattern binding.scrutinee
+    let patternDeclarations ← predeclareBindingPattern typeContext false
+      binding.pattern patternType locals.size
+    for (localInfo, localDecl) in patternDeclarations do
+      locals := locals.push localDecl
+      declarations := declarations.push localInfo
+  let (origin, _) ← addOriginAndAlignment loc
+  let context : ExprContext := {
+    types := typeContext
+    generics
+    locals := parameterLocalTypes
+    declarations
+    returnType := unitType
+    specification := true }
+  let (contract, contractLocals) ← lowerContract context declaration.contract none #[] false
+    locals.size
+  -- A recursive lemma's measure is a mathematical integer per component.
+  let intType ← internType (.integer .unbounded true)
+  let decreases ← declaration.decreases.mapM fun source => do
+    let lowered ← lowerExpr context (some intType) source
+    ensureType intType lowered.2 source.span
+    pure ({ loc := ← addLoc source.span, kind := .decreases, expression := lowered.1 } :
+      LeanerIR.Condition)
+  let boolType ← internType .bool
+  let proof ← declaration.proof.mapM fun (kind, source) => do
+    let kind ← match kind with
+      | .assertion => pure ConditionKind.assertion
+      | .assumption => pure ConditionKind.assumption
+      | .apply => pure ConditionKind.apply
+      | .split => pure ConditionKind.split
+      | .let_ _ | .loopInvariant =>
+          failAt "LEANER-LEMMA-STEP"
+            "a lemma's step asserts, assumes, applies lemmas, or splits cases" (some source.span)
+    let lowered ← lowerExpr { context with lemmaInstances := kind matches .apply }
+      (if kind matches .split then none else some boolType) source
+    pure ({ loc := ← addLoc source.span, kind, expression := lowered.1 } : LeanerIR.Condition)
+  let lemma : LeanerIR.LemmaDecl := {
+    loc
+    name
+    profile := state.sourceNamespace.profile.toLIR
+    signature := { generics, parameters }
+    origin
+    locals := locals ++ contractLocals
+    contract := { contract with conditions := contract.conditions ++ decreases }
+    proof }
+  modify fun state => { state with output := { state.output with
+    lemmas := state.output.lemmas.push lemma } }
+
 private def lowerConstant (declaration : ConstantDecl) : LowerM Unit := do
   let loc ← addLoc declaration.span
   let state ← get
@@ -5946,6 +6384,23 @@ private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
     locals := locals.push {
       id := ⟨index⟩, name := source.name, type, mutable := false, loc := field.loc }
     localTypes := localTypes.push (source.name, ⟨index⟩, typeId)
+  /- After its fields, a structure invariant reads the whole value as `this`,
+  as an enum invariant does: a positional field has no name of its own. -/
+  if declaration.contract.any (fun clause => match clause with
+      | .invariant .. => true
+      | _ => false) then
+    let mut arguments : Array LeanerIR.GenericArgument := #[]
+    for (binder, index) in generics.zipIdx do
+      unless binder.kind == .typeArg do
+        failAt "LEANER-STRUCT-INVARIANT-GENERIC"
+          "a structure invariant over a non-type parameter is not supported" (some declaration.span)
+      arguments := arguments.push
+        (.typeArg { typeId := ← internType (.typeParameter index), loc })
+    let thisType ← internType (.nominal name arguments)
+    let id : LocalId := ⟨locals.size⟩
+    locals := locals.push {
+      id, name := "this", type := { typeId := thisType, loc }, mutable := false, loc }
+    localTypes := localTypes.push ("this", id, thisType)
   let mut declarations := #[]
   for binding in declaration.contract.filterMap clauseExpression? |>.flatMap
       sourceQuantifierBindings do
@@ -6133,6 +6588,7 @@ private def lowerItem : Item → LowerM Unit
   | .enum declaration => lowerEnum declaration
   | .function declaration => lowerFunction declaration
   | .specFunction declaration => lowerSpecFunction declaration
+  | .lemma declaration => lowerLemma declaration
   | .namespaceInvariants declarations => lowerNamespaceInvariants declarations
 
 /-- Reconstruct namespace intrinsic declarations from the inverted source
@@ -6320,7 +6776,7 @@ private def completeInvocationTypes (namespaces : Array RawNamespace)
             known := known.insert key
             pending := pending.push (function.name.index, value.typeId)
         match operation with
-        | .call (.function target) | .call (.closure target) =>
+        | .call (.function target) | .call (.closure target _) =>
             calls := calls.push { caller := function.name, callee := target.name, arguments }
         | _ => pure ()
   if calls.isEmpty then return
@@ -6390,7 +6846,7 @@ def lower (unit : CompilationUnit) : Result RawUnit := do
       source := unit, sourceNamespace, namespaceId := ⟨0⟩, tables,
       output := namespaces[0]! }
     tables := completed.tables
-  return {
+  let lowered : RawUnit := {
     tables
     profiles := configs unit
     namespaces
@@ -6398,5 +6854,8 @@ def lower (unit : CompilationUnit) : Result RawUnit := do
       producer := "LeanerLang"
       description := "direct lowering from authored Leaner source"
       trusted := true }] }
+  match elaborateReferencePatterns lowered with
+  | .ok elaborated => return elaborated
+  | .error message => Result.error "LEANER-REFERENCE-PATTERN" message
 
 end LeanerLang

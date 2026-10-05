@@ -247,6 +247,7 @@ impl UnitMapper {
                 imports: vec![],
                 intrinsics: vec![],
                 invariants: vec![],
+                lemmas: vec![],
                 loc: namespace_loc,
                 patterns: vec![],
                 places: self.arenas.places,
@@ -283,7 +284,7 @@ impl UnitMapper {
                 origins,
                 types: self.types.types,
             },
-            version: Version { major: 1, minor: 1 },
+            version: Version { major: 1, minor: 5 },
         })
     }
 }
@@ -2166,11 +2167,13 @@ impl<'a> FunctionMapper<'a> {
                         arguments: vec![],
                         instantiations: vec![],
                         operation: Operation::Call {
+                            // A function pointer captures nothing.
                             kind: CallKind::Closure {
                                 function: QualifiedRef {
                                     name,
                                     namespace_id: NamespaceId::new(0),
                                 },
+                                mask: 0,
                             },
                         },
                         surface: None,
@@ -3210,6 +3213,7 @@ fn empty_contract() -> FunctionContract {
         loc: None,
         modifies: vec![],
         modifies_all: false,
+        parameter_frames: vec![],
         pragmas: vec![],
         reads: vec![],
         reads_all: false,

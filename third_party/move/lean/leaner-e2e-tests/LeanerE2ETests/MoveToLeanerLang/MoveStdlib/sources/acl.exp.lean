@@ -66,6 +66,7 @@ leaner module std::acl where
     let (_t1, _t2) := core.prim.removeVector(*_t0, index)
     *_t0 := _t2
     _t1
+    ()
 
   spec remove where
     pragma opaque

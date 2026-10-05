@@ -206,23 +206,50 @@ run_cmd do
     throwError "generics are not a canonical fixed point:\n{printed}\n{formatted}"
 
 -- The public runtime boundary states the Move data domain explicitly: the
--- public theorem carries a type parameter as a loan-free runtime value, so
--- loan-bearing values are not admitted as generic data arguments.
+-- public theorem carries a type parameter its type arguments leave a
+-- parameter as a loan-free runtime value, so loan-bearing values are not
+-- admitted as generic data arguments, and runs from global memory a typed
+-- memory encodes.
 open LeanerIR LeanerIR.Proofs LeanerIR.Proofs.Denote in
-example (value : RuntimeValue) (initial : RuntimeState) :
-    «0x42».language_generics.identity.contract.requires #[value] initial ↔
-        SemanticOperations.FreshGlobalLoanIds initial ∧ SemanticOperations.Plain value := by
-  simp only [«0x42».language_generics.identity.contract, Contract.prophetic, Admissible,
-    lendArguments, NRow.lend, NTy.lend, NTy.encode, NTy.codec]
+example {unit : Validation.ValidatedUnit} (executable : Validation.ExecutableUnit unit)
+    (typeInstantiation : Array (TypeId × TypeId)) (value : RuntimeValue) (initial : RuntimeState) :
+    («0x42».language_generics.identity.contract executable ⟨.cons (.param 0) .nil, rfl⟩
+        typeInstantiation).requires #[value] initial ↔
+        SemanticOperations.FreshGlobalLoanIds initial ∧ SemanticOperations.Plain value ∧
+          ∃ memory, Encodes unit memory initial.globals := by
+  simp only [«0x42».language_generics.identity.contract, Contract.prophetic, Contract.ofSkolem,
+    Admissible, lendArguments, NRow.subst, NTy.subst, NRow.getD, NRow.lend, NTy.lend, NTy.encode,
+    NTy.codec]
   constructor
-  · rintro ⟨⟨loans, ⟨raw, _⟩, ⟨-, -, fresh⟩, lent⟩, -⟩
+  · rintro ⟨⟨loans, ⟨raw, _⟩, ⟨-, -, fresh⟩, lent⟩, encoded, -⟩
     cases loans with
     | nil =>
         simp at lent
-        exact ⟨fresh, lent ▸ raw.property⟩
+        exact ⟨fresh, lent ▸ raw.property, encoded⟩
     | cons => simp at lent
-  · rintro ⟨fresh, plain⟩
-    exact ⟨⟨[], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, rfl⟩, fun _ _ _ => trivial⟩
+  · rintro ⟨fresh, plain, encoded⟩
+    exact ⟨⟨[], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, rfl⟩, encoded,
+      fun _ _ _ _ _ => trivial⟩
+
+-- A generic function's public theorem holds of its runs at the instantiation a
+-- call at type arguments gives it, coherent by evaluation with the frame
+-- they induce: `identity` at `u64`, as `identity_u64` calls it.
+open LeanerIR LeanerIR.Proofs LeanerIR.Proofs.Denote in
+example {registry : Validation.SemanticsRegistry}
+    {executable : Validation.ExecutableUnit «0x42».language_generics.unit}
+    (prepared :
+      Validation.prepareExecution registry «0x42».language_generics.unit = .ok executable)
+    (preserved : GlobalsPreserved executable) :
+    SatisfiesFunctionAt executable ⟨⟨0⟩, ⟨0⟩⟩
+      (frameInstantiation «0x42».language_generics.unit ⟨⟨0⟩, ⟨0⟩⟩ #[]
+        #[⟨⟨10⟩, ⟨0⟩⟩])
+      («0x42».language_generics.identity.contract executable ⟨.cons (.int 64 false) .nil, rfl⟩
+        (frameInstantiation «0x42».language_generics.unit ⟨⟨0⟩, ⟨0⟩⟩ #[]
+          #[⟨⟨10⟩, ⟨0⟩⟩])) :=
+  «0x42».language_generics.identity.verified prepared preserved
+    ⟨.cons (.int 64 false) .nil, rfl⟩ rfl _ (FrameOf.frame rfl)
+    (@Coherent.ofCheck _ (Skolems.instantiate ⟨.cons (.int 64 false) .nil, rfl⟩
+      (Skolems.runtime _)) _ _ (by decide +kernel))
 
 -- Run the functions on concrete inputs in the interpreter and compare the
 -- outcomes through concrete wrappers, since the

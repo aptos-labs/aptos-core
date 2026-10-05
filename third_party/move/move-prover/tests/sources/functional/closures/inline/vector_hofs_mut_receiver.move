@@ -85,6 +85,7 @@ module 0x42::vector_hofs_mut_receiver {
         });
     }
     spec add_index {
+        pragma heartbeats = 100;
         requires forall i in 0..len(s.v): s.v[i] + i <= MAX_U64;
         aborts_if false;
         ensures forall i in 0..len(s.v): s.v[i] == old(s.v)[i] + i;

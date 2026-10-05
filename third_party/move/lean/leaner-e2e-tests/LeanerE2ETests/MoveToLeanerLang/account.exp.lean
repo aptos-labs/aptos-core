@@ -48,11 +48,17 @@ leaner module 0x42::account where
       }
     )
 
+  spec publish where
+    modifies *
+
   public fun is_published(addr : Address) -> Bool := exists<Balance>(addr)
 
   public fun remove(addr : Address) -> u64 := do
     let Balance { balance := balance } := move_from<Balance>(addr)
     balance.value
+
+  spec remove where
+    modifies *
 
   public fun balance_of(addr : Address) -> u64 := Balance[addr].balance.value
 

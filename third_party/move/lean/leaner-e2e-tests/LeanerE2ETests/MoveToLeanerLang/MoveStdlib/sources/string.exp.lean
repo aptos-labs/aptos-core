@@ -8,7 +8,6 @@ leaner module std::«string» where
   use std::option::Option
   use std::option::none
   use std::option::some
-  use std::vector
 
   /--
   An invalid UTF8 encoding.
@@ -60,7 +59,7 @@ leaner module std::«string» where
   /--
   Checks whether this string is empty.
   -/
-  public fun is_empty(self : &String) -> Bool := self.bytes.is_empty()
+  public fun is_empty(self : &String) -> Bool := self.bytes.length == 0
 
   /--
   Returns the length of this string, in bytes.
@@ -71,7 +70,8 @@ leaner module std::«string» where
   Appends a string.
   -/
   public fun append(self : &mut String, r : String) -> Unit := do
-    self.bytes.append(r.bytes)
+    let _t0 := &mut self.bytes
+    *_t0 := core.prim.concatVector(*_t0, r.bytes)
 
   /--
   Appends bytes which must be in valid utf8 format.
