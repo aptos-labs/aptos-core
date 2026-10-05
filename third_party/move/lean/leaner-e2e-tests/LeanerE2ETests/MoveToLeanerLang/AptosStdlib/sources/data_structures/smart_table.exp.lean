@@ -302,7 +302,7 @@ leaner module aptos_std::smart_table where
           let mut keys := vector<K>[]
           let mut values := vector<V>[]
           let self := entries
-          spec assume folds_capture_anchor!(106)
+          spec assume folds_capture_anchor!(95)
           let i := 0
           let len := self.length
           while i < len do
@@ -316,8 +316,8 @@ leaner module aptos_std::smart_table where
             invariant ∀ (j in 0 .. i), true
             invariant (keys, values)
               == «spec_fold$gen$0»(
-                self, with_state_anchor!(106, old(keys)),
-                with_state_anchor!(106, old(values)), i
+                self, with_state_anchor!(95, old(keys)),
+                with_state_anchor!(95, old(values)), i
               )
             invariant ∀ (j in i .. len), true
             invariant ∀ (x : Entry<K, V>),
@@ -700,6 +700,7 @@ leaner module aptos_std::smart_table where
   -- This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
   -- while remove would continue from the identified index to the end of the vector.
   -- We need to reverse the vector to consume it efficiently
+  @[weight = 50]
   spec fun «spec_fold$gen$0» {T0} {T1}(
     _v : Vector<Entry<T0, T1> >, «keys$init» : Vector<T0>,
     «values$init» : Vector<T1>, _end : Int
