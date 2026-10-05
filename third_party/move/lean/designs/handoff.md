@@ -29,15 +29,14 @@ Status: 2026-10-05, branch `wrwg/lean3` (worktree `dev3`), clean at the commit t
   flag".
 - Prover test `generic_aliasing_all_partitions::never_alias` now exhausts its budget
   (was a clause failure) since S3b.
-- From the S3b cleanup review, not done: `seeThroughReferences` is applied at five sites
-  beside `Context.typeOf?` (twelve sites, some of which need the physical type) —
-  `lemmaParameterTypes` and the expanded specification-function path do not see through
-  references while `lemmaDomains` and `definitionDomains` do; one accessor should decide.
-  `singleFieldRead?` (one integer field) and `boundWitnesses` (`<`, `≤`, `=` with the binder
-  on one side) are the instances of "a binder read only through projections" and "the
-  binder's interval from the bounds machinery". The `subst` and `projections` leaf stages
-  run for every leaf of every target; whether they explain the `comparator`/`string`
-  heartbeat growth needs a measurement.
+- From the S3b cleanup review, not done: `singleFieldRead?` (one integer field) and
+  `boundWitnesses` (`<`, `≤`, `=` with the binder on one side) are the instances of "a binder
+  read only through projections" and "the binder's interval from the bounds machinery".
+  The `subst` and `projections` leaf stages run for every leaf of every target; whether
+  they explain the `comparator`/`string` heartbeat growth needs a measurement.
+- A quantifier over a vector's elements is not instantiated at a read position:
+  `requires forall x in v: x < 10; ensures v[0] < 10` (with `len(v) > 0`) fails, by value
+  and by reference alike, while `forall i in 0..len(v): v[i] < 10` verifies.
 - `leaner_denote_witness` decides the conjuncts reading the binder first, in the order
   `Array.qsort` leaves them; a stable order puts `verify_vector::verify_contains` over its
   budget, so the search depends on an incidental order.

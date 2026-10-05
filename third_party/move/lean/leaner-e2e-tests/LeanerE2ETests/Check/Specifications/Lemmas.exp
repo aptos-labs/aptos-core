@@ -1,13 +1,13 @@
-LeanerE2ETests/Check/Specifications/Lemmas.lean:97:4: error: the specification clause `ensures x + 1 == x` is not established
-LeanerE2ETests/Check/Specifications/Lemmas.lean:96:13: error: leaner verification failed: the lemma `bad_claim` is not established
-LeanerE2ETests/Check/Specifications/Lemmas.lean:101:4: error: the specification clause `ensures sum(n) <= n` is not established
-LeanerE2ETests/Check/Specifications/Lemmas.lean:99:13: warning: unused termination hints, function is not recursive
-LeanerE2ETests/Check/Specifications/Lemmas.lean:99:13: error: leaner verification failed: the lemma `upper_bound` is not established
-LeanerE2ETests/Check/Specifications/Lemmas.lean:110:15: error: the requirement of the lemma applied at `needs_positive(x)` does not hold
-LeanerE2ETests/Check/Specifications/Lemmas.lean:112:7: error: leaner verification failed: the automatic verification of `might_be_zero` failed; provide a proof: `verify might_be_zero by …` in the module (`verify might_be_zero by skip` shows the obligations it leaves)
-LeanerE2ETests/Check/Specifications/Lemmas.lean:116:15: error: the requirement of the lemma applied at `x >= 0 ==> add_zero_right(x)` does not hold
-LeanerE2ETests/Check/Specifications/Lemmas.lean:118:7: error: leaner verification failed: the automatic verification of `out_of_range` failed; provide a proof: `verify out_of_range by …` in the module (`verify out_of_range by skip` shows the obligations it leaves)
-LeanerE2ETests/Check/Specifications/Lemmas.lean:124:4: error: the specification clause `ensures prefix_sum(v, i) + v[i] <= prefix_sum(v, v.length)` is not established
-LeanerE2ETests/Check/Specifications/Lemmas.lean:122:7: error: leaner verification failed: the automatic verification of `step_bound_unapplied` failed; provide a proof: `verify step_bound_unapplied by …` in the module (`verify step_bound_unapplied by skip` shows the obligations it leaves)
-LeanerE2ETests/Check/Specifications/Lemmas.lean:139:4: error: the specification clause `ensures result == x` is not established
-LeanerE2ETests/Check/Specifications/Lemmas.lean:137:7: error: leaner verification failed: the automatic verification of `needs_unestablished` failed; provide a proof: `verify needs_unestablished by …` in the module (`verify needs_unestablished by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/Lemmas.lean:99:4: error: the specification clause `ensures x + 1 == x` is not established
+LeanerE2ETests/Check/Specifications/Lemmas.lean:98:13: error: leaner verification failed: the lemma `bad_claim` is not established
+LeanerE2ETests/Check/Specifications/Lemmas.lean:103:4: error: the specification clause `ensures sum(n) <= n` is not established
+LeanerE2ETests/Check/Specifications/Lemmas.lean:101:13: warning: unused termination hints, function is not recursive
+LeanerE2ETests/Check/Specifications/Lemmas.lean:101:13: error: leaner verification failed: the lemma `upper_bound` is not established
+LeanerE2ETests/Check/Specifications/Lemmas.lean:112:15: error: the requirement of the lemma applied at `needs_positive(x)` does not hold
+LeanerE2ETests/Check/Specifications/Lemmas.lean:114:7: error: leaner verification failed: the automatic verification of `might_be_zero` failed; provide a proof: `verify might_be_zero by …` in the module (`verify might_be_zero by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/Lemmas.lean:118:15: error: the requirement of the lemma applied at `x >= 0 ==> add_zero_right(x)` does not hold
+LeanerE2ETests/Check/Specifications/Lemmas.lean:120:7: error: leaner verification failed: the automatic verification of `out_of_range` failed; provide a proof: `verify out_of_range by …` in the module (`verify out_of_range by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/Lemmas.lean:126:4: error: the specification clause `ensures prefix_sum(v, i) + v[i] <= prefix_sum(v, v.length)` is not established
+LeanerE2ETests/Check/Specifications/Lemmas.lean:124:7: error: leaner verification failed: the automatic verification of `step_bound_unapplied` failed; provide a proof: `verify step_bound_unapplied by …` in the module (`verify step_bound_unapplied by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/Lemmas.lean:141:4: error: the specification clause `ensures result == x` is not established
+LeanerE2ETests/Check/Specifications/Lemmas.lean:139:7: error: leaner verification failed: the automatic verification of `needs_unestablished` failed; provide a proof: `verify needs_unestablished by …` in the module (`verify needs_unestablished by skip` shows the obligations it leaves)

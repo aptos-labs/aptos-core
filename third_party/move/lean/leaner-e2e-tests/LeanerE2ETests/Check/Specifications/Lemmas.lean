@@ -10,7 +10,9 @@ order). An `apply` step owes the lemma's premise and gives its conclusion;
 under a quantifier it gives the lemma's implication. A `split` step
 continues once per case. A lemma's integer parameters are bounded by their
 types, which an application owes; a parameter of a vector type ranges
-over vectors of its element type, whose elements are bounded so. -/
+over vectors of its element type, whose elements are bounded so. A
+parameter of a reference type is read as its referent, as a specification
+reads a reference. -/
 
 leaner module 0x42::lemmas where
   spec fun sum(n : Int) : Int decreases n := if n <= 0 then 0 else n + sum(n - 1)
@@ -137,3 +139,30 @@ leaner module 0x42::lemmas where
   spec needs_unestablished where
     requires x < MAX_U64
     ensures result == x -- error: `bad_claim` is not established
+
+  -- ## Parameters of reference types
+
+  struct Counter has Copy, Drop where
+    value : u64
+
+  spec lemma successor_fits(r : &u64) where
+    requires r < MAX_U64
+    ensures r + 1 <= MAX_U64
+
+  fun successor(r : &u64) -> u64 := do
+    spec apply successor_fits(r)
+    *r + 1
+  spec successor where
+    requires r < MAX_U64
+    ensures result == r + 1
+
+  spec lemma counted(c : &Counter) where
+    requires c.value > 0
+    ensures c.value >= 1
+
+  fun at_least_one(c : &Counter) -> u64 := do
+    spec apply counted(c)
+    c.value
+  spec at_least_one where
+    requires c.value > 0
+    ensures result >= 1

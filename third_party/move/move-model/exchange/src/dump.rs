@@ -1829,6 +1829,38 @@ pub fn scan_comments(text: &str) -> Vec<(usize, usize)> {
     out
 }
 
+/// Binds the type parameters of `pattern` to the corresponding components of
+/// `actual`, where they are not bound yet. References are transparent, as in
+/// specifications.
+fn match_type(pattern: &Type, actual: &Type, inst: &mut [Option<Type>]) {
+    match (pattern, actual.skip_reference()) {
+        (Type::TypeParameter(index), actual) => {
+            if let Some(slot @ None) = inst.get_mut(*index as usize) {
+                *slot = Some(actual.clone());
+            }
+        },
+        (Type::Reference(_, pattern), actual) => match_type(pattern, actual, inst),
+        (Type::Vector(pattern), Type::Vector(actual)) => match_type(pattern, actual, inst),
+        (Type::Struct(module, id, patterns), Type::Struct(module2, id2, actuals))
+            if module == module2 && id == id2 =>
+        {
+            for (pattern, actual) in patterns.iter().zip(actuals) {
+                match_type(pattern, actual, inst);
+            }
+        },
+        (Type::Tuple(patterns), Type::Tuple(actuals)) => {
+            for (pattern, actual) in patterns.iter().zip(actuals) {
+                match_type(pattern, actual, inst);
+            }
+        },
+        (Type::Fun(arguments, result, _), Type::Fun(arguments2, result2, _)) => {
+            match_type(arguments, arguments2, inst);
+            match_type(result, result2, inst);
+        },
+        _ => {},
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2008,37 +2040,5 @@ mod tests {
             "/* b /* c */ */",
             "/**/"
         ]);
-    }
-}
-
-/// Binds the type parameters of `pattern` to the corresponding components of
-/// `actual`, where they are not bound yet. References are transparent, as in
-/// specifications.
-fn match_type(pattern: &Type, actual: &Type, inst: &mut [Option<Type>]) {
-    match (pattern, actual.skip_reference()) {
-        (Type::TypeParameter(index), actual) => {
-            if let Some(slot @ None) = inst.get_mut(*index as usize) {
-                *slot = Some(actual.clone());
-            }
-        },
-        (Type::Reference(_, pattern), actual) => match_type(pattern, actual, inst),
-        (Type::Vector(pattern), Type::Vector(actual)) => match_type(pattern, actual, inst),
-        (Type::Struct(module, id, patterns), Type::Struct(module2, id2, actuals))
-            if module == module2 && id == id2 =>
-        {
-            for (pattern, actual) in patterns.iter().zip(actuals) {
-                match_type(pattern, actual, inst);
-            }
-        },
-        (Type::Tuple(patterns), Type::Tuple(actuals)) => {
-            for (pattern, actual) in patterns.iter().zip(actuals) {
-                match_type(pattern, actual, inst);
-            }
-        },
-        (Type::Fun(arguments, result, _), Type::Fun(arguments2, result2, _)) => {
-            match_type(arguments, arguments2, inst);
-            match_type(result, result2, inst);
-        },
-        _ => {},
     }
 }

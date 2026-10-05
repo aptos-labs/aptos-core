@@ -449,6 +449,13 @@ private partial def projectSpecTypeIdFuel (id : TypeId) (fuel : Nat) : LowerM Ty
 private def projectSpecTypeId (id : TypeId) : LowerM TypeId := do
   projectSpecTypeIdFuel id ((← get).tables.types.size + 1)
 
+/-- The type a specification binds a parameter of type `id` at: a
+reference's referent, as specifications see through references. -/
+private partial def specReferentTypeId (id : TypeId) : LowerM TypeId := do
+  match (← get).tables.types[id.index]? with
+  | some (.reference reference) => specReferentTypeId reference.referent
+  | _ => return id
+
 private def specificationExprContext (context : ExprContext) : LowerM ExprContext := do
   let locals ← context.locals.mapM fun (name, id, typeId) => do
     pure (name, id, ← projectSpecTypeId typeId)
@@ -6134,7 +6141,8 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
     parameters := parameters.push { name := parameter.name, typeUse }
     locals := locals.push {
       id := ⟨index⟩, name := parameter.name, type := typeUse, loc := parameterLoc }
-    localTypes := localTypes.push (parameter.name, ⟨index⟩, typeUse.typeId)
+    localTypes := localTypes.push
+      (parameter.name, ⟨index⟩, ← specReferentTypeId typeUse.typeId)
   let parameterLocalTypes := localTypes
   let mut declarations := #[]
   let mut inferenceLocals := localTypes
@@ -6259,7 +6267,8 @@ private def lowerLemma (declaration : LemmaDecl) : LowerM Unit := do
     parameters := parameters.push { name := parameter.name, typeUse }
     locals := locals.push {
       id := ⟨index⟩, name := parameter.name, type := typeUse, loc := parameterLoc }
-    localTypes := localTypes.push (parameter.name, ⟨index⟩, typeUse.typeId)
+    localTypes := localTypes.push
+      (parameter.name, ⟨index⟩, ← specReferentTypeId typeUse.typeId)
   let parameterLocalTypes := localTypes
   let roots := declaration.contract.filterMap clauseExpression? ++ declaration.decreases ++
     declaration.proof.map (·.2)

@@ -321,19 +321,17 @@ private def Context.typeOf? (context : Context) (typeId : TypeId) : Option IrTy 
   | .typeParameter index => (context.typeArguments[index]?).map (·.1) <|> pure ty
   | _ => pure ty
 
-/-- A type as a specification value has it: specifications see through
-references, so a reference's values are its referent's. -/
-private partial def seeThroughReferences (unit : ValidatedUnit) (ty : IrTy) : IrTy :=
-  match ty with
-  | .reference reference =>
-      match unit.tables.types[reference.referent.index]? with
-      | some referent => seeThroughReferences unit referent
-      | none => ty
-  | _ => ty
+/-- The type a specification reads a value of type `typeId` at:
+specifications see through references, so a reference's values are its
+referent's. -/
+private partial def specTypeId (unit : ValidatedUnit) (typeId : TypeId) : TypeId :=
+  match unit.tables.types[typeId.index]? with
+  | some (.reference reference) => specTypeId unit reference.referent
+  | _ => typeId
 
 /-- The type of a specification value, through references. -/
 private def Context.valueTypeOf? (context : Context) (typeId : TypeId) : Option IrTy :=
-  (context.typeOf? typeId).map (seeThroughReferences context.unit)
+  context.typeOf? (specTypeId context.unit typeId)
 
 /-- The native type of a specification type, with the parameters replaced
 by the expansion's type arguments. -/
@@ -382,10 +380,11 @@ private def domainOf (ty : IrTy) : Domain :=
 
 /-- The domain of a type of a declaration's signature, through references;
 `role` names the position in the error for an unknown type. -/
-private def Context.signatureDomain (context : Context) (typeId : TypeId) (role : String) :
+private def signatureDomain (unit : ValidatedUnit) (typeId : TypeId) (role : String) :
     MetaM Domain := do
-  let some ty := context.unit.tables.types[typeId.index]? | throwError "{role} has an unknown type"
-  pure (domainOf (seeThroughReferences context.unit ty))
+  let some ty := unit.tables.types[(specTypeId unit typeId).index]?
+    | throwError "{role} has an unknown type"
+  pure (domainOf ty)
 
 /-- The Lean type of a binder in this domain. -/
 private def Domain.leanType : Domain → Lean.Expr
@@ -707,7 +706,7 @@ of a map's keys read at their type, becomes the order's relation. -/
 
 private def typeOfExpr? (context : Context) (id : ExprId) : Option IrTy := do
   let expression ← context.ns.expressions[id.index]?
-  context.typeOf? expression.typeId
+  context.valueTypeOf? expression.typeId
 
 private def describeType (ty : IrTy) : String :=
   toString (repr ty)
@@ -893,10 +892,10 @@ private def lemmaTypedParameters (unit : ValidatedUnit) (reference : LeanerIR.Qu
   let some (_, declaration) := lemmaOf? unit reference | return #[]
   let mut typed := #[]
   for parameter in declaration.signature.parameters, index in [0:declaration.signature.parameters.size] do
-    let some parameterType := unit.tables.types[parameter.typeUse.typeId.index]? | continue
+    let typeId := specTypeId unit parameter.typeUse.typeId
+    let some parameterType := unit.tables.types[typeId.index]? | continue
     unless domainOf parameterType matches .aggregate do continue
-    let some nty := LeanerIR.Proofs.Denote.ntyOf unit reference.namespaceId
-      parameter.typeUse.typeId | continue
+    let some nty := LeanerIR.Proofs.Denote.ntyOf unit reference.namespaceId typeId | continue
     typed := typed.push (index, nty)
   return typed
 
@@ -1203,9 +1202,9 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
             | throwError "generated contracts currently require a variable quantifier pattern"
           let some domainExpression := active.ns.expressions[binder.domain.index]?
             | throwError "quantifier domain {binder.domain.index} is out of range"
-          let some patternType := active.typeOf? pattern.typeId
+          let some patternType := active.valueTypeOf? pattern.typeId
             | throwError "quantifier pattern type {pattern.typeId.index} is out of range"
-          let some domainType := active.typeOf? domainExpression.typeId
+          let some domainType := active.valueTypeOf? domainExpression.typeId
             | throwError "quantifier domain type {domainExpression.typeId.index} is out of range"
           let domain := domainOf patternType
           let binderName := match active.localNames[localId.index]? with
@@ -1393,7 +1392,7 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
                 | .variable localId =>
                     let selected ← mkAppM ``LeanerIR.RuntimeValue.field
                       #[scrutineeValue, toExpr index]
-                    let some childType := context.typeOf? child.typeId
+                    let some childType := context.valueTypeOf? child.typeId
                       | throwError "specification match child has an unknown type"
                     let value ← match domainOf childType with
                       | .integer => mkAppM ``LeanerIR.RuntimeValue.asInt #[selected]
@@ -1454,7 +1453,7 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
       match patternNode.kind with
       | .wildcard => translate context body
       | .variable localId =>
-          let some patternType := context.typeOf? patternNode.typeId
+          let some patternType := context.valueTypeOf? patternNode.typeId
             | throwError "specification binding pattern has an unknown type"
           unless localId.index < context.locals.size do
             throwError "specification local {localId.index} has no binder slot"
@@ -1484,7 +1483,7 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
               match elementNode.kind with
               | .wildcard => pure ()
               | .variable localId =>
-                  let some elementType := context.typeOf? elementNode.typeId
+                  let some elementType := context.valueTypeOf? elementNode.typeId
                     | throwError "specification binding pattern has an unknown type"
                   unless localId.index < context.locals.size do
                     throwError "specification local {localId.index} has no binder slot"
@@ -1513,7 +1512,7 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
             match elementNode.kind with
             | .wildcard => pure ()
             | .variable localId =>
-                let some elementType := context.typeOf? elementNode.typeId
+                let some elementType := context.valueTypeOf? elementNode.typeId
                   | throwError "specification binding pattern has an unknown type"
                 unless localId.index < context.locals.size do
                   throwError "specification local {localId.index} has no binder slot"
@@ -1660,9 +1659,9 @@ where
     let some (_, declaration) := specFunctionOf? context.unit reference
       | throwError "specification function `{repr reference}` does not resolve"
     let parameters ← declaration.signature.parameters.mapM fun parameter =>
-      context.signatureDomain parameter.typeUse.typeId "a specification function parameter"
+      signatureDomain context.unit parameter.typeUse.typeId "a specification function parameter"
     let result ← match declaration.signature.results.toList with
-      | [result] => context.signatureDomain result.typeId "a specification function result"
+      | [result] => signatureDomain context.unit result.typeId "a specification function result"
       | _ => throwError "a recursive specification function returns one value"
     pure (parameters, result)
   /-- The Lean type of a domain as a definition's result: a Boolean result
@@ -2049,7 +2048,7 @@ where
     let some (_, declaration) := lemmaOf? context.unit reference
       | throwError "lemma `{repr reference}` does not resolve"
     declaration.signature.parameters.mapM fun parameter =>
-      context.signatureDomain parameter.typeUse.typeId "a lemma parameter"
+      signatureDomain context.unit parameter.typeUse.typeId "a lemma parameter"
   /-- The arguments of a lemma instance as the bundle its definitions take. -/
   lemmaBundle (reference : LeanerIR.QualifiedRef) (arguments : Array ExprId) :
       MetaM Lean.Expr := do
@@ -2356,13 +2355,13 @@ where
           Array.replicate declaration.locals.size none
         let mut targetTypes : Array IrTy := #[]
         for localDecl in declaration.locals do
-          let some localType := callee.typeOf? localDecl.type.typeId
+          let some localType := callee.valueTypeOf? localDecl.type.typeId
             | throwError "specification function local has an unknown type"
           targetTypes := targetTypes.push localType
         for (argument, index) in arguments.zipIdx do
           let some parameter := declaration.signature.parameters[index]?
             | throwError "specification function parameter is out of range"
-          let some parameterType := callee.typeOf? parameter.typeUse.typeId
+          let some parameterType := callee.valueTypeOf? parameter.typeUse.typeId
             | throwError "specification function parameter has an unknown type"
           let value ← translate context argument
           let value ← match domainOf parameterType with
@@ -2604,7 +2603,7 @@ state labels. -/
       | throwError "a behavioral predicate names a function value"
     let some callableExpression := context.ns.expressions[callable.index]?
       | throwError "a behavioral predicate's function value is out of range"
-    let some (.function parameters _ _) := context.typeOf? callableExpression.typeId
+    let some (.function parameters _ _) := context.valueTypeOf? callableExpression.typeId
       | throwError "a behavioral predicate's operand is not a function value"
     -- A shared reference is the observed value itself, at runtime as in a
     -- specification.
@@ -4421,10 +4420,8 @@ def lemmaParameterTypes (unit : ValidatedUnit) (reference : LeanerIR.QualifiedRe
     MetaM (Array Lean.Expr) := do
   let some (_, declaration) := lemmaOf? unit reference
     | throwError "a lemma does not resolve"
-  declaration.signature.parameters.mapM fun parameter => do
-    let some parameterType := unit.tables.types[parameter.typeUse.typeId.index]?
-      | throwError "a lemma parameter has an unknown type"
-    pure (domainOf parameterType).leanType
+  declaration.signature.parameters.mapM fun parameter =>
+    (·.leanType) <$> signatureDomain unit parameter.typeUse.typeId "a lemma parameter"
 
 /-- What a lemma's statement reads besides its parameters: the executable
 unit, the table of declared preconditions, the family, and the state, each
