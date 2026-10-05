@@ -30,7 +30,7 @@ fun compare(r0, r1): u64 {
     r2: u64
   code:
   L2:
-    0: [x0] := call eq, [r0, r1] @2
+    0: [x0] := call_exempt eq, [r0, r1] @2
     1: br_false L0, x0 @3
   L1:
     2: r2 := ld_u64 10 @4
@@ -59,7 +59,7 @@ fun compare() {
   code:
     0: Move8 [56] <- [8] @2
     1: Move8 [48] <- [0] @2
-    2: CallIndirect 0x1::test::eq @2
+    2: CallByNameExempt 0x1::test::eq @2
     3: JumpZeroByte @7 [48] gas_taken=56 gas_fallthrough=56 @3
     4: StoreImm8 [16] <- #10 @4
     5: Move8 [0] <- [16] @5

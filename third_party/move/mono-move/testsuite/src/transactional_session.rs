@@ -152,6 +152,7 @@ impl From<VMInternalError> for RunError {
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)
+                | LoaderError::NativeShadowsMoveFunction { .. }
                 | LoaderError::InvariantViolation(_),
             )
             | None => RunError::Vm(err),

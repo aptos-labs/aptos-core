@@ -59,8 +59,8 @@ fun trigger(): u64 {
     9: r1 := vec_len u64, r6 @10
     10: r0 := move r5 @12
     11: r5 := copy r0 @13
-    12: [x1] := call bonus7, [] @14
-    13: [r1] := call mutate_first, [r5, x1] @15
+    12: [x1] := call_exempt bonus7, [] @14
+    13: [r1] := call_exempt mutate_first, [r5, x1] @15
     14: r6 := imm_borrow_loc r0 @17
     15: r2 := ld_u64 0 @18
     16: r7 := vec_imm_borrow u64, r6, r2 @19

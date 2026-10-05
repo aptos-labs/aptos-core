@@ -7,9 +7,10 @@
 //! Expected function definition indexes and bytecode offsets are derived from
 //! the compiled modules so compiler layout changes do not invalidate them.
 //!
-//! A failure while `CallIndirect` loads its callee, a lazy closure-resolution
+//! A failure while `CallByName` loads its callee, a lazy closure-resolution
 //! failure, and a VM error raised by a native are all attributed to the call
-//! instruction.
+//! instruction. A call rejected by the reentrancy checker instead names only
+//! the module of the calling frame's caller.
 //!
 //! Bytecode execution errors are tested differentially. These tests cover
 //! resolution and native failures separately: missing-module cases require
@@ -20,6 +21,7 @@ use mono_move_core::{
     VMInternalError,
 };
 use mono_move_global_context::GlobalContext;
+use mono_move_runtime::RuntimeError;
 use mono_move_testsuite::{
     find_module, function_def_index, sole_bytecode_offset, with_mono_function,
     InMemoryModuleProvider, RunResult,
@@ -119,6 +121,22 @@ fn module_id(name: &str) -> ModuleId {
         AccountAddress::ONE,
         IdentStr::new(name).expect("valid identifier").to_owned(),
     )
+}
+
+/// The module a failure was attributed to without naming an instruction.
+fn module_of(err: &VMInternalError) -> &ModuleId {
+    match err.location() {
+        Some(ErrorLocation::Module(module)) => module,
+        other => panic!("expected the failure to name only a module, got {other:?}"),
+    }
+}
+
+/// The function whose call the module lock rejected.
+fn rejected_callee(err: &VMInternalError) -> &str {
+    match err.downcast_ref::<RuntimeError>() {
+        Some(RuntimeError::ReentrancyUnderModuleLock { function, .. }) => function.as_str(),
+        _ => panic!("expected a module-lock reentrancy error, got {err}"),
+    }
 }
 
 /// The instruction the failure was attributed to.
@@ -240,4 +258,47 @@ fn missing_native_names_the_calling_instruction() {
             Bytecode::Call(_)
         ))
     );
+}
+
+/// The rejected closure call in `callee::run` names its caller's module,
+/// `caller`, without a bytecode offset.
+#[test]
+fn module_lock_rejected_closure_call_names_the_frame_beneath() {
+    const SOURCE: &str = r#"
+        module 0x1::callee {
+            public fun run(action: ||) { action() }
+        }
+        module 0x1::caller {
+            #[module_lock]
+            public fun entry() { 0x1::callee::run(|| pure()) }
+            fun pure() {}
+        }
+    "#;
+
+    let (_, err) = run_to_failure(SOURCE, ident_str!("caller"), ident_str!("entry"), &[]);
+    assert_eq!(rejected_callee(&err), "pure");
+    assert_eq!(*module_of(&err), module_id("caller"));
+}
+
+/// The rejected regular call in `mid::back` names its caller's module, `low`,
+/// without a bytecode offset.
+#[test]
+fn module_lock_rejected_regular_call_names_the_frame_beneath() {
+    const SOURCE: &str = r#"
+        module 0x1::low {
+            public fun run(action: ||) { action() }
+            public fun noop() {}
+        }
+        module 0x1::mid {
+            public fun back() { 0x1::low::noop() }
+        }
+        module 0x1::top {
+            #[module_lock]
+            public fun entry() { 0x1::low::run(0x1::mid::back) }
+        }
+    "#;
+
+    let (_, err) = run_to_failure(SOURCE, ident_str!("top"), ident_str!("entry"), &[]);
+    assert_eq!(rejected_callee(&err), "noop");
+    assert_eq!(*module_of(&err), module_id("low"));
 }

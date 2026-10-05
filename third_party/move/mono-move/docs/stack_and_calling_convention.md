@@ -31,6 +31,12 @@ When the callee returns:
 1. The callee stores all return values at the beginning of its frame, contiguously, potentially overwriting some of its own parameters or locals.
 2. The interpreter reads the saved metadata at `fp - 24` to restore the caller's `pc`, `fp` and `func_ptr`.
 
+### Reentrancy tag on `saved_pc`
+
+Bit 63 of `saved_pc` (`SAVED_PC_CHECKED_TAG`) marks a frame the reentrancy checker holds a record for. `Return` tests the bit and, when set, pops the checker's record before restoring `pc` from the remaining bits. A `pc` never reaches bit 63, and the root sentinel is never tagged.
+
+The call protocol sets the bit when a checked call (`CallByName`, `CallByPtr`, every `CallClosure`) enters the callee; nothing else writes it (see `runtime/src/reentrancy.rs`).
+
 ## Local Access
 
 Instructions access locals via `fp + offset`, where offsets are computed at compile time (during monomorphization). This avoids runtime index lookups and keeps the common case — reading or writing a local — to a single base-plus-offset memory access.

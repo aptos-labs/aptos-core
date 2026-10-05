@@ -366,8 +366,9 @@ impl Drop for LoadedModule {
     //      is dropped. In this case just-leaked box was never published into
     //      any slot, so it has no aliases by construction.
     //
-    // TODO(correctness): `FunctionPtr`s in other modules' `CallDirect` ops are only sound
-    //   if callers are evicted with direct callees. (or their code is de-optimized).
+    // TODO(correctness): Callers with cross-module `CallByPtr` ops must be evicted
+    //   with their callees or have those ops replaced before the callees are freed.
+    //   `CallByPtrExempt` targets only functions in the caller's module.
     fn drop(&mut self) {
         self.functions.retain(|_, cell| {
             if let Some(slot) = cell.take() {

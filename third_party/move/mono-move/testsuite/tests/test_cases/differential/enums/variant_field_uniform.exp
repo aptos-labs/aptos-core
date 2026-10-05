@@ -25,7 +25,7 @@ fun run_computed() {
     3: HeapMoveTo8 [16]+16 <- [24] @2
     4: SlotBorrow [80] <- &[16] @4
     5: Move8 [96] <- [8] @6
-    6: CallIndirect 0x42::enum_variant_field_uniform::write_computed @6
+    6: CallByNameExempt 0x42::enum_variant_field_uniform::write_computed @6
     7: SlotBorrow [32] <- &[16] @7
     8: HeapReadOffset(8) [24] <- (*[32]).8 @8
     9: Move8 [0] <- [24] @10
@@ -42,7 +42,7 @@ fun run_simple() {
     1: HeapMoveTo8 [16]+8 <- [0] @1
     2: SlotBorrow [80] <- &[16] @3
     3: Move8 [96] <- [8] @5
-    4: CallIndirect 0x42::enum_variant_field_uniform::write_simple @5
+    4: CallByNameExempt 0x42::enum_variant_field_uniform::write_simple @5
     5: SlotBorrow [24] <- &[16] @6
     6: HeapReadOffset(8) [40] <- (*[24]).8 @7
     7: Move8 [0] <- [40] @9

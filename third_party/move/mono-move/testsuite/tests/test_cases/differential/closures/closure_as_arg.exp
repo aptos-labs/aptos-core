@@ -55,7 +55,7 @@ fun run(r0, r1): u64 {
   code:
   L0:
     0: x0 := pack_closure add_u64, 1, [r0] @1
-    1: [x0] := call apply, [x0, r1] @3
+    1: [x0] := call_exempt apply, [x0, r1] @3
     2: ret [x0] @4
 }
 === micro-ops ===
@@ -86,7 +86,7 @@ fun run() {
   code:
     0: PackClosure [40] <- func_ref=Unresolved(add_u64), mask=1, captured_desc=0, captured=[[0](8)] @1
     1: Move8 [48] <- [8] @3
-    2: CallIndirect 0x99::closure_as_arg::apply @3
+    2: CallByNameExempt 0x99::closure_as_arg::apply @3
     3: Move8 [0] <- [40] @4
     4: Return @4
   safe_point_layouts:

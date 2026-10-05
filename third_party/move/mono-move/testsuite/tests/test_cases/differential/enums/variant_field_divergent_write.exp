@@ -61,10 +61,10 @@ fun run_read_y() {
   entry_gas: 136
   code:
     0: Move8 [40] <- [0] @1
-    1: CallIndirect 0x43::variant_field_divergent_write::make_f @1
+    1: CallByNameExempt 0x43::variant_field_divergent_write::make_f @1
     2: Move8 [8] <- [40] @1
     3: SlotBorrow [40] <- &[8] @3
-    4: CallIndirect 0x43::variant_field_divergent_write::read_y @4
+    4: CallByNameExempt 0x43::variant_field_divergent_write::read_y @4
     5: Move(1) [0] <- [40] @5
     6: Return @5
 }
@@ -74,13 +74,13 @@ fun run_write_y() {
   entry_gas: 203
   code:
     0: Move8 [48] <- [0] @1
-    1: CallIndirect 0x43::variant_field_divergent_write::make_f @1
+    1: CallByNameExempt 0x43::variant_field_divergent_write::make_f @1
     2: Move8 [16] <- [48] @1
     3: SlotBorrow [48] <- &[16] @3
     4: Move(1) [64] <- [8] @5
-    5: CallIndirect 0x43::variant_field_divergent_write::set_y @5
+    5: CallByNameExempt 0x43::variant_field_divergent_write::set_y @5
     6: SlotBorrow [48] <- &[16] @6
-    7: CallIndirect 0x43::variant_field_divergent_write::read_y @7
+    7: CallByNameExempt 0x43::variant_field_divergent_write::read_y @7
     8: Move(1) [0] <- [48] @8
     9: Return @8
 }
@@ -108,11 +108,11 @@ fun write_read() {
   entry_gas: 148
   code:
     0: Move8 [72] <- [0] @1
-    1: CallIndirect 0x43::variant_field_divergent_write::make_e @1
+    1: CallByNameExempt 0x43::variant_field_divergent_write::make_e @1
     2: Move8 [16] <- [72] @1
     3: SlotBorrow [72] <- &[16] @3
     4: Move(1) [88] <- [8] @5
-    5: CallIndirect 0x43::variant_field_divergent_write::set_x @5
+    5: CallByNameExempt 0x43::variant_field_divergent_write::set_x @5
     6: SlotBorrow [24] <- &[16] @6
     7: EnumReadVariantFieldByTag(1) [40] <- (*[24]) by tag [Some(9), Some(10)] @7
     8: Move(1) [0] <- [40] @9

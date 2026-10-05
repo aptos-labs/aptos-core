@@ -42,8 +42,8 @@ fun trigger(): u64 {
   slots: params(0), locals(0), temps(0), transfer(2)
   code:
   L0:
-    0: [x0, x1] := call two_rets, [] @0
-    1: [x0] := call two_args, [x0, x1] @1
+    0: [x0, x1] := call_exempt two_rets, [] @0
+    1: [x0] := call_exempt two_args, [x0, x1] @1
     2: ret [x0] @2
 }
 
@@ -53,8 +53,8 @@ fun trigger_swap(): u64 {
     r1: u64
   code:
   L0:
-    0: [r1, r0] := call two_rets, [] @0
-    1: [x0] := call two_args, [r0, r1] @5
+    0: [r1, r0] := call_exempt two_rets, [] @0
+    1: [x0] := call_exempt two_args, [r0, r1] @5
     2: ret [x0] @6
 }
 
@@ -86,8 +86,8 @@ fun trigger() {
   frame_data_size: 8
   entry_gas: 126
   code:
-    0: CallIndirect 0xc0ffee::multi_ret_flow::two_rets @0
-    1: CallIndirect 0xc0ffee::multi_ret_flow::two_args @1
+    0: CallByNameExempt 0xc0ffee::multi_ret_flow::two_rets @0
+    1: CallByNameExempt 0xc0ffee::multi_ret_flow::two_args @1
     2: Move8 [0] <- [32] @2
     3: Return @2
 }
@@ -96,12 +96,12 @@ fun trigger_swap() {
   frame_data_size: 16
   entry_gas: 178
   code:
-    0: CallIndirect 0xc0ffee::multi_ret_flow::two_rets @0
+    0: CallByNameExempt 0xc0ffee::multi_ret_flow::two_rets @0
     1: Move8 [8] <- [40] @0
     2: Move8 [0] <- [48] @0
     3: Move8 [48] <- [8] @5
     4: Move8 [40] <- [0] @5
-    5: CallIndirect 0xc0ffee::multi_ret_flow::two_args @5
+    5: CallByNameExempt 0xc0ffee::multi_ret_flow::two_args @5
     6: Move8 [0] <- [40] @6
     7: Return @6
 }

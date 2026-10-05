@@ -9,7 +9,9 @@ use mono_move_core::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    identifier::Identifier,
     int256::{I256, U256},
+    language_storage::ModuleId,
     vm_status::AbortLocation,
 };
 use std::{fmt, str::Utf8Error};
@@ -67,6 +69,28 @@ pub enum RuntimeError {
 
     #[error("MoveTo: resource already exists at {addr}")]
     ResourceAlreadyExists { addr: AccountAddress },
+
+    /// A call to `function` was rejected because it would re-enter `module`
+    /// while a module lock was held.
+    #[error(
+        "call: `{}::{function}` re-enters its module while a module lock is active",
+        .module.short_str_lossless()
+    )]
+    ReentrancyUnderModuleLock {
+        module: Box<ModuleId>,
+        function: Identifier,
+    },
+
+    /// A resource operation was rejected because its defining module was
+    /// re-entered.
+    #[error(
+        "resource `{}::{name}` is locked while its module is re-entered",
+        .module.short_str_lossless()
+    )]
+    ResourceAccessDuringReentrancy {
+        module: Box<ModuleId>,
+        name: Identifier,
+    },
 
     #[error("enum variant mismatch: runtime variant tag {tag} is not the expected variant")]
     EnumVariantMismatch { tag: u64 },
@@ -157,6 +181,8 @@ impl RuntimeError {
             | VectorIndexOutOfBounds { .. }
             | ResourceDoesNotExist { .. }
             | ResourceAlreadyExists { .. }
+            | ReentrancyUnderModuleLock { .. }
+            | ResourceAccessDuringReentrancy { .. }
             | EnumVariantMismatch { .. }
             | StackOverflow
             | OutOfHeapMemory { .. }
@@ -190,6 +216,8 @@ impl IntoExecutionError for RuntimeError {
             | InvalidAbortMessage { .. }
             | ResourceDoesNotExist { .. }
             | ResourceAlreadyExists { .. }
+            | ReentrancyUnderModuleLock { .. }
+            | ResourceAccessDuringReentrancy { .. }
             | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
@@ -459,6 +487,15 @@ pub enum RuntimeInvariantViolation {
 
     #[error("a root pool handle was still outstanding when the session was closed")]
     LiveRootAtSessionEnd,
+
+    #[error("reentrancy checker: tagged return with no checked frame to exit")]
+    ReentrancyExitWithoutRecord,
+
+    #[error("reentrancy checker: exiting a module that is not active")]
+    ReentrancyModuleNotActive,
+
+    #[error("reentrancy checker: module lock counter underflow")]
+    ReentrancyLockUnderflow,
 }
 
 /// Successful terminal outcomes from `Interpreter::run`.

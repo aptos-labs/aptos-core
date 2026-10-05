@@ -32,9 +32,9 @@ fun caller(r0) {
     r3: u64
   code:
   L0:
-    0: [r1, r3, r2] := call three_rets, [] @0
+    0: [r1, r3, r2] := call_exempt three_rets, [] @0
     1: x2 := ld_u64 0 @6
-    2: [] := call three_args, [r0, r1, x2] @7
+    2: [] := call_exempt three_args, [r0, r1, x2] @7
     3: ret [] @8
 }
 
@@ -45,7 +45,7 @@ fun trigger(): u64 {
   L0:
     0: r0 := ld_u64 99 @0
     1: x0 := mut_borrow_loc r0 @2
-    2: [] := call caller, [x0] @3
+    2: [] := call_exempt caller, [x0] @3
     3: ret [r0] @5
 }
 === micro-ops ===
@@ -72,14 +72,14 @@ fun caller() {
   frame_data_size: 40
   entry_gas: 204
   code:
-    0: CallIndirect 0x66::test::three_rets @0
+    0: CallByNameExempt 0x66::test::three_rets @0
     1: Move8 [16] <- [64] @0
     2: Move8 [32] <- [72] @0
     3: Move8 [24] <- [80] @0
     4: StoreImm8 [88] <- #0 @6
     5: Move8 [80] <- [16] @7
     6: Move(16) [64] <- [0] @7
-    7: CallIndirect 0x66::test::three_args @7
+    7: CallByNameExempt 0x66::test::three_args @7
     8: Return @8
 }
 
@@ -89,6 +89,6 @@ fun trigger() {
   code:
     0: StoreImm8 [0] <- #99 @0
     1: SlotBorrow [32] <- &[0] @2
-    2: CallIndirect 0x66::test::caller @3
+    2: CallByNameExempt 0x66::test::caller @3
     3: Return @5
 }
