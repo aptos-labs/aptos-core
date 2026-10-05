@@ -43,6 +43,9 @@ enum LoweringError {
     #[error("layout id does not resolve to a layout")]
     LayoutIdUnresolved,
 
+    #[error("a layout published by type carries no type")]
+    LayoutWithoutType,
+
     #[error("gc_layout: field offset {field_offset} + inner offset {inner_offset} overflows u32")]
     GcFieldOffsetOverflow {
         field_offset: u32,
@@ -193,6 +196,7 @@ impl IntoExecutionError for LoweringError {
             | LayoutNotPopulated
             | TypeParamReachedGcLayout
             | LayoutIdUnresolved
+            | LayoutWithoutType
             | GcFieldOffsetOverflow { .. }
             | NoConcreteSize { .. }
             | StructLayoutNotPopulated { .. }

@@ -22,7 +22,6 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
-use mono_move_aptos_transaction_executor::AptosTransactionExecutor;
 use mono_move_global_context::GlobalContext;
 use move_binary_format::{
     errors::{Location, VMError},
@@ -36,11 +35,9 @@ use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
 
-/// A global context with everything the MonoMove executor reads preinstalled.
+/// A global context for the MonoMove executor.
 fn new_global_context(num_workers: usize) -> Arc<GlobalContext> {
-    let mut ctx = GlobalContext::with_num_execution_workers(num_workers);
-    AptosTransactionExecutor::preinstall(&mut ctx);
-    Arc::new(ctx)
+    Arc::new(GlobalContext::with_num_execution_workers(num_workers))
 }
 
 /// Raises an alert with the specified message. In case we run in testing mode, instead prints the

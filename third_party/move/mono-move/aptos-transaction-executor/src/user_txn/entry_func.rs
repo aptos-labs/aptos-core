@@ -3,27 +3,25 @@
 
 //! Running an entry-function payload.
 
-use super::args::{leading_signer_params, place_user_txn_args};
+use super::args::run_user_txn_call;
 use crate::errors::{InvalidArguments, MoveExecutionFailure};
 use mono_move_core::{
-    interner::{view_module_id, InternedIdentifier, InternedModuleId},
-    types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Interner, PreparedModule,
+    interner::InternedIdentifier, types::InternedTypeList, Interner, PreparedModule,
 };
 use mono_move_global_context::{ExecutionGuard, LoadedModule};
 use mono_move_natives::RandomnessContext;
-use mono_move_runtime::{CompletedCall, InterpreterContext, RuntimeStatus};
+use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
-/// Checks that the function `def_idx` of `module` is one a user transaction
-/// may call.
+/// Checks what sets an entry function apart from a script's `main`, based on
+/// info from its definition. The checks the two share follow in
+/// [`run_user_txn_call`].
 /// - It must not be a native.
 /// - It must be an entry function.
-/// - It must not return values.
 fn check_callable_definition(
     module: &PreparedModule,
     def_idx: FunctionDefinitionIndex,
@@ -35,91 +33,7 @@ fn check_callable_definition(
     if !def.is_entry {
         return Err(InvalidArguments::NotEntryFunction);
     }
-    let handle = module.function_handle_at(def.function);
-    if !module.interned_types_at(handle.return_).is_empty() {
-        return Err(InvalidArguments::ReturnsValues);
-    }
     Ok(())
-}
-
-/// Checks that a user transaction can fill every parameter, returning the
-/// number of leading signer parameters.
-/// - All signers must be in leading positions.
-/// - All other parameters must be of the allowed types.
-//
-// TODO(security, completeness): the current checks are INCOMPLETE:
-// - Certain framework types require additional checks during creation.
-//   - String: must be valid UTF-8.
-//   - Object: an `ObjectCore` resource must exist at the address, and
-//     a resource of type `T` must also exist under the same address.
-// - Public structs and enums are not yet supported.
-fn check_callable_signature(param_tys: &[InternedType]) -> Result<usize, InvalidArguments> {
-    let num_signer_params = leading_signer_params(param_tys)?;
-    if param_tys[num_signer_params..]
-        .iter()
-        .any(|&ty| !is_allowed_arg_type(ty))
-    {
-        return Err(InvalidArguments::DisallowedParameterType);
-    }
-    Ok(num_signer_params)
-}
-
-/// Whether a type can be allowed as a transaction argument.
-//
-// TODO(security): audit the depth of type arguments this recursion can reach
-// so the check stays bounded.
-fn is_allowed_arg_type(ty: InternedType) -> bool {
-    match view_type(ty) {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::I8
-        | Type::I16
-        | Type::I32
-        | Type::I64
-        | Type::I128
-        | Type::I256
-        | Type::Address => true,
-        Type::Vector { elem } => is_allowed_arg_type(*elem),
-        Type::Nominal {
-            module_id,
-            name,
-            ty_args,
-        } => is_allowed_framework_struct(*module_id, *name, *ty_args),
-        Type::Signer
-        | Type::ImmutRef { .. }
-        | Type::MutRef { .. }
-        | Type::Function { .. }
-        | Type::TypeParam { .. } => false,
-    }
-}
-
-/// Whether the given type is a framework struct allowed to be constructed as a
-/// transaction argument.
-fn is_allowed_framework_struct(
-    module_id: InternedModuleId,
-    name: InternedIdentifier,
-    ty_args: InternedTypeList,
-) -> bool {
-    let module_id = view_module_id(module_id);
-    if *module_id.address() != AccountAddress::ONE {
-        return false;
-    }
-    match (view_name(module_id.name()), view_name(name)) {
-        // An `Object<T>` argument is only an address, so `T` is unrestricted.
-        ("string", "String")
-        | ("object", "Object")
-        | ("fixed_point32", "FixedPoint32")
-        | ("fixed_point64", "FixedPoint64") => true,
-        ("option", "Option") => view_type_list(ty_args)
-            .iter()
-            .all(|&ty| is_allowed_arg_type(ty)),
-        _ => false,
-    }
 }
 
 /// Whether the function `def_idx` of `module`, named `name`, may call the
@@ -166,19 +80,14 @@ pub(crate) fn call_entry_function<'a>(
     let func = interp
         .load_function(module_id, function_name, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    let num_signer_params = check_callable_signature(&func.param_tys)
-        .map_err(MoveExecutionFailure::InvalidArguments)?;
-    let mut call = interp
-        .build_call(func)
-        .map_err(MoveExecutionFailure::RuntimeError)?;
-    place_user_txn_args(
-        &mut call,
-        num_signer_params,
+    run_user_txn_call(
+        guard,
+        interp,
+        module,
+        function_name,
+        func,
         sender,
         secondary_signers,
         args,
-    )?;
-    call.run()
-        .map(CompletedCall::into_status)
-        .map_err(|err| MoveExecutionFailure::RuntimeError(err.into_error()))
+    )
 }

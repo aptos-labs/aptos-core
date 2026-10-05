@@ -4,6 +4,7 @@
 pub mod abilities;
 pub mod align;
 mod error;
+mod framework_symbols;
 mod function;
 mod gas;
 mod instruction;
@@ -23,6 +24,7 @@ pub use align::{
     MAX_ALIGN,
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
+pub use framework_symbols::FrameworkSymbols;
 pub use function::{
     BytecodeOffset, Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry,
     SortedSafePointEntries,

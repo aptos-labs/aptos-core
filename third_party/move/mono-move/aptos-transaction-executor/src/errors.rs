@@ -14,15 +14,6 @@ use mono_move_runtime::{
 use move_core_types::vm_status::AbortLocation;
 use thiserror::Error;
 
-/// Why an executor could not be created.
-#[derive(Debug, Error)]
-pub enum ExecutorCreationError {
-    /// The global context was not prepared for this executor: see
-    /// `AptosTransactionExecutor::preinstall`.
-    #[error("the framework symbols are not preinstalled into the global context")]
-    ContextNotPrepared,
-}
-
 /// Every reason a transaction's effects could not be rendered into a
 /// `TransactionOutput`. Always an executor bug; the reasons are diagnostics.
 #[derive(Debug, Error)]
@@ -159,6 +150,12 @@ pub enum InvalidArguments {
     SignerCountMismatch,
     /// An argument's bytes do not decode to its parameter's type.
     UndecodableArgument,
+    /// A `String` argument is not valid UTF-8.
+    MalformedString,
+    /// An `Object<T>` argument names an address holding no object.
+    ObjectDoesNotExist,
+    /// An `Object<T>` argument names an object holding no `T`.
+    ObjectLacksResource,
 }
 
 /// Why a script was refused before running.

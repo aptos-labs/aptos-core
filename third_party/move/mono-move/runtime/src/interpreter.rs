@@ -29,7 +29,7 @@ use crate::{
         VEC_PUSHBACK_INIT_CAPACITY,
     },
     value_cmp, value_conv,
-    value_conv::rust::write_value,
+    value_conv::{bcs::DeserializeHooks, rust::write_value},
 };
 use mono_move_core::{
     captured_values_size,
@@ -85,7 +85,9 @@ macro_rules! resolve_resource_group {
             ));
         };
         let arena_ref = $ctx.loader.guard().arena_ref_for_module_id(*module_id);
-        Ok($ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name))
+        Ok::<Option<InternedType>, VMInternalError>(
+            $ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name),
+        )
     }};
 }
 
@@ -327,6 +329,78 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
         // SAFETY: `dst` and `ty` come from the function's own signature, so
         // the slot is writable for the type's in-memory size.
         unsafe { value_conv::bcs::deserialize_into(guard, &mut self.interp.heap, ty, bytes, dst) }
+    }
+
+    /// Places a BCS-encoded argument from an untrusted source, refusing the
+    /// framework values that fail validation (e.g. String that is not valid utf-8).
+    ///
+    /// On error, the parameter slot may be left partially written and the call
+    /// must be abandoned.
+    pub fn arg_bcs_untrusted(&mut self, bytes: &[u8]) -> VMResult<()> {
+        // Taken before the hooks below borrow the interpreter's fields.
+        let (dst, ty) = self.next_slot()?;
+
+        // The `0x1::object::ObjectCore` type, needed for checking that a valid
+        // object sits under a deserialized address, is interned once per
+        // context.
+        let guard = self.interp.loader.guard();
+        let object_core = guard.framework_symbols().object_core;
+
+        // Set up the hooks required for validating certain value types, deserialized from
+        // untrusted bytes.
+        let mut hooks = Hooks {
+            loader: &self.interp.loader,
+            read_set: &mut self.interp.read_set,
+            resource_provider: self.interp.resource_provider,
+            read_write_set: &mut self.interp.read_write_set,
+            object_core,
+        };
+
+        struct Hooks<'a, 'guard> {
+            loader: &'a Loader<'guard, 'guard>,
+            read_set: &'a mut ModuleReadSet<'guard>,
+            resource_provider: &'guard dyn ResourceProvider,
+            read_write_set: &'a mut ResourceReadWriteSet,
+            object_core: InternedType,
+        }
+
+        impl DeserializeHooks for Hooks<'_, '_> {
+            /// Relies on lowering to have published `ty`'s layout and
+            /// descriptor and recorded its module in the read set.
+            fn resource_exists(
+                &mut self,
+                address: AccountAddress,
+                ty: InternedType,
+            ) -> VMResult<bool> {
+                let group = resolve_resource_group!(self, ty)?;
+                Ok(self.read_write_set.exists(
+                    self.resource_provider,
+                    &InMemoryStorageKey::resource(address, ty),
+                    group,
+                )?)
+            }
+
+            fn object_core_type(&self) -> InternedType {
+                self.object_core
+            }
+        }
+
+        // Deserialize in untrusted mode, performing validation for certain
+        // framework types.
+        //
+        // SAFETY: `dst` and `ty` come from the function's own signature, so
+        // the slot is writable for the type's in-memory size.
+        unsafe {
+            value_conv::bcs::deserialize_untrusted(
+                guard,
+                &mut self.interp.heap,
+                ty,
+                bytes,
+                dst,
+                &mut hooks,
+            )
+        }
+        .map_err(|e| VMInternalError::new(e.into_runtime_error()))
     }
 
     /// Runs the call. Returns a [`CompletedCall`] if it returns or aborts, or

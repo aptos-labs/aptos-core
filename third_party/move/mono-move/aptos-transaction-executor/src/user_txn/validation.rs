@@ -10,13 +10,14 @@ use super::metadata::TxnMetadata;
 use crate::{
     calls::call_system_function_unmetered,
     errors::{call_result, MoveExecutionFailure},
-    symbols::FrameworkSymbols,
 };
 use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{EpilogueArgs, PrologueArgs},
 };
-use mono_move_core::{interner::InternedIdentifier, types::EMPTY_TYPE_LIST, VMInternalError};
+use mono_move_core::{
+    interner::InternedIdentifier, types::EMPTY_TYPE_LIST, FrameworkSymbols, VMInternalError,
+};
 use mono_move_runtime::{InterpreterContext, RuntimeStatus};
 use move_core_types::account_address::AccountAddress;
 use move_value_view::MoveValueView;
