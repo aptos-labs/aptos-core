@@ -49,29 +49,6 @@
 //! A slot list is **ascending and disjoint** iff `end(s_i) <= o_{i+1}` for every
 //! consecutive pair.
 //!
-//! # Operand kinds
-//!
-//! `MicroOp::for_each_frame_operand` (in `instruction::operands`) reports every
-//! frame slot an op touches together with the kind of access the interpreter
-//! performs on it. The kind fixes the access width and alignment:
-//!
-//! | `OperandKind` | width | align | interpreter access |
-//! |---|---|---|---|
-//! | `Bool` | 1 | 1 | `read_bool` / `write_bool` |
-//! | `Byte` | 1 | 1 | `read_u8` |
-//! | `U64` | 8 | 8 | `read_u64` / `write_u64` |
-//! | `Ptr` | 8 | 8 | `read_ptr` / `write_ptr` |
-//! | `FatPtr` | 16 | 8 | `read_fat_ptr` / `write_fat_ptr` |
-//! | `Address` | 32 | 1 | `read_account_address` |
-//! | `Bytes(n)` | `n` | 1 | byte copy, or an explicitly unaligned load/store |
-//! | `Int(w)` | `w` | `w` if `w <= A`, else 1 | `read_int<T>` / `write_int<T>` |
-//! | `Value(ty)` | `layout(ty).size` | `layout(ty).align` | by-value comparison |
-//! | `Constant(idx)` | `layout(const_ty(idx)).size` | `layout(const_ty(idx)).align` | `StoreImmVec` destination |
-//!
-//! Alignment follows the interpreter, not the layout convention: `Move8` and the
-//! frame side of `HeapMoveFrom8` / `HeapMoveTo8` are `Bytes(8)` because the
-//! interpreter reads them unaligned.
-//!
 //! # Checks
 //!
 //! ## Function shape
@@ -113,8 +90,10 @@
 //! ## Operand accesses
 //!
 //! - **O1**: for every `pc` and every `(o, kind)` reported by
-//!   `code[pc].for_each_frame_operand`, the access `(o, width(kind),
-//!   align(kind))` is valid.
+//!   `code[pc].for_each_frame_operand` (see `instruction::operands`), the
+//!   access `(o, w, a)` is valid, where `(w, a)` is
+//!   `OperandKind::width_and_align`, or `layout(ty)` for `Value(ty)`, or
+//!   `layout(const_ty(idx))` for `Constant(idx)`.
 //! - **O2**: for `Value(ty)`, `layout(ty)` exists.
 //! - **O3**: for `Value(ty)`, and for the `ty` of `ValueRefCmp` and
 //!   `JumpValueRefCmp`, `ty` is not a reference type.
