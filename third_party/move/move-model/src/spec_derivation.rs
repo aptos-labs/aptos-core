@@ -1549,16 +1549,31 @@ fn pure_spec_companion_is_backend_supported(
         return true;
     }
     let decl = env.get_spec_fun(spec_fun);
-    let backend_primitive = env
-        .get_module(spec_fun.module_id)
+    let module = env.get_module(spec_fun.module_id);
+    let move_fun = module
         .get_functions()
-        .any(|fun| {
-            fun.find_spec_fun().is_some_and(|(id, _)| id == spec_fun.id)
-                && (fun.is_well_known(well_known::TYPE_NAME_MOVE)
-                    || fun.is_well_known(well_known::TYPE_INFO_MOVE)
-                    || fun.is_well_known(well_known::TYPE_NAME_GET_MOVE)
-                    || well_known::is_boogie_prelude_spec_native(&fun))
-        });
+        .find(|fun| fun.find_spec_fun().is_some_and(|(id, _)| id == spec_fun.id));
+    let backend_primitive = move_fun.as_ref().is_some_and(|fun| {
+        fun.is_well_known(well_known::TYPE_NAME_MOVE)
+            || fun.is_well_known(well_known::TYPE_INFO_MOVE)
+            || fun.is_well_known(well_known::TYPE_NAME_GET_MOVE)
+            || well_known::is_boogie_prelude_spec_native(fun)
+    });
+    // A Move companion describes the implementation. An opaque function's
+    // abstract contract may deliberately describe a different value (as
+    // std::error::canonical does). Reject this substitution transitively so
+    // the call summary uses that contract instead of its concrete body.
+    if !backend_primitive
+        && move_fun.is_some_and(|fun| {
+            fun.is_opaque()
+                && fun.get_spec().conditions.iter().any(|cond| {
+                    env.is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
+                        .unwrap_or(false)
+                })
+        })
+    {
+        return false;
+    }
     let Some(body) = &decl.body else {
         return decl.uninterpreted || backend_primitive;
     };
