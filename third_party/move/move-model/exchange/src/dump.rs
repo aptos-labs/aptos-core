@@ -23,9 +23,8 @@ use move_model::{
     ast::{
         AbortKind, Address, Attribute, AttributeValue, BehaviorKind, Condition, ConditionKind, Exp,
         ExpData, FriendDecl, FunParamAccessOf, LemmaDecl, LemmaId, MemoryLabel, MemoryRange,
-        Operation, Pattern,
-        Proof, PropertyBag, PropertyValue, QuantKind, Spec, SpecFunDecl, SpecVarDecl, TraceKind,
-        Value,
+        Operation, Pattern, Proof, PropertyBag, PropertyValue, QuantKind, Spec, SpecFunDecl,
+        SpecVarDecl, TraceKind, Value,
     },
     model::{
         FieldEnv, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv, NodeId,
@@ -1073,25 +1072,26 @@ impl<'a> Ctx<'a> {
             .iter()
             .map(|Parameter(name, ty, _)| (*name, ty.clone()))
             .collect();
-        let (conditions, decreases, proof) = self.with_params(param_types, || {
-            self.with_scope(param_vars, || {
-                let conditions = decl
-                    .conditions
-                    .iter()
-                    .map(|cond| self.condition(cond))
-                    .collect::<Result<Vec<_>>>()?;
-                let decreases = match &decl.decreases {
-                    Some(measure) => Some(self.exps(measure)?),
-                    None => None,
-                };
-                let proof = match &decl.proof {
-                    Some(proof) => Some(self.proof(proof)?),
-                    None => None,
-                };
-                Ok((conditions, decreases, proof))
+        let (conditions, decreases, proof) = self
+            .with_params(param_types, || {
+                self.with_scope(param_vars, || {
+                    let conditions = decl
+                        .conditions
+                        .iter()
+                        .map(|cond| self.condition(cond))
+                        .collect::<Result<Vec<_>>>()?;
+                    let decreases = match &decl.decreases {
+                        Some(measure) => Some(self.exps(measure)?),
+                        None => None,
+                    };
+                    let proof = match &decl.proof {
+                        Some(proof) => Some(self.proof(proof)?),
+                        None => None,
+                    };
+                    Ok((conditions, decreases, proof))
+                })
             })
-        })
-        .map_err(|e| anyhow!("in lemma `{}`: {:#}", self.name(decl.name), e))?;
+            .map_err(|e| anyhow!("in lemma `{}`: {:#}", self.name(decl.name), e))?;
         Ok(xast::Lemma {
             name: self.name(decl.name),
             loc: self.loc(&decl.loc),
@@ -1150,7 +1150,10 @@ impl<'a> Ctx<'a> {
                 application: self.lemma_application(*lemma, args)?,
             },
             Proof::ForallApply(loc, binders, triggers, lemma, args, weight) => {
-                let vars = binders.iter().map(|(name, ty)| (*name, ty.clone())).collect();
+                let vars = binders
+                    .iter()
+                    .map(|(name, ty)| (*name, ty.clone()))
+                    .collect();
                 let (triggers, application) = self.with_scope(vars, || {
                     let triggers = triggers
                         .iter()

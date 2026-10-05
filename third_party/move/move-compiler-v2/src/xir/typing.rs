@@ -933,7 +933,9 @@ mod tests {
             r(Ty::StructInst(2, vec![Ty::U64])),
             // 33..
             Ty::Function(vec![Ty::Bool], vec![Ty::U64], vec!["drop".to_owned()]),
-            Ty::Function(vec![Ty::U64, Ty::Bool], vec![Ty::U64], vec!["drop".to_owned()]),
+            Ty::Function(vec![Ty::U64, Ty::Bool], vec![Ty::U64], vec![
+                "drop".to_owned()
+            ]),
             Ty::Function(vec![Ty::U64], vec![Ty::U64], vec!["drop".to_owned()]),
         ];
         module.functions = vec![
@@ -1180,7 +1182,10 @@ mod tests {
             (false, call(&[34], Oper::Closure(1, 0b1), &[0])),
             (true, call(&[34], Oper::Closure(1, 0), &[])),
             (false, call(&[0], Oper::Closure(1, 0), &[])),
-            (true, call(&[35], Oper::ClosureInst(2, 0, vec![Ty::U64]), &[])),
+            (
+                true,
+                call(&[35], Oper::ClosureInst(2, 0, vec![Ty::U64]), &[]),
+            ),
             (
                 false,
                 call(&[35], Oper::ClosureInst(2, 0, vec![Ty::Bool]), &[]),
