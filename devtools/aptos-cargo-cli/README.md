@@ -46,6 +46,16 @@ related_test_packages = [
 | `e2e_tests` | Subsystem | Eligible named suites, selected when a declared dependency is affected or an input changes. |
 | `ignored_paths` | Both | Global: repository-wide. Subsystem: within its roots, without suppressing overlapping subsystems. Global inputs and explicit package/E2E mappings take precedence; a mapped path inside an ignored tree seeds only its mapped packages, not the crate containing it. |
 
+`Cargo.lock` remains a global input unless parsed lockfiles differ only in the
+dependency lists of existing workspace packages. In that case, subsystem and
+compare modes seed selection with those packages' `Cargo.toml` paths, even if
+only the lockfile changed. External package records are compared in full:
+versions, sources (including Git revisions), checksums, and dependency edges.
+Package additions/removals, other metadata changes, unknown lockfile formats,
+or unavailable lockfiles retain global coverage. The JSON plan preserves the
+original changed paths and explains the refinement in `reasons`. Legacy mode,
+builds, lints, and doc-test gates are unchanged.
+
 Changes are measured from the merge base of HEAD and `--base` (default
 `origin/main`), including tracked staged/unstaged edits, deletions, and both rename
 endpoints. Untracked files are excluded. Each path seeds its nearest owning

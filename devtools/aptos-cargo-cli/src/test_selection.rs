@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    process::Command,
     str::FromStr,
     sync::LazyLock,
 };
@@ -318,7 +319,29 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
     let paths = args.compute_changed_files(&plan.base)?;
     plan.changed_paths = paths.iter().map(|p| p.to_string()).collect();
     plan.changed_paths.sort();
+    // Capture the working lockfile before Cargo metadata can regenerate it.
+    let lockfiles = (mode != Mode::Legacy && plan.changed_paths.iter().any(|p| p == "Cargo.lock"))
+        .then(|| read_lockfiles(&plan.base));
     let head = head_package_graph()?;
+    let mut selection_paths = plan.changed_paths.clone();
+    if let Some(lockfiles) = lockfiles {
+        match lockfiles
+            .and_then(|(base, current)| workspace_lockfile_inputs(&base, &current, &head))
+        {
+            Ok(inputs) => {
+                selection_paths.retain(|p| p != "Cargo.lock");
+                selection_paths.extend(inputs);
+                selection_paths.sort();
+                selection_paths.dedup();
+                plan.reasons.push(
+                    "Cargo.lock changes only workspace dependency lists: selecting from package manifests".into(),
+                );
+            },
+            Err(error) => plan
+                .reasons
+                .push(format!("Cargo.lock retains global coverage: {error:#}")),
+        }
+    }
     plan.package_specs = head
         .workspace()
         .iter()
@@ -337,7 +360,7 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
             let config = load_config(args, head.workspace().root())?;
             config.validate(&head, None)?;
             // Global inputs and an empty diff need no historical dependency graph.
-            if matches_any(&config.global_test_inputs, &plan.changed_paths) {
+            if matches_any(&config.global_test_inputs, &selection_paths) {
                 config.validate(&head, Some(&head))?;
                 plan.reasons.push(GLOBAL_INPUT_REASON.into());
                 let selected = global_selection(&head);
@@ -345,9 +368,9 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
                 plan.finish(selected.packages);
                 return Ok(plan);
             }
-            if plan.changed_paths.is_empty() {
+            if selection_paths.is_empty() {
                 config.validate(&head, Some(&head))?;
-                plan.reasons.push("No tracked changes".into());
+                plan.reasons.push("No relevant tracked changes".into());
                 return Ok(plan);
             }
             let base = args.base_package_graph(&plan.base)?;
@@ -355,7 +378,7 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
                 &config,
                 &base,
                 &head,
-                &plan.changed_paths,
+                &selection_paths,
                 &mut plan.subsystems,
                 &mut plan.reasons,
             )?;
@@ -376,7 +399,7 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
                     &config,
                     &base,
                     &head,
-                    &plan.changed_paths,
+                    &selection_paths,
                     &mut plan.subsystems,
                     &mut plan.reasons,
                 )
@@ -402,6 +425,100 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
         },
     }
     Ok(plan)
+}
+
+/// Read both versions without a checkout or network access. Any failure leaves
+/// Cargo.lock in the normal global-input path.
+fn read_lockfiles(base: &str) -> Result<(String, String)> {
+    let old = Command::new("git")
+        .args(["show", &format!("{base}:Cargo.lock")])
+        .output()?;
+    ensure!(old.status.success(), "base lockfile unavailable");
+    let root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()?;
+    ensure!(root.status.success(), "workspace root unavailable");
+    let root = String::from_utf8(root.stdout)?;
+    Ok((
+        String::from_utf8(old.stdout)?,
+        fs::read_to_string(Utf8Path::new(root.trim()).join("Cargo.lock"))?,
+    ))
+}
+
+/// Only dependency-list edits in existing workspace records are exempt from
+/// global coverage. Compare everything else, including external dependency
+/// edges, checksums, sources, package additions/removals and lockfile metadata.
+fn workspace_lockfile_inputs(old: &str, new: &str, head: &PackageGraph) -> Result<Vec<String>> {
+    let workspace: BTreeMap<_, _> = head
+        .workspace()
+        .iter_by_path()
+        .map(|(path, package)| {
+            (
+                (package.name().to_owned(), package.version().to_string()),
+                path.join("Cargo.toml").to_string(),
+            )
+        })
+        .collect();
+    let normalize = |text: &str| -> Result<(toml::Value, BTreeMap<String, toml::Value>)> {
+        let mut lock: toml::Value = toml::from_str(text)?;
+        ensure!(
+            matches!(
+                lock.get("version").and_then(toml::Value::as_integer),
+                Some(3 | 4)
+            ),
+            "unsupported lockfile version"
+        );
+        let packages = lock
+            .get_mut("package")
+            .and_then(toml::Value::as_array_mut)
+            .context("missing lockfile packages")?;
+        let mut dependencies = BTreeMap::new();
+        let mut identities = BTreeSet::new();
+        for package in packages.iter_mut() {
+            let record = package.as_table_mut().context("invalid package record")?;
+            let name = record
+                .get("name")
+                .and_then(toml::Value::as_str)
+                .context("missing package name")?;
+            let version = record
+                .get("version")
+                .and_then(toml::Value::as_str)
+                .context("missing package version")?;
+            ensure!(
+                identities.insert((
+                    name.to_owned(),
+                    version.to_owned(),
+                    record.get("source").map(ToString::to_string)
+                )),
+                "duplicate package record"
+            );
+            if !record.contains_key("source") {
+                if let Some(path) = workspace.get(&(name.to_owned(), version.to_owned())) {
+                    let deps = record
+                        .remove("dependencies")
+                        .unwrap_or_else(|| toml::Value::Array(vec![]));
+                    ensure!(
+                        deps.as_array()
+                            .is_some_and(|values| values.iter().all(|v| v.as_str().is_some())),
+                        "invalid dependency list"
+                    );
+                    dependencies.insert(path.clone(), deps);
+                }
+            }
+        }
+        packages.sort_by_key(ToString::to_string);
+        Ok((lock, dependencies))
+    };
+    let (old_lock, old_dependencies) = normalize(old)?;
+    let (new_lock, new_dependencies) = normalize(new)?;
+    ensure!(
+        old_lock == new_lock,
+        "changes extend beyond workspace dependency lists"
+    );
+    Ok(new_dependencies
+        .into_iter()
+        .filter_map(|(path, deps)| (old_dependencies.get(&path) != Some(&deps)).then_some(path))
+        .collect())
 }
 
 const GLOBAL_INPUT_REASON: &str =
@@ -813,6 +930,45 @@ mod tests {
             command.other_options(["--offline"]);
             command.exec().unwrap().build_graph().unwrap()
         }
+    }
+
+    #[test]
+    fn lockfile_workspace_edges_and_external_changes() {
+        let graph = Fixture::new().graph();
+        let old = "version = 4\n[[package]]\nname = 'core'\nversion = '0.1.0'\ndependencies = ['external']\n[[package]]\nname = 'external'\nversion = '1.0.0'\nsource = 'registry+https://example.com'\nchecksum = 'abc'\ndependencies = ['other']\n";
+        let new = old.replace("dependencies = ['external']", "dependencies = ['other']");
+        assert_eq!(workspace_lockfile_inputs(old, &new, &graph).unwrap(), vec![
+            "move/core/Cargo.toml"
+        ]);
+        assert!(
+            workspace_lockfile_inputs(old, &format!("# formatting\n{old}"), &graph)
+                .unwrap()
+                .is_empty()
+        );
+        // External records must match completely, not just by name/version.
+        for changed in [
+            new.replace("1.0.0", "1.0.1"),
+            new.replace(
+                "registry+https://example.com",
+                "git+https://example.com#123",
+            ),
+            new.replace("checksum = 'abc'", "checksum = 'def'"),
+            new.replace(
+                "dependencies = ['other']\n",
+                "dependencies = ['different']\n",
+            ),
+            format!("{new}\n[[package]]\nname = 'added'\nversion = '1.0.0'\n"),
+            new.replace("version = 4", "version = 5"),
+            new.replace("name = 'core'", "name = 'unknown-path-package'"),
+            "invalid toml [".into(),
+        ] {
+            assert!(
+                workspace_lockfile_inputs(old, &changed, &graph).is_err(),
+                "{changed}"
+            );
+        }
+        assert!(workspace_lockfile_inputs(&new, old, &graph).is_ok());
+        assert!(workspace_lockfile_inputs(old, "version = 4", &graph).is_err());
     }
 
     fn config() -> Config {
