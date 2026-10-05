@@ -12,7 +12,7 @@ use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{InterpreterContext, ProductionNativeRegistry};
 
 /// Runs `f` with a fresh [`InterpreterContext`] over an empty module provider
-/// and no natives, with `entry` verified. A fresh global context per call
+/// and no natives, with `entry` checked for well-formedness. A fresh global context per call
 /// keeps cached module and interned state from leaking between tests. `f`
 /// receives `entry` at the context's lifetime, as `build_call` requires.
 // Not every test binary that includes `common` uses the helper.
@@ -34,7 +34,7 @@ pub fn with_test_interpreter<R>(
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
         &NoNatives,
     );
-    mono_move_runtime::assert_verified(entry, &guard);
+    mono_move_runtime::assert_well_formed(entry, &guard);
     let mut interp = InterpreterContext::new(
         loader,
         GasMeter::new(gas_budget),

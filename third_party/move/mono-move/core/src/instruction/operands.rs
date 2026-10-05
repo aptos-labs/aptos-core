@@ -3,7 +3,7 @@
 
 //! Frame-operand schema: for every micro-op, which frame slots it touches and
 //! how the interpreter accesses each one. This is the single source of truth
-//! the static verifier checks against; tools that need the same table (a
+//! the well-formedness checker checks against; tools that need the same table (a
 //! disassembler, a runtime access checker, a micro-op fuzzer) should use it
 //! rather than re-deriving it from the interpreter.
 //!

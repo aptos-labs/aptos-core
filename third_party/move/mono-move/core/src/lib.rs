@@ -17,8 +17,8 @@ pub mod root_pool;
 pub mod storage;
 pub mod types;
 pub mod value_layout;
-mod verifier;
 pub mod vm_error;
+mod well_formedness;
 
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, checked_align_up_u32,
@@ -67,7 +67,8 @@ pub use value_layout::{
     reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
     LayoutProvider, ValueLayout, ValueLayoutTable,
 };
-pub use verifier::{
-    assert_verified, verify_function, ConstantPoolProvider, VerificationError, VerifierProvider,
-};
 pub use vm_error::{CallFrame, ErrorLocation, VMInternalError, VMResult};
+pub use well_formedness::{
+    assert_well_formed, check_well_formedness, ConstantPoolProvider, WellFormednessError,
+    WellFormednessProvider,
+};

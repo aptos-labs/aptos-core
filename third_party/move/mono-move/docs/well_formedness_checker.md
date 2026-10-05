@@ -1,17 +1,19 @@
-# Micro-op Verifier
+# Well-formedness Checker
 
-The micro-op verifier (`core/src/verifier.rs`) is a static well-formedness
-checker for lowered functions. The loader runs it on every lowered
+The well-formedness checker (`core/src/well_formedness.rs`) is a static
+checker for lowered functions. It is distinct from the Move bytecode
+verifier, which runs on bytecode before lowering; this checker runs on the
+lowered micro-ops after it. The loader runs it on every lowered
 `Function` before the function is cached, so a lowering it rejects is never
 executed. This document is the specification of what it checks, written so
 that each check is a precise statement about the function's data and can be
 turned into a formal specification later. The implementation names each
 check by its identifier below.
 
-The verifier is defence in depth against bugs in the specializer. The
+The checker is defence in depth against bugs in the specializer. The
 bytecode it lowers has already passed the Move bytecode verifier, so a
 rejected lowering is a VM bug and surfaces as an invariant violation
-(`LoaderInvariantViolation::MicroOpVerificationFailed`), never as a user
+(`LoaderInvariantViolation::NotWellFormed`), never as a user
 error.
 
 ## 1. Notation
@@ -90,7 +92,7 @@ alignment requirement even if the layout pass would align it.
 
 ## 3. Checks
 
-Every check is a predicate on `F` and the providers. The verifier evaluates
+Every check is a predicate on `F` and the providers. The checker evaluates
 all of them and reports every violation; no check depends on another having
 passed. Identifiers are stable and are cited in the implementation.
 
@@ -290,9 +292,9 @@ Every check is a pure predicate over immutable inputs and the result is the
 union of all violations, so the groups are already independent: none reads
 another's result, and evaluating them in any order, or separately, gives
 the same answer. Splitting the implementation into one pass per group is
-therefore feasible and cheap. Verification is linear in `N` plus the sizes
+therefore feasible and cheap. Checking is linear in `N` plus the sizes
 of the layouts and slot lists; several passes over `code` instead of one
-change the constant only, and verification runs once per cached lowering.
+change the constant only, and the checker runs once per cached lowering.
 
 What a split would buy:
 
@@ -308,5 +310,5 @@ What it would cost: a small amount of plumbing to share the error sink and
 the function context between passes, and a second iteration over `code`.
 The one shared primitive, access validity (section 1), stays in one place.
 
-The implementation today is a single `FunctionVerifier` whose methods map
+The implementation today is a single `Checker` whose methods map
 one-to-one onto the groups above; a pass split is a mechanical follow-up.

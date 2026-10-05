@@ -3,11 +3,11 @@
 
 //! Static well-formedness checker for lowered [`Function`] bodies.
 //!
-//! The loader runs [`verify_function`] on every lowered function before it is
+//! The loader runs [`check_well_formedness`] on every lowered function before it is
 //! cached, so a rejected lowering never reaches the interpreter. Test harnesses
-//! that build `Function`s by hand call [`assert_verified`] instead.
+//! that build `Function`s by hand call [`assert_well_formed`] instead.
 //!
-//! The checks are specified in `docs/micro_op_verifier.md`. Each check has a
+//! The checks are specified in `docs/well_formedness_checker.md`. Each check has a
 //! stable identifier there (`F1`, `P3`, `O1`, ...), and the implementation
 //! cites the identifier at the point where it is evaluated. Frame operands and
 //! the kind of access the interpreter performs on each one come from the
@@ -15,8 +15,9 @@
 //! to the function's metadata. All checks are evaluated and every violation is
 //! reported; no check depends on another having passed.
 //!
-//! TODO(cleanup): rename to a well-formedness checker to avoid ambiguity with
-//! the Move bytecode verifier.
+//! The name is deliberate: this is not the Move bytecode verifier, which runs
+//! on the bytecode before lowering. This checker runs on the lowered micro-ops
+//! after it.
 
 use crate::{
     align::MAX_ALIGN,
@@ -39,7 +40,7 @@ const PTR_ALIGN: u32 = 8;
 // Providers
 // ---------------------------------------------------------------------------
 
-/// Constant-pool view of the modules whose functions are being verified.
+/// Constant-pool view of the modules whose functions are being checked.
 pub trait ConstantPoolProvider {
     /// Interned type of constant `idx` in `module_id`'s pool, or `None` if
     /// the module is unknown or `idx` is out of range.
@@ -50,10 +51,13 @@ pub trait ConstantPoolProvider {
     ) -> Option<InternedType>;
 }
 
-/// Everything the verifier needs to resolve a function's operands.
-pub trait VerifierProvider: DescriptorProvider + LayoutProvider + ConstantPoolProvider {}
+/// Everything the checker needs to resolve a function's operands.
+pub trait WellFormednessProvider:
+    DescriptorProvider + LayoutProvider + ConstantPoolProvider
+{
+}
 
-impl<P: DescriptorProvider + LayoutProvider + ConstantPoolProvider + ?Sized> VerifierProvider
+impl<P: DescriptorProvider + LayoutProvider + ConstantPoolProvider + ?Sized> WellFormednessProvider
     for P
 {
 }
@@ -63,13 +67,13 @@ impl<P: DescriptorProvider + LayoutProvider + ConstantPoolProvider + ?Sized> Ver
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct VerificationError {
+pub struct WellFormednessError {
     pub func_name: String,
     pub pc: Option<usize>,
     pub message: String,
 }
 
-impl fmt::Display for VerificationError {
+impl fmt::Display for WellFormednessError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.pc {
             Some(pc) => write!(f, "'{}', pc {}: {}", self.func_name, pc, self.message),
@@ -78,7 +82,7 @@ impl fmt::Display for VerificationError {
     }
 }
 
-/// Records a verification error at `pc` (`Option<usize>`) with a formatted
+/// Records a well-formedness error at `pc` (`Option<usize>`) with a formatted
 /// message.
 macro_rules! fail {
     ($self:ident, $pc:expr, $($arg:tt)*) => {
@@ -92,26 +96,26 @@ macro_rules! fail {
 
 /// Validate a single function against the providers. Returns an empty `Vec`
 /// on success.
-pub fn verify_function<P: VerifierProvider + ?Sized>(
+pub fn check_well_formedness<P: WellFormednessProvider + ?Sized>(
     func: &Function,
     provider: &P,
-) -> Vec<VerificationError> {
+) -> Vec<WellFormednessError> {
     let mut errors = Vec::new();
-    FunctionVerifier {
+    Checker {
         func,
         provider,
         errors: &mut errors,
     }
-    .verify();
+    .run();
     errors
 }
 
-/// Panics with the verifier's findings unless `function` verifies cleanly.
-pub fn assert_verified<P: VerifierProvider + ?Sized>(function: &Function, provider: &P) {
-    let errors = verify_function(function, provider);
+/// Panics with the checker's findings unless `function` is well-formed.
+pub fn assert_well_formed<P: WellFormednessProvider + ?Sized>(function: &Function, provider: &P) {
+    let errors = check_well_formedness(function, provider);
     assert!(
         errors.is_empty(),
-        "verification failed:\n{}",
+        "well-formedness check failed:\n{}",
         errors
             .iter()
             .map(|e| format!("  {}", e))
@@ -121,17 +125,17 @@ pub fn assert_verified<P: VerifierProvider + ?Sized>(function: &Function, provid
 }
 
 // ---------------------------------------------------------------------------
-// Per-function verifier
+// Per-function checker
 // ---------------------------------------------------------------------------
 
-struct FunctionVerifier<'a, P: VerifierProvider + ?Sized> {
+struct Checker<'a, P: WellFormednessProvider + ?Sized> {
     func: &'a Function,
     provider: &'a P,
-    errors: &'a mut Vec<VerificationError>,
+    errors: &'a mut Vec<WellFormednessError>,
 }
 
-impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
-    fn verify(&mut self) {
+impl<'a, P: WellFormednessProvider + ?Sized> Checker<'a, P> {
+    fn run(&mut self) {
         let code = self.func.code.ops();
 
         // F1.
@@ -151,9 +155,9 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             }
         }
 
-        self.verify_frame_geometry();
-        self.verify_param_and_return_slots();
-        self.verify_gc_layouts();
+        self.check_frame_geometry();
+        self.check_param_and_return_slots();
+        self.check_gc_layouts();
 
         // F7. Origins: either absent (hand-built functions) or one per micro-op;
         // a partial table would attribute errors to wrong bytecode offsets.
@@ -171,7 +175,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         // O1–O5 through the operand schema, then the op-specific checks.
         for (pc, instr) in code.iter().enumerate() {
             instr.frame_operands(&mut |off, kind| self.check(Some(pc), off, kind));
-            self.verify_instruction(pc, instr);
+            self.check_instruction(pc, instr);
         }
     }
 
@@ -179,7 +183,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
     // Function-level checks
     // -----------------------------------------------------------------------
 
-    fn verify_frame_geometry(&mut self) {
+    fn check_frame_geometry(&mut self) {
         let func = self.func;
         // F3.
         if func.frame_size() > func.extended_frame_size {
@@ -226,7 +230,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
-    fn verify_param_and_return_slots(&mut self) {
+    fn check_param_and_return_slots(&mut self) {
         let func = self.func;
         // P1–P4 and R1–R4. `CallClosure` and `CallBuilder` write `size` bytes at
         // `callee_fp + offset` for each parameter slot, and `call_unchecked`
@@ -333,7 +337,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
-    fn verify_gc_layouts(&mut self) {
+    fn check_gc_layouts(&mut self) {
         let code = self.func.code.ops();
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_points = self.func.safe_point_layouts.entries();
@@ -443,7 +447,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
     // Per-instruction checks beyond the operand schema
     // -----------------------------------------------------------------------
 
-    fn verify_instruction(&mut self, pc: usize, instr: &MicroOp) {
+    fn check_instruction(&mut self, pc: usize, instr: &MicroOp) {
         use MicroOp::*;
         match *instr {
             // Fully described by the operand schema.
@@ -566,7 +570,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             // C4.
             CallDirect { ref ptr } => {
                 // SAFETY: the function pointer lives in the global context,
-                // which the caller's guard keeps alive during verification.
+                // which the caller's guard keeps alive during the check.
                 let callee = unsafe { ptr.as_ref_unchecked() };
                 self.check_direct_callee(pc, callee);
             },
@@ -691,7 +695,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
             },
 
             // L1–L8.
-            PackClosure(ref op) => self.verify_pack_closure(pc, op),
+            PackClosure(ref op) => self.check_pack_closure(pc, op),
             // L9.
             CallClosure(ref op) => {
                 for (i, slot) in op.provided_args.iter().enumerate() {
@@ -705,7 +709,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         }
     }
 
-    fn verify_pack_closure(&mut self, pc: usize, op: &PackClosureOp) {
+    fn check_pack_closure(&mut self, pc: usize, op: &PackClosureOp) {
         // The closure object uses the implicit reserved `CLOSURE_DESCRIPTOR_ID`
         // (no per-op field); every provider installs `Closure` there.
         debug_assert!(
@@ -777,7 +781,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
         match &op.func_ref {
             ClosureFuncRef::Resolved(func_ptr) => {
                 // SAFETY: the function pointer lives in the global context,
-                // which the caller's guard keeps alive during verification.
+                // which the caller's guard keeps alive during the check.
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
                 let param_count = callee.param_slots.len();
                 // L6.
@@ -860,7 +864,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
     // -----------------------------------------------------------------------
 
     fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
-        self.errors.push(VerificationError {
+        self.errors.push(WellFormednessError {
             func_name: self.func.name().to_string(),
             pc,
             message: msg.into(),
@@ -1083,7 +1087,7 @@ impl<'a, P: VerifierProvider + ?Sized> FunctionVerifier<'a, P> {
     // -----------------------------------------------------------------------
 
     /// Resolves `descriptor_id`, reporting an unknown id on behalf of `op`.
-    /// The result borrows the provider, not the verifier, so callers can keep
+    /// The result borrows the provider, not the checker, so callers can keep
     /// reporting while holding it.
     fn descriptor_or_report(
         &mut self,

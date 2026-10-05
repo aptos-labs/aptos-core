@@ -3,7 +3,7 @@
 
 //! Loader subsystem error types.
 
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VerificationError};
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError, WellFormednessError};
 use move_binary_format::errors::VMError;
 use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
@@ -79,8 +79,8 @@ impl IntoExecutionError for LoaderError {
     }
 }
 
-/// Joins the verifier's findings into a single diagnostic line.
-fn format_verification_errors(errors: &[VerificationError]) -> String {
+/// Joins the checker's findings into a single diagnostic line.
+fn format_well_formedness_errors(errors: &[WellFormednessError]) -> String {
     errors
         .iter()
         .map(ToString::to_string)
@@ -147,11 +147,11 @@ pub enum LoaderInvariantViolation {
     MandatoryDepsNotLazy,
 
     // ---- lowering ----
-    /// The specializer produced a function the micro-op verifier rejects.
+    /// The specializer produced a function the well-formedness checker rejects.
     /// The bytecode already passed the Move bytecode verifier, so this is a
     /// bug in the lowering pipeline, not in the user's code.
-    #[error("Lowered function failed micro-op verification: {}", format_verification_errors(.errors))]
-    MicroOpVerificationFailed { errors: Vec<VerificationError> },
+    #[error("Lowered function is not well-formed: {}", format_well_formedness_errors(.errors))]
+    NotWellFormed { errors: Vec<WellFormednessError> },
 }
 
 /// Returns from the enclosing function with a [`LoaderError::InvariantViolation`]

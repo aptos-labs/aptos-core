@@ -1,23 +1,24 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests for the static verifier (`verify_function`).
+//! Tests for the well-formedness checker (`check_well_formedness`).
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
+    check_well_formedness,
     interner::{InternedModuleId, ModuleId},
     native::{FrameSlot, NativeABI, NativeIdx},
     types::{InternedType, InternedTypeList, Type, ADDRESS_TY, EMPTY_TYPE_LIST, U64_TY},
-    verify_function, CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, ConstantPoolIndex,
-    ConstantPoolProvider, DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO,
-    Function, FunctionDefinitionIndex, FunctionPtr, IntBinaryOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable,
-    PackClosureOp, SafePointEntry, ShiftOperand, SizedSlot, SortedSafePointEntries, ValueCmpOp,
-    ValueLayout, VecUnpackOp, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, ConstantPoolIndex, ConstantPoolProvider,
+    DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO, Function,
+    FunctionDefinitionIndex, FunctionPtr, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
+    LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, PackClosureOp,
+    SafePointEntry, ShiftOperand, SizedSlot, SortedSafePointEntries, ValueCmpOp, ValueLayout,
+    VecUnpackOp, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// A descriptor table paired with an empty layout provider and a fixed
-/// constant pool, to satisfy the verifier's provider bound. These tests do
+/// constant pool, to satisfy the checker's provider bound. These tests do
 /// not exercise nominal types, the only operands that read a layout.
 struct TestProvider {
     descriptors: ObjectDescriptorTable,
@@ -108,7 +109,7 @@ fn minimal_func() -> Function {
 #[test]
 fn valid_minimal() {
     let func = minimal_func();
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -130,7 +131,7 @@ fn valid_with_arithmetic_and_jumps() {
         extended_frame_size: 40,
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -154,7 +155,7 @@ fn valid_with_vec_and_pointer_slots() {
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -176,7 +177,7 @@ fn frame_bounds_store_u64() {
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert_eq!(errors.len(), 1);
     assert!(
         errors[0].message.contains("overlaps metadata"),
@@ -201,7 +202,7 @@ fn frame_bounds_mov() {
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
@@ -227,7 +228,7 @@ fn frame_bounds_fat_ptr_write() {
         extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
@@ -240,7 +241,7 @@ fn frame_bounds_extended_frame_too_small() {
         extended_frame_size: 16, // param_and_local_sizes_sum 8 + 24 = 32 > 16
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
@@ -252,14 +253,14 @@ fn origins_table_must_be_empty_or_match_code_length() {
     // Two-entry origins table against one-op code.
     let mut func = minimal_func();
     func.code = Code::with_origins(vec![MicroOp::Return], vec![0, 0]);
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors
         .iter()
         .any(|error| error.message.contains("number of origins")));
 
     // A table with one entry per micro-op passes.
     func.code = Code::with_origins(vec![MicroOp::Return], vec![0]);
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -274,7 +275,7 @@ fn pointer_slots_offset_out_of_bounds() {
         frame_layout: FrameLayoutInfo::new(vec![FO(100)]), // offset 100 + 8 > extended_frame_size 32
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
@@ -289,7 +290,7 @@ fn pointer_slots_overlaps_metadata() {
         frame_layout: FrameLayoutInfo::new(vec![FO(8)]), // offset 8 overlaps metadata [8, 32) since param_and_local_sizes_sum = 8
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
@@ -303,7 +304,7 @@ fn param_and_local_sizes_sum_misaligned() {
         param_and_local_sizes_sum: 1, // not a multiple of 8
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("8-byte aligned")));
 }
@@ -314,7 +315,7 @@ fn args_size_exceeds_data_size() {
         param_region_size: 16, // > param_and_local_sizes_sum 8
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors
         .iter()
@@ -338,7 +339,7 @@ fn invalid_jump_target() {
         ]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("jump target")));
 }
@@ -362,7 +363,7 @@ fn invalid_conditional_jump_target() {
         ]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("jump target")));
 }
@@ -400,7 +401,7 @@ fn invalid_descriptor_id() {
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("descriptor_id")));
 }
@@ -423,7 +424,7 @@ fn zero_size_mov() {
         ]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("size")));
 }
@@ -457,7 +458,7 @@ fn zero_elem_size_vec_push() {
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("size")));
 }
@@ -472,7 +473,7 @@ fn empty_code() {
         code: Code::from_vec(vec![]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("non-empty")));
 }
@@ -484,7 +485,7 @@ fn zero_frame_size() {
         extended_frame_size: 0,
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("frame_size")));
 }
@@ -494,7 +495,7 @@ fn zero_frame_size() {
 // ---------------------------------------------------------------------------
 //
 // Unchecked u64 division, remainder, and shift ops require nonzero divisors
-// and shift amounts below 64. The verifier rejects violations of these
+// and shift amounts below 64. The checker rejects violations of these
 // lowering invariants.
 
 fn func_with_single_op(op: MicroOp) -> Function {
@@ -513,7 +514,7 @@ fn div_u64_imm_zero() {
         src: FO(8),
         imm: 0,
     });
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(
         errors
             .iter()
@@ -530,7 +531,7 @@ fn mod_u64_imm_zero() {
         src: FO(8),
         imm: 0,
     });
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(
         errors
             .iter()
@@ -547,7 +548,7 @@ fn div_u64_imm_nonzero_ok() {
         src: FO(8),
         imm: 1,
     });
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -558,7 +559,7 @@ fn shl_u64_imm_oversize() {
         src: FO(8),
         imm: 64,
     });
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(
         errors.iter().any(|e| e.message.contains("shift amount")),
         "expected oversize-shift error, got: {:?}",
@@ -573,7 +574,7 @@ fn shr_u64_imm_oversize() {
         src: FO(8),
         imm: 100,
     });
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(
         errors.iter().any(|e| e.message.contains("shift amount")),
         "expected oversize-shift error, got: {:?}",
@@ -588,7 +589,7 @@ fn shl_u64_imm_in_range_ok() {
         src: FO(8),
         imm: 63,
     });
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -613,7 +614,7 @@ fn multiple_errors_collected() {
         ]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(
         errors.len() >= 2,
         "expected at least 2 errors, got {}",
@@ -662,7 +663,7 @@ fn vec_pushback_func(descriptor_id: DescriptorId) -> Function {
 fn vec_pushback_accepts_trivial_descriptor() {
     // A pointer-free vector canonically uses the Trivial descriptor.
     let func = vec_pushback_func(TRIVIAL_DESCRIPTOR_ID);
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors.is_empty(), "errors: {:?}", errors);
 }
 
@@ -672,7 +673,7 @@ fn vec_pushback_rejects_non_vector_descriptor() {
     let mut descriptors = ObjectDescriptorTable::new();
     let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
     let func = vec_pushback_func(struct_desc);
-    let errors = verify_function(&func, &TestProvider::new(descriptors));
+    let errors = check_well_formedness(&func, &TestProvider::new(descriptors));
     assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
         && e.message.contains("not a non-empty Vector or Trivial")));
 }
@@ -692,7 +693,7 @@ fn heap_new_rejects_vector_descriptor() {
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         ..minimal_func()
     };
-    let errors = verify_function(&func, &trivial_descriptors());
+    let errors = check_well_formedness(&func, &trivial_descriptors());
     assert!(errors
         .iter()
         .any(|e| e.message.contains("not a Struct or Enum")));
@@ -730,7 +731,7 @@ fn ref_u64() -> InternedType {
 }
 
 fn errors_of(func: &Function) -> Vec<String> {
-    verify_function(func, &trivial_descriptors())
+    check_well_formedness(func, &trivial_descriptors())
         .into_iter()
         .map(|e| e.message)
         .collect()
@@ -744,7 +745,7 @@ fn assert_error_contains(func: &Function, needle: &str) {
     );
 }
 
-fn assert_verifies(func: &Function) {
+fn assert_accepted(func: &Function) {
     let errors = errors_of(func);
     assert!(errors.is_empty(), "unexpected errors: {errors:#?}");
 }
@@ -796,17 +797,17 @@ fn misaligned_pointer_offset_rejected() {
 
 #[test]
 fn move8_and_byte_copies_need_no_alignment() {
-    assert_verifies(&func_with_single_op(MicroOp::Move8 {
+    assert_accepted(&func_with_single_op(MicroOp::Move8 {
         dst: FO(1),
         src: FO(9),
     }));
-    assert_verifies(&func_with_single_op(MicroOp::Move {
+    assert_accepted(&func_with_single_op(MicroOp::Move {
         dst: FO(1),
         src: FO(9),
         size: 8,
     }));
     // The frame side of the 8-byte heap moves is unaligned too.
-    assert_verifies(&func_with_single_op(MicroOp::HeapMoveFrom8 {
+    assert_accepted(&func_with_single_op(MicroOp::HeapMoveFrom8 {
         dst: FO(1),
         heap_ptr: FO(16),
         offset: 0,
@@ -823,7 +824,7 @@ fn int_slots_use_natural_alignment_up_to_max_align() {
     }));
     assert_error_contains(&func, "[2, 6) is not 4-byte aligned");
     // u128 operands are read unaligned, so any offset is fine.
-    assert_verifies(&func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
+    assert_accepted(&func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
         dst: FO(4),
         lhs: FO(4),
         rhs: IntOperand::SlotU128(FO(4)),
@@ -887,7 +888,7 @@ fn param_slot_must_lie_in_param_region() {
         ..one_param_callee()
     };
     assert_error_contains(&func, "param slot [0, 8) exceeds param_region_size (0)");
-    assert_verifies(&one_param_callee());
+    assert_accepted(&one_param_callee());
 }
 
 #[test]
@@ -985,12 +986,12 @@ fn pointer_slot_beyond_params_requires_zero_frame() {
         &func,
         "pointer slot 0 beyond param_region_size (0) but zero_frame is false",
     );
-    assert_verifies(&Function {
+    assert_accepted(&Function {
         zero_frame: true,
         ..func
     });
     // A pointer-typed parameter is written by the caller and needs no zeroing.
-    assert_verifies(&Function {
+    assert_accepted(&Function {
         zero_frame: false,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
         ..one_param_callee()
@@ -1039,7 +1040,7 @@ fn safe_points_must_be_sorted_in_bounds_at_allocating_ops_and_disjoint_from_base
         safe_point_layouts: SortedSafePointEntries::new(vec![safe_point(0, vec![FO(8)])]),
         ..base()
     };
-    assert_verifies(&ok);
+    assert_accepted(&ok);
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,7 +1065,7 @@ fn last_op_must_be_a_terminator() {
             gas: 0,
         },
     ] {
-        assert_verifies(&Function {
+        assert_accepted(&Function {
             code: Code::from_vec(vec![terminator]),
             ..minimal_func()
         });
@@ -1094,7 +1095,7 @@ fn shift_on_signed_rejected() {
         rhs: ShiftOperand::ImmU8(1),
     }));
     assert_error_contains(&func, "shift on signed type");
-    assert_verifies(&func_with_single_op(MicroOp::IntShl(IntShiftOp {
+    assert_accepted(&func_with_single_op(MicroOp::IntShl(IntShiftOp {
         ty: IntTy::U64,
         dst: FO(0),
         lhs: FO(0),
@@ -1110,7 +1111,7 @@ fn negate_on_unsigned_rejected() {
         src: FO(0),
     }));
     assert_error_contains(&func, "negate on unsigned type");
-    assert_verifies(&func_with_single_op(MicroOp::IntNegate(IntNegateOp {
+    assert_accepted(&func_with_single_op(MicroOp::IntNegate(IntNegateOp {
         ty: IntTy::I64,
         dst: FO(0),
         src: FO(0),
@@ -1188,7 +1189,7 @@ fn deep_copy_heap_ptrs_offsets_are_checked() {
         }),
         "[4, 12) is not 8-byte aligned",
     );
-    assert_verifies(&func_with_single_op(MicroOp::DeepCopyHeapPtrs {
+    assert_accepted(&func_with_single_op(MicroOp::DeepCopyHeapPtrs {
         base: FO(0),
         offsets: Box::new([0, 8]),
     }));
@@ -1202,7 +1203,7 @@ fn vec_unpack_destinations_must_be_disjoint() {
         dsts: vec![FO(0), FO(4)],
     })));
     assert_error_contains(&func, "VecUnpack: destinations [0, 8) and [4, 12) overlap");
-    assert_verifies(&func_with_single_op(MicroOp::VecUnpack(Box::new(
+    assert_accepted(&func_with_single_op(MicroOp::VecUnpack(Box::new(
         VecUnpackOp {
             src: FO(16),
             elem_size: 8,
@@ -1233,7 +1234,7 @@ fn store_imm_vec_constant_index_must_exist() {
         dst: FO(0),
         idx: ConstantPoolIndex(0),
     });
-    let errors = verify_function(&func, &TestProvider::with_constants(vec![]));
+    let errors = check_well_formedness(&func, &TestProvider::with_constants(vec![]));
     assert!(errors
         .iter()
         .any(|e| e.message.contains("constant pool index 0 out of range")));
@@ -1246,10 +1247,10 @@ fn store_imm_vec_destination_is_sized_for_the_constant() {
         idx: ConstantPoolIndex(0),
     });
     // A u64 constant fits an 8-byte slot...
-    let errors = verify_function(&func, &TestProvider::with_constants(vec![U64_TY]));
+    let errors = check_well_formedness(&func, &TestProvider::with_constants(vec![U64_TY]));
     assert!(errors.is_empty(), "{errors:#?}");
     // ...but a 32-byte address written at offset 0 runs into the metadata.
-    let errors = verify_function(&func, &TestProvider::with_constants(vec![ADDRESS_TY]));
+    let errors = check_well_formedness(&func, &TestProvider::with_constants(vec![ADDRESS_TY]));
     assert!(errors
         .iter()
         .any(|e| e.message.contains("[0, 32) overlaps metadata")));
@@ -1272,13 +1273,13 @@ fn enum_new_tag_must_name_a_variant() {
             variant,
         })
     };
-    let errors = verify_function(&enum_new(enum_desc, 1), &provider);
+    let errors = check_well_formedness(&enum_new(enum_desc, 1), &provider);
     assert!(errors
         .iter()
         .any(|e| e.message.contains("tag 1 out of range")));
-    let errors = verify_function(&enum_new(struct_desc, 0), &provider);
+    let errors = check_well_formedness(&enum_new(struct_desc, 0), &provider);
     assert!(errors.iter().any(|e| e.message.contains("is not an Enum")));
-    let errors = verify_function(&enum_new(enum_desc, 0), &provider);
+    let errors = check_well_formedness(&enum_new(enum_desc, 0), &provider);
     assert!(errors.is_empty(), "{errors:#?}");
 }
 
@@ -1306,7 +1307,7 @@ fn native_slot_region_must_fit_the_frame() {
         &func_with_single_op(native_call(abi.clone())),
         "native slot region [48, 56) exceeds extended_frame_size 48",
     );
-    assert_verifies(&Function {
+    assert_accepted(&Function {
         extended_frame_size: 56,
         ..func_with_single_op(native_call(abi))
     });
@@ -1352,7 +1353,7 @@ fn native_pointer_offsets_are_aligned_bounded_and_inside_args() {
         }],
         vec![FO(0), FO(8)],
     );
-    assert_verifies(&with_abi(ok));
+    assert_accepted(&with_abi(ok));
 }
 
 #[test]
@@ -1384,7 +1385,7 @@ fn call_direct_callee_must_fit_the_callee_region() {
         &func_with_single_op(call.clone()),
         "CallDirect: callee return slot 0 [0, 8) exceeds the callee region (0)",
     );
-    assert_verifies(&Function {
+    assert_accepted(&Function {
         extended_frame_size: 56,
         ..func_with_single_op(call)
     });
@@ -1417,7 +1418,7 @@ fn capturing_closure() -> PackClosureOp {
 
 #[test]
 fn pack_closure_well_formed_accepted() {
-    assert_verifies(&pack_closure(capturing_closure()));
+    assert_accepted(&pack_closure(capturing_closure()));
 }
 
 #[test]
@@ -1506,7 +1507,7 @@ fn call_closure_provided_args_are_checked() {
             provided_args,
         })))
     };
-    assert_verifies(&call(vec![slot(8, 8, 8)]));
+    assert_accepted(&call(vec![slot(8, 8, 8)]));
     assert_error_contains(
         &call(vec![slot(8, 0, 8)]),
         "provided_args[0]: size must be > 0",

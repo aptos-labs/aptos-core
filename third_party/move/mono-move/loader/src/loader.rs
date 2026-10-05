@@ -23,15 +23,16 @@ use crate::{
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
+    check_well_formedness,
     interner::{
         script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    verify_function, ConstantPoolIndex, ConstantPoolProvider, DescriptorId, DescriptorProvider,
-    ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols, Function, FunctionPtr, GasMeter,
-    Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, ObjectDescriptor, PreparedModule,
-    VMInternalError, VMResult, ValueLayout,
+    ConstantPoolIndex, ConstantPoolProvider, DescriptorId, DescriptorProvider, ErrorLocation,
+    FieldTypes, FrameOffset, FrameworkSymbols, Function, FunctionPtr, GasMeter, Interner, LayoutId,
+    LayoutProvider, ModuleId, ModuleProvider, ObjectDescriptor, PreparedModule, VMInternalError,
+    VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -107,7 +108,7 @@ pub struct Loader<'guard, 'ctx> {
     natives: &'guard dyn NativeResolver,
 }
 
-/// Preserves the verifier's error details, including its location.
+/// Preserves the checker's error details, including its location.
 fn script_verification_failed(error: VMError) -> VMInternalError {
     VMInternalError::new(LoaderError::ScriptVerificationFailed { error })
 }
@@ -436,7 +437,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
-        // TODO(metering): the lowering work, including micro-op verification
+        // TODO(metering): the lowering work, including the well-formedness check
         // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
@@ -484,15 +485,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }))
             },
         };
-        // Verify once per lowering, before the function is leaked into a
-        // cache: a rejected function is dropped here and never executed.
-        let provider = FunctionVerifyProvider {
+        // Check well-formedness once per lowering, before the function is
+        // leaked into a cache: a rejected function is dropped here and never
+        // executed.
+        let provider = ModuleBoundProvider {
             guard: self.guard,
             module: &module.ir().module,
         };
-        let errors = verify_function(&function, &provider);
+        let errors = check_well_formedness(&function, &provider);
         if !errors.is_empty() {
-            invariant_violation!(MicroOpVerificationFailed { errors });
+            invariant_violation!(NotWellFormed { errors });
         }
         Ok((function, function_ms))
     }
@@ -502,21 +504,21 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 // Only private APIs below.
 // ------------------------
 
-/// Verifier view bound to the module a lowering came from. Descriptors and
+/// Well-formedness checker view bound to the module a lowering came from. Descriptors and
 /// layouts come from the guard; constants come from the module itself, so
 /// scripts (cached by hash, not module id) resolve them too.
-struct FunctionVerifyProvider<'a, 'ctx> {
+struct ModuleBoundProvider<'a, 'ctx> {
     guard: &'a ExecutionGuard<'ctx>,
     module: &'a PreparedModule,
 }
 
-impl DescriptorProvider for FunctionVerifyProvider<'_, '_> {
+impl DescriptorProvider for ModuleBoundProvider<'_, '_> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.guard.descriptor(id)
     }
 }
 
-impl LayoutProvider for FunctionVerifyProvider<'_, '_> {
+impl LayoutProvider for ModuleBoundProvider<'_, '_> {
     fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
         self.guard.layout(id)
     }
@@ -526,7 +528,7 @@ impl LayoutProvider for FunctionVerifyProvider<'_, '_> {
     }
 }
 
-impl ConstantPoolProvider for FunctionVerifyProvider<'_, '_> {
+impl ConstantPoolProvider for ModuleBoundProvider<'_, '_> {
     fn constant_type(
         &self,
         _module_id: InternedModuleId,
