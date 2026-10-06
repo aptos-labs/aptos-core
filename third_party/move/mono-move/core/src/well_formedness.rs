@@ -15,10 +15,8 @@
 //! violation is reported; none depends on another having passed.
 //!
 //! The checker is unmetered, so its cost must stay linear, or at worst
-//! `n log n`, in the data it reads: the ops and their operands, the slot and
-//! layout lists, and the ABIs and callees named by call ops. Provider lookups
-//! are constant time. Where a check relates two lists it uses binary search or
-//! a single sort, never a rescan of one list per element of the other.
+//! `O(n * log(n))`. Lookups must be implemented efficiently, e.g. with binary
+//! search over sorted lists or with map data structures.
 //!
 //! # Notation
 //!
