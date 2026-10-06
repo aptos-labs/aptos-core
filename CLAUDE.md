@@ -52,6 +52,8 @@ This regenerates `aptos-move/framework/cached-packages/src/head.mrb`, the binary
 
 ## Architecture Overview
 
+For pull request CI architecture and developer flow, see the [CI architecture guide](.github/ci-architecture.md).
+
 ### Core Transaction Flow
 1. **API Layer** (`api/`) - REST endpoints receive transactions
 2. **Mempool** (`mempool/`) - Transaction validation and ordering

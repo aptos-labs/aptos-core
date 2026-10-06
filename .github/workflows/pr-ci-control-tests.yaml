@@ -1,0 +1,104 @@
+name: PR CI control tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python_contracts:
+    name: Python contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install Python test dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ci-contract-tests-venv"
+          "$RUNNER_TEMP/ci-contract-tests-venv/bin/python" -m pip install --require-hashes --only-binary=:all: -r .github/ci/requirements-forge-test.txt
+      - name: Run Python contract tests
+        env:
+          HYPOTHESIS_PROFILE: ci
+        run: |
+          source "$RUNNER_TEMP/ci-contract-tests-venv/bin/activate"
+          python3 .github/ci/run_python_tests.py
+
+  rust_contracts:
+    name: Rust contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run trusted indexer helper contract tests
+        run: |
+          cargo test -p aptos-indexer-transaction-generator --lib ci_helper::
+          cargo test -p aptos-indexer-transaction-generator --test ci_helper
+
+  ruby_contracts:
+    name: Ruby policy and workflow contract tests
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/.github/workflows/tests/Gemfile
+      BUNDLE_FROZEN: "true"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8
+        with:
+          ruby-version: "4.0.6"
+          bundler: "4.0.16"
+          bundler-cache: false
+      - name: Install locked Ruby test dependencies
+        env:
+          BUNDLE_PATH: ${{ runner.temp }}/ci-contract-tests-gems
+        run: bundle _4.0.16_ install --jobs 4 --retry 3
+      - name: Run Ruby contract tests
+        env:
+          BUNDLE_PATH: ${{ runner.temp }}/ci-contract-tests-gems
+          RUBY_PROPERTY_PROFILE: ci
+          RUBY_PROPERTY_SEED: "20260930"
+        run: |
+          mapfile -d '' tests < <(find .github/workflows/tests -type f -name 'test_*.rb' -print0 | sort -z)
+          test "${#tests[@]}" -gt 0
+          status=0
+          for test_file in "${tests[@]}"; do bundle _4.0.16_ exec ruby "$test_file" || status=1; done
+          exit "$status"
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install pinned actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca #v1.7.12
+      - name: Lint hardened GitHub Actions workflows
+        shell: bash
+        run: |
+          actionlint_bin="$(go env GOPATH)/bin/actionlint"
+          ruby -rjson -e 'puts JSON.parse(File.read(".github/ci/pr-ci-policy.json")).fetch("hardened_workflows")' \
+            | xargs --no-run-if-empty "$actionlint_bin"
+
+  semgrep:
+    name: Semgrep rule contract test
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep:1.136.0@sha256:61a7ab31cdab865212ae8ed3ddefc0a51d61ef3b016a63e79848f56241d4586d
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify the pull request target checkout rule
+        run: |
+          semgrep --config .github/linters/semgrep/pull-request-target-code-checkout.yaml --json .github/workflows/tests/pr_ci_policy/fixtures/permission-check-bypass.yaml > semgrep-result.json
+          python3 -c 'import json; result = json.load(open("semgrep-result.json")); assert len(result["results"]) == 1; assert result["results"][0]["extra"]["severity"] == "INFO"'

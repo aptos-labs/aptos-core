@@ -2,3 +2,15 @@ self-hosted-runner:
   # Labels of self-hosted runners in array of string
   labels:
     - runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    - 2cpu-gh-ubuntu24-x64
+    - benchmark-c3d-60-pr
+    - runs-on/fleet=aptos-protected-build/env=protected
+    - runs-on/fleet=aptos-protected-forge/env=protected
+    - runs-on/fleet=aptos-protected-e2e/env=protected
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      # actionlint does not know cache-mode yet.
+      - 'unexpected key "cache-mode" for "(workflow|job)" section'
+      # actionlint does not know concurrency queue yet (rhysd/actionlint#657).
+      - 'unexpected key "queue" for "concurrency" section'

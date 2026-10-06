@@ -17,6 +17,7 @@
     ".github/workflows/mono-move-micro-bench.yaml",
     ".github/workflows/module-verify.yaml",
     ".github/workflows/node-api-compatibility-tests.yaml",
+    ".github/workflows/pr-ci-control-tests.yaml",
     ".github/workflows/pr-ci-policy.yaml",
     ".github/workflows/pr-ci-report.yaml",
     ".github/workflows/rust-client-tests.yaml",
