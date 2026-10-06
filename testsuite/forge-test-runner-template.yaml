@@ -46,7 +46,7 @@ spec:
         - name: GITHUB_HEAD_REF
           value: "{GITHUB_HEAD_REF}"
         - name: GITHUB_REF_NAME
-          value: "{GITHUB_REF_NAME}"
+          value: "{GITHUB_REF_NAME}"{PROTECTED_IMAGE_ENV}
         - name: KUBERNETES_POD_NAME
           valueFrom:
             fieldRef:

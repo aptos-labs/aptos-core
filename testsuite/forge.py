@@ -62,6 +62,46 @@ MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
 GAR_REPO_NAME = "us-docker.pkg.dev/aptos-registry/docker"
 DEFAULT_FORGE_IMAGE_NAME = "forge"
+IMAGE_DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}\Z")
+
+
+def protected_image_ref(repository: str, tag: str) -> str:
+    """Resolve a protected tag to its approved repository digest."""
+    protected_tag = os.getenv("PROTECTED_IMAGE_TAG")
+    raw_digests = os.getenv("PROTECTED_IMAGE_DIGESTS")
+    if not protected_tag and not raw_digests:
+        return f"{repository}:{tag}"
+    if not protected_tag or not raw_digests:
+        raise ValueError("PROTECTED_IMAGE_TAG and PROTECTED_IMAGE_DIGESTS must be set together")
+    if tag != protected_tag:
+        return f"{repository}:{tag}"
+    try:
+        digests = json.loads(raw_digests)
+    except json.JSONDecodeError as exc:
+        raise ValueError("PROTECTED_IMAGE_DIGESTS is not valid JSON") from exc
+    if not isinstance(digests, dict):
+        raise ValueError("PROTECTED_IMAGE_DIGESTS must be an object")
+    digest = digests.get(repository)
+    if not isinstance(digest, str) or not IMAGE_DIGEST_RE.fullmatch(digest):
+        raise ValueError(f"Missing or invalid protected image digest for {repository}")
+    return f"{repository}@{digest}"
+
+
+def protected_forge_image_ref(repository: str, tag: str) -> str:
+    """Keep the credentialed controller on the trusted base image."""
+    if not any(os.getenv(key) for key in (
+        "PROTECTED_IMAGE_TAG", "PROTECTED_IMAGE_DIGESTS", "PROTECTED_FORGE_IMAGE"
+    )):
+        return f"{repository}:{tag}"
+    reference = os.getenv("PROTECTED_FORGE_IMAGE", "")
+    prefix = f"{GAR_REPO_NAME}/forge@"
+    if (
+        repository != f"{GAR_REPO_NAME}/forge"
+        or not reference.startswith(prefix)
+        or not IMAGE_DIGEST_RE.fullmatch(reference[len(prefix):])
+    ):
+        raise ValueError("Missing or invalid trusted Forge controller digest")
+    return reference
 
 
 @dataclass
@@ -861,12 +901,14 @@ class K8sForgeRunner(ForgeRunner):
 
         # determine the interal image repos based on the context of where the cluster is located
         if context.cloud == Cloud.AWS:
+            # Protected images are published in GAR. Fail if an AWS runner requests one.
+            protected_image_ref(f"{ECR_REPO_PREFIX}/forge", context.forge_image_tag)
             forge_image_full = f"{context.aws_account_num}.dkr.ecr.{context.aws_region}.amazonaws.com/{ECR_REPO_PREFIX}/forge:{context.forge_image_tag}"
             validator_node_selector = "eks.amazonaws.com/nodegroup: validators"
         elif context.cloud == Cloud.GCP:
             # the GCP project for images is separate from the cluster
-            forge_image_full = (
-                f"{GAR_REPO_NAME}/{context.forge_image_name}:{context.forge_image_tag}"
+            forge_image_full = protected_forge_image_ref(
+                f"{GAR_REPO_NAME}/{context.forge_image_name}", context.forge_image_tag
             )
             validator_node_selector = ""  # no selector
             # TODO: also no NAP node selector yet
@@ -874,9 +916,23 @@ class K8sForgeRunner(ForgeRunner):
         else:
             raise Exception(f"Unknown cloud: {context.cloud}")
 
+        protected_tag = os.getenv("PROTECTED_IMAGE_TAG", "")
+        protected_digests = os.getenv("PROTECTED_IMAGE_DIGESTS", "")
+        protected_image_env = ""
+        if protected_tag or protected_digests:
+            if not protected_tag or not protected_digests:
+                raise ValueError("PROTECTED_IMAGE_TAG and PROTECTED_IMAGE_DIGESTS must be set together")
+            # JSON string literals are also safe YAML double-quoted scalar values.
+            protected_image_env = (
+                "\n        - name: PROTECTED_IMAGE_TAG"
+                f"\n          value: {json.dumps(protected_tag)}"
+                "\n        - name: PROTECTED_IMAGE_DIGESTS"
+                f"\n          value: {json.dumps(protected_digests)}"
+            )
+
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
-            FORGE_IMAGE_TAG=context.forge_image_tag,
+            FORGE_IMAGE_TAG=context.forge_image_tag[:63].rstrip("-_."),
             IMAGE_TAG=context.image_tag,
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
             FORGE_IMAGE=forge_image_full,
@@ -893,6 +949,7 @@ class K8sForgeRunner(ForgeRunner):
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
             GITHUB_HEAD_REF=os.getenv("GITHUB_HEAD_REF", ""),
             GITHUB_REF_NAME=os.getenv("GITHUB_REF_NAME", ""),
+            PROTECTED_IMAGE_ENV=protected_image_env,
         )
 
         log.info(f"rendered_forge_test_runner: {rendered}")
@@ -1054,6 +1111,9 @@ def ensure_provided_image_tags_has_profile_or_features(
         curr_tag = None
         if not tag:
             pass
+        elif tag == os.getenv("PROTECTED_IMAGE_TAG"):
+            # The approved build tag already includes its profile and features.
+            curr_tag = tag
         elif enable_failpoints:
             curr_tag = add_build_variant_prefix(tag, "failpoints")
         elif enable_performance_profile:
@@ -1146,7 +1206,7 @@ def image_exists(
 ) -> bool:
     """Check if an image exists in a given repository"""
     if cloud == Cloud.GCP:
-        full_image = f"{GAR_REPO_NAME}/{image_name}:{image_tag}"
+        full_image = protected_image_ref(f"{GAR_REPO_NAME}/{image_name}", image_tag)
         return shell.run(
             [
                 "crane",
@@ -1156,6 +1216,7 @@ def image_exists(
             stream_output=True,
         ).succeeded()
     elif cloud == Cloud.AWS:
+        protected_image_ref(f"{ECR_REPO_PREFIX}/{image_name}", image_tag)
         full_image = f"{ECR_REPO_PREFIX}/{image_name}:{image_tag}"
         log.info(f"Checking if image exists in GCP: {full_image}")
         return shell.run(

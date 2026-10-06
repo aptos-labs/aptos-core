@@ -24,7 +24,9 @@
     ".github/workflows/workflow-run-docker-rust-build.yaml",
     ".github/workflows/workflow-run-docker-rust-publish-pr.yaml",
     ".github/workflows/workflow-run-execution-performance.yaml",
-    ".github/workflows/workflow-run-forge.yaml"
+    ".github/workflows/workflow-run-forge-pr.yaml",
+    ".github/workflows/workflow-run-forge.yaml",
+    ".github/workflows/workflow-run-pr-e2e-tests.yaml"
   ],
   "approved_protected_reusables": [
     ".github/workflows/workflow-run-docker-rust-publish-pr.yaml",

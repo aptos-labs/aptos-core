@@ -24,6 +24,7 @@ pub mod constants;
 pub mod kube_api;
 pub mod node;
 pub mod prometheus;
+mod protected_images;
 mod stateful_set;
 mod swarm;
 
@@ -38,6 +39,7 @@ pub use constants::*;
 pub use kube_api::mocks::*;
 pub use kube_api::*;
 pub use node::K8sNode;
+use protected_images::{ProtectedImages, TOOLS_REPO, VALIDATOR_TESTING_REPO};
 pub use stateful_set::*;
 pub use swarm::*;
 
@@ -75,6 +77,9 @@ impl K8sFactory {
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
             hex::decode(DEFAULT_ROOT_PRIV_KEY)?.try_into().unwrap();
+        let protected_images = ProtectedImages::from_env()?;
+        protected_images.digest_for(VALIDATOR_TESTING_REPO, &image_tag)?;
+        protected_images.digest_for(VALIDATOR_TESTING_REPO, &upgrade_image_tag)?;
 
         match kube_namespace.as_str() {
             "default" => {
@@ -242,15 +247,28 @@ impl Factory for K8sFactory {
             let indexer_kube_client = kube_client.clone();
             let deploy_indexer_fut = async move {
                 if enable_indexer {
+                    let protected_images = ProtectedImages::from_env()?;
+                    let indexer_grpc_image = protected_images
+                        .image_ref(INDEXER_GRPC_DOCKER_IMAGE_REPO, &indexer_init_version)?;
+                    let fullnode_repo = if protected_images
+                        .digest_for(VALIDATOR_TESTING_REPO, &indexer_init_version)?
+                        .is_some()
+                    {
+                        VALIDATOR_TESTING_REPO
+                    } else {
+                        VALIDATOR_DOCKER_IMAGE_REPO
+                    };
+                    let fullnode_image =
+                        protected_images.image_ref(fullnode_repo, &indexer_init_version)?;
                     // NOTE: by default, use a deploy profile and no additional configuration values
                     let config = serde_json::from_value(json!({
                         "profile": indexer_profile,
                         "era": indexer_era,
                         "namespace": indexer_kube_namespace,
                         "indexer-grpc-values": {
-                            "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, indexer_init_version),
+                            "indexerGrpcImage": indexer_grpc_image,
                             "fullnodeConfig": {
-                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, indexer_init_version),
+                                "image": fullnode_image,
                             }
                         },
                     }))?;
@@ -300,6 +318,17 @@ impl Factory for K8sFactory {
                             "name": "ephemeral",
                         },
                     });
+                    let protected_images = ProtectedImages::from_env()?;
+                    if let Some(tag) =
+                        protected_images.chart_tag(VALIDATOR_TESTING_REPO, &pfn_init_version)?
+                    {
+                        pfn_values["image"]["repo"] = VALIDATOR_TESTING_REPO.into();
+                        pfn_values["image"]["tag"] = tag.into();
+                    }
+                    if let Some(tag) = protected_images.chart_tag(TOOLS_REPO, &pfn_init_version)? {
+                        pfn_values["tools"]["image"]["repo"] = TOOLS_REPO.into();
+                        pfn_values["tools"]["image"]["tag"] = tag.into();
+                    }
                     if let Some(node_config) = pfn_base_node_config {
                         pfn_values["fullnode"]["config"] = node_config;
                     }

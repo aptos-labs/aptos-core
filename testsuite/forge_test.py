@@ -1,6 +1,7 @@
 from contextlib import ExitStack
 import json
 import os
+import sys
 import textwrap
 import unittest
 import tempfile
@@ -12,6 +13,9 @@ from typing import (
     Protocol,
 )
 from unittest.mock import patch
+
+import yaml
+from hypothesis import example, given, strategies as st
 
 import forge
 from forge import (
@@ -40,10 +44,13 @@ from forge import (
     get_humio_link_for_test_runner_logs,
     get_humio_link_for_node_logs,
     get_testsuite_images,
+    image_exists,
     main,
     sanitize_forge_resource_name,
     validate_forge_config,
     GAR_REPO_NAME,
+    protected_image_ref,
+    protected_forge_image_ref,
 )
 
 from click.testing import CliRunner, Result
@@ -78,6 +85,122 @@ def get_cwd() -> Path:
 
 def get_fixture_path(fixture_name: str) -> Path:
     return get_cwd() / "fixtures" / fixture_name
+
+
+CI_DIR = Path(__file__).resolve().parents[1] / ".github" / "ci"
+if str(CI_DIR) in sys.path:
+    sys.path.remove(str(CI_DIR))
+sys.path.insert(0, str(CI_DIR))
+from tests.harness_support import DIGESTS, TAGS, invalid_maps
+from tests.property_support import configure_profiles
+
+configure_profiles()
+
+
+class ProtectedImageTest(unittest.TestCase):
+    def test_approved_tag_is_not_rewritten_for_performance_profile(self) -> None:
+        tag = "pr-42_performance_r123-a1_" + "a" * 40
+        with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag}, clear=True):
+            self.assertEqual(
+                ensure_provided_image_tags_has_profile_or_features(
+                    tag, "baseline", enable_failpoints=False, enable_performance_profile=True
+                ),
+                (tag, "performance_baseline"),
+            )
+
+    def test_image_exists_checks_approved_digest(self) -> None:
+        digest = "sha256:" + "a" * 64
+        shell = SpyShell([
+            FakeCommand(
+                f"crane manifest {GAR_REPO_NAME}/validator-testing@{digest}",
+                RunResult(0, b""),
+            ),
+        ])
+        with patch.dict(os.environ, {
+            "PROTECTED_IMAGE_TAG": "approved",
+            "PROTECTED_IMAGE_DIGESTS": json.dumps({f"{GAR_REPO_NAME}/validator-testing": digest}),
+        }, clear=True):
+            self.assertTrue(image_exists(shell, "validator-testing", "approved", Cloud.GCP))
+        shell.assert_commands(self)
+
+    @given(TAGS, DIGESTS)
+    def test_generated_forge_digest_and_trusted_controller_references(self, tag, digest):
+        repository = f"{GAR_REPO_NAME}/forge"
+        controller = "sha256:" + ("1" if digest[7] == "0" else "0") + digest[8:]
+        env = {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": json.dumps({repository: digest}),
+               "PROTECTED_FORGE_IMAGE": f"{repository}@{controller}"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(f"{repository}@{digest}", protected_image_ref(repository, tag))
+            self.assertEqual(f"{repository}:{tag}-baseline", protected_image_ref(repository, tag + "-baseline"))
+            # The controller stays on the trusted base for approved and baseline test tags.
+            for requested in (tag, tag + "-baseline"):
+                self.assertEqual(f"{repository}@{controller}", protected_forge_image_ref(repository, requested))
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(f"{repository}:{tag}", protected_image_ref(repository, tag))
+            self.assertEqual(f"{repository}:{tag}", protected_forge_image_ref(repository, tag))
+
+    @given(TAGS, DIGESTS)
+    def test_generated_forge_maps_and_controller_fail_closed(self, tag, digest):
+        repository = f"{GAR_REPO_NAME}/forge"
+        mapping = json.dumps({repository: digest})
+        for raw in invalid_maps(repository):
+            with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": raw}, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_image_ref(repository, tag)
+        for env in ({"PROTECTED_IMAGE_TAG": tag}, {"PROTECTED_IMAGE_DIGESTS": mapping},
+                    {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": ""},
+                    {"PROTECTED_IMAGE_TAG": "", "PROTECTED_IMAGE_DIGESTS": mapping}):
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_image_ref(repository, tag)
+        for reference in ("", "latest", f"{repository}:baseline", "evil/forge@" + digest,
+                          f"{GAR_REPO_NAME}/validator@{digest}", f"{repository}@sha256:" + "A" * 64,
+                          f"{repository}@sha256:" + "a" * 63, f"{repository}@{digest}\n",
+                          "x" * len(f"{repository}@") + digest):
+            with patch.dict(os.environ, {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_FORGE_IMAGE": reference}, clear=True):
+                with self.assertRaises(ValueError):
+                    protected_forge_image_ref(repository, tag)
+        with patch.dict(os.environ, {"PROTECTED_FORGE_IMAGE": f"{repository}@{digest}"}, clear=True):
+            for foreign in ("evil/forge", f"{GAR_REPO_NAME}/validator"):
+                with self.assertRaises(ValueError):
+                    protected_forge_image_ref(foreign, tag)
+
+    def render_pod(self, tag, env):
+        class SuccessfulPodShell(FakeShell):
+            def run(self, command, stream_output=False):
+                return RunResult(0, b"Succeeded" if any("status.phase" in arg for arg in command) else b"")
+        template = (get_cwd() / "forge-test-runner-template.yaml").read_bytes()
+        filesystem = SpyFilesystem({}, {"forge-test-runner-template.yaml": template})
+        context = fake_context(SuccessfulPodShell(), filesystem, mode="k8s")
+        context.cloud = Cloud.GCP
+        context.forge_image_tag = tag
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(ForgeState.PASS, K8sForgeRunner().run(context).state)
+        return yaml.safe_load(filesystem.get_write("temp1"))
+
+    # A separator at index 62 must be stripped from the truncated label.
+    @example("a" * 59 + "_", "sha256:" + "b" * 64)
+    @given(st.text(alphabet="abcdefghijklmnopqrstuvwxyz0123456789-_.", min_size=1, max_size=180), DIGESTS)
+    def test_generated_k8s_pod_changes_only_controller_image_and_protected_env(self, part, digest):
+        repository = f"{GAR_REPO_NAME}/forge"
+        controller = "sha256:" + ("1" if digest[7] == "0" else "0") + digest[8:]
+        mapping = json.dumps({repository: digest, f"{GAR_REPO_NAME}/validator-testing": digest})
+        for tag in ("pr-" + part[:20] + "a", "pr-" + part + "a" + "z" * 70):
+            pod = self.render_pod(tag, {"PROTECTED_IMAGE_TAG": tag, "PROTECTED_IMAGE_DIGESTS": mapping,
+                                        "PROTECTED_FORGE_IMAGE": f"{repository}@{controller}"})
+            unprotected = self.render_pod(tag, {})
+            container, plain_container = pod["spec"]["containers"][0], unprotected["spec"]["containers"][0]
+            self.assertEqual(f"{repository}@{controller}", container.pop("image"))
+            self.assertEqual(f"{repository}:{tag}", plain_container.pop("image"))
+            env, plain_env = container.pop("env"), plain_container.pop("env")
+            protected_env = [{"name": "PROTECTED_IMAGE_TAG", "value": tag},
+                             {"name": "PROTECTED_IMAGE_DIGESTS", "value": mapping}]
+            self.assertEqual(protected_env, [item for item in env if item not in plain_env])
+            self.assertEqual(plain_env, [item for item in env if item not in protected_env])
+            self.assertEqual(unprotected, pod)
+            label = pod["metadata"]["labels"]["forge-image-tag"]
+            self.assertEqual(tag[:63].rstrip("-_."), label)
+            self.assertRegex(label, r"^[a-z0-9](?:[a-z0-9_.-]{0,61}[a-z0-9])?$")
 
 
 class AssertFixtureMixin:
@@ -161,6 +284,7 @@ def fake_context(
         ),
         aws_account_num="123",
         aws_region="banana-east-1",
+        forge_image_name="forge",
         forge_image_tag="forge_asdf",
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
@@ -758,6 +882,11 @@ class ForgeMainTests(unittest.TestCase, AssertFixtureMixin):
                     RunResult(0, b""),
                 ),
                 FakeCommand(
+                    "kubectl --kubeconfig temp1 get pod -n default forge-perry-1659078000-1659078000-banana -o "
+                    "jsonpath={.status.containerStatuses[*].state.terminated.exitCode}",
+                    RunResult(0, b"1"),
+                ),
+                FakeCommand(
                     "kubectl --kubeconfig temp1 get pods -n forge-perry-1659078000",
                     RunResult(0, b""),
                 ),
@@ -1249,9 +1378,9 @@ class ForgeConfigTests(unittest.TestCase):
             self.assertEqual(result_helm_config_present_complete.exit_code, 0)
             self.assertIsNotNone(helm_after_complete.get("default_helm_values"))
             self.assertIsNotNone(helm_after_complete.get("default_helm_values").get("aptos-node"))  # type: ignore
-            # the output config is printed with an extra newline
+            # Forge logs the config to stderr with an extra newline.
             self.assertEqual(
-                result_helm_config_present_complete.stdout_bytes,
+                result_helm_config_present_complete.stderr_bytes,
                 f'{json.dumps(helm_after_complete.get("default_helm_values").get("aptos-node"), indent=2)}\n'.encode(),  # type: ignore
             )
 
@@ -1428,9 +1557,9 @@ class ForgeConfigTests(unittest.TestCase):
             filesystem.assert_writes(self)
             self.assertEqual(ret.exception, None)
             self.assertEqual(ret.exit_code, 0)
-            assert ret.stdout_bytes.decode("utf-8").strip()
+            self.assertTrue(ret.stderr_bytes.decode("utf-8").strip())
             self.assertEqual(
-                ret.stdout_bytes.decode("utf-8").strip(),
+                ret.stderr_bytes.decode("utf-8").strip(),
                 config_fixture_preview.read_bytes().decode("utf-8").strip(),
             )
 

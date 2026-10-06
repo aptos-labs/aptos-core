@@ -1,7 +1,9 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import os
+import re
 from dataclasses import dataclass
 from enum import Enum
 from aptos_sdk.account_address import AccountAddress
@@ -45,7 +47,25 @@ def build_image_name(image_repo_with_project: str, tag: str):
     image_repo_with_project = image_repo_with_project.rstrip("/")
     if image_repo_with_project != "":
         image_repo_with_project = f"{image_repo_with_project}/"
-    return f"{image_repo_with_project}tools:{tag}"
+    repository = f"{image_repo_with_project}tools"
+    protected_tag = os.getenv("PROTECTED_IMAGE_TAG")
+    raw_digests = os.getenv("PROTECTED_IMAGE_DIGESTS")
+    if not protected_tag and not raw_digests:
+        return f"{repository}:{tag}"
+    if not protected_tag or not raw_digests:
+        raise ValueError("PROTECTED_IMAGE_TAG and PROTECTED_IMAGE_DIGESTS must be set together")
+    if str(tag) != protected_tag:
+        return f"{repository}:{tag}"
+    try:
+        digests = json.loads(raw_digests)
+    except json.JSONDecodeError as exc:
+        raise ValueError("PROTECTED_IMAGE_DIGESTS is not valid JSON") from exc
+    if not isinstance(digests, dict):
+        raise ValueError("PROTECTED_IMAGE_DIGESTS must be an object")
+    digest = digests.get(repository)
+    if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+        raise ValueError(f"Missing or invalid protected image digest for {repository}")
+    return f"{repository}@{digest}"
 
 
 # Exception to use when a test fails, for the CLI did something unexpected, an

@@ -145,11 +145,11 @@ jobs:
     uses: ./.github/workflows/workflow-run-execution-performance.yaml
     secrets: inherit
     with:
+      GIT_REPOSITORY: ${{ github.repository }}
       GIT_SHA: ${{ github.sha }}
       RUNNER_NAME: benchmark-c3d-60
       IGNORE_TARGET_DETERMINATION: true
       FLOW: CONTINUOUS
-      NOTIFY_SLACK: false
 
   mono-move-performance:
     uses: ./.github/workflows/mono-move-e2e-perf.yaml

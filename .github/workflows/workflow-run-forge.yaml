@@ -171,8 +171,10 @@ jobs:
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: ${{ !inputs.SKIP_JOB }}
+        with:
+          python-version-file: .python-version
 
       - name: Install python deps
         run: pip3 install click==8.1.3 psutil==5.9.1
@@ -185,8 +187,8 @@ jobs:
         if: ${{ !inputs.SKIP_JOB }}
         id: calculate-auth-duration
         run: |
-          auth_duration=$(( $FORGE_RUNNER_DURATION_SECS > 5400 ? $FORGE_RUNNER_DURATION_SECS + 30 * 60 : 5400 ))
-          echo "auth_duration=${auth_duration}" >> $GITHUB_OUTPUT
+          auth_duration=$(( FORGE_RUNNER_DURATION_SECS > 5400 ? FORGE_RUNNER_DURATION_SECS + 30 * 60 : 5400 ))
+          echo "auth_duration=${auth_duration}" >> "$GITHUB_OUTPUT"
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         if: ${{ !inputs.SKIP_JOB }}
@@ -210,7 +212,7 @@ jobs:
       - name: "Export GCloud auth token"
         if: ${{ !inputs.SKIP_JOB }}
         id: gcloud-auth
-        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> $GITHUB_ENV
+        run: echo "CLOUDSDK_AUTH_ACCESS_TOKEN=${{ steps.docker-setup.outputs.CLOUDSDK_AUTH_ACCESS_TOKEN }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: "Setup GCloud project"
@@ -231,13 +233,13 @@ jobs:
             local image_name=$2
             local output_prefix=$3
             if [[ -n "$tag" ]]; then
-              if docker manifest inspect us-docker.pkg.dev/aptos-registry/docker/${image_name}:${tag} &> /dev/null; then
-                echo "${output_prefix}_EXISTS=true" >> $GITHUB_OUTPUT
-                echo "${output_prefix}_TAG=$tag" >> $GITHUB_OUTPUT
-                echo "✅ $image_name image found for tag: $tag" >> $GITHUB_STEP_SUMMARY
+              if docker manifest inspect "us-docker.pkg.dev/aptos-registry/docker/${image_name}:${tag}" &> /dev/null; then
+                echo "${output_prefix}_EXISTS=true" >> "$GITHUB_OUTPUT"
+                echo "${output_prefix}_TAG=$tag" >> "$GITHUB_OUTPUT"
+                echo "✅ $image_name image found for tag: $tag" >> "$GITHUB_STEP_SUMMARY"
               else
-                echo "${output_prefix}_EXISTS=false" >> $GITHUB_OUTPUT
-                echo "⚠️ No $image_name image found for tag: $tag. The latest available image will be used instead." >> $GITHUB_STEP_SUMMARY
+                echo "${output_prefix}_EXISTS=false" >> "$GITHUB_OUTPUT"
+                echo "⚠️ No $image_name image found for tag: $tag. The latest available image will be used instead." >> "$GITHUB_STEP_SUMMARY"
               fi
             fi
           }
@@ -247,7 +249,7 @@ jobs:
           check_image_exists "$INPUT_GIT_SHA" "forge" "FORGE_GIT_SHA"
           check_image_exists "$INPUT_FORGE_IMAGE_TAG" "forge" "FORGE_IMAGE_TAG"
 
-          echo "ℹ️ If testing Forge changes, ensure the 'CICD: build-images' label is added to your PR and the image build workflow has completed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ If testing Forge changes, ensure the 'CICD: build-images' label is added to your PR and the image build workflow has completed successfully." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run pre-Forge checks
         if: ${{ !inputs.SKIP_JOB }}

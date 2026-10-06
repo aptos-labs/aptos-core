@@ -90,6 +90,11 @@ class RunHelper:
                     # as well.
                     f"HOME={WORKING_DIR_IN_CONTAINER}",
                     "--rm",
+                    *(
+                        ["--pull", "never"]
+                        if os.environ.get("APTOS_E2E_OFFLINE_IMAGES") == "true"
+                        else []
+                    ),
                     "--network",
                     "host",
                     "-i",
@@ -164,14 +169,18 @@ class RunHelper:
             ignore=shutil.ignore_patterns("build"),
         )
 
-    # If image_Tag is set, pull the test CLI image. We don't technically have to do
-    # this separately but it makes the steps clearer. Otherwise, cli_path must be
-    # set, in which case we ensure the file is there.
+    # If image_tag is set, pull the test CLI image or verify the local image in
+    # offline mode. Otherwise, cli_path must exist on the host.
     def prepare_cli(self):
         if self.image_tag:
             image_name = self.build_image_name()
-            LOG.info(f"Pre-pulling image for CLI we're testing: {image_name}")
-            command = ["docker", "pull", image_name]
+            offline = os.environ.get("APTOS_E2E_OFFLINE_IMAGES") == "true"
+            if offline:
+                LOG.info(f"Checking local CLI image: {image_name}")
+                command = ["docker", "image", "inspect", image_name]
+            else:
+                LOG.info(f"Pre-pulling image for CLI we're testing: {image_name}")
+                command = ["docker", "pull", image_name]
             LOG.debug(f"Running command: {command}")
             output = subprocess.check_output(command)
             LOG.debug(f"Output: {output}")

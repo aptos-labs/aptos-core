@@ -4,24 +4,33 @@ on:
   pull_request_target:
     types: ["labeled", "closed"]
 
-permissions:
-  contents: write
-  pull-requests: write
+# The backport action writes through the bot token. GITHUB_TOKEN only reads the
+# sender's repository permission, which needs no scope beyond metadata. No step
+# checks out or runs pull request code.
+permissions: {}
 
 jobs:
-  permission-check:
+  authorize-sender:
+    name: Authorize sender
     if: github.event.pull_request.merged == true && contains(join(github.event.pull_request.labels.*.name, ','), 'v1.')
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
-      - name: Check repository permission for user which triggered workflow
-        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-        with:
-          required-permission: write
-          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+      - name: Require write permission for the sender
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          set -euo pipefail
+          permission="$(gh api "repos/${REPO}/collaborators/${SENDER}/permission" --jq .permission)"
+          case "$permission" in
+            admin|write) echo "Sender ${SENDER} has ${permission} permission." ;;
+            *) echo "::error::Sender ${SENDER} has ${permission} permission. Backport requires write."; exit 1 ;;
+          esac
 
   backport:
     name: Backport PR
-    needs: [permission-check]
+    needs: [authorize-sender]
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Backport Action
