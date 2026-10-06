@@ -8,7 +8,7 @@ use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value};
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::{Result, StateSnapshotReceiver};
+use aptos_storage_interface::{db_ensure as ensure, Result, StateSnapshotReceiver};
 use aptos_types::{
     proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
@@ -131,6 +131,9 @@ pub struct StateSnapshotRestore<K, V> {
     tree_restore: Arc<Mutex<Option<JellyfishMerkleRestore<K>>>>,
     kv_restore: Arc<Mutex<Option<StateValueRestore<K, V>>>>,
     restore_mode: StateSnapshotRestoreMode,
+    /// Adding a chunk mutates the object internally even on verification failure, so it should
+    /// not be reused when such failure happens.
+    failed: bool,
 }
 
 impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
@@ -154,6 +157,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
                 version,
             )))),
             restore_mode,
+            failed: false,
         })
     }
 
@@ -175,6 +179,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotRestore<K, V> {
                 version,
             )))),
             restore_mode,
+            failed: false,
         })
     }
 
@@ -211,6 +216,13 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     for StateSnapshotRestore<K, V>
 {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
+        ensure!(
+            !self.failed,
+            "The snapshot restore must be abandoned after a failed chunk."
+        );
+        // Stays set if any step below fails.
+        self.failed = true;
+
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => {
                 let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_add_chunk"]);
@@ -249,10 +261,15 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
             },
         }
 
+        self.failed = false;
         Ok(())
     }
 
     fn finish(self) -> Result<()> {
+        ensure!(
+            !self.failed,
+            "The snapshot restore must be abandoned after a failed chunk."
+        );
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => self.kv_restore.lock().take().unwrap().finish()?,
             StateSnapshotRestoreMode::TreeOnly => {
