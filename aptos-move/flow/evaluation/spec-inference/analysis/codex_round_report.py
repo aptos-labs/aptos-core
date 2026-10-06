@@ -406,17 +406,23 @@ def interval_text(
 
 
 def render_report(round_id: str, model: str, price: dict[str, Any], data: dict[str, Any]) -> str:
-    lines = [
-        f"# {round_id}",
-        "",
+    intro = (
         f"Model `{model}`; {data['recorded_cells']} of {data['scheduled_cells']} scheduled cells "
         "recorded. Cost is API-equivalent, priced per request from the recorded token counts "
         f"(${price['fresh_input_per_million']}/M input, ${price['cached_input_per_million']}/M "
         f"cached, ${price['output_per_million']}/M output, reasoning included in output; a request "
-        f"above {price['long_context_threshold_input_tokens']:,} input tokens is long-context).",
-        "",
+        f"above {price['long_context_threshold_input_tokens']:,} input tokens is long-context)."
+    )
+    arm_header = (
         "| arm | strict | unmeasured | disqualified | operational | cost | mean / cell "
-        "| cost / strict success | mean wall | long-context requests |",
+        "| cost / strict success | mean wall | long-context requests |"
+    )
+    lines = [
+        f"# {round_id}",
+        "",
+        intro,
+        "",
+        arm_header,
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for arm, entry in data["arms"].items():
@@ -427,11 +433,14 @@ def render_report(round_id: str, model: str, price: dict[str, Any], data: dict[s
             f"| {money(entry['cost_per_strict_success_usd'])} | {entry['mean_wall_seconds']:.1f} s "
             f"| {entry['long_context_requests']} |"
         )
-    lines += [
-        "",
+    contrast_note = (
         "Contrasts are equal-weight means over tasks of within-task block differences, with 95% "
         "task-bootstrap intervals; p-values are blocked randomization tests, Holm-adjusted across "
-        "C1 and C2.",
+        "C1 and C2."
+    )
+    lines += [
+        "",
+        contrast_note,
         "",
         "| contrast | strict success | Holm p | cost / cell | wall / cell | restricted time to success |",
         "| --- | ---: | ---: | ---: | ---: | ---: |",

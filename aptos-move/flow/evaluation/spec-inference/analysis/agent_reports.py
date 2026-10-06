@@ -60,9 +60,11 @@ def collect(round_dir: Path, manifest: Path) -> list[dict[str, Any]]:
 
 
 def render(round_id: str, rows: list[dict[str, Any]]) -> str:
-    lines = [f"# Agent reports: {round_id}", "",
-             "The final report of every cell, as the agent wrote it, grouped by "
-             "target and tactic.", ""]
+    intro = (
+        "The final report of every cell, as the agent wrote it, grouped by "
+        "target and tactic."
+    )
+    lines = [f"# Agent reports: {round_id}", "", intro, ""]
     for target in sorted({row["target"] for row in rows}):
         cells = [row for row in rows if row["target"] == target]
         lines += [f"## `{target}`", "", f"`{cells[0]['module']}`, task id `{cells[0]['task_id']}`", ""]
