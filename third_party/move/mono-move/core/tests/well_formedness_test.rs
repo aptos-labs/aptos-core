@@ -1613,7 +1613,7 @@ fn every_specified_check_is_implemented_and_vice_versa() {
     let specified: BTreeSet<String> = Spec::CHECKS.iter().map(|c| c.id.to_string()).collect();
     let declared: BTreeSet<String> = IMPLEMENTED_CHECKS
         .iter()
-        .flat_map(|(_, ids, ..)| ids.iter().map(|id| id.to_string()))
+        .flat_map(|m| m.checks.iter().map(|id| id.to_string()))
         .collect();
     assert!(!specified.is_empty() && !declared.is_empty());
     let unimplemented: Vec<_> = specified.difference(&declared).collect();

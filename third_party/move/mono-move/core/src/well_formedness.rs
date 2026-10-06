@@ -87,32 +87,17 @@ use crate::{
     Function, LayoutProvider, MicroOp, ObjectDescriptorInner, OperandKind, PackClosureOp,
     SizedSlot, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
-use mono_move_spec_macro::{checks, spec};
+use mono_move_spec::{checks, spec};
 use std::fmt;
 
 // ---------------------------------------------------------------------------
 // Specification
 // ---------------------------------------------------------------------------
 
-/// One row of the check tables on [`Spec`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CheckSpec {
-    /// Stable identifier, e.g. `F1`.
-    pub id: &'static str,
-    /// The table's heading, e.g. `Function shape`.
-    pub group: &'static str,
-    /// The property in English.
-    pub property: &'static str,
-    /// The predicate.
-    pub condition: &'static str,
-    /// Why the property matters, or empty.
-    pub rationale: &'static str,
-}
-
 /// The checks the well-formedness checker performs. Each table row is one
 /// check; the implementation tags the statement that evaluates it with
 /// `#[check(<Id>)]`, and the `#[spec]` attribute compiles these tables into
-/// [`Spec::CHECKS`].
+/// [`Spec::CHECKS`] (a list of [`mono_move_spec::CheckSpec`]).
 ///
 /// ## Function shape
 ///

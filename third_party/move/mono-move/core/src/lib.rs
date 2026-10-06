@@ -69,6 +69,6 @@ pub use value_layout::{
 };
 pub use vm_error::{CallFrame, ErrorLocation, VMInternalError, VMResult};
 pub use well_formedness::{
-    assert_well_formed, check_well_formedness, CheckSpec, ConstantPoolProvider, Spec,
-    WellFormednessError, WellFormednessProvider, IMPLEMENTED_CHECKS,
+    assert_well_formed, check_well_formedness, ConstantPoolProvider, Spec, WellFormednessError,
+    WellFormednessProvider, IMPLEMENTED_CHECKS,
 };

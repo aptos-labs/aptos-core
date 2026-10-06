@@ -2,13 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Provides macros for defining a spec sheet, and binding spec items to
-//! their implementation.
+//! their implementation. Use them through the `mono-move-spec` crate, which
+//! re-exports them alongside the data types they emit.
 //!
 //! - `#[spec]` on an item turns the markdown check tables in its doc comment
 //!   into `Self::CHECKS: &[CheckSpec]`, validating them at compile time.
 //! - `#[check(R1)]` tags the statement or match arm that implements a check.
-//! - `#[checks(registry = NAME)]` on an `impl` collects the tags into a
-//!   registry const.
+//! - `#[checks(registry = NAME)]` on an `impl` collects the tags into
+//!   `NAME: &[MethodChecks]`.
 //! - `#[complexity(class [in "what"] [because "why"])]` declares a method's
 //!   time complexity and writes its `Complexity:` doc line. Classes:
 //!   `constant`, `log`, `linear`, `n_log_n`; nothing worse exists.
@@ -182,6 +183,8 @@ impl Parse for IdItem {
 struct ComplexityArgs {
     /// Big-O rendering of the class.
     class: &'static str,
+    /// `ComplexityClass` variant name.
+    variant: &'static str,
     /// What `N` measures, or empty.
     measured_in: String,
     /// Why the method has this class, or empty.
@@ -191,11 +194,11 @@ struct ComplexityArgs {
 impl Parse for ComplexityArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let class_ident: Ident = input.parse()?;
-        let class = match class_ident.to_string().as_str() {
-            "constant" => "O(1)",
-            "log" => "O(log(N))",
-            "linear" => "O(N)",
-            "n_log_n" => "O(N * log(N))",
+        let (class, variant) = match class_ident.to_string().as_str() {
+            "constant" => ("O(1)", "Constant"),
+            "log" => ("O(log(N))", "Log"),
+            "linear" => ("O(N)", "Linear"),
+            "n_log_n" => ("O(N * log(N))", "NLogN"),
             other => {
                 return Err(syn::Error::new(
                     class_ident.span(),
@@ -219,6 +222,7 @@ impl Parse for ComplexityArgs {
         };
         Ok(Self {
             class,
+            variant,
             measured_in,
             because,
         })
@@ -295,9 +299,19 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
             method.attrs.push(syn::parse_quote!(#[doc = #line]));
             complexity = Some(args);
         }
-        let (class, measured_in, because) = match &complexity {
-            Some(args) => (args.class, args.measured_in.as_str(), args.because.as_str()),
-            None => ("", "", ""),
+        let complexity_expr = match &complexity {
+            Some(args) => {
+                let variant = Ident::new(args.variant, proc_macro2::Span::call_site());
+                let (measured_in, because) = (&args.measured_in, &args.because);
+                quote! {
+                    ::core::option::Option::Some(::mono_move_spec::Complexity {
+                        class: ::mono_move_spec::ComplexityClass::#variant,
+                        measured_in: #measured_in,
+                        because: #because,
+                    })
+                }
+            },
+            None => quote! { ::core::option::Option::None },
         };
 
         let mut ids = body.ids;
@@ -313,17 +327,21 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
         ids.sort();
         ids.dedup();
         let name = method.sig.ident.to_string();
-        entries.push(quote! { (#name, &[#(#ids),*], #class, #measured_in, #because) });
+        entries.push(quote! {
+            ::mono_move_spec::MethodChecks {
+                method: #name,
+                checks: &[#(#ids),*],
+                complexity: #complexity_expr,
+            }
+        });
     }
 
     quote! {
         #item_impl
 
-        /// Checks evaluated by each method, as declared with `#[checks(...)]`:
-        /// `(method, checks, complexity class, what N measures, why)`. The
-        /// last three are empty when the method declares no
-        /// `#[complexity(...)]`.
-        pub const #registry: &[(&str, &[&str], &str, &str, &str)] = &[#(#entries),*];
+        /// What each method implements, from its `#[check(...)]` tags and
+        /// `#[complexity(...)]` declaration.
+        pub const #registry: &[::mono_move_spec::MethodChecks] = &[#(#entries),*];
     }
     .into()
 }
@@ -384,7 +402,7 @@ pub fn spec(_args: TokenStream, item: TokenStream) -> TokenStream {
         let (id, group, property, condition, rationale) =
             (&r.id, &r.group, &r.property, &r.condition, &r.rationale);
         quote! {
-            CheckSpec {
+            ::mono_move_spec::CheckSpec {
                 id: #id,
                 group: #group,
                 property: #property,
@@ -398,7 +416,7 @@ pub fn spec(_args: TokenStream, item: TokenStream) -> TokenStream {
 
         impl #ident {
             /// Every check in the tables above, in order.
-            pub const CHECKS: &'static [CheckSpec] = &[#(#entries),*];
+            pub const CHECKS: &'static [::mono_move_spec::CheckSpec] = &[#(#entries),*];
         }
     }
     .into()
