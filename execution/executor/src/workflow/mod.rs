@@ -15,6 +15,7 @@ use do_state_checkpoint::DoStateCheckpoint;
 
 pub mod do_get_execution_output;
 pub mod do_ledger_update;
+pub mod do_positions;
 pub mod do_state_checkpoint;
 
 pub struct ApplyExecutionOutput;
