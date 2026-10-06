@@ -848,7 +848,7 @@ mod tests {
 
     #[test]
     fn test_ty_tag_cost_is_the_same_on_cache_hit_and_miss() {
-        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true);
 
         let vm_config = VMConfig {
             type_base_cost: 3,
