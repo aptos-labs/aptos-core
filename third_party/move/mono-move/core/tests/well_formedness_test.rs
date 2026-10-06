@@ -14,7 +14,7 @@ use mono_move_core::{
     FunctionDefinitionIndex, FunctionPtr, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
     LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, PackClosureOp,
     SafePointEntry, ShiftOperand, SizedSlot, SortedSafePointEntries, ValueCmpOp, ValueLayout,
-    VecUnpackOp, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    VecUnpackOp, IMPLEMENTED_CHECKS, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// A descriptor table paired with an empty layout provider and a fixed
@@ -1605,74 +1605,37 @@ fn call_closure_provided_args_are_checked() {
 // Specification / implementation consistency
 // ---------------------------------------------------------------------------
 
-/// Expands `[F1, P2-P4]` into `{F1, P2, P3, P4}`.
-fn expand_ids(list: &str) -> Vec<String> {
-    list.split(',')
-        .map(str::trim)
-        .flat_map(|item| match item.split_once('-') {
-            Some((lo, hi)) => {
-                let prefix = &lo[..1];
-                let (a, b): (u32, u32) = (lo[1..].parse().unwrap(), hi[1..].parse().unwrap());
-                (a..=b).map(|n| format!("{prefix}{n}")).collect::<Vec<_>>()
-            },
-            None => vec![item.to_string()],
-        })
-        .collect()
-}
-
-/// The id list inside the first `[...]` of `line`, if it looks like one
-/// (`F1`, `P1-P4, R1-R4`).
-fn bracketed_ids(line: &str) -> Option<&str> {
-    let start = line.find('[')?;
-    let end = line[start..].find(']')? + start;
-    let inner = &line[start + 1..end];
-    let is_id = |s: &str| {
-        s.len() >= 2
-            && s.chars().next().unwrap().is_ascii_uppercase()
-            && s[1..].chars().all(|c| c.is_ascii_digit())
-    };
-    let is_item = |s: &str| s.trim().split('-').all(is_id);
-    inner.split(',').all(is_item).then_some(inner)
-}
-
-/// Every check in the spec tables is cited at least once where it is
-/// evaluated, and every cited id is specified. A spec row is `//! | F1 | ...`;
-/// a citation is a `//` or `///` comment opening with a bracketed id list such
-/// as `[F1]` or `[P1-P4, R1-R4]`.
+/// Every check in the spec tables is declared by some method's
+/// `#[checks(...)]`, and every declared check is specified. A spec row is
+/// `//! | F1 | ...`; declarations are compiled into `IMPLEMENTED_CHECKS`.
 #[test]
 fn every_specified_check_is_implemented_and_vice_versa() {
     use std::collections::BTreeSet;
     let source = include_str!("../src/well_formedness.rs");
-    let mut specified = BTreeSet::new();
-    let mut cited = BTreeSet::new();
-    for line in source.lines() {
-        let trimmed = line.trim_start();
-        if let Some(rest) = trimmed.strip_prefix("//! | ") {
-            let id = rest.split(' ').next().unwrap_or("");
-            if id.len() >= 2
+    let specified: BTreeSet<String> = source
+        .lines()
+        .filter_map(|line| line.trim_start().strip_prefix("//! | "))
+        .map(|rest| rest.split(' ').next().unwrap_or(""))
+        .filter(|id| {
+            id.len() >= 2
                 && id.chars().next().unwrap().is_ascii_uppercase()
                 && id[1..].chars().all(|c| c.is_ascii_digit())
-            {
-                specified.insert(id.to_string());
-            }
-        } else if trimmed.starts_with("//") && !trimmed.starts_with("//!") {
-            let body = trimmed.trim_start_matches('/').trim_start();
-            if body.starts_with('[') {
-                if let Some(list) = bracketed_ids(body) {
-                    cited.extend(expand_ids(list));
-                }
-            }
-        }
-    }
-    assert!(!specified.is_empty() && !cited.is_empty());
-    let unimplemented: Vec<_> = specified.difference(&cited).collect();
-    let unspecified: Vec<_> = cited.difference(&specified).collect();
+        })
+        .map(str::to_string)
+        .collect();
+    let declared: BTreeSet<String> = IMPLEMENTED_CHECKS
+        .iter()
+        .flat_map(|(_, ids)| ids.iter().map(|id| id.to_string()))
+        .collect();
+    assert!(!specified.is_empty() && !declared.is_empty());
+    let unimplemented: Vec<_> = specified.difference(&declared).collect();
+    let unspecified: Vec<_> = declared.difference(&specified).collect();
     assert!(
         unimplemented.is_empty(),
-        "specified but never cited: {unimplemented:?}"
+        "specified but not declared by any method: {unimplemented:?}"
     );
     assert!(
         unspecified.is_empty(),
-        "cited but not in the spec: {unspecified:?}"
+        "declared but not in the spec: {unspecified:?}"
     );
 }

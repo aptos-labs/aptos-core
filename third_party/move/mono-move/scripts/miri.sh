@@ -72,6 +72,7 @@ RUN_PACKAGES=(
 # silently escape Miri. It can only be deliberately excluded.
 SKIP_PACKAGES=(
   "specializer:contains no unsafe code"
+  "mono-move-checks-macro:proc macro, contains no unsafe code"
   "mono-move-orchestrator:has no tests"
   "mono-move-loader:tests reach the Move compiler via mono-move-testsuite"
   "mono-move-testsuite:differential suite compiles Move source per case"

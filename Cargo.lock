@@ -13005,6 +13005,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-checks-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
@@ -13014,6 +13023,7 @@ dependencies = [
  "bytes",
  "fxhash",
  "mono-move-alloc",
+ "mono-move-checks-macro",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
