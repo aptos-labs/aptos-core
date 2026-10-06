@@ -1449,6 +1449,25 @@ fn pack_closure_descriptor_and_captures_must_agree() {
 }
 
 #[test]
+fn pack_closure_captured_data_pointers_must_lie_inside_the_values() {
+    let mut descriptors = ObjectDescriptorTable::new();
+    // Offsets 0 and 8 need 16 bytes of values; the closure only has 8.
+    let captured_data =
+        descriptors.push(ObjectDescriptor::new_captured_data(16, vec![0, 8]).unwrap());
+    let op = PackClosureOp {
+        captured_data_descriptor_id: Some(captured_data),
+        ..capturing_closure()
+    };
+    let errors = check_well_formedness(&pack_closure(op), &TestProvider::new(descriptors));
+    assert!(
+        errors.iter().any(|e| e
+            .message
+            .contains("pointer offset 8 out of bounds of values_size 8")),
+        "{errors:#?}"
+    );
+}
+
+#[test]
 fn pack_closure_mask_and_captured_list_must_match_the_callee() {
     assert_error_contains(
         &pack_closure(PackClosureOp {

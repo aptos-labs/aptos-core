@@ -14,6 +14,12 @@
 //! implementation cites where the check is evaluated. All checks run and every
 //! violation is reported; none depends on another having passed.
 //!
+//! The checker is unmetered, so its cost must stay linear, or at worst
+//! `n log n`, in the data it reads: the ops and their operands, the slot and
+//! layout lists, and the ABIs and callees named by call ops. Provider lookups
+//! are constant time. Where a check relates two lists it uses binary search or
+//! a single sort, never a rescan of one list per element of the other.
+//!
 //! # Notation
 //!
 //! For a function `F`:
@@ -245,7 +251,7 @@ use crate::{
     Function, LayoutProvider, MicroOp, ObjectDescriptorInner, OperandKind, PackClosureOp,
     SizedSlot, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
-use std::{cmp::Ordering, fmt};
+use std::fmt;
 
 /// Width and alignment of a heap-pointer slot, as the GC and the call
 /// protocol read it.
@@ -620,24 +626,18 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             let sp_offsets = &entry.layout.heap_ptr_offsets;
             // G6.
             self.check_pointer_offsets(Some(co), sp_offsets);
-            // G7. Both lists are strictly increasing (G2, G6), so a merge finds
-            // every duplicate in linear time. If either list is unsorted that
-            // is already reported, and a duplicate missed here is moot.
-            let (mut i, mut j) = (0, 0);
-            while let (Some(sp), Some(base)) = (sp_offsets.get(i), base_offsets.get(j)) {
-                match sp.0.cmp(&base.0) {
-                    Ordering::Less => i += 1,
-                    Ordering::Greater => j += 1,
-                    Ordering::Equal => {
-                        fail!(
-                            self,
-                            Some(co),
-                            "safe_point_layouts: offset {} duplicates frame_layout",
-                            sp.0
-                        );
-                        i += 1;
-                        j += 1;
-                    },
+            // G7. `base` is strictly increasing (G2), so each safe-point offset
+            // is looked up by binary search: O(log |base|) per offset rather
+            // than a rescan of `base` per safe point. If `base` is unsorted
+            // that is already reported, and a duplicate missed here is moot.
+            for sp in sp_offsets {
+                if base_offsets.binary_search_by_key(&sp.0, |b| b.0).is_ok() {
+                    fail!(
+                        self,
+                        Some(co),
+                        "safe_point_layouts: offset {} duplicates frame_layout",
+                        sp.0
+                    );
                 }
             }
         }
@@ -950,8 +950,11 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             (Some(id), false) => match self.descriptor_or_report(pc, "PackClosure", id) {
                 Some(ObjectDescriptorInner::Trivial) | None => {},
                 Some(ObjectDescriptorInner::CapturedData { pointer_offsets }) => {
-                    for &off in pointer_offsets
-                        .iter()
+                    // The constructor keeps `pointer_offsets` strictly
+                    // increasing, so the last one bounds them all: O(1) per
+                    // op regardless of the descriptor's size.
+                    if let Some(&off) = pointer_offsets
+                        .last()
                         .filter(|&&off| off as u64 + PTR_WIDTH as u64 > op.values_size as u64)
                     {
                         fail!(
@@ -1023,10 +1026,13 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 // L7. The runtime writes captured values with the slot's
                 // `(size, align)` and reads them back at the callee parameter's
                 // natural-aligned offset, so both must match. The captured list
-                // is in mask-bit-set order through the param list.
+                // is in mask-bit-set order through the param list. Bounded to
+                // the 64 parameters a mask can address; more is already an
+                // L6 error.
                 let captured_params = callee
                     .param_slots
                     .iter()
+                    .take(64)
                     .enumerate()
                     .filter(|(i, _)| (op.mask >> i) & 1 != 0);
                 for (k, ((i, param_slot), slot)) in captured_params.zip(&op.captured).enumerate() {
@@ -1244,10 +1250,15 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                     off.0
                 );
             }
-            let inside_arg = abi.args().iter().any(|slot| {
-                slot.offset as u64 <= off.0 as u64
-                    && off_end <= slot.offset as u64 + slot.size as u64
-            });
+            // `args` is sorted by offset and non-overlapping (`NativeABI::new`),
+            // so the only candidate is the last slot starting at or before
+            // `off`: O(log |args|) per offset.
+            let args = abi.args();
+            let inside_arg = args
+                .partition_point(|slot| slot.offset <= off.0)
+                .checked_sub(1)
+                .map(|i| &args[i])
+                .is_some_and(|slot| off_end <= slot.offset as u64 + slot.size as u64);
             if !inside_arg {
                 fail!(
                     self,
