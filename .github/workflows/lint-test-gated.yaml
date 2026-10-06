@@ -121,7 +121,9 @@ jobs:
             exit 1
           fi
 
-  # Check the freshess of the merge base. This is a PR required job.
+  # Run aptos-batch-encryption (i.e., with TypeScript/Node.js). This is a PR required job.
+  # A skipped job satisfies the required check, so an unselected run reserves no
+  # runner, while a failed prerequisite runs the job to fail it visibly.
   rust-batch-encryption-tests:
     needs: [gated_file_change_determinator, e2e-test-determinator]
     if: | # Only run on each PR once an appropriate event occurs
