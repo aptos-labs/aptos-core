@@ -6,7 +6,7 @@
 //!
 //! - `#[spec]` on an item turns the markdown check tables in its doc comment
 //!   into `Self::CHECKS: &[CheckSpec]`, validating them at compile time.
-//! - `#[check(F3)]` tags the statement or match arm that implements a check.
+//! - `#[check(R1)]` tags the statement or match arm that implements a check.
 //! - `#[checks(registry = NAME)]` on an `impl` collects the tags into a
 //!   registry const.
 //! - `#[complexity(class [in "what"] [because "why"])]` declares a method's
@@ -17,20 +17,23 @@
 //! versa.
 //!
 //! ```ignore
-//! /// ## Function shape
+//! /// ## Requests
 //! ///
-//! /// | Id | Property                 | Condition    |
-//! /// |----|--------------------------|--------------|
-//! /// | F3 | frame holds its metadata | `S + M <= E` |
+//! /// | Id | Property              | Condition          |
+//! /// |----|-----------------------|--------------------|
+//! /// | R1 | a request has a body  | `len(body) > 0`    |
+//! /// | R2 | a request fits a page | `len(body) <= MAX` |
 //! #[spec]
 //! pub struct Spec;
 //!
 //! #[checks(registry = IMPLEMENTED_CHECKS)]
-//! impl Checker {
+//! impl Validator {
 //!     #[complexity(constant)]
-//!     fn check_frame_geometry(&mut self) {
-//!         #[check(F3)]
-//!         if func.frame_size() > func.extended_frame_size { ... }
+//!     fn check_request(&mut self, body: &[u8]) {
+//!         #[check(R1)]
+//!         if body.is_empty() { ... }
+//!         #[check(R2)]
+//!         if body.len() > MAX { ... }
 //!     }
 //! }
 //! ```
@@ -249,7 +252,7 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
         let ImplItem::Fn(method) = item else {
             continue;
         };
-        // Tags inside the body: `#[check(F3)]` on a statement or match arm.
+        // Tags inside the body: `#[check(R1)]` on a statement or match arm.
         let mut body = BodyTags {
             ids: Vec::new(),
             error: None,
