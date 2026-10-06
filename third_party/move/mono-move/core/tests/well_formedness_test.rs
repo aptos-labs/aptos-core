@@ -13,7 +13,7 @@ use mono_move_core::{
     DescriptorId, DescriptorProvider, FrameLayoutInfo, FrameOffset as FO, Function,
     FunctionDefinitionIndex, FunctionPtr, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
     LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, PackClosureOp,
-    SafePointEntry, ShiftOperand, SizedSlot, SortedSafePointEntries, ValueCmpOp, ValueLayout,
+    SafePointEntry, ShiftOperand, SizedSlot, SortedSafePointEntries, Spec, ValueCmpOp, ValueLayout,
     VecUnpackOp, IMPLEMENTED_CHECKS, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
@@ -1605,24 +1605,12 @@ fn call_closure_provided_args_are_checked() {
 // Specification / implementation consistency
 // ---------------------------------------------------------------------------
 
-/// Every check in the spec tables is declared by some method's
-/// `#[checks(...)]`, and every declared check is specified. A spec row is
-/// `//! | F1 | ...`; declarations are compiled into `IMPLEMENTED_CHECKS`.
+/// Every check in [`Spec::CHECKS`] is evaluated by some tagged statement, and
+/// every tagged check is specified.
 #[test]
 fn every_specified_check_is_implemented_and_vice_versa() {
     use std::collections::BTreeSet;
-    let source = include_str!("../src/well_formedness.rs");
-    let specified: BTreeSet<String> = source
-        .lines()
-        .filter_map(|line| line.trim_start().strip_prefix("//! | "))
-        .map(|rest| rest.split(' ').next().unwrap_or(""))
-        .filter(|id| {
-            id.len() >= 2
-                && id.chars().next().unwrap().is_ascii_uppercase()
-                && id[1..].chars().all(|c| c.is_ascii_digit())
-        })
-        .map(str::to_string)
-        .collect();
+    let specified: BTreeSet<String> = Spec::CHECKS.iter().map(|c| c.id.to_string()).collect();
     let declared: BTreeSet<String> = IMPLEMENTED_CHECKS
         .iter()
         .flat_map(|(_, ids, ..)| ids.iter().map(|id| id.to_string()))

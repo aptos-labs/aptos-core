@@ -54,7 +54,7 @@ use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     visit_mut::{self, VisitMut},
-    Attribute, Ident, ImplItem, ItemImpl, LitStr, Token,
+    Attribute, Expr, ExprLit, Ident, ImplItem, Item, ItemImpl, Lit, LitStr, Meta, Token,
 };
 
 /// Collects and strips `#[check(...)]` tags from statements and match arms
@@ -328,4 +328,169 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
         pub const #registry: &[(&str, &[&str], &str, &str, &str)] = &[#(#entries),*];
     }
     .into()
+}
+
+// ---------------------------------------------------------------------------
+// #[spec]: the check tables in an item's doc comments, as data
+// ---------------------------------------------------------------------------
+
+/// `#[spec]` on an item whose documentation holds the check tables parses
+/// every markdown table with an `Id` column and emits
+///
+/// ```ignore
+/// impl Spec {
+///     pub const CHECKS: &'static [CheckSpec] = &[
+///         CheckSpec { id: "F1", group: "Function shape", property: "...", condition: "...", rationale: "..." },
+///         ...
+///     ];
+/// }
+/// ```
+///
+/// where the group is the nearest preceding `## ` heading. The item's
+/// documentation is left unchanged, so rustdoc still renders the tables. A
+/// table must have `Id`, `Property`, and `Condition` columns and may have
+/// `Rationale`; every row must have as many cells as the header; ids must be
+/// well-formed and unique across all tables. Each violation is a compile
+/// error pointing at the item.
+#[proc_macro_attribute]
+pub fn spec(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as Item);
+    let (ident, attrs) = match &item {
+        Item::Struct(s) => (&s.ident, &s.attrs),
+        Item::Enum(e) => (&e.ident, &e.attrs),
+        Item::Mod(m) => (&m.ident, &m.attrs),
+        _ => {
+            return syn::Error::new(item.span(), "#[spec] goes on a struct, enum, or module")
+                .to_compile_error()
+                .into()
+        },
+    };
+    let doc_lines: Vec<String> = attrs
+        .iter()
+        .filter_map(|attr| match &attr.meta {
+            Meta::NameValue(nv) if nv.path.is_ident("doc") => match &nv.value {
+                Expr::Lit(ExprLit {
+                    lit: Lit::Str(text),
+                    ..
+                }) => Some(text.value()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect();
+    let rows = match parse_tables(&doc_lines) {
+        Ok(rows) => rows,
+        Err(msg) => return syn::Error::new(ident.span(), msg).to_compile_error().into(),
+    };
+    let entries = rows.iter().map(|r| {
+        let (id, group, property, condition, rationale) =
+            (&r.id, &r.group, &r.property, &r.condition, &r.rationale);
+        quote! {
+            CheckSpec {
+                id: #id,
+                group: #group,
+                property: #property,
+                condition: #condition,
+                rationale: #rationale,
+            }
+        }
+    });
+    quote! {
+        #item
+
+        impl #ident {
+            /// Every check in the tables above, in order.
+            pub const CHECKS: &'static [CheckSpec] = &[#(#entries),*];
+        }
+    }
+    .into()
+}
+
+struct SpecRow {
+    id: String,
+    group: String,
+    property: String,
+    condition: String,
+    rationale: String,
+}
+
+/// Splits a markdown table row into trimmed cells.
+fn cells(line: &str) -> Vec<String> {
+    let inner = line.trim().trim_start_matches('|').trim_end_matches('|');
+    inner.split('|').map(|c| c.trim().to_string()).collect()
+}
+
+fn is_check_id(id: &str) -> bool {
+    let mut chars = id.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_uppercase())
+        && !chars.as_str().is_empty()
+        && chars.all(|c| c.is_ascii_digit())
+}
+
+/// Parses every table whose header starts with an `Id` column.
+fn parse_tables(lines: &[String]) -> Result<Vec<SpecRow>, String> {
+    let mut rows = Vec::new();
+    let mut group = String::new();
+    let mut header: Option<Vec<String>> = None;
+    for raw in lines {
+        let line = raw.trim();
+        if let Some(h) = line.strip_prefix("## ") {
+            group = h.trim().to_string();
+            header = None;
+            continue;
+        }
+        if !line.starts_with('|') {
+            header = None;
+            continue;
+        }
+        let c = cells(line);
+        if c.iter().all(|x| x.chars().all(|ch| ch == '-')) {
+            continue; // separator row
+        }
+        match &header {
+            None => {
+                if c.first().map(String::as_str) == Some("Id") {
+                    for required in ["Property", "Condition"] {
+                        if !c.iter().any(|x| x == required) {
+                            return Err(format!(
+                                "table in group `{group}` lacks a `{required}` column"
+                            ));
+                        }
+                    }
+                    header = Some(c);
+                }
+            },
+            Some(h) => {
+                if c.len() != h.len() {
+                    return Err(format!(
+                        "row `{}` has {} cells but its table has {} columns",
+                        c.first().cloned().unwrap_or_default(),
+                        c.len(),
+                        h.len()
+                    ));
+                }
+                let col = |name: &str| h.iter().position(|x| x == name).map(|i| c[i].clone());
+                let id = c[0].clone();
+                if !is_check_id(&id) {
+                    return Err(format!(
+                        "`{id}` is not a check id (an uppercase letter followed by digits)"
+                    ));
+                }
+                if rows.iter().any(|r: &SpecRow| r.id == id) {
+                    return Err(format!("check `{id}` is specified twice"));
+                }
+                rows.push(SpecRow {
+                    id,
+                    group: group.clone(),
+                    property: col("Property").unwrap_or_default(),
+                    condition: col("Condition").unwrap_or_default(),
+                    rationale: col("Rationale").unwrap_or_default(),
+                });
+            },
+        }
+    }
+    if rows.is_empty() {
+        return Err("no check table found in the documentation".to_string());
+    }
+    Ok(rows)
 }
