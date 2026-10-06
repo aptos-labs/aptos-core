@@ -313,11 +313,11 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     fn run(&mut self) {
         let code = self.func.code.ops();
 
-        // F1.
+        // [F1].
         if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
-        // F2. The dispatch loop falls through to `pc + 1` after any op that does
+        // [F2]. The dispatch loop falls through to `pc + 1` after any op that does
         // not set `pc` itself, so the last op must leave the function or jump.
         // Calls do not qualify: returning to `call_pc + 1` would run off the
         // end.
@@ -334,7 +334,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         self.check_param_and_return_slots();
         self.check_gc_layouts();
 
-        // F7. Origins: either absent (hand-built functions) or one per micro-op;
+        // [F7]. Origins: either absent (hand-built functions) or one per micro-op;
         // a partial table would attribute errors to wrong bytecode offsets.
         let origins = self.func.code.origins();
         if !origins.is_empty() && origins.len() != code.len() {
@@ -347,7 +347,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             );
         }
 
-        // O1–O5 through the operand schema, then the op-specific checks.
+        // [O1-O6] through the operand schema, then the op-specific checks.
         for (pc, instr) in code.iter().enumerate() {
             instr.for_each_frame_operand(&mut |off, kind| {
                 self.check_frame_operand(Some(pc), off, kind)
@@ -362,11 +362,11 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
     fn check_frame_geometry(&mut self) {
         let func = self.func;
-        // F3.
+        // [F3].
         if func.frame_size() > func.extended_frame_size {
             fail!(self, None, "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})", func.extended_frame_size, func.param_and_local_sizes_sum, FRAME_METADATA_SIZE, func.frame_size());
         }
-        // F4.
+        // [F4].
         if func.param_region_size > func.param_and_local_sizes_sum {
             fail!(
                 self,
@@ -376,7 +376,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 func.param_and_local_sizes_sum
             );
         }
-        // F5, F6. Frame metadata is written at `fp + param_and_local_sizes_sum` with
+        // [F5, F6]. Frame metadata is written at `fp + param_and_local_sizes_sum` with
         // aligned 8-byte stores, and the callee fp `fp + frame_size()` must
         // be `MAX_ALIGN`-aligned for the callee's own slot accesses.
         if !func.param_and_local_sizes_sum.is_multiple_of(MAX_ALIGN) {
@@ -401,7 +401,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
     fn check_param_and_return_slots(&mut self) {
         let func = self.func;
-        // P1–P4 and R1–R4. `CallClosure` and `CallBuilder` write `size` bytes at
+        // [P1-P4, R1-R4]. `CallClosure` and `CallBuilder` write `size` bytes at
         // `callee_fp + offset` for each parameter slot, and `call_unchecked`
         // zeroes `[param_region_size, extended_frame_size)` afterwards, so a
         // slot outside the parameter region is either overwritten or out of
@@ -439,7 +439,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         );
     }
 
-    /// P2–P4 / R2–R4. A parameter or return slot list: every slot
+    /// [P2-P4, R2-R4]. A parameter or return slot list: every slot
     /// well-formed and within `[0, region_end)`, slots ascending and disjoint.
     fn check_slot_list(
         &mut self,
@@ -475,7 +475,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// Slot well-formedness (P2, R2, L4, L9). A [`SizedSlot`] carries its own
+    /// Slot well-formedness [P2, R2, L4, L9]. A [`SizedSlot`] carries its own
     /// alignment, which the closure runtime
     /// feeds to `align_up` (undefined for zero or non-power-of-two) and which
     /// must divide the offset for the slot to be where the layout says.
@@ -502,7 +502,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// G1–G7.
+    /// [G1-G7].
     ///
     /// Complexity: O(N * log(N)) in the number of layout slots: each safe-point
     /// slot is one binary search into `base`.
@@ -511,10 +511,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_points = self.func.safe_point_layouts.entries();
 
-        // G1, G2.
+        // [G1, G2].
         self.check_pointer_offsets(None, base_offsets);
 
-        // G3. The GC scans the base layout of every frame unconditionally, so a
+        // [G3]. The GC scans the base layout of every frame unconditionally, so a
         // slot beyond the parameter region must start out null rather than
         // holding whatever the previous frame left there.
         if !self.func.zero_frame {
@@ -526,7 +526,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             }
         }
 
-        // G4.
+        // [G4].
         if let Some(w) = safe_points
             .windows(2)
             .find(|w| w[0].code_offset.0 >= w[1].code_offset.0)
@@ -542,7 +542,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
         for entry in safe_points {
             let co = entry.code_offset.0 as usize;
-            // G5.
+            // [G5].
             match code.get(co) {
                 None => fail!(self, None, "safe_point_layouts: code_offset {co} out of bounds (code length {})", code.len()),
                 // Top-frame-only contract: an entry sits at the PC of an
@@ -551,9 +551,9 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 Some(_) => {},
             }
             let sp_offsets = &entry.layout.heap_ptr_offsets;
-            // G6.
+            // [G6].
             self.check_pointer_offsets(Some(co), sp_offsets);
-            // G7. `base` is strictly increasing (G2), so each safe-point offset
+            // [G7]. `base` is strictly increasing (G2), so each safe-point offset
             // is looked up by binary search: O(log |base|) per offset rather
             // than a rescan of `base` per safe point. If `base` is unsorted
             // that is already reported, and a duplicate missed here is moot.
@@ -570,7 +570,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// G1, G2 (and G6 for a safe point). Pointer offsets the GC reads with
+    /// [G1, G2] (and G6 for a safe point). Pointer offsets the GC reads with
     /// aligned `read_ptr`: each an in-frame, aligned pointer slot; the list
     /// strictly increasing.
     fn check_pointer_offsets(&mut self, pc: Option<usize>, offsets: &[FrameOffset]) {
@@ -651,7 +651,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             | EnumBorrowVariantFieldByTag { .. }
             | EnumCheckVariant { .. } => {},
 
-            // I1, I2. Unchecked u64 immediates: lowering uses the checked ops for
+            // [I1, I2]. Unchecked u64 immediates: lowering uses the checked ops for
             // zero divisors and out-of-range shifts, so these are lowering bugs.
             DivU64Imm { imm, .. } | ModU64Imm { imm, .. } if imm == 0 => {
                 self.err(pc, "division by zero (imm)");
@@ -662,7 +662,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             },
             ShlU64Imm { .. } | ShrU64Imm { .. } => {},
 
-            // I3, I4, I5. Signedness the interpreter would otherwise reject at
+            // [I3, I4, I5]. Signedness the interpreter would otherwise reject at
             // runtime.
             IntBitAnd(ref op) | IntBitOr(ref op) | IntBitXor(ref op) if op.rhs.is_signed() => {
                 self.err(pc, "bitwise on signed type");
@@ -677,10 +677,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             },
             IntNegate(_) => {},
 
-            // Z1.
+            // [Z1].
             Move { size, .. } => self.check_nonzero_size(pc, size),
 
-            // B1. Forms a fat pointer to `local` without dereferencing it, so only
+            // [B1]. Forms a fat pointer to `local` without dereferencing it, so only
             // the base is checked: it must lie in the data region, not in the
             // metadata or callee region. The op carries no size, so the
             // borrowed extent is not bounds-checked here.
@@ -695,7 +695,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             },
             SlotBorrow { .. } => {},
 
-            // J1 (and O3 for the reference comparisons).
+            // [J1] (and O3 for the reference comparisons).
             Jump { target, .. }
             | JumpNotZeroU64 { target, .. }
             | JumpNotZeroByte { target, .. }
@@ -716,17 +716,17 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             ValueCmp(_) => {}, // `Value` operands are type-checked in `check_frame_operand`.
             ValueRefCmp(ref op) => self.check_value_type(pc, op.ty),
 
-            // C4.
+            // [C4].
             CallDirect { ref ptr } => {
                 // SAFETY: the function pointer lives in the global context,
                 // which the caller's guard keeps alive during the check.
                 let callee = unsafe { ptr.as_ref_unchecked() };
                 self.check_direct_callee(pc, callee);
             },
-            // C1, C2, C3.
+            // [C1, C2, C3].
             CallNative { ref abi, .. } => self.check_native_abi(pc, abi),
 
-            // Z1, Z2. Heap and reference offset ops: nonzero width, `offset +
+            // [Z1, Z2]. Heap and reference offset ops: nonzero width, `offset +
             // size` must not wrap.
             HeapMoveFrom8 { offset, .. }
             | HeapMoveTo8 { offset, .. }
@@ -743,7 +743,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 self.check_offset_size(pc, offset, size);
             },
             ReadRef { size, .. } | WriteRef { size, .. } => self.check_nonzero_size(pc, size),
-            // Z1, Z2. Any tag may be selected at runtime, so every present offset
+            // [Z1, Z2]. Any tag may be selected at runtime, so every present offset
             // must keep `offset + size` within `u32`.
             EnumReadVariantFieldByTag {
                 ref offsets, size, ..
@@ -756,7 +756,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                     self.check_offset_size(pc, offset, size);
                 }
             },
-            // Z3. The interpreter adds `base + off` in `u32`; the schema reports
+            // [Z3]. The interpreter adds `base + off` in `u32`; the schema reports
             // the saturated slot, this reports the overflow itself.
             DeepCopyHeapPtrs { base, ref offsets } => {
                 for &off in offsets
@@ -772,7 +772,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 }
             },
 
-            // Z1, K3. Vectors.
+            // [Z1, K3]. Vectors.
             VecPushBack {
                 elem_size,
                 descriptor_id,
@@ -790,13 +790,13 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_vector_descriptor(pc, "VecPack", op.descriptor_id, op.elem_size);
             },
-            // Z1, D1. The element copies are independent `copy_nonoverlapping`s.
+            // [Z1, D1]. The element copies are independent `copy_nonoverlapping`s.
             VecUnpack(ref op) => {
                 self.check_nonzero_size(pc, op.elem_size);
                 self.check_disjoint_destinations(pc, "VecUnpack", &op.dsts, op.elem_size);
             },
 
-            // K1, K2. Allocation descriptors.
+            // [K1, K2]. Allocation descriptors.
             HeapNew { descriptor_id, .. } => {
                 if let Some(inner) = self.descriptor_or_report(pc, "HeapNew", descriptor_id) {
                     if !matches!(
@@ -833,9 +833,9 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 None => {},
             },
 
-            // L1–L8.
+            // [L1-L8].
             PackClosure(ref op) => self.check_pack_closure(pc, op),
-            // L9.
+            // [L9].
             CallClosure(ref op) => {
                 for (i, slot) in op.provided_args.iter().enumerate() {
                     self.check_sized_slot(
@@ -865,7 +865,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         // captured. Pointer-free captures use the reserved `Trivial` slot;
         // pointer-bearing ones a `CapturedData` descriptor whose offsets must
         // lie within the values region so GC traces stay in bounds.
-        // L1, L2, L3.
+        // [L1, L2, L3].
         match (op.captured_data_descriptor_id, op.captured.is_empty()) {
             (None, true) => {},
             (Some(id), false) => match self.descriptor_or_report(pc, "PackClosure", id) {
@@ -897,11 +897,11 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 "PackClosure: captured non-empty but captured_data_descriptor_id is None",
             ),
         }
-        // L4. Each captured slot's `align` drives the captured-data layout.
+        // [L4]. Each captured slot's `align` drives the captured-data layout.
         for (i, slot) in op.captured.iter().enumerate() {
             self.check_sized_slot(Some(pc), &format!("PackClosure: captured[{i}]"), slot);
         }
-        // L5.
+        // [L5].
         let captured_count = op.mask.count_ones() as usize;
         if op.captured.len() != captured_count {
             fail!(self, pc, "PackClosure: captured list length {} does not match mask captured count {captured_count}", op.captured.len());
@@ -912,14 +912,14 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 // which the caller's guard keeps alive during the check.
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
                 let param_count = callee.param_slots.len();
-                // L6.
+                // [L6].
                 if param_count > u64::BITS as usize {
                     fail!(self, pc, "PackClosure: callee has {param_count} params, exceeds 64-bit mask capacity");
                 }
                 if param_count < u64::BITS as usize && op.mask >> param_count != 0 {
                     fail!(self, pc, "PackClosure: mask 0x{:x} sets bits beyond callee param count {param_count}", op.mask);
                 }
-                // L7. The runtime writes captured values with the slot's
+                // [L7]. The runtime writes captured values with the slot's
                 // `(size, align)` and reads them back at the callee parameter's
                 // natural-aligned offset, so both must match. The captured list
                 // is in mask-bit-set order through the param list. Bounded to
@@ -950,7 +950,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             // against the resolved callee.
             ClosureFuncRef::Unresolved(_) => {},
         }
-        // L8. `values_size` must equal the natural-aligned captured layout size;
+        // [L8]. `values_size` must equal the natural-aligned captured layout size;
         // a smaller size would let the runtime's writes run out of bounds.
         // Skipped when a captured alignment is invalid (already reported),
         // since the layout is then undefined.
@@ -980,8 +980,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         });
     }
 
-    /// O1, with O2–O5 for the provider-dependent kinds and O6 for scalar
-    /// kinds. Checks one frame operand per the [`OperandKind`] schema.
+    /// [O1-O6]. Checks one frame operand per the [`OperandKind`] schema,
+    /// resolving the provider-dependent kinds first.
     ///
     /// Complexity: O(log(N)) in the number of GC pointer slots (O6).
     fn check_frame_operand(&mut self, pc: Option<usize>, offset: FrameOffset, kind: OperandKind) {
@@ -1019,7 +1019,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 .expect("every other kind is provider-independent"),
         };
         self.check_access(pc, offset, width, align);
-        // O6. A scalar read or written where the GC expects a pointer is type
+        // [O6]. A scalar read or written where the GC expects a pointer is type
         // confusion: the GC would trace the integer as an object.
         if matches!(
             kind,
@@ -1033,7 +1033,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// O6. `[offset, offset + width)` does not intersect any pointer slot in
+    /// [O6]. `[offset, offset + width)` does not intersect any pointer slot in
     /// `frame_layout` or in the safe-point layout at `pc`. Both lists are
     /// strictly increasing (G2, G6), so each is one binary search.
     ///
@@ -1105,7 +1105,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// O3. Structural comparison is defined on values, not references; a
+    /// [O3]. Structural comparison is defined on values, not references; a
     /// reference type is an unconditional runtime invariant violation.
     fn check_value_type(&mut self, pc: usize, ty: InternedType) {
         if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
@@ -1113,7 +1113,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// D1. Destinations of a multi-destination op are pairwise disjoint.
+    /// [D1]. Destinations of a multi-destination op are pairwise disjoint.
     ///
     /// Complexity: O(N * log(N)) in the number of destinations.
     fn check_disjoint_destinations(
@@ -1142,7 +1142,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     // Calls
     // -----------------------------------------------------------------------
 
-    /// C1, C2, C3. The native's slot region fits the caller's extended frame, and its
+    /// [C1, C2, C3]. The native's slot region fits the caller's extended frame, and its
     /// pointer slots (read by the GC with aligned `read_ptr` at the native's
     /// fp) are aligned, inside the region, and inside an argument slot.
     ///
@@ -1204,7 +1204,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// C4. A direct callee's parameters are written into, and its return values
+    /// [C4]. A direct callee's parameters are written into, and its return values
     /// read back from, this function's callee region
     /// `[frame_size(), extended_frame_size)`.
     fn check_direct_callee(&mut self, pc: usize, callee: &Function) {
@@ -1249,7 +1249,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         inner
     }
 
-    /// K3. A vector allocation's descriptor is `Trivial`, or a `Vector` with a
+    /// [K3]. A vector allocation's descriptor is `Trivial`, or a `Vector` with a
     /// non-empty pointer-offset list and a matching `elem_size`: the GC
     /// strides the data region by the descriptor's `elem_size`, so a mismatch
     /// would trace past the allocation.
@@ -1278,7 +1278,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// J1.
+    /// [J1].
     // TODO(metering): validate branch gas fields are populated.
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.ops().len();
@@ -1292,14 +1292,14 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// Z1.
+    /// [Z1].
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(pc, "size must be > 0");
         }
     }
 
-    /// Z2. `offset + size` fits in `u32`, so the window `[offset, offset + size)`
+    /// [Z2]. `offset + size` fits in `u32`, so the window `[offset, offset + size)`
     /// into a heap object or referent cannot wrap.
     fn check_offset_size(&mut self, pc: usize, offset: u32, size: u32) {
         if offset.checked_add(size).is_none() {
