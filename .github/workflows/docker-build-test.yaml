@@ -23,7 +23,7 @@ name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
@@ -66,7 +66,7 @@ env:
 
   # On PRs, only build and push to GCP
   # On push, build and push to all remote registries
-  TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'remote' || 'remote-all' }}
+  TARGET_REGISTRY: remote
 
 permissions:
   contents: read
@@ -141,7 +141,7 @@ jobs:
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
-      SKIP_JOB: ${{ github.event_name == 'pull_request_target' && needs.e2e-test-determinator.outputs.docker_images == 'false' && !contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') && !contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test') }}
+      SKIP_JOB: true
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
