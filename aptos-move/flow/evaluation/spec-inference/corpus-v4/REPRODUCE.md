@@ -175,7 +175,7 @@ one exactly.
 
 ## 3. Rerun the experiment
 
-This repeats the protocol of round 7, which runs once per model: Terra 5.6
+This repeats the protocol of round 8, which runs once per model: Terra 5.6
 (`terra56`, `gpt-5.6-terra`) and Sol 6.1 (`sol61`, `gpt-6.1-sol`), each through
 the Codex CLI at `high` effort, three arms, four replicates of all 26 tasks (312
 cells per model), concurrency 3, the ordinary mutant set withheld as a
@@ -186,9 +186,14 @@ that asked for helper contracts and simplified WP's output, took about four and
 a half hours and cost $82 at API-equivalent prices, a mean of $0.26 per cell, as
 `analysis.codex_round_report` prices it; a four-task pilot of the current
 protocol with Terra cost $0.16 per cell over the agent-only and hybrid-guided
-arms. Prices per million tokens are
-$2.00 input, $0.20 cached and $12.00 output for Terra 5.6, and $2.00, $0.10 and
-$10.00 for Sol 6.1.
+arms. Prices per million tokens are $2.00 input, $0.20 cached and $12.00
+output for Terra 5.6, and $2.00, $0.10 and $10.00 for Sol 6.1.
+
+Round 7 ran Terra under this protocol and is superseded by round 8: scoring
+could not apply four mutants whose loop guard an inline invariant had
+rewritten as `while ({ spec { .. }; cond })`. Locating such code is part of the
+harness, and scoring refuses a round under a harness other than the one it ran
+with, so the fix required a new round.
 
 **Environment.**
 

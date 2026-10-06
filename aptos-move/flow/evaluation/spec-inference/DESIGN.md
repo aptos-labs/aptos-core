@@ -25,7 +25,7 @@ the workflow and the availability of WP differ:
 
 `agent_only` has no simplification step because it is never given
 mechanically generated conditions. A round rendered with
-`--no-wp-simplification`, as corpus-v4 round 7 is, drops it from
+`--no-wp-simplification`, as corpus-v4 round 8 is, drops it from
 `hybrid_guided` as well. In it the WP router is **absent**, not
 discouraged: the tool cannot be listed or called.
 
