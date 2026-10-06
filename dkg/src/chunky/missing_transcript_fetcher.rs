@@ -92,7 +92,11 @@ impl TranscriptFetcher {
             .session_metadata
             .dealer_consensus_infos_cloned()
             .into_iter()
-            .map(|info| info.public_key)
+            .map(|info| {
+                info.public_key()
+                    .expect("on-chain dealer consensus keys must be valid")
+                    .clone()
+            })
             .collect();
 
         while !missing_set.is_empty() && !pending_requests.is_empty() {
