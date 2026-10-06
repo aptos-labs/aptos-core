@@ -57,169 +57,115 @@
 //!
 //! ## Function shape
 //!
-//! - **F1 (has code)**: the function has at least one op. `N >= 1`.
-//! - **F2 (cannot run off the end)**: the last op leaves the function or
-//!   jumps; every other op falls through to `pc + 1`, and a call returns to
-//!   `call_pc + 1`. `code[N - 1]` is `Return`, `Abort`, `AbortMsg`, or `Jump`.
-//! - **F3 (frame holds its metadata)**: the extended frame is at least the
-//!   data region plus the metadata block. `S + M <= E`.
-//! - **F4 (parameters fit the data region)**: `P <= S`.
-//! - **F5 (metadata is aligned)**: the metadata block, written with aligned
-//!   8-byte stores, starts on an aligned offset. `S mod A = 0`.
-//! - **F6 (callee fp is aligned)**: a callee's frame pointer, `fp + S + M`,
-//!   is aligned. `(S + M) mod A = 0`.
-//! - **F7 (origins match code)**: bytecode provenance is absent or covers
-//!   every op. `len(origins) = 0` or `len(origins) = N`.
+//! | Id | Property                       | Condition                                                 | Rationale                                                                 |
+//! |----|--------------------------------|-----------------------------------------------------------|---------------------------------------------------------------------------|
+//! | F1 | has code                       | `N >= 1`                                                  |                                                                           |
+//! | F2 | cannot run off the end         | `code[N - 1]` is `Return`, `Abort`, `AbortMsg`, or `Jump` | every other op falls through to `pc + 1`; a call returns to `call_pc + 1` |
+//! | F3 | frame holds its metadata       | `S + M <= E`                                              |                                                                           |
+//! | F4 | parameters fit the data region | `P <= S`                                                  |                                                                           |
+//! | F5 | metadata is aligned            | `S mod A = 0`                                             | `Meta` is written with aligned 8-byte stores                              |
+//! | F6 | callee fp is aligned           | `(S + M) mod A = 0`                                       | a callee's frame pointer is `fp + S + M`                                  |
+//! | F7 | origins match code             | `len(origins) = 0` or `len(origins) = N`                  |                                                                           |
 //!
 //! ## Parameter and return slots
 //!
-//! - **P1 (one slot per parameter)**: `len(params) = len(param_tys)`.
-//! - **P2 (parameter slots are well-formed)**: every slot in `params` is
-//!   well-formed.
-//! - **P3 (parameters lie in the parameter region)**: callers write each
-//!   parameter at its slot, and the callee then zeroes everything from `P`
-//!   up, so a slot past `P` would be wiped or out of frame. Every slot in
-//!   `params` has `end <= P`.
-//! - **P4 (parameters do not overlap)**: `params` is ascending and disjoint.
-//! - **R1 (one slot per return value)**: `len(rets) = len(ret_tys)`.
-//! - **R2 (return slots are well-formed)**: every slot in `rets` is
-//!   well-formed.
-//! - **R3 (return values lie in the data region)**: every slot in `rets` has
-//!   `end <= S`.
-//! - **R4 (return values do not overlap)**: `rets` is ascending and disjoint.
+//! | Id | Property                               | Condition                             | Rationale                                                                 |
+//! |----|----------------------------------------|---------------------------------------|---------------------------------------------------------------------------|
+//! | P1 | one slot per parameter                 | `len(params) = len(param_tys)`        |                                                                           |
+//! | P2 | parameter slots are well-formed        | every slot in `params` is well-formed |                                                                           |
+//! | P3 | parameters lie in the parameter region | every slot in `params` has `end <= P` | callers write each parameter at its slot, then the callee zeroes `[P, E)` |
+//! | P4 | parameters do not overlap              | `params` is ascending and disjoint    |                                                                           |
+//! | R1 | one slot per return value              | `len(rets) = len(ret_tys)`            |                                                                           |
+//! | R2 | return slots are well-formed           | every slot in `rets` is well-formed   |                                                                           |
+//! | R3 | return values lie in the data region   | every slot in `rets` has `end <= S`   |                                                                           |
+//! | R4 | return values do not overlap           | `rets` is ascending and disjoint      |                                                                           |
 //!
 //! ## GC layouts
 //!
-//! - **G1 (base pointer slots are real slots)**: every pointer slot the GC
-//!   scans is an aligned 8-byte slot inside the frame. Every `o` in `base`
-//!   is a valid access `(o, 8, 8)`.
-//! - **G2 (base layout is sorted)**: `base` is strictly increasing.
-//! - **G3 (unwritten pointer slots start null)**: the GC scans `base` even
-//!   before the function has written anything, so a pointer slot past the
-//!   parameters, which the caller does not fill, must be zeroed on entry.
-//!   If some `o` in `base` has `o >= P`, then `F.zero_frame`.
-//! - **G4 (safe points are sorted)**: the `code_offset`s of `sps` are
-//!   strictly increasing.
-//! - **G5 (safe points sit at allocating ops)**: a safe point describes the
-//!   frame at an op that may trigger GC. Every `code_offset < N` and
-//!   `code[code_offset].is_allocating()`.
-//! - **G6 (safe-point pointer slots are real slots)**: every entry's
-//!   `heap_ptr_offsets` satisfies G1 and G2.
-//! - **G7 (safe points do not repeat the base layout)**: no offset is in both
-//!   an entry's `heap_ptr_offsets` and `base`.
+//! | Id | Property                                  | Condition                                                       | Rationale                                                                                        |
+//! |----|-------------------------------------------|-----------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+//! | G1 | base pointer slots are real slots         | every `o` in `base` is a valid access `(o, 8, 8)`               |                                                                                                  |
+//! | G2 | base layout is sorted                     | `base` is strictly increasing                                   |                                                                                                  |
+//! | G3 | unwritten pointer slots start null        | if some `o` in `base` has `o >= P`, then `F.zero_frame`         | the GC scans `base` before the function writes anything; the caller does not fill slots past `P` |
+//! | G4 | safe points are sorted                    | the `code_offset`s of `sps` are strictly increasing             |                                                                                                  |
+//! | G5 | safe points sit at allocating ops         | every `code_offset < N` and `code[code_offset].is_allocating()` |                                                                                                  |
+//! | G6 | safe-point pointer slots are real slots   | every entry's `heap_ptr_offsets` satisfies G1 and G2            |                                                                                                  |
+//! | G7 | safe points do not repeat the base layout | no offset is in both an entry's `heap_ptr_offsets` and `base`   |                                                                                                  |
 //!
 //! ## Operand accesses
 //!
-//! - **O1 (every operand access is in frame, off the metadata, and aligned)**:
-//!   for every `pc` and every `(o, kind)` reported by
-//!   `code[pc].for_each_frame_operand` (see `instruction::operands`), the
-//!   access `(o, w, a)` is valid, where `(w, a)` is
-//!   `OperandKind::width_and_align`, or `layout(ty)` for `Value(ty)`, or
-//!   `layout(const_ty(idx))` for `Constant(idx)`.
-//! - **O2 (compared values have a layout)**: for `Value(ty)`, `layout(ty)`
-//!   exists.
-//! - **O3 (comparison is on values, not references)**: for `Value(ty)`, and
-//!   for the `ty` of `ValueRefCmp` and `JumpValueRefCmp`, `ty` is not a
-//!   reference type.
-//! - **O4 (constants exist)**: for `Constant(idx)`, `const_ty(idx)` exists.
-//! - **O5 (constants have a layout)**: for `Constant(idx)`,
-//!   `layout(const_ty(idx))` exists.
+//! For every `pc` and every `(o, kind)` reported by `code[pc].for_each_frame_operand` (see `instruction::operands`):
+//!
+//! | Id | Property                                                        | Condition                                                                                                                                                        |
+//! |----|-----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+//! | O1 | every operand access is in frame, off the metadata, and aligned | the access `(o, w, a)` is valid, with `(w, a)` = `OperandKind::width_and_align`, or `layout(ty)` for `Value(ty)`, or `layout(const_ty(idx))` for `Constant(idx)` |
+//! | O2 | compared values have a layout                                   | for `Value(ty)`, `layout(ty)` exists                                                                                                                             |
+//! | O3 | comparison is on values, not references                         | for `Value(ty)`, and for the `ty` of `ValueRefCmp` and `JumpValueRefCmp`, `ty` is not a reference type                                                           |
+//! | O4 | constants exist                                                 | for `Constant(idx)`, `const_ty(idx)` exists                                                                                                                      |
+//! | O5 | constants have a layout                                         | for `Constant(idx)`, `layout(const_ty(idx))` exists                                                                                                              |
 //!
 //! ## Instruction-local invariants
 //!
-//! - **I1 (no unchecked division by zero)**: `DivU64Imm`, `ModU64Imm`:
-//!   `imm != 0`.
-//! - **I2 (no unchecked over-shift)**: `ShlU64Imm`, `ShrU64Imm`: `imm < 64`.
-//! - **I3 (bitwise ops are unsigned)**: `IntBitAnd`, `IntBitOr`, `IntBitXor`:
-//!   `rhs` is unsigned.
-//! - **I4 (shifts are unsigned)**: `IntShl`, `IntShr`: `ty` is unsigned.
-//! - **I5 (negation is signed)**: `IntNegate`: `ty` is signed.
-//! - **Z1 (copies move at least one byte)**: `size > 0` for `Move`,
-//!   `ReadRef`, `WriteRef`, `ReadRefOffset`, `WriteRefOffset`,
+//! | Id | Property                               | Condition                                                                |
+//! |----|----------------------------------------|--------------------------------------------------------------------------|
+//! | I1 | no unchecked division by zero          | `DivU64Imm`, `ModU64Imm`: `imm != 0`                                     |
+//! | I2 | no unchecked over-shift                | `ShlU64Imm`, `ShrU64Imm`: `imm < 64`                                     |
+//! | I3 | bitwise ops are unsigned               | `IntBitAnd`, `IntBitOr`, `IntBitXor`: `rhs` is unsigned                  |
+//! | I4 | shifts are unsigned                    | `IntShl`, `IntShr`: `ty` is unsigned                                     |
+//! | I5 | negation is signed                     | `IntNegate`: `ty` is signed                                              |
+//! | Z1 | copies move at least one byte          | `size > 0`, or `elem_size > 0`, for the ops listed below                 |
+//! | Z2 | heap and reference windows do not wrap | `offset + size` (or `offset + 8`) fits in `u32` for the ops listed below |
+//! | Z3 | deep-copy slot offsets do not wrap     | `DeepCopyHeapPtrs`: `base + off` fits in `u32` for every `off`           |
+//! | J1 | jumps stay in the function             | every jump `target < N`                                                  |
+//! | D1 | multiple destinations do not overlap   | an op writing more than one frame destination writes disjoint ranges     |
+//! | B1 | borrowed locals are in the data region | `SlotBorrow`: `local < S`                                                |
+//!
+//! - Z1 `size`: `Move`, `ReadRef`, `WriteRef`, `ReadRefOffset`, `WriteRefOffset`,
 //!   `HeapReadOffset`, `HeapWriteOffset`, `HeapMoveFrom`, `HeapMoveTo`,
-//!   `EnumReadVariantFieldByTag`, `EnumWriteVariantFieldByTag`;
-//!   `elem_size > 0` for `VecPushBack`, `VecPopBack`, `VecLoadElem`,
-//!   `VecStoreElem`, `VecSwap`, `VecBorrow`, `VecPack`, `VecUnpack`.
-//! - **Z2 (heap and reference windows do not wrap)**: `offset + size` fits in
-//!   `u32` for `HeapMoveFrom`, `HeapMoveTo`, `HeapReadOffset`,
-//!   `HeapWriteOffset`, `ReadRefOffset`, `WriteRefOffset`; `offset + 8` fits
-//!   for `HeapMoveFrom8`, `HeapMoveTo8`, `HeapMoveToImm8`; for
-//!   `EnumReadVariantFieldByTag` and `EnumWriteVariantFieldByTag`, every
-//!   `Some(offset)` in the table satisfies `offset + size` fits.
-//! - **Z3 (deep-copy slot offsets do not wrap)**: `DeepCopyHeapPtrs`:
-//!   `base + off` fits in `u32` for every `off`.
-//! - **J1 (jumps stay in the function)**: every jump `target < N`.
-//! - **D1 (multiple destinations do not overlap)**: an op that writes more
-//!   than one frame destination writes them to disjoint ranges. Today only
-//!   `VecUnpack`, with destinations `[d, d + elem_size)` for each `d` in
-//!   `dsts`.
-//! - **B1 (borrowed locals are in the data region)**: `SlotBorrow`:
-//!   `local < S`.
+//!   `EnumReadVariantFieldByTag`, `EnumWriteVariantFieldByTag`. Z1 `elem_size`:
+//!   `VecPushBack`, `VecPopBack`, `VecLoadElem`, `VecStoreElem`, `VecSwap`,
+//!   `VecBorrow`, `VecPack`, `VecUnpack`.
+//! - Z2 `offset + size`: `HeapMoveFrom`, `HeapMoveTo`, `HeapReadOffset`,
+//!   `HeapWriteOffset`, `ReadRefOffset`, `WriteRefOffset`, and every `Some(offset)`
+//!   in the tables of `EnumReadVariantFieldByTag` and `EnumWriteVariantFieldByTag`.
+//!   Z2 `offset + 8`: `HeapMoveFrom8`, `HeapMoveTo8`, `HeapMoveToImm8`.
+//! - D1: today only `VecUnpack`, with destinations `[d, d + elem_size)` for each
+//!   `d` in `dsts`.
 //!
 //! ## Descriptors
 //!
-//! - **K1 (HeapNew allocates a struct or enum)**: `desc(descriptor_id)` exists
-//!   and is `Struct` or `Enum`.
-//! - **K2 (EnumNew names a real variant)**: `desc(descriptor_id)` exists, is
-//!   `Enum`, and `variant < len(variant_pointer_offsets)`.
-//! - **K3 (vector descriptors match the element stride)**: the GC strides a
-//!   vector by the descriptor's element size, so it must equal the op's.
-//!   `VecPushBack`, `VecPack`: `desc(descriptor_id)` exists and is `Trivial`,
-//!   or `Vector` with non-empty `elem_pointer_offsets` and `elem_size` equal
-//!   to the op's.
+//! | Id | Property                                    | Condition                                                                                                                                                    | Rationale                                                |
+//! |----|---------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+//! | K1 | HeapNew allocates a struct or enum          | `desc(descriptor_id)` exists and is `Struct` or `Enum`                                                                                                       |                                                          |
+//! | K2 | EnumNew names a real variant                | `desc(descriptor_id)` exists, is `Enum`, and `variant < len(variant_pointer_offsets)`                                                                        |                                                          |
+//! | K3 | vector descriptors match the element stride | `VecPushBack`, `VecPack`: `desc(descriptor_id)` exists and is `Trivial`, or `Vector` with non-empty `elem_pointer_offsets` and `elem_size` equal to the op's | the GC strides a vector by the descriptor's element size |
 //!
 //! ## Calls
 //!
-//! For `CallNative` with ABI `abi`:
+//! For `CallNative` with ABI `abi`, and `CallDirect` to `callee`:
 //!
-//! - **C1 (native frame fits)**: `S + M + abi.total_frame_size <= E`.
-//! - **C2 (native pointer slots are real argument slots)**: the GC reads them
-//!   with aligned `read_ptr` at the native's fp. Every `o` in
-//!   `abi.heap_ptr_offsets` has `o + 8 <= abi.total_frame_size`,
-//!   `o mod 8 = 0`, and lies inside an argument slot of `abi`.
-//! - **C3 (native descriptors exist)**: every `id` in
-//!   `abi.required_descriptors` has `desc(id)`.
-//!
-//! For `CallDirect` to `callee`:
-//!
-//! - **C4 (callee fits the callee region)**: the caller passes arguments and
-//!   reads results through `Callee`. `callee.P <= E - (S + M)` and every slot
-//!   in `callee.rets` has `end <= E - (S + M)`.
+//! | Id | Property                                     | Condition                                                                                                                         | Rationale                                                    |
+//! |----|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
+//! | C1 | native frame fits                            | `S + M + abi.total_frame_size <= E`                                                                                               |                                                              |
+//! | C2 | native pointer slots are real argument slots | every `o` in `abi.heap_ptr_offsets` has `o + 8 <= abi.total_frame_size`, `o mod 8 = 0`, and lies inside an argument slot of `abi` | the GC reads them with aligned `read_ptr` at the native's fp |
+//! | C3 | native descriptors exist                     | every `id` in `abi.required_descriptors` has `desc(id)`                                                                           |                                                              |
+//! | C4 | callee fits the callee region                | `callee.P <= E - (S + M)` and every slot in `callee.rets` has `end <= E - (S + M)`                                                | arguments and results pass through `Callee`                  |
 //!
 //! ## Closures
 //!
-//! For `PackClosure` with `mask`, `cdd` (`captured_data_descriptor_id`),
-//! `values_size`, `captured`:
+//! For `PackClosure` with `mask`, `cdd` (`captured_data_descriptor_id`), `values_size`, `captured`, and for `CallClosure` with `provided_args`:
 //!
-//! - **L1 (captured data exists iff something is captured)**: `cdd` is
-//!   `Some` iff `captured` is non-empty.
-//! - **L2 (captured-data descriptor is the right kind)**: if `cdd =
-//!   Some(id)`, `desc(id)` exists and is `Trivial` or `CapturedData`.
-//! - **L3 (captured-data pointers lie inside the values)**: these
-//!   descriptors are shared across closures of different sizes, so the
-//!   descriptor's own bound does not apply. If `desc(id)` is
-//!   `CapturedData { pointer_offsets }`, every `off` has
-//!   `off + 8 <= values_size`.
-//! - **L4 (captured slots are well-formed)**: their alignment drives
-//!   `align_up`, which is undefined for zero or non-power-of-two. Every slot
-//!   in `captured` is well-formed.
-//! - **L5 (captured count matches the mask)**: `len(captured) =
-//!   popcount(mask)`.
-//! - **L6 (mask fits the callee)**: if `func_ref = Resolved(callee)`:
-//!   `len(callee.params) <= 64` and `mask >> len(callee.params) = 0`.
-//! - **L7 (captured values match the callee's parameters)**: a captured value
-//!   is written with its own `(w, a)` and read back at the parameter's, so
-//!   both must agree. If `func_ref = Resolved(callee)`: for the `k`-th set
-//!   bit `i` of `mask`, `captured[k].w = callee.params[i].w` and
-//!   `captured[k].a = callee.params[i].a`.
-//! - **L8 (values size matches the captured layout)**: if every slot in
-//!   `captured` has a valid `a`, `values_size =
-//!   captured_values_size(captured)`.
-//!
-//! For `CallClosure`:
-//!
-//! - **L9 (provided arguments are well-formed)**: every slot in
-//!   `provided_args` is well-formed.
+//! | Id | Property                                       | Condition                                                                                                                                             | Rationale                                                                          |
+//! |----|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+//! | L1 | captured data exists iff something is captured | `cdd` is `Some` iff `captured` is non-empty                                                                                                           |                                                                                    |
+//! | L2 | captured-data descriptor is the right kind     | if `cdd = Some(id)`, `desc(id)` exists and is `Trivial` or `CapturedData`                                                                             |                                                                                    |
+//! | L3 | captured-data pointers lie inside the values   | if `desc(id)` is `CapturedData { pointer_offsets }`, every `off` has `off + 8 <= values_size`                                                         | these descriptors are shared across closures of different sizes                    |
+//! | L4 | captured slots are well-formed                 | every slot in `captured` is well-formed                                                                                                               | its alignment drives `align_up`, undefined for 0 or non-powers of two              |
+//! | L5 | captured count matches the mask                | `len(captured) = popcount(mask)`                                                                                                                      |                                                                                    |
+//! | L6 | mask fits the callee                           | if `func_ref = Resolved(callee)`: `len(callee.params) <= 64` and `mask >> len(callee.params) = 0`                                                     |                                                                                    |
+//! | L7 | captured values match the callee's parameters  | if `func_ref = Resolved(callee)`: for the `k`-th set bit `i` of `mask`, `captured[k].w = callee.params[i].w` and `captured[k].a = callee.params[i].a` | a captured value is written with its own `(w, a)` and read back at the parameter's |
+//! | L8 | values size matches the captured layout        | if every slot in `captured` has a valid `a`, `values_size = captured_values_size(captured)`                                                           |                                                                                    |
+//! | L9 | provided arguments are well-formed             | every slot in `provided_args` is well-formed                                                                                                          |                                                                                    |
 //!
 //! With `func_ref = Unresolved(_)`, L6 and L7 are checked at call time against
 //! the resolved callee.
