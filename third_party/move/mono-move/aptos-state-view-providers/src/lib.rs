@@ -30,7 +30,7 @@ use mono_move_core::{
     OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena};
+use mono_move_runtime::{deserialize_into, unsupported_stored_value, Heap, SharedArena};
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
@@ -265,8 +265,13 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
                 .ok_or_else(|| internal("resource arena is full".to_string()))?;
             // SAFETY: `obj` is a freshly reserved object sized for the value's
             // layout; `deserialize_into` writes the flat value there.
-            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }
-                .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
+            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }.map_err(
+                |e| {
+                    unsupported_stored_value(&e).unwrap_or_else(|| {
+                        internal(format!("stored value failed to deserialize: {e}"))
+                    })
+                },
+            )?;
             Ok(obj)
         })?;
         let read = StorageRead::ExternalHeap {

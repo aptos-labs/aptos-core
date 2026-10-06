@@ -121,12 +121,17 @@ pub fn nominal_tag(ty: InternedType) -> anyhow::Result<StructTag> {
 pub enum ResourceProviderError {
     #[error("resource provider invariant violation: {0}")]
     InvariantViolation(String),
+    /// A stored value uses a feature MonoMove does not support yet.
+    #[error("stored value is unsupported: {0}")]
+    Unsupported(&'static str),
 }
 
 impl IntoExecutionError for ResourceProviderError {
     fn kind(&self) -> ExecutionErrorKind {
         match self {
-            ResourceProviderError::InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            // As `RuntimeError::Unsupported`.
+            ResourceProviderError::InvariantViolation(_)
+            | ResourceProviderError::Unsupported(_) => ExecutionErrorKind::InvariantViolation,
         }
     }
 }

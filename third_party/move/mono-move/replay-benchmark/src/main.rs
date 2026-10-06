@@ -10,68 +10,18 @@
 //!   execution time (primary) and outputs (strictly).
 
 use anyhow::Result;
-use aptos_rest_client::AptosBaseUrl;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use mono_move_replay_benchmark::{
     capture, data, report::TransactionReport, timing::TimingConfig, v1, v2, BenchmarkRun,
+};
+use mono_move_replay_common::{
+    cli::{Network, VMSelection},
+    panic_message,
 };
 use std::{
     panic::{catch_unwind, AssertUnwindSafe},
     path::PathBuf,
-    str::FromStr,
 };
-use url::Url;
-
-/// The chain to capture from. Mirrors [`AptosBaseUrl`]: a named network or a custom REST endpoint.
-#[derive(Clone)]
-enum Network {
-    Mainnet,
-    Testnet,
-    Devnet,
-    Custom(Url),
-}
-
-impl FromStr for Network {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, String> {
-        Ok(match s {
-            "mainnet" => Network::Mainnet,
-            "testnet" => Network::Testnet,
-            "devnet" => Network::Devnet,
-            url => Network::Custom(Url::parse(url).map_err(|e| e.to_string())?),
-        })
-    }
-}
-
-impl From<Network> for AptosBaseUrl {
-    fn from(network: Network) -> Self {
-        match network {
-            Network::Mainnet => AptosBaseUrl::Mainnet,
-            Network::Testnet => AptosBaseUrl::Testnet,
-            Network::Devnet => AptosBaseUrl::Devnet,
-            Network::Custom(url) => AptosBaseUrl::Custom(url),
-        }
-    }
-}
-
-/// Which VM(s) to run. A single VM lets you profile it without the other in the same process.
-#[derive(Clone, Copy, ValueEnum)]
-enum VMSelection {
-    V1,
-    V2,
-    Both,
-}
-
-impl VMSelection {
-    fn runs_v1(self) -> bool {
-        matches!(self, VMSelection::V1 | VMSelection::Both)
-    }
-
-    fn runs_v2(self) -> bool {
-        matches!(self, VMSelection::V2 | VMSelection::Both)
-    }
-}
 
 #[derive(Parser)]
 #[command(
@@ -212,15 +162,5 @@ fn run_vm(f: impl FnOnce() -> Result<BenchmarkRun>) -> Result<BenchmarkRun, Stri
         Ok(Ok(run)) => Ok(run),
         Ok(Err(err)) => Err(format!("{:#}", err)),
         Err(panic) => Err(format!("panicked: {}", panic_message(&panic))),
-    }
-}
-
-fn panic_message(panic: &Box<dyn std::any::Any + Send>) -> String {
-    if let Some(s) = panic.downcast_ref::<&str>() {
-        (*s).to_string()
-    } else if let Some(s) = panic.downcast_ref::<String>() {
-        s.clone()
-    } else {
-        "unknown panic".to_string()
     }
 }
