@@ -24,8 +24,8 @@ pub use memory::{
     write_u64, MemoryRegion,
 };
 pub use mono_move_core::{
-    assert_verified, verify_function, verify_program, ObjectDescriptor, ObjectDescriptorTable,
-    VerificationError,
+    assert_well_formed, check_well_formedness, ConstantPoolProvider, ObjectDescriptor,
+    ObjectDescriptorTable, WellFormednessError,
 };
 pub use native_context::{
     ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,

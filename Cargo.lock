@@ -13014,6 +13014,7 @@ dependencies = [
  "bytes",
  "fxhash",
  "mono-move-alloc",
+ "mono-move-spec",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -13188,6 +13189,23 @@ dependencies = [
  "serde",
  "shared-dsa",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mono-move-spec"
+version = "0.1.0"
+dependencies = [
+ "mono-move-spec-macro",
+]
+
+[[package]]
+name = "mono-move-spec-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "regex",
+ "syn 2.0.87",
 ]
 
 [[package]]
