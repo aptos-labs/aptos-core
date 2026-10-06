@@ -581,7 +581,8 @@ private def checkContract (registry : ProfileRegistry) (unit : RawUnit) (ns : Ra
 /-- The parameter frames of a function: each of a function-typed parameter,
 at most one per parameter, its formals locals beyond the parameters, one per
 argument of the parameter's function type, and `modifiesAll` without
-targets or formals. A structure or specification function declares none. -/
+targets or formals. Structures use their fields in place of parameters;
+specification functions declare no frames. -/
 private def checkParameterFrames (unit : RawUnit) (ns : RawNamespace)
     (parameters : Array Parameter) (locals : Array LocalDecl)
     (frames : Array ParameterFrame) : Array Diagnostic :=
@@ -969,7 +970,9 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
         ds ++ checkProfileValue registry unit property ProfileSchema.checkProperty) #[] ++
       checkLocals unit.tables struct.locals ++
       checkContract registry unit ns struct.contract structBinders ++
-      checkParameterFrames unit ns #[] #[] struct.contract.parameterFrames ++
+      checkParameterFrames unit ns
+        (struct.fields.map fun field => { name := "", typeUse := field.type })
+        struct.locals struct.contract.parameterFrames ++
       checkAttributes registry unit unit.tables struct.attributes
     let ds := if !struct.fields.isEmpty && !struct.variants.isEmpty then
         ds.push <| .at "LIR-NOMINAL-SHAPE"

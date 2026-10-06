@@ -1,2 +1,7 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/aborts_if_at_state_label.move:4:1: error: state label `S1` is not bound in this clause; a label a state-change predicate or an invocation defines is not carried yet
+tests/sources/functional/state_labels/aborts_if_at_state_label.move:37:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/state_labels/aborts_if_at_state_label.move:37:5: error: leaner verification failed: the automatic verification of `caller` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify caller by …` in `tests/sources/functional/state_labels/aborts_if_at_state_label.proof.lean` (`verify caller by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

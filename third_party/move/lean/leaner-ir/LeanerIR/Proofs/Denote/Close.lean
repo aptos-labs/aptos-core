@@ -889,7 +889,13 @@ elab "leaner_denote_clear_computations" : tactic => do
       if decl.isImplementationDetail then continue
       let ty ← instantiateMVars decl.type
       let constants := ty.getUsedConstants
-      if constants.contains ``LeanerIR.Proofs.wp || constants.contains ``LeanerIR.Proofs.Spec ||
+      -- Saved continuations have a plain function type; their bodies carry
+      -- the computation. Leaving unused ones here makes simp unfold the
+      -- rest of the program again on an already extracted leaf.
+      let savedComputation := decl.value?.any fun value =>
+        let constants := value.getUsedConstants
+        constants.contains ``LeanerIR.Proofs.wp || constants.contains ``LeanerIR.Proofs.Spec
+      if savedComputation || constants.contains ``LeanerIR.Proofs.wp || constants.contains ``LeanerIR.Proofs.Spec ||
           constants.contains ``LeanerIR.Validation.prepareExecution ||
           constants.contains ``LeanerIR.Validation.ExecutableUnit ||
           constants.contains ``LeanerIR.Validation.SemanticsRegistry then
@@ -948,6 +954,64 @@ elab "leaner_denote_budgeted " step:tactic : tactic => do
     fun failure => do
       if failure.isMaxHeartbeat then throwError "the attempt exceeded its heartbeat budget"
       throw failure
+
+/-- Facts the arithmetic fast path can use without inspecting stored-state
+invariants, closure contracts, or equalities between encoded values. -/
+private partial def arithmeticProposition (type : Lean.Expr) : Bool :=
+  if type.isAppOfArity ``Eq 3 then
+    (type.getArg! 0).isConstOf ``Int || (type.getArg! 0).isConstOf ``Nat
+  else if type.isAppOfArity ``LE.le 4 || type.isAppOfArity ``LT.lt 4 then
+    (type.getArg! 0).isConstOf ``Int || (type.getArg! 0).isConstOf ``Nat
+  else if type.isAppOfArity ``Not 1 then arithmeticProposition (type.getArg! 0)
+  else if type.isAppOfArity ``And 2 || type.isAppOfArity ``Or 2 then
+    arithmeticProposition (type.getArg! 0) && arithmeticProposition (type.getArg! 1)
+  else type.isConstOf ``False
+
+/-- Try only arithmetic hypotheses first. Even checked integer bounds become
+expensive when omega preprocesses unrelated resource and function facts.
+This speculative attempt is small; the caller retains the full-context solver
+when its proof needs facts outside this syntactic subset. -/
+elab "leaner_denote_arithmetic_only" : tactic => do
+  let context ← readThe Core.Context
+  let now ← IO.getNumHeartbeats
+  let remaining := if context.maxHeartbeats == 0 then 500000
+    else context.initHeartbeats + context.maxHeartbeats - now
+  let budget := max 1 (min remaining 500000)
+  tryCatchRuntimeEx
+    (withTheReader Core.Context
+      (fun context => { context with initHeartbeats := now, maxHeartbeats := budget }) do
+      let original ← getMainGoal
+      let some goal ← original.falseOrByContra | replaceMainGoal []; return
+      goal.withContext do
+        let facts ← (← getLCtx).foldlM (init := []) fun facts decl => do
+          if decl.isImplementationDetail then return facts
+          let type ← instantiateMVars decl.type
+          if arithmeticProposition type then return decl.toExpr :: facts else return facts
+        Lean.Elab.Tactic.Omega.omega facts goal {}
+      replaceMainGoal [])
+    fun failure => do
+      if failure.isMaxHeartbeat then throwError "the arithmetic fast path exceeded its budget"
+      throw failure
+
+/-- Filtering is useful only where memory-dependent facts would burden the
+arithmetic solver. Pure arithmetic keeps its original proof construction,
+whose terms are smaller than the speculative refutation's on simple bounds. -/
+elab "leaner_denote_has_memory_facts" : tactic => do
+  let goal ← getMainGoal
+  let applies ← goal.withContext do
+    let mut memories : FVarIdSet := {}
+    for decl in ← getLCtx do
+      if decl.type.isAppOfArity ``LeanerIR.Proofs.Denote.Memory 1 then
+        memories := memories.insert decl.fvarId
+    if memories.isEmpty then return false
+    (← getLCtx).anyM fun decl => do
+      if decl.isImplementationDetail || decl.isLet then return false
+      unless ← isProp decl.type do return false
+      return (decl.type.find? fun e => e.isFVar && memories.contains e.fvarId!).isSome
+  unless applies do throwError "the leaf has no memory-dependent hypothesis"
+
+macro "leaner_denote_omega" : tactic => `(tactic|
+  first | (leaner_denote_has_memory_facts; leaner_denote_arithmetic_only) | omega)
 
 /-- Abstract the rank tables of the structural order (`valueRanks` of a
 literal) to variables: no lemma reads inside one, and as literals they make
@@ -2576,6 +2640,29 @@ elab "leaner_denote_map_positions" : tactic => do
   -- The facts the positions are decided by, out of their obligations.
   evalTactic (← `(tactic| try simp only [LeanerIR.Proofs.Obligation_iff] at *))
   if (← getGoals).isEmpty then return
+  -- A constructor equality can make these reads computational. Use only
+  -- literal construction equations here, before generating rank/order facts;
+  -- those facts are unnecessary (and costly) for a map whose entries are known.
+  let concrete ← (← getMainGoal).withContext do
+    let mut equations := #[]
+    for fvarId in ← (← getMainGoal).getNondepPropHyps do
+      let type ← instantiateMVars (← fvarId.getType)
+      let some (_, _, rhs) := type.eq? | continue
+      if rhs.isAppOfArity ``LeanerIR.Maps.Layout.build 2 &&
+          (rhs.getArg! 1).listLit?.isSome then
+        equations := equations.push fvarId
+    return equations
+  unless concrete.isEmpty do
+    let goal ← getMainGoal
+    let hypotheses ← (← goal.getNondepPropHyps).filterM fun fvarId => do
+      let type ← instantiateMVars (← fvarId.getType)
+      return !type.isForall && (type.find? fun e =>
+        e.isAppOf ``LeanerIR.Maps.keyAt || e.isAppOf ``LeanerIR.Maps.rank ||
+        e.isAppOf ``LeanerIR.Maps.valueAt || e.isAppOf ``LeanerIR.Maps.size ||
+        e.isAppOf ``LeanerIR.Maps.remove).isSome
+    simpMainAt (← `(tactic| simp only [lir_denote_norm, Prod.fst, Prod.snd]))
+      concrete hypotheses true
+    if (← getGoals).isEmpty then return
   let mut goal ← getMainGoal
   -- A fact the context states is not asserted again.
   let mut stated : Std.HashSet Lean.Expr ← goal.withContext do
@@ -3472,7 +3559,7 @@ macro_rules
      first
      | done
      | leaner_denote_assumption
-     | (leaner_denote_bounds; omega)
+     | (leaner_denote_bounds; leaner_denote_omega)
      | leaner_denote_decide
      | leaner_denote_witness
      -- A conjunction, such as a clause with an abort code, conjunct by
@@ -4416,33 +4503,45 @@ results have carrier types) replaced by what it names, earliest first, as an
 authored proof states it. -/
 elab "leaner_denote_unname" : tactic => do
   let mut goal ← getMainGoal
+  let mut visited : Array FVarId := #[]
   repeat
     let named ← goal.withContext do
       (← getLCtx).findDeclM? fun decl => do
+        if visited.contains decl.fvarId then return none
         return (← namedDefinition? decl).map fun (result, _) => (decl.fvarId, result)
     let some (equation, result) := named | break
+    visited := visited.push equation
     let targets ← goal.withContext do
       return (← goal.getNondepPropHyps).filter (· != equation)
     setGoals [goal]
     match ← simpAt goal (← `(tactic| simp only [])) #[equation] targets true with
     | none => replaceMainGoal []; return
-    | some next => goal ← (← next.clear equation).tryClear result
+    | some next =>
+        -- simpAt rewrites propositions and the goal, but a saved continuation
+        -- can still mention the name in its local definition. Keep the equation
+        -- until that use disappears; otherwise later unfolding loses the value.
+        let used ← next.withContext do
+          if (← next.getType).containsFVar result then return true
+          return (← getLCtx).any fun decl =>
+            decl.fvarId != equation && decl.fvarId != result &&
+              (decl.type.containsFVar result || decl.value?.any (·.containsFVar result))
+        goal ← if used then pure next else (← next.clear equation).tryClear result
   replaceMainGoal [goal]
 
-/-- The deciders of a leaf an authored proof may take over: the cheap ones,
-and the goal alone in normal form rewritten by the hypotheses, which is
-cheap where the context is large and decides a leaf whose facts are
-already in the context. -/
-macro "leaner_denote_decide_residual" : tactic => `(tactic|
+/-- The deciders of a leaf an authored proof may take over. Bound the attempt:
+even omega can branch heavily on the conditional facts of a prepared map
+leaf. Automatic search must leave budget for the authored proof. -/
+macro "leaner_denote_decide_residual" : tactic => `(tactic| leaner_denote_budgeted (
   first
   | done
-  | omega
-  | leaner_denote_decide_cheap
-  | leaner_denote_instance
-  | leaner_denote_range_instance
-  | (leaner_denote_simp_by_context
-     first | done | (leaner_denote_bounds; omega))
-  | leaner_denote_trivial)
+  | leaner_denote_timed "residual omega" omega
+  | leaner_denote_timed "residual cheap" leaner_denote_decide_cheap
+  | leaner_denote_timed "residual instance" leaner_denote_instance
+  | leaner_denote_timed "residual range" leaner_denote_range_instance
+  | leaner_denote_timed "residual context" (
+      leaner_denote_simp_by_context
+      first | done | (leaner_denote_bounds; omega))
+  | leaner_denote_trivial))
 
 macro_rules
   | `(tactic| leaner_denote_decide_by_context) => `(tactic|
@@ -4634,11 +4733,17 @@ elab "leaner_denote_memory_invariants" : tactic => do
         | throwError "the write law did not leave its two obligations"
       return (← establish holds fuel) ++ [stored]
   replaceMainGoal (← establish (← getMainGoal) 256)
+  -- Select the invariant of each written resource before running the leaf
+  -- pipeline over the surrounding context. Constructor comparisons in the
+  -- unit's dispatch table are computations, not new proof obligations.
+  evalTactic (← `(tactic| all_goals (try simp only
+    [lir_denote, lir_denote_norm, lir_denote_eval, Prod.fst, Prod.snd])))
 
 /-- The data invariant of each stored value the leaf reads, from the stored
 invariants of the memory it reads (`MemoryInvariants.read`). -/
 elab "leaner_denote_stored_reads" : tactic => do
   let goal ← getMainGoal
+  let (ctx, simprocs) ← normalization
   let facts ← goal.withContext do
     let mut facts : Array Lean.Expr := #[]
     for declaration in ← getLCtx do
@@ -4648,8 +4753,12 @@ elab "leaner_denote_stored_reads" : tactic => do
       let memory := read.appFn!.appFn!
       unless (← whnfR (← inferType memory)).isAppOfArity ``LeanerIR.Proofs.Denote.Memory 1 do continue
       let some holds ← storedInvariantsProof? memory | continue
-      facts := facts.push
-        (← mkAppM ``LeanerIR.Proofs.Denote.MemoryInvariants.read #[holds, declaration.toExpr])
+      let fact ← mkAppM ``LeanerIR.Proofs.Denote.MemoryInvariants.read #[holds, declaration.toExpr]
+      let (result, _) ← Simp.main (← inferType fact) ctx
+        (methods := Simp.mkDefaultMethodsCore simprocs)
+      facts := facts.push (← match result.proof? with
+        | some equality => mkEqMP equality fact
+        | none => pure fact)
     pure facts
   if facts.isEmpty then throwError "the leaf reads no stored value with stored invariants"
   replaceMainGoal [← assertFacts goal `stored facts]
@@ -4696,6 +4805,25 @@ macro_rules
            leaner_denote_timed "written" leaner_denote_decide_written)
         | leaner_denote_timed "range pipeline" leaner_denote_pipeline)))
 
+/-- Stored-field invariants and an invocation can spell the same unknown
+closure through its native encoding and its raw value, respectively. Align
+those facts only within this closing attempt: known-closure dispatch and
+authored proofs still need the unreduced encoding elsewhere. -/
+elab "leaner_denote_function_facts" : tactic => do
+  let goal ← getMainGoal
+  let applies ← goal.withContext do
+    (← getLCtx).anyM fun decl => do
+      if decl.isImplementationDetail then return false
+      let type ← instantiateMVars decl.type
+      return (type.find? (·.isConstOf ``NTy.encode)).isSome &&
+        (type.find? (·.isConstOf ``LeanerIR.Proofs.EnsuresOf)).isSome
+  unless applies do throwError "the leaf has no encoded function variable"
+  evalTactic (← `(tactic| leaner_denote_budgeted (
+    leaner_denote_prepare
+    all_goals simp only [NTy.encode_function] at *
+    all_goals leaner_denote_grind
+    done)))
+
 /-- Decide a leaf in the normal form an authored proof receives: the
 normalization is one pass over the context, where the saturation of the
 pipeline rewrites the hypotheses with each other for rounds. -/
@@ -4735,6 +4863,29 @@ macro "leaner_denote_leaf_cheap" : tactic => `(tactic|
 /-- Decide one leaf. -/
 syntax "leaner_denote_leaf" : tactic
 
+/-- An opaque call can describe a stored value through its codec and a
+non-aborting memory read. Expose the present value before reducing the codec.
+Keep this closing attempt bounded: unrelated leaves and failed attempts retain
+their original context. -/
+elab "leaner_denote_decoded_reads" : tactic => do
+  let goal ← getMainGoal
+  let applies ← goal.withContext do
+    let mentionsDecode (e : Lean.Expr) :=
+      (e.find? (·.isConstOf ``LeanerIR.Proofs.Codec.decode?)).isSome
+    if mentionsDecode (← instantiateMVars (← goal.getType)) then return true
+    (← getLCtx).anyM fun decl => do
+      if decl.isImplementationDetail then return false
+      return mentionsDecode (← instantiateMVars decl.type)
+  unless applies do throwError "the leaf has no decoded memory read"
+  evalTactic (← `(tactic| leaner_denote_budgeted (
+    try leaner_denote_unname
+    leaner_denote_prepare
+    all_goals simp only [not_or, Option.ne_none_iff_exists] at *
+    all_goals leaner_denote_split_hypotheses
+    all_goals simp [lir_denote_norm] at *
+    all_goals grind
+    done)))
+
 /-- Decide one leaf whose recursive specification functions are unfolded. -/
 syntax "leaner_denote_leaf_unfolded" : tactic
 
@@ -4758,6 +4909,8 @@ macro_rules
           all_goals leaner_denote_leaf)
        -- A goal a hypothesis states, as the unfolding gives it.
        | leaner_denote_timed "assumption" leaner_denote_assumption
+       | leaner_denote_timed "decoded reads" leaner_denote_decoded_reads
+       | leaner_denote_timed "function facts" leaner_denote_function_facts
        -- Atomic hypotheses first: each is rewritten, used, and dropped on
        -- its own. A goal whose binders a loop step introduced is an
        -- instance of a quantified hypothesis as much as a quantified one.
@@ -5058,6 +5211,27 @@ dsimproc ↓ [lir_denote, lir_denote_norm] codecOuterFamily
   let some (outer, substituted) ← outerSpelling? family τ | return .continue
   return .visit (mkApp2 e.getAppFn outer substituted)
 
+/-- Opaque map encodings exposed after preparation use the caller's family.
+Restrict this to the enumeration-backed entry-vector layout: control-flow
+variants retain the carrier spelling their constructor rules match. -/
+dsimproc ↓ [lir_denote, lir_denote_norm] encodeOuterFamily
+    (@LeanerIR.Proofs.Denote.NTy.encode ?skolems _ _) := fun e => do
+  let_expr LeanerIR.Proofs.Denote.NTy.encode family τ value := e | return .continue
+  unless value.isFVar do return .continue
+  let type := τ
+  unless type.isAppOfArity ``LeanerIR.Proofs.Denote.NTy.enum 5 do return .continue
+  let rows := type.getArg! 3
+  unless rows.isAppOfArity ``LeanerIR.Proofs.Denote.NRows.cons 2 &&
+      (rows.getArg! 1).isConstOf ``LeanerIR.Proofs.Denote.NRows.nil do return .continue
+  let fields := rows.getArg! 0
+  unless fields.isAppOfArity ``LeanerIR.Proofs.Denote.NRow.cons 2 &&
+      (fields.getArg! 1).isConstOf ``LeanerIR.Proofs.Denote.NRow.nil do return .continue
+  let vector := fields.getArg! 0
+  unless vector.isAppOfArity ``LeanerIR.Proofs.Denote.NTy.vector 1 &&
+      vector.appArg!.isAppOfArity ``LeanerIR.Proofs.Denote.NTy.struct 3 do return .continue
+  let some (outer, substituted) ← outerSpelling? family τ | return .continue
+  return .visit (mkApp3 e.getAppFn outer substituted value)
+
 /-- A term with every family-dependent spelling of a spelled type at an
 induced family canonical: the carrier, row, codec, and encoding of a type at
 a family a call's type arguments induce are, by definition, those of its
@@ -5091,11 +5265,16 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
     let rebuilt : Option Lean.Expr := do
       let family ← args[0]?
       let (outer, row) ← induced family
-      if head == ``LeanerIR.Proofs.Denote.NTy.carrier || head == ``LeanerIR.Proofs.Denote.NTy.codec then
+      -- Encodings must use the same family as their values as well: a concrete
+      -- enum field returned by a generic callee otherwise keeps an induced
+      -- family that prevents the row-encoding simp rules from matching.
+      if head == ``LeanerIR.Proofs.Denote.NTy.carrier || head == ``LeanerIR.Proofs.Denote.NTy.codec ||
+          head == ``LeanerIR.Proofs.Denote.NTy.encode then
         let τ ← args[1]?
         let τ' ← substituteNTy row τ
         pure (mkAppN t.getAppFn (#[outer, τ'] ++ args.extract 2 args.size))
-      else if head == ``LeanerIR.Proofs.Denote.HList || head == ``LeanerIR.Proofs.Denote.rowCodec then
+      else if head == ``LeanerIR.Proofs.Denote.HList || head == ``LeanerIR.Proofs.Denote.rowCodec ||
+          head == ``LeanerIR.Proofs.Denote.HList.encode then
         let fields ← args[1]?
         let fields' ← substituteNRow row fields
         pure (mkAppN t.getAppFn (#[outer, fields'] ++ args.extract 2 args.size))
@@ -5350,9 +5529,29 @@ the weakest-precondition rules, and the propositional normal forms a leaf
 is decided in. -/
 attribute [lir_denote_norm] LeanerIR.Proofs.Denote.NTy.encode_enum_inl
   LeanerIR.Proofs.Denote.NTy.encode_enum_inr LeanerIR.Proofs.Denote.variantName_inl
-  LeanerIR.Proofs.Denote.variantName_inr LeanerIR.Proofs.Denote.HList.encode_cons
+  LeanerIR.Proofs.Denote.variantName_inr LeanerIR.Proofs.Denote.variantPayload_inl
+  LeanerIR.Proofs.Denote.variantPayload_inr LeanerIR.Proofs.Denote.HList.encode_cons
   LeanerIR.Proofs.Denote.HList.encode_nil LeanerIR.Proofs.Denote.NTy.encode_int
+/-- Comparing a constructed closure with a specification literal compares its
+runtime captures. Keep the encoding intact elsewhere for invocation dispatch. -/
+theorem typedClosure_eq_literal {unit : Validation.ValidatedUnit} [Skolems unit]
+    (parameters : NRow) (shared : List Bool) (results : NRow)
+    (handle : FunctionHandle) (mask : Nat) (inst : Array (TypeId × TypeId))
+    {captured : NRow} (captures : HList captured)
+    (typed : Carriers.closureTyped parameters shared results (closureOf handle mask inst captures))
+    (other : FunctionHandle) (otherMask : Nat) (otherInst : Array (TypeId × TypeId))
+    (otherCaptures : Array RuntimeValue) :
+    ((NTy.function parameters shared results).encode
+        (typedClosure parameters shared results (closureOf handle mask inst captures) typed) =
+      RuntimeValue.closure other otherMask otherInst otherCaptures) ↔
+    (RuntimeValue.closure handle mask inst (HList.encode captures).toArray =
+      RuntimeValue.closure other otherMask otherInst otherCaptures) := Iff.rfl
+
+attribute [lir_denote_norm] typedClosure_eq_literal RuntimeValue.closure.injEq
 attribute [lir_denote_norm] LeanerIR.Proofs.wp_choose LeanerIR.Proofs.wp_assume
+attribute [lir_denote_norm] LeanerIR.Proofs.encodedKeepsMemory_encode
+  LeanerIR.Proofs.encodedKeepsMemory_function
+  LeanerIR.Proofs.encodedFramed_encode LeanerIR.Proofs.encodedFramed_function
 attribute [lir_denote_norm] LeanerIR.Proofs.Denote.typedClosure_val
 -- A clause's Boolean literal, decided, is the runtime's; a Boolean's truth,
 -- decided, is the Boolean.
@@ -5912,6 +6111,19 @@ private def recursiveHypothesis? (goal : MVarId) : TacticM (Option (List MVarId)
     unless target.isAppOfArity ``LeanerIR.Proofs.wp 7 do return none
     let recursive := (target.getArg! 3).getAppFn
     unless recursive.isFVar do return none
+    -- A call in the loop can leave a source marker on the abort continuation,
+    -- while normalization has removed it from the induction hypothesis.
+    -- `apply` need not unfold that semireducible marker during unification.
+    -- The marker is definitionally its proposition; keep the back edge in
+    -- the same form as the hypothesis before matching it.
+    let stripAbortMarkers (type : Lean.Expr) := type.replace fun e =>
+      if e.isAppOfArity ``LeanerIR.Proofs.wp 7 then
+        let args := e.getAppArgs
+        let abort := args[5]!.replace fun marker =>
+          if marker.isAppOfArity ``LeanerIR.Proofs.Obligation 4 then some (marker.getArg! 3) else none
+        some (mkAppN e.getAppFn (args.set! 5 abort))
+      else none
+    let unmarked := stripAbortMarkers target
     (← getLCtx).findDeclM? fun decl => do
       if decl.isImplementationDetail then return none
       let ty ← instantiateMVars decl.type
@@ -5921,7 +6133,14 @@ private def recursiveHypothesis? (goal : MVarId) : TacticM (Option (List MVarId)
           (conclusion.getArg! 3).getAppFn == recursive do return none
       let saved ← saveState
       try
-        let subgoals ← goal.apply decl.toExpr
+        -- Replacing a target assigns the old metavariable. Keep that mutation
+        -- inside the saved attempt, so a mismatch leaves the original goal live.
+        let goal ← if unmarked == target then pure goal else goal.replaceTargetDefEq unmarked
+        -- Preserve invariant-premise markers: they identify a failed step's
+        -- exact source clause. Only the final abort continuation must agree.
+        let hypothesisType := stripAbortMarkers ty
+        let hypothesis := mkExpectedPropHint decl.toExpr hypothesisType
+        let subgoals ← goal.apply hypothesis
         -- A value the hypothesis binds and states by an equation on the
         -- row (the value a slot holds) is what the row holds there: the
         -- equation is reflexive at reducible transparency and fixes it.
@@ -5937,8 +6156,10 @@ private def recursiveHypothesis? (goal : MVarId) : TacticM (Option (List MVarId)
             continue
           unless ← subgoal.isAssigned do remaining := remaining.push subgoal
         return some remaining.toList
-      catch _ =>
+      catch failure =>
         saved.restore
+        if leaner.denoteDebug.get (← getOptions) then
+          IO.println s!"recursive hypothesis mismatch: {← failure.toMessageData.toString}"
         return none
 
 /-- The callee a goal's weakest precondition is over, if any, with the
@@ -6034,6 +6255,17 @@ private partial def states (statement : Lean.Expr) : Bool :=
     let statement := unmarked statement
     statement.isAppOf ``LeanerIR.Proofs.EnsuresOf || statement.isAppOf ``LeanerIR.Proofs.AbortsOf
 
+/-- Behavioral contract derivation only handles literal closures. An abstract
+function value has no target theorem to re-derive, so trying to avoid that
+work by preparing the whole context would add only speculative cost. -/
+private partial def statesLiteralBehavior (statement : Lean.Expr) : Bool :=
+  if statement.isArrow then statesLiteralBehavior statement.bindingBody!
+  else
+    let statement := unmarked statement
+    (statement.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7 ||
+      statement.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5) &&
+      ((statement.getArg! 2).find? (·.isAppOfArity ``closureOf 7)).isSome
+
 /-- Whether a premise of a goal's binders states `ensures_of` or `aborts_of`. -/
 private partial def spineStates : Lean.Expr → Bool
   | .forallE _ domain body _ => states domain || spineStates body
@@ -6111,7 +6343,10 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     let meaning := statement.getArg! 4
     unless meaning.isAppOf ``propheticMeaning do continue
     let shape ← whnfD meaning.appArg!
-    let verified := mkAppN theoremProof theoremArguments
+    -- Fix the target theorem's family before unifying its dependent contract.
+    -- Scalar argument carriers alone do not determine this implicit family.
+    unless ← isDefEq (meaning.getArg! 2) (closure.getArg! 1) do continue
+    let verified ← instantiateMVars (mkAppN theoremProof theoremArguments)
     let some arguments := literalElements? (type.getArg! 3) | continue
     let some natives ← nativeRow? supplied arguments | continue
     -- Reference-freedom of a row or type, decided by the kernel.
@@ -6147,7 +6382,10 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
             #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
               ← free (mkApp (mkConst ``NRow.refFree) supplied), closure.getArg! 4, coherent,
               closure.appArg!, natives, verified, stated]
-      catch _ => pure none
+      catch ex =>
+        if leaner.denoteDebug.get (← getOptions) then
+          IO.println s!"behavior dispatch skipped: {← ex.toMessageData.toString}"
+        pure none
     let some implication := implication? | continue
     -- The natives the target's theorem assumes, the caller assumes too.
     let mut assumed := true
@@ -6155,7 +6393,9 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       if let .mvar id ← instantiateMVars argument then
         unless ← id.isAssigned do
           try id.assumption catch _ => assumed := false
-    unless assumed do continue
+    unless assumed do
+      if leaner.denoteDebug.get (← getOptions) then IO.println "behavior dispatch: theorem assumptions missing"
+      continue
     let constants ← contractConstants (← inferType theoremProof)
     let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
       `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
@@ -6170,7 +6410,9 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
         established := false
         break
       fact := mkApp fact (← instantiateMVars premise)
-    unless established do continue
+    unless established do
+      if leaner.denoteDebug.get (← getOptions) then IO.println "behavior dispatch: contract premises unproved"
+      continue
     let (_, next) ← (← current.assert `leanerBehavior (← inferType fact) fact).intro1P
     current := next
     let state ← saveState
@@ -6230,11 +6472,24 @@ private def proveMemoryTyped (facts : Array Lean.Expr) (goal : MVarId) : TacticM
       return true
   return false
 
-/-- The frame a hypothesis states of a function value's runs: of a
-`KeepsMemoryAt` hypothesis, `post = pre`; of a `FramedAt` one, its frame.
-With its parameter row, the function value, and the frame term. -/
-private def framedFact? (type : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+/-- Inspect a frame under a source clause's diagnostic marker. -/
+private partial def frameFactType (type : Lean.Expr) : MetaM Lean.Expr := do
   let type ← instantiateMVars type
+  if type.isAppOfArity ``LeanerIR.Proofs.Obligation 4 then
+    frameFactType type.appArg!
+  else pure type
+
+/-- Remove diagnostic markers from a frame proof before applying it. -/
+private partial def frameFactProof (fact : Lean.Expr) : MetaM Lean.Expr := do
+  let type ← instantiateMVars (← inferType fact)
+  if type.isAppOfArity ``LeanerIR.Proofs.Obligation 4 then
+    frameFactProof (mkApp4 (mkConst ``Iff.mp) type type.appArg!
+      (mkAppN (mkConst ``LeanerIR.Proofs.Obligation_iff) type.getAppArgs) fact)
+  else pure fact
+
+/-- The parameter row and function value of a stored frame hypothesis. -/
+private def framedFact? (type : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let type ← frameFactType type
   if type.isAppOfArity ``LeanerIR.Proofs.KeepsMemoryAt 5 then
     return some (type.getArg! 3, type.getArg! 4)
   if type.isAppOfArity ``LeanerIR.Proofs.FramedAt 6 then
@@ -6252,9 +6507,11 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
     let ensuresType ← instantiateMVars ensures.type
     unless ensuresType.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7 do return none
     for fact in facts do
-      let factType ← instantiateMVars (← inferType fact)
+      let factType ← frameFactType (← inferType fact)
       let some (row, closure) ← framedFact? factType | continue
-      unless ← isDefEq closure (action.getArg! 3) do continue
+      unless ← isDefEq closure (action.getArg! 3) do
+        if leaner.denoteDebug.get (← getOptions) then logInfo m!"frame closure mismatch: {closure} vs {action.getArg! 3}"
+        continue
       unless ← isDefEq (factType.getArg! 1) (ensuresType.getArg! 1) do continue
       let typed ← mkFreshExprMVar (← mkAppM ``LeanerIR.Proofs.MemoryTyped
         #[ensuresType.getArg! 0, ensuresType.getArg! 5])
@@ -6263,17 +6520,20 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
       unless ← isDefEq refFree (mkConst ``Bool.true) do continue
       let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
         (← mkEq refFree (mkConst ``Bool.true))
-      let kept := mkAppN fact #[free, action.getArg! 6, ensuresType.getArg! 4,
+      let kept := mkAppN (← frameFactProof fact) #[free, action.getArg! 6, ensuresType.getArg! 4,
         ensuresType.getArg! 5, ensuresType.getArg! 6, ← instantiateMVars typed, ensures.toExpr]
-      try check kept catch _ => continue
+      try check kept catch error =>
+        if leaner.denoteDebug.get (← getOptions) then logInfo m!"frame application: {error.toMessageData}"
+        continue
       return some (kept, factType.isAppOfArity ``LeanerIR.Proofs.KeepsMemoryAt 5)
     return none
   let some (kept, keeps) := kept? | return goal
-  let (_, next) ← goal.withContext do
+  let (equation, next) ← goal.withContext do
     (← goal.assert `leanerKept (← whnfR (← inferType kept)).headBeta kept).intro1P
-  setGoals [next]
-  if keeps then evalTactic (← `(tactic| subst $(mkIdent `leanerFinal):ident))
-  getMainGoal
+  -- Substitute using the frame equation itself. Substituting `leanerFinal`
+  -- by name can select the earlier StateOf equation instead, leaving the
+  -- memory hidden behind the invocation's state-label expression.
+  if keeps then next.withContext (Lean.Meta.subst next equation) else pure next
 
 /-- A row the frame resolves to scalars (`ScalarAt`): a hypothesis of the
 theorem, or by evaluation where the frame is the runtime frame or one a
@@ -6361,47 +6621,84 @@ private def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :
     let action := (target.getArg! 3).consumeMData
     unless action.isAppOfArity ``closureMeaning 7 do return none
     if (literalClosure? (action.getArg! 3)).isSome then return none
-    let mut facts := #[]
-    for declaration in ← getLCtx do
-      if declaration.isImplementationDetail then continue
-      if ← isProp declaration.type then
-        facts := facts ++ (← conjuncts declaration.toExpr)
-    let state ← saveState
-    let rule ← mkConstWithFreshMVarLevels ``LeanerIR.Proofs.wp_closureMeaning_unseen_at
-    let (arguments, _, conclusion) ← forallMetaTelescope (← inferType rule)
-    unless ← isDefEq conclusion target do
-      state.restore
-      return none
-    -- The premises before the runs and the aborts: the row facts by
-    -- evaluation, the rest from the hypotheses.
-    for argument in arguments.extract 0 (arguments.size - 2) do
-      let .mvar id ← instantiateMVars argument | continue
-      if ← id.isAssigned then continue
-      let type ← instantiateMVars (← id.getType)
-      unless ← isProp type do continue
-      let mut found := false
-      if type.isAppOfArity ``Eq 3 then
-        found ← isDefEq argument (← mkEqRefl (type.getArg! 1))
-      else if type.isAppOfArity ``LeanerIR.Proofs.MemoryTyped 2 then
-        found ← proveMemoryTyped facts id
-      else if type.isAppOfArity ``LeanerIR.Proofs.ClosureTypedAt 5 then
-        found ← carrierClosureTyped? facts id
-      else
-        for fact in facts do
-          if ← isDefEq (← inferType fact) type then
-            id.assign fact
-            found := true
-            break
-      unless found do
-        state.restore
-        return none
-    goal.assign (mkAppN rule arguments)
-    let some (.mvar returns) := arguments[arguments.size - 2]? | return none
-    let some (.mvar fails) := arguments[arguments.size - 1]? | return none
-    let (_, returns) ← returns.introN 5
-      [`leanerResult, `leanerFinal, `leanerEnsures, `leanerUnaborted, `leanerResultOf]
-    let returns ← keptMemory returns action facts
-    return some [returns, fails]
+    let original ← saveState
+    let result ← do
+      -- A closure read from a resource gets its field frame from that value's
+      -- stored invariant. Recover it before recording the invocation's final
+      -- memory, so the call can use the frame just as a parameter call does.
+      let goal ← do
+        let saved ← saveState
+        try
+          setGoals [goal]
+          evalTactic (← `(tactic| leaner_denote_split_hypotheses))
+          evalTactic (← `(tactic| leaner_denote_stored_reads))
+          evalTactic (← `(tactic| simp_all only [Which.project?_eq_some_iff,
+            Which.inject_here, Which.inject_there, lir_denote_norm]))
+          -- Tuple/enum matches expose another payload equation after the
+          -- first normalization. Substitute it before matching the frame to
+          -- the closure being invoked.
+          for _ in [0:2] do
+            evalTactic (← `(tactic| leaner_denote_split_hypotheses))
+            evalTactic (← `(tactic| leaner_denote_subst_vars))
+            evalTactic (← `(tactic| leaner_denote_reduce_projections))
+            evalTactic (← `(tactic| leaner_denote_normalize_hypotheses))
+          getMainGoal
+        catch error =>
+          if leaner.denoteDebug.get (← getOptions) then
+            IO.println s!"stored closure frame: {← error.toMessageData.toString}"
+          saved.restore
+          pure goal
+      goal.withContext do
+        let target ← instantiateMVars (← goal.getType)
+        unless target.isAppOfArity ``LeanerIR.Proofs.wp 7 do return none
+        let action := (target.getArg! 3).consumeMData
+        unless action.isAppOfArity ``closureMeaning 7 do return none
+        let mut facts := #[]
+        for declaration in ← getLCtx do
+          if declaration.isImplementationDetail then continue
+          if ← isProp declaration.type then
+            facts := facts ++ (← conjuncts declaration.toExpr)
+        let state ← saveState
+        let rule ← mkConstWithFreshMVarLevels ``LeanerIR.Proofs.wp_closureMeaning_unseen_at
+        let (arguments, _, conclusion) ← forallMetaTelescope (← inferType rule)
+        unless ← isDefEq conclusion target do
+          state.restore
+          return none
+        -- The premises before the runs and the aborts: the row facts by
+        -- evaluation, the rest from the hypotheses.
+        for argument in arguments.extract 0 (arguments.size - 2) do
+          let .mvar id ← instantiateMVars argument | continue
+          if ← id.isAssigned then continue
+          let type ← instantiateMVars (← id.getType)
+          unless ← isProp type do continue
+          let mut found := false
+          if type.isAppOfArity ``Eq 3 then
+            found ← isDefEq argument (← mkEqRefl (type.getArg! 1))
+          else if type.isAppOfArity ``LeanerIR.Proofs.MemoryTyped 2 then
+            found ← proveMemoryTyped facts id
+          else if type.isAppOfArity ``LeanerIR.Proofs.ClosureTypedAt 5 then
+            found ← carrierClosureTyped? facts id
+          else
+            for fact in facts do
+              if ← isDefEq (← inferType fact) type then
+                id.assign fact
+                found := true
+                break
+          unless found do
+            state.restore
+            return none
+        goal.assign (mkAppN rule arguments)
+        let some (.mvar returns) := arguments[arguments.size - 2]? | return none
+        let some (.mvar fails) := arguments[arguments.size - 1]? | return none
+        let (_, returns) ← returns.introN 6
+          [`leanerResult, `leanerFinal, `leanerEnsures, `leanerUnaborted, `leanerResultOf,
+            `leanerStateOf]
+        let returns ← keptMemory returns action facts
+        return some [returns, fails]
+    -- Preparation can assign the original goal. A failed match must undo
+    -- that preparation as well as the attempted invocation rule.
+    if result.isNone then original.restore
+    return result
 
 /-- A literal closure of a non-generic target at rows its frame resolves to
 scalars: the check, evaluated by the kernel over the goal's unit
@@ -6456,9 +6753,11 @@ The goals left, if the closure's frame is decided. -/
 private def literalClosureKeepsMemory? (goal : MVarId)
     (callees : Array (Lean.Expr × String × Lean.Expr)) : TacticM (Option (List MVarId)) := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
+  let target := if target.isAppOfArity ``LeanerIR.Proofs.Obligation 4 then target.appArg! else target
   let target ← if target.isAppOfArity ``LeanerIR.Proofs.KeepsMemoryAt 5 then
       goal.withContext (whnfR target) else pure target
   unless target.isAppOfArity ``LeanerIR.Proofs.FramedAt 6 do return none
+  if leaner.denoteDebug.get (← getOptions) then logInfo "frame: inspecting closure"
   let references ← goal.withContext do
     let refFree := mkApp (mkConst ``NRow.refFree) (target.getArg! 3)
     if ← isDefEq refFree (mkConst ``Bool.false) then
@@ -6472,12 +6771,13 @@ private def literalClosureKeepsMemory? (goal : MVarId)
           target.getArg! 4, target.getArg! 5, references])
     return some []
   -- A frame a hypothesis states of the same function value, within it.
+  if leaner.denoteDebug.get (← getOptions) then logInfo "frame: checking stated frames"
   let stated ← try goal.withContext do
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
       let some (_, closure) ← framedFact? decl.type | continue
       unless ← isDefEq closure (target.getArg! 5) do continue
-      let narrow ← whnfR (← instantiateMVars decl.type)
+      let narrow ← whnfR (← frameFactType decl.type)
       unless narrow.isAppOfArity ``LeanerIR.Proofs.FramedAt 6 do continue
       let .forallE _ argumentsType _ _ ← whnfR (← inferType (target.getArg! 4)) | continue
       let memoryType := mkApp (mkConst ``LeanerIR.Proofs.Denote.Memory) (target.getArg! 0)
@@ -6492,16 +6792,19 @@ private def literalClosureKeepsMemory? (goal : MVarId)
           intro _ _ _ $(mkIdent `leanerFrame):ident
           first
           | exact $(mkIdent `leanerFrame)
-          | (subst_vars; leaner_denote_leaf)
-          | leaner_denote_leaf))) do continue
+          | leaner_denote_bounded
+              (simp only [lir_denote_norm, lir_denote_eval] at $(mkIdent `leanerFrame):ident ⊢
+               grind)))) do continue
       return some (← mkAppAtFrame ``LeanerIR.Proofs.FramedAt.mono
           (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
-        #[← mkExpectedTypeHint decl.toExpr narrow, ← instantiateMVars within])
+        #[← mkExpectedTypeHint (← frameFactProof decl.toExpr) narrow, ← instantiateMVars within])
     return none
     catch _ => pure none
   if let some proof := stated then
+    if leaner.denoteDebug.get (← getOptions) then logInfo "frame: applying stated frame"
     goal.assign proof
     return some []
+  if leaner.denoteDebug.get (← getOptions) then logInfo "frame: checking literal target"
   let some closure := literalClosure? (target.getArg! 5) | return none
   let mask := closure.getArg! 3
   unless mask.isAppOfArity ``Weave.mask 4 do return none
@@ -6525,12 +6828,14 @@ private def literalClosureKeepsMemory? (goal : MVarId)
     let (theoremArguments, _, statement) ← forallMetaTelescope (← inferType theoremProof)
     let meaning := statement.getArg! 4
     unless meaning.isAppOf ``propheticMeaning do throwError "not a function's meaning"
+    unless ← isDefEq (meaning.getArg! 2) (target.getArg! 2) do
+      throwError "the closure and its target theorem use different type families"
     let rule ← mkAppAtFrame ``LeanerIR.Proofs.FramedAt.ofVerified
         (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
       #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
         ← free (mkApp (mkConst ``NRow.refFree) supplied),
         ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[← whnfD meaning.appArg!])),
-        closure.getArg! 4, coherent, closure.appArg!, mkAppN theoremProof theoremArguments]
+        closure.getArg! 4, coherent, closure.appArg!, ← instantiateMVars (mkAppN theoremProof theoremArguments)]
     let rule := mkApp rule (target.getArg! 4)
     -- The natives the target's theorem assumes, the caller assumes too.
     for argument in theoremArguments do
@@ -6554,7 +6859,8 @@ private def literalClosureKeepsMemory? (goal : MVarId)
     let framed ← mkFreshExprSyntheticOpaqueMVar framedType
     unless ← closesBy framed.mvarId! (← `(tactic| (
         intro _ _ _ $(mkIdent `leanerFrame):ident
-        (try simp only [$lemmas,*, lir_denote_norm] at $(mkIdent `leanerFrame):ident ⊢)
+        (try simp only [$lemmas,*, Weave.compose, lir_denote_norm]
+          at $(mkIdent `leanerFrame):ident ⊢)
         first
         | exact $(mkIdent `leanerFrame)
         | leaner_denote_leaf))) do
@@ -6563,7 +6869,10 @@ private def literalClosureKeepsMemory? (goal : MVarId)
     unless ← isDefEq (← inferType proof) target do throwError "not the closure"
     goal.assign proof
     return some []
-  catch _ => state.restore
+  catch error =>
+    if leaner.denoteDebug.get (← getOptions) then
+      IO.println s!"closure frame: {← error.toMessageData.toString}"
+    state.restore
   -- The target's body, where the proof inlines it.
   let mut compiled? := none
   for (candidate, _, proof) in callees do
@@ -6681,7 +6990,8 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
   let (_, next) ← goal.withContext do
     (← goal.assert `leanerReturns (← inferType proof) proof).intro1P
   setGoals [next]
-  evalTactic (← `(tactic| obtain ⟨_, _, $(mkIdent `leanerEnsures), $(mkIdent `leanerResult)⟩ :=
+  evalTactic (← `(tactic| obtain ⟨_, _, $(mkIdent `leanerEnsures), $(mkIdent `leanerResult),
+    $(mkIdent `leanerStateOf)⟩ :=
     $(mkIdent `leanerReturns)))
   -- The results as the leaf spells them: a literal array.
   evalTactic (← `(tactic| try leaner_denote_normalize at $(mkIdent `leanerEnsures):ident))
@@ -6704,17 +7014,12 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
 
 /-- The `result_of` reads of a term at arguments a leaf names: those of
 function values a closure literal builds, outside binders. -/
-private partial def resultOfReads (e : Lean.Expr) (found : Array Lean.Expr := #[]) :
-    Array Lean.Expr :=
-  let found := if e.isAppOfArity ``LeanerIR.Proofs.ResultOf 5 && !e.hasLooseBVars &&
+private def resultOfReads (terms : Array Lean.Expr) : Array Lean.Expr :=
+  sitesWhere (fun e =>
+    (e.isAppOfArity ``LeanerIR.Proofs.ResultOf 5 ||
+      e.isAppOfArity ``LeanerIR.Proofs.StateOf 5) && !e.hasLooseBVars &&
       ((e.getArg! 2).find? (·.isAppOf ``closureOf)).isSome &&
-      (literalElements? (e.getArg! 3)).isSome && !found.contains e then found.push e else found
-  match e with
-  | .app function argument => resultOfReads argument (resultOfReads function found)
-  | .lam _ domain body _ | .forallE _ domain body _ => resultOfReads body (resultOfReads domain found)
-  | .letE _ type value body _ => resultOfReads body (resultOfReads value (resultOfReads type found))
-  | .mdata _ inner | .proj _ _ inner => resultOfReads inner found
-  | _ => found
+      (literalElements? (e.getArg! 3)).isSome) terms
 
 /-- A leaf that reads `result_of` of a literal closure where it knows
 neither that the invocation aborts nor that it does not, case by case on
@@ -6729,14 +7034,12 @@ private def abortCases? (goal : MVarId) : TacticM (Option (List MVarId)) := do
             ``LeanerIR.Proofs.Terminating 2) do
         return none
       let target ← instantiateMVars (← goal.getType)
-      let mut reads := resultOfReads target
       let mut statements := #[target]
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
         let type ← instantiateMVars decl.type
-        reads := resultOfReads type reads
         statements := statements.push type
-      for read in reads do
+      for read in resultOfReads statements do
         let aborts := mkAppN (mkConst ``LeanerIR.Proofs.AbortsOf) read.getAppArgs
         if statements.any (fun statement => (statement.find? (· == aborts)).isSome) then continue
         -- Arguments a run is read at: natives of the function value's row.
@@ -6975,12 +7278,23 @@ private def rewriteResultOf (goal : MVarId) : MetaM MVarId := goal.withContext d
   let mut goal := goal
   for declaration in ← getLCtx do
     let type ← instantiateMVars declaration.type
-    unless type.isAppOfArity ``Eq 3 && (type.getArg! 1).isAppOfArity ``LeanerIR.Proofs.ResultOf 5 do
+    unless type.isAppOfArity ``Eq 3 &&
+        ((type.getArg! 1).isAppOfArity ``LeanerIR.Proofs.ResultOf 5 ||
+          (type.getArg! 1).isAppOfArity ``LeanerIR.Proofs.StateOf 5) do
       continue
     try
       let rewritten ← goal.rewrite (← goal.getType) declaration.toExpr
       goal ← goal.replaceTargetEq rewritten.eNew rewritten.eqProof
     catch _ => pure ()
+    if (type.getArg! 1).isAppOfArity ``LeanerIR.Proofs.StateOf 5 then
+      for other in ← getLCtx do
+        if other.isImplementationDetail || other.fvarId == declaration.fvarId then continue
+        unless (other.type.find? (·.isAppOf ``LeanerIR.Proofs.StateOf)).isSome do continue
+        try
+          goal ← goal.withContext do
+            let rewritten ← goal.rewrite other.type declaration.toExpr
+            pure (← goal.replaceLocalDecl other.fvarId rewritten.eNew rewritten.eqProof).mvarId
+        catch _ => pure ()
   return goal
 
 /-- A call of a target taking and returning no reference, where the goal
@@ -6992,7 +7306,7 @@ private def namedCall (goal : MVarId) : TacticM MVarId := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
   unless (target.find? fun e =>
       e.isConstOf ``LeanerIR.Proofs.EnsuresOf || e.isConstOf ``LeanerIR.Proofs.AbortsOf ||
-        e.isConstOf ``LeanerIR.Proofs.ResultOf).isSome do
+        e.isConstOf ``LeanerIR.Proofs.ResultOf || e.isConstOf ``LeanerIR.Proofs.StateOf).isSome do
     return goal
   -- The rules at the call's executable and frame, which no instance search
   -- finds.
@@ -7208,6 +7522,10 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   -- definition.
   let mut foldedNormal : Std.HashMap FVarId (Array Lean.Expr) := {}
   let mut leaves := 0
+  -- A successful preparation pays for itself by closing its leaf. Bound
+  -- failed speculation across the target, while allowing one unrelated bad
+  -- clause without disabling preparation for all its siblings.
+  let mut behaviorFailures := 0
   let mut stageCost : Array (String × Nat) := #[]
   let mut reported : Array (ObligationRange × String) := #[]
   let mut pending : Array (MVarId × Option Provenance × Array ObligationRange) :=
@@ -7572,6 +7890,11 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       stageCost := stageCost.push ("closure typing", (← IO.getNumHeartbeats) - stageStart)
       continue
     if let some remaining ← literalClosureKeepsMemory? goal callees then
+      let clauses ← goal.withContext do
+        let target ← instantiateMVars (← goal.getType)
+        pure <| match obligationRange? target with
+          | some range => if clauses.contains range then clauses else clauses.push range
+          | none => clauses
       pending := pending ++ remaining.toArray.map fun g => (g, provenance, clauses)
       stageCost := stageCost.push ("closure frame", (← IO.getNumHeartbeats) - stageStart)
       continue
@@ -7780,7 +8103,48 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       stageCost := stageCost.push ("denoted run", (← IO.getNumHeartbeats) - stageStart)
       continue
     -- A literal closure's behavior, by its target's theorem.
-    let goal ← dispatchBehavior (← rewriteResultOf (← terminatingRuns goal)) callees
+    let behaviorStart ← IO.getNumHeartbeats
+    let goal ← terminatingRuns goal
+    let terminatingDone ← IO.getNumHeartbeats
+    let goal ← rewriteResultOf goal
+    let rewritingDone ← IO.getNumHeartbeats
+    -- An authored proof may need only the facts the ordinary call rule
+    -- already supplied. Try those before re-deriving behavioral contracts;
+    -- retain the original path when higher-order facts are still needed.
+    let hasBehavior ← if residual && behaviorFailures < 2 then goal.withContext do
+        (← getLCtx).anyM fun decl => do
+          if decl.isImplementationDetail then return false
+          return statesLiteralBehavior (← instantiateMVars decl.type)
+      else pure false
+    if hasBehavior then
+      let saved ← saveState
+      let context ← readThe Core.Context
+      let now ← IO.getNumHeartbeats
+      let remaining := if context.maxHeartbeats == 0 then 2000000
+        else context.initHeartbeats + context.maxHeartbeats - now
+      let budget := max 1 (min remaining 2000000)
+      let closed ← tryCatchRuntimeEx
+        (withTheReader Core.Context
+          (fun context => { context with initHeartbeats := now, maxHeartbeats := budget }) do
+          closesBy goal (← `(tactic|
+            (try leaner_denote_unname
+             leaner_denote_prepare
+             all_goals (first
+               | leaner_denote_decide_residual
+               | (solve | simp_all))))))
+        (fun _ => pure false)
+      let spent := (← IO.getNumHeartbeats) - now
+      if closed then
+        stageCost := stageCost.push ("existing behavior facts", spent)
+        continue
+      saved.restore
+      behaviorFailures := behaviorFailures + 1
+      stageCost := stageCost.push ("existing behavior attempt", spent)
+    let derivationStart ← IO.getNumHeartbeats
+    let goal ← dispatchBehavior goal callees
+    stageCost := stageCost.push ("terminating facts", terminatingDone - behaviorStart)
+      |>.push ("result/state rewriting", rewritingDone - terminatingDone)
+      |>.push ("behavior facts", (← IO.getNumHeartbeats) - derivationStart)
     setGoals [goal]
     leaves := leaves + 1
     if residual then

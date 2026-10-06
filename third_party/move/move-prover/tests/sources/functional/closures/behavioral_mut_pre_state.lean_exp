@@ -1,0 +1,2 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/closures/behavioral_mut_pre_state.move: LIR-SEMANTIC-TYPE: in fun only_call_wrong: data operation operand is not its nominal target type or supported reference at [976, 997)

@@ -1,0 +1,4 @@
+LeanerE2ETests/SourceVerify/constant_vectors.move:19:31: error: the assertion `BYTES[0] == 22` does not hold
+LeanerE2ETests/SourceVerify/constant_vectors.move:19:5: error: leaner verification failed: the automatic verification of `wrong_byte` failed; provide a proof: `verify wrong_byte by …` in `LeanerE2ETests/SourceVerify/constant_vectors.proof.lean` (`verify wrong_byte by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/constant_vectors.move:20:34: error: the assertion `ADDRESSES[0] == @0x2` does not hold
+LeanerE2ETests/SourceVerify/constant_vectors.move:20:5: error: leaner verification failed: the automatic verification of `wrong_address` failed; provide a proof: `verify wrong_address by …` in `LeanerE2ETests/SourceVerify/constant_vectors.proof.lean` (`verify wrong_address by skip` shows the obligations it leaves)

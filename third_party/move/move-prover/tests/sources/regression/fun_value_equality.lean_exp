@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/fun_value_equality.move:18:9: error: the specification clause `ensures p != q` is not established
+tests/sources/regression/fun_value_equality.move:16:5: error: leaner verification failed: the automatic verification of `two_params` failed; provide a proof: `verify two_params by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify two_params by skip` shows the obligations it leaves)
+tests/sources/regression/fun_value_equality.move:28:9: error: the specification clause `ensures s.cb != p` is not established
+tests/sources/regression/fun_value_equality.move:27:5: error: leaner verification failed: the automatic verification of `param_and_field` failed; provide a proof: `verify param_and_field by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify param_and_field by skip` shows the obligations it leaves)
+tests/sources/regression/fun_value_equality.move:38:9: error: the specification clause `ensures a.cb != b.cb` is not established
+tests/sources/regression/fun_value_equality.move:37:5: error: leaner verification failed: the automatic verification of `two_fields` failed; provide a proof: `verify two_fields by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify two_fields by skip` shows the obligations it leaves)
+tests/sources/regression/fun_value_equality.move:76:9: error: the specification clause `ensures result == false` is not established
+tests/sources/regression/fun_value_equality.move:75:5: error: leaner verification failed: the automatic verification of `boxed_params` failed; provide a proof: `verify boxed_params by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify boxed_params by skip` shows the obligations it leaves)
+tests/sources/regression/fun_value_equality.move:88:9: error: the specification clause `ensures result == false` is not established
+tests/sources/regression/fun_value_equality.move:87:5: error: leaner verification failed: the automatic verification of `captured_params` failed; provide a proof: `verify captured_params by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify captured_params by skip` shows the obligations it leaves)
+tests/sources/regression/fun_value_equality.move:98:9: error: the specification clause `ensures (p, 1) != (q, 1)` is not established
+tests/sources/regression/fun_value_equality.move:97:5: error: leaner verification failed: the automatic verification of `tupled_params` failed; provide a proof: `verify tupled_params by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify tupled_params by skip` shows the obligations it leaves)
+tests/sources/regression/fun_value_equality.move:107:9: error: the specification clause `ensures result == false` is not established
+tests/sources/regression/fun_value_equality.move:106:5: error: leaner verification failed: the automatic verification of `field_and_closure` failed; provide a proof: `verify field_and_closure by …` in `tests/sources/regression/fun_value_equality.proof.lean` (`verify field_and_closure by skip` shows the obligations it leaves)

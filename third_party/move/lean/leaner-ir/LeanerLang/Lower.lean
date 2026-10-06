@@ -67,6 +67,7 @@ private def ThrowKind.toLIR : ThrowKind → LeanerIR.ThrowKind
   | .abort => .abort
   | .panic => .panic
   | .moveVectorError => .profile { profile := .move, tag := "runtime.vector_error" }
+  | .moveArithmeticError => LeanerIR.moveArithmeticError
 
 private def arrayIndex? [BEq α] (values : Array α) (needle : α) : Option Nat :=
   (Array.range values.size).find? fun index => values[index]? == some needle
@@ -559,7 +560,7 @@ mutual
         .freezeReference _ value _ | .dereference value _ | .return_ value _ =>
         sourceBindings value
     | .storageIndex _ index _ => sourceBindings index
-    | .index value index _ | .membership value index _ =>
+    | .index value index _ | .membership value index _ | .updateField value _ index _ =>
         sourceBindings value ++ sourceBindings index
     | .mutateReference reference value _ => sourceBindings reference ++ sourceBindings value
     | .quantifier _ binders body _ =>
@@ -624,7 +625,7 @@ mutual
         .borrowValue _ value _ | .rawBorrowValue _ value _ | .freezeReference _ value _ |
         .dereference value _ | .return_ value _ | .storageIndex _ value _ |
         .assign _ value _ | .assignPattern _ _ value _ | .loop value _ _ => #[value]
-    | .index value index _ | .membership value index _ |
+    | .index value index _ | .membership value index _ | .updateField value _ index _ |
         .mutateReference value index _ | .assignExpression value index _ |
         .rawAssignExpression value index _ => #[value, index]
     | .quantifier _ binders body _ => binders.map (·.2) ++ #[body]
@@ -805,7 +806,7 @@ mutual
         .freezeReference _ value _ | .dereference value _ | .return_ value _ =>
         sourceQuantifierBindings value
     | .storageIndex _ index _ => sourceQuantifierBindings index
-    | .index value index _ | .membership value index _ =>
+    | .index value index _ | .membership value index _ | .updateField value _ index _ =>
         sourceQuantifierBindings value ++ sourceQuantifierBindings index
     | .mutateReference reference value _ =>
         sourceQuantifierBindings reference ++ sourceQuantifierBindings value
@@ -873,7 +874,7 @@ mutual
         .freezeReference _ value _ | .dereference value _ | .return_ value _ =>
         sourceMatchBindings value
     | .storageIndex _ index _ => sourceMatchBindings index
-    | .index value index _ | .membership value index _ =>
+    | .index value index _ | .membership value index _ | .updateField value _ index _ =>
         sourceMatchBindings value ++ sourceMatchBindings index
     | .mutateReference reference value _ =>
         sourceMatchBindings reference ++ sourceMatchBindings value
@@ -1127,23 +1128,23 @@ private def primitiveLIR (specification : Bool) : Primitive → PrimitiveOperati
 private def profilePrimitiveLIR (profile : ProfileName) (specification : Bool) :
     Primitive → PrimitiveOperation
   | .profileAdd => if specification then .add else match profile with
-      | .move => .checkedAdd .abort | .rust => .add
+      | .move => .checkedAdd LeanerIR.moveArithmeticError | .rust => .add
   | .profileSubtract => if specification then .subtract else match profile with
-      | .move => .checkedSubtract .abort | .rust => .subtract
+      | .move => .checkedSubtract LeanerIR.moveArithmeticError | .rust => .subtract
   | .profileMultiply => if specification then .multiply else match profile with
-      | .move => .checkedMultiply .abort | .rust => .multiply
+      | .move => .checkedMultiply LeanerIR.moveArithmeticError | .rust => .multiply
   | .profileDivide => if specification then .divide else match profile with
-      | .move => .checkedDivide .abort | .rust => .divide
+      | .move => .checkedDivide LeanerIR.moveArithmeticError | .rust => .divide
   | .profileModulo => if specification then .modulo else match profile with
-      | .move => .checkedModulo .abort | .rust => .modulo
+      | .move => .checkedModulo LeanerIR.moveArithmeticError | .rust => .modulo
   | .profileShiftLeft => if specification then .shiftLeft else match profile with
-      | .move => .checkedShiftLeft .abort | .rust => .shiftLeft
+      | .move => .checkedShiftLeft LeanerIR.moveArithmeticError | .rust => .shiftLeft
   | .profileShiftRight => if specification then .shiftRight else match profile with
-      | .move => .checkedShiftRight .abort | .rust => .shiftRight
+      | .move => .checkedShiftRight LeanerIR.moveArithmeticError | .rust => .shiftRight
   | .profileNegate => if specification then .negate else match profile with
-      | .move => .checkedNegate .abort | .rust => .negate
+      | .move => .checkedNegate LeanerIR.moveArithmeticError | .rust => .negate
   | .profileCast => if specification then .cast else match profile with
-      | .move => .checkedCast .abort | .rust => .cast
+      | .move => .checkedCast LeanerIR.moveArithmeticError | .rust => .cast
   | operation => primitiveLIR specification operation
 
 private def isBooleanPrimitive : Primitive → Bool
@@ -2064,6 +2065,15 @@ private def storageIndexLocalBase? (context : ExprContext) (head : Located Ty) :
   some <| rest.foldl (fun base field => .field base field head.span)
     (.local name head.span)
 
+/-- Constants are values too: `C[i]` must not invent a resource family C.
+Move constants cannot contain nominal values, so a bare constant is the
+only additional head the storage/value ambiguity needs to recognize. -/
+private def storageIndexConstantBase? (sourceNs : Namespace) (head : Located Ty) :
+    Option Expr := do
+  let .named #[name] #[] := head.value | none
+  let _ ← sourceConstant? sourceNs name
+  some (.local name head.span)
+
 private def storageIndexLocalName? (context : ExprContext) (head : Located Ty) :
     Option String := do
   let base ← storageIndexLocalBase? context head
@@ -2441,7 +2451,9 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
   | .field source field _ =>
       lowerFieldExpr context expected span loc source field
   | .storageIndex head indexSource _ =>
-      if let some localBase := storageIndexLocalBase? context head then
+      let sourceNs := (← get).sourceNamespace
+      if let some localBase := (storageIndexLocalBase? context head).orElse
+          (fun _ => storageIndexConstantBase? sourceNs head) then
         return ← lowerExpr context expected
           (.index localBase indexSource span)
       unless (← get).sourceNamespace.profile == .move do
@@ -2512,6 +2524,24 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let id ← pushExpression loc boolType <| .operation
         (.data (.testVariants reference variants)) #[] #[value.1]
       return (id, boolType)
+  | .updateField value field replacement _ =>
+      unless context.specification do
+        failAt "LEANER-UPDATE-FIELD" "functional field updates are specification expressions" (some span)
+      let value ← lowerExpr context none value
+      let value ← match ← typeNode? value.2 with
+        | some (.reference reference) => do
+            let id ← pushExpression loc reference.referent <|
+              .operation (.reference .dereference) #[] #[value.1]
+            pure (id, reference.referent)
+        | _ => pure value
+      let (owner, _, fieldType, _) ← resolveNominalField value.2 field span
+      let replacement ← lowerExpr context (some (← projectSpecTypeId fieldType)) replacement
+      if let some expected := expected then ensureType expected value.2 span
+      let some (.nominal _ instantiations) ← typeNode? value.2
+        | failAt "LEANER-UPDATE-FIELD" "a field update requires a nominal value" (some span)
+      let id ← pushExpression loc value.2 <| .operation
+        (.data (.updateField owner field)) instantiations #[value.1, replacement.1]
+      return (id, value.2)
   | .discriminant ownerType resultType value _ =>
       lowerDiscriminantExpr context expected span loc ownerType resultType value
   | .placeOperation operation sourcePlace _ =>
@@ -3760,7 +3790,7 @@ private partial def lowerIndexExpr (context : ExprContext) (expected : Option Ty
     LowerM (ExprId × TypeId) := do
   if (← get).sourceNamespace.profile == .move then
     if let some (head, index, fields) := storageProjection? context source then
-      if fields.isEmpty then
+      if fields.isEmpty && (storageIndexConstantBase? (← get).sourceNamespace head).isNone then
         return ← lowerExpr context expected (.storageIndex head index span)
   let value ← lowerExpr context none valueSource
   let value ← match ← typeNode? value.2 with
@@ -4214,7 +4244,11 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
       unless arguments.size == 1 do
         failAt "LEANER-SPEC-ARITY"
           s!"spec.old expects one argument, got {arguments.size}" (some span)
-      let value ← lowerExpr context expected arguments[0]!
+      -- `old` selects the range's pre-state. Carrying its post-label into
+      -- a global read would make an old-only label definition self-referential.
+      let oldRange : LeanerIR.MemoryRange :=
+        { pre := context.stateRange.pre, post := context.stateRange.pre }
+      let value ← lowerExpr { context with stateRange := oldRange } expected arguments[0]!
       let typeArgument : TypeUse := { typeId := value.2, loc }
       let id ← pushExpression loc value.2 <|
         .operation (.specification .old) #[.typeArg typeArgument] #[value.1]
@@ -5612,13 +5646,14 @@ private def clauseKind? : ContractClause → Option ConditionKind
   | .requires .. => some .requires
   | .ensures .. => some .ensures
   | .abortsIf .. => some .abortsIf
+  | .abortsWith .. => some .abortsWith
   | .invariant .. => some .structInvariant
   | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
       .modifiesOfAll .. => none
 
 private def clauseExpression? : ContractClause → Option Expr
   | .letPre _ expression .. | .letPost _ expression .. |
-      .requires expression .. | .ensures expression .. | .abortsIf expression .. |
+      .requires expression .. | .ensures expression .. | .abortsIf expression .. | .abortsWith expression .. |
       .invariant expression .. | .modifies expression .. => some expression
   | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. | .modifiesOfAll .. => none
 
@@ -5627,11 +5662,14 @@ private def clauseAuxiliary (context : ExprContext) : ContractClause →
   | .abortsIf _ code _ _ => code.toArray.mapM fun code => do
       let code ← lowerExpr context none code
       pure ("abortCode", code.1)
+  | .abortsWith _ additional _ _ => additional.mapM fun code => do
+      let code ← lowerExpr context none code
+      pure ("additionalCode", code.1)
   | _ => pure #[]
 
-private def clauseProperties : ContractClause → Array String
+private def clauseProperties : ContractClause → Array Pragma
   | .letPre _ _ properties _ | .letPost _ _ properties _ |
-      .requires _ properties _ | .ensures _ properties _ | .abortsIf _ _ properties _ |
+      .requires _ properties _ | .ensures _ properties _ | .abortsIf _ _ properties _ | .abortsWith _ _ properties _ |
       .invariant _ properties _ => properties
   | .modifies .. | .modifiesAll .. | .reads .. | .readsAll .. | .modifiesOf .. |
       .modifiesOfAll .. => #[]
@@ -5754,11 +5792,11 @@ private def lowerContract (context : ExprContext) (clauses : Array ContractClaus
     let isBinding := match clause with
       | .letPre .. | .letPost .. => true
       | _ => false
-    let expression ← lowerExpr context (if isBinding then none else some boolType)
+    let isCode := clause matches .abortsWith ..
+    let expression ← lowerExpr context (if isBinding || isCode then none else some boolType)
       (clauseExpression? clause).get!
     let auxiliary ← clauseAuxiliary context clause
-    let properties := clauseProperties clause |>.map fun name =>
-      Attribute.assign name (.constant (.bool true))
+    let properties ← (clauseProperties clause).mapM pragmaAttribute
     conditions := conditions.push {
       loc, kind := (clauseKind? clause).get!, properties,
       expression := expression.1, auxiliary }
@@ -5837,37 +5875,35 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   -- the function's own result type.
   let predeclareReturnType := (← lowerTypeUse typeContext declaration.result).typeId
   for (binding, scope) in scopedBindings #[] (declaration.body.getD (.unit {})) do
-    -- A body's quantifier binders are predeclared with the initializers
-    -- that hold them, below, and with the clauses'.
-    if binding.quantifier then continue
     let scopeLocals := scope.reverse.flatMap fun entry =>
       predeclared.filterMap fun (span, name, id, typeId) =>
         if span == entry.span then some (name, id, typeId) else none
     let inferenceLocals := scopeLocals ++ localTypes
-    -- A quantifier inside this initializer binds locals the inference probe
-    -- below must already know, so predeclare those binders first.
-    for quantifierBinding in binding.value.toArray.flatMap sourceQuantifierBindings do
-      unless declarations.any (·.span == quantifierBinding.pattern.span) do
-        -- The binders of this initializer's own declarations are already
-        -- predeclared, so the domain sees every local it can mention.
-        let visible := predeclared.reverse.map
-          (fun (_, name, id, typeId) => (name, id, typeId)) ++ localTypes
-        let quantifierScope ← visible.mapM fun (name, id, typeId) => do
-          pure (name, id, ← projectSpecTypeId typeId)
-        let predeclareContext : ExprContext := {
-          types := typeContext
-          locals := quantifierScope
-          declarations
-          returnType := predeclareReturnType
-          specification := true }
-        let patternType ← sourceQuantifierPatternType predeclareContext
-          quantifierBinding.domain
-        let patternDeclarations ← predeclareBindingPattern typeContext false
-          quantifierBinding.pattern patternType locals.size
-        for (localInfo, localDecl) in patternDeclarations do
-          locals := locals.push localDecl
-          declarations := declarations.push localInfo
-          logicalLocals := logicalLocals.push localInfo.id
+    if binding.quantifier then
+      -- A quantified domain sees its lexical scope, not later declarations
+      -- or bindings inside sibling blocks. In particular, a lambda's local
+      -- named `v` must not shadow an outer vector in a later assertion.
+      let visible ← inferenceLocals.mapM fun (name, id, typeId) => do
+        let projected ← if logicalLocals.contains id then pure typeId else projectSpecTypeId typeId
+        pure (name, id, projected)
+      let predeclareContext : ExprContext := {
+        types := typeContext
+        locals := visible
+        declarations
+        returnType := predeclareReturnType
+        specification := true }
+      let some domain := binding.value
+        | failAt "LEANER-QUANTIFIER-DOMAIN" "a quantifier has no domain" (some binding.span)
+      let patternType ← sourceQuantifierPatternType predeclareContext domain
+      let patternDeclarations ← predeclareBindingPattern typeContext false
+        binding.pattern patternType locals.size
+      for (localInfo, localDecl) in patternDeclarations do
+        locals := locals.push localDecl
+        declarations := declarations.push localInfo
+        logicalLocals := logicalLocals.push localInfo.id
+        predeclared := predeclared.push
+          (binding.span, localInfo.name, localInfo.id, localInfo.typeId)
+      continue
     let typeId ← match binding.type with
       | some type => pure (← lowerTypeUse typeContext type).typeId
       | none => do
@@ -5900,7 +5936,8 @@ private def lowerFunction (declaration : FunctionDecl) : LowerM Unit := do
   -- scope is every local declared above.
   let bodyLocals := predeclared.map fun (_, name, id, typeId) => (name, id, typeId)
   let mut quantifierLocals ← (bodyLocals.reverse ++ localTypes).mapM fun (name, id, typeId) => do
-    pure (name, id, ← projectSpecTypeId typeId)
+    let projected ← if logicalLocals.contains id then pure typeId else projectSpecTypeId typeId
+    pure (name, id, projected)
   -- A specification clause may bind locals itself (a `let` inside a clause,
   -- as an inlined specification call leaves one). They are predeclared in
   -- the logical domain, each inferred with the locals its clause can see.
@@ -6387,7 +6424,7 @@ private def lowerStruct (declaration : StructDecl) : LowerM Unit := do
   /- After its fields, a structure invariant reads the whole value as `this`,
   as an enum invariant does: a positional field has no name of its own. -/
   if declaration.contract.any (fun clause => match clause with
-      | .invariant .. => true
+      | .invariant .. | .modifiesOf .. | .modifiesOfAll .. => true
       | _ => false) then
     let mut arguments : Array LeanerIR.GenericArgument := #[]
     for (binder, index) in generics.zipIdx do
@@ -6479,10 +6516,14 @@ private def lowerEnum (declaration : EnumDecl) : LowerM Unit := do
   if declaration.contract.any (fun clause => match clause with
       | .invariant .. => true
       | _ => false) then
-    unless declaration.generics.isEmpty do
-      failAt "LEANER-ENUM-INVARIANT-GENERIC"
-        "generic enum invariants are not supported yet" (some declaration.span)
-    let thisType ← internType (.nominal name #[])
+    let mut arguments : Array LeanerIR.GenericArgument := #[]
+    for (binder, index) in generics.zipIdx do
+      unless binder.kind == .typeArg do
+        failAt "LEANER-ENUM-INVARIANT-GENERIC"
+          "an enum invariant over a non-type parameter is not supported" (some declaration.span)
+      arguments := arguments.push
+        (.typeArg { typeId := ← internType (.typeParameter index), loc })
+    let thisType ← internType (.nominal name arguments)
     locals := locals.push {
       id := ⟨0⟩, name := "this", type := { typeId := thisType, loc }
       mutable := false, loc }
@@ -6567,9 +6608,10 @@ private def lowerNamespaceInvariants
       returnType := boolType
       specification := true }
     let expression ← lowerExpr context (some boolType) declaration.expression
-    let isUpdate := declaration.properties.contains "update"
-    let properties := (declaration.properties.filter (· != "update")).map fun name =>
-      Attribute.assign name (.constant (.bool true))
+    let updateProperty (property : Pragma) :=
+      property.name == "update" && (property.value matches .bool true _)
+    let isUpdate := declaration.properties.any updateProperty
+    let properties ← (declaration.properties.filter (!updateProperty ·)).mapM pragmaAttribute
     let invariant : LeanerIR.NamespaceInvariant := {
       loc
       condition := {

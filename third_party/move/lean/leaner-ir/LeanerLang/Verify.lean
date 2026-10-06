@@ -124,7 +124,10 @@ theorem LeanerLang.Contract.selectVariantField_encode_enum {unit : LeanerIR.Vali
       else .unit := by
   rw [LeanerIR.Proofs.Denote.NTy.encode_enum_payload]; rfl
 
-attribute [lir_denote_norm] LeanerLang.Contract.testVariants_encode_enum
+attribute [lir_denote_norm] LeanerIR.moveArithmeticError LeanerLang.Contract.abortCodeMatches
+attribute [lir_denote_norm] LeanerLang.Contract.updateNominalField
+  LeanerLang.Contract.updateFieldIndex
+  LeanerLang.Contract.testVariants_encode_enum
   LeanerLang.Contract.selectVariantField_encode_enum
   LeanerLang.Contract.testVariants_nominal_self
   LeanerLang.Contract.testVariants_nominal LeanerLang.Contract.variantMember

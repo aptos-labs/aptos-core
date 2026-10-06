@@ -114,6 +114,7 @@ inductive ThrowKind where
   | abort
   | panic
   | moveVectorError
+  | moveArithmeticError
   deriving Repr, BEq, DecidableEq, Inhabited
 
 inductive QuantifierKind where
@@ -367,6 +368,7 @@ inductive Expr where
       (value : Expr) (span : Span := {})
   | testVariants (owner : Located Ty) (variants : Array String)
       (value : Expr) (span : Span := {})
+  | updateField (value : Expr) (field : String) (replacement : Expr) (span : Span := {})
   | discriminant (owner result : Located Ty) (value : Expr) (span : Span := {})
   | placeOperation (operation : PlaceOperation) (place : Expr) (span : Span := {})
   | borrowPlace (mutable : Bool) (place : Place) (span : Span := {})
@@ -439,7 +441,7 @@ def Expr.span : Expr → Span
       .select _ _ _ span | .field _ _ span | .storageIndex _ _ span |
       .index _ _ span |
       .membership _ _ span | .variantTest _ _ span | .selectVariants _ _ _ span |
-      .testVariants _ _ _ span | .discriminant _ _ _ span |
+      .testVariants _ _ _ span | .discriminant _ _ _ span | .updateField _ _ _ span |
       .placeOperation _ _ span | .block _ _ span |
       .borrowPlace _ _ span | .dropPlace _ span | .borrowValue _ _ span |
       .rawBorrowValue _ _ span |
@@ -479,16 +481,26 @@ structure FunctionModifiers where
   isOpaque : Bool := false
   deriving Repr, BEq, Inhabited
 
+structure Pragma where
+  name : String
+  value : Expr := .bool true
+  /-- The qualified name a pragma assigns, in place of a value. -/
+  qualified : Option String := none
+  span : Span := {}
+  deriving Repr, BEq, Inhabited
+
 inductive ContractClause where
-  | letPre (name : String) (expression : Expr) (properties : Array String := #[])
+  | letPre (name : String) (expression : Expr) (properties : Array Pragma := #[])
       (span : Span := {})
-  | letPost (name : String) (expression : Expr) (properties : Array String := #[])
+  | letPost (name : String) (expression : Expr) (properties : Array Pragma := #[])
       (span : Span := {})
-  | requires (expression : Expr) (properties : Array String := #[]) (span : Span := {})
-  | ensures (expression : Expr) (properties : Array String := #[]) (span : Span := {})
+  | requires (expression : Expr) (properties : Array Pragma := #[]) (span : Span := {})
+  | ensures (expression : Expr) (properties : Array Pragma := #[]) (span : Span := {})
   | abortsIf (expression : Expr) (code : Option Expr := none)
-      (properties : Array String := #[]) (span : Span := {})
-  | invariant (expression : Expr) (properties : Array String := #[]) (span : Span := {})
+      (properties : Array Pragma := #[]) (span : Span := {})
+  | abortsWith (expression : Expr) (additional : Array Expr := #[])
+      (properties : Array Pragma := #[]) (span : Span := {})
+  | invariant (expression : Expr) (properties : Array Pragma := #[]) (span : Span := {})
   | modifies (expression : Expr) (span : Span := {}) (loose : Bool := false)
   | modifiesAll (span : Span := {})
   | reads (type : Located Ty) (span : Span := {})
@@ -504,17 +516,9 @@ inductive ContractClause where
 
 def ContractClause.span : ContractClause → Span
   | .letPre _ _ _ span | .letPost _ _ _ span |
-      .requires _ _ span | .ensures _ _ span | .abortsIf _ _ _ span |
+      .requires _ _ span | .ensures _ _ span | .abortsIf _ _ _ span | .abortsWith _ _ _ span |
       .invariant _ _ span | .modifies _ span _ | .modifiesAll span |
       .reads _ span | .readsAll span | .modifiesOf _ _ _ span | .modifiesOfAll _ span => span
-
-structure Pragma where
-  name : String
-  value : Expr := .bool true
-  /-- The qualified name a pragma assigns, in place of a value. -/
-  qualified : Option String := none
-  span : Span := {}
-  deriving Repr, BEq, Inhabited
 
 /-- Literal or unresolved name assigned in declaration metadata. -/
 inductive SourceAttributeValue where
@@ -628,7 +632,7 @@ structure EnumDecl where
 /-- One predicate declared by a namespace-level `spec module` block. -/
 structure NamespaceInvariantDecl where
   expression : Expr
-  properties : Array String := #[]
+  properties : Array Pragma := #[]
   /-- An axiom: assumed, never an obligation. -/
   isAxiom : Bool := false
   span : Span := {}

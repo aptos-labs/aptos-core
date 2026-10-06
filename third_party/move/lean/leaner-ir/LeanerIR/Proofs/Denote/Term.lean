@@ -2064,6 +2064,25 @@ theorem wp_call {Args Result : Type} {function : Args → Comp unit Result}
 A bind on a literal outcome reduces directly; only a symbolic outcome goes
 through the weakest-precondition rule. -/
 
+/-- A pure short-circuit guard can be kept as one proposition. Splitting its
+two false paths first would verify the same continuation twice. The identical
+environments and pure branches are essential: an effectful right operand or
+a branch that changes locals must retain its short-circuit execution. -/
+theorem Flow.pure_shortCircuit_and {ρ : ResultShape} {Γ : NRow}
+    (p q : Prop) [Decidable p] [Decidable q] (env : HEnv Γ) :
+    (if p then (Spec.pure (.value (decide q) env) : Comp unit (Flow ρ Γ Bool))
+     else Spec.pure (.value false env)) =
+      Spec.pure (.value (decide (p ∧ q)) env) := by
+  by_cases hp : p <;> by_cases hq : q <;> simp [hp, hq]
+
+/-- The corresponding sharing law for the two true paths of a pure `||`. -/
+theorem Flow.pure_shortCircuit_or {ρ : ResultShape} {Γ : NRow}
+    (p q : Prop) [Decidable p] [Decidable q] (env : HEnv Γ) :
+    (if p then (Spec.pure (.value true env) : Comp unit (Flow ρ Γ Bool))
+     else Spec.pure (.value (decide q) env)) =
+      Spec.pure (.value (decide (p ∨ q)) env) := by
+  by_cases hp : p <;> by_cases hq : q <;> simp [hp, hq]
+
 @[simp] theorem Flow.bind_pure_value {ρ : ResultShape} {Γ : NRow} {α β : Type}
     (value : α) (env : HEnv Γ) (next : α → HEnv Γ → Comp unit (Flow ρ Γ β)) :
     Flow.bind (Spec.pure (.value value env)) next = next value env := by
@@ -2278,6 +2297,7 @@ theorem wp_anchorAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ
 -- A one-choice selection or update reads as a map over the projection, whose
 -- equations the normalizer inverts into the variant value itself.
 attribute [lir_denote high] Choices.select?_single Choices.update?_single
+attribute [lir_denote] Flow.pure_shortCircuit_and Flow.pure_shortCircuit_or
 attribute [lir_denote] Which.project?_eq_some_iff
 
 -- The denotation rewrites by its equations; unfolding remains the fallback

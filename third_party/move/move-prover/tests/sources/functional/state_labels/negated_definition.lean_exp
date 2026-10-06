@@ -1,5 +1,9 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/negated_definition.move:7:1: error: specification operation LeanerIR.Operation.specification
-  (LeanerIR.SpecOperation.update { pre := none, post := some 4 }) is not supported in generated contracts
-tests/sources/functional/state_labels/negated_definition.move:7:1: error: specification operation LeanerIR.Operation.specification
-  (LeanerIR.SpecOperation.update { pre := none, post := some 4 }) is not supported in generated contracts
+tests/sources/functional/state_labels/negated_definition.move:17:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/state_labels/negated_definition.move:16:9: error: the specification clause `ensures !((..S |~ update<R>(addr, new R { value := 1 })))
+        && ((..S |~ exists<R>(addr)))` is not established
+tests/sources/functional/state_labels/negated_definition.move:13:5: error: leaner verification failed: the automatic verification of `write_negated` failed; provide a proof: `verify write_negated by …` in `tests/sources/functional/state_labels/negated_definition.proof.lean` (`verify write_negated by skip` shows the obligations it leaves)
+tests/sources/functional/state_labels/negated_definition.move:28:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/state_labels/negated_definition.move:26:9: error: the specification clause `ensures (((..S |~ update<R>(addr, new R { value := 1 }))) ==> false)
+        && ((..S |~ exists<R>(addr)))` is not established
+tests/sources/functional/state_labels/negated_definition.move:23:5: error: leaner verification failed: the automatic verification of `write_in_antecedent` failed; provide a proof: `verify write_in_antecedent by …` in `tests/sources/functional/state_labels/negated_definition.proof.lean` (`verify write_in_antecedent by skip` shows the obligations it leaves)

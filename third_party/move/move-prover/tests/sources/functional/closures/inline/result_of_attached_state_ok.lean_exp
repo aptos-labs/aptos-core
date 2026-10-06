@@ -16,8 +16,8 @@ recursive✝ :
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                       (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                         LeanerIR.Proofs.Denote.NRow.nil))))))))) →
     LeanerIR.Proofs.Denote.Comp unit
@@ -29,8 +29,8 @@ recursive✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil)))))))))
         Unit)
@@ -71,8 +71,8 @@ leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier →
@@ -85,8 +85,8 @@ leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -99,8 +99,8 @@ leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -116,8 +116,8 @@ loopHypothesis✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil))))))))))
     (state : LeanerIR.Proofs.Denote.Memory unit),
@@ -125,7 +125,7 @@ loopHypothesis✝ :
       env.snd.fst = some a →
         env.snd.snd.fst = some v →
           env.snd.snd.snd.snd.snd.fst = some (LeanerIR.Proofs.Denote.vectorLength v) →
-            env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+            env.snd.snd.snd.snd.snd.snd.fst = none →
               env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
                 (env.snd.snd.fst.elim False fun v =>
                     env.snd.snd.snd.fst.elim False fun result =>
@@ -175,8 +175,8 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -205,8 +205,8 @@ recursive✝ :
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                       (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                         LeanerIR.Proofs.Denote.NRow.nil))))))))) →
     LeanerIR.Proofs.Denote.Comp unit
@@ -218,8 +218,8 @@ recursive✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil)))))))))
         Unit)
@@ -258,8 +258,8 @@ leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier →
@@ -272,8 +272,8 @@ leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -286,8 +286,8 @@ leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -303,8 +303,8 @@ loopHypothesis✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil))))))))))
     (state : LeanerIR.Proofs.Denote.Memory unit),
@@ -312,7 +312,7 @@ loopHypothesis✝ :
       env.snd.fst = some a →
         env.snd.snd.fst = some v →
           env.snd.snd.snd.snd.snd.fst = some (LeanerIR.Proofs.Denote.vectorLength v) →
-            env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+            env.snd.snd.snd.snd.snd.snd.fst = none →
               env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
                 (env.snd.fst.elim False fun a =>
                     env.snd.snd.fst.elim False fun v =>
@@ -364,8 +364,8 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →

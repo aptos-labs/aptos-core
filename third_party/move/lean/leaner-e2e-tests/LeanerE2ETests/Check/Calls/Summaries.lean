@@ -48,7 +48,9 @@ leaner module 0x99::summaries where
   spec succ_twice where
     pragma aborts_if_is_partial
     ensures result == value + 2
-    aborts_if value >= E_LIMIT with E_LIMIT
+    -- The second call also aborts at value = E_LIMIT - 1. Partial abort
+    -- conditions still constrain codes, so that case needs coverage too.
+    aborts_if value >= E_LIMIT - 1 with E_LIMIT
 
   -- A native over references: callers see its contract.
   native fun swap {T} (left : &mut T, right : &mut T) -> Unit

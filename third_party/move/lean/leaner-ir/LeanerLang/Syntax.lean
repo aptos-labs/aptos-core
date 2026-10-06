@@ -67,6 +67,7 @@ private def kwView := Lean.Parser.nonReservedSymbol "view" true
 private def kwPragma := Lean.Parser.nonReservedSymbol "pragma" true
 private def kwRequires := Lean.Parser.nonReservedSymbol "requires" true
 private def kwEnsures := Lean.Parser.nonReservedSymbol "ensures" true
+private def kwAbortsWith := Lean.Parser.nonReservedSymbol "aborts_with" true
 private def kwAbortsIf := Lean.Parser.nonReservedSymbol "aborts_if" true
 private def kwLetPre := Lean.Parser.nonReservedSymbol "let_pre" true
 private def kwLetPost := Lean.Parser.nonReservedSymbol "let_post" true
@@ -178,6 +179,7 @@ private def kwDataSelect := Lean.Parser.nonReservedSymbol "core.data.select" tru
 private def kwDataSelectVariants :=
   Lean.Parser.nonReservedSymbol "core.data.selectVariants" true
 private def kwDataTestVariants := Lean.Parser.nonReservedSymbol "core.data.testVariants" true
+private def kwDataUpdateField := Lean.Parser.nonReservedSymbol "core.data.updateField" true
 private def kwDataDiscriminant := Lean.Parser.nonReservedSymbol "core.data.discriminant" true
 private def kwCoreCall := Lean.Parser.nonReservedSymbol "core.call" true
 private def kwCoreInvoke := Lean.Parser.nonReservedSymbol "core.invoke" true
@@ -215,7 +217,7 @@ private def leanerIdentifier : Lean.Parser.Parser :=
     "type", "lifetime", "evidence", "mut", "private", "public", "package",
     "friend", "entry", "native", "opaque", "deprecated", "view", "pragma",
     "let_pre", "let_post", "modifies", "modifies_of", "reads", "requires", "ensures",
-    "aborts_if", "assert", "assume", "invariant", "spec", "fun", "module",
+    "aborts_if", "aborts_with", "assert", "assume", "invariant", "spec", "fun", "module",
     "namespace", "using", "where", "struct", "enum", "has", "Copy", "Drop",
     "Store", "Key", "true", "false", "abort", "panic", "do", "let", "loop",
     "while", "for", "break", "continue", "forall", "exists", "in", "immutable", "if",
@@ -223,7 +225,7 @@ private def leanerIdentifier : Lean.Parser.Parser :=
     "discriminant", "invoke", "function", "as", "match", "with"].foldr
       (fun keyword parser =>
         (if ["let_pre", "let_post", "modifies", "modifies_of", "reads", "requires", "ensures",
-            "aborts_if", "invariant"].contains keyword then
+            "aborts_if", "aborts_with", "invariant"].contains keyword then
           Lean.Parser.notFollowedBy (Lean.Parser.nonReservedSymbol keyword true) keyword
         else Lean.Parser.notSymbol keyword) >> parser)
       Lean.Parser.rawIdent
@@ -337,6 +339,7 @@ declare_syntax_cat leanerThrow
 syntax (name := leanerAbortThrow) kwAbort : leanerThrow
 syntax (name := leanerPanicThrow) kwPanic : leanerThrow
 syntax (name := leanerMoveVectorErrorThrow) "moveVectorError" : leanerThrow
+syntax (name := leanerMoveArithmeticErrorThrow) "moveArithmeticError" : leanerThrow
 
 declare_syntax_cat leanerExpr
 declare_syntax_cat leanerFieldIdentifier
@@ -376,7 +379,7 @@ syntax (name := leanerRuntimeAssertExpr) (priority := high)
 syntax (name := leanerRuntimeAssertMacroExpr) (priority := high)
   kwAssertBang "(" leanerExpr "," leanerExpr ")" : leanerExpr
 syntax (name := leanerThrowSurfaceExpr) (priority := high)
-  (kwAbort <|> kwPanic <|> "moveVectorError") "(" leanerExpr,* ")" : leanerExpr
+  (kwAbort <|> kwPanic <|> "moveVectorError" <|> "moveArithmeticError") "(" leanerExpr,* ")" : leanerExpr
 declare_syntax_cat leanerBehaviorCall
 syntax (name := leanerBehaviorCallSyntax)
   (kwRequiresOf <|> kwAbortsOf <|> kwEnsuresOf <|> kwResultOf <|>
@@ -514,6 +517,8 @@ syntax (name := leanerVariantNameSyntax) leanerIdentifier : leanerVariantName
 syntax (name := leanerTestVariantsExpr)
   kwDataTestVariants "[" leanerType "," leanerVariantName,+ "]"
     "(" leanerExpr ")" : leanerExpr
+syntax (name := leanerUpdateFieldExpr)
+  kwDataUpdateField "(" leanerExpr "," leanerFieldIdentifier "," leanerExpr ")" : leanerExpr
 syntax (name := leanerDiscriminantExpr)
   kwDataDiscriminant "[" leanerType "," leanerType "]"
     "(" leanerExpr ")" : leanerExpr
@@ -800,8 +805,11 @@ syntax (name := leanerDeprecatedModifier) kwDeprecated : leanerModifier
 syntax (name := leanerViewModifier) kwView : leanerModifier
 
 declare_syntax_cat leanerClause
+declare_syntax_cat leanerConditionProperty
+syntax (name := leanerConditionPropertySyntax)
+  leanerIdentifier ("=" leanerExpr)? : leanerConditionProperty
 declare_syntax_cat leanerConditionProperties
-syntax (name := leanerConditionPropertiesSyntax) "[" leanerIdentifier,* "]" : leanerConditionProperties
+syntax (name := leanerConditionPropertiesSyntax) "[" leanerConditionProperty,* "]" : leanerConditionProperties
 syntax (name := leanerLetPreClause)
   kwLetPre (leanerConditionProperties)? leanerIdentifier ":=" leanerExpr (";")? : leanerClause
 syntax (name := leanerLetPostClause)
@@ -812,6 +820,8 @@ syntax (name := leanerEnsuresClause)
   kwEnsures (leanerConditionProperties)? leanerExpr (";")? : leanerClause
 syntax (name := leanerAbortsIfClause)
   kwAbortsIf (leanerConditionProperties)? leanerExpr (kwWith leanerExpr)? (";")? : leanerClause
+syntax (name := leanerAbortsWithClause)
+  kwAbortsWith (leanerConditionProperties)? leanerExpr ("," leanerExpr)* (";")? : leanerClause
 syntax (name := leanerInvariantClause)
   kwInvariant (leanerConditionProperties)? leanerExpr (";")? : leanerClause
 syntax (name := leanerModifiesClause) kwModifies leanerExpr (";")? : leanerClause

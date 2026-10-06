@@ -1,3 +1,2 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/discarded_mut_ref_result.move:31:5: error: operation `LeanerIR.Operation.data
-  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 1 } } "value")` is outside the current LeanerLang parser
+tests/sources/functional/closures/inline/discarded_mut_ref_result.move:1:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet

@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/labeled_state_shape_mismatch.move:25:9: error: the specification clause `ensures ∃ (S : StateDomain),
-        (..S |~ single_progressed(old(a), a))
+        ((..S |~ single_progressed(old(a), a)))
           && (S.. |~ pair_progressed(old(a), a, old(b), b))` is not established
 tests/sources/functional/state_labels/labeled_state_shape_mismatch.move:24:5: error: leaner verification failed: the automatic verification of `step_both` failed; provide a proof: `verify step_both by …` in `tests/sources/functional/state_labels/labeled_state_shape_mismatch.proof.lean` (`verify step_both by skip` shows the obligations it leaves)

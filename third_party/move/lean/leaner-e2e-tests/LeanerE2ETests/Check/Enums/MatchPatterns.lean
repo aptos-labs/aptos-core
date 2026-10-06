@@ -125,6 +125,7 @@ leaner module 0x42::match_patterns where
   spec assign where
     pragma aborts_if_is_partial
     aborts_if !(token is Pair) with 14566554180833181697
+    aborts_if token is Pair && token.left + token.right > MAX_U64 with -1
 
 -- The runtime makes the same throw.
 open LeanerIR LeanerE2ETests.CheckSupport in

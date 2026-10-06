@@ -113,7 +113,7 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``leanerIndexExpr, ``leanerMembershipExpr,
     ``leanerVariantTestSurfaceExpr,
     ``leanerSelectVariantsExpr,
-    ``leanerTestVariantsExpr, ``leanerDiscriminantExpr,
+    ``leanerTestVariantsExpr, ``leanerUpdateFieldExpr, ``leanerDiscriminantExpr,
     ``leanerDiscriminantSurfaceExpr,
     ``leanerMatchExpr,
     ``leanerQuantifierExpr, ``leanerSpecificationAnchorMarkerExpr,
@@ -212,7 +212,7 @@ private def isModifierSyntax (stx : Syntax) : Bool :=
 private def isClauseSyntax (stx : Syntax) : Bool :=
   [``leanerLetPreClause, ``leanerLetPostClause,
     ``leanerRequiresClause, ``leanerEnsuresClause,
-    ``leanerAbortsIfClause, ``leanerInvariantClause,
+    ``leanerAbortsIfClause, ``leanerAbortsWithClause, ``leanerInvariantClause,
     ``leanerModifiesClause, ``leanerLooseModifiesClause, ``leanerModifiesAllClause,
     ``leanerModifiesOfClause, ``leanerModifiesOfAllClause,
     ``leanerReadsClause, ``leanerReadsAllClause].contains stx.getKind
@@ -293,7 +293,11 @@ private def typeChildren := childrenWhereOutsideExpressions isTypeSyntax
 private def typeArgumentChildren := childrenWhereOutsideExpressions isTypeArgumentSyntax
 private def lifetimeChildren := childrenWhereOutsideExpressions isLifetimeSyntax
 private def exprChildren (stx : Syntax) : Array Syntax :=
-  let found := childrenWhere isExprSyntax stx
+  -- Metadata values are expressions too, but are not operands of the
+  -- enclosing clause. Parse them only from their individual property node.
+  let found := (childrenWhere (fun child => isExprSyntax child ||
+    child.isOfKind ``leanerConditionPropertiesSyntax) stx).filter
+      (! ·.isOfKind ``leanerConditionPropertiesSyntax)
   found.zipIdx.filterMap fun (child, index) =>
     let span := spanOf child
     if found.drop (index + 1) |>.any (spanOf · == span) then none else some child
@@ -314,7 +318,8 @@ private partial def signatureTypeChildren (stx : Syntax) : Array Syntax :=
 private partial def throwChildren (stx : Syntax) : Array Syntax :=
   stx.getArgs.foldl (fun found child =>
     if child.isOfKind ``leanerAbortThrow || child.isOfKind ``leanerPanicThrow ||
-        child.isOfKind ``leanerMoveVectorErrorThrow then
+        child.isOfKind ``leanerMoveVectorErrorThrow ||
+        child.isOfKind ``leanerMoveArithmeticErrorThrow then
       found.push child
     else if isExprSyntax child then
       found
@@ -702,6 +707,7 @@ private def throwOf (stx : Syntax) : Except String ThrowKind :=
   if stx.isOfKind ``leanerAbortThrow then pure .abort
   else if stx.isOfKind ``leanerPanicThrow then pure .panic
   else if stx.isOfKind ``leanerMoveVectorErrorThrow then pure .moveVectorError
+  else if stx.isOfKind ``leanerMoveArithmeticErrorThrow then pure .moveArithmeticError
   else throw "expected `abort` or `panic`"
 
 private def primitiveOf (name : String) (failure : Option ThrowKind) : Except String Primitive :=
@@ -1006,6 +1012,7 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
   else if stx.isOfKind ``leanerThrowSurfaceExpr then
     let kind := if containsAtomOutsideExpressions "abort" stx then ThrowKind.abort
       else if containsAtomOutsideExpressions "moveVectorError" stx then .moveVectorError
+      else if containsAtomOutsideExpressions "moveArithmeticError" stx then .moveArithmeticError
       else .panic
     pure (.throw_ kind (← (exprChildren stx).mapM expressionOf) span)
   else if stx.isOfKind ``leanerRuntimeAssertExpr ||
@@ -1328,6 +1335,14 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
     let some value := (exprChildren stx)[0]?
       | throw "a variant-test expression must have one operand"
     pure (.testVariants (← typeOf owner) variants (← expressionOf value) span)
+  else if stx.isOfKind ``leanerUpdateFieldExpr then
+    let expressions := exprChildren stx
+    let some fieldSyntax := stx.getArgs.find? isFieldIdentifierSyntax
+      | throw "a field update requires its field name"
+    let field ← fieldIdentifierOf fieldSyntax
+    unless expressions.size == 2 do throw "a field update requires two operands"
+    pure (.updateField (← expressionOf expressions[0]!) field
+      (← expressionOf expressions[1]!) span)
   else if stx.isOfKind ``leanerDiscriminantExpr ||
       stx.isOfKind ``leanerDiscriminantSurfaceExpr then
     let types := typeChildren stx
@@ -1693,6 +1708,26 @@ private def modifiersOf (syntaxes : Array Syntax) : Except String FunctionModifi
     else throw s!"unknown function modifier `{stx.getKind}`"
   return result
 
+private def pragmaOf (stx : Syntax) : Except String Pragma := do
+  if stx.isOfKind ``leanerQualifiedPragmaClause then
+    let some name := (identifiers stx)[0]? | throw "a pragma must have a name"
+    let some path := stx.getArgs.find? (·.isOfKind ``leanerQualifiedNameSyntax)
+      | throw "a qualified pragma must name a path"
+    return { name, qualified := some (String.intercalate "::" (pathSegments path).toList)
+             span := spanOf stx }
+  let name ← match (identifiers stx)[0]? with
+    | some name => pure name
+    | none => if containsAtom "opaque" stx then pure "opaque" else throw "a pragma must have a name"
+  let value ← match (exprChildren stx)[0]? with
+    | some value => expressionOf value
+    | none => pure (.bool true (spanOf stx))
+  pure { name, value, span := spanOf stx }
+
+private def conditionPropertiesOf (stx : Syntax) : Except String (Array Pragma) := do
+  let properties := (childrenOfKind ``leanerConditionPropertiesSyntax stx).flatMap fun properties =>
+    childrenOfKind ``leanerConditionPropertySyntax properties
+  properties.mapM pragmaOf
+
 private def clauseOf (stx : Syntax) : Except String ContractClause := do
   let span := spanOf stx
   if stx.isOfKind ``leanerModifiesAllClause then return .modifiesAll span
@@ -1713,7 +1748,7 @@ private def clauseOf (stx : Syntax) : Except String ContractClause := do
   let some expression := expressions[0]?
     | throw "a contract clause requires an expression"
   let expression ← expressionOf expression
-  let properties := (childrenOfKind ``leanerConditionPropertiesSyntax stx).flatMap identifiers
+  let properties ← conditionPropertiesOf stx
   if stx.isOfKind ``leanerModifiesClause then return .modifies expression span
   if stx.isOfKind ``leanerLooseModifiesClause then return .modifies expression span true
   if stx.isOfKind ``leanerLetPreClause || stx.isOfKind ``leanerLetPostClause then
@@ -1728,23 +1763,10 @@ private def clauseOf (stx : Syntax) : Except String ContractClause := do
   else if stx.isOfKind ``leanerAbortsIfClause then
     if expressions.size > 2 then throw "an aborts_if clause has more than one abort code"
     pure (.abortsIf expression (← expressions[1]?.mapM expressionOf) properties span)
+  else if stx.isOfKind ``leanerAbortsWithClause then
+    pure (.abortsWith expression (← (expressions.extract 1 expressions.size).mapM expressionOf) properties span)
   else if stx.isOfKind ``leanerInvariantClause then pure (.invariant expression properties span)
   else throw s!"unknown contract clause `{stx.getKind}`"
-
-private def pragmaOf (stx : Syntax) : Except String Pragma := do
-  if stx.isOfKind ``leanerQualifiedPragmaClause then
-    let some name := (identifiers stx)[0]? | throw "a pragma must have a name"
-    let some path := stx.getArgs.find? (·.isOfKind ``leanerQualifiedNameSyntax)
-      | throw "a qualified pragma must name a path"
-    return { name, qualified := some (String.intercalate "::" (pathSegments path).toList)
-             span := spanOf stx }
-  let name ← match (identifiers stx)[0]? with
-    | some name => pure name
-    | none => if containsAtom "opaque" stx then pure "opaque" else throw "a pragma must have a name"
-  let value ← match (exprChildren stx)[0]? with
-    | some value => expressionOf value
-    | none => pure (.bool true (spanOf stx))
-  pure { name, value, span := spanOf stx }
 
 private def binderOf (stx : Syntax) : Except String GenericBinder := do
   let some name := (identifiers stx)[0]? | throw "a generic binder must have a name"
@@ -1913,7 +1935,7 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
         | throw "a module invariant requires an expression"
       pure ({
         expression := ← expressionOf expression
-        properties := (childrenOfKind ``leanerConditionPropertiesSyntax member).flatMap identifiers
+        properties := ← conditionPropertiesOf member
         isAxiom := member.isOfKind ``LeanerLang.leanerNamespaceAxiomMemberSyntax
         span := spanOf member } : NamespaceInvariantDecl)
     pure (.item (.namespaceInvariants declarations))

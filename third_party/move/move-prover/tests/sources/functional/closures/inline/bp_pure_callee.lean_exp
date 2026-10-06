@@ -27,12 +27,6 @@ warning: cannot derive `folds_of` exactly for this lambda argument: the enclosin
     │         │            lambda argument
     │         from a call inlined at this callsite
 
-tests/sources/functional/closures/inline/bp_pure_callee.move:97:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/bp_pure_callee.move:97:5: error: leaner verification failed: the automatic verification of `count_all` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify count_all by …` in `tests/sources/functional/closures/inline/bp_pure_callee.proof.lean` (`verify count_all by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/bp_pure_callee.move:121:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

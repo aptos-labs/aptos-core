@@ -1,0 +1,7 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/state_domain_binder_capture.move:22:9: error: the specification clause `ensures ∃ (s : StateDomain),
+        ∃ (s_val : Int), s_val < 100 && (s.. |~ lt_100(old(x), x))` is not established
+tests/sources/regression/state_domain_binder_capture.move:20:5: error: leaner verification failed: the automatic verification of `captured` failed; provide a proof: `verify captured by …` in `tests/sources/regression/state_domain_binder_capture.proof.lean` (`verify captured by skip` shows the obligations it leaves)
+tests/sources/regression/state_domain_binder_capture.move:30:9: error: the specification clause `ensures ∃ (s : StateDomain),
+        ∃ (k_val : Int), k_val < 100 && (s.. |~ lt_100(old(x), x))` is not established
+tests/sources/regression/state_domain_binder_capture.move:28:5: error: leaner verification failed: the automatic verification of `renamed` failed; provide a proof: `verify renamed by …` in `tests/sources/regression/state_domain_binder_capture.proof.lean` (`verify renamed by skip` shows the obligations it leaves)

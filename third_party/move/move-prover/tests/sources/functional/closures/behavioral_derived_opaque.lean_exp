@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/behavioral_derived_opaque.move:22:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](outer)>(1) == 1` is not established
+tests/sources/functional/closures/behavioral_derived_opaque.move:21:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](wrapper)>(1) == 1` is not established
+tests/sources/functional/closures/behavioral_derived_opaque.move:18:5: error: leaner verification failed: the automatic verification of `check` failed; provide a proof: `verify check by …` in `tests/sources/functional/closures/behavioral_derived_opaque.proof.lean` (`verify check by skip` shows the obligations it leaves)

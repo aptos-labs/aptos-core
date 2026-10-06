@@ -1,4 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/aborting_result_definition.move:5:1: error: state label `S` is not bound in this clause; a label a state-change predicate or an invocation defines is not carried yet
-tests/sources/functional/state_labels/aborting_result_definition.move:5:1: error: specification operation LeanerIR.Operation.specification
-  (LeanerIR.SpecOperation.remove { pre := none, post := some 6 }) is not supported in generated contracts
+tests/sources/functional/state_labels/aborting_result_definition.move:18:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/state_labels/aborting_result_definition.move:16:5: error: leaner verification failed: the automatic verification of `caller` failed; provide a proof: `verify caller by …` in `tests/sources/functional/state_labels/aborting_result_definition.proof.lean` (`verify caller by skip` shows the obligations it leaves)
+tests/sources/functional/state_labels/aborting_result_definition.move:32:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/state_labels/aborting_result_definition.move:29:5: error: leaner verification failed: the automatic verification of `missing` failed; provide a proof: `verify missing by …` in `tests/sources/functional/state_labels/aborting_result_definition.proof.lean` (`verify missing by skip` shows the obligations it leaves)

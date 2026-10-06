@@ -791,3 +791,392 @@ not help: the types differ, so delta is the only way to agree. Such facts
 are now auxiliary theorems (`mkAuxTheorem`, kernel-checked once, cached by
 statement): constants nothing rewrites, whose comparisons are syntactic.
 Same shape as `compiled_eq` and the pointer-width fact.
+
+## Failed benchmark targets (2026-10-05)
+
+A fresh full run on `wrwg/lean4` verified 23/32 problems. Two map problems
+crashed before verification: the current `simple_map` source binds
+`map_spec_insertion_key_at` and `map_spec_insertion_rank`, outside the old
+62-role registry. They now use the existing position operations without
+selecting the ordered discipline (64 roles). `InsertionMap.lean` checks
+descending keys, ranks, and the implicit sequence-map validity obligation.
+
+`ordered_map::test_verify_drain_symbolic` now has a proof companion using
+`all_goals grind` on its prepared obligations. The isolated native run
+verifies at 439,463,639 heartbeats versus the original automatic timeout
+at 1,500,266,913 (71% less). No specification or budget was changed. The
+same simple proof did not fix `ground_enum_123`, so it was not retained.
+The full-module comparison confirms `drain` at 438,622,463 heartbeats,
+with `ordered_map` falling from 13,374,095,060 to 12,336,281,295 (7.8%
+less), and 16 failing targets instead of 17. Wall time fell from 606 s to
+429 s, but other unchanged problems were also faster, so do not attribute
+all of that wall-time change to the fix.
+
+The isolation script previously left assertion-only functions running,
+because it disabled only existing spec blocks. It now adds disabled specs
+for those functions and omits unrelated authored proofs, including quoted
+identifiers; a Python regression covers these cases. Check the result's
+`targets` array when attributing a run. The invocation projection scanner
+now visits shared expression subterms once across the goal and context,
+using the existing order-preserving `sitesWhere` traversal. Both existing
+performance gates pass without baseline changes.
+
+Remaining failures include `behavior::add_two` (nested invocation facts),
+`capability` (storage/abort implications), `pool_u64` (quantified map
+invariants and a costly `buy_in`), and further ordered-map targets.
+`type_info` needs concrete reflection semantics, while `ristretto255`
+leaves native-specification equalities. The higher-order paper examples
+still stop at frontend gaps: `amm` refers to a contract let in a body proof;
+`calculator` carries a valued condition property that the printer treats
+as a Boolean flag. These are distinct from proof-search timeouts.
+
+The final full run verifies **24/32** problems (was 23/32), with no crashes:
+`simple_map` verifies and `pool_u64` reaches its remaining proof failures.
+The 23 problems verified in both runs have essentially unchanged aggregate
+heartbeats (4.79G). Their wall time changed from 222 s to 193 s, illustrating
+why the map heartbeat comparison is the attributable saving. All four Lake
+builds and suites pass, including 113 Check fixtures, both performance gates,
+and the new Python isolation regression. No expected-output baselines were
+changed in this benchmark increment. `local_benchmark.html` is refreshed.
+
+
+### Follow-up: benchmark sample proofs (2026-10-05)
+
+The higher-order examples now reach verification. Valued clause attributes,
+contract lets used in proof steps, grouping of post-only labels, lexical lets
+around free label definitions, and captured function literals are supported.
+The lexical-label regression also calls an opaque specification: it does not
+rely on callee program points.
+
+The AMM companion proves `constant_product`, `constant_product_with_fee`, and
+`constant_product_with_fee_non_compliant`. The proofs establish division bounds,
+fee-adjusted input bounds, overflow safety, and the reserve-product inequality.
+The non-compliant pricing function's own contract is valid; storing it in a
+pool remains an intentional invariant violation. Other pool obligations remain.
+
+The `ristretto255` companion proves the three previously failing option-wrapped
+scalar results by normalizing option payloads and using byte-vector codec
+tightness. These are representation proofs over the existing native contracts.
+
+The `capability` companion proves `acquire` and `acquire_linear`. A proved
+normalization lemma reduces the partially applied address transport under vector
+mapping, connecting search results to the quantified membership contract.
+`delegate` and `revoke` still leave obligations; unsuccessful proof attempts for
+them were removed.
+
+Validation for these frontend and IR changes passed all four package suites,
+including 114 Check fixtures and both performance gates without baseline changes.
+The Move-to-Leaner state-label baseline was updated through its owning driver
+for three parenthesization changes, then the full end-to-end suite passed.
+Both Python isolation tests pass.
+
+A proposed relaxation of `abortCases?` was tested against nested `result_of`
+calls and discarded: it expanded proof search to the budget without fixing
+`behavior::add_two`. The narrower existing suppression rule remains in place.
+
+The completed follow-up full run verifies **25/32** problems (was 24/32),
+with no crashes. `ristretto255` drops from 483M to 451M heartbeats (6.6%);
+its reduced and uniform scalar constructors drop by about 49%, and inversion
+by 19%. The two capability acquisition targets drop by about 21% each;
+the module drops from 467M to 442M but still fails delegation/revocation.
+The 24 problems verified in both runs use essentially unchanged aggregate
+heartbeats (5.00G); wall time changes from 203.0 s to 198.5 s. AMM and
+calculator now spend time on actual proof obligations rather than stopping
+at frontend errors, so their increased costs are not comparable proof-search
+regressions. All three authored AMM pricing proofs pass in the full run.
+`local_benchmark.html` contains the completed report.
+
+
+### Capability delegation and revocation (2026-10-05)
+
+Both remaining targets now verify, and a native whole-module verification run
+passes. The residual storage facts retained `Memory.set` reads across distinct
+resource declarations: resolving generic types kept their handles distinct,
+but the simplifier did not establish that premise of `Memory.set_other`.
+The companion proves a direct read-after-write lemma using the existing
+`handle?_resolve_struct` theorem, then discharges concrete handle inequalities.
+`delegate` additionally normalizes `ofRuntime (toRuntime value)`. Normalizing
+parameter transport for the generic vector helpers is needed by both targets;
+without it, the integrated proofs still leave a leaf. No Move code, contract,
+verification budget, or shared verifier implementation changed in this step.
+
+The benchmark driver confirms **capability verified, zero errors** in a targeted
+rerun and refreshes `local_benchmark.html`. Relative to the preceding full run:
+
+| Measurement | Before | After | Change |
+| --- | ---: | ---: | ---: |
+| Module heartbeats | 441,834,760 | 307,590,516 | -30.4% |
+| `delegate` heartbeats | 154,271,003 | 59,293,737 | -61.6% |
+| `revoke` heartbeats | 116,344,784 | 74,068,608 | -36.3% |
+
+Wall time increased from 17.9 s to 26.4 s despite the heartbeat reduction;
+this run does not establish a wall-time improvement. This is a capability-only
+rerun, not another full 32-problem run. The preceding full run remains 25/32;
+capability is now additionally verified, leaving six failing samples from that
+run (`type_info`, `pool_u64`, `ordered_map`, `behavior`, `amm`, `calculator`).
+
+
+### Ordered-map proof search (2026-10-05)
+
+The regular full run after the capability fix verifies **26/32** samples.
+`ordered_map` still consumes 12,335,645,764 heartbeats; elapsed-time variation
+is not the performance criterion. Four targets (`ground_enum_123`,
+`test_verify_remove_or_none`, `test_verify_enumeration_view`, and
+`test_verify_pop_rank`) each exhaust about 1.5G heartbeats. Together with
+lower-bound rank/gap and mutable iteration, the seven most expensive failing
+targets account for roughly 9.5G heartbeats.
+
+Profiling `ground_enum_123` with an authored proof identified `omega` in
+`leaner_denote_decide_residual`: a leaf costs roughly 9M to prepare and 508M
+in that decider; the next decider consumes the remaining budget. The prepared
+map-position facts contain conditional ordering relations. These automatic
+attempts now use the existing 20M speculative-attempt bound, leaving the
+residual for the authored proof. The individual residual deciders have timing
+labels, so their costs are visible in `leaner.denoteProfile`/`denoteDebug`.
+The target's overall budget is unchanged.
+
+The companion adds proofs for the literal duplicate-key constructor, front/back
+key borrowing, and `ground_enum_123`. Literal construction is simplified and
+vector membership is established with concrete witnesses. No Move source or
+specification changed. All four Lake suites pass, including 114 Check fixtures
+and both performance gates without baseline changes.
+
+Intermediate `stageLog` theorem reports do not establish success: the marker
+is written before the verifier checks recorded errors, and rendering the
+large residual diagnostics can continue afterward. The simple `grind` attempts for the
+lower-bound targets were not retained; the rank attempt failed after its
+intermediate stage report. Use completed process results and the native
+benchmark for validation and final heartbeat comparisons.
+
+The completed native module benchmark confirms the retained changes:
+
+| Target / scope | Before heartbeats | After heartbeats | Change |
+| --- | ---: | ---: | ---: |
+| Entire `ordered_map` | 12,335,645,764 | 11,042,938,271 | -10.5% |
+| `ground_enum_123` | 1,500,093,336 (timeout) | 263,678,562 | -82.4% |
+| `test_verify_borrow_front_key` | 89,311,691 | 41,793,692 | -53.2% |
+| `test_verify_borrow_back_key` | 75,892,790 | 42,339,481 | -44.2% |
+| `test_aborts_if_new_from_1` | 10,512,861 | 8,689,423 | -17.3% |
+
+The module remains failed; its error count falls from 75 to 63. The remaining
+three 1.5G timeouts are `test_verify_remove_or_none`,
+`test_verify_enumeration_view`, and `test_verify_pop_rank`. The symbolic
+lower-bound rank/gap and mutable-walk targets still cost roughly 1.185G,
+1.078G, and 1.252G. These dominate the remaining work. In the enumeration
+caller, `leaner_denote_map_positions` itself times out during simplification;
+a proved literal bulk-constructor rule alone did not fix it. Iterator-payload
+and parameter-transport normalization alone did not close the lower-bound
+proof either. These experiments were not retained. The benchmark driver
+regenerated `local_benchmark.html` from this module rerun.
+
+A separate native batch containing exactly the four newly fixed targets
+finishes with `verified`, zero errors. This confirms their proof status
+independently of the full module report, which truncates its error list.
+
+
+### Lower-bound gap normalization (2026-10-05)
+
+`test_verify_lower_bound_gap_symbolic` is a symbolic consequence of the opaque
+lower-bound contract: for an absent key, a returned position has a strictly
+larger key and a strictly smaller predecessor; End means all keys are smaller.
+The End obligation already closed. The other two were blocked by the callee's
+encoded enum-field read surviving as a separate arithmetic atom from the
+caller's integer index. In the residual, omega could assign a negative value
+to the encoded read while respecting nonnegativity of the actual u64 index.
+
+Two normalization omissions caused this. `variantPayload_inl/inr` were not in
+`lir_denote_norm`, and `canonicalFamilies` handled carriers and codecs but not
+`NTy.encode` or `HList.encode`. A concrete row encoded under a generic callee's
+instantiated family did not match the row-encoding simp rules when its value
+was spelled in the caller's family. Canonicalize these encodings by definitional
+replacement and register the existing payload reduction theorems. No new axioms,
+Move edits, contract changes, or authored proof for this target are needed.
+
+The native isolated run `/tmp/gap-native.json` verifies with zero errors:
+**37,756,214 target heartbeats**, versus **1,077,776,124** in the preceding
+whole-module run (96.5% fewer). This is target proof cost, excluding module
+loading and certification. `GenericEnumPayload` is a small regression: a generic
+opaque callee returns a concrete enum position and the caller derives
+`index + 1 <= length` from its contract's `index < length`. It fails without
+the payload normalization and passes with the fix.
+
+Validation: all four Lake suites pass, including 115 Check fixtures and both
+performance gates without baseline updates. The final isolated automatic run
+also exits successfully against the built library, without local attributes
+or a companion proof.
+
+The completed whole-module rerun `/tmp/perf-ordered-gap-fixed.json` records
+37,703,146 heartbeats for the gap target. The module's total falls from
+11,042,938,271 to 8,378,929,045 heartbeats (24.1%); errors fall from 63 to 43.
+The module still fails other targets. The benchmark driver recorded the run
+and regenerated `local_benchmark.html` from its results.
+
+
+### Ground remove-or-none proof (2026-10-05)
+
+After the lower-bound fix, `test_verify_remove_or_none` was the most expensive
+ordered-map target at 1,501,030,575 heartbeats (timeout). No suites were running
+when the user requested stopping tests; no broad suites were launched for this
+increment.
+
+The model retained `updateAll` for the literal three-key constructor. The
+following membership, deletion, and size obligations accumulated around that
+expression; an authored-proof preparation alone spent about 764M heartbeats
+on residuals. Unrestricted unfolding of the constructor did not solve it and
+still timed out in map-position simplification.
+
+The companion now proves the concrete constructor equation for keys 1, 2, 3
+with arbitrary values, plus size and recursive membership laws for constructed
+maps. Registering these proven equations for normalization makes the initial
+facts computational before map-position reasoning. The remove-or-none proof
+then closes by simplification of the model's deletion, membership, and size
+operations. No Move code, contracts, core verifier, or heartbeat limits changed.
+
+The independent native run `/tmp/remove-verified.json` is **verified, zero
+errors**, at **124,901,888 target heartbeats** (91.7% fewer than the timeout).
+The initial successful proof without early size/membership normalization cost
+about 306M; the early rules reduce the map-position stage from about 242M to
+71M. Validation is deliberately the focused native proof and the affected
+module benchmark, following the user's benchmark-first/periodic-suite policy.
+
+The completed module benchmark `/tmp/perf-ordered-remove-fixed.json` confirms
+**123,966,728 heartbeats** for `test_verify_remove_or_none`. Total ordered-map
+heartbeats fall from **8,378,929,045 to 6,900,704,697** (17.6%); errors fall
+from 43 to 23. There are no new failing targets; `test_verify_upsert` also
+stops failing with the computational lemmas. Six targets remain failed:
+`test_aborts_if_new_from_2`, `test_verify_enumeration_view`,
+`test_verify_iter_collect_symbolic`, `test_verify_next_key`,
+`test_verify_pop_rank`, and `test_verify_prev_key`. The driver records the data
+and regenerates `local_benchmark.html`. Wall time increased in this run;
+heartbeat counts are the performance result, not a claimed wall-time speedup.
+
+### Ordered-map verification complete and full suites (2026-10-05)
+
+The native whole-module run `/tmp/perf-ordered-scoped.json` verifies **all 29
+targets with zero errors**. Total heartbeats decrease from **6,900,704,697 to
+4,125,866,249** (40.2%); verification accounts for 3,661,351,695. The normal
+benchmark driver recorded the data and regenerated `local_benchmark.html`.
+The remaining six failures from the preceding run are all closed.
+
+Three automation fixes matter. First, map-position preparation substitutes
+proven literal constructor equations into concrete map reads before generating
+symbolic order facts. Quantified context is excluded from that substitution to
+avoid expanding large hypotheses. Second, normalization canonicalizes opaque
+map encodings exposed late in a proof across caller/callee families. This rule
+is restricted to enumeration-backed map layouts and variable values: applying
+it indiscriminately to control-flow enums disrupts iterator pattern matching.
+Third, recursive loop hypotheses are matched after definitionally normalizing
+abort-continuation obligation markers. Invariant premise markers remain intact
+so failures retain their original source-clause diagnostics; unsuccessful
+matching attempts restore the original goal.
+
+The companion supplies a duplicate-index characterization of non-distinct keys
+for `new_from_2`, computational next/previous-key proofs, and constructor/read/
+removal equations for literal maps. Ground enumeration and pop-rank proofs use
+explicit finite witnesses for specification membership. No Move source or
+specification changed, and no axioms, admissions, or budget increases were used.
+The earlier specification errors were unestablished proof obligations, not
+counterexamples to those specifications.
+
+Selected final target heartbeats:
+
+| Target | Heartbeats | Previous result |
+|---|---:|---|
+| `test_aborts_if_new_from_2` | 21,350,722 | Failed |
+| `test_verify_next_key` | 47,165,957 | Failed |
+| `test_verify_prev_key` | 38,776,989 | Failed |
+| `test_verify_enumeration_view` | 99,573,282 | 1.500G timeout |
+| `test_verify_pop_rank` | 215,334,745 | 1.500G timeout |
+| `test_verify_iter_collect_symbolic` | 182,138,877 | Failed |
+| `test_verify_remove_or_none` | 63,673,408 | 123,966,728 |
+
+The largest remaining costs are mutable iterator walk (943,189,244), drain
+(438,953,085), and insertion in the middle (283,712,677). Walk companion
+experiments with restricted `grind only` did not establish the specification;
+they were discarded. Its passing automatic proof remains unchanged.
+
+At the user's request, all four full Lake suites were run. The first end-to-end
+run caught two diagnostic regressions (`LoopInvariantErrors` and `vault_errors`)
+from overly broad obligation-marker normalization. Restricting it to abort
+continuations fixed the diagnostics without updating baselines. After the final
+module benchmark and report generation, **all four full suites passed**:
+`leaner-ir`, `leaner-move`, `leaner-rust`, and `leaner-e2e-tests`, including 115
+Check fixtures, source verification, MonoVM, differential tests, and both
+performance gates. Logs are `/tmp/ordered-final-<package>-test.log`. This is a
+complete Leaner test-matrix run, not a new aggregate run of all 32 benchmark
+samples or all Move Prover registry tests.
+
+### AMM and calculator proof failures (2026-10-05)
+
+The native scoped run `/tmp/amm-calculator-final.json` verifies calculator
+with zero errors and all six valid AMM targets. AMM's deliberately
+non-compliant constructor still fails: it calls pricing that can abort when
+the fee resource is absent, contradicting the pool's all-state no-abort law.
+The benchmark continues to report AMM as failed; no expected-failure override
+or specification weakening hides the negative example. Its automatic search
+still reaches the 1.5G heartbeat limit, so fast rejection remains open.
+
+The failures exposed missing propagation of behavior assumptions from data
+invariants and missing default frames for stored function fields. Move
+function fields now carry the empty modification frame, checked at packing,
+mutation, return, and storage boundaries. The closer recovers it from stored
+invariants before invoking a removed resource's closure. `EncodedKeepsMemory`
+and its encoding equations are kernel-checked; the same declaration predicate
+controls compiler checkpoints and generated contracts. Explicit field writes
+(`modifies_of`) remain unsupported and are rejected rather than silently
+receiving the default empty frame.
+
+Calculator also read `old(State[addr])` inside the state selected after
+`move_from`: Leaner's partial memory has no value there. Its specification
+now binds the entry-state continuation before selecting that label. The
+companion proof normalizes enum payloads, closure masks, and stored invariants.
+No implementation behavior changes. State labels remain expressions over
+memory, usable in opaque contracts at callers without program points.
+
+AMM's companion proves bounded integer division and monotonicity of rounded
+pricing. Literal-closure contract dispatch first identifies its family, so
+the existing pricing theorems apply without expanding the pricing body at
+each constructor. Arithmetic names retained by saved continuations keep
+their defining equations; unused continuation lets are removed before
+authored simplification. A bare `open` in the companion had prematurely
+ended the module and hidden its helper lemmas; scoped `open … in` fixes it.
+
+Scoped native target heartbeats:
+
+| Target | Heartbeats | Result |
+|---|---:|---|
+| AMM `constant_product` | 26,758,185 | Verified |
+| AMM `constant_product_with_fee` | 335,759,272 | Verified |
+| AMM `constant_product_with_fee_non_compliant` | 614,769,503 | Verified under its own contract |
+| AMM `create_constant_product_pool` | 82,260,048 | Verified |
+| AMM `swap` | 157,495,677 | Verified |
+| AMM `create_compliant_fee_pool` | 118,055,055 | Verified |
+| AMM `create_noncompliant_fee_pool` | 1,500,124,400 | Rejected; search times out |
+| Calculator `process` | 1,160,168,202 | Verified |
+
+Calculator totals 1,242,895,584 heartbeats across all eight targets. This
+is more than its earlier failed run (971M), so it is a correctness result,
+not a claimed heartbeat reduction. AMM totals 2,865,860,388. New Check
+fixtures cover behavioral invariants and stored closures, including rejection
+of packing and field replacement with a memory-writing closure. The complete
+benchmark refresh and broad-suite validation follow the scoped run.
+
+The final full 32-problem run
+`/tmp/leaner-benchmark-amm-calculator-complete.json` confirms **28/32 verified**,
+up from 27 before this increment. Calculator totals **1,242,871,952**
+heartbeats with zero errors; AMM totals **2,865,859,391**, with only its
+intentional negative constructor failed. Aptos Framework `ordered_map`
+retains all 29 passing targets and zero errors at **4,120,422,247**. No
+previously verified problem regresses to failure. The generated HTML uses
+this complete run against the `main` CI baseline (`ea4ecc43e7`, run
+37250691414), excluding intermediate local runs. This report was regenerated
+before starting the four full Lake suites.
+
+Validation complete: all four package builds and full Lake suites pass
+(`leaner-ir`, `leaner-move`, `leaner-rust`, `leaner-e2e-tests`), including
+118 Check fixtures, source verification, MonoVM/differential checks, and both
+performance gates. No existing baseline was regenerated. The new
+`StoredFrameErrors.exp` was generated through the owning baseline helper and
+reviewed for its four intended diagnostics. Logs are
+`/tmp/amm-calculator-<package>-test.log`; aggregate exit statuses are in
+`/tmp/amm-calculator-full-tests.log`.

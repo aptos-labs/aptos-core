@@ -39,13 +39,22 @@ def resourceOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : Type
       some ⟨type, NRow.ofList arguments⟩
   | _ => none
 
+/-- Only a closed resource type names a runtime storage key. Open generic
+entries remain templates for frame instantiation (`resourceOf`), but do not
+encode independent runtime slots before that instantiation. -/
+def runtimeResourceOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : TypeId) :
+    Option ResourceType := do
+  let resource ← resourceOf unit namespaceId typeId
+  guard resource.type.paramFree
+  some resource
+
 /-- Runtime global memory holding exactly what a typed memory holds: under
 every key, the encoding of the value at the resource type its type
 identifier denotes, and nothing under a key that denotes none.  Its entries
 are in key order, so the memory determines it. -/
 def Encodes (unit : ValidatedUnit) (memory : Memory unit) (globals : GlobalMap) : Prop :=
   globals.Sorted ∧ ∀ namespaceId typeId key, globals.lookup ⟨namespaceId, typeId, key⟩ =
-    match resourceOf unit namespaceId typeId with
+    match runtimeResourceOf unit namespaceId typeId with
     | some resource => (memory resource key).map (@NTy.encode (Carriers.runtime unit) resource.type)
     | none => none
 
@@ -57,7 +66,7 @@ theorem Encodes.unique {unit : ValidatedUnit} {memory : Memory unit} {left right
 
 /-- A resource type no runtime key of the unit names. -/
 def Unnamed (unit : ValidatedUnit) (resource : ResourceType) : Prop :=
-  ∀ namespaceId typeId, resourceOf unit namespaceId typeId ≠ some resource
+  ∀ namespaceId typeId, runtimeResourceOf unit namespaceId typeId ≠ some resource
 
 /-- Two memories that agree on every resource type no runtime key names. -/
 def AgreeUnnamed (unit : ValidatedUnit) (left right : Memory unit) : Prop :=

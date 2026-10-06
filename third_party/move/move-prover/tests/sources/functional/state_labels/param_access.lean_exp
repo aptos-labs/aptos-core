@@ -1,5 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/param_access.move:72:9: error: the specification clause `ensures result == global<Data>(addr).value * global<Index>(addr).pos` is not established
 tests/sources/functional/state_labels/param_access.move:70:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

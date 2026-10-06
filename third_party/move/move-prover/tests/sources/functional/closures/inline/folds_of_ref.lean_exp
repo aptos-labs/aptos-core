@@ -1,3 +1,13 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_ref.move:25:10: error: operation `LeanerIR.Operation.data
-  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 2 } } "count")` is outside the current LeanerLang parser
+tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: leaner verification failed: the automatic verification of `weighted_via_ref` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify weighted_via_ref by …` in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean` (`verify weighted_via_ref by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: leaner verification failed: the automatic verification of `weighted_via_ref_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify weighted_via_ref_wrong by …` in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean` (`verify weighted_via_ref_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

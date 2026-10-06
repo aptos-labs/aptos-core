@@ -6,7 +6,7 @@ iterator tests and a client module); `simple_map` and `pool_u64` in part.
 A Move structure marked `pragma intrinsic = map` binds roles of the Move
 Prover's map theory to functions of its module (`lir-design.md`, "Intrinsic
 declarations and role graphs"; the Move-profile registry in
-`leaner-move/LeanerMove/Intrinsics.lean` checks the 62 roles). This design
+`leaner-move/LeanerMove/Intrinsics.lean` checks the 64 roles). This design
 gives the roles their verification meaning. The authority for what each role
 guarantees is the Prover's `table_module` in
 `move-prover/boogie-backend/src/prelude/native.bpl`; where Leaner deviates,
@@ -57,7 +57,9 @@ which the registry already constrains:
   entry structures (`SimpleMap { data }`, `OrderedMap::SortedVectorMap
   { entries }`). The model is that vector, read as pairs; the discipline is
   ordered when the owner binds an ordering role (`spec_key_at`, `spec_rank`,
-  front/back, prev/next), sequence otherwise.
+  front/back, prev/next), sequence otherwise. The separate insertion-position
+  roles (`spec_insertion_key_at`, `spec_insertion_rank`) read the same model
+  positions without selecting the ordered discipline.
 - **Table layout**: the entries live in native table storage behind a handle
   (`Table`), and composite owners build on tables (`TableWithLength`,
   `SmartTable`, `BigOrderedMap`). Their model needs the table natives
@@ -104,7 +106,8 @@ verified against them (the Prover does not verify them either).
 | `replace_key_inplace` | absent old key; new key out of order | the entry's key replaced at its position |
 | `borrow_front`, `borrow_back`, `front_key`, `back_key`, `pop_front`, `pop_back` | empty | smallest or largest entry; `pop_*` removes it |
 | `prev_key`, `next_key` | never | the neighbouring key as `Option` |
-| `spec_key_at`, `spec_rank` | — | position ↔ key |
+| `spec_key_at`, `spec_rank` | — | position ↔ key in key order |
+| `spec_insertion_key_at`, `spec_insertion_rank` | — | position ↔ key in sequence order |
 | `keys`, `values`, `to_vec_pair`, `to_ordered_map` | never | the entries' keys, values, both; the same entries as an ordered map |
 | `spec_aborts_*` | — | the abort condition of the executable role |
 | `spec_iter_valid`, `spec_leaf_iter_valid`, `spec_iter_preserved`, `spec_leaf_offset` | — | iterator validity versions (stage 3) |

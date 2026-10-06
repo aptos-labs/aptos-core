@@ -20,6 +20,12 @@ namespace LeanerIR.Proofs
 
 open LeanerIR.Validation (ExecutableUnit ValidatedUnit)
 
+/-- A literal callable's encoding with its specification type retained as
+an elaboration hint. This asserts no typing property: invocation rules
+still establish the closure's typing independently. -/
+abbrev Denote.ClosureValue.encodeFor (_type : Denote.NTy) (closure : Denote.ClosureValue) : RuntimeValue :=
+  closure.encode
+
 /-- An invocation of a function value on supplied arguments, as the big-step
 semantics runs it: the closure's target under the instantiation the closure
 fixed, on the captures and the arguments composed by its mask. A value that
@@ -63,6 +69,16 @@ noncomputable def ResultOf {unit : ValidatedUnit} (executable : ExecutableUnit u
     (arguments : List RuntimeValue) (state : Denote.Memory unit) : Array RuntimeValue :=
   if returns : ∃ results post, EnsuresOf executable callable arguments results state post
   then returns.choose else #[]
+
+open Classical in
+/-- The post-state of a successful invocation, sharing `ResultOf`'s choice.
+On an invocation with no successful execution this defaults to its pre-state;
+using the label does not assume that the invocation succeeds. -/
+noncomputable def StateOf {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (callable : RuntimeValue) (arguments : List RuntimeValue)
+    (state : Denote.Memory unit) : Denote.Memory unit :=
+  if returns : ∃ results post, EnsuresOf executable callable arguments results state post
+  then returns.choose_spec.choose else state
 
 /-- Where the invocation returns, `result_of` names results it returns. -/
 theorem ensuresOf_resultOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}

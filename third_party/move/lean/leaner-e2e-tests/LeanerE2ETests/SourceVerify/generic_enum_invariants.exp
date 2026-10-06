@@ -1,0 +1,6 @@
+LeanerE2ETests/SourceVerify/generic_enum_invariants.move:61:9: error: the specification clause `ensures result == 0` is not established
+LeanerE2ETests/SourceVerify/generic_enum_invariants.move:60:5: error: leaner verification failed: the automatic verification of `wrong_read` failed; provide a proof: `verify wrong_read by …` in `LeanerE2ETests/SourceVerify/generic_enum_invariants.proof.lean` (`verify wrong_read by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/generic_enum_invariants.move:10:9: error: the data invariant `invariant match this with
+        | Tagged<T>::Empty {} => true
+        | Tagged<T>::Filled { value := _, tag := tag } => tag > 0` does not hold where a value is constructed
+LeanerE2ETests/SourceVerify/generic_enum_invariants.move:50:5: error: leaner verification failed: the automatic verification of `invalid` failed; provide a proof: `verify invalid by …` in `LeanerE2ETests/SourceVerify/generic_enum_invariants.proof.lean` (`verify invalid by skip` shows the obligations it leaves)

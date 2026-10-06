@@ -1,0 +1,478 @@
+LeanerE2ETests/SourceVerify/behavior_manual_facts.proof.lean:8:43: error: incorrect final counter value
+case leaf_1
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+nativesTyped : LeanerIR.NativesTyped executable✝
+nativesShift : LeanerIR.NativesShift executable✝
+leanerAgree : LeanerIR.Proofs.TypesAgree unit
+leanerResources : LeanerIR.Proofs.ResourcesTyped unit
+addr : LeanerIR.Proofs.Denote.NTy.address.carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+result : increment.shape.carrier
+a✝⁵ :
+  ¬(initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          (LeanerIR.StorageKey.address addr) =
+        none ∨
+      18446744073709551615 <
+        ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+                  (initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          LeanerIR.Proofs.Denote.NRow.nil
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                            LeanerIR.Proofs.Denote.NRow.nil),
+                      arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address addr))).getD
+              LeanerIR.RuntimeValue.unit).asInt +
+          1)
+a✝⁴ :
+  ¬LeanerIR.Proofs.AbortsOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr] initialState✝
+a✝³ :
+  LeanerIR.Proofs.ResultOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr] initialState✝ =
+    #[]
+a✝² :
+  ∀ (key : LeanerIR.StorageKey),
+    ¬key = LeanerIR.StorageKey.address addr →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key =
+        initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key
+a✝¹ :
+  ∀ (resource : LeanerIR.Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil } →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝ resource =
+        initialState✝ resource
+a✝ :
+  LeanerIR.Proofs.EnsuresOf executable✝
+    (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+        LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+    [LeanerIR.RuntimeValue.address addr] #[] initialState✝
+    (LeanerIR.Proofs.StateOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr] initialState✝)
+x✝⁶ : flip_flag.shape.carrier
+x✝⁵ :
+  (LeanerIR.Proofs.StateOf executable✝
+        (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [LeanerIR.RuntimeValue.address addr] initialState✝
+        {
+          type :=
+            LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+              LeanerIR.Proofs.Denote.NRow.nil
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+          arguments := LeanerIR.Proofs.Denote.NRow.nil }
+        (LeanerIR.StorageKey.address addr)).isSome =
+    true
+x✝⁴ :
+  ¬LeanerIR.Proofs.AbortsOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr]
+      (LeanerIR.Proofs.StateOf executable✝
+        (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [LeanerIR.RuntimeValue.address addr] initialState✝)
+x✝³ :
+  LeanerIR.Proofs.ResultOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr]
+      (LeanerIR.Proofs.StateOf executable✝
+        (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [LeanerIR.RuntimeValue.address addr] initialState✝) =
+    #[]
+left✝⁵ :
+  ∀ (key : LeanerIR.StorageKey),
+    ¬key = LeanerIR.StorageKey.address addr →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key =
+        initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key
+left✝⁴ :
+  ∀ (resource : LeanerIR.Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil } →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝ resource =
+        initialState✝ resource
+right✝¹ :
+  ¬(initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          (LeanerIR.StorageKey.address addr) =
+        none ∨
+      18446744073709551615 <
+        ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+                  (initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          LeanerIR.Proofs.Denote.NRow.nil
+                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                            LeanerIR.Proofs.Denote.NRow.nil),
+                      arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address addr))).getD
+              LeanerIR.RuntimeValue.unit).asInt +
+          1)
+right✝ :
+  (LeanerIR.Proofs.StateOf executable✝
+        (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [LeanerIR.RuntimeValue.address addr] initialState✝
+        {
+          type :=
+            LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+              LeanerIR.Proofs.Denote.NRow.nil
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+          arguments := LeanerIR.Proofs.Denote.NRow.nil }
+        (LeanerIR.StorageKey.address addr)).isSome =
+    true
+x✝² :
+  ∀ (key : LeanerIR.StorageKey),
+    ¬key = LeanerIR.StorageKey.address addr →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr]
+          (LeanerIR.Proofs.StateOf executable✝
+            (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+            [LeanerIR.RuntimeValue.address addr] initialState✝)
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key =
+        LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key
+x✝¹ :
+  ∀ (resource : LeanerIR.Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil } →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr]
+          (LeanerIR.Proofs.StateOf executable✝
+            (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+            [LeanerIR.RuntimeValue.address addr] initialState✝)
+          resource =
+        LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝ resource
+x✝ :
+  LeanerIR.Proofs.EnsuresOf executable✝
+    (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+        LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+    [LeanerIR.RuntimeValue.address addr] #[]
+    (LeanerIR.Proofs.StateOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr] initialState✝)
+    (LeanerIR.Proofs.StateOf executable✝
+      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [LeanerIR.RuntimeValue.address addr]
+      (LeanerIR.Proofs.StateOf executable✝
+        (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [LeanerIR.RuntimeValue.address addr] initialState✝))
+left✝³ :
+  ∀ (key : LeanerIR.StorageKey),
+    ¬key = LeanerIR.StorageKey.address addr →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr]
+          (LeanerIR.Proofs.StateOf executable✝
+            (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+            [LeanerIR.RuntimeValue.address addr] initialState✝)
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key =
+        LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          key
+left✝² :
+  ∀ (resource : LeanerIR.Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil } →
+      LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr]
+          (LeanerIR.Proofs.StateOf executable✝
+            (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+            [LeanerIR.RuntimeValue.address addr] initialState✝)
+          resource =
+        LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝ resource
+consumed :
+  ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+            (LeanerIR.Proofs.StateOf executable✝
+              (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                  LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+              [LeanerIR.RuntimeValue.address addr] initialState✝
+              {
+                type :=
+                  LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                    LeanerIR.Proofs.Denote.NRow.nil
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                      LeanerIR.Proofs.Denote.NRow.nil),
+                arguments := LeanerIR.Proofs.Denote.NRow.nil }
+              (LeanerIR.StorageKey.address addr))).getD
+        LeanerIR.RuntimeValue.unit).asInt =
+    ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+              (initialState✝
+                {
+                  type :=
+                    LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                      LeanerIR.Proofs.Denote.NRow.nil
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                        LeanerIR.Proofs.Denote.NRow.nil),
+                  arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                (LeanerIR.StorageKey.address addr))).getD
+          LeanerIR.RuntimeValue.unit).asInt +
+      1
+left✝¹ :
+  ¬(initialState✝
+            {
+              type :=
+                LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                  LeanerIR.Proofs.Denote.NRow.nil
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                    LeanerIR.Proofs.Denote.NRow.nil),
+              arguments := LeanerIR.Proofs.Denote.NRow.nil }
+            (LeanerIR.StorageKey.address addr) =
+          none ∨
+        18446744073709551615 <
+          ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+                    (initialState✝
+                      {
+                        type :=
+                          LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            LeanerIR.Proofs.Denote.NRow.nil
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                              LeanerIR.Proofs.Denote.NRow.nil),
+                        arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                      (LeanerIR.StorageKey.address addr))).getD
+                LeanerIR.RuntimeValue.unit).asInt +
+            1) →
+    ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+              (LeanerIR.Proofs.StateOf executable✝
+                (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                    LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                [LeanerIR.RuntimeValue.address addr] initialState✝
+                {
+                  type :=
+                    LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                      LeanerIR.Proofs.Denote.NRow.nil
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                        LeanerIR.Proofs.Denote.NRow.nil),
+                  arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                (LeanerIR.StorageKey.address addr))).getD
+          LeanerIR.RuntimeValue.unit).asInt =
+      ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+                (initialState✝
+                  {
+                    type :=
+                      LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                        LeanerIR.Proofs.Denote.NRow.nil
+                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                          LeanerIR.Proofs.Denote.NRow.nil),
+                    arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                  (LeanerIR.StorageKey.address addr))).getD
+            LeanerIR.RuntimeValue.unit).asInt +
+        1
+x left✝ :
+  (LeanerIR.Proofs.StateOf executable✝
+          (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [LeanerIR.RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                LeanerIR.Proofs.Denote.NRow.nil
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool LeanerIR.Proofs.Denote.NRow.nil),
+            arguments := LeanerIR.Proofs.Denote.NRow.nil }
+          (LeanerIR.StorageKey.address addr)).isSome =
+      true →
+    ¬(((Option.map (fun value => LeanerIR.RuntimeValue.bool value.fst)
+                  (LeanerIR.Proofs.StateOf executable✝
+                    (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+                        LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                    [LeanerIR.RuntimeValue.address addr]
+                    (LeanerIR.Proofs.StateOf executable✝
+                      (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                          LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                      [LeanerIR.RuntimeValue.address addr] initialState✝)
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                          LeanerIR.Proofs.Denote.NRow.nil
+                          (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool
+                            LeanerIR.Proofs.Denote.NRow.nil),
+                      arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address addr))).getD
+              LeanerIR.RuntimeValue.unit).asBool =
+          true ↔
+        ((Option.map (fun value => LeanerIR.RuntimeValue.bool value.fst)
+                  (LeanerIR.Proofs.StateOf executable✝
+                    (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                        LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                    [LeanerIR.RuntimeValue.address addr] initialState✝
+                    {
+                      type :=
+                        LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 }
+                          LeanerIR.Proofs.Denote.NRow.nil
+                          (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.bool
+                            LeanerIR.Proofs.Denote.NRow.nil),
+                      arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                    (LeanerIR.StorageKey.address addr))).getD
+              LeanerIR.RuntimeValue.unit).asBool =
+          true)
+⊢ ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+            (LeanerIR.Proofs.StateOf executable✝
+              (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+                  LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+              [LeanerIR.RuntimeValue.address addr]
+              (LeanerIR.Proofs.StateOf executable✝
+                (LeanerIR.Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                    LeanerIR.Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                [LeanerIR.RuntimeValue.address addr] initialState✝)
+              {
+                type :=
+                  LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                    LeanerIR.Proofs.Denote.NRow.nil
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                      LeanerIR.Proofs.Denote.NRow.nil),
+                arguments := LeanerIR.Proofs.Denote.NRow.nil }
+              (LeanerIR.StorageKey.address addr))).getD
+        LeanerIR.RuntimeValue.unit).asInt =
+    ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+              (initialState✝
+                {
+                  type :=
+                    LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                      LeanerIR.Proofs.Denote.NRow.nil
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                        LeanerIR.Proofs.Denote.NRow.nil),
+                  arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                (LeanerIR.StorageKey.address addr))).getD
+          LeanerIR.RuntimeValue.unit).asInt +
+      2
+LeanerE2ETests/SourceVerify/behavior_manual_facts.proof.lean:7:8: error: leaner verification failed: the proof of `wrong_final_value` does not establish its specification

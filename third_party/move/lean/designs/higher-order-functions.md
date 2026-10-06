@@ -317,6 +317,31 @@ a parameter does not keep its state, and the frontend reads the invocation
 as a write. A frame a hypothesis states of a passed function value
 establishes any wider one (`FramedAt.mono`).
 
+Default frames of directly function-typed Move fields are now carried as
+implicit data invariants (2026-10-05). `EncodedKeepsMemory` states the frame
+over the field's runtime encoding. Construction, mutation, parameters,
+results, and stored resources check or carry it; an invocation of a closure
+read from storage recovers its frame from `MemoryInvariants.read`. The
+compiler and contract generator share the field predicate so packing and
+mutation cannot miss the obligation. `StoredFrames` checks construction,
+publication, removal, and invocation; `StoredFrameErrors` rejects both
+packing and assigning a memory-writing closure. This does not constrain
+arbitrary function values supplied as type arguments or nested in vectors.
+Explicit struct-field write frames (2026-10-06) use `EncodedFramed` instead:
+the frame's formals bind invocation arguments, its resource types are
+instantiated in the enclosing nominal's type scope, and its addresses are
+evaluated in the invocation's pre-state. Other fields of the same struct
+are available to address expressions. A wildcard frame imposes no memory
+restriction. The same construction and mutation checkpoints establish the
+frame, and opaque results carry it to callers. Source-clause markers are
+unwrapped when applying these guarantees. Shared-reference arguments admit
+referent-typed specification formals, matching behavioral predicates.
+Explicit enum-field write frames still receive an unsupported diagnostic.
+All four full suites passed with the focused frame checks. Dependency
+interfaces still omit nominal contracts, so an explicit write frame at that
+boundary is rejected; importing it as an empty frame would be unsound. The
+interface rejection and preservation of owned frames have frontend guards.
+
 **State labels.** A contract is a Lean proposition over states, so a label is
 a state variable: `..S |~ ensures_of<f>(x, y)` makes `S` the post-state of the
 application, and a label quantified by `exists S in *` or `forall S in *`, or
@@ -449,8 +474,9 @@ traits are.
      `Check/Closures/Frames.lean`, and generic higher-order functions over
      rows of type parameters (`Check/Closures/GenericHofs.lean`). Open:
      state labels, `&mut` arguments,
-     frames and typing of closures stored in fields (the exchange carries
-     their `modifies_of`), and `reads_of` (below).
+     explicit `modifies_of` frames on stored closures, and `reads_of` (below).
+     Default frames of directly function-typed Move fields are implemented
+     (2026-10-05, “Frames” above); explicit field write frames are diagnosed.
 5. **H5 — re-entrancy.** Call-stack modules and resource locks in the
    semantics, with MonoVM.
 

@@ -993,10 +993,16 @@ operation. It must not silently replace a plain operation with a checked Move
 operation or vice versa.
 
 The profile selects operator semantics. For example, the same `+` token may
-lower to `checkedAdd[abort]` in Move and modular `add` behind a Rust overflow
+lower to `checkedAdd[moveArithmeticError]` in Move and modular `add` behind a Rust overflow
 assertion in Rust. When an operator alone would not determine the LIR
 constructor, canonical source uses a standard snake-case builtin rather than
 exposing `core.prim.*`.
+
+Move arithmetic traps use the `runtime.arithmetic_error` profile throw,
+which rolls back like other Move failures but is distinct from an explicit
+`abort(code)`. Its payload describes the failed operation; it is not a user
+abort code. Contract clauses recognize arithmetic and vector runtime errors
+as `EXECUTION_FAILURE` (`-1`). Explicit aborts retain their integer codes.
 
 ## References and nominal data operations
 
@@ -1042,7 +1048,7 @@ core.data.select[Type, field](value)
 core.data.selectVariants[Type, Variant₁.field₁, ...](value)
 core.data.testVariants[Type, Variant₁, ...](value)
 core.data.discriminant[Type](value)
-core.data.updateField[Type, field](value, replacement)
+core.data.updateField(value, field, replacement)
 ```
 
 The multi-variant operations express fields common to selected variants and
@@ -1051,6 +1057,13 @@ variant it reads with that variant's field; a value holding an unlisted
 variant is a mismatch. A field access `value.field` of an enum lists every
 variant that declares the field, so the core form is printed only for a
 selection of some of them, such as Move's specification `x.Variant.field`. `discriminant` returns the declared observable discriminant.
+
+Functional field updates are specification expressions. The receiver determines
+the nominal owner and its type arguments; the replacement uses the field's
+logical type. Updates preserve the variant and all other fields, including
+when a shared enum field occupies different positions in different variants.
+Updates on intrinsic maps and fields absent from some enum variants remain
+explicitly unsupported.
 
 ## Global storage
 

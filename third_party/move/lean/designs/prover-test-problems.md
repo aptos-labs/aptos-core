@@ -49,25 +49,80 @@ relative to `tests/sources`.
 
 ## Summary
 
-| Outcome | Tests |
-|---|---|
-| Verify | 109 |
-| Verify with the Move compiler's warnings only | 3 |
-| Compile errors, the same as the Prover's | 31 |
-| Rejected before verification ([C entries](#rejected-before-verification)) | 51 |
-| Errors during verification ([V entries](#errors-during-verification), [unproved functions](#functions-left-unproved)) | 220 |
+The full 2026-10-06 run discovers 437 files. All four Leaner packages build
+and pass their full suites, including the 122 Check fixtures, both cost
+gates, source verification, MonoVM, and differential tests. Logs:
+`/tmp/registry-prepared-behavior-<package>-{build,test}.log`.
 
-Of the 51 rejected tests, 22 are rejected by the Prover too (bytecode
-transformation or condition generation errors). For those, the rejection
-itself is expected and only its report is a problem ([G1](#g1-a-rejection-is-an-uncaught-exception)).
+The owning Move Prover test runner refreshed all 437 baselines successfully
+(`/tmp/behavior-guard-prover-refresh.log`). The final guard’s diagnostic audit
+shows no changes from its scoped-validated snapshot
+(`/tmp/behavior-guard-registry-audit.log`). `bp_pure_callee::count_all` now proves
+at 25k with its fold-equation companion; `remove_all_found` still times out.
+Returned-reference freezing
+and quantifier lexical scope now let both C16 files reach verification; two
+previously blocked `bp_forwarding` targets prove. The generic-caller companion
+closes `specialize_generic_caller::use_concrete` at 25k, leaving only its existing
+compiler warning. The latest full-run diagnostics are:
 
-The 220 tests with verification errors hold 399 functions and lemmas whose
-verification fails. The problems are the V entries and the 120 functions
-and lemmas in 43 tests that the Prover proves but Leaner does not, listed under
-[functions left unproved](#functions-left-unproved): 111 of the failing
-functions and 9 that are not attempted. The other 288 failing functions
-are deliberately wrong specifications the Prover fails too, such as the
-`_incorrect` functions, or belong to tests the Prover rejects.
+| Outcome | Files |
+|---|---:|
+| No diagnostics | 119 |
+| Warnings/notes only | 4 |
+| Rejected before verification | 50 |
+| Verification diagnostics | 232 |
+| Compiler/other errors | 32 |
+
+These are diagnostic categories, not parity counts. Many fixtures deliberately
+contain invalid specifications. In particular, abort-code and constant-vector
+fixes expose their intended negative cases; an empty baseline is not the
+expected result for those files. A subsequent stored-field-frame batch now
+reaches verification in `stored_fun_values` (33/42 targets prove in the scoped
+run; see V26). The nominal function-field quantifier restriction remains a
+soundness guard, not a proved positive case.
+The C18 resource-projection fix moves one more file from preverification
+rejection to verification diagnostics. Field-update normalization and the
+cross-resource companion plus prepared-call-fact simplification now prove all
+six positive targets at 25k. These changes
+are included in the full suites above. The full registry audit additionally
+finds `anchor_mutation_pre_state::valid_derived_claim` now proves, while its
+wrong attached claim still fails. No previously proved target regressed.
+`state_labels/aliasing` reports an extra unresolved clause before its existing
+timeout; its failed target names are unchanged. Audit:
+`/tmp/update-normalization-registry-audit.{json,log}`.
+The function ledger below tracks known positive obligations still unproved;
+it is being reconciled as previously rejected files reach verification.
+
+The regular benchmark was regenerated before these suites and its HTML
+generated against main CI run 37250691414 (`ea4ecc43e7`). The fresh full run
+`/tmp/leaner-benchmark-update-normalization.json` retains 28/32 passing samples,
+all six valid benchmark AMM targets, and no newly failed targets. Framework
+ordered_map is 29/29 at 4.146G heartbeats; calculator is 8/8 at 1.072G.
+Benchmark constant_product is 16.1M versus 26.8M before guard fusion (-39.8%).
+Total AMM is 2.860G versus 2.870G; the deliberately invalid constructor retains
+its timeout. Sample-status counts alone can hide target regressions.
+
+The final registry audit found no diagnostic changes after the cost-gate and
+Order proof corrections (`/tmp/short-circuit-final-registry-audit.log`). The
+preceding refresh changed only two diagnostics, with no new failed functions:
+shorter aborts_if residuals and bug_15044 failing normally instead of timing out.
+The run includes generic enums, stored-field frames, implicit function wrappers,
+and the registry AMM constant_product companion. `result_of_old_label` and
+`fun_arg_frame_check_valid` also have no diagnostics.
+
+The generic-caller companion applies the already proved `count_is_len` lemma
+at u64 for the loop entry, exit, and back edge. Inlining intentionally omits the
+callee's proof block, so the caller needs these instances itself. No source
+specification or heartbeat limit changed. Scoped refresh and ordinary baseline
+check pass (`/tmp/specialize-generic-caller-registry-{update,check}.log`); the
+current audit records only that removed failed target and no additions
+(`/tmp/specialize-generic-caller-registry-audit.log`). The full suites above
+precede this proof-only follow-up.
+
+The older 414-file survey found 120 MVP-positive functions/lemmas unproved
+in 43 files. That historical count is no longer a current parity measurement;
+current entries must distinguish unsupported constructs, budget exhaustion,
+and intended negative specifications.
 
 ## General
 
@@ -245,17 +300,30 @@ LIR-SEMANTIC-TARGET: call target `increment` does not resolve to a declared func
 
 Tests: `functional/behavioral_predicate_inline_fun.move`, `functional/closures/inline/opaque_inline_body_fail.move`, `functional/closures/inline/opaque_inline_loop_sum.move`, `functional/restrictions.move`†.
 
-### C16. Call result differs from the callee signature
+### C16. Implicit freezing of returned references — frontend gap fixed
 
-2 tests, 6 messages.
+Compiler-v2 can type a call's result as `(&u64, &mut u64)` while its callee
+returns `(&mut u64, &mut u64)`. The frontend now preserves the instantiated
+callee result, evaluates it once, destructures it, and explicitly freezes the
+components whose context expects shared references. Computed freeze operands
+are held in a temporary for the denotation. Other type mismatches remain errors.
 
-Example (`functional/closures/inline/bp_forwarding.move`):
+`SourceVerify/returned_reference_freeze.move` verifies mixed/shared tuple
+results, a single returned reference, and mutation through the retained mutable
+reference at 25k; its false postcondition still fails. The follow-on lexical
+scope bug in `bp_forwarding` is fixed too: body quantifier domains are
+predeclared in their lexical scope, so a nested lambda's local cannot shadow an
+outer vector in a later assertion. `SourceVerify/quantifier_shadowing.move`
+verifies both positive cases and rejects the false assertion.
 
-```text
-LIR-SEMANTIC-TYPE: in fun set_values: function call result differs from the callee signature at [3981, 4001)
-```
-
-Tests: `functional/closures/inline/bp_forwarding.move`, `functional/closures/inline/folds_of_wrapper_mut.move`.
+Both affected registry files now reach verification. In `bp_forwarding`,
+`check_keys_bounded` and `check_all_positive` prove; `set_values` and
+`all_values_bounded` still exceed 25k. In `folds_of_wrapper_mut`, `mirror_keys`
+and `set_both` still exceed 25k. Their intentional negative cases remain failures.
+Scoped logs: `/tmp/returned-freeze-{bp_forwarding,folds_of_wrapper_mut}-registry.log`.
+Both cost gates, frontend tests, and new-fixture non-update baseline checks pass.
+The full benchmark/main report, all four suites, and registry refresh completed
+successfully under `/tmp/returned-freeze-validation.py`.
 
 ### C17. Bit-vector conversion typing
 
@@ -275,34 +343,93 @@ LIR-SEMANTIC-TYPE: in fun bv2int_boundary: bit-vector-to-int result is not logic
 
 Tests: `functional/bv_internal.move`, `functional/bv_signed_generic.move`.
 
-### C18. Borrow result is not a reference type
+### C18. Borrow result is not a reference type — resource projection fixed
 
-2 tests, 4 messages.
+`functional/state_labels/spec_fun_cross_resource.move` now reaches verification.
+Compiler-v2 retained `borrow_global` in a derived specification function after
+projecting its result to a resource value. The frontend now treats that logical,
+value-typed node as a global read; actual reference-typed borrows are unchanged.
+`SourceVerify/projected_global_reads.move` proves four positive targets at 25k,
+including a caller using an opaque contract's invocation-defined label without
+a callee program point. Its incorrect increment-by-two claim still fails.
+Closure-frame widening now normalizes `Weave.compose` when comparing a verified
+callee's frame with the wrapper's frame, as the precondition proof already did.
+That removes two residual frame obligations in the larger callers. The focused
+`closure_frame_widening` fixture proves six positives at 25k, including captures,
+and rejects a callback writing an unauthorized captured address; both cost gates
+pass. The subsequent field-update and prepared-fact changes below close the
+remaining cross-resource obligations.
 
-Example (`functional/closures/bp_mut_ref_selector.move`):
+The scoped registry update and ordinary baseline check now pass with no
+diagnostics: all six targets prove at 25k. Field-update normalization and codec
+round trips close the two higher-order callers. The final direct-call target
+now tries its already available call facts before repeating behavioral contract
+derivation; preparation drops from 28.437M to 20.974M raw heartbeats. Failed
+speculative attempts restore the original goal and use the existing higher-order
+fallback. The 25k acceptance budget is unchanged. A short companion completes
+the proof. `SourceVerify/behavior_manual_facts` proves three positives and rejects
+the wrong final counter value at both 25k and the suite default. Both cost gates
+pass. Scoped evidence: `/tmp/prepared-behavior-registry-{update,check}.log` and
+`/tmp/behavior-manual-fixture-{check,default}.log`. Fresh benchmark/main HTML, all four full suites, and the 437-file registry
+refresh passed (`/tmp/prepared-behavior-validation.log`). A final literal-closure
+guard bounds failed speculation to two attempts per target; scoped checks and
+both cost gates pass (`/tmp/behavior-guard-two-*.log`).
 
-```text
-LIR-SEMANTIC-TYPE: in fun apply_to_x: borrow result is not a reference type at [924, 932)
-```
+`functional/closures/bp_mut_ref_selector.move` remains rejected. Its projected
+field borrow also needs the behavioral predicate's implicit pre/post argument
+expansion, followed by V20's mutable-reference invocation support. Simply
+removing the borrow does not implement those semantics.
 
-Tests: `functional/closures/bp_mut_ref_selector.move`, `functional/state_labels/spec_fun_cross_resource.move`.
+### C20. Function-value typing — frontend gap fixed
 
-### C20. Function-value typing
+`functional/closures/amm_example.move` previously stopped with three
+`closure construction result is not a function type` diagnostics and one
+`invoked operand is not a function type`. Compiler-v2 implicitly packs a
+function into a positional single-function-field wrapper and unwraps it for
+invocation. The frontend now emits ordinary constructor and field-selection
+operations, instantiating the field type with the wrapper's type arguments.
+This preserves the wrapper's data-invariant and field-frame checks.
 
-1 test, 4 messages.
+Both printer stages quote numeric field-frame targets (`modifies_of<«0»>`).
+`SourceVerify/function_wrappers.move` proves all eight valid targets at 25k and
+rejects its invalid implicit pack. The frontend formatting test checks addressed
+and wildcard positional frames through two formatting passes.
 
-Messages:
+The scoped registry run now reaches verification. A follow-up combines pure
+short-circuit guards whose branches leave identical environments, avoiding
+repeated verification of their continuations. `constant_product` now proves at
+25k with its arithmetic companion (`/tmp/short-circuit-registry-amm.log`), as
+`create_pool` already did. Its closer is 15.1M raw heartbeats and 17 leaves,
+versus exhaustion before the manual proof in the earlier 25k run.
+The two fee functions, `swap`, and `create_constant_product_pool` still exceed
+25k; the other two constructors depend on the unproved fee functions. The
+full three-function arithmetic candidate remains only in
+`/tmp/registry-amm-arithmetic-candidate.proof.lean`. No budget was raised.
 
-- 3 × `closure construction result is not a function type`
-- 1 × `invoked operand is not a function type`
+A bounded arithmetic-only omega attempt now precedes the full-context solver
+in the cheap bound decider when memory-dependent hypotheses are present. It avoids preprocessing unrelated memory and
+closure facts; `ArithmeticContext.lean` checks both the fast path and fallback.
+The final regular AMM benchmark retains its six valid targets:
+`constant_product` is 16.1M heartbeats (previous 26.8M, down 39.8%). Total
+AMM is 2.86G versus 2.87G. An earlier unrestricted fast-path experiment reduced
+the non-compliant pricing function by 51%, but grew proof terms on the core
+cost gate; the final memory-context guard does not retain that pricing gain.
+Both cost gates now pass without baseline changes. `Scalars/Order::ordered3`
+introduces both comparison premises after guard fusion.
+The fresh full benchmark `/tmp/leaner-benchmark-returned-freeze-final.json`
+retains 28/32 passing samples and all previously proved targets. The HTML was
+regenerated against main before the full suites. The controller is
+`/tmp/short-circuit-final-validation.py`; all four suites and the 437-file
+registry refresh passed. The final registry audit found no changed diagnostics.
+The first 437-file refresh introduced no failed functions; its diagnostic changes
+were shorter aborts_if residuals and bug_15044 failing normally instead of timing
+out (`/tmp/short-circuit-registry-audit.log`).
 
-Example (`functional/closures/amm_example.move`):
-
-```text
-LIR-SEMANTIC-TYPE: in fun swap: invoked operand is not a function type at [9270, 9358)
-```
-
-Tests: `functional/closures/amm_example.move`.
+The focused probes also exposed open-generic closure-frame and state-labelled
+`result_of`/wildcard-frame proof gaps. The checked regression covers concrete
+generic instantiation and `ensures_of` invariants; it does not claim those broader
+proof gaps are solved. This scoped follow-up is after the full 437-file counts
+above (one pre-verification rejection now reaches verification).
 
 ### C21. Field selection not on every variant
 
@@ -350,45 +477,54 @@ Tests: `functional/state_labels/nonlinear_cfg_error.move`.
 
 ### V1. Rendering outside the LeanerLang parser
 
-28 tests, 28 messages.
+16 tests, 16 messages (2026-10-05 refresh).
 
 Messages:
 
-- 11 × `` operation `…` is outside the current LeanerLang parser `` (all `update_field`)
 - 6 × `generic module invariants are outside the current LeanerLang parser`
 - 4 × `generic module axioms are outside the current LeanerLang parser`
-- 3 × `` condition kind `…` is outside the current LeanerLang parser ``
+- 2 × `` condition kind `…` is outside the current LeanerLang parser ``
 - 2 × `this quantifier kind is outside the current LeanerLang parser`
 - 1 × `` in-body specification condition `…` with N properties and N auxiliary expressions is outside the current LeanerLang parser ``
 - 1 × `generic update module invariants are outside the current LeanerLang parser`
 
-Example (`functional/aborts_if.move:170`):
+Example (`functional/emits.move`):
 
 ```text
-condition kind `LeanerIR.ConditionKind.abortsWith` is outside the current LeanerLang parser
+condition kind `LeanerIR.ConditionKind.emits` is outside the current LeanerLang parser
 ```
 
-Tests: `functional/aborts_if.move`, `functional/aborts_if_with_code.move`, `functional/axiom_generic.move`, `functional/axioms.move`, `functional/choice.move`, `functional/closures/inline/anchor_aliasing.move`, `functional/closures/inline/anchor_mutation_pre_state.move`, `functional/closures/inline/discarded_mut_ref_result.move`, `functional/closures/inline/folds_of.move`, `functional/closures/inline/folds_of_callee_ensures.move`, `functional/closures/inline/folds_of_ref.move`, `functional/emits.move`, `functional/generic_invariants.move`, `functional/loop_unroll.move`, `functional/mono.move`, `functional/opaque_native.move`, `functional/state_labels/aliasing.move`, `functional/state_labels/bp_with_state_labels.move`, `functional/state_labels/two_state_labels.move`, `functional/uninst_global_invariant.move`, `regression/enum_update_out_of_variant.move`, `regression/generic_aliasing_ghost_main.move`, `regression/generic_aliasing_ghost_pair.move`, `regression/generic_aliasing_ghost_params.move`, `regression/mono_after_global_invariant.move`, `regression/mono_on_axiom_spec_type.move`, `regression/type_param_bug_121721.move`, `regression/write_back_local_type_inst.move`.
+Functional `update_field` is supported for ordinary structs and enum fields
+present in every variant, including generic and nested updates. The eleven
+former render failures now reach proof obligations or a more specific gap.
+`aborts_with` is now supported too: the two abort-clause registry files prove
+all 12 positive functions and reject all 15 deliberately invalid functions.
+Allowed codes remain constrained with partial abort conditions; arithmetic
+traps are distinguished from explicit aborts and map to `EXECUTION_FAILURE`.
+
+Partial-variant enum updates and mutable-reference behavioral predicates are
+listed under V2; `mono` now reaches its unsupported `emits` clause.
+
+Tests: `functional/axiom_generic.move`, `functional/axioms.move`, `functional/choice.move`, `functional/emits.move`, `functional/generic_invariants.move`, `functional/loop_unroll.move`, `functional/mono.move`, `functional/opaque_native.move`, `functional/uninst_global_invariant.move`, `regression/generic_aliasing_ghost_main.move`, `regression/generic_aliasing_ghost_pair.move`, `regression/generic_aliasing_ghost_params.move`, `regression/mono_after_global_invariant.move`, `regression/mono_on_axiom_spec_type.move`, `regression/type_param_bug_121721.move`, `regression/write_back_local_type_inst.move`.
 
 ### V2. Construct not supported in generated contracts
 
-11 tests, 14 messages.
+9 tests, 12 messages (2026-10-05 refresh).
 
 Messages:
 
 - 3 × `` a type argument of the specification function `…` has no native type (LeanerIR.GenericArgument.typeArg …) ``
-- 2 × `a function value with captures or type arguments is not carried in generated contracts`
-- 2 × `specification operation … (LeanerIR.SpecOperation.remove …) is not supported in generated contracts`
-- 2 × `specification operation … (LeanerIR.SpecOperation.update …) is not supported in generated contracts`
-- 1 × `specification operation … (LeanerIR.SpecOperation.publish …) is not supported in generated contracts`
+- 2 × `a function value with type arguments is not carried in generated contracts`
 - 1 × `specification function call namespace is out of range`
 - 1 × `specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts`
 - 1 × `` primitive `…` has non-inferable generic operation arguments ``
 - 1 × `generated contracts currently expand specification functions with one result`
+- 2 × `a field update on an enum whose variants do not all carry the field is not supported yet`
+- 1 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
 
-The state-change predicates `publish`, `remove`, and `update` are carried
-to LIR since S1 of [`state-labels.md`](state-labels.md); their contracts are
-S2.
+The state-change predicates `publish`, `remove`, and `update` now translate
+in contracts, including labels they define (S2b of
+[`state-labels.md`](state-labels.md), 2026-10-05).
 
 Example (`functional/abort_in_fun.move:1`):
 
@@ -396,7 +532,7 @@ Example (`functional/abort_in_fun.move:1`):
 a type argument of the specification function `0x42::TestAbortInFunction::__leaner_arbitrary_4_62` has no native type (LeanerIR.GenericArgument.typeArg …)
 ```
 
-Tests: `functional/abort_in_fun.move`, `functional/bv_aborts.move`, `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/closures/inline/bp_inline_derive.move`, `functional/defines.move`, `functional/spec_fun_tuple_errors.move`, `functional/state_labels/aborting_result_definition.move`, `functional/state_labels/mixed_callee_postcondition.move`, `functional/state_labels/negated_definition.move`, `regression/performance_200511.move`.
+Tests: `functional/abort_in_fun.move`, `functional/bv_aborts.move`, `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/defines.move`, `functional/spec_fun_tuple_errors.move`, `regression/performance_200511.move`, `regression/enum_update_out_of_variant.move`, `functional/closures/inline/discarded_mut_ref_result.move`.
 
 ### V6. Construct not carried by the denotation
 
@@ -439,23 +575,25 @@ Tests: `functional/bitwise_table.move`, `functional/bitwise_table_mixed_instance
 
 ### V10. Other elaboration errors in the rendering
 
-8 tests, 8 messages.
+6 tests, 6 messages.
 
 Messages:
 
 - 2 × `` LEANER-CALL-NAME: unknown function `…` ``
 - 3 × `LEANER-SPEC-ARITY: behavior predicate expects N value argument(s), got N`
-- 1 × `LEANER-INTEGER-CONTEXT: an integer literal appears in a non-integer context`
-- 1 × `LEANER-ENUM-INVARIANT-GENERIC: generic enum invariants are not supported yet`
 - 1 × `a quantifier range must be written as a range`
 
-Example (`functional/consts.move:44`):
+The constant-vector indexing error in `functional/consts.move` is fixed:
+its three valid functions verify, and its five invalid functions fail their
+clauses. The index head now resolves constants as values, just like locals.
 
-```text
-LEANER-INTEGER-CONTEXT: an integer literal appears in a non-integer context
-```
+Generic enum invariants now instantiate their `this` type with the enum's
+type parameters, as struct invariants already do. `enum_19575` has no
+remaining diagnostics. The source fixture `generic_enum_invariants.move`
+checks generic constructors/readers and an opaque concrete caller, and rejects
+both an invalid generic constructor and a false postcondition.
 
-Tests: `functional/closures/behavioral_results.move`, `functional/closures/inline/folds_of_idx.move`, `functional/closures/inline/folds_of_multi.move`, `functional/closures/result_of_mut_ref_soundness.move`, `functional/consts.move`, `functional/enum_19575.move`, `functional/macro_verification.move`, `functional/state_labels/followed_by_mut_ref.move`.
+Tests: `functional/closures/behavioral_results.move`, `functional/closures/inline/folds_of_idx.move`, `functional/closures/inline/folds_of_multi.move`, `functional/closures/result_of_mut_ref_soundness.move`, `functional/macro_verification.move`, `functional/state_labels/followed_by_mut_ref.move`.
 
 ### V16. Native without specification or prelude model
 
@@ -481,49 +619,23 @@ Example (`functional/recursive_move_funs_multi_hop.move:13`):
 
 Tests: `functional/recursive_move_funs_multi_hop.move`.
 
-### V20. State labels and behavioral predicate forms not carried yet
+### V20. Behavioral predicates with mutable-reference parameters
 
-5 tests, 5 messages.
+3 tests, 3 messages.
 
-Quantified labels, over memory and the values of the `&mut` parameters at
-their state, are bound in contracts (S2a and S3a of
-[`state-labels.md`](state-labels.md)); a label a state-change predicate or
-an invocation defines is not carried yet (S2b), nor a behavioral predicate
-over a function with `&mut` parameters.
+Quantified labels and both state-change and invocation-defined labels are
+carried in contracts (S2 and S3 of [`state-labels.md`](state-labels.md)).
+Behavioral predicates over functions with `&mut` parameters remain open.
 
-Messages:
+Message:
 
 - 3 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
-- 2 × `` state label `…` is not bound in this clause; a label a state-change predicate or an invocation defines is not carried yet ``
 
-Example (`functional/state_labels/aborts_if_at_state_label.move:1`):
+Tests: `functional/closures/lambda_spec_global_memory.move`, `functional/state_labels/bp_requires_aborts_labeled_mut.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`.
 
-```text
-state label `S1` is not bound in this clause; a label a state-change predicate or an invocation defines is not carried yet
-```
-
-Tests: `functional/closures/lambda_spec_global_memory.move`, `functional/state_labels/aborting_result_definition.move`, `functional/state_labels/aborts_if_at_state_label.move`, `functional/state_labels/bp_requires_aborts_labeled_mut.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`.
-
-### V22. Resource typing not decided for the unit
-
-A theorem that invokes a function value its proof cannot see needs the
-unit's resource types to correspond to their keys' types (`ResourcesTyped`,
-[`static-memory.md`](static-memory.md)), decided by evaluation
-(`resourcesTypedCheck`, through `NTy.TypedAs`). Enum resources, fields of
-generic declarations' instances, and function-typed fields are decided; a
-generic resource type over its parameters has no closed type to be typed
-at.
-
-1 test, 2 messages.
-
-Example (`regression/generic_aliasing_write_routes.move:7`):
-
-```text
-Tactic `decide` failed for proposition
-  LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit = true
-```
-
-Tests: `regression/generic_aliasing_write_routes.move`.
+The invocation-label increment moves `aborting_result_definition` to its
+intended no-abort clause failures. `aborts_if_at_state_label::caller` now
+reaches verification but exceeds the runner's 25k heartbeat budget.
 
 ### V23. Storage clause over a resource without a native type
 
@@ -541,6 +653,98 @@ a storage clause names a type that is not a resource
 
 Tests: `functional/bitwise_error_2.move`.
 
+### V25. Quantified nominal values with function fields need a validity domain
+
+MVP's quantified nominal domain ties each function-valued field to its owning
+struct instantiation. Leaner's native carrier is a field row; treating all
+rows as valid lets a quantified `G<u64>` invariant constrain a closure taken
+from `G<bool>`. These quantifiers are explicitly rejected until the validity
+domain is represented. Expanding native-row quantifiers is not a sound parity
+fix: it proved the negative `other_instantiation` in a scratch experiment.
+
+1 registry test, 3 messages: `regression/behavior_axiom_target_field.move`.
+The valid `same_type_quantified` and `fun_inst` remain unsupported, as does the
+negative `other_instantiation`. The direct-field positives `f_lower`, `g_upper`,
+`own_field_generic`, and `enum_field` now verify under the existing 25k budget.
+`fixed_value`, `g_lower`, and `f_upper` remain rejected.
+
+The former V22 resource certificate error is fixed: open generic entries are
+frame templates, not concrete runtime keys. Encoding, unnamed-memory agreement,
+and the resource typing certificate share the closed-key lookup; frame
+coherence retains the template lookup. All eight intentionally invalid claims
+in `generic_aliasing_write_routes` remain rejected. Scoped refresh log:
+`/tmp/registry-resource-targets.log`.
+
+`functional/nonlinear_arithm.move::mul5` now has a proof companion: its
+five increasing unsigned factors yield zero or a product of at least 120,
+so the result is not 72. The deliberately invalid `mul5_incorrect` and other
+negative cases remain rejected (`/tmp/registry-nonlinear-target.log`).
+
+The proof companion for `functional/invariants_with_quant.move` now proves
+all four quantified postconditions at the existing 25k budget by enumerating
+the three valid indices and computing the vector reads. The file has no
+remaining diagnostics (`/tmp/registry-quant-vector-target.log`).
+All eleven positives in `for_loop_invariants.move` now verify. Its three
+triangular-sum proofs use a proved conversion from truncating to Euclidean
+division: `i * (i - 1)` is nonnegative for every integer. This prevents costly
+absolute-value case splits during preparation, retaining the 25k budget.
+Both intentionally incorrect loop invariants remain rejected
+(`/tmp/registry-for-loops-final.log`).
+
+`functional/simple_vector_client.move` now verifies completely. Its companion
+normalizes literal list spines before branch exploration and supplies the
+four membership witnesses for `test_contains`. `test_index_of` and
+`option_type` close by simplification at the unchanged 25k budget
+(`/tmp/registry-simple-vector-target.log`).
+
+### V26. Stored write frames and global invariant preservation
+
+Explicit struct-field `modifies_of` now reaches verification, including
+referent-typed formals for shared-reference arguments. All 42 targets in
+`functional/closures/stored_fun_values.move` run within the 25k budget; 33
+prove. Seven remaining failures are intentional negative specifications.
+The two addressed-frame callers, `use_counter_modifier` and
+`use_config_aware_modifier`, now have a kernel-checked companion proof: a
+frame can alter Counter, whose invariant is trivial, while preserving the
+invariants of all other resources. Two MVP-positive targets remain:
+
+- `use_any_modifier`: a wildcard frame alone does not establish that a call
+  preserves the data invariants of every resource it may overwrite. The current
+  field contract has no such preservation guarantee. Adding one requires
+  checking it at construction, including its recursive relationship with
+  stored function fields; assuming it at invocation would be unsound.
+- `create_modifier_valid`: it packs `safe_increment`, which writes Counter,
+  into a field with the implicit empty write frame. MVP's backend also treats
+  undeclared field access as pure (`derive_struct_field_frame_access`), but its
+  fixture accepts this construction. Leaner checks the implicit frame at pack
+  time. This discrepancy needs a specification/validity decision rather than
+  an unchecked proof shortcut.
+
+Scoped evidence: `/tmp/stored-frames-prover-followup.log`. The formerly expensive
+`increment_counter` and `use_transformer` use 7.95M and 5.13M closer heartbeats,
+respectively, after computing resource-invariant dispatch locally. All four
+suites passed. Dependency interfaces still omit field contracts; explicit write
+frames are therefore rejected at that boundary rather than silently becoming
+empty frames. Owned declarations retain their frames.
+
+### V27. Specification observations after moving a mutable reference
+
+`functional/specs_in_fun_ref.move::simple7` fails its in-body `assert x == y`
+after `let a = x; *a = y`. The denotation consumes `x` with `Term.take`;
+`assertionConditions`/`overDefined` then requires that emptied slot to be defined.
+The residual is `False`, not budget exhaustion. Reproduction at the registry's
+25k cap: `/tmp/specs-in-fun-ref-residual.{lean,log}`.
+
+The Move observation needs the current value held by `a`. Substituting the
+function-entry value or the final prophecy is incorrect: a later write can
+change the final value. A static `x → a` rewrite also needs to handle further
+moves, reassignment, reborrowing (including field reborrows), branch joins,
+and lexical shadowing. `old(x)` and saved-label observations retain their
+own states. The borrow certificate currently records loan-site holders across
+the function, not a per-observation current-owner map. A fix must establish
+that map or an equivalent sound observation mechanism; choosing any holder
+with the same type or prophecy value would be unsound.
+
 ## Functions left unproved
 
 | Test | Functions |
@@ -548,42 +752,39 @@ Tests: `functional/bitwise_error_2.move`.
 | `functional/address_serialization_constant_size.move` | `serialized_addresses_same_len` |
 | `functional/bitwise_features.move` | `contains` (budget), `is_enabled` (not attempted), `set` (budget), `disable_feature_flags` (budget) |
 | `functional/bug-17117.move` | `get_s_error` (budget), `get_s_no_error` (budget), `test_input_param_as_mut_ref` |
-| `functional/bug_15044.move` | `compare_u8_vector` (budget) |
+| `functional/bug_15044.move` | `compare_u8_vector` |
 | `functional/bug_15880.move` | `test2` |
 | `functional/bv_mutual_recursion.move` | `split_nibbles` (not attempted) |
+| `functional/closures/amm_example.move` | `constant_product_with_fee` (budget), `constant_product_with_fee_non_compliant` (budget), `swap` (budget), `create_constant_product_pool` (budget), `create_compliant_fee_pool` (not attempted) |
 | `functional/closures/behavioral_predicates_examples.move` | `contains_test_not_found` (budget), `contains_opaque_test_not_found` (not attempted), `index` (budget), `index_opaque` (budget), `index_test_found` (budget), `index_opaque_test_found` (not attempted), `reduce_test_ok` (budget), `reduce_opaque_test_ok` |
 | `functional/closures/behavioral_target_two_masks.move` | `pending` |
-| `functional/closures/inline/bp_pure_callee.move` | `count_all` (budget), `remove_all_found` (budget) |
+| `functional/closures/inline/bp_forwarding.move` | `set_values` (budget), `all_values_bounded` (budget) |
+| `functional/closures/inline/bp_pure_callee.move` | `remove_all_found` (budget; `count_all` now proves with a companion at 25k) |
 | `functional/closures/inline/fold_symbolic.move` | `sum` (budget) |
 | `functional/closures/inline/folds_of_collect.move` | `fold_is_prefix` (lemma), `collect` (budget) |
 | `functional/closures/inline/folds_of_consuming.move` | `sum_literal` (budget), `digits_forward` (budget), `digits_reverse` (budget), `sum_noncopy` (budget) |
 | `functional/closures/inline/folds_of_wrapper.move` | `sum_values` (budget), `sum_kv` (budget), `collect_keys` (budget), `sum_values_three_levels` (budget), `sum_values_both` (budget), `sum_values_through_inline` (budget) |
+| `functional/closures/inline/folds_of_wrapper_mut.move` | `mirror_keys` (budget), `set_both` (budget) |
 | `functional/closures/inline/result_of_attached_state_ok.move` | `map_add_global` (budget), `map_add_global_bare` (budget) |
-| `functional/closures/inline/specialize_generic_caller.move` | `use_concrete` |
 | `functional/closures/inline/vector_hofs_fold.move` | `sum_concrete` (budget), `sum_inferred` (budget), `sum_scaled` (budget), `product_concrete` (budget), `count_even_concrete` (budget) |
 | `functional/closures/inline/vector_hofs_for_each.move` | `find_value` (budget), `increment_all` (budget), `scale_all` (budget), `increment_all_inferred` (budget), `clamp_all_inferred` (budget), `clamp_all` (budget) |
 | `functional/closures/inline/vector_hofs_mut_receiver.move` | `bump_field` (budget), `bump_resource` (budget) |
-| `functional/closures/stored_fun_values.move` | `use_transformer` (budget), `use_monotone`, `use_reader`, `increment_counter` (budget), `safe_increment` (budget), `use_modifier`, `use_safe_op`, `use_counter_reader`, `use_counter_modifier`, `config_aware_increment` (budget), `use_config_aware_modifier`, `use_any_reader`, `use_any_modifier`, `use_action` (budget), `create_modifier_valid` (not attempted), `create_counter_modifier` (not attempted), `create_config_aware_modifier` (not attempted), `create_any_modifier` (not attempted), `create_any_modifier_multi` (not attempted) |
-| `functional/for_loop_invariants.move` | `sum_range`, `sum_from` (budget), `sum_skip_first` (budget) |
+| `functional/closures/stored_fun_values.move` | `use_any_modifier`, `create_modifier_valid` (V26 semantic gaps) |
 | `functional/inline_fun.move` | `test_filter` (budget) |
-| `functional/invariants_with_quant.move` | `vector_of_proper_positives` (budget) |
 | `functional/loops_with_memory_ops.move` | `nested_loop1` (budget) |
 | `functional/math8.move` | `pow` (budget), `floor_log2` (budget), `sqrt` (not attempted) |
 | `functional/math_fixed8.move` | `pow_raw` (budget), `exp_raw` (not attempted), `exp` (not attempted) |
 | `functional/mut_ref.move` | `call_return_ref_different_path_vec` (budget), `call_return_ref_different_path_vec2` (budget) |
 | `functional/nested_loop_inv.move` | `assert_no_duplicate` (budget) |
-| `functional/nonlinear_arithm.move` | `mul5` |
 | `functional/opaque.move` | `opaque_caller` (not attempted) |
 | `functional/serialize_model.move` | `bcs_test1` |
-| `functional/simple_vector_client.move` | `test_contains` (budget), `test_index_of` (budget), `option_type` (budget) |
-| `functional/specs_in_fun_ref.move` | `simple7` |
+| `functional/specs_in_fun_ref.move` | `simple7`: in-body assertion reads emptied reference slot after move (not a timeout) |
+| `functional/state_labels/aborts_if_at_state_label.move` | `caller` (budget; invocation labels now translate) |
 | `functional/state_labels/intermediate_states.move` | `test_config_preserved` (budget) |
-| `functional/state_labels/mixed_callee_postcondition.move` | `caller` (not attempted), `create_then_call` (not attempted) |
+| `functional/state_labels/unmodified_memory_at_label.move` | `swap` (a read after removal; Boogie retains absent resource contents) |
 | `functional/state_labels/spec_fun_old_param_labeled_with_memory.move` | `inc_under_cap_twice` (budget) |
 | `functional/verify_vector.move` | `verify_reverse` (budget), `verify_reverse_with_unroll` (budget), `verify_append` (budget), `verify_append_with_unroll`, `verify_index_of` (budget), `verify_index_of_with_unroll` (budget), `verify_contains_with_unroll`, `verify_remove` (budget), `verify_remove_with_unroll` (budget), `verify_swap_remove` (budget), `verify_model_swap_remove` (budget) |
-| `regression/behavior_axiom_quantifier_domain.move` | `whole_type` |
-| `regression/behavior_axiom_shared_result.move` | `distinct_results` |
-| `regression/behavior_axiom_target_field.move` | `f_lower` (budget), `g_upper` (budget), `own_field_generic`, `same_type_quantified`, `enum_field`, `fun_inst` |
+| `regression/behavior_axiom_target_field.move` | `same_type_quantified`, `fun_inst` (unsupported quantified field-validity domain; V25) |
 | `regression/generic_aliasing_all_partitions.move` | `true_in_every_case` (budget), `never_alias` (budget) |
 | `regression/moved_local_with_refs.move` | `moved_local_in_loop` (budget) |
 | `regression/vector_theory_boogie_array_intern.move` | `f1` (budget) |

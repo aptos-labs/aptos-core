@@ -102,8 +102,13 @@ runtime side of calls and closures.
 **Calls.** A callee's run (`propheticRun`) runs the big-step semantics from
 every admissible runtime start whose globals encode the caller's memory and
 yields the memory its exit globals encode (`Encodes`: under every runtime
-key, the encoding of the slot of the resource type its type identifier
-denotes, `resourceOf`). Its prophetic meaning (`propheticMeaning`) is the
+key, the encoding of the slot of the closed resource type its type identifier
+denotes, `runtimeResourceOf`). Open generic entries in the type table are
+templates, not independent runtime keys. The template lookup (`resourceOf`)
+remains available to frame coherence, which relates a template to its
+instantiated resource. Unnamed-memory agreement uses the same runtime-key
+lookup as encoding, so it still preserves every slot an encoding cannot name.
+Its prophetic meaning (`propheticMeaning`) is the
 run where the frame is coherent with the runtime type instantiation
 (`Coherent`: every resource type of the callee's namespace mentioning only
 its own type parameters, instantiated as the runtime does, is the frame's),
