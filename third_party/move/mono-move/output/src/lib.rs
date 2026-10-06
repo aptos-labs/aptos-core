@@ -11,6 +11,7 @@
 
 pub mod error;
 pub mod events;
+pub mod gap;
 pub mod v1_error;
 
 pub use error::OutputError;
