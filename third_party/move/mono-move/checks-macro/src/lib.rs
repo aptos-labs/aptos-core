@@ -28,6 +28,23 @@
 //! range `A1, A2, A3, A4`. Malformed ids and ids repeated on one method are
 //! compile errors. Checks may legitimately appear on several methods when the
 //! methods share them.
+//!
+//! A method may also declare its time complexity, with what `N` measures and
+//! an optional explanation:
+//!
+//! ```ignore
+//! #[checks(G3, G4, G5, G7)]
+//! #[complexity(n_log_n in "the number of layout slots"
+//!              because "each safe-point slot is one binary search into `base`")]
+//! fn check_gc_layouts(&mut self) { ... }
+//! ```
+//!
+//! The class is one of `constant`, `log`, `linear`, `n_log_n`; the grammar has
+//! nothing worse, so an unmetered checker cannot declare a method beyond
+//! `O(N * log(N))`. The macro appends `Complexity: O(N * log(N)) in the number
+//! of layout slots: each safe-point slot is one binary search into `base`.` to
+//! the method's documentation, and the registry entry becomes
+//! `(method, checks, complexity, measured_in, because)`.
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -36,7 +53,7 @@ use syn::{
     parse_macro_input,
     punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, Ident, ImplItem, ItemImpl, Token,
+    Attribute, Ident, ImplItem, ItemImpl, LitStr, Token,
 };
 
 /// `registry = NAME`.
@@ -100,6 +117,53 @@ impl Parse for IdItem {
     }
 }
 
+/// `class [in "what"] [because "why"]`.
+struct ComplexityArgs {
+    /// Big-O rendering of the class.
+    class: &'static str,
+    /// What `N` measures, or empty.
+    measured_in: String,
+    /// Why the method has this class, or empty.
+    because: String,
+}
+
+impl Parse for ComplexityArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let class_ident: Ident = input.parse()?;
+        let class = match class_ident.to_string().as_str() {
+            "constant" => "O(1)",
+            "log" => "O(log(N))",
+            "linear" => "O(N)",
+            "n_log_n" => "O(N * log(N))",
+            other => {
+                return Err(syn::Error::new(
+                    class_ident.span(),
+                    format!(
+                        "unknown complexity class `{other}`; expected constant, log, linear, or n_log_n (nothing worse is allowed)"
+                    ),
+                ))
+            },
+        };
+        let measured_in = if input.peek(Token![in]) {
+            input.parse::<Token![in]>()?;
+            input.parse::<LitStr>()?.value()
+        } else {
+            String::new()
+        };
+        let because = if input.peek(Ident) && input.fork().parse::<Ident>()? == "because" {
+            input.parse::<Ident>()?;
+            input.parse::<LitStr>()?.value()
+        } else {
+            String::new()
+        };
+        Ok(Self {
+            class,
+            measured_in,
+            because,
+        })
+    }
+}
+
 /// Parses `#[checks(F1, P1-P4)]` into its expanded id list.
 fn method_ids(attr: &Attribute) -> syn::Result<Vec<String>> {
     let items = attr.parse_args_with(Punctuated::<IdItem, Token![,]>::parse_terminated)?;
@@ -133,22 +197,57 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
             .attrs
             .drain(..)
             .partition(|attr| attr.path.is_ident("checks"));
+        let (complexity_attrs, rest): (Vec<_>, Vec<_>) = rest
+            .into_iter()
+            .partition(|attr| attr.path.is_ident("complexity"));
         method.attrs = rest;
+
+        let mut complexity = None;
+        for attr in complexity_attrs {
+            if complexity.is_some() {
+                return syn::Error::new(attr.span(), "a method declares its complexity once")
+                    .to_compile_error()
+                    .into();
+            }
+            let args: ComplexityArgs = match attr.parse_args() {
+                Ok(args) => args,
+                Err(err) => return err.to_compile_error().into(),
+            };
+            let mut line = format!(" Complexity: {}", args.class);
+            if !args.measured_in.is_empty() {
+                line.push_str(&format!(" in {}", args.measured_in));
+            }
+            if !args.because.is_empty() {
+                line.push_str(&format!(": {}", args.because));
+            }
+            line.push('.');
+            method.attrs.push(syn::parse_quote!(#[doc = ""]));
+            method.attrs.push(syn::parse_quote!(#[doc = #line]));
+            complexity = Some(args);
+        }
+        let (class, measured_in, because) = match &complexity {
+            Some(args) => (args.class, args.measured_in.as_str(), args.because.as_str()),
+            None => ("", "", ""),
+        };
+
         for attr in checks_attrs {
             let ids = match method_ids(&attr) {
                 Ok(ids) => ids,
                 Err(err) => return err.to_compile_error().into(),
             };
             let name = method.sig.ident.to_string();
-            entries.push(quote! { (#name, &[#(#ids),*]) });
+            entries.push(quote! { (#name, &[#(#ids),*], #class, #measured_in, #because) });
         }
     }
 
     quote! {
         #item_impl
 
-        /// Checks evaluated by each method, as declared with `#[checks(...)]`.
-        pub const #registry: &[(&str, &[&str])] = &[#(#entries),*];
+        /// Checks evaluated by each method, as declared with `#[checks(...)]`:
+        /// `(method, checks, complexity class, what N measures, why)`. The
+        /// last three are empty when the method declares no
+        /// `#[complexity(...)]`.
+        pub const #registry: &[(&str, &[&str], &str, &str, &str)] = &[#(#entries),*];
     }
     .into()
 }

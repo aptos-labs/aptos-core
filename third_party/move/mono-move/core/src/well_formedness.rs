@@ -310,9 +310,8 @@ struct FunctionChecker<'a, P: WellFormednessProvider + ?Sized> {
 #[checks(registry = IMPLEMENTED_CHECKS)]
 impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// Runs every check and records each violation.
-    ///
-    /// Complexity: O(N * log(N)) in the size of the function.
     #[checks(F1, F2, F7)]
+    #[complexity(n_log_n in "the size of the function" because "every operand is checked against the sorted GC layouts")]
     fn run(&mut self) {
         let code = self.func.code.ops();
 
@@ -364,6 +363,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     // -----------------------------------------------------------------------
 
     #[checks(F3-F6)]
+    #[complexity(constant)]
     fn check_frame_geometry(&mut self) {
         let func = self.func;
         // F3.
@@ -404,6 +404,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     }
 
     #[checks(P1, R1)]
+    #[complexity(linear in "the number of parameter and return slots")]
     fn check_param_and_return_slots(&mut self) {
         let func = self.func;
         // P1–P4, R1-R4. `CallClosure` and `CallBuilder` write `size` bytes at
@@ -447,6 +448,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// P2–P4, R2-R4. A parameter or return slot list: every slot
     /// well-formed and within `[0, region_end)`, slots ascending and disjoint.
     #[checks(P3, P4, R3, R4)]
+    #[complexity(linear in "the number of slots")]
     fn check_slot_list(
         &mut self,
         kind: &str,
@@ -486,6 +488,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// feeds to `align_up` (undefined for zero or non-power-of-two) and which
     /// must divide the offset for the slot to be where the layout says.
     #[checks(P2, R2, L4, L9)]
+    #[complexity(constant)]
     fn check_sized_slot(&mut self, pc: Option<usize>, what: &str, slot: &SizedSlot) {
         if slot.size == 0 {
             fail!(self, pc, "{what}: size must be > 0");
@@ -510,10 +513,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     }
 
     /// G1–G7.
-    ///
-    /// Complexity: O(N * log(N)) in the number of layout slots: each safe-point
-    /// slot is one binary search into `base`.
     #[checks(G3, G4, G5, G7)]
+    #[complexity(n_log_n in "the number of layout slots" because "each safe-point slot is one binary search into `base`")]
     fn check_gc_layouts(&mut self) {
         let code = self.func.code.ops();
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
@@ -582,6 +583,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// aligned `read_ptr`: each an in-frame, aligned pointer slot; the list
     /// strictly increasing.
     #[checks(G1, G2, G6)]
+    #[complexity(linear in "the number of pointer offsets")]
     fn check_pointer_offsets(&mut self, pc: Option<usize>, offsets: &[FrameOffset]) {
         for &off in offsets {
             self.check_frame_operand(pc, off, OperandKind::Ptr);
@@ -602,10 +604,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     // -----------------------------------------------------------------------
 
     /// Op-specific checks beyond the operand schema.
-    ///
-    /// Complexity: O(N * log(N)) in the op's operands: `VecUnpack` destinations
-    /// are sorted.
     #[checks(I1-I5, Z3, B1, K1, K2)]
+    #[complexity(n_log_n in "the op's operands" because "`VecUnpack` destinations are sorted")]
     fn check_instruction(&mut self, pc: usize, instr: &MicroOp) {
         use MicroOp::*;
         match *instr {
@@ -859,6 +859,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     }
 
     #[checks(L1, L2, L3, L5-L8)]
+    #[complexity(linear in "the number of captured values")]
     fn check_pack_closure(&mut self, pc: usize, op: &PackClosureOp) {
         // The closure object uses the implicit reserved `CLOSURE_DESCRIPTOR_ID`
         // (no per-op field); every provider installs `Closure` there.
@@ -993,9 +994,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
     /// O1–O6. Checks one frame operand per the [`OperandKind`] schema,
     /// resolving the provider-dependent kinds first.
-    ///
-    /// Complexity: O(log(N)) in the number of GC pointer slots (O6).
     #[checks(O2, O4, O5)]
+    #[complexity(log in "the number of GC pointer slots" because "O6 binary-searches the sorted layouts")]
     fn check_frame_operand(&mut self, pc: Option<usize>, offset: FrameOffset, kind: OperandKind) {
         let (width, align) = match kind {
             OperandKind::Value(ty) => {
@@ -1048,9 +1048,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// O6. `[offset, offset + width)` does not intersect any pointer slot in
     /// `frame_layout` or in the safe-point layout at `pc`. Both lists are
     /// strictly increasing (G2, G6), so each is one binary search.
-    ///
-    /// Complexity: O(log(N)) in the number of pointer slots and safe points.
     #[checks(O6)]
+    #[complexity(log in "the number of pointer slots and safe points" because "one binary search into each sorted list")]
     fn check_not_pointer_slot(&mut self, pc: Option<usize>, offset: FrameOffset, width: u32) {
         let start = offset.0 as u64;
         let end = start + width as u64;
@@ -1088,6 +1087,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// Accesses into the callee arg/return region are permitted: that is how
     /// arguments and return values are passed.
     #[checks(O1)]
+    #[complexity(constant)]
     fn check_access(&mut self, pc: Option<usize>, offset: FrameOffset, size: u32, align: u32) {
         let offset = offset.0 as usize;
         let Some(end) = offset.checked_add(size as usize) else {
@@ -1122,6 +1122,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// O3. Structural comparison is defined on values, not references; a
     /// reference type is an unconditional runtime invariant violation.
     #[checks(O3)]
+    #[complexity(constant)]
     fn check_value_type(&mut self, pc: usize, ty: InternedType) {
         if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
             self.err(pc, "value comparison on a reference type");
@@ -1129,9 +1130,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     }
 
     /// D1. Destinations of a multi-destination op are pairwise disjoint.
-    ///
-    /// Complexity: O(N * log(N)) in the number of destinations.
     #[checks(D1)]
+    #[complexity(n_log_n in "the number of destinations" because "they are sorted to find overlaps")]
     fn check_disjoint_destinations(
         &mut self,
         pc: usize,
@@ -1161,9 +1161,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// C1, C2, C3. The native's slot region fits the caller's extended frame, and its
     /// pointer slots (read by the GC with aligned `read_ptr` at the native's
     /// fp) are aligned, inside the region, and inside an argument slot.
-    ///
-    /// Complexity: O(N * log(N)) in the ABI's pointer offsets and argument slots.
     #[checks(C1-C3)]
+    #[complexity(n_log_n in "the ABI's pointer offsets and argument slots" because "each offset binary-searches the sorted argument slots")]
     fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
         let base = self.func.frame_size();
         let total = abi.total_frame_size();
@@ -1225,6 +1224,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// read back from, this function's callee region
     /// `[frame_size(), extended_frame_size)`.
     #[checks(C4)]
+    #[complexity(linear in "the callee's return slots")]
     fn check_direct_callee(&mut self, pc: usize, callee: &Function) {
         let region = self
             .func
@@ -1272,6 +1272,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// strides the data region by the descriptor's `elem_size`, so a mismatch
     /// would trace past the allocation.
     #[checks(K3)]
+    #[complexity(constant)]
     fn check_vector_descriptor(
         &mut self,
         pc: usize,
@@ -1300,6 +1301,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// J1.
     // TODO(metering): validate branch gas fields are populated.
     #[checks(J1)]
+    #[complexity(constant)]
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
         let code_len = self.func.code.ops().len();
         if (target.0 as usize) >= code_len {
@@ -1314,6 +1316,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
     /// Z1.
     #[checks(Z1)]
+    #[complexity(constant)]
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(pc, "size must be > 0");
@@ -1323,6 +1326,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// Z2. `offset + size` fits in `u32`, so the window `[offset, offset + size)`
     /// into a heap object or referent cannot wrap.
     #[checks(Z2)]
+    #[complexity(constant)]
     fn check_offset_size(&mut self, pc: usize, offset: u32, size: u32) {
         if offset.checked_add(size).is_none() {
             fail!(self, pc, "offset {offset} + size {size} overflows u32");
