@@ -11,8 +11,8 @@ value layout, the calling convention, or the GC.
 ## Safety model
 
 The interpreter uses raw pointer arithmetic throughout. Correctness rests on
-three invariants held jointly by the compiler, the verifier, and the runtime.
-Any change that could break one needs a matching verifier check or a proof:
+three invariants held jointly by the compiler, the checker, and the runtime.
+Any change that could break one needs a matching well-formedness check or a proof:
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by
    call/return, never by user micro-ops.
@@ -23,7 +23,7 @@ Any change that could break one needs a matching verifier check or a proof:
    `obj_ptr - 8` and `obj_ptr - 4`, written by the allocator. User micro-ops
    address only offsets `>= 0`, so they cannot reach the header.
 
-`mono_move_core::verify_function` (run by the loader on every lowered function
+`mono_move_core::check_well_formedness` (run by the loader on every lowered function
 before it is cached) checks frame-access bounds, metadata overlap, jump targets, and
 descriptor validity before execution. Everything else is the compiler's
 responsibility.

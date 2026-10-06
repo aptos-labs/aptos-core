@@ -837,8 +837,8 @@ mod tests {
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
-            LoaderError::InvariantViolation(LoaderInvariantViolation::MicroOpVerificationFailed {
-                errors: vec![mono_move_core::VerificationError {
+            LoaderError::InvariantViolation(LoaderInvariantViolation::NotWellFormed {
+                errors: vec![mono_move_core::WellFormednessError {
                     func_name: "f".to_string(),
                     pc: Some(0),
                     message: "frame access out of bounds".to_string(),
