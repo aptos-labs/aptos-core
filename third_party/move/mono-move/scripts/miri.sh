@@ -78,7 +78,9 @@ SKIP_PACKAGES=(
   "mono-move-output:1 test against 3 unsafe sites"
   "mono-move-aptos-state-view-providers:has no tests"
   "mono-move-aptos-transaction-executor:e2e tests need genesis and a 64MiB arena"
+  "mono-move-replay:links rocksdb; tests spawn worker processes and call libc (dup2, proc_pid_rusage)"
   "mono-move-replay-benchmark:links rocksdb, jemalloc, and zstd"
+  "mono-move-replay-common:tests reach the Move compiler via mono-move-testsuite"
   "mono-move-lean-link:unit tests reach no unsafe code; integration tests compile Move source and shell out to cargo and nm"
 )
 

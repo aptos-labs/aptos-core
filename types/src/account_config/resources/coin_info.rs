@@ -51,6 +51,10 @@ impl<C: CoinType> CoinInfoResource<C> {
         &self.supply
     }
 
+    pub fn set_supply(&mut self, supply: Option<OptionalAggregatorV1Resource>) {
+        self.supply = supply;
+    }
+
     /// Returns a new CoinInfo instance. Aggregator that tracks supply is
     /// initialized with random handle/key. This function is useful if we
     /// want to add CoinInfo to the fake data store.

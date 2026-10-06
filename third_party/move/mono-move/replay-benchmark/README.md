@@ -15,6 +15,9 @@ and purging all state metadata to prevent refunds.
 
 There is no Block-STM; execution is sequential against the captured read-set.
 
+Code shared with `mono-move-replay` (gas-free state, read capture, the module closure, transaction
+labels, CLI types) lives in `mono-move-replay-common` (`../replay-common`).
+
 ## Usage
 
 The CLI has two subcommands: `capture` (fetch transactions from chain into an on-disk dump) and
