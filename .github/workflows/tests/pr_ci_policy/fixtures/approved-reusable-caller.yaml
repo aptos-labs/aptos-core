@@ -1,0 +1,13 @@
+name: caller
+on: pull_request_target
+permissions:
+  contents: read
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/workflow-run-docker-rust-publish-pr.yaml
+    with:
+      SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}

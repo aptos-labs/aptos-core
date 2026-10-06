@@ -1,0 +1,14 @@
+name: legacy
+on: pull_request_target
+permissions:
+  contents: write
+jobs:
+  legacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: ./legacy.sh
+        env:
+          TOKEN: ${{ secrets.LEGACY_TOKEN }}

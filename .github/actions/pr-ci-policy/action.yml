@@ -1,0 +1,14 @@
+name: PR CI policy guard
+description: Compare base and head workflow files as bounded API data.
+inputs:
+  token:
+    description: Read-only GitHub token.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Evaluate proposed workflow changes
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: ruby "$GITHUB_ACTION_PATH/policy_checker.rb"

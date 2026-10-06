@@ -1,0 +1,13 @@
+name: shell PR event file
+on: pull_request_target
+permissions:
+  contents: write
+jobs:
+  execute:
+    runs-on: windows-latest
+    steps:
+      - shell: pwsh
+        run: |
+          $event = Get-Content ${Env:github_event_path} | ConvertFrom-Json
+          git fetch origin $event.pull_request.head.sha
+          git checkout FETCH_HEAD

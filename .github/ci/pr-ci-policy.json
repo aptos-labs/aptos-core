@@ -1,0 +1,48 @@
+{
+  "hardened_workflows": [
+    ".github/workflows/adhoc-forge.yaml",
+    ".github/workflows/cli-e2e-tests.yaml",
+    ".github/workflows/docker-build-test.yaml",
+    ".github/workflows/execution-performance.yaml",
+    ".github/workflows/faucet-tests-main.yaml",
+    ".github/workflows/faucet-tests-prod.yaml",
+    ".github/workflows/forge-continuous-land-blocking-test.yaml",
+    ".github/workflows/forge-framework-upgrade.yaml",
+    ".github/workflows/forge-stable.yaml",
+    ".github/workflows/indexer-processor-testing.yaml",
+    ".github/workflows/mono-move-e2e-perf.yaml",
+    ".github/workflows/mono-move-micro-bench.yaml",
+    ".github/workflows/module-verify.yaml",
+    ".github/workflows/node-api-compatibility-tests.yaml",
+    ".github/workflows/pr-ci-policy.yaml",
+    ".github/workflows/rust-client-tests.yaml",
+    ".github/workflows/workflow-run-docker-rust-build.yaml",
+    ".github/workflows/workflow-run-execution-performance.yaml",
+    ".github/workflows/workflow-run-forge.yaml"
+  ],
+  "approved_protected_reusables": [
+    ".github/workflows/workflow-run-docker-rust-publish-pr.yaml",
+    ".github/workflows/workflow-run-forge-pr.yaml",
+    ".github/workflows/workflow-run-pr-e2e-tests.yaml"
+  ],
+  "protected_runtime_prefixes": [
+    ".github/actions/checkout-exact-pr-source/",
+    ".github/actions/pr-ci-policy/",
+    ".github/ci/",
+    "docker/builder/",
+    "ecosystem/indexer-grpc/indexer-transaction-generator/src/",
+    "terraform/helm/",
+    "testsuite/test_framework/",
+    ".dockerignore",
+    ".python-version",
+    "ecosystem/indexer-grpc/indexer-transaction-generator/Cargo.toml",
+    "testsuite/__init__.py",
+    "testsuite/determinator.py",
+    "testsuite/determine_target_branch_to_fetch_last_released_image.py",
+    "testsuite/find_latest_image.py",
+    "testsuite/forge-test-runner-template.yaml",
+    "testsuite/forge.env",
+    "testsuite/forge.py",
+    "testsuite/run_forge.sh"
+  ]
+}

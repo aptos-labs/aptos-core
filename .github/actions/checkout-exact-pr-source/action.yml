@@ -1,0 +1,54 @@
+name: Check out exact PR source
+description: Validate and check out one exact untrusted PR commit
+
+inputs:
+  source_repository:
+    description: Repository that owns the PR commit
+    required: true
+  source_sha:
+    description: Full lowercase SHA of the PR commit
+    required: true
+  path:
+    description: Checkout path relative to the workspace
+    required: false
+    default: pr-source
+  fetch-depth:
+    description: Number of commits to fetch; zero fetches complete history
+    required: false
+    default: "1"
+
+runs:
+  using: composite
+  steps:
+    - name: Validate the exact source SHA
+      shell: bash
+      env:
+        SOURCE_SHA: ${{ inputs.source_sha }}
+      run: bash "$GITHUB_ACTION_PATH/verify-source.sh" validate "$SOURCE_SHA"
+
+    - name: Stage the trusted verifier outside the checkout
+      id: stage-verifier
+      shell: bash
+      run: |
+        set -euo pipefail
+        verifier_dir="$(mktemp -d "$RUNNER_TEMP/exact-source-verify.XXXXXXXX")"
+        cp "$GITHUB_ACTION_PATH/verify-source.sh" "$verifier_dir/verify-source.sh"
+        echo "path=$verifier_dir/verify-source.sh" >> "$GITHUB_OUTPUT"
+
+    # Fork PRs need the opt-in below; callers hold no secrets.
+    - name: Check out the exact approved PR revision
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: ${{ inputs.source_repository }}
+        ref: ${{ inputs.source_sha }}
+        path: ${{ inputs.path }}
+        fetch-depth: ${{ inputs.fetch-depth }}
+        persist-credentials: false
+        allow-unsafe-pr-checkout: true
+
+    - name: Verify the exact source revision
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      env:
+        SOURCE_SHA: ${{ inputs.source_sha }}
+      run: bash "${{ steps.stage-verifier.outputs.path }}" verify "$SOURCE_SHA"
