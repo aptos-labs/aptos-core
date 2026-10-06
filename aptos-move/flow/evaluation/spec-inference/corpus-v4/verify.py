@@ -2,10 +2,11 @@
 """Re-derive corpus-v4's committed evidence from the pinned sources.
 
 Rebuilds the package and checks every generated file against the manifest,
-assembles the reference packages, and re-validates both mutant sets of every
-ready task with `harness.validate_mutants`, which proves the reference, checks
-it for vacuity and its implementation against the package, and re-runs every
-mutant. Validation rewrites `mutants*/TASK/mutants.json` in place, so a clean
+assembles the reference packages, checks every task's preparation patch, and
+re-validates both mutant sets of every ready task with
+`harness.validate_mutants` against the tree the task starts from, which proves
+the reference, checks it for vacuity and its implementation against that tree,
+and re-runs every mutant. Validation rewrites `mutants*/TASK/mutants.json` in place, so a clean
 `git diff` afterwards means the committed records were reproduced.
 
 Run from the evaluation root with the pinned `move-flow` first on PATH:
@@ -20,6 +21,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -28,6 +30,7 @@ EVALUATION = ROOT.parent
 sys.path.insert(0, str(EVALUATION))
 
 from harness.identifiers import module_name, require_plain_name  # noqa: E402
+from harness.materialize import materialize_task, preparation_patch  # noqa: E402
 
 MUTANT_SETS = ("mutants", "mutants-scoring")
 
@@ -46,6 +49,7 @@ def main() -> None:
         ("package", [sys.executable, str(ROOT / "build.py")]),
         ("package digests", [sys.executable, str(ROOT / "build.py"), "--verify"]),
         ("references", [sys.executable, str(ROOT / "build_references.py")]),
+        ("task trees", [sys.executable, str(ROOT / "prepare_tasks.py"), "--verify"]),
     ):
         result = run(command)
         if result.returncode != 0:
@@ -64,6 +68,10 @@ def main() -> None:
     for record in records:
         task_id = require_plain_name(record["task_id"], "task_id")
         reference = ROOT / "references" / "build" / module_name(record["module"])
+        temporary = tempfile.TemporaryDirectory(prefix=f"corpus-v4-verify-{task_id}-")
+        baseline = Path(temporary.name) / "package"
+        materialize_task(ROOT / "package", preparation_patch(ROOT, record), baseline,
+                         record["prepared_sha256"])
         for mutant_set in MUTANT_SETS:
             manifest_path = ROOT / mutant_set / task_id / "mutants.json"
             start = time.time()
@@ -71,7 +79,7 @@ def main() -> None:
                 sys.executable, "-m", "harness.validate_mutants",
                 "--config", "config/default.json",
                 "--reference", str(reference),
-                "--baseline", str(ROOT / "package"),
+                "--baseline", str(baseline),
                 "--target", record["target"],
                 "--mutants", str(manifest_path),
                 "--timeout", str(args.timeout),
@@ -88,6 +96,7 @@ def main() -> None:
             state = "ok  " if not survivors else "BAD "
             print(f"{state} {task_id} {mutant_set} ({elapsed:.0f}s): "
                   f"{len(cases) - len(survivors)}/{len(cases)} killed", flush=True)
+        temporary.cleanup()
 
     if problems:
         raise SystemExit(f"{problems} problem(s)")

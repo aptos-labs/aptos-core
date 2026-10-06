@@ -531,8 +531,8 @@ pub enum VerificationScope {
     Public,
     /// Verify all functions.
     All,
-    /// Verify only one function.
-    Only(String),
+    /// Verify only the named functions.
+    Only(Vec<String>),
     /// Verify only functions from the given module.
     OnlyModule(String),
     /// Verify no functions
@@ -540,21 +540,13 @@ pub enum VerificationScope {
 }
 
 impl VerificationScope {
-    /// Whether verification is exclusive to only one function or module. If set, this overrides
-    /// all implicitly included verification targets via invariants and friends.
+    /// Whether verification is exclusive to the named functions or a module. If set, this
+    /// overrides all implicitly included verification targets via invariants and friends.
     pub fn is_exclusive(&self) -> bool {
         matches!(
             self,
             VerificationScope::Only(_) | VerificationScope::OnlyModule(_)
         )
-    }
-
-    /// Returns the target function if verification is exclusive to one function.
-    pub fn get_exclusive_verify_function_name(&self) -> Option<&String> {
-        match self {
-            VerificationScope::Only(s) => Some(s),
-            _ => None,
-        }
     }
 }
 
@@ -6465,9 +6457,9 @@ impl<'env> FunctionEnv<'env> {
 
     /// Determine whether the function is target of verification.
     pub fn should_verify(&self, default_scope: &VerificationScope) -> bool {
-        if let VerificationScope::Only(function_name) = default_scope {
+        if let VerificationScope::Only(function_names) = default_scope {
             // Overrides pragmas.
-            return self.matches_name(function_name);
+            return self.matches_any_name(function_names);
         }
         if !self.module_env.is_target() {
             // Don't generate verify method for functions from dependencies.
@@ -6501,6 +6493,11 @@ impl<'env> FunctionEnv<'env> {
         } else {
             name.eq(&*self.get_simple_name_string())
         }
+    }
+
+    /// Whether any of `names` matches this function, as `matches_name` does.
+    pub fn matches_any_name(&self, names: &[String]) -> bool {
+        names.iter().any(|name| self.matches_name(name))
     }
 
     /// Determine whether this function is explicitly deactivated for verification.

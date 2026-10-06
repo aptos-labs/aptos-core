@@ -31,10 +31,5 @@ warning: WP could not characterize the aborts of `partial_abort_fallback::caller
 16 │ │     }
    │ ╰─────^
 
-Verification: exiting with condition generation errors
-error: this function has no specification but is referenced by a behavioral predicate
-  ┌─ partial_abort_fallback.enriched.move:5:5
-  │
-5 │     fun maybe_abort() {}
-  │     ^^^^^^^^^^^^^^^^^^^^
+Verification: Succeeded.
 */

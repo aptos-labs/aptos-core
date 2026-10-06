@@ -1,0 +1,12 @@
+diff --git a/sources/framework/extracted_multisig_account.spec.move b/sources/framework/extracted_multisig_account.spec.move
+index 9a56a68ad4..6f2db4c786 100644
+--- a/sources/framework/extracted_multisig_account.spec.move
++++ b/sources/framework/extracted_multisig_account.spec.move
+@@ -6,6 +6,7 @@ spec aptos_framework::extracted_multisig_account {
+         multisig_account: address,
+         sequence_number: u64,
+     ): MultisigTransaction {
++        pragma opaque;
+         let multisig_account_resource = global<MultisigAccount>(multisig_account);
+         aborts_if !exists<MultisigAccount>(multisig_account);
+         aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;

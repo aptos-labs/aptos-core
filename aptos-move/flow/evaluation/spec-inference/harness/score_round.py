@@ -35,6 +35,7 @@ from typing import Any
 from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
 from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig
+from .identifiers import resolve_within
 from .mutants import (
     NO_MUTANTS,
     mutation_fingerprint,
@@ -286,7 +287,10 @@ async def score_round(
                 repeated = overlapping_mutations(
                     load_object(manifest)["mutants"],
                     set(shown),
-                    artifact / "baseline" / record["package_relpath"],
+                    resolve_within(
+                        artifact / "baseline", record["package_relpath"], "package_relpath",
+                        allow_root=True,
+                    ),
                 )
                 if repeated:
                     raise ValueError(
@@ -305,7 +309,10 @@ async def score_round(
             # escaping symlinks have been defused -- scoring the live
             # workspace would compile the wrong tree for a nested package and
             # could fail on a link the finalized record was built to survive.
-            baseline = artifact / "baseline" / record["package_relpath"]
+            baseline = resolve_within(
+                artifact / "baseline", record["package_relpath"], "package_relpath",
+                allow_root=True,
+            )
             pending.append(
                 PendingScore(
                     entry,

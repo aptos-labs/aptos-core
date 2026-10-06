@@ -31,55 +31,6 @@ use std::{
     fmt::{self, Formatter},
 };
 
-/// The helpers inferred together with a single function: its transitive static
-/// callees in target modules which have no specification, reached through such
-/// helpers. A caller's contract is phrased over its callees' contracts, so a
-/// helper without one is inferred in the same run, before its callers.
-struct InferenceHelpers {
-    target: String,
-    helpers: BTreeSet<QualifiedId<FunId>>,
-}
-
-pub fn inference_helpers(env: &GlobalEnv, name: &str) -> BTreeSet<QualifiedId<FunId>> {
-    if let Some(cached) = env.get_extension::<InferenceHelpers>() {
-        if cached.target == name {
-            return cached.helpers.clone();
-        }
-    }
-    let mut work: Vec<QualifiedId<FunId>> = env
-        .get_modules()
-        .filter(|module| module.is_target())
-        .flat_map(|module| {
-            module
-                .get_functions()
-                .filter(|fun| fun.matches_name(name))
-                .map(|fun| fun.get_qualified_id())
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    let mut helpers = BTreeSet::new();
-    while let Some(qid) = work.pop() {
-        let fun = env.get_function(qid);
-        for callee in fun.get_called_functions().into_iter().flatten() {
-            let callee_env = env.get_function(*callee);
-            let unspecified_helper = callee_env.module_env.is_target()
-                && !callee_env.is_native()
-                && !callee_env.is_intrinsic()
-                && !callee_env.is_inline()
-                && callee_env.is_pragma_true(VERIFY_PRAGMA, || true)
-                && !callee_env.get_spec().has_conditions();
-            if unspecified_helper && helpers.insert(*callee) {
-                work.push(*callee);
-            }
-        }
-    }
-    env.set_extension(InferenceHelpers {
-        target: name.to_string(),
-        helpers: helpers.clone(),
-    });
-    helpers
-}
-
 /// The annotation for information about verification.
 #[derive(Clone, Default)]
 pub struct VerificationInfo {
@@ -284,7 +235,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
         let options = ProverOptions::get(env);
 
-        // If we are verifying only one function or module, check that this indeed exists.
+        // If we are verifying only some functions or a module, check that these indeed exist.
         match &options.verify_scope {
             VerificationScope::OnlyModule(name) => {
                 let sym = env.symbol_pool().make(name);
@@ -295,16 +246,18 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
                     )
                 }
             },
-            VerificationScope::Only(name) => {
-                let target_exists = env
-                    .get_modules()
-                    .filter(|m| m.is_target())
-                    .any(|m| m.get_functions().any(|f| f.matches_name(name)));
-                if !target_exists {
-                    env.error(
-                        &env.unknown_loc(),
-                        &format!("function target {} does not exist in target modules", name),
-                    )
+            VerificationScope::Only(names) => {
+                for name in names {
+                    let target_exists = env
+                        .get_modules()
+                        .filter(|m| m.is_target())
+                        .any(|m| m.get_functions().any(|f| f.matches_name(name)));
+                    if !target_exists {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!("function target {} does not exist in target modules", name),
+                        )
+                    }
                 }
             },
             _ => {},
@@ -325,19 +278,22 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
                         )
                     }
                 },
-                VerificationScope::Only(name) => {
-                    let target_exists = env
-                        .get_modules()
-                        .filter(|m| m.is_target())
-                        .any(|m| m.get_functions().any(|f| f.matches_name(name)));
-                    if !target_exists {
-                        env.error(
-                            &env.unknown_loc(),
-                            &format!(
-                                "exclusion function target `{}` does not exist in target modules",
-                                name
-                            ),
-                        )
+                VerificationScope::Only(names) => {
+                    for name in names {
+                        let target_exists = env
+                            .get_modules()
+                            .filter(|m| m.is_target())
+                            .any(|m| m.get_functions().any(|f| f.matches_name(name)));
+                        if !target_exists {
+                            env.error(
+                                &env.unknown_loc(),
+                                &format!(
+                                    "exclusion function target `{}` does not exist in target \
+                                     modules",
+                                    name
+                                ),
+                            )
+                        }
                     }
                 },
                 _ => {},
@@ -479,12 +435,7 @@ impl VerificationAnalysisProcessor {
         let in_scope = match &options.verify_scope {
             VerificationScope::Public => carrier.is_exposed(),
             VerificationScope::All => true,
-            VerificationScope::Only(name) => {
-                carrier.matches_name(name)
-                    || options.inference
-                        && options.infer_unspecified_helpers
-                        && inference_helpers(env, name).contains(&carrier.get_qualified_id())
-            },
+            VerificationScope::Only(names) => carrier.matches_any_name(names),
             VerificationScope::OnlyModule(name) => carrier.module_env.matches_name(name),
             VerificationScope::None => false,
         };
@@ -494,7 +445,7 @@ impl VerificationAnalysisProcessor {
     /// Check whether the function matches any entry in the exclusion list.
     fn is_excluded_from_verification(fun_env: &FunctionEnv, options: &ProverOptions) -> bool {
         options.verify_exclude.iter().any(|excl| match excl {
-            VerificationScope::Only(name) => fun_env.matches_name(name),
+            VerificationScope::Only(names) => fun_env.matches_any_name(names),
             VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
             _ => false,
         })

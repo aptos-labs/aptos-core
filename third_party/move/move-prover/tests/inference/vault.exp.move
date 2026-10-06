@@ -1,7 +1,7 @@
 /*
 Inference returns: exiting with bytecode transformation errors
 Inference diagnostics:
-error: WP cannot complete `vault::harvest` while a transparent callee lacks a complete opaque contract. Repair the named callee boundary before changing or rerunning the caller. Reasons:
+error: WP cannot complete `vault::harvest` through a transparent callee which has neither a complete opaque contract nor a body describing its behavior exactly. Reasons:
   = transparent callee `0x1::fungible_asset::balance` is outside the editable WP scope and has neither a complete opaque contract nor a body which describes its behavior exactly; WP cannot construct a complete caller specification. The package or corpus must provide and verify a complete opaque contract for that callee before the caller is rerun
   = transparent callee `0x1::fungible_asset::deposit` is outside the editable WP scope and has neither a complete opaque contract nor a body which describes its behavior exactly; WP cannot construct a complete caller specification. The package or corpus must provide and verify a complete opaque contract for that callee before the caller is rerun
   = transparent callee `0x1::fungible_asset::withdraw` is outside the editable WP scope and has neither a complete opaque contract nor a body which describes its behavior exactly; WP cannot construct a complete caller specification. The package or corpus must provide and verify a complete opaque contract for that callee before the caller is rerun

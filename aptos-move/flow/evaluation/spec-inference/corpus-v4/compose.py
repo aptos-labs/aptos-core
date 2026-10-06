@@ -48,6 +48,7 @@ sys.path.append(str(ROOT))
 
 from build_references import assemble  # noqa: E402
 from harness.identifiers import module_name, require_plain_name  # noqa: E402
+from harness.materialize import materialize_task, preparation_patch  # noqa: E402
 from harness.mutants import apply_mutant  # noqa: E402
 
 
@@ -60,14 +61,14 @@ def module_file(module: str) -> Path:
     return matches[0]
 
 
-def mutant_diff(case: dict, relative: str, pristine: str) -> str:
+def mutant_diff(case: dict, relative: str, pristine: str, task_tree: Path) -> str:
     """Render one mutant as a unified diff of the file it rewrites."""
     with tempfile.TemporaryDirectory(prefix="move-inference-inspect-") as temporary:
         package = Path(temporary) / "package"
         target = package / relative
         target.parent.mkdir(parents=True)
         target.write_text(pristine, encoding="utf-8")
-        apply_mutant(package, PACKAGE, case)
+        apply_mutant(package, task_tree, case)
         mutated = target.read_text(encoding="utf-8")
     return "".join(
         difflib.unified_diff(
@@ -129,7 +130,13 @@ def compose_task(record: dict, output: Path, assembled: dict[str, Path]) -> dict
     relative = source.relative_to(PACKAGE).as_posix()
     directory = output / "tasks" / task_id
     directory.mkdir(parents=True)
-    shutil.copyfile(source, directory / source.name)
+    # The task starts from the package with its preparation patch applied.
+    temporary = tempfile.TemporaryDirectory(prefix=f"move-inference-inspect-{task_id}-")
+    task_tree = Path(temporary.name) / "package"
+    materialize_task(PACKAGE, preparation_patch(ROOT, record), task_tree,
+                     record.get("prepared_sha256"))
+    received = (task_tree / relative).read_text(encoding="utf-8")
+    (directory / source.name).write_text(received, encoding="utf-8")
 
     name = module_name(module)
     reference = None
@@ -145,7 +152,6 @@ def compose_task(record: dict, output: Path, assembled: dict[str, Path]) -> dict
     manifest = MUTANTS / task_id / "mutants.json"
     if manifest.is_file():
         mutants = json.loads(manifest.read_text(encoding="utf-8"))["mutants"]
-        pristine = source.read_text(encoding="utf-8")
         (directory / "mutants").mkdir()
         for case in mutants:
             if case["file"] != relative:
@@ -155,11 +161,12 @@ def compose_task(record: dict, output: Path, assembled: dict[str, Path]) -> dict
                 )
             mutant_id = require_plain_name(case["mutant_id"], "mutant_id")
             (directory / "mutants" / f"{mutant_id}.diff").write_text(
-                mutant_diff(case, relative, pristine), encoding="utf-8"
+                mutant_diff(case, relative, received, task_tree), encoding="utf-8"
             )
     (directory / "README.md").write_text(
         task_readme(record, mutants, reference), encoding="utf-8"
     )
+    temporary.cleanup()
     return {"task_id": task_id, "record": record, "mutants": len(mutants), "reference": reference is not None}
 
 

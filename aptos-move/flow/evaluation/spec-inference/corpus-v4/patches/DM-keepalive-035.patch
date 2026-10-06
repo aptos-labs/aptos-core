@@ -1,0 +1,21 @@
+diff --git a/sources/trading/extracted_dead_mans_switch_tracker.move b/sources/trading/extracted_dead_mans_switch_tracker.move
+index c1918211c5..5fee875a34 100644
+--- a/sources/trading/extracted_dead_mans_switch_tracker.move
++++ b/sources/trading/extracted_dead_mans_switch_tracker.move
+@@ -87,6 +87,16 @@ module aptos_experimental::extracted_dead_mans_switch_tracker {
+         );
+     }
+ 
++    spec disable_keep_alive {
++        pragma opaque;
++        aborts_if false;
++        ensures tracker.min_keep_alive_time_secs == old(tracker.min_keep_alive_time_secs);
++        ensures !aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == old(tracker.state);
++        ensures aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == aptos_std::big_ordered_map::spec_remove(old(tracker.state), account);
++    }
++
+     public(friend) fun keep_alive(
+         tracker: &mut DeadMansSwitchTracker,
+         parent: address,

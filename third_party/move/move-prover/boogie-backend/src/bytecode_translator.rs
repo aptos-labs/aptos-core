@@ -3075,7 +3075,8 @@ impl<'env> BoogieTranslator<'env> {
             // target of the type through the evaluator, however the value is
             // named -- as a closure, parameter, local, or struct field. An
             // intrinsic whose aborts the prover's model defines publishes that
-            // model instead.
+            // model instead. An opaque function publishes its contract even
+            // when that states no condition: callers are verified against it.
             let qid = info.fun.to_qualified_id();
             let modeled_intrinsic = self
                 .env
@@ -3084,6 +3085,7 @@ impl<'env> BoogieTranslator<'env> {
                 .is_some()
                 && spec_derivation::spec_aborts_are_exact(self.env, qid);
             if closure_spec.conditions.is_empty()
+                && !fun_env.is_opaque()
                 && !fun_env.is_native()
                 && !modeled_intrinsic
                 && !spec_derivation::has_derived_behavior(self.env, qid, &info.fun.inst)

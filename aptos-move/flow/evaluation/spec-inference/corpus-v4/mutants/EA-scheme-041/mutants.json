@@ -3,7 +3,7 @@
     {
       "anchor": {
         "length": 32,
-        "offset": 582,
+        "offset": 739,
         "sha256": "c0d6fe8712dc9d5c0570f93924174712867fdb00e5f3930e538ff2f1c80e7514"
       },
       "edit": {
@@ -35,7 +35,7 @@
     {
       "anchor": {
         "length": 24,
-        "offset": 817,
+        "offset": 974,
         "sha256": "b48e8804a5a3b8aa1a776eb475c89049d2ffa684b3029c4b25d89e5f79acc1e1"
       },
       "edit": {
@@ -67,7 +67,7 @@
     {
       "anchor": {
         "length": 9,
-        "offset": 858,
+        "offset": 1015,
         "sha256": "04dea9c870a7736423e57b3a384bf84d693ec7cb4de43e9da64bdf57d3da2466"
       },
       "edit": {
@@ -97,6 +97,6 @@
       }
     }
   ],
-  "reference_sha256": "2f8fe332da8753837afd1c4423fbeb55a64af0c003023499d5dca75d07f2b08e",
+  "reference_sha256": "d5edf101fde30edada2f5087d0d0807f9285d5ef6d1ee4317187a8d4fee0aeab",
   "task_id": "EA-scheme-041"
 }
