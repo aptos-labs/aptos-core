@@ -973,8 +973,12 @@ impl SnapshotReceiver {
 
 /// The outcome of applying a single snapshot chunk via [`apply_snapshot_chunk`].
 enum ChunkApplyOutcome {
-    /// The chunk was applied (or it failed and an error was sent); keep listening.
+    /// The chunk was applied (or persisting its progress failed and an error
+    /// was sent); keep listening.
     Continue,
+    /// The receiver failed to apply the chunk and an error was sent. The
+    /// receiver may hold partial in-memory state, so the caller must drop it.
+    Abort,
     /// The final chunk was applied; the caller should finalize the snapshot.
     Finalize {
         notification_id: NotificationId,
@@ -1066,6 +1070,8 @@ async fn apply_snapshot_chunk<MetadataStorage: MetadataStorageInterface + Clone>
                         pending_data_errors,
                     )
                     .await;
+                    decrement_pending_data_chunks(pending_data_chunks.clone());
+                    return ChunkApplyOutcome::Abort;
                 },
             }
         },
@@ -1111,7 +1117,8 @@ fn spawn_snapshot_receiver<
             let _timer =
                 metrics::start_timer(&metrics::STORAGE_SYNCHRONIZER_LATENCIES, timer_label);
 
-            // Create the receiver lazily on the first chunk, so a failure (e.g.
+            // Create the receiver lazily on the first chunk (or the first one
+            // after an aborted chunk), so a failure (e.g.
             // the native-position backend not being attached locally) surfaces as
             // a recoverable error notification tied to the chunk, rather than
             // panicking the receiver task.
@@ -1153,6 +1160,12 @@ fn spawn_snapshot_receiver<
             .await
             {
                 ChunkApplyOutcome::Continue => {},
+                ChunkApplyOutcome::Abort => {
+                    // A failed chunk can stay staged in the receiver, and a replay of it
+                    // would then be skipped without verification. Rebuild the receiver
+                    // from the persisted progress on the next chunk instead.
+                    snapshot_receiver = None;
+                },
                 ChunkApplyOutcome::Finalize {
                     notification_id,
                     last_index,
