@@ -1,0 +1,86 @@
+name: Prepare a privileged PR runtime
+description: Authenticate trusted orchestration without checking out or executing PR code
+
+inputs:
+  source_repository:
+    description: Repository that owns the approved PR commit
+    required: true
+  source_sha:
+    description: Full lowercase SHA of the approved PR commit
+    required: true
+  pr_number:
+    description: Pull request number
+    required: true
+  profile:
+    description: Cargo profile of the images
+    required: false
+    default: release
+  features:
+    description: Cargo features of the images
+    required: false
+    default: ""
+  workload_identity_provider:
+    description: Google Cloud workload identity provider
+    required: true
+  service_account:
+    description: Google Cloud service account
+    required: true
+  artifact_repo:
+    description: Google Artifact Registry repository for the images
+    required: true
+
+outputs:
+  image_tag_prefix:
+    description: Trusted IMAGE_TAG_PREFIX for docker-bake-rust-all.sh
+    value: ${{ steps.tags.outputs.image_tag_prefix }}
+  image_tag:
+    description: Expected full tag for the approved source SHA
+    value: ${{ steps.tags.outputs.image_tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check protected deployment prerequisites
+      shell: bash
+      env:
+        GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ inputs.workload_identity_provider }}
+        GCP_SERVICE_ACCOUNT_EMAIL: ${{ inputs.service_account }}
+        GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.artifact_repo }}
+      run: |
+        set -euo pipefail
+        test -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" || { echo "::error::privileged-pr-ci lacks GCP_WORKLOAD_IDENTITY_PROVIDER"; exit 1; }
+        test -n "$GCP_SERVICE_ACCOUNT_EMAIL" || { echo "::error::privileged-pr-ci lacks GCP_SERVICE_ACCOUNT_EMAIL"; exit 1; }
+        test -n "$GCP_DOCKER_ARTIFACT_REPO" || { echo "::error::privileged-pr-ci lacks GCP_DOCKER_ARTIFACT_REPO"; exit 1; }
+
+    - name: Authenticate to Google Cloud from the protected environment
+      uses: ./trusted-base/.github/actions/gcp-registry-auth
+      with:
+        create_credentials_file: false
+        access_token_lifetime: 5400
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - name: Derive the protected image tag
+      id: tags
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr_number }}
+        SOURCE_SHA: ${{ inputs.source_sha }}
+        PROFILE: ${{ inputs.profile }}
+        FEATURES: ${{ inputs.features }}
+      run: |
+        set -euo pipefail
+        [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,9}$ ]] || { echo "::error::Invalid PR number"; exit 1; }
+        [[ "$PROFILE" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "::error::Invalid build profile"; exit 1; }
+        [[ "$FEATURES" =~ ^[a-z0-9,-]*$ ]] || { echo "::error::Invalid build features"; exit 1; }
+        source "$GITHUB_ACTION_PATH/../../../docker/builder/image-tag-prefix.sh"
+        image_tag_prefix="$(image_tag_prefix "$PR_NUMBER" "$PROFILE" "$FEATURES")"
+        [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
+        [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || exit 1
+        image_tag_prefix="${image_tag_prefix}r${GITHUB_RUN_ID}-a${GITHUB_RUN_ATTEMPT}_"
+        image_tag="${image_tag_prefix}${SOURCE_SHA}"
+        {
+          echo "image_tag_prefix=$image_tag_prefix"
+          echo "image_tag=$image_tag"
+        } >> "$GITHUB_OUTPUT"
+        echo "PR_IMAGE_TAG=$image_tag" >> "$GITHUB_ENV"

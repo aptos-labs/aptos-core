@@ -1,0 +1,86 @@
+name: "*build untrusted PR Docker images locally"
+
+on:
+  workflow_call:
+    inputs:
+      SOURCE_REPOSITORY:
+        required: true
+        type: string
+        description: Fork repository that owns the exact PR revision
+      SOURCE_SHA:
+        required: true
+        type: string
+        description: Full PR head SHA to build
+      BASE_SHA:
+        required: true
+        type: string
+        description: Exact trusted event-base SHA
+      PROFILE:
+        required: false
+        default: release
+        type: string
+      FEATURES:
+        required: false
+        default: ""
+        type: string
+      BUILD_TARGET:
+        required: false
+        default: all
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-local-images:
+    runs-on: benchmark-c3d-60-pr
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the exact trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.BASE_SHA }}
+          path: trusted-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out and verify the exact untrusted PR revision
+        uses: ./trusted-base/.github/actions/checkout-exact-pr-source
+        with:
+          source_repository: ${{ inputs.SOURCE_REPOSITORY }}
+          source_sha: ${{ inputs.SOURCE_SHA }}
+
+      - name: Set up an isolated local Docker builder
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          name: pr-${{ github.run_id }}-${{ github.run_attempt }}
+          keep-state: false
+          cleanup: true
+          cache-binary: false
+
+      - name: Build local images without credentials or remote cache
+        working-directory: pr-source
+        env:
+          BUILD_TARGET: ${{ inputs.BUILD_TARGET }}
+          PROFILE: ${{ inputs.PROFILE }}
+          FEATURES: ${{ inputs.FEATURES }}
+          BUILD_ADDL_TESTING_IMAGES: "true"
+          TARGET_CACHE_ID: pr-${{ inputs.SOURCE_SHA }}
+          TARGET_REGISTRY: local
+        run: |
+          set -euo pipefail
+          CI=false TARGET_REGISTRY=local docker/builder/docker-bake-rust-all.sh "$BUILD_TARGET"
+
+      - name: Record the exact local build source
+        env:
+          SOURCE_REPOSITORY: ${{ inputs.SOURCE_REPOSITORY }}
+          SOURCE_SHA: ${{ inputs.SOURCE_SHA }}
+        run: |
+          {
+            echo "## Untrusted PR local image build"
+            echo "Repository: \`$SOURCE_REPOSITORY\`"
+            echo "Exact source SHA: \`$SOURCE_SHA\`"
+            echo "Images stayed on this disposable runner and were not published."
+          } >> "$GITHUB_STEP_SUMMARY"

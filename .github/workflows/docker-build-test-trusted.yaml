@@ -1,0 +1,176 @@
+name: "Build+Test Docker Images (trusted push/manual)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - devnet
+      - testnet
+      - mainnet
+      - aptos-node-v*
+      - aptos-release-v*
+      - performance_benchmark
+      - preview
+      - preview-networking
+      - aptos-indexer-grpc-devnet
+      - aptos-indexer-grpc-testnet
+      - aptos-indexer-grpc-mainnet
+      - aptos-indexer-grpc-v*
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.sha }}
+  cancel-in-progress: true
+
+# Trusted push and manual behavior remains on the existing generic workflows.
+# Every build binds the pushed commit and uses the branch name as its cache ID.
+jobs:
+  file_change_determinator:
+    runs-on: 2cpu-gh-ubuntu24-x64
+    outputs:
+      only_docs_changed: ${{ steps.determine.outputs.only_docs_changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: determine
+        uses: ./.github/actions/file-change-determinator
+
+  trusted-rust-images:
+    permissions: {contents: read, id-token: write}
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      TARGET_CACHE_ID: ${{ github.ref_name }}
+      PROFILE: release
+      BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: remote-all
+
+  trusted-rust-images-failpoints:
+    permissions: {contents: read, id-token: write}
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      TARGET_CACHE_ID: ${{ github.ref_name }}
+      PROFILE: release
+      FEATURES: failpoints
+      BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: remote-all
+
+  trusted-rust-images-performance:
+    permissions: {contents: read, id-token: write}
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      TARGET_CACHE_ID: ${{ github.ref_name }}
+      PROFILE: performance
+      BUILD_ADDL_TESTING_IMAGES: true
+      TARGET_REGISTRY: remote-all
+
+  trusted-node-api-compatibility-tests:
+    needs: [trusted-rust-images, file_change_determinator]
+    permissions: {contents: read, id-token: write}
+    uses: ./.github/workflows/node-api-compatibility-tests.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+
+  trusted-cli-e2e-tests:
+    needs: [trusted-rust-images, file_change_determinator]
+    permissions: {contents: read, id-token: write}
+    uses: aptos-labs/aptos-core/.github/workflows/cli-e2e-tests.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+
+  trusted-faucet-tests-main:
+    needs: [trusted-rust-images, file_change_determinator]
+    permissions: {contents: read, id-token: write}
+    uses: ./.github/workflows/faucet-tests-main.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+
+  trusted-forge-e2e-test:
+    needs: [trusted-rust-images, trusted-rust-images-failpoints, trusted-rust-images-performance, file_change_determinator]
+    if: |
+      ((github.event_name == 'push' && github.ref_name != 'main') || github.event_name == 'workflow_dispatch')
+    permissions: {contents: read, id-token: write, pull-requests: write}
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      FORGE_TEST_SUITE: realistic_env_max_load
+      IMAGE_TAG: ${{ github.sha }}
+      FORGE_RUNNER_DURATION_SECS: 480
+      COMMENT_HEADER: forge-e2e
+      FORGE_NAMESPACE: forge-e2e-${{ github.ref_name }}
+      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SEND_RESULTS_TO_TRUNK: true
+
+  trusted-fetch-last-released-docker-image-tag:
+    if: |
+      ((github.event_name == 'push' && github.ref_name != 'main') || github.event_name == 'workflow_dispatch')
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions: {contents: read, id-token: write}
+    outputs:
+      IMAGE_TAG: ${{ steps.image.outputs.IMAGE_TAG }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 1}
+      - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          EXPORT_GCP_PROJECT_VARIABLES: "false"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - id: image
+        uses: ./.github/actions/determine-or-use-target-branch-and-get-last-released-image
+        with:
+          base-branch: ${{ github.ref_name }}
+          variants: "failpoints performance"
+
+  trusted-forge-compat-test:
+    needs: [trusted-fetch-last-released-docker-image-tag, trusted-rust-images, trusted-rust-images-failpoints, trusted-rust-images-performance, file_change_determinator]
+    if: |
+      ((github.event_name == 'push' && github.ref_name != 'main') || github.event_name == 'workflow_dispatch')
+    permissions: {contents: read, id-token: write, pull-requests: write}
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      FORGE_TEST_SUITE: compat
+      IMAGE_TAG: ${{ needs.trusted-fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 300
+      COMMENT_HEADER: forge-compat
+      FORGE_NAMESPACE: forge-compat-${{ github.ref_name }}
+      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+      SEND_RESULTS_TO_TRUNK: true
+
+  trusted-forge-framework-upgrade-test:
+    needs: [trusted-fetch-last-released-docker-image-tag, trusted-rust-images, trusted-rust-images-failpoints, trusted-rust-images-performance]
+    if: |
+      github.event_name == 'push' && github.ref_name != 'main'
+    permissions: {contents: read, id-token: write, pull-requests: write}
+    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      FORGE_TEST_SUITE: framework_upgrade
+      IMAGE_TAG: ${{ needs.trusted-fetch-last-released-docker-image-tag.outputs.IMAGE_TAG }}
+      FORGE_RUNNER_DURATION_SECS: 3600
+      COMMENT_HEADER: forge-framework-upgrade
+      FORGE_NAMESPACE: forge-framework-upgrade-${{ github.ref_name }}
+      SKIP_JOB: true
+      SEND_RESULTS_TO_TRUNK: true

@@ -23,28 +23,13 @@ export NORMALIZED_GIT_BRANCH_OR_PR=$(printf "$TARGET_CACHE_ID" | sed -e 's/[^a-z
 export PROFILE=${PROFILE:-release}
 export FEATURES=${FEATURES:-""}
 export NORMALIZED_FEATURES_LIST=$(printf "$FEATURES" | sed -e 's/[^a-zA-Z0-9]/_/g')
-export CUSTOM_IMAGE_TAG_PREFIX=${CUSTOM_IMAGE_TAG_PREFIX:-""}
 export CARGO_TARGET_DIR="target/${FEATURES:-"default"}"
 
-if [ "$PROFILE" = "release" ]; then
-  # Do not prefix image tags if we're building the default profile "release"
-  profile_prefix=""
-else
-  # Builds for profiles other than "release" should be tagged with their profile name
-  profile_prefix="${PROFILE}_"
+if [ "${IMAGE_TAG_PREFIX+x}" != x ]; then
+  source "$(dirname "${BASH_SOURCE[0]}")/image-tag-prefix.sh"
+  IMAGE_TAG_PREFIX="$(image_tag_prefix "" "$PROFILE" "$FEATURES")"
 fi
-
-if [ -n "$CUSTOM_IMAGE_TAG_PREFIX" ]; then
-  export IMAGE_TAG_PREFIX="${CUSTOM_IMAGE_TAG_PREFIX}_"
-else
-  export IMAGE_TAG_PREFIX=""
-fi
-
-if [ -n "$FEATURES" ]; then
-  export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}${NORMALIZED_FEATURES_LIST}_"
-else
-  export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}"
-fi
+export IMAGE_TAG_PREFIX
 
 BUILD_TARGET="${1:-all}"
 echo "Building target: ${BUILD_TARGET}"

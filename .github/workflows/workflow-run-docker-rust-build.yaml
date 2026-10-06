@@ -157,10 +157,10 @@ jobs:
             if [[ "$output" == *"${{ github.run_id }}"* ]]; then
               echo "Lock file for current workflow exists. Continuing ..."
             else
-              echo "Lock file exists: Current workflow building: " | tee -a $GITHUB_STEP_SUMMARY
-              echo "$output" | tee -a $GITHUB_STEP_SUMMARY
-              echo "Attempting to wait for build to finish ..." | tee -a $GITHUB_STEP_SUMMARY
-              echo "wait_images=true" >> $GITHUB_OUTPUT
+              echo "Lock file exists: Current workflow building: " | tee -a "$GITHUB_STEP_SUMMARY"
+              echo "$output" | tee -a "$GITHUB_STEP_SUMMARY"
+              echo "Attempting to wait for build to finish ..." | tee -a "$GITHUB_STEP_SUMMARY"
+              echo "wait_images=true" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "Lock file does not exist"

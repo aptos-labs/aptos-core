@@ -1,0 +1,62 @@
+name: Prepare a privileged PR image build
+description: Run the trusted-base setup that must finish before PR-controlled code runs
+
+inputs:
+  source_repository:
+    description: Repository that owns the approved PR commit
+    required: true
+  source_sha:
+    description: Full lowercase SHA of the approved PR commit
+    required: true
+  pr_number:
+    description: Pull request number
+    required: true
+  profile:
+    description: Cargo profile of the images
+    required: false
+    default: release
+  features:
+    description: Cargo features of the images
+    required: false
+    default: ""
+  workload_identity_provider:
+    description: Google Cloud workload identity provider
+    required: true
+  service_account:
+    description: Google Cloud service account
+    required: true
+  artifact_repo:
+    description: Google Artifact Registry repository for the images
+    required: true
+
+outputs:
+  image_tag_prefix:
+    description: Trusted IMAGE_TAG_PREFIX for docker-bake-rust-all.sh
+    value: ${{ steps.runtime.outputs.image_tag_prefix }}
+  image_tag:
+    description: Expected full tag for the approved source SHA
+    value: ${{ steps.runtime.outputs.image_tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare exact source and registry authentication
+      id: runtime
+      uses: ./trusted-base/.github/actions/privileged-pr-runtime-setup
+      with:
+        source_repository: ${{ inputs.source_repository }}
+        source_sha: ${{ inputs.source_sha }}
+        pr_number: ${{ inputs.pr_number }}
+        profile: ${{ inputs.profile }}
+        features: ${{ inputs.features }}
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+        artifact_repo: ${{ inputs.artifact_repo }}
+
+    - name: Set up an isolated protected Docker builder
+      uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+      with:
+        name: protected-pr-${{ github.run_id }}-${{ github.run_attempt }}
+        keep-state: false
+        cleanup: true
+        cache-binary: false

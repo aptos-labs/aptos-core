@@ -2,6 +2,7 @@
   "hardened_workflows": [
     ".github/workflows/adhoc-forge.yaml",
     ".github/workflows/cli-e2e-tests.yaml",
+    ".github/workflows/docker-build-test-trusted.yaml",
     ".github/workflows/docker-build-test.yaml",
     ".github/workflows/docker-forge-pr-report.yaml",
     ".github/workflows/execution-performance.yaml",
@@ -19,7 +20,9 @@
     ".github/workflows/pr-ci-policy.yaml",
     ".github/workflows/pr-ci-report.yaml",
     ".github/workflows/rust-client-tests.yaml",
+    ".github/workflows/workflow-run-docker-rust-build-pr.yaml",
     ".github/workflows/workflow-run-docker-rust-build.yaml",
+    ".github/workflows/workflow-run-docker-rust-publish-pr.yaml",
     ".github/workflows/workflow-run-execution-performance.yaml",
     ".github/workflows/workflow-run-forge.yaml"
   ],
@@ -40,6 +43,8 @@
     ".github/actions/indexer-processor-dispatch/",
     ".github/actions/pr-ci-policy/",
     ".github/actions/pr-ci-report/",
+    ".github/actions/privileged-pr-runtime-setup/",
+    ".github/actions/privileged-pr-setup/",
     ".github/actions/protected-image-manifest/",
     ".github/ci/",
     ".python-version",
