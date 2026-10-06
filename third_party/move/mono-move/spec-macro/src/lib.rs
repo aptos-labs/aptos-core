@@ -1,31 +1,27 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Attributes that bind a checker's specification to its implementation.
+//! Provides macros for defining a spec sheet, and binding spec items to
+//! their implementation.
 //!
-//! A checker such as the well-formedness checker specifies its checks as
-//! markdown tables with stable ids (`F1`, `P3`, ...) and implements them as
-//! statements spread over many methods. These attributes make both sides
-//! data, so a test can prove that every specified check is evaluated
-//! somewhere and every evaluated check is specified, and so a method's time
-//! complexity is declared in a grammar that cannot express anything beyond
-//! `O(N * log(N))`.
+//! - `#[spec]` on an item turns the markdown check tables in its doc comment
+//!   into `Self::CHECKS: &[CheckSpec]`, validating them at compile time.
+//! - `#[check(F3)]` tags the statement or match arm that implements a check.
+//! - `#[checks(registry = NAME)]` on an `impl` collects the tags into a
+//!   registry const.
+//! - `#[complexity(class [in "what"] [because "why"])]` declares a method's
+//!   time complexity and writes its `Complexity:` doc line. Classes:
+//!   `constant`, `log`, `linear`, `n_log_n`; nothing worse exists.
 //!
-//! - [`macro@spec`] on an item parses the check tables in its doc comment into
-//!   `Self::CHECKS: &[CheckSpec]`, validating their shape at compile time. The
-//!   documentation is left as it is.
-//! - `#[check(F3)]` tags the statement or match arm that evaluates a check.
-//! - [`macro@checks`] on the checker's `impl` block collects those tags and
-//!   emits a registry of `(method, checks, complexity, measured_in, because)`.
-//! - `#[complexity(class [in "what"] [because "why"])]` on a method declares
-//!   its cost class and generates the `Complexity:` line of its documentation.
+//! A test can then assert that every specified check is implemented and vice
+//! versa.
 //!
 //! ```ignore
 //! /// ## Function shape
 //! ///
-//! /// | Id | Property                 | Condition    | Rationale |
-//! /// |----|--------------------------|--------------|-----------|
-//! /// | F3 | frame holds its metadata | `S + M <= E` |           |
+//! /// | Id | Property                 | Condition    |
+//! /// |----|--------------------------|--------------|
+//! /// | F3 | frame holds its metadata | `S + M <= E` |
 //! #[spec]
 //! pub struct Spec;
 //!
@@ -34,29 +30,14 @@
 //!     #[complexity(constant)]
 //!     fn check_frame_geometry(&mut self) {
 //!         #[check(F3)]
-//!         if func.frame_size() > func.extended_frame_size {
-//!             ...
-//!         }
-//!     }
-//!
-//!     #[complexity(n_log_n in "the number of layout slots"
-//!                  because "each safe-point slot is one binary search")]
-//!     fn check_gc_layouts(&mut self) {
-//!         #[check(G7)]
-//!         for sp in sp_offsets { ... }
+//!         if func.frame_size() > func.extended_frame_size { ... }
 //!     }
 //! }
 //! ```
 //!
-//! Grammar:
-//!
-//! - A check id is an uppercase letter followed by digits. `A1-A4` in a tag is
-//!   the inclusive range `A1, A2, A3, A4`. An id repeated on one statement is
-//!   an error; the same id on several statements or methods is allowed.
-//! - A spec table needs `Id`, `Property`, and `Condition` columns and may have
-//!   `Rationale`; its group is the nearest preceding `## ` heading. Ids must
-//!   be unique across all tables.
-//! - A complexity class is `constant`, `log`, `linear`, or `n_log_n`.
+//! Ids are an uppercase letter and digits; `A1-A4` is a range. Tables need
+//! `Id`, `Property`, `Condition` columns, optionally `Rationale`; the group is
+//! the nearest `## ` heading.
 
 use proc_macro::TokenStream;
 use quote::quote;
