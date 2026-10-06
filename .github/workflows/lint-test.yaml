@@ -43,6 +43,8 @@ jobs:
     needs: file_change_determinator
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
+      - name: Intentionally fail this disposable regression test PR
+        run: exit 1
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
