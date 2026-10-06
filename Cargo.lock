@@ -13005,15 +13005,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mono-move-checks-macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
 name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
@@ -13023,7 +13014,7 @@ dependencies = [
  "bytes",
  "fxhash",
  "mono-move-alloc",
- "mono-move-checks-macro",
+ "mono-move-spec-macro",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -13198,6 +13189,15 @@ dependencies = [
  "serde",
  "shared-dsa",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mono-move-spec-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
 ]
 
 [[package]]

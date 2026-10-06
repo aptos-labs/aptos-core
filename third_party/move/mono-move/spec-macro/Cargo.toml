@@ -1,5 +1,5 @@
 [package]
-name = "mono-move-checks-macro"
+name = "mono-move-spec-macro"
 version = "0.1.0"
 
 # Workspace inherited keys

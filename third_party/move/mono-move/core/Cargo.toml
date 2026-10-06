@@ -18,7 +18,7 @@ bitflags = { workspace = true }
 bytes = { workspace = true }
 fxhash = { workspace = true }
 mono-move-alloc = { workspace = true }
-mono-move-checks-macro = { workspace = true }
+mono-move-spec-macro = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }

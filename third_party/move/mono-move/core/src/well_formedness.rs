@@ -87,7 +87,7 @@ use crate::{
     Function, LayoutProvider, MicroOp, ObjectDescriptorInner, OperandKind, PackClosureOp,
     SizedSlot, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
-use mono_move_checks_macro::{checks, spec};
+use mono_move_spec_macro::{checks, spec};
 use std::fmt;
 
 // ---------------------------------------------------------------------------

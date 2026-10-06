@@ -1,50 +1,62 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! `#[checks]`: declares which specified checks each method of an `impl`
-//! block evaluates, and generates a registry of them.
+//! Attributes that bind a checker's specification to its implementation.
+//!
+//! A checker such as the well-formedness checker specifies its checks as
+//! markdown tables with stable ids (`F1`, `P3`, ...) and implements them as
+//! statements spread over many methods. These attributes make both sides
+//! data, so a test can prove that every specified check is evaluated
+//! somewhere and every evaluated check is specified, and so a method's time
+//! complexity is declared in a grammar that cannot express anything beyond
+//! `O(N * log(N))`.
+//!
+//! - [`macro@spec`] on an item parses the check tables in its doc comment into
+//!   `Self::CHECKS: &[CheckSpec]`, validating their shape at compile time. The
+//!   documentation is left as it is.
+//! - `#[check(F3)]` tags the statement or match arm that evaluates a check.
+//! - [`macro@checks`] on the checker's `impl` block collects those tags and
+//!   emits a registry of `(method, checks, complexity, measured_in, because)`.
+//! - `#[complexity(class [in "what"] [because "why"])]` on a method declares
+//!   its cost class and generates the `Complexity:` line of its documentation.
 //!
 //! ```ignore
+//! /// ## Function shape
+//! ///
+//! /// | Id | Property                 | Condition    | Rationale |
+//! /// |----|--------------------------|--------------|-----------|
+//! /// | F3 | frame holds its metadata | `S + M <= E` |           |
+//! #[spec]
+//! pub struct Spec;
+//!
 //! #[checks(registry = IMPLEMENTED_CHECKS)]
 //! impl Checker {
-//!     #[checks(F3, F4, F5, F6)]
-//!     fn check_frame_geometry(&mut self) { ... }
+//!     #[complexity(constant)]
+//!     fn check_frame_geometry(&mut self) {
+//!         #[check(F3)]
+//!         if func.frame_size() > func.extended_frame_size {
+//!             ...
+//!         }
+//!     }
 //!
-//!     #[checks(P1-P4, R1-R4)]
-//!     fn check_slots(&mut self) { ... }
+//!     #[complexity(n_log_n in "the number of layout slots"
+//!                  because "each safe-point slot is one binary search")]
+//!     fn check_gc_layouts(&mut self) {
+//!         #[check(G7)]
+//!         for sp in sp_offsets { ... }
+//!     }
 //! }
 //! ```
 //!
-//! expands to the `impl` with the method attributes removed, plus
+//! Grammar:
 //!
-//! ```ignore
-//! pub const IMPLEMENTED_CHECKS: &[(&str, &[&str])] = &[
-//!     ("check_frame_geometry", &["F3", "F4", "F5", "F6"]),
-//!     ("check_slots", &["P1", "P2", "P3", "P4", "R1", "R2", "R3", "R4"]),
-//! ];
-//! ```
-//!
-//! An id is an uppercase letter followed by digits; `A1-A4` is the inclusive
-//! range `A1, A2, A3, A4`. Malformed ids and ids repeated on one method are
-//! compile errors. Checks may legitimately appear on several methods when the
-//! methods share them.
-//!
-//! A method may also declare its time complexity, with what `N` measures and
-//! an optional explanation:
-//!
-//! ```ignore
-//! #[checks(G3, G4, G5, G7)]
-//! #[complexity(n_log_n in "the number of layout slots"
-//!              because "each safe-point slot is one binary search into `base`")]
-//! fn check_gc_layouts(&mut self) { ... }
-//! ```
-//!
-//! The class is one of `constant`, `log`, `linear`, `n_log_n`; the grammar has
-//! nothing worse, so an unmetered checker cannot declare a method beyond
-//! `O(N * log(N))`. The macro appends `Complexity: O(N * log(N)) in the number
-//! of layout slots: each safe-point slot is one binary search into `base`.` to
-//! the method's documentation, and the registry entry becomes
-//! `(method, checks, complexity, measured_in, because)`.
+//! - A check id is an uppercase letter followed by digits. `A1-A4` in a tag is
+//!   the inclusive range `A1, A2, A3, A4`. An id repeated on one statement is
+//!   an error; the same id on several statements or methods is allowed.
+//! - A spec table needs `Id`, `Property`, and `Condition` columns and may have
+//!   `Rationale`; its group is the nearest preceding `## ` heading. Ids must
+//!   be unique across all tables.
+//! - A complexity class is `constant`, `log`, `linear`, or `n_log_n`.
 
 use proc_macro::TokenStream;
 use quote::quote;
