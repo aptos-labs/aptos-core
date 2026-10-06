@@ -18,7 +18,10 @@ use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transacti
 use proptest::{collection::btree_map, prelude::*};
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 #[derive(Default)]
@@ -122,6 +125,40 @@ where
     }
 }
 
+/// Fails the first KV write if `fail_next_write` is set.
+struct FailingValueWriter<K: TestKey, V: TestValue> {
+    store: Arc<MockSnapshotStore<K, V>>,
+    fail_next_write: AtomicBool,
+}
+
+impl<K, V> StateValueWriter<K, V> for FailingValueWriter<K, V>
+where
+    K: TestKey,
+    V: TestValue,
+{
+    fn write_kv_batch(
+        &self,
+        version: Version,
+        kv_batch: &StateValueBatch<K, Option<V>>,
+        progress: StateSnapshotProgress,
+    ) -> Result<()> {
+        if self.fail_next_write.swap(false, Ordering::Relaxed) {
+            return Err(aptos_storage_interface::AptosDbError::Other(
+                "Injected KV write failure.".to_string(),
+            ));
+        }
+        self.store.write_kv_batch(version, kv_batch, progress)
+    }
+
+    fn kv_finish(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
+        self.store.kv_finish(version, usage)
+    }
+
+    fn get_progress(&self, version: Version) -> Result<Option<StateSnapshotProgress>> {
+        self.store.get_progress(version)
+    }
+}
+
 fn init_mock_store<V>(kvs: &BTreeMap<V, V>) -> (MockSnapshotStore<V, V>, Version)
 where
     V: TestKey + TestValue,
@@ -217,6 +254,16 @@ proptest! {
     }
 
     #[test]
+    fn test_restore_rejects_chunks_after_failed_verification(btree in arb_btree_map(1)) {
+        assert_restore_rejects_chunks_after_failure(&btree, false /* fail_kv_write */);
+    }
+
+    #[test]
+    fn test_restore_rejects_chunks_after_failed_kv_write(btree in arb_btree_map(1)) {
+        assert_restore_rejects_chunks_after_failure(&btree, true /* fail_kv_write */);
+    }
+
+    #[test]
     fn test_overwrite(
         btree in arb_btree_map(1),
         target_version in 0u64..2000,
@@ -254,6 +301,57 @@ fn assert_success<V>(
     let usage_stored = db.get_stored_usage(version);
     assert_eq!(usage_calculated, usage_stored);
     assert_eq!(usage_stored.items(), tree.get_leaf_count(version).unwrap());
+}
+
+/// The first chunk fails either its proof check (forged values) or its KV write (honest values),
+/// and may stay staged in the tree restore. A replay with forged values would then be skipped by
+/// the tree restore as an overlap without verification, while the KV restore writes it. So the
+/// restore must reject every later chunk and refuse to finish.
+fn assert_restore_rejects_chunks_after_failure(
+    btree: &BTreeMap<HashValue, (ValueBlob, ValueBlob)>,
+    fail_kv_write: bool,
+) {
+    let (db, version) = init_mock_store(&btree.values().cloned().collect());
+    let tree = JellyfishMerkleTree::new(&db);
+    let expected_root_hash = tree.get_root_hash(version).unwrap();
+    let proof = tree
+        .get_range_proof(*btree.keys().last().unwrap(), version)
+        .unwrap();
+    let chunk: Vec<_> = btree.values().cloned().collect();
+    let forged_chunk: Vec<_> = btree
+        .values()
+        .map(|(k, _v)| (k.clone(), ValueBlob::from(b"forged".to_vec())))
+        .collect();
+
+    let restore_db = Arc::new(MockSnapshotStore::default());
+    let value_writer = Arc::new(FailingValueWriter {
+        store: Arc::clone(&restore_db),
+        fail_next_write: AtomicBool::new(fail_kv_write),
+    });
+    let mut restore = StateSnapshotRestore::new(
+        Arc::clone(&restore_db),
+        value_writer,
+        version,
+        expected_root_hash,
+        false, /* async_commit */
+        StateSnapshotRestoreMode::Default,
+    )
+    .unwrap();
+    let failed_chunk = if fail_kv_write {
+        chunk.clone()
+    } else {
+        forged_chunk.clone()
+    };
+    assert!(restore.add_chunk(failed_chunk, proof.clone()).is_err());
+    assert!(restore.add_chunk(forged_chunk, proof.clone()).is_err());
+    assert!(restore.add_chunk(chunk, proof).is_err());
+    assert!(restore.finish().is_err());
+
+    assert!(restore_db.get_progress(version).unwrap().is_none());
+    assert!(restore_db
+        .get_node_option(&NodeKey::new_empty_path(version), "test")
+        .unwrap()
+        .is_none());
 }
 
 fn restore_without_interruption<V>(
