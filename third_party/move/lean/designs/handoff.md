@@ -1,6 +1,6 @@
 # Handoff
 
-Status: 2026-10-06, branch `wrwg/lean4` (worktree `dev3`); PAUSED at the user’s request; validated fixes are in the working tree.
+Status: 2026-10-06, branch `wrwg/lean4` (worktree `dev3`); the broad MVP-parity goal remains PAUSED at the user’s request. Checkpoint `30b94c309b` is committed; the subsequent AMM/report, pool and nested-behavior follow-ups form the new commit checkpoint. Native benchmarks verify all 22 pool targets and all 20 behavior targets.
 
 ## Where the state is
 
@@ -24,15 +24,19 @@ resume only when requested.
 Broad suites run at batch boundaries.
 
 1. AMM/calculator valid targets now verify and all four full suites pass.
-   Remaining performance work includes fast rejection of AMM’s intentionally
-   non-compliant constructor (still 1.5G heartbeats), calculator `process`
-   (1.16G), and ordered-map performance: all
-   29 targets now verify with zero errors, at 4.126G total heartbeats. The
-   largest remaining target is `test_verify_iter_walk_mut_symbolic` (943M),
+   AMM's intentionally non-compliant constructor now rejects normally at
+   185,036,096 heartbeats, down 87.7% from its 1.5G timeout. The benchmark labels
+   it **expected rejection**, and counts rejected attempts in suite totals.
+   Remaining performance work includes calculator `process`
+   (989M), and ordered-map performance: all
+   29 targets verify with zero errors, at 4,157,416,781 total heartbeats. The
+   largest remaining target is `test_verify_iter_walk_mut_symbolic` (955M),
    followed by drain (439M). A restricted `grind only` companion experiment
-   did not close the walk proof and was discarded. Other failed benchmark
-   work includes `pool_u64::buy_in`/`deduct_shares`, then nested invocation
-   facts in `behavior::add_two`. `capability` verifies completely.
+   did not close the walk proof and was discarded. The pool now verifies all 22 targets with zero errors or timeouts;
+   `buy_in` costs 854M heartbeats instead of its 1.5G timeout. Other failed
+   benchmark work includes the existing `type_info::verify_type_of` assertions.
+   `behavior` now verifies all 20 targets after the nested-invocation fix below.
+   `capability` verifies completely.
 2. A registry entry by test count: V7 intrinsic maps (12), C8 `update` of a spec
    variable (9), V16 natives (7), the `update_field` operation (V1, 11 messages).
 3. S4: attribute the remaining `state_labels/` failures. Invocation labels now
@@ -42,6 +46,105 @@ Broad suites run at batch boundaries.
    removed resource contents (see the state-label design).
 
 ## This increment
+
+- Requested checkpoint: commit the validated AMM/report, pool and nested-behavior
+  follow-ups and suspend. `type_info` is removed from `bench/problems.toml`:
+  the next full benchmark has 31 problems. The existing generated HTML/JSON
+  intentionally retains the last complete 32-problem measurement until then.
+- Checkpoint validation after removing the experiment: restored native build
+  passes (249 jobs); existing VectorOperations, Behavior and ArithmeticContext
+  checks pass; the ordinary scoped MVP baseline check passes without updating
+  expectations; eight Python report tests pass. Logs:
+  `/tmp/checkpoint-restored-native-build.log`, `/tmp/checkpoint-vector-check.log`,
+  `/tmp/checkpoint-behavior-check.log`, `/tmp/checkpoint-arithmetic-check.log`,
+  `/tmp/checkpoint-bp-baseline.log` and `/tmp/checkpoint-report-tests.log`.
+  The restored closer exactly matches the previously full-suite-validated
+  behavior implementation; no further full benchmark or broad suite was started
+  for the requested suspension.
+- Resumption experiment for `bp_pure_callee::remove_all_found`: the current
+  implementation reproduces a 25M timeout; diagnostic automatic proof at 100M
+  takes 52.221M. Kernel-proved swap/remove normalization, array-map transport
+  laws and a search-index bound reduce it to 22.698M and pass the official
+  scoped runner. However, the removal rewrite regresses existing vector checks
+  (`remove_middle`, `swap_remove_value`) and generic swap/remove callers. All
+  experimental production changes and their scoped baseline update were removed;
+  this checkpoint retains the prior verified implementation and baseline.
+  Scratch sources are `/tmp/registry-vector-operations-checkpoint-experiment.lean`
+  and `/tmp/registry-vector-generic-checkpoint-experiment.lean`; logs include
+  `/tmp/registry-remove-official-25k.log`, `/tmp/registry-vector-existing-check.log`
+  and `/tmp/registry-vector-generic-residual.log`. Investigate the residual
+  `wp (Spec.pure ...)` and simplifier transparency before installing the rewrite.
+
+- Nested-behavior fix: the closer splits marked literal-closure abort
+  alternatives before analyzing individual invocations. Shared argument
+  decoding now recognizes the certified integer inside a packed single-result
+  projection; both termination and contract dispatch use it. `abortCases?`'s
+  existing suppression rule remains unchanged. The valid two-increment
+  regression passes at a 50M target budget, and a guarded negative still
+  rejects a clause that omits second-invocation overflow.
+- Focused native benchmark `/tmp/leaner-benchmark-behavior-fixed.json` verifies
+  20/20 behavior targets, zero errors. `add_two` costs 18,943,903 heartbeats;
+  module total 125,588,922. The benchmark script regenerated the local JSON
+  and HTML before broad testing. The fresh full run
+  `/tmp/leaner-benchmark-behavior-final.json` records 30 verified modules,
+  one expected rejection (AMM), one existing failure (`type_info`), and zero
+  timeouts. All measured work is 16,168,784,777 heartbeats (+0.017% versus
+  the previous pool full run). Behavior verifies all 20 targets at 125,589,180
+  total; `add_two` costs 18,944,093. The complete local JSON and script-generated
+  HTML now show this run against main. Pool, ordered-map and calculator retain
+  their complete verification, and AMM's declared negative rejects normally.
+- Behavior validation: the positive and guarded negative core checks pass in
+  scratch. Native Move tools were rebuilt before measurements. The full core
+  suite passes (135 jobs, including both performance gates and the new
+  positive/negative behavior checks) after publishing the full benchmark
+  data/HTML. Eight Python report tests pass. Core log:
+  `/tmp/behavior-final-core-tests.log`. The broad MVP-parity goal remains
+  paused.
+
+- Scoped pool follow-up: `pool_u64.proof.lean` rewrites carrier scalar call
+  summaries by hypothesis identity for `buy_in`, and uses proved map/vector
+  coverage lemmas for the two `deduct_shares` search branches. All 22 targets
+  verify under the regular budget. Existing Move sources/specifications are
+  unchanged. The new helpers are invoked explicitly by the companion; adding
+  them to automatic search regressed option/simple-map and was discarded.
+- Previous pool full native benchmark: `/tmp/leaner-benchmark-pool-final.json`;
+  the new behavior runs replace it in the default generated report against main. Results: 29 verified, 1 expected
+  rejection, 2 existing failures (`type_info`, `behavior`), zero timeouts.
+  All measured work totals 16,166,103,625 heartbeats. Pool totals 3,393,032,305,
+  including two previously skipped downstream proofs; its total rose from
+  3,050,102,018 despite `buy_in` falling to 854,318,280. `deduct_shares` costs
+  763,749,746, `redeem_shares` 632,868,911 and `transfer_shares` 307,052,384.
+  Option/simple-map verify, bit-vector cost is restored, ordered-map verifies
+  all 29 targets, calculator all eight, and AMM's six positives verify while
+  its declared negative rejects normally at 185,035,863 heartbeats.
+- Pool validation: focused scalar/coverage checks and eight Python report tests
+  pass. Full core suite passes (135 jobs, including both performance gates) after
+  the full benchmark data and HTML were regenerated. Log:
+  `/tmp/pool-final-core-tests.log`. The broad MVP-parity goal remains paused.
+
+- Scoped AMM/report follow-up (the broad goal stays paused): function-valued
+  automatic leaves bound speculative cheap/prepared/pipeline/case solvers by
+  the existing 20M attempt budget. Repeated leaves of an already rejected
+  clause reuse its rejection, keyed by both clause and provenance. Logged
+  errors still prevent certifying the target. Ordinary vector/reflection
+  solvers retain their original budgets; an unconditional cap regressed ACL
+  and was discarded. The six valid AMM targets still verify.
+- Previous AMM baseline benchmark: `/tmp/leaner-benchmark-amm-final.json`;
+  the new pool run above replaces it in the default local report, which omits
+  intermediate local runs.
+  Results: 28 verified, 1 expected rejection, 2 unresolved rejections
+  (`type_info`, `behavior`), and 1 timeout (`pool_u64`). No newly failed problems
+  or missing targets relative to the committed checkpoint. All measured work
+  totals 15,822,941,895 heartbeats; the 28 verified problems total 10,968,397,511
+  (+0.22%). AMM totals 1,547,801,426; its negative constructor costs 185,036,096
+  and reports all four invariants normally, including the no-abort invariant.
+- Validation after publishing benchmark data/HTML: `leaner-ir` full `lake test`
+  PASS (both cost gates included), Behavior and InvariantBehavior checks PASS,
+  eight Python report tests PASS, and four native classification checks PASS
+  (expected rejection, unexpected acceptance, timeout, unrelated frontend error).
+  Logs: `/tmp/amm-final-{core-tests,native-outcome-tests,invariant-behavior-check}.log`
+  and `/tmp/amm-function-budget-behavior-check.log`. Native Move/benchmark tools
+  are rebuilt. The broad Move/Rust/e2e/registry sweep was not resumed.
 
 - Checkpoint requested by user: suspend after the current guard validation and
   report refresh; do not begin another fix. This is the validated commit checkpoint.

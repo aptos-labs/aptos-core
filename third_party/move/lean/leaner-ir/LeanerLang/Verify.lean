@@ -4638,6 +4638,11 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
   if (← covered.get).contains target.function then return
   let scripts (name : String) := (targets.find? (·.function == name)).bind (·.script)
   let covering (names : Array String) : CommandElabM Unit := covered.modify (· ++ names)
+  let measuring ← Perf.measuring.get
+  let errorsBefore ← if measuring then do pure (countErrors (← get).messages) else pure 0
+  let messagesBefore ← if measuring then do
+      pure (← get).messages.reportedPlusUnreported.size
+    else pure 0
   try
     if targets.any (·.script.isSome) then
       withScope openModule
@@ -4652,6 +4657,15 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
         else logErrorAt target.reference m!"leaner verification of `{target.function}` failed: \
           {message}"
     | _ => logException error
+  if measuring then
+    let errors := countErrors (← get).messages - errorsBefore
+    let logged := (← get).messages.reportedPlusUnreported.toList.drop messagesBefore
+    let timedOut := logged.any fun message =>
+      message.severity == .error && message.data.hasTag (· == `runtime.maxHeartbeats)
+    Perf.outcomes.modify (·.push {
+      target := s!"{moduleNamespace}::{target.function}"
+      status := if errors == 0 then "verified" else if timedOut then "timeout" else "rejected"
+      errors })
 
 /-- Elaborate `commands` in the module namespace `moduleNamespace`, taken
 from the root: the namespace of the module's generated definitions. -/

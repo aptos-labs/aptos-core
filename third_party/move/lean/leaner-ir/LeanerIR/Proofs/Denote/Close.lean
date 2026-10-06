@@ -8,6 +8,7 @@ import LeanerIR.Proofs.ClosureTyping
 import LeanerIR.Proofs.Order
 import LeanerIR.Proofs.Denote.SimpAll
 import LeanerIR.Proofs.Maps
+import LeanerIR.Proofs.Denote.MapCoverage
 import LeanerIR.Proofs.Denote.BitLift
 import LeanerIR.Proofs.Denote.LemmaSteps
 
@@ -89,6 +90,7 @@ inductive Provenance where
   | memoryWritten
   | callReturned
   | lemmaRequirement
+  deriving BEq
 
 def Provenance.describe : Provenance → String
   | .precondition callee => s!"the precondition of `{callee}`"
@@ -954,6 +956,24 @@ elab "leaner_denote_budgeted " step:tactic : tactic => do
     fun failure => do
       if failure.isMaxHeartbeat then throwError "the attempt exceeded its heartbeat budget"
       throw failure
+
+/-- Bound speculative solvers on leaves involving function values. Their
+encoded behavior can trigger expensive definitional reduction even in the
+arithmetic solver. Ordinary vector and reflection proofs retain their
+existing solver budgets. -/
+elab "leaner_denote_function_budgeted " step:tactic : tactic => do
+  if (← getGoals).isEmpty then return
+  let goal ← getMainGoal
+  let involvesFunction ← goal.withContext do
+    let mentionsFunction (type : Lean.Expr) :=
+      (type.find? (·.isConstOf ``LeanerIR.Proofs.Denote.NTy.function)).isSome
+    if mentionsFunction (← instantiateMVars (← goal.getType)) then return true
+    (← getLCtx).anyM fun decl => do
+      if decl.isImplementationDetail || decl.isLet then return false
+      return mentionsFunction (← instantiateMVars decl.type)
+  if involvesFunction then
+    evalTactic (← `(tactic| leaner_denote_budgeted $step))
+  else evalTactic step
 
 /-- Facts the arithmetic fast path can use without inspecting stored-state
 invariants, closure contracts, or equalities between encoded values. -/
@@ -4528,6 +4548,100 @@ elab "leaner_denote_unname" : tactic => do
         goal ← if used then pure next else (← next.clear equation).tryClear result
   replaceMainGoal [goal]
 
+/-- Rewrite scalar equalities from opaque call summaries by hypothesis
+identity. Several summaries use the same binder name (`consumed`), so a
+name-based rewrite can select an unrelated equation. Carrier-typed results
+are included even when the source-form unname pass keeps their names. -/
+elab "leaner_denote_scalar_equalities" : tactic => do
+  let goal ← getMainGoal
+  let rules ← goal.withContext do
+    let mut rules := #[]
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | continue
+      unless lhs.isAppOfArity ``LeanerIR.SpecInt.val 3 do continue
+      let .fvar value := lhs.appArg! | continue
+      unless rhs.containsFVar value do rules := rules.push decl.fvarId
+    pure rules
+  if rules.isEmpty then throwError "no scalar equality"
+  let targets ← goal.withContext do
+    return (← goal.getNondepPropHyps).filter (!rules.contains ·)
+  let next ← simpAt goal (← `(tactic| simp only [])) rules targets true
+  replaceMainGoal next.toList
+
+/-- Maps and address vectors connected by a quantified coverage hypothesis.
+Only inspect hypotheses that visibly mention membership: callee contracts
+and saved continuations are not candidates for this finite-map argument. -/
+private def mapCoverageCandidates (goal : MVarId) : MetaM (Array (Lean.Expr × Lean.Expr)) :=
+  goal.withContext do
+    let mut candidates := #[]
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let type ← instantiateMVars decl.type
+      unless type.isForall && (type.find? (·.isConstOf ``LeanerIR.Maps.hasKey)).isSome do continue
+      let originalContext ← getLCtx
+      let candidate ← forallTelescopeReducing type fun _ body => do
+        let some (_, lhs, rhs) := body.eq? | return none
+        unless lhs.isAppOfArity ``LeanerIR.Maps.hasKey 2 && rhs.isConstOf ``Bool.true do return none
+        let some lookup := lhs.appArg!.find? (·.isAppOfArity ``GetElem?.getElem? 7) | return none
+        let array := lookup.getArg! 5
+        let map := lhs.getArg! 0
+        -- Binder-dependent maps/vectors do not enumerate one fixed map.
+        if array.hasLooseBVars || map.hasLooseBVars then return none
+        unless ((collectFVars {} array).fvarIds ++ (collectFVars {} map).fvarIds).all
+            (fun id => originalContext.contains id) do return none
+        return some (map, array)
+      if let some candidate := candidate then
+        unless candidates.contains candidate do candidates := candidates.push candidate
+    return candidates
+
+/-- Derive a contradiction from a failed search in a complete map-key
+vector, or prove coverage after removing the matching element and key.
+Every premise is discharged from the current leaf; incomplete or duplicate
+vectors do not justify either argument. -/
+syntax "leaner_denote_map_coverage_prepared" : tactic
+
+elab "leaner_denote_map_coverage" : tactic => do
+  let goal ← getMainGoal
+  let mentionsMap ← goal.withContext do
+    pure ((← instantiateMVars (← goal.getType)).find? (·.isConstOf ``LeanerIR.Maps.hasKey)).isSome
+  unless mentionsMap do throwError "the goal states no map membership"
+  evalTactic (← `(tactic| leaner_denote_budgeted (
+    leaner_denote_prepare
+    all_goals leaner_denote_map_coverage_prepared
+    done)))
+
+elab_rules : tactic
+  | `(tactic| leaner_denote_map_coverage_prepared) => do
+    let goal ← getMainGoal
+    for (map, array) in ← mapCoverageCandidates goal do
+      let attempt ← saveState
+      try
+        let proof ← goal.withContext do
+          let rule ← mkConstWithFreshMVarLevels ``map_key_search_absurd
+          let (args, _, _) ← forallMetaTelescope (← inferType rule)
+          unless ← isDefEq args[0]! map do throwError "map"
+          unless ← isDefEq args[1]! array do throwError "vector"
+          -- Membership determines the missing key; the coverage, cardinality,
+          -- distinctness and failed-search facts then have concrete types.
+          for i in #[6, 2, 3, 4, 7] do
+            setGoals [args[i]!.mvarId!]
+            evalTactic (← `(tactic| leaner_denote_assumption))
+          instantiateMVars (mkAppN rule args)
+        goal.withContext do
+          goal.assign (mkApp2 (mkConst ``False.elim [Lean.Level.zero]) (← goal.getType) proof)
+        setGoals []
+        return
+      catch _ => attempt.restore
+      try
+        let rule ← goal.withContext (mkConstWithFreshMVarLevels ``map_keys_after_remove)
+        setGoals (← goal.apply (mkAppN rule #[map, array]))
+        evalTactic (← `(tactic| all_goals leaner_denote_assumption))
+        evalTactic (← `(tactic| done))
+        return
+      catch _ => attempt.restore
+    throwError "no complete map-key enumeration or matching removal"
+
 /-- The deciders of a leaf an authored proof may take over. Bound the attempt:
 even omega can branch heavily on the conditional facts of a prepared map
 leaf. Automatic search must leave budget for the authored proof. -/
@@ -4927,17 +5041,21 @@ macro_rules
           -- What an implication concludes where its premises hold.
           try leaner_denote_timed "modus ponens" leaner_denote_modus_ponens
           first
-          | leaner_denote_timed "cheap" leaner_denote_decide_cheap
+          | leaner_denote_timed "cheap" (leaner_denote_function_budgeted leaner_denote_decide_cheap)
           | leaner_denote_timed "instance" leaner_denote_instance
           | (leaner_denote_timed "assembled witness" leaner_denote_assembled_witness
              all_goals leaner_denote_leaf)
           | leaner_denote_timed "range" leaner_denote_range_instance_stated
-          | leaner_denote_timed "cheap cases" (leaner_denote_cheap_cases 3)
-          | leaner_denote_timed "prepared" leaner_denote_decide_prepared
-          | leaner_denote_timed "pipeline" leaner_denote_pipeline
+          | leaner_denote_timed "cheap cases" (leaner_denote_function_budgeted (leaner_denote_cheap_cases 3))
+          | leaner_denote_timed "prepared" (leaner_denote_function_budgeted leaner_denote_decide_prepared)
+          -- General rewriting is speculative after the cheaper deciders
+          -- failed. An invalid clause must leave a diagnostic rather than
+          -- spend the entire target budget in this fallback.
+          | leaner_denote_timed "pipeline" (leaner_denote_function_budgeted leaner_denote_pipeline)
           -- A disjunctive hypothesis, case by case.
-          | (leaner_denote_timed "cases" leaner_denote_split_disjunction
-             all_goals leaner_denote_leaf)
+          | leaner_denote_function_budgeted
+             (leaner_denote_timed "cases" leaner_denote_split_disjunction
+              all_goals leaner_denote_leaf)
           | leaner_denote_trivial)
        -- A quantified or conditional goal, at an arbitrary instance.
        | leaner_denote_budgeted
@@ -6209,6 +6327,14 @@ private def nativeOf? (τ value : Lean.Expr) : TacticM (Option Lean.Expr) := do
   match value.getAppFn.constName?, τ.getAppFn.constName? with
   | some ``RuntimeValue.integer, some ``NTy.int =>
       let integer := value.appArg!
+      -- A nested invocation reads its scalar from the result vector. Once
+      -- that vector is known, recover the certified carrier before trying
+      -- to prove fresh bounds for the packed projection.
+      let integer := Id.run do
+        unless integer.isAppOfArity ``RuntimeValue.asInt 1 &&
+            integer.appArg!.isAppOfArity ``SemanticOperations.packResults 1 do return integer
+        let some (_, [single]) := integer.appArg!.appArg!.arrayLit? | return integer
+        return if single.isAppOfArity ``RuntimeValue.integer 1 then single.appArg! else integer
       let width ← mkAppM ``LeanerIR.IntWidth.bits #[τ.getArg! 0]
       let signed := τ.getArg! 1
       if integer.isAppOfArity ``SpecInt.val 3 then
@@ -6285,6 +6411,31 @@ private def introduceBehaviors (goal : MVarId) : TacticM MVarId := do
       goal.replaceTargetDefEq (.forallE `leanerAborts negated.appArg! marked .default)
     else pure goal
   return (← goal.intro1P).2
+
+/-- Whether every alternative is an abort of a literal closure. -/
+private partial def literalAbortAlternatives (statement : Lean.Expr) : Bool :=
+  let statement := unmarked statement
+  if statement.isAppOfArity ``Or 2 then
+    literalAbortAlternatives (statement.getArg! 0) && literalAbortAlternatives (statement.getArg! 1)
+  else statement.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5 && statesLiteralBehavior statement
+
+/-- Expose the abort alternatives of a literal closure's contract before
+reading another invocation's result. A disjunction only states that one run
+aborted; it does not decide the individual runs. Keep this split restricted
+to literal abort predicates, including the source clause's marker. -/
+private def behaviorAlternatives? (goal : MVarId) : TacticM (Option (List MVarId)) := do
+  let some (hypothesis, statement) ← goal.withContext do
+      for decl in ← getLCtx do
+        if decl.isImplementationDetail then continue
+        let statement := unmarked (← instantiateMVars decl.type)
+        if statement.isAppOfArity ``Or 2 && literalAbortAlternatives statement then
+          return some (decl.fvarId, statement)
+      return none
+    | return none
+  -- The marker is definitionally its proposition, but the closer keeps it
+  -- opaque to ordinary unification so diagnostics retain the source clause.
+  let goal ← goal.replaceLocalDeclDefEq hypothesis statement
+  return some ((← goal.cases hypothesis).map (·.mvarId)).toList
 
 /-- What a leaf learns from `ensures_of` and `aborts_of` of a closure whose
 target, weave, and captures it sees, and whose target is a verified
@@ -6938,15 +7089,6 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
       else throwError "the results are not one shape"
     let some elements := literalElements? (aborts.getArg! 3)
       | throwError "the arguments are not literal"
-    -- An argument another invocation's single result gave is that result:
-    -- `(packResults #[integer e]).asInt` is `e`, by definition.
-    let elements := elements.map fun element => Id.run do
-      unless element.isAppOfArity ``RuntimeValue.integer 1 do return element
-      let read := element.appArg!
-      unless read.isAppOfArity ``RuntimeValue.asInt 1 &&
-          read.appArg!.isAppOfArity ``SemanticOperations.packResults 1 do return element
-      let some (_, [single]) := read.appArg!.appArg!.arrayLit? | return element
-      return if single.isAppOfArity ``RuntimeValue.integer 1 then single else element
     let some args ← nativeRow? parameterRow elements
       | throwError m!"the arguments {elements} are not native at {parameterRow}"
     let rule ← mkConstWithFreshMVarLevels ``LeanerIR.Proofs.returns_of_terminating
@@ -7528,6 +7670,10 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   let mut behaviorFailures := 0
   let mut stageCost : Array (String × Nat) := #[]
   let mut reported : Array (ObligationRange × String) := #[]
+  -- Once a clause has failed, its other paths cannot establish the target
+  -- or add another diagnostic for the same origin. Keep distinct origins
+  -- (such as loop entry and iteration) independent.
+  let mut rejectedClauses : Array (Option Provenance × ObligationRange) := #[]
   let mut pending : Array (MVarId × Option Provenance × Array ObligationRange) :=
     (← getGoals).toArray.map fun g => (g, none, #[])
   -- The runs `denotedRun` reads, each the target's body the call rule
@@ -8093,6 +8239,10 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     -- A literal closure's run, by its target's body where the target has
     -- no theorem, and its abort, by its body where the proof inlines it.
     let goal ← introduceBehaviors goal
+    if let some cases ← behaviorAlternatives? goal then
+      pending := pending ++ cases.toArray.map fun g => (g, provenance, clauses)
+      stageCost := stageCost.push ("behavior alternatives", (← IO.getNumHeartbeats) - stageStart)
+      continue
     if let some cases ← abortCases? goal then
       pending := pending ++ cases.toArray.map fun g => (g, provenance, clauses)
       stageCost := stageCost.push ("abort cases", (← IO.getNumHeartbeats) - stageStart)
@@ -8197,7 +8347,14 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       stageCost := stageCost.push ("residual", (← IO.getNumHeartbeats) - before)
       continue
     let leafStart ← IO.getNumHeartbeats
-    let closed ← tryCatchRuntimeEx
+    let ranges ← goal.withContext do
+      let target ← instantiateMVars (← goal.getType)
+      pure <| (clauses ++ obligationRanges target).toList.eraseDups.filter
+        fun range => range.startByte < range.endByte
+    let repeated := !ranges.isEmpty && ranges.all fun range =>
+      rejectedClauses.contains (provenance, range)
+    let closed ← if repeated then pure false else do
+      tryCatchRuntimeEx
         (do
           -- Without recovery: a failing alternative raises at once, so the
           -- next alternative runs instead of an aborted goal list.
@@ -8209,7 +8366,7 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           if failure.isMaxHeartbeat then throw failure
           if debug then logInfo m!"leaf not decided: {failure.toMessageData}\n{goal}"
           pure false
-    stageCost := stageCost.push (if closed then "leaf" else "undecided",
+    stageCost := stageCost.push (if repeated then "rejected clause" else if closed then "leaf" else "undecided",
       (← IO.getNumHeartbeats) - leafStart)
     if debug then
       IO.println s!"leaf {leaves}: {if closed then "closed" else "undecided"} in \
@@ -8217,6 +8374,9 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     unless closed do
       setGoals [goal]
       reported ← reportObligation goal provenance clauses reported
+      for range in ranges do
+        unless rejectedClauses.contains (provenance, range) do
+          rejectedClauses := rejectedClauses.push (provenance, range)
       admitGoal goal
   if debug then
     let mut totals : Array (String × Nat × Nat) := #[]

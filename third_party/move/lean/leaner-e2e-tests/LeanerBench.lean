@@ -115,6 +115,7 @@ private def targetsJson (samples : Array Perf.Sample) : Array Json := Id.run do
 unsafe def run (request : Request) : IO UInt32 := do
   let some out := request.out | throw <| IO.userError s!"--out is required\n{usage}"
   Perf.recorded.set #[]
+  Perf.outcomes.set #[]
   Perf.measuring.set true
   Perf.countingObjects.set false
   let started ← IO.monoNanosNow
@@ -128,14 +129,19 @@ unsafe def run (request : Request) : IO UInt32 := do
   -- run are those charged to its phases.
   let beats := phases.foldl (fun sum (_, _, heartbeats) => sum + heartbeats) 0
   let samples ← Perf.recorded.get
+  let outcomes ← Perf.outcomes.get
   let errors := messages.filter (·.isError)
+  let status := if errors.isEmpty then "verified"
+    else if outcomes.any (·.status == "timeout") then "timeout"
+    else "failed"
   let result := Json.mkObj [
-    ("status", toJson (if errors.isEmpty then "verified" else "failed")),
+    ("status", toJson status),
     ("wall_ms", phaseJson (phases.map fun (phase, nanos, _) => (phase.name, nanos / 1000000))
       (wall / 1000000)),
     ("heartbeats", phaseJson (phases.map fun (phase, _, heartbeats) => (phase.name, heartbeats))
       beats),
     ("targets", toJson (targetsJson samples)),
+    ("outcomes", toJson outcomes),
     ("errors", toJson errors.size),
     ("error_messages", toJson ((errors.extract 0 10).map (·.text)))]
   IO.FS.writeFile out (result.pretty ++ "\n")

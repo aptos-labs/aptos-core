@@ -1180,3 +1180,247 @@ performance gates. No existing baseline was regenerated. The new
 reviewed for its four intended diagnostics. Logs are
 `/tmp/amm-calculator-<package>-test.log`; aggregate exit statuses are in
 `/tmp/amm-calculator-full-tests.log`.
+
+### Suite-total investigation (2026-10-06)
+
+The suite chart previously summed only completely verified problems
+(`suite_value` in `scripts/leaner-bench.py`). Its rise did not measure a fixed workload. The
+latest cached main run, 37398209356 (`b30c5bae4e`, October 6), has 23 passing
+problems and 4,791,718,157 counted heartbeats. The validated local run
+`/tmp/leaner-benchmark-behavior-guard.json` has 28 and 10,944,358,307.
+Five newly passing problems contribute 6,178,478,596: framework ordered_map
+4,145,490,348; calculator 1,072,283,339; ristretto255 448,278,510; capability
+303,178,134; simple_map 209,248,265. The 23 problems passing in both runs
+instead decrease from 4,791,718,157 to 4,765,879,711 (0.54%). Summing all
+available measurements, including failed attempts, decreases from
+19,366,783,385 to 17,108,476,376; main has two problems without heartbeat
+measurements, versus none locally, so this is not a fixed successful workload.
+
+The local comparison table uses an older merge-base run (37250691414,
+`ea4ecc43e7`, October 5), whereas the chart also includes the newer main run.
+The earlier diagnosis of an original-nine-target OrderedMap regression
+(260M to 316M) compared against that older run, not the latest main result.
+The newer main already measures all 17 OrderedMap targets. Its module total
+is 1,437,697,990 versus 1,445,785,449 locally (+0.56%). There are small real
+increases: add +3,871,799 and borrow +1,978,317; lower_bound_loop decreases
+366,407. These do not explain the suite-total jump.
+
+Focused reproduction against the older main source was built separately at
+`/tmp/ordered-main-baseline`, with only final closer-summary logging enabled
+in the scratch copy to avoid goal-printing overhead. No production verifier
+source was modified. Inputs `/tmp/ordered-{main,regression}-*.lean` and logs
+`/tmp/ordered-regression-{main-clean,current,parent}-*.log` show:
+
+- empty: older closer 235k, two leaves; current 2,148k, three leaves, including
+  a new 1,581k construction-invariant step. The parent already has that step.
+- lower_bound_loop: older closer 35,695k versus current 54,536k, both 27
+  leaves. Call processing rises 6,202k to 8,949k and residual processing
+  22,668k to 27,237k. The parent is already 54,647k, so the large increase
+  predates the latest fix batch; it is not extra scenario target count alone.
+- borrow: older closer 24,719k with 13 leaves, parent 28,652k with 12,
+  current 34,175k with 14. The smaller remaining regression includes more
+  proof branches and residual processing; an exact attribution needs further
+  profiling before changing automation.
+
+The eight scenarios existed as interpreter tests in the older source. Current
+verification also checks their map data invariants at construction and mutation;
+`handlesDataInvariants` enrolls functions without explicit postconditions.
+They add 911,560,604 target heartbeats relative to the older nine-target run.
+Keep coverage totals separate from comparisons of the same measured targets.
+
+### AMM expected rejection (2026-10-06)
+
+The benchmark's `create_noncompliant_fee_pool` is an intentional negative.
+Its captured pricing callback reads `Fee[owner]` unconditionally, whereas
+the Pool invariant requires no abort in every state. A state without that
+resource violates the invariant. MVP rejects the exact paper example too:
+`/tmp/amm-example-mvp-negative.log`. Its registry test passes by matching
+expected verification diagnostics (`/tmp/amm-mvp-baseline-check.log`), rather
+than by proving the constructor valid.
+
+The closer visits the constant-product invariant before the no-abort
+invariant. General rewriting and the nominally cheap arithmetic solver
+could each consume the entire target budget on this invalid universal claim.
+Recursive case splitting then repeated those failed attempts. The automatic
+leaf's cheap, prepared, pipeline, and case alternatives now use the existing
+20M speculative budget when the goal or context mentions function values;
+case branches share their enclosing attempt's budget.
+Manual residual preparation and the target budget remain unchanged.
+
+An unconditional limit regressed `acl::remove` in a regular benchmark attempt.
+That experiment was stopped before publishing a full run, and the limits were
+restricted to function-valued leaves. The scoped rerun restores ACL verification.
+`type_info::verify_type_of` retains its four pre-existing diagnostics; comparison
+with the checkpoint confirms that it was not a regression of this experiment.
+Ordinary vector and reflection solvers retain their original budgets.
+
+Once an authored clause has failed, additional leaves with the same clause
+and provenance reuse that rejection. Other clauses and other origins still
+receive their own diagnostics. This uses the existing failed-obligation
+path; its logged errors still prevent publishing the target's verification
+artifacts. Successful targets never reuse a rejection.
+
+An isolated run importing the previously verified pricing prerequisites
+finishes with the same four invariant diagnostics and final verification
+failure, without a timeout. Preparation is approximately 184.972M raw
+heartbeats, versus the original 1.5G timeout; five repeated leaves avoid
+another 242.9M of search. Evidence: `/tmp/amm-negative-cached.log`; the bounded
+solver without rejection reuse cost 427.879M (`/tmp/amm-negative-bounded-3.log`).
+These are diagnostic profiles; the native benchmark measures the complete
+module independently.
+
+The benchmark records per-target outcomes and diagnostic counts. AMM's
+manifest declares this constructor as an expected rejection; unrelated
+errors, missing targets, timeouts, and acceptance of the negative remain
+visible problems. Suite totals and main comparisons include all available
+measurements, including rejected attempts. The default local report contains
+the latest measurement against main, with intermediate runs retained only
+for explicit history comparisons.
+
+The fresh regular native benchmark (`/tmp/leaner-benchmark-amm-final.json`)
+records the constructor at 185,036,096 heartbeats (87.7% lower), with all six
+positive AMM targets still verified. AMM's total falls from 2,862,902,197 to
+1,547,801,426. Results are 28 verified, one expected rejection, two unresolved
+rejections, and one timeout, with no newly failed problems or missing targets.
+All measured suite work is 15,822,941,895 heartbeats, versus 17,108,476,376 at
+the checkpoint. The same 28 verified problems rise 0.22%, from 10,944,358,307
+to 10,968,397,511; keep that small overhead separate from the rejected target's
+search reduction. The script regenerates `local_benchmark.json` and HTML
+before tests. The full core suite passes, including both cost gates; Behavior,
+InvariantBehavior, eight Python outcome/report tests, and four native outcome
+classification checks pass. Native tests confirm a timeout or unrelated error
+cannot masquerade as an expected rejection, and acceptance of a declared
+negative is flagged. Logs: `/tmp/amm-final-{core-tests,native-outcome-tests,
+invariant-behavior-check}.log` and `/tmp/amm-function-budget-behavior-check.log`.
+
+
+## Pool scalar summaries and shareholder coverage (2026-10-06)
+
+`pool_u64::buy_in` computes shares before changing the pool totals and calling
+`add_shares`. The call summaries name those scalar values with carrier-typed
+results. Several facts reuse the binder name `consumed`; a rewrite selected by
+name can therefore use a different fact. The explicit proof rewrites every
+scalar equation by its hypothesis identity, after clearing unused computation
+and callee contracts, then closes the arithmetic with `omega` or `grind -ring
+only`. Expanding map definitions adds no information to that arithmetic.
+
+`deduct_shares` ignores the Boolean from `index_of`. Both search branches
+remain in the proof. The existing invariants say that the shareholder vector
+covers the map, has the same cardinality, and contains no duplicates; these
+jointly imply that every present map key occurs in the vector. A proved
+finite-cardinality lemma rules out the missing-search branch. A second lemma
+preserves coverage when the matching vector element and map key are removed,
+including the intermediate write that ends the mutable borrow. All premises
+are discharged from the leaf; the helper deliberately fails without the
+cardinality premise. The proofs live in `LeanerIR/Proofs/Denote/MapCoverage.lean`
+and the pool's adjacent `pool_u64.proof.lean` companion.
+
+Adding these strategies to automatic search regressed `option::from_vec`,
+`simple_map::add_all`, and bit-vector cost. Those automatic hooks were removed.
+The companion invokes the strategies only for the two pool targets. Native
+regression checks restore option/simple-map verification and bit-vector cost
+(377M rather than 723M). The scoped native run
+`/tmp/leaner-benchmark-pool-scoped.json` verifies all 22 pool targets, with no
+errors or timeout, under the unchanged regular budget. `buy_in` costs
+854,176,924 heartbeats versus its previous 1,500,719,364 timeout;
+`deduct_shares` costs 763,747,941 versus its previous 763,008,081 rejection.
+The newly attempted `redeem_shares` and `transfer_shares` cost 632,904,030 and
+307,066,539. Pool total work rises from 3,050,102,018 to 3,392,927,076 because
+these two formerly skipped proofs now run. Preparation profiles (618M buy-in,
+310M deduct) exclude the authored script and subsequent theorem checking;
+use the complete native target measurements for comparisons.
+
+
+The subsequent fresh full native run, `/tmp/leaner-benchmark-pool-final.json`,
+records 29 verified modules, one expected rejection, two existing failures
+(`type_info`, `behavior`), and no timeout. All measured work is
+16,166,103,625 heartbeats, versus 15,822,941,895 before the pool follow-up.
+Pool verifies 22/22 targets at 3,393,032,305 total. Its final target measurements
+are 854,318,280 (`buy_in`), 763,749,746 (`deduct_shares`), 632,868,911
+(`redeem_shares`) and 307,052,384 (`transfer_shares`). The script regenerated
+the full local JSON and HTML against main before the core suite started.
+
+Validation at this batch boundary passes: the full `leaner-ir` core suite
+(135 jobs, including both performance gates and scalar/coverage regressions),
+eight Python report/outcome tests, and the focused native pool/option/
+simple-map/bit-vector benchmark. Core log: `/tmp/pool-final-core-tests.log`.
+No broad registry/parity work was resumed.
+
+
+## Nested invocation abort alternatives (2026-10-06)
+
+`behavior::add_two` calls opaque `apply_twice(increment, x)`. Its successful
+result and no-overflow branch already verified, but the abort branch retained
+`aborts_of<increment>(x) || aborts_of<increment>(result_of<increment>(x))`
+inside the callee clause's `Obligation` marker. The behavior dispatcher needs
+an individual abort fact; the generic disjunction splitter sees only bare
+`Or`. Meanwhile, `abortCases?` suppresses an extra split when the first abort
+predicate occurs anywhere in the context, including inside that disjunction.
+
+The closer now exposes a marked disjunction whose alternatives are all
+literal-closure abort predicates, then revisits each branch through the
+ordinary invocation rules. On the second alternative, it splits the first
+invocation's abort predicate: either that invocation overflows, or termination
+supplies its successful run and result. The source marker is definitionally
+its proposition; only this context fact is exposed for the split.
+
+That alone did not close the successful-first/aborted-second branch. The
+rewritten second argument remains `(packResults #[integer result.val]).asInt`.
+`terminatingRun` had a local decoder for that expression, but
+`dispatchBehavior` and `denotedRun` did not. The decoder now lives in
+`nativeOf?`, shared by all three, so it recovers the existing certified carrier
+rather than asking `omega` for fresh bounds on the packed projection.
+The earlier broad relaxation of `abortCases?` remains discarded; its
+suppression rule is unchanged.
+
+Scratch validation verifies all 20 benchmark targets. A core regression proves
+the opaque two-increment caller with a 50M raw target budget, and a guarded
+negative still rejects the incorrect `aborts_if x + 1 > MAX_U64` clause. At
+`x = MAX_U64 - 1`, the first invocation succeeds and the second aborts; that
+failure must be accounted for. Logs: `/tmp/behavior-fixed-{probe3,
+regressions3}.log`. The rebuilt native executable verifies 20/20 behavior targets with zero
+errors. `add_two` costs 18,943,903 raw heartbeats, versus 16,654,950 for its
+previous failed attempt. Module work is 125,588,922 versus 122,971,215.
+The script regenerated benchmark data and HTML against main before broader
+testing. Data: `/tmp/leaner-benchmark-behavior-fixed.json`.
+
+
+The fresh full regular benchmark, `/tmp/leaner-benchmark-behavior-final.json`,
+verifies 30/32 modules, with AMM's intended negative classified as expected
+rejection and only the existing `type_info` failure unresolved. There are no
+timeouts or newly failed problems. All measured work is 16,168,784,777 raw
+heartbeats, versus 16,166,103,625 in the previous pool full run (+0.017%).
+Behavior verifies 20/20 targets at 125,589,180 total; `add_two` costs 18,944,093.
+The complete local data and HTML were regenerated against main before the
+full core suite started. Native tools were rebuilt before both measurements.
+
+Validation passes: the full `leaner-ir` core suite (135 jobs, including both
+cost gates and the positive/negative nested-behavior checks), plus eight
+Python benchmark outcome/report tests. Core log:
+`/tmp/behavior-final-core-tests.log`. No broader registry/parity goal was resumed.
+
+### Suspended vector normalization experiment (2026-10-06)
+
+The official dependency export at `/tmp/bp-pure-callee-official-export` reproduces
+`bp_pure_callee::remove_all_found`'s 25M timeout. A diagnostic 100M budget permits
+an automatic proof at 52.221M raw heartbeats (24 leaves, 24.912M leaf cost).
+Kernel-proved normalization removes redundant representability checks from swap
+and remove; map/swap and map/erase identities preserve generic carrier transport,
+and the search's default index is in bounds whenever the vector is nonempty.
+Together these produce a 22.698M automatic proof at the original 25M budget.
+
+This is **not installed**: focused vector checks reject valid `remove_middle`,
+`swap_remove_value` and generic callers after the remove rewrite. Residuals retain
+`wp (Spec.pure ...)`; a diagnostic `simp only [wp_pure]` reports an expression
+that is not type-correct at instances transparency. Replacing the embedded index
+proof or restoring the optional element match did not resolve those failures.
+The swap-only version retains the passing generic checks but exceeds the 25M
+budget for this target. No acceptance budget or specification changed.
+
+Sources: `/tmp/registry-vector-operations-checkpoint-experiment.lean` and
+`/tmp/registry-vector-generic-checkpoint-experiment.lean`. Logs:
+`/tmp/registry-resume-remove-profile.log`, `/tmp/registry-remove-official-25k.log`,
+`/tmp/registry-vector-existing-check.log`, `/tmp/registry-vector-generic-residual.log`,
+`/tmp/registry-vector-generic-manual.log`. Resume with the simplifier/continuation
+processing of the pure tuple result; require both the official 25M runner and
+existing vector checks to pass before installing.
