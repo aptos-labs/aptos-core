@@ -15,7 +15,12 @@ analysis price table.
 
 Each round's aggregate archive is in this directory
 (`corpus4-run8-codex-terra56-high.tar.gz`, `corpus4-run8-codex-sol56-high.tar.gz`).
-The tables below are computed from those two archives alone:
+The final report each agent wrote at the end of its session, with the cell's
+target, tactic and outcome, is in `corpus4-run8-codex-terra56-high-reports.md`
+and `corpus4-run8-codex-sol56-high-reports.md` (and as JSON lines in the
+`.jsonl` files beside them), extracted by `analysis.agent_reports`.
+
+The tables below are computed from the two archives alone:
 
 ```text
 python3 -m analysis.codex_model_comparison \
