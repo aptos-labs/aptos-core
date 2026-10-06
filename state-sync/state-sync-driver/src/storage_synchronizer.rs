@@ -1118,9 +1118,9 @@ fn spawn_snapshot_receiver<
                 metrics::start_timer(&metrics::STORAGE_SYNCHRONIZER_LATENCIES, timer_label);
 
             // Create the receiver lazily on the first chunk (or the first one
-            // after an aborted chunk), so a failure (e.g.
-            // the native-position backend not being attached locally) surfaces as
-            // a recoverable error notification tied to the chunk, rather than
+            // after a failed chunk or finish), so a failure (e.g. the
+            // native-position backend not being attached locally) surfaces as a
+            // recoverable error notification tied to the chunk, rather than
             // panicking the receiver task.
             if snapshot_receiver.is_none() {
                 match SnapshotReceiver::new(&storage, kind, version, expected_root) {
@@ -1199,9 +1199,12 @@ fn spawn_snapshot_receiver<
                             &pending_data_errors,
                         )
                         .await;
-                    } else {
-                        info!("All snapshot values have synced, version: {}", version);
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
+                        // The bootstrapper retries the snapshot on this task. The next
+                        // chunk rebuilds the receiver from the persisted progress.
+                        continue;
                     }
+                    info!("All snapshot values have synced, version: {}", version);
                     decrement_pending_data_chunks(pending_data_chunks.clone());
                     return;
                 },
