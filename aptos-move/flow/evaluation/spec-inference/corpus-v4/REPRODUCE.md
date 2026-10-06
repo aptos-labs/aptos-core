@@ -51,7 +51,7 @@ Prompts that work well:
   difference from the committed records.*
 - *Re-score the round in `<archive>` against corpus-v4's mutant sets and compare
   with its published summary, per task and per arm.*
-- *Run a new corpus-v4 round with terra56 (or sol61), four replicates,
+- *Run a new corpus-v4 round with terra56 (or sol56), four replicates,
   following corpus-v4/REPRODUCE.md; stop and report after preflight before
   launching.*
 
@@ -175,19 +175,17 @@ one exactly.
 
 ## 3. Rerun the experiment
 
-This repeats the protocol of round 8, which runs once per model: Terra 5.6
-(`terra56`, `gpt-5.6-terra`) and Sol 6.1 (`sol61`, `gpt-6.1-sol`), each through
-the Codex CLI at `high` effort, three arms, four replicates of all 26 tasks (312
+This repeats the protocol of round 8, which runs once per model of the GPT-5.6
+generation: the cheaper Terra 5.6 (`terra56`, `gpt-5.6-terra`) and the frontier
+Sol 5.6 (`sol56`, `gpt-5.6-sol`), each through the Codex CLI at `high` effort, three arms, four replicates of all 26 tasks (312
 cells per model), concurrency 3, the ordinary mutant set withheld as a
 disqualification gate and the held-out set used for scoring. Each task starts
 from its task tree, with complete contracts for the helpers its target calls,
-and WP's output is not simplified. Round 6, Terra under an earlier protocol
-that asked for helper contracts and simplified WP's output, took about four and
-a half hours and cost $82 at API-equivalent prices, a mean of $0.26 per cell, as
-`analysis.codex_round_report` prices it; a four-task pilot of the current
-protocol with Terra cost $0.16 per cell over the agent-only and hybrid-guided
-arms. Prices per million tokens are $2.00 input, $0.20 cached and $12.00
-output for Terra 5.6, and $2.00, $0.10 and $10.00 for Sol 6.1.
+and WP's output is not simplified. The Terra round took about four and a
+quarter hours and cost $56.56 at API-equivalent prices, a mean of $0.18 per
+cell, as `analysis.codex_round_report` prices it. Prices per million tokens are
+$2.00 input, $0.20 cached and $12.00 output for Terra 5.6, and $4.00, $0.40 and
+$20.00 for Sol 5.6.
 
 **Environment.**
 
@@ -197,14 +195,13 @@ cc -O2 -Wall -Wextra -Werror sandbox/landlock_exec.c -o sandbox/landlock-exec
 codex login
 ```
 
-Install the Codex CLI release the round's profile pins, with its code-mode
-host, as the runbook's *Environment* section shows: `rust-v0.153.2` for
-`terra56` and `rust-v0.160.1` for `sol61`, each into
-`evaluation-artifacts/tools/codex-<version>`. The round puts that directory
-first on `PATH`; the harness refuses any other version or host.
+Install the Codex CLI release both profiles pin, `rust-v0.153.2`, with its
+code-mode host, into `evaluation-artifacts/tools/codex-0.153.2`, as the
+runbook's *Environment* section shows. The round puts that directory first on
+`PATH`; the harness refuses any other version or host.
 
 `codex login` must sign in with a ChatGPT account that has Codex access to the
-round's model (`gpt-5.6-terra`, `gpt-6.1-sol`): the round configuration pins the
+round's model (`gpt-5.6-terra`, `gpt-5.6-sol`): the round configuration pins the
 ChatGPT endpoint, which an API-key login does not use. The launcher copies the
 saved `~/.codex/auth.json` into each cell's private sandbox home and removes it
 afterwards; it never reaches the artifacts. Set `MOVE_INFERENCE_CODEX_AUTH_FILE`
@@ -215,7 +212,7 @@ limits; the dollar figures above are API-equivalent estimates.
 its own directory and is never rewritten.
 
 ```text
-MODEL=terra56 CODEX=0.153.2          # or MODEL=sol61 CODEX=0.160.1
+MODEL=terra56 CODEX=0.153.2          # or MODEL=sol56 CODEX=0.153.2
 export PATH=$PWD/evaluation-artifacts/tools/codex-$CODEX:$PATH
 ROUND=evaluation-artifacts/corpus4-ROUNDID-codex-$MODEL-high
 COMMIT=$(git rev-parse HEAD)
@@ -231,8 +228,7 @@ done
 `--aborts-if-is-strict` makes WP report an abort characterization it cannot
 make exact as an error instead of emitting `aborts_if_is_partial`, which the
 acceptance check rejects anyway. `--no-wp-simplification` leaves WP's output as
-it is instead of instructing the hybrid arms to simplify it, as in the V3.2
-rounds.
+it is instead of instructing the hybrid arms to simplify it.
 
 and write `$ROUND/plugins.json`:
 
@@ -295,5 +291,5 @@ schedule, and rehearses an outage without spending model budget. A run that is
 interrupted resumes with `--resume`; the runbook's *Interrupted rounds* section
 explains what that keeps and what it refuses.
 
-Other models are selected the same way (`--model sol61`, `sol56`, or `opus` and
+Other models are selected the same way (`--model sol61`, or `opus` and
 `sonnet` through Claude Code); the runbook lists their credentials.
