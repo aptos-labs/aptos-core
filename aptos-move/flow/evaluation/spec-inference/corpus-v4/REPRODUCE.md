@@ -189,12 +189,6 @@ protocol with Terra cost $0.16 per cell over the agent-only and hybrid-guided
 arms. Prices per million tokens are $2.00 input, $0.20 cached and $12.00
 output for Terra 5.6, and $2.00, $0.10 and $10.00 for Sol 6.1.
 
-Round 7 ran Terra under this protocol and is superseded by round 8: scoring
-could not apply four mutants whose loop guard an inline invariant had
-rewritten as `while ({ spec { .. }; cond })`. Locating such code is part of the
-harness, and scoring refuses a round under a harness other than the one it ran
-with, so the fix required a new round.
-
 **Environment.**
 
 ```text
