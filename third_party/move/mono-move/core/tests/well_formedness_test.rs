@@ -823,11 +823,18 @@ fn int_slots_use_natural_alignment_up_to_max_align() {
         rhs: IntOperand::SlotU32(FO(4)),
     }));
     assert_error_contains(&func, "[2, 6) is not 4-byte aligned");
-    // u128 operands are read unaligned, so any offset is fine.
-    assert_accepted(&func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
+    // u128 slots are 8-aligned under the layout convention, even though the
+    // interpreter happens to read them unaligned.
+    let func = func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
         dst: FO(4),
         lhs: FO(4),
         rhs: IntOperand::SlotU128(FO(4)),
+    }));
+    assert_error_contains(&func, "[4, 20) is not 8-byte aligned");
+    assert_accepted(&func_with_single_op(MicroOp::IntAdd(IntBinaryOp {
+        dst: FO(8),
+        lhs: FO(8),
+        rhs: IntOperand::SlotU128(FO(8)),
     })));
 }
 

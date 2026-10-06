@@ -31,6 +31,7 @@
 //! | `E`                   | `F.extended_frame_size`                                                                |
 //! | `P`                   | `F.param_region_size`                                                                  |
 //! | `A`                   | `MAX_ALIGN` (8)                                                                        |
+//! | `ptr`                 | `PTR_SLOT`: width and alignment `(w, a)` of a heap-pointer slot, currently `(8, 8)`    |
 //! | `Data`                | `[0, S)`: parameters and locals                                                        |
 //! | `Meta`                | `[S, S + M)`: saved pc, fp, and function pointer, written only by call and return      |
 //! | `Callee`              | `[S + M, E)`: the callee's argument and return region; the callee's fp is `fp + S + M` |
@@ -63,7 +64,7 @@
 //! | F2 | cannot run off the end         | `code[N - 1]` is `Return`, `Abort`, `AbortMsg`, or `Jump` | every other op falls through to `pc + 1`; a call returns to `call_pc + 1` |
 //! | F3 | frame holds its metadata       | `S + M <= E`                                              |                                                                           |
 //! | F4 | parameters fit the data region | `P <= S`                                                  |                                                                           |
-//! | F5 | metadata is aligned            | `S mod A = 0`                                             | `Meta` is written with aligned 8-byte stores                              |
+//! | F5 | metadata is aligned            | `S mod A = 0`                                             | `Meta` is written with aligned `u64` stores                               |
 //! | F6 | callee fp is aligned           | `(S + M) mod A = 0`                                       | a callee's frame pointer is `fp + S + M`                                  |
 //! | F7 | origins match code             | `len(origins) = 0` or `len(origins) = N`                  |                                                                           |
 //!
@@ -84,7 +85,7 @@
 //!
 //! | Id | Property                                  | Condition                                                       | Rationale                                                                                        |
 //! |----|-------------------------------------------|-----------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-//! | G1 | base pointer slots are real slots         | every `o` in `base` is a valid access `(o, 8, 8)`               |                                                                                                  |
+//! | G1 | base pointer slots are real slots         | every `o` in `base` is a valid access `(o, ptr.w, ptr.a)`       |                                                                                                  |
 //! | G2 | base layout is sorted                     | `base` is strictly increasing                                   |                                                                                                  |
 //! | G3 | unwritten pointer slots start null        | if some `o` in `base` has `o >= P`, then `F.zero_frame`         | the GC scans `base` before the function writes anything; the caller does not fill slots past `P` |
 //! | G4 | safe points are sorted                    | the `code_offset`s of `sps` are strictly increasing             |                                                                                                  |
@@ -144,12 +145,12 @@
 //!
 //! For `CallNative` with ABI `abi`, and `CallDirect` to `callee`:
 //!
-//! | Id | Property                                     | Condition                                                                                                                         | Rationale                                                    |
-//! |----|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-//! | C1 | native frame fits                            | `S + M + abi.total_frame_size <= E`                                                                                               |                                                              |
-//! | C2 | native pointer slots are real argument slots | every `o` in `abi.heap_ptr_offsets` has `o + 8 <= abi.total_frame_size`, `o mod 8 = 0`, and lies inside an argument slot of `abi` | the GC reads them with aligned `read_ptr` at the native's fp |
-//! | C3 | native descriptors exist                     | every `id` in `abi.required_descriptors` has `desc(id)`                                                                           |                                                              |
-//! | C4 | callee fits the callee region                | `callee.P <= E - (S + M)` and every slot in `callee.rets` has `end <= E - (S + M)`                                                | arguments and results pass through `Callee`                  |
+//! | Id | Property                                     | Condition                                                                                                                                 | Rationale                                                    |
+//! |----|----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
+//! | C1 | native frame fits                            | `S + M + abi.total_frame_size <= E`                                                                                                       |                                                              |
+//! | C2 | native pointer slots are real argument slots | every `o` in `abi.heap_ptr_offsets` has `o + ptr.w <= abi.total_frame_size`, `o mod ptr.a = 0`, and lies inside an argument slot of `abi` | the GC reads them with aligned `read_ptr` at the native's fp |
+//! | C3 | native descriptors exist                     | every `id` in `abi.required_descriptors` has `desc(id)`                                                                                   |                                                              |
+//! | C4 | callee fits the callee region                | `callee.P <= E - (S + M)` and every slot in `callee.rets` has `end <= E - (S + M)`                                                        | arguments and results pass through `Callee`                  |
 //!
 //! ## Closures
 //!
@@ -159,10 +160,10 @@
 //! |----|------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
 //! | L1 | captured data exists iff something is captured | `cdd` is `Some` iff `captured` is non-empty                                                                                                           |                                                                                    |
 //! | L2 | captured-data descriptor is the right kind     | if `cdd = Some(id)`, `desc(id)` exists and is `Trivial` or `CapturedData`                                                                             |                                                                                    |
-//! | L3 | captured-data pointers lie inside the values   | if `desc(id)` is `CapturedData { pointer_offsets }`, every `off` has `off + 8 <= values_size`                                                         | these descriptors are shared across closures of different sizes                    |
+//! | L3 | captured-data pointers lie inside the values   | if `desc(id)` is `CapturedData { pointer_offsets }`, every `off` has `off + ptr.w <= values_size`                                                     | these descriptors are shared across closures of different sizes                    |
 //! | L4 | captured slots are well-formed                 | every slot in `captured` is well-formed                                                                                                               | its alignment drives `align_up`, undefined for 0 or non-powers of two              |
 //! | L5 | captured count matches the mask                | `len(captured) = popcount(mask)`                                                                                                                      |                                                                                    |
-//! | L6 | mask fits the callee                           | if `func_ref = Resolved(callee)`: `len(callee.params) <= 64` and `mask >> len(callee.params) = 0`                                                     |                                                                                    |
+//! | L6 | mask fits the callee                           | if `func_ref = Resolved(callee)`: `len(callee.params) <= u64::BITS` and `mask >> len(callee.params) = 0`                                              |                                                                                    |
 //! | L7 | captured values match the callee's parameters  | if `func_ref = Resolved(callee)`: for the `k`-th set bit `i` of `mask`, `captured[k].w = callee.params[i].w` and `captured[k].a = callee.params[i].a` | a captured value is written with its own `(w, a)` and read back at the parameter's |
 //! | L8 | values size matches the captured layout        | if every slot in `captured` has a valid `a`, `values_size = captured_values_size(captured)`                                                           |                                                                                    |
 //! | L9 | provided arguments are well-formed             | every slot in `provided_args` is well-formed                                                                                                          |                                                                                    |
@@ -190,17 +191,12 @@ use crate::{
     captured_values_size,
     interner::InternedModuleId,
     native::NativeABI,
-    types::{view_type, view_type_list, InternedType, Type},
+    types::{view_type, view_type_list, InternedType, Type, PTR_SLOT},
     ClosureFuncRef, CodeOffset, ConstantPoolIndex, DescriptorId, DescriptorProvider, FrameOffset,
     Function, LayoutProvider, MicroOp, ObjectDescriptorInner, OperandKind, PackClosureOp,
     SizedSlot, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
-
-/// Width and alignment of a heap-pointer slot, as the GC and the call
-/// protocol read it.
-const PTR_WIDTH: u32 = 8;
-const PTR_ALIGN: u32 = 8;
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -714,7 +710,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             HeapMoveFrom8 { offset, .. }
             | HeapMoveTo8 { offset, .. }
             | HeapMoveToImm8 { offset, .. } => {
-                self.check_offset_size(pc, offset, PTR_WIDTH);
+                self.check_offset_size(pc, offset, PTR_SLOT.0);
             },
             HeapMoveFrom { offset, size, .. }
             | HeapMoveTo { offset, size, .. }
@@ -859,7 +855,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                     // op regardless of the descriptor's size.
                     if let Some(&off) = pointer_offsets
                         .last()
-                        .filter(|&&off| off as u64 + PTR_WIDTH as u64 > op.values_size as u64)
+                        .filter(|&&off| off as u64 + PTR_SLOT.0 as u64 > op.values_size as u64)
                     {
                         fail!(self, pc, "PackClosure: captured_data pointer offset {off} out of bounds of values_size {}", op.values_size);
                     }
@@ -896,10 +892,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
                 let param_count = callee.param_slots.len();
                 // L6.
-                if param_count > 64 {
+                if param_count > u64::BITS as usize {
                     fail!(self, pc, "PackClosure: callee has {param_count} params, exceeds 64-bit mask capacity");
                 }
-                if param_count < 64 && op.mask >> param_count != 0 {
+                if param_count < u64::BITS as usize && op.mask >> param_count != 0 {
                     fail!(self, pc, "PackClosure: mask 0x{:x} sets bits beyond callee param count {param_count}", op.mask);
                 }
                 // L7. The runtime writes captured values with the slot's
@@ -911,7 +907,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 let captured_params = callee
                     .param_slots
                     .iter()
-                    .take(64)
+                    .take(u64::BITS as usize)
                     .enumerate()
                     .filter(|(i, _)| (op.mask >> i) & 1 != 0);
                 for (k, ((i, param_slot), slot)) in captured_params.zip(&op.captured).enumerate() {
@@ -1089,7 +1085,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             Some(_) => {},
         }
         for &off in abi.heap_ptr_offsets() {
-            let off_end = off.0 as u64 + PTR_WIDTH as u64;
+            let off_end = off.0 as u64 + PTR_SLOT.0 as u64;
             if off_end > total as u64 {
                 fail!(
                     self,
@@ -1098,12 +1094,13 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                     off.0
                 );
             }
-            if !off.0.is_multiple_of(PTR_ALIGN) {
+            if !off.0.is_multiple_of(PTR_SLOT.1) {
                 fail!(
                     self,
                     pc,
-                    "native heap pointer offset {} is not 8-byte aligned",
-                    off.0
+                    "native heap pointer offset {} is not {}-byte aligned",
+                    off.0,
+                    PTR_SLOT.1
                 );
             }
             // `args` is sorted by offset and non-overlapping (`NativeABI::new`),

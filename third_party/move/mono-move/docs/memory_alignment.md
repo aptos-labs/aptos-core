@@ -283,7 +283,7 @@ Alignment correctness depends on three layers cooperating; if any of them is wro
 
 The combination of (1) computing aligned offsets, (2) checking them statically, and (3) maintaining aligned base pointers gives end-to-end alignment safety without runtime alignment checks on the hot path.
 
-> The specializer rounds `pl_sum` up to `MAX_ALIGN` so the callee's `fp` lands on a `MAX_ALIGN`-aligned offset ([§3.2](#32-the-stack)). The well-formedness checker enforces both `pl_sum % MAX_ALIGN == 0` and `(pl_sum + FRAME_METADATA_SIZE) % MAX_ALIGN == 0`, and additionally checks that every slot operand is aligned as the interpreter's access to it requires (8 for pointer, `u64`, and fat-pointer slots; natural width for 2/4/8-byte integer slots; none for byte copies and unaligned loads).
+> The specializer rounds `pl_sum` up to `MAX_ALIGN` so the callee's `fp` lands on a `MAX_ALIGN`-aligned offset ([§3.2](#32-the-stack)). The well-formedness checker enforces both `pl_sum % MAX_ALIGN == 0` and `(pl_sum + FRAME_METADATA_SIZE) % MAX_ALIGN == 0`, and additionally checks that every typed slot operand is aligned per the layout convention in `core/src/types.rs` (`int_slot_size_and_align`, `PTR_SLOT`, `REF_SLOT`, `ADDRESS_SLOT`: natural alignment capped at `MAX_ALIGN`); byte copies have no alignment requirement.
 
 ## 7. Optimizations
 

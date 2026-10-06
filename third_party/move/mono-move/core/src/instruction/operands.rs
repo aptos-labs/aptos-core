@@ -6,16 +6,19 @@
 //! table; any other tool that needs it should use it rather than re-derive it
 //! from the interpreter.
 //!
-//! Kinds follow the interpreter's access, not the layout convention: `Move8`
-//! and the frame side of the 8-byte heap moves are unaligned, so they are
-//! `Bytes(8)`, not `U64`.
+//! A typed kind (`Bool`, `U64`, `Ptr`, ...) carries the slot's width and
+//! alignment from the layout convention in `types`, which is the table the
+//! specializer lays slots out with and is at least as strict as the
+//! interpreter's access. `Bytes(n)` is a byte copy of arbitrary data and has no
+//! alignment requirement: `Move8` and the frame side of the 8-byte heap moves
+//! are `Bytes(8)`, not `U64`.
 
 use super::{
     CallClosureOp, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntShiftOp,
     JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, MicroOp, PackClosureOp, ShiftOperand,
     ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp,
 };
-use crate::{align::MAX_ALIGN, types::InternedType};
+use crate::types::{int_slot_size_and_align, InternedType, ADDRESS_SLOT, PTR_SLOT, REF_SLOT};
 use move_binary_format::file_format::ConstantPoolIndex;
 
 /// How the interpreter accesses a frame slot.
@@ -31,12 +34,12 @@ pub enum OperandKind {
     Ptr,
     /// An aligned 16-byte reference `(base, byte_offset)` (`read_fat_ptr`).
     FatPtr,
-    /// A 32-byte inline `address`, read unaligned.
+    /// An inline `address` or `signer`.
     Address,
     /// `n` bytes moved with a byte copy or an explicitly unaligned load/store.
     Bytes(u32),
     /// An integer slot of `width` bytes accessed with `read_int<T>` /
-    /// `write_int<T>`: aligned for widths up to `MAX_ALIGN`, unaligned beyond.
+    /// `write_int<T>`.
     Int(u32),
     /// A by-value comparison operand: occupies the type's in-frame size and
     /// alignment, which only a layout provider can resolve.
@@ -52,12 +55,13 @@ impl OperandKind {
     pub fn width_and_align(self) -> Option<(u32, u32)> {
         use OperandKind::*;
         Some(match self {
-            Bool | Byte => (1, 1),
-            U64 | Ptr => (8, 8),
-            FatPtr => (16, 8),
-            Address => (32, 1),
+            Bool | Byte => int_slot_size_and_align(1),
+            U64 => int_slot_size_and_align(8),
+            Ptr => PTR_SLOT,
+            FatPtr => REF_SLOT,
+            Address => ADDRESS_SLOT,
             Bytes(n) => (n, 1),
-            Int(w) => (w, if w as usize <= MAX_ALIGN { w } else { 1 }),
+            Int(w) => int_slot_size_and_align(w),
             Value(_) | Constant(_) => return None,
         })
     }
