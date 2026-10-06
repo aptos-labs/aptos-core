@@ -314,8 +314,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     #[complexity(n_log_n in "the size of the function" because "every operand is checked against the sorted GC layouts")]
     fn run(&mut self) {
         let code = self.func.code.ops();
-
-        // F1.
         if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
@@ -366,11 +364,9 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     #[complexity(constant)]
     fn check_frame_geometry(&mut self) {
         let func = self.func;
-        // F3.
         if func.frame_size() > func.extended_frame_size {
             fail!(self, None, "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})", func.extended_frame_size, func.param_and_local_sizes_sum, FRAME_METADATA_SIZE, func.frame_size());
         }
-        // F4.
         if func.param_region_size > func.param_and_local_sizes_sum {
             fail!(
                 self,
@@ -407,7 +403,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     #[complexity(linear in "the number of parameter and return slots")]
     fn check_param_and_return_slots(&mut self) {
         let func = self.func;
-        // P1–P4, R1-R4. `CallClosure` and `CallBuilder` write `size` bytes at
+        // P1–P4, R1–R4. `CallClosure` and `CallBuilder` write `size` bytes at
         // `callee_fp + offset` for each parameter slot, and `call_unchecked`
         // zeroes `[param_region_size, extended_frame_size)` afterwards, so a
         // slot outside the parameter region is either overwritten or out of
@@ -445,7 +441,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         );
     }
 
-    /// P2–P4, R2-R4. A parameter or return slot list: every slot
+    /// P2–P4, R2–R4. A parameter or return slot list: every slot
     /// well-formed and within `[0, region_end)`, slots ascending and disjoint.
     #[checks(P3, P4, R3, R4)]
     #[complexity(linear in "the number of slots")]
@@ -512,15 +508,12 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// G1–G7.
     #[checks(G3, G4, G5, G7)]
     #[complexity(n_log_n in "the number of layout slots" because "each safe-point slot is one binary search into `base`")]
     fn check_gc_layouts(&mut self) {
         let code = self.func.code.ops();
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
         let safe_points = self.func.safe_point_layouts.entries();
-
-        // G1, G2.
         self.check_pointer_offsets(None, base_offsets);
 
         // G3. The GC scans the base layout of every frame unconditionally, so a
@@ -534,8 +527,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 fail!(self, None, "frame_layout names pointer slot {} beyond param_region_size ({}) but zero_frame is false", off.0, self.func.param_region_size);
             }
         }
-
-        // G4.
         if let Some(w) = safe_points
             .windows(2)
             .find(|w| w[0].code_offset.0 >= w[1].code_offset.0)
@@ -551,7 +542,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
         for entry in safe_points {
             let co = entry.code_offset.0 as usize;
-            // G5.
             match code.get(co) {
                 None => fail!(self, None, "safe_point_layouts: code_offset {co} out of bounds (code length {})", code.len()),
                 // Top-frame-only contract: an entry sits at the PC of an
@@ -560,7 +550,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 Some(_) => {},
             }
             let sp_offsets = &entry.layout.heap_ptr_offsets;
-            // G6.
             self.check_pointer_offsets(Some(co), sp_offsets);
             // G7. `base` is strictly increasing (G2), so each safe-point offset
             // is looked up by binary search: O(log |base|) per offset rather
@@ -686,8 +675,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 self.err(pc, "negate on unsigned type");
             },
             IntNegate(_) => {},
-
-            // Z1.
             Move { size, .. } => self.check_nonzero_size(pc, size),
 
             // B1. Forms a fat pointer to `local` without dereferencing it, so only
@@ -725,15 +712,12 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             },
             ValueCmp(_) => {}, // `Value` operands are type-checked in `check_frame_operand`.
             ValueRefCmp(ref op) => self.check_value_type(pc, op.ty),
-
-            // C4.
             CallDirect { ref ptr } => {
                 // SAFETY: the function pointer lives in the global context,
                 // which the caller's guard keeps alive during the check.
                 let callee = unsafe { ptr.as_ref_unchecked() };
                 self.check_direct_callee(pc, callee);
             },
-            // C1, C2, C3.
             CallNative { ref abi, .. } => self.check_native_abi(pc, abi),
 
             // Z1, Z2. Heap and reference offset ops: nonzero width, `offset +
@@ -842,10 +826,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 ),
                 None => {},
             },
-
-            // L1–L8.
             PackClosure(ref op) => self.check_pack_closure(pc, op),
-            // L9.
             CallClosure(ref op) => {
                 for (i, slot) in op.provided_args.iter().enumerate() {
                     self.check_sized_slot(
@@ -877,7 +858,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         // captured. Pointer-free captures use the reserved `Trivial` slot;
         // pointer-bearing ones a `CapturedData` descriptor whose offsets must
         // lie within the values region so GC traces stay in bounds.
-        // L1, L2, L3.
         match (op.captured_data_descriptor_id, op.captured.is_empty()) {
             (None, true) => {},
             (Some(id), false) => match self.descriptor_or_report(pc, "PackClosure", id) {
@@ -913,7 +893,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         for (i, slot) in op.captured.iter().enumerate() {
             self.check_sized_slot(Some(pc), &format!("PackClosure: captured[{i}]"), slot);
         }
-        // L5.
         let captured_count = op.mask.count_ones() as usize;
         if op.captured.len() != captured_count {
             fail!(self, pc, "PackClosure: captured list length {} does not match mask captured count {captured_count}", op.captured.len());
@@ -924,7 +903,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 // which the caller's guard keeps alive during the check.
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
                 let param_count = callee.param_slots.len();
-                // L6.
                 if param_count > u64::BITS as usize {
                     fail!(self, pc, "PackClosure: callee has {param_count} params, exceeds 64-bit mask capacity");
                 }
@@ -1298,7 +1276,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// J1.
     // TODO(metering): validate branch gas fields are populated.
     #[checks(J1)]
     #[complexity(constant)]
@@ -1314,7 +1291,6 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
-    /// Z1.
     #[checks(Z1)]
     #[complexity(constant)]
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
