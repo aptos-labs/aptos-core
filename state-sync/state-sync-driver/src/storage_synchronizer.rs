@@ -1118,13 +1118,20 @@ fn spawn_snapshot_receiver<
                 metrics::start_timer(&metrics::STORAGE_SYNCHRONIZER_LATENCIES, timer_label);
 
             // Create the receiver lazily on the first chunk (or the first one
-            // after an aborted chunk), so a failure (e.g.
-            // the native-position backend not being attached locally) surfaces as
-            // a recoverable error notification tied to the chunk, rather than
+            // after a failed chunk or finish), so a failure (e.g. the
+            // native-position backend not being attached locally) surfaces as a
+            // recoverable error notification tied to the chunk, rather than
             // panicking the receiver task.
             if snapshot_receiver.is_none() {
                 match SnapshotReceiver::new(&storage, kind, version, expected_root) {
-                    Ok(new_receiver) => snapshot_receiver = Some(new_receiver),
+                    Ok(new_receiver) => {
+                        info!(LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                            "Created the {} snapshot receiver for version {} from the persisted progress.",
+                            kind.label(),
+                            version
+                        )));
+                        snapshot_receiver = Some(new_receiver);
+                    },
                     Err(error) => {
                         if let StorageDataChunk::States(notification_id, _) = &storage_data_chunk {
                             send_storage_synchronizer_error(
@@ -1177,7 +1184,11 @@ fn spawn_snapshot_receiver<
                         .expect("The snapshot receiver was initialized above!")
                         .finish()
                         .map_err(|error| {
-                            format!("Failed to finish the snapshot! Error: {:?}", error)
+                            format!(
+                                "Failed to finish the {} snapshot! Error: {:?}",
+                                kind.label(),
+                                error
+                            )
                         })
                         .and_then(|()| {
                             metadata_storage
@@ -1199,9 +1210,16 @@ fn spawn_snapshot_receiver<
                             &pending_data_errors,
                         )
                         .await;
-                    } else {
-                        info!("All snapshot values have synced, version: {}", version);
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
+                        // `finish` consumed the receiver and left it as `None`, so
+                        // continuing is similar to `Abort`.
+                        continue;
                     }
+                    info!(
+                        "All {} snapshot values have synced, version: {}",
+                        kind.label(),
+                        version
+                    );
                     decrement_pending_data_chunks(pending_data_chunks.clone());
                     return;
                 },
