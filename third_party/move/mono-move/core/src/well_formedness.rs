@@ -262,6 +262,9 @@ macro_rules! fail {
 
 /// Validate a single function against the providers. Returns an empty `Vec`
 /// on success.
+///
+/// Complexity: O(N * log(N)) in the size of the function: its ops and their
+/// operands, slot lists, and GC layouts.
 pub fn check_well_formedness<P: WellFormednessProvider + ?Sized>(
     func: &Function,
     provider: &P,
@@ -277,6 +280,9 @@ pub fn check_well_formedness<P: WellFormednessProvider + ?Sized>(
 }
 
 /// Panics with the checker's findings unless `function` is well-formed.
+///
+/// Complexity: O(N * log(N)) in the size of the function, as
+/// [`check_well_formedness`].
 pub fn assert_well_formed<P: WellFormednessProvider + ?Sized>(function: &Function, provider: &P) {
     let errors = check_well_formedness(function, provider);
     assert!(
@@ -301,6 +307,9 @@ struct FunctionChecker<'a, P: WellFormednessProvider + ?Sized> {
 }
 
 impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
+    /// Runs every check and records each violation.
+    ///
+    /// Complexity: O(N * log(N)) in the size of the function.
     fn run(&mut self) {
         let code = self.func.code.ops();
 
@@ -493,6 +502,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
     }
 
+    /// G1–G7.
+    ///
+    /// Complexity: O(N * log(N)) in the number of layout slots: each safe-point
+    /// slot is one binary search into `base`.
     fn check_gc_layouts(&mut self) {
         let code = self.func.code.ops();
         let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
@@ -579,6 +592,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     // Per-instruction checks beyond the operand schema
     // -----------------------------------------------------------------------
 
+    /// Op-specific checks beyond the operand schema.
+    ///
+    /// Complexity: O(N * log(N)) in the op's operands: `VecUnpack` destinations
+    /// are sorted.
     fn check_instruction(&mut self, pc: usize, instr: &MicroOp) {
         use MicroOp::*;
         match *instr {
@@ -965,6 +982,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
 
     /// O1, with O2–O5 for the provider-dependent kinds and O6 for scalar
     /// kinds. Checks one frame operand per the [`OperandKind`] schema.
+    ///
+    /// Complexity: O(log(N)) in the number of GC pointer slots (O6).
     fn check_frame_operand(&mut self, pc: Option<usize>, offset: FrameOffset, kind: OperandKind) {
         let (width, align) = match kind {
             OperandKind::Value(ty) => {
@@ -1017,6 +1036,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// O6. `[offset, offset + width)` does not intersect any pointer slot in
     /// `frame_layout` or in the safe-point layout at `pc`. Both lists are
     /// strictly increasing (G2, G6), so each is one binary search.
+    ///
+    /// Complexity: O(log(N)) in the number of pointer slots and safe points.
     fn check_not_pointer_slot(&mut self, pc: Option<usize>, offset: FrameOffset, width: u32) {
         let start = offset.0 as u64;
         let end = start + width as u64;
@@ -1093,6 +1114,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     }
 
     /// D1. Destinations of a multi-destination op are pairwise disjoint.
+    ///
+    /// Complexity: O(N * log(N)) in the number of destinations.
     fn check_disjoint_destinations(
         &mut self,
         pc: usize,
@@ -1122,6 +1145,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// C1, C2, C3. The native's slot region fits the caller's extended frame, and its
     /// pointer slots (read by the GC with aligned `read_ptr` at the native's
     /// fp) are aligned, inside the region, and inside an argument slot.
+    ///
+    /// Complexity: O(N * log(N)) in the ABI's pointer offsets and argument slots.
     fn check_native_abi(&mut self, pc: usize, abi: &NativeABI) {
         let base = self.func.frame_size();
         let total = abi.total_frame_size();
