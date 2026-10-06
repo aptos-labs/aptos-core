@@ -1,0 +1,32 @@
+name: Trusted PR CI report
+description: Validate a completed producer run and render its bounded typed report
+
+inputs:
+  run_id:
+    description: Completed originating workflow run ID
+    required: true
+
+outputs:
+  should_comment:
+    description: Whether the trusted benchmark job ran and produced a report
+    value: ${{ steps.report.outputs.should_comment }}
+  comment_path:
+    description: Path to trusted rendered Markdown
+    value: ${{ steps.report.outputs.comment_path }}
+  comment_header:
+    description: Validated sticky comment header
+    value: ${{ steps.report.outputs.comment_header }}
+  pr_number:
+    description: Validated pull request number
+    value: ${{ steps.report.outputs.pr_number }}
+
+runs:
+  using: composite
+  steps:
+    - name: Bind run, validate artifact and render fixed template
+      id: report
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_RUN_ID: ${{ inputs.run_id }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" pr-ci-report

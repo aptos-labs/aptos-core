@@ -1,0 +1,42 @@
+name: "trusted-pr-ci-report"
+on:
+  workflow_run:
+    workflows: ["mono-move-e2e-perf", "mono-move-micro-bench"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: trusted-pr-ci-report-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    if: ${{ github.event.workflow_run.event == 'pull_request_target' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out trusted reporter from the base repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Validate originating run and render typed report
+        id: report
+        uses: ./.github/actions/pr-ci-report
+        with:
+          run_id: ${{ github.event.workflow_run.id }}
+
+      - name: Update validated sticky PR comment
+        if: ${{ steps.report.outputs.should_comment == 'true' }}
+        uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
+        with:
+          number: ${{ steps.report.outputs.pr_number }}
+          header: ${{ steps.report.outputs.comment_header }}
+          path: ${{ steps.report.outputs.comment_path }}

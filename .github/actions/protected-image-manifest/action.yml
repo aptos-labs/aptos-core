@@ -1,0 +1,50 @@
+name: Protected image manifest
+description: Collect or validate exact-source image digests using trusted code
+inputs:
+  mode:
+    description: Protected image mode
+    required: true
+  manifest_path:
+    description: Protected image manifest path
+    required: true
+  source_repository:
+    description: Protected image source repository
+    required: true
+  source_sha:
+    description: Protected image source sha
+    required: true
+  base_sha:
+    description: Trusted controller source SHA
+    required: true
+  pr_number:
+    description: Protected image pr number
+    required: true
+  run_id:
+    description: Protected image run id
+    required: true
+  run_attempt:
+    description: Protected image run attempt
+    required: true
+  variant:
+    description: Protected image variant
+    required: true
+  artifact_repo:
+    description: Protected image artifact repo
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Process the protected image manifest
+      shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_MANIFEST_PATH: ${{ inputs.manifest_path }}
+        INPUT_SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+        INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+        INPUT_BASE_SHA: ${{ inputs.base_sha }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_RUN_ID: ${{ inputs.run_id }}
+        INPUT_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        INPUT_VARIANT: ${{ inputs.variant }}
+        INPUT_ARTIFACT_REPO: ${{ inputs.artifact_repo }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" protected-image-manifest

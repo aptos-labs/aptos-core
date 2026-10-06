@@ -1,0 +1,27 @@
+name: Compute Docker capability plan
+description: Verify Docker capability labels and emit a validated execution plan
+
+inputs:
+  pr_number:
+    description: Pull request number to authorize
+    required: true
+  protected_runners_enabled:
+    description: Exactly true or false; whether the protected runner fleets are enabled for this run
+    required: true
+
+outputs:
+  plan:
+    description: Validated compact Docker capability plan
+    value: ${{ steps.plan.outputs.plan }}
+
+runs:
+  using: composite
+  steps:
+    - name: Verify Docker capabilities and build plan
+      id: plan
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_PROTECTED_RUNNERS_ENABLED: ${{ inputs.protected_runners_enabled }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" docker-capability-plan

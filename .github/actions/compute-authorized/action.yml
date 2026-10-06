@@ -1,0 +1,40 @@
+name: Compute authorization
+description: Verify that a current privileged collaborator applied the compute approval label
+
+inputs:
+  pr_number:
+    description: Pull request number to authorize
+    required: true
+  required_label:
+    description: One label that grants compute authorization
+    required: false
+  required_labels:
+    description: JSON array of labels to authorize in one request batch
+    required: false
+
+outputs:
+  approved:
+    description: Whether compute is currently authorized
+    value: ${{ steps.authorize.outputs.approved }}
+  approver:
+    description: Login of the collaborator who applied the authorizing label
+    value: ${{ steps.authorize.outputs.approver }}
+  approval_event_id:
+    description: Timeline event ID for the authorizing label application
+    value: ${{ steps.authorize.outputs.approval_event_id }}
+  approvals:
+    description: JSON object keyed by label with approved, approver, and approval_event_id values
+    value: ${{ steps.authorize.outputs.approvals }}
+
+runs:
+  using: composite
+  steps:
+    - name: Verify compute authorization
+      id: authorize
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_REQUIRED_LABEL: ${{ inputs.required_label }}
+        INPUT_REQUIRED_LABELS: ${{ inputs.required_labels }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" compute-authorized

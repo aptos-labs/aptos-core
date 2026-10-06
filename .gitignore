@@ -130,6 +130,7 @@ metadata-cache
 run_*
 # The rule above is unanchored, so it also swallows checked-in scripts.
 !third_party/move/mono-move/testsuite/e2e-perf/run_e2e_perf_test.py
+!/.github/ci/**/run_*
 
 # test files for indexer GRPC
 test_indexer_grpc_*.yaml

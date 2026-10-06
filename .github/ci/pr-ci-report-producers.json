@@ -1,0 +1,20 @@
+{
+  "producers": [
+    {
+      "key": "mono-move-e2e-perf",
+      "workflow_path": ".github/workflows/mono-move-e2e-perf.yaml",
+      "workflow_name": "mono-move-e2e-perf",
+      "job": "mono-move-e2e-perf",
+      "benchmark_step": "Run mono-move e2e performance comparison",
+      "label": "mono-move-e2e-perf"
+    },
+    {
+      "key": "mono-move-micro-bench",
+      "workflow_path": ".github/workflows/mono-move-micro-bench.yaml",
+      "workflow_name": "mono-move-micro-bench",
+      "job": "mono-move-micro-bench",
+      "benchmark_step": "Run A/B benchmark gate",
+      "label": "mono-move"
+    }
+  ]
+}

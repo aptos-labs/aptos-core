@@ -1,0 +1,21 @@
+name: Evaluate Docker PR statuses
+description: Validate the Docker capability plan and evaluate every required Docker check
+
+inputs:
+  needs:
+    description: toJSON(needs) of the calling job; it must list the authorization, image, and manifest workload jobs
+    required: true
+
+outputs:
+  statuses:
+    description: Compact JSON object that maps each required check name to true (pass) or false (fail)
+    value: ${{ steps.evaluate.outputs.statuses }}
+
+runs:
+  using: composite
+  steps:
+    - id: evaluate
+      shell: bash
+      env:
+        INPUT_NEEDS: ${{ inputs.needs }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" docker-status-plan

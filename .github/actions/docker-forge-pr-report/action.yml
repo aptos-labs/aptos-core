@@ -1,0 +1,31 @@
+name: Trusted Docker Forge PR report
+description: Bind a completed Docker Forge run to its exact current PR and emit the Forge report matrix
+
+inputs:
+  run_id:
+    description: Completed originating workflow run ID
+    required: true
+
+outputs:
+  pr_number:
+    description: Validated pull request number
+    value: ${{ steps.report.outputs.pr_number }}
+  head_sha:
+    description: Validated exact pull request head SHA
+    value: ${{ steps.report.outputs.head_sha }}
+  run_url:
+    description: Trusted originating workflow run URL
+    value: ${{ steps.report.outputs.run_url }}
+  report_matrix:
+    description: Compact validated Forge report matrix
+    value: ${{ steps.report.outputs.report_matrix }}
+
+runs:
+  using: composite
+  steps:
+    - id: report
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_RUN_ID: ${{ inputs.run_id }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" docker-forge-pr-report

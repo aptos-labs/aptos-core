@@ -1,0 +1,50 @@
+name: Protected image archive
+description: Export, validate and transfer fixed Docker image archives across isolated jobs
+inputs:
+  mode:
+    description: export-build, publish-build, prepare-e2e or load-e2e
+    required: true
+  directory:
+    description: Fresh archive directory or downloaded artifact directory
+    required: true
+  source_repository:
+    description: Approved source repository
+    required: true
+  source_sha:
+    description: Approved full source SHA
+    required: true
+  base_sha:
+    description: Exact trusted base SHA
+    required: true
+  pr_number:
+    description: Approved PR number
+    required: true
+  run_id:
+    description: Workflow run ID
+    required: true
+  run_attempt:
+    description: Workflow attempt
+    required: true
+  variant:
+    description: Protected image variant
+    required: true
+  artifact_repo:
+    description: Protected registry repository
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Process fixed image archives
+      shell: bash
+      env:
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_DIRECTORY: ${{ inputs.directory }}
+        INPUT_SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+        INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
+        INPUT_BASE_SHA: ${{ inputs.base_sha }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_RUN_ID: ${{ inputs.run_id }}
+        INPUT_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        INPUT_VARIANT: ${{ inputs.variant }}
+        INPUT_ARTIFACT_REPO: ${{ inputs.artifact_repo }}
+      run: python3 -I "$GITHUB_ACTION_PATH/../../ci/run_action.py" image-archive
