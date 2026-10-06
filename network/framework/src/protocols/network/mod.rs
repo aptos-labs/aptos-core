@@ -676,8 +676,11 @@ mod tests {
         }
     }
 
-    fn received_message(peer: PeerId, message: DelayedMessage) -> ReceivedMessage {
-        let protocol = ProtocolId::ConsensusDirectSendBcs;
+    fn received_message_with_protocol(
+        peer: PeerId,
+        message: DelayedMessage,
+        protocol: ProtocolId,
+    ) -> ReceivedMessage {
         let raw_msg = protocol.to_bytes(&message).unwrap();
         ReceivedMessage::new(
             NetworkMessage::DirectSendMsg(DirectSendMsg {
@@ -691,7 +694,15 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn busy_peer_cannot_fill_all_deserialization_slots() {
-        let protocol = ProtocolId::ConsensusDirectSendBcs;
+        assert_peer_isolation(ProtocolId::ConsensusDirectSendBcs).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn consensus_observer_peers_are_isolated() {
+        assert_peer_isolation(ProtocolId::ConsensusObserver).await;
+    }
+
+    async fn assert_peer_isolation(protocol: ProtocolId) {
         let attacker = PeerId::random();
         let honest_peer = PeerId::random();
         let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 10, None);
@@ -700,19 +711,27 @@ mod tests {
         sender
             .push(
                 (attacker, protocol),
-                received_message(attacker, DelayedMessage {
-                    delay_ms: 250,
-                    id: 1,
-                }),
+                received_message_with_protocol(
+                    attacker,
+                    DelayedMessage {
+                        delay_ms: 250,
+                        id: 1,
+                    },
+                    protocol,
+                ),
             )
             .unwrap();
         sender
             .push(
                 (attacker, protocol),
-                received_message(attacker, DelayedMessage {
-                    delay_ms: 250,
-                    id: 2,
-                }),
+                received_message_with_protocol(
+                    attacker,
+                    DelayedMessage {
+                        delay_ms: 250,
+                        id: 2,
+                    },
+                    protocol,
+                ),
             )
             .unwrap();
 
@@ -728,7 +747,11 @@ mod tests {
         sender
             .push(
                 (honest_peer, protocol),
-                received_message(honest_peer, DelayedMessage { delay_ms: 0, id: 3 }),
+                received_message_with_protocol(
+                    honest_peer,
+                    DelayedMessage { delay_ms: 0, id: 3 },
+                    protocol,
+                ),
             )
             .unwrap();
 
@@ -740,5 +763,44 @@ mod tests {
             event,
             Event::Message(honest_peer, DelayedMessage { delay_ms: 0, id: 3 },)
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn consensus_observer_preserves_publisher_order() {
+        let peer = PeerId::random();
+        let protocol = ProtocolId::ConsensusObserver;
+        let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let mut events = NetworkEvents::<DelayedMessage>::new(receiver, Some(2), true);
+        for message in [
+            DelayedMessage {
+                delay_ms: 50,
+                id: 1,
+            },
+            DelayedMessage { delay_ms: 0, id: 2 },
+        ] {
+            sender
+                .push(
+                    (peer, protocol),
+                    received_message_with_protocol(peer, message, protocol),
+                )
+                .unwrap();
+        }
+        drop(sender);
+        let messages = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut messages = Vec::new();
+            while let Some(event) = events.next().await {
+                messages.push(event);
+            }
+            messages
+        })
+        .await
+        .expect("the stream should drain after the sender closes");
+        assert_eq!(messages, vec![
+            Event::Message(peer, DelayedMessage {
+                delay_ms: 50,
+                id: 1
+            }),
+            Event::Message(peer, DelayedMessage { delay_ms: 0, id: 2 }),
+        ]);
     }
 }
