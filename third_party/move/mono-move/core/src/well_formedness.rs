@@ -22,25 +22,25 @@
 //!
 //! For a function `F`:
 //!
-//! | Symbol | Meaning |
-//! |---|---|
-//! | `code` | `F.code.ops()`; `N = len(code)`; `code[pc]` is the op at `pc` |
-//! | `origins` | `F.code.origins()`, one bytecode offset per op, or empty |
-//! | `S` | `F.param_and_local_sizes_sum` |
-//! | `M` | `FRAME_METADATA_SIZE` (24) |
-//! | `E` | `F.extended_frame_size` |
-//! | `P` | `F.param_region_size` |
-//! | `A` | `MAX_ALIGN` (8) |
-//! | `Data` | `[0, S)`: parameters and locals |
-//! | `Meta` | `[S, S + M)`: saved pc, fp, and function pointer, written only by call and return |
-//! | `Callee` | `[S + M, E)`: the callee's argument and return region; the callee's fp is `fp + S + M` |
-//! | `params`, `param_tys` | `F.param_slots` and the matching types |
-//! | `rets`, `ret_tys` | `F.return_slots` and the matching types |
-//! | `base` | `F.frame_layout.heap_ptr_offsets`: pointer slots the GC scans at every pc |
-//! | `sps` | `F.safe_point_layouts.entries()`: `(code_offset, heap_ptr_offsets)` pairs |
-//! | `desc(id)` | the descriptor for `id`, or none |
-//! | `layout(ty)` | `(size, align)` of `ty`, or none |
-//! | `const_ty(idx)` | the type of constant `idx` in `F`'s module, or none |
+//! | Symbol                | Meaning                                                                                |
+//! |-----------------------|----------------------------------------------------------------------------------------|
+//! | `code`                | `F.code.ops()`; `N = len(code)`; `code[pc]` is the op at `pc`                          |
+//! | `origins`             | `F.code.origins()`, one bytecode offset per op, or empty                               |
+//! | `S`                   | `F.param_and_local_sizes_sum`                                                          |
+//! | `M`                   | `FRAME_METADATA_SIZE` (24)                                                             |
+//! | `E`                   | `F.extended_frame_size`                                                                |
+//! | `P`                   | `F.param_region_size`                                                                  |
+//! | `A`                   | `MAX_ALIGN` (8)                                                                        |
+//! | `Data`                | `[0, S)`: parameters and locals                                                        |
+//! | `Meta`                | `[S, S + M)`: saved pc, fp, and function pointer, written only by call and return      |
+//! | `Callee`              | `[S + M, E)`: the callee's argument and return region; the callee's fp is `fp + S + M` |
+//! | `params`, `param_tys` | `F.param_slots` and the matching types                                                 |
+//! | `rets`, `ret_tys`     | `F.return_slots` and the matching types                                                |
+//! | `base`                | `F.frame_layout.heap_ptr_offsets`: pointer slots the GC scans at every pc              |
+//! | `sps`                 | `F.safe_point_layouts.entries()`: `(code_offset, heap_ptr_offsets)` pairs              |
+//! | `desc(id)`            | the descriptor for `id`, or none                                                       |
+//! | `layout(ty)`          | `(size, align)` of `ty`, or none                                                       |
+//! | `const_ty(idx)`       | the type of constant `idx` in `F`'s module, or none                                    |
 //!
 //! A **slot** is `(o, w, a)`: offset `o` from the frame pointer, width `w`,
 //! alignment `a`; `end = o + w`. A slot is **well-formed** iff `w > 0`, `a` is a
