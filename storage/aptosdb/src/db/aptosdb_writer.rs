@@ -558,7 +558,7 @@ impl AptosDB {
                 merkle_db: bundle.merkle_db.clone(),
                 version: persisted_base.version(),
             };
-            latest.extend(version, updates, persisted_base.summary(), &proof_reader)
+            latest.extend(version, updates, &persisted_base, &proof_reader)
         };
 
         for (i, output) in chunk.transaction_outputs.iter().enumerate() {

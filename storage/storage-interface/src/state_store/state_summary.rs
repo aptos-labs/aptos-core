@@ -431,6 +431,11 @@ impl<'db> ProvablePositionStateSummary<'db> {
         self.persisted.summary()
     }
 
+    /// The persisted position state: the floor new layers are built over.
+    pub fn persisted(&self) -> &PositionStateWithSummary {
+        &self.persisted
+    }
+
     /// The pre-committed position tip — seeds the in-memory parent at genesis
     /// or the first block after the feature is enabled. It includes committed
     /// writes the merklized snapshot may not yet reflect, so the computed root
