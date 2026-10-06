@@ -21,16 +21,6 @@
       "long_context_threshold_input_tokens": 272000,
       "long_context_input_multiplier": 2,
       "long_context_output_multiplier": 1.5
-    },
-    "gpt-6.1-sol": {
-      "source": "OpenAI GPT-6.1 Sol standard API pricing, retrieved 2026-10-05",
-      "fresh_input_per_million": 2.0,
-      "cached_input_per_million": 0.1,
-      "cache_write_per_million": 2.5,
-      "output_per_million": 10.0,
-      "long_context_threshold_input_tokens": 272000,
-      "long_context_input_multiplier": 2,
-      "long_context_output_multiplier": 1.5
     }
   }
 }

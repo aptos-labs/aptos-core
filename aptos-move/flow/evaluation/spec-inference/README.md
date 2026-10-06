@@ -65,23 +65,19 @@ python3 -m venv .venv
 cc -O2 -Wall -Wextra -Werror sandbox/landlock_exec.c -o sandbox/landlock-exec
 ```
 
-Each Codex profile pins a Codex CLI release: `sol56` and `terra56` run
-`rust-v0.153.2`, and `sol61` runs `rust-v0.160.1`, since the earlier release
-does not know `gpt-6.1-sol`. The CLI and its code-mode host are the release
-assets for the machine, unpacked side by side under the names the launcher
-looks for. Put the directory of the release the round's profile pins first on
-`PATH` for preflight and launch:
+The Codex profiles `sol56` and `terra56` pin Codex CLI release `rust-v0.153.2`.
+The CLI and its code-mode host are the release assets for the machine, unpacked
+side by side under the names the launcher looks for, and put first on `PATH` for
+preflight and launch:
 
 ```text
-arch=$(uname -m)-unknown-linux-musl
-for version in 0.153.2 0.160.1; do
-  dir=evaluation-artifacts/tools/codex-$version; mkdir -p $dir
-  for asset in codex codex-code-mode-host; do
-    gh release download rust-v$version --repo openai/codex --dir $dir \
-      --pattern "$asset-$arch.tar.gz"
-    tar xzf "$dir/$asset-$arch.tar.gz" -C $dir && mv "$dir/$asset-$arch" "$dir/$asset"
-    rm "$dir/$asset-$arch.tar.gz"
-  done
+arch=$(uname -m)-unknown-linux-musl; dir=evaluation-artifacts/tools/codex-0.153.2
+mkdir -p $dir
+for asset in codex codex-code-mode-host; do
+  gh release download rust-v0.153.2 --repo openai/codex --dir $dir \
+    --pattern "$asset-$arch.tar.gz"
+  tar xzf "$dir/$asset-$arch.tar.gz" -C $dir && mv "$dir/$asset-$arch" "$dir/$asset"
+  rm "$dir/$asset-$arch.tar.gz"
 done
 ```
 
@@ -116,7 +112,7 @@ SDK metrics remain available for cost accounting; missing terminal usage is
 not zero usage. The launch report distinguishes queued aborts (`started: false`)
 from in-flight aborts (`started: true`). Neither is a completed evaluation.
 
-## Select GLM, Opus, Sonnet, Sol 5.6, Sol 6.1, or Terra 5.6
+## Select GLM, Opus, Sonnet, Sol 5.6, or Terra 5.6
 
 Select the model before screening and scheduling. `--model glm` selects
 GLM 5.3 through Z.ai; `--model opus` selects `claude-opus-5` through Anthropic
@@ -130,9 +126,8 @@ effort. It uses `codex exec --json`, retains the thread across controller
 follow-ups, inlines the immutable rendered `move-inf` skill, and requires the
 generated Move Flow MCP tool allowlist.
 
-`--model sol61` selects `gpt-6.1-sol` and `--model terra56` selects
-`gpt-5.6-terra`, both through the same Codex path with `high` reasoning
-effort. Pass `--infrastructure-retries 0` when preparing a
+`--model terra56` selects `gpt-5.6-terra` through the same Codex path with
+`high` reasoning effort. Pass `--infrastructure-retries 0` when preparing a
 round that must not retry genuine infrastructure failures.
 
 ```text
@@ -147,7 +142,7 @@ and set `MOVE_INFERENCE_CLAUDE_TOKEN_FILE` to that path. The sandbox passes
 subscription OAuth through and redacts it from artifacts. An API key is not
 used as a fallback for the subscription profile.
 
-For Sol 5.6, Sol 6.1 or Terra 5.6, run `codex login`. The launcher copies the saved `auth.json` into
+For Sol 5.6 or Terra 5.6, run `codex login`. The launcher copies the saved `auth.json` into
 the private per-cell sandbox home and removes it with that staging directory;
 set `MOVE_INFERENCE_CODEX_AUTH_FILE` only when the login is stored elsewhere.
 

@@ -291,5 +291,5 @@ schedule, and rehearses an outage without spending model budget. A run that is
 interrupted resumes with `--resume`; the runbook's *Interrupted rounds* section
 explains what that keeps and what it refuses.
 
-Other models are selected the same way (`--model sol61`, or `opus` and
-`sonnet` through Claude Code); the runbook lists their credentials.
+Other models are selected the same way (`opus` and `sonnet` through Claude
+Code); the runbook lists their credentials.
