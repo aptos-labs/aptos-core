@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .identifiers import require_plain_name
+from .materialize import preparation_patch
 from .artifacts import load_object, sha256_file, tree_hash, write_json
 from .prepare import (
     _atomic_text,
@@ -74,9 +75,7 @@ def consolidate_corpus(
         snapshot = output_root / "snapshots" / task_id
         if tree_hash(snapshot) != record["prepared_sha256"]:
             raise ValueError(f"prepared source hash mismatch for {task_id}")
-        source_patch = (
-            source_manifest.parent / record["preparation_patch"]
-        ).resolve()
+        source_patch = preparation_patch(source_manifest.parent, record)
         if sha256_file(source_patch) != record["preparation_patch_sha256"]:
             raise ValueError(f"preparation patch hash mismatch for {task_id}")
         destination_patch = patches_dir / f"{task_id}.patch"
@@ -178,7 +177,7 @@ def validate_consolidated_corpus(root: Path) -> None:
     for record in records:
         task_id = record["task_id"]
         snapshot = root / record["prepared_path"]
-        patch = root / record["preparation_patch"]
+        patch = preparation_patch(root, record)
         result = root / record["compatibility_screen"]["result_path"]
         if tree_hash(snapshot) != record["prepared_sha256"]:
             raise ValueError(f"consolidated source hash mismatch for {task_id}")
@@ -211,7 +210,7 @@ def normalize_consolidated_patches(root: Path) -> None:
     }
     for record in manifest["records"]:
         task_id = record["task_id"]
-        patch = root / record["preparation_patch"]
+        patch = preparation_patch(root, record)
         text = patch.read_text(encoding="utf-8")
         pattern = re.compile(
             rf"(?m)^diff --git a/.*/snapshots/{re.escape(task_id)}/([^ ]+) b/([^ ]+)$"

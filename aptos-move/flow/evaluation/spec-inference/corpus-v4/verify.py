@@ -30,7 +30,7 @@ EVALUATION = ROOT.parent
 sys.path.insert(0, str(EVALUATION))
 
 from harness.identifiers import module_name, require_plain_name  # noqa: E402
-from harness.materialize import materialize_task  # noqa: E402
+from harness.materialize import materialize_task, preparation_patch  # noqa: E402
 
 MUTANT_SETS = ("mutants", "mutants-scoring")
 
@@ -70,7 +70,7 @@ def main() -> None:
         reference = ROOT / "references" / "build" / module_name(record["module"])
         temporary = tempfile.TemporaryDirectory(prefix=f"corpus-v4-verify-{task_id}-")
         baseline = Path(temporary.name) / "package"
-        materialize_task(ROOT / "package", ROOT / record["preparation_patch"], baseline,
+        materialize_task(ROOT / "package", preparation_patch(ROOT, record), baseline,
                          record["prepared_sha256"])
         for mutant_set in MUTANT_SETS:
             manifest_path = ROOT / mutant_set / task_id / "mutants.json"

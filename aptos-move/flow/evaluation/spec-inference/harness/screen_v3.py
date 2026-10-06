@@ -50,7 +50,7 @@ from dataclasses import asdict
 from .config import ExperimentConfig
 from .judge import render_command, run_command
 from .identifiers import module_name, require_plain_name
-from .materialize import materialize_task
+from .materialize import materialize_task, preparation_patch
 
 
 async def screen_corpus_v3(
@@ -93,7 +93,7 @@ async def screen_corpus_v3(
                 task_tree = Path(temporary) / "package"
                 task_tree_sha256 = materialize_task(
                     package,
-                    manifest_path.parent / record["preparation_patch"],
+                    preparation_patch(manifest_path.parent, record),
                     task_tree,
                     record.get("prepared_sha256"),
                 )

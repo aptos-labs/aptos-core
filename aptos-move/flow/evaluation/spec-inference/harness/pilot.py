@@ -21,7 +21,7 @@ from .identifiers import require_plain_name
 from .artifacts import canonical_json, sha256_file, tree_hash, write_json
 from .compatibility import changed_stages, tool_executables
 from .config import ExperimentConfig, FEEDBACK_LEVELS, RunSpec
-from .materialize import materialize_task, materialized_task
+from .materialize import materialize_task, materialized_task, preparation_patch
 from .mutants import NO_MUTANTS, mutation_fingerprint, require_unique_mutant_ids
 from .schedule import ARMS
 
@@ -472,11 +472,7 @@ def _record_recipe(manifest_path: Path, record: Mapping[str, Any]) -> CorpusReci
     target = _record_target(record)
     patch = None
     if record.get("preparation_patch"):
-        patch = (corpus / record["preparation_patch"]).resolve()
-        if not patch.is_relative_to(corpus):
-            raise ValueError(
-                f"preparation patch for {record['task_id']} escapes the corpus: {patch}"
-            )
+        patch = preparation_patch(corpus, record)
         if not patch.is_file():
             raise FileNotFoundError(patch)
         recorded = record.get("preparation_patch_sha256")

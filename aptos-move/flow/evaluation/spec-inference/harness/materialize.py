@@ -10,6 +10,12 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .artifacts import copy_snapshot, tree_hash, validate_symlinks
+from .identifiers import resolve_within
+
+
+def preparation_patch(corpus: Path, record: dict) -> Path:
+    """A record's preparation patch, refused unless it lies inside the corpus."""
+    return resolve_within(corpus, record["preparation_patch"], "preparation_patch")
 
 
 def materialize_task(

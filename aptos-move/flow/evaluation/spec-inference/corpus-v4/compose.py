@@ -48,7 +48,7 @@ sys.path.append(str(ROOT))
 
 from build_references import assemble  # noqa: E402
 from harness.identifiers import module_name, require_plain_name  # noqa: E402
-from harness.materialize import materialize_task  # noqa: E402
+from harness.materialize import materialize_task, preparation_patch  # noqa: E402
 from harness.mutants import apply_mutant  # noqa: E402
 
 
@@ -133,7 +133,7 @@ def compose_task(record: dict, output: Path, assembled: dict[str, Path]) -> dict
     # The task starts from the package with its preparation patch applied.
     temporary = tempfile.TemporaryDirectory(prefix=f"move-inference-inspect-{task_id}-")
     task_tree = Path(temporary.name) / "package"
-    materialize_task(PACKAGE, ROOT / record["preparation_patch"], task_tree,
+    materialize_task(PACKAGE, preparation_patch(ROOT, record), task_tree,
                      record.get("prepared_sha256"))
     received = (task_tree / relative).read_text(encoding="utf-8")
     (directory / source.name).write_text(received, encoding="utf-8")
