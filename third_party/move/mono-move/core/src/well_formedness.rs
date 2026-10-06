@@ -97,13 +97,14 @@
 //!
 //! For every `pc` and every `(o, kind)` reported by `code[pc].for_each_frame_operand` (see `instruction::operands`):
 //!
-//! | Id | Property                                                        | Condition                                                                                                                                                        |
-//! |----|-----------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-//! | O1 | every operand access is in frame, off the metadata, and aligned | the access `(o, w, a)` is valid, with `(w, a)` = `OperandKind::width_and_align`, or `layout(ty)` for `Value(ty)`, or `layout(const_ty(idx))` for `Constant(idx)` |
-//! | O2 | compared values have a layout                                   | for `Value(ty)`, `layout(ty)` exists                                                                                                                             |
-//! | O3 | comparison is on values, not references                         | for `Value(ty)`, and for the `ty` of `ValueRefCmp` and `JumpValueRefCmp`, `ty` is not a reference type                                                           |
-//! | O4 | constants exist                                                 | for `Constant(idx)`, `const_ty(idx)` exists                                                                                                                      |
-//! | O5 | constants have a layout                                         | for `Constant(idx)`, `layout(const_ty(idx))` exists                                                                                                              |
+//! | Id | Property                                                        | Condition                                                                                                                                                           | Rationale                                                                                      |
+//! |----|-----------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+//! | O1 | every operand access is in frame, off the metadata, and aligned | the access `(o, w, a)` is valid, with `(w, a)` = `OperandKind::width_and_align`, or `layout(ty)` for `Value(ty)`, or `layout(const_ty(idx))` for `Constant(idx)`    |                                                                                                |
+//! | O2 | compared values have a layout                                   | for `Value(ty)`, `layout(ty)` exists                                                                                                                                |                                                                                                |
+//! | O3 | comparison is on values, not references                         | for `Value(ty)`, and for the `ty` of `ValueRefCmp` and `JumpValueRefCmp`, `ty` is not a reference type                                                              |                                                                                                |
+//! | O4 | constants exist                                                 | for `Constant(idx)`, `const_ty(idx)` exists                                                                                                                         |                                                                                                |
+//! | O5 | constants have a layout                                         | for `Constant(idx)`, `layout(const_ty(idx))` exists                                                                                                                 |                                                                                                |
+//! | O6 | scalars do not alias GC pointer slots                           | for `kind` in {`Bool`, `Byte`, `U64`, `Int`, `Address`}, `[o, o + w)` does not intersect `[b, b + ptr.w)` for any `b` in `base` or in the safe-point layout at `pc` | a pointer slot read or written as an integer is type confusion; the GC would trace the integer |
 //!
 //! ## Instruction-local invariants
 //!
@@ -180,7 +181,10 @@
 //!   pointer;
 //! - `elem_size` against a vector's real stride;
 //! - enum offset tables against the pointee's variant count;
-//! - whether a GC layout slot holds a pointer at a given pc;
+//! - whether a GC layout slot holds a pointer at a given pc, or whether
+//!   `base` within `[0, P)` matches the pointer positions of `param_tys`
+//!   (that walk lives in the specializer and is what derives `base`, so
+//!   re-running it here would check the specializer against itself);
 //! - write-before-read of slots.
 //!
 //! Descriptor contents are validated by `ObjectDescriptor`'s constructors at
@@ -959,8 +963,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         });
     }
 
-    /// O1, with O2–O5 for the provider-dependent kinds. Checks one frame
-    /// operand per the [`OperandKind`] schema.
+    /// O1, with O2–O5 for the provider-dependent kinds and O6 for scalar
+    /// kinds. Checks one frame operand per the [`OperandKind`] schema.
     fn check_frame_operand(&mut self, pc: Option<usize>, offset: FrameOffset, kind: OperandKind) {
         let (width, align) = match kind {
             OperandKind::Value(ty) => {
@@ -996,6 +1000,53 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 .expect("every other kind is provider-independent"),
         };
         self.check_access(pc, offset, width, align);
+        // O6. A scalar read or written where the GC expects a pointer is type
+        // confusion: the GC would trace the integer as an object.
+        if matches!(
+            kind,
+            OperandKind::Bool
+                | OperandKind::Byte
+                | OperandKind::U64
+                | OperandKind::Int(_)
+                | OperandKind::Address
+        ) {
+            self.check_not_pointer_slot(pc, offset, width);
+        }
+    }
+
+    /// O6. `[offset, offset + width)` does not intersect any pointer slot in
+    /// `frame_layout` or in the safe-point layout at `pc`. Both lists are
+    /// strictly increasing (G2, G6), so each is one binary search.
+    fn check_not_pointer_slot(&mut self, pc: Option<usize>, offset: FrameOffset, width: u32) {
+        let start = offset.0 as u64;
+        let end = start + width as u64;
+        let ptr_width = PTR_SLOT.0 as u64;
+        let overlapping = |slots: &[FrameOffset]| -> Option<u32> {
+            // First pointer slot ending after `start`; it overlaps iff it
+            // begins before `end`.
+            let i = slots.partition_point(|b| b.0 as u64 + ptr_width <= start);
+            slots.get(i).filter(|b| (b.0 as u64) < end).map(|b| b.0)
+        };
+        let base = &self.func.frame_layout.heap_ptr_offsets;
+        if let Some(b) = overlapping(base) {
+            fail!(
+                self,
+                pc,
+                "access [{start}, {end}) aliases frame_layout pointer slot {b}"
+            );
+        }
+        let Some(pc) = pc else { return };
+        let sps = self.func.safe_point_layouts.entries();
+        let i = sps.partition_point(|e| (e.code_offset.0 as usize) < pc);
+        if let Some(entry) = sps.get(i).filter(|e| e.code_offset.0 as usize == pc) {
+            if let Some(b) = overlapping(&entry.layout.heap_ptr_offsets) {
+                fail!(
+                    self,
+                    pc,
+                    "access [{start}, {end}) aliases safe-point pointer slot {b}"
+                );
+            }
+        }
     }
 
     /// `[offset, offset + size)` lies within the extended frame, does not

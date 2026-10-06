@@ -1084,6 +1084,65 @@ fn last_op_must_be_a_terminator() {
 // ---------------------------------------------------------------------------
 
 #[test]
+fn scalar_operands_must_not_alias_pointer_slots() {
+    let with_ptr_slot = |op| Function {
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        ..func_with_single_op(op)
+    };
+    // A u64 op on the pointer slot itself.
+    assert_error_contains(
+        &with_ptr_slot(MicroOp::AddU64 {
+            dst: FO(0),
+            lhs: FO(8),
+            rhs: FO(8),
+        }),
+        "access [0, 8) aliases frame_layout pointer slot 0",
+    );
+    // A u32 op straddling the pointer slot's tail.
+    assert_error_contains(
+        &with_ptr_slot(MicroOp::IntAdd(IntBinaryOp {
+            dst: FO(4),
+            lhs: FO(8),
+            rhs: IntOperand::SlotU32(FO(8)),
+        })),
+        "access [4, 8) aliases frame_layout pointer slot 0",
+    );
+    // Byte copies and pointer kinds may touch it.
+    assert_accepted(&with_ptr_slot(MicroOp::Move8 {
+        dst: FO(0),
+        src: FO(8),
+    }));
+    assert_accepted(&with_ptr_slot(MicroOp::VecNew { dst: FO(0) }));
+    // A scalar next to the slot is fine.
+    assert_accepted(&with_ptr_slot(MicroOp::StoreRandomU64 { dst: FO(8) }));
+}
+
+#[test]
+fn scalar_operands_must_not_alias_safe_point_pointer_slots() {
+    // `MoveFrom` allocates, so it may carry a safe point; its 32-byte `addr`
+    // operand at 0 overlaps a pointer slot listed at 8.
+    let func = Function {
+        code: Code::from_vec(vec![
+            MicroOp::MoveFrom {
+                dst: FO(32),
+                addr: FO(0),
+                ty: U64_TY,
+            },
+            MicroOp::Return,
+        ]),
+        param_and_local_sizes_sum: 40,
+        extended_frame_size: 64,
+        safe_point_layouts: SortedSafePointEntries::new(vec![SafePointEntry {
+            code_offset: CO(0),
+            layout: FrameLayoutInfo::new(vec![FO(8)]),
+        }]),
+        ..minimal_func()
+    };
+    assert_error_contains(&func, "access [0, 32) aliases safe-point pointer slot 8");
+}
+
+#[test]
 fn bitwise_on_signed_rejected() {
     let func = func_with_single_op(MicroOp::IntBitAnd(IntBinaryOp {
         dst: FO(0),
