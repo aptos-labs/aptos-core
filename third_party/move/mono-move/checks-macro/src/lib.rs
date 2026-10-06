@@ -53,8 +53,71 @@ use syn::{
     parse_macro_input,
     punctuated::Punctuated,
     spanned::Spanned,
+    visit_mut::{self, VisitMut},
     Attribute, Ident, ImplItem, ItemImpl, LitStr, Token,
 };
+
+/// Collects and strips `#[check(...)]` tags from statements and match arms
+/// inside a method body.
+struct BodyTags {
+    ids: Vec<String>,
+    error: Option<syn::Error>,
+}
+
+impl BodyTags {
+    fn take(&mut self, attrs: &mut Vec<Attribute>) {
+        let (tags, rest): (Vec<_>, Vec<_>) = std::mem::take(attrs)
+            .into_iter()
+            .partition(|attr| attr.path().is_ident("check"));
+        *attrs = rest;
+        for tag in tags {
+            match method_ids(&tag) {
+                Ok(ids) => self.ids.extend(ids),
+                Err(err) => {
+                    self.error.get_or_insert(err);
+                },
+            }
+        }
+    }
+}
+
+impl VisitMut for BodyTags {
+    fn visit_expr_mut(&mut self, expr: &mut syn::Expr) {
+        if let Some(attrs) = expr_attrs_mut(expr) {
+            self.take(attrs);
+        }
+        visit_mut::visit_expr_mut(self, expr);
+    }
+
+    fn visit_arm_mut(&mut self, arm: &mut syn::Arm) {
+        self.take(&mut arm.attrs);
+        visit_mut::visit_arm_mut(self, arm);
+    }
+
+    fn visit_local_mut(&mut self, local: &mut syn::Local) {
+        self.take(&mut local.attrs);
+        visit_mut::visit_local_mut(self, local);
+    }
+}
+
+/// The outer attributes of an expression, for the expression kinds that can
+/// carry them in statement position.
+fn expr_attrs_mut(expr: &mut syn::Expr) -> Option<&mut Vec<Attribute>> {
+    use syn::Expr::*;
+    Some(match expr {
+        If(e) => &mut e.attrs,
+        Match(e) => &mut e.attrs,
+        ForLoop(e) => &mut e.attrs,
+        While(e) => &mut e.attrs,
+        Loop(e) => &mut e.attrs,
+        Block(e) => &mut e.attrs,
+        Macro(e) => &mut e.attrs,
+        Call(e) => &mut e.attrs,
+        MethodCall(e) => &mut e.attrs,
+        Let(e) => &mut e.attrs,
+        _ => return None,
+    })
+}
 
 /// `registry = NAME`.
 struct ImplArgs {
@@ -190,16 +253,25 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut entries = Vec::new();
     for item in &mut item_impl.items {
-        let ImplItem::Method(method) = item else {
+        let ImplItem::Fn(method) = item else {
             continue;
         };
+        // Tags inside the body: `#[check(F3)]` on a statement or match arm.
+        let mut body = BodyTags {
+            ids: Vec::new(),
+            error: None,
+        };
+        body.visit_block_mut(&mut method.block);
+        if let Some(err) = body.error {
+            return err.to_compile_error().into();
+        }
         let (checks_attrs, rest): (Vec<_>, Vec<_>) = method
             .attrs
             .drain(..)
-            .partition(|attr| attr.path.is_ident("checks"));
+            .partition(|attr| attr.path().is_ident("checks"));
         let (complexity_attrs, rest): (Vec<_>, Vec<_>) = rest
             .into_iter()
-            .partition(|attr| attr.path.is_ident("complexity"));
+            .partition(|attr| attr.path().is_ident("complexity"));
         method.attrs = rest;
 
         let mut complexity = None;
@@ -230,14 +302,20 @@ pub fn checks(args: TokenStream, item: TokenStream) -> TokenStream {
             None => ("", "", ""),
         };
 
+        let mut ids = body.ids;
         for attr in checks_attrs {
-            let ids = match method_ids(&attr) {
-                Ok(ids) => ids,
+            match method_ids(&attr) {
+                Ok(more) => ids.extend(more),
                 Err(err) => return err.to_compile_error().into(),
-            };
-            let name = method.sig.ident.to_string();
-            entries.push(quote! { (#name, &[#(#ids),*], #class, #measured_in, #because) });
+            }
         }
+        if ids.is_empty() && complexity.is_none() {
+            continue;
+        }
+        ids.sort();
+        ids.dedup();
+        let name = method.sig.ident.to_string();
+        entries.push(quote! { (#name, &[#(#ids),*], #class, #measured_in, #because) });
     }
 
     quote! {
