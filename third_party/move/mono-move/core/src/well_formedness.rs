@@ -302,8 +302,8 @@ impl fmt::Display for WellFormednessError {
     }
 }
 
-/// Records a well-formedness error at `pc` (`Option<usize>`) with a formatted
-/// message.
+/// Records a well-formedness error at `pc` (a `usize`, an `Option<usize>`, or
+/// `None` for function-level errors) with a formatted message.
 macro_rules! fail {
     ($self:ident, $pc:expr, $($arg:tt)*) => {
         $self.err($pc, format!($($arg)*))
@@ -409,15 +409,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         let func = self.func;
         // F3.
         if func.frame_size() > func.extended_frame_size {
-            fail!(
-                self,
-                None,
-                "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})",
-                func.extended_frame_size,
-                func.param_and_local_sizes_sum,
-                FRAME_METADATA_SIZE,
-                func.frame_size()
-            );
+            fail!(self, None, "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})", func.extended_frame_size, func.param_and_local_sizes_sum, FRAME_METADATA_SIZE, func.frame_size());
         }
         // F4.
         if func.param_region_size > func.param_and_local_sizes_sum {
@@ -480,9 +472,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             fail!(
                 self,
                 None,
-                "number of return slots ({}) must equal number of return types ({})",
-                func.return_slots.len(),
-                num_return_tys
+                "number of return slots ({}) must equal number of return types ({num_return_tys})",
+                func.return_slots.len()
             );
         }
         self.check_slot_list(
@@ -509,10 +500,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 fail!(
                     self,
                     None,
-                    "{kind} slot [{}, {}) exceeds {region_name} ({})",
-                    slot.offset.0,
-                    end,
-                    region_end
+                    "{kind} slot [{}, {end}) exceeds {region_name} ({region_end})",
+                    slot.offset.0
                 );
             }
         }
@@ -521,8 +510,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 fail!(
                     self,
                     None,
-                    "{kind} slots {} and {} are not ascending and disjoint ([{}, {}) then {})",
-                    i,
+                    "{kind} slots {i} and {} are not ascending and disjoint ([{}, {}) then {})",
                     i + 1,
                     w[0].offset.0,
                     slot_end(&w[0]),
@@ -575,13 +563,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 .iter()
                 .find(|off| off.0 as usize >= self.func.param_region_size)
             {
-                fail!(
-                    self,
-                    None,
-                    "frame_layout names pointer slot {} beyond param_region_size ({}) but zero_frame is false",
-                    off.0,
-                    self.func.param_region_size
-                );
+                fail!(self, None, "frame_layout names pointer slot {} beyond param_region_size ({}) but zero_frame is false", off.0, self.func.param_region_size);
             }
         }
 
@@ -603,22 +585,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             let co = entry.code_offset.0 as usize;
             // G5.
             match code.get(co) {
-                None => fail!(
-                    self,
-                    None,
-                    "safe_point_layouts: code_offset {} out of bounds (code length {})",
-                    co,
-                    code.len()
-                ),
+                None => fail!(self, None, "safe_point_layouts: code_offset {co} out of bounds (code length {})", code.len()),
                 // Top-frame-only contract: an entry sits at the PC of an
                 // allocating op (see `MicroOp::is_allocating`).
-                Some(op) if !op.is_allocating() => fail!(
-                    self,
-                    Some(co),
-                    "safe_point_layouts: code_offset {} is not at an allocating op; \
-                     top-frame-only contract — see `SafePointEntry`",
-                    co
-                ),
+                Some(op) if !op.is_allocating() => fail!(self, co, "safe_point_layouts: code_offset {co} is not at an allocating op; top-frame-only contract — see `SafePointEntry`"),
                 Some(_) => {},
             }
             let sp_offsets = &entry.layout.heap_ptr_offsets;
@@ -632,7 +602,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 if base_offsets.binary_search_by_key(&sp.0, |b| b.0).is_ok() {
                     fail!(
                         self,
-                        Some(co),
+                        co,
                         "safe_point_layouts: offset {} duplicates frame_layout",
                         sp.0
                     );
@@ -721,26 +691,26 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             // I1, I2. Unchecked u64 immediates: lowering uses the checked ops for
             // zero divisors and out-of-range shifts, so these are lowering bugs.
             DivU64Imm { imm, .. } | ModU64Imm { imm, .. } if imm == 0 => {
-                self.err(Some(pc), "division by zero (imm)");
+                self.err(pc, "division by zero (imm)");
             },
             DivU64Imm { .. } | ModU64Imm { .. } => {},
             ShlU64Imm { imm, .. } | ShrU64Imm { imm, .. } if imm >= 64 => {
-                fail!(self, Some(pc), "shift amount {} exceeds 63 (imm)", imm);
+                fail!(self, pc, "shift amount {imm} exceeds 63 (imm)");
             },
             ShlU64Imm { .. } | ShrU64Imm { .. } => {},
 
             // I3, I4, I5. Signedness the interpreter would otherwise reject at
             // runtime.
             IntBitAnd(ref op) | IntBitOr(ref op) | IntBitXor(ref op) if op.rhs.is_signed() => {
-                self.err(Some(pc), "bitwise on signed type");
+                self.err(pc, "bitwise on signed type");
             },
             IntBitAnd(_) | IntBitOr(_) | IntBitXor(_) => {},
             IntShl(op) | IntShr(op) if op.ty.is_signed() => {
-                self.err(Some(pc), "shift on signed type");
+                self.err(pc, "shift on signed type");
             },
             IntShl(_) | IntShr(_) => {},
             IntNegate(op) if !op.ty.is_signed() => {
-                self.err(Some(pc), "negate on unsigned type");
+                self.err(pc, "negate on unsigned type");
             },
             IntNegate(_) => {},
 
@@ -754,7 +724,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             SlotBorrow { local, .. } if local.0 as usize >= self.func.param_and_local_sizes_sum => {
                 fail!(
                     self,
-                    Some(pc),
+                    pc,
                     "SlotBorrow local {} is outside the data region [0, {})",
                     local.0,
                     self.func.param_and_local_sizes_sum
@@ -832,10 +802,9 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 {
                     fail!(
                         self,
-                        Some(pc),
-                        "DeepCopyHeapPtrs: base {} + offset {} overflows u32",
-                        base.0,
-                        off
+                        pc,
+                        "DeepCopyHeapPtrs: base {} + offset {off} overflows u32",
+                        base.0
                     );
                 }
             },
@@ -873,9 +842,8 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                     ) {
                         fail!(
                             self,
-                            Some(pc),
-                            "HeapNew: descriptor_id {} is not a Struct or Enum",
-                            descriptor_id
+                            pc,
+                            "HeapNew: descriptor_id {descriptor_id} is not a Struct or Enum"
                         );
                     }
                 }
@@ -891,21 +859,13 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 }) => {
                     let variant_count = variant_pointer_offsets.len();
                     if variant as usize >= variant_count {
-                        fail!(
-                            self,
-                            Some(pc),
-                            "EnumNew: tag {} out of range (descriptor {} has {} variants)",
-                            variant,
-                            descriptor_id,
-                            variant_count
-                        );
+                        fail!(self, pc, "EnumNew: tag {variant} out of range (descriptor {descriptor_id} has {variant_count} variants)");
                     }
                 },
                 Some(_) => fail!(
                     self,
-                    Some(pc),
-                    "EnumNew: descriptor_id {} is not an Enum",
-                    descriptor_id
+                    pc,
+                    "EnumNew: descriptor_id {descriptor_id} is not an Enum"
                 ),
                 None => {},
             },
@@ -955,27 +915,19 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                         .last()
                         .filter(|&&off| off as u64 + PTR_WIDTH as u64 > op.values_size as u64)
                     {
-                        fail!(
-                            self,
-                            Some(pc),
-                            "PackClosure: captured_data pointer offset {} out of bounds of values_size {}",
-                            off,
-                            op.values_size
-                        );
+                        fail!(self, pc, "PackClosure: captured_data pointer offset {off} out of bounds of values_size {}", op.values_size);
                     }
                 },
                 Some(_) => fail!(
                     self,
-                    Some(pc),
-                    "PackClosure: descriptor_id {} is not a Trivial or CapturedData",
-                    id
+                    pc,
+                    "PackClosure: descriptor_id {id} is not a Trivial or CapturedData"
                 ),
             },
             (Some(id), true) => fail!(
                 self,
-                Some(pc),
-                "PackClosure: captured_data_descriptor_id {} provided but no captures",
-                id
+                pc,
+                "PackClosure: captured_data_descriptor_id {id} provided but no captures"
             ),
             (None, false) => self.err(
                 Some(pc),
@@ -989,13 +941,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         // L5.
         let captured_count = op.mask.count_ones() as usize;
         if op.captured.len() != captured_count {
-            fail!(
-                self,
-                Some(pc),
-                "PackClosure: captured list length {} does not match mask captured count {}",
-                op.captured.len(),
-                captured_count
-            );
+            fail!(self, pc, "PackClosure: captured list length {} does not match mask captured count {captured_count}", op.captured.len());
         }
         match &op.func_ref {
             ClosureFuncRef::Resolved(func_ptr) => {
@@ -1005,21 +951,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 let param_count = callee.param_slots.len();
                 // L6.
                 if param_count > 64 {
-                    fail!(
-                        self,
-                        Some(pc),
-                        "PackClosure: callee has {} params, exceeds 64-bit mask capacity",
-                        param_count
-                    );
+                    fail!(self, pc, "PackClosure: callee has {param_count} params, exceeds 64-bit mask capacity");
                 }
                 if param_count < 64 && op.mask >> param_count != 0 {
-                    fail!(
-                        self,
-                        Some(pc),
-                        "PackClosure: mask 0x{:x} sets bits beyond callee param count {}",
-                        op.mask,
-                        param_count
-                    );
+                    fail!(self, pc, "PackClosure: mask 0x{:x} sets bits beyond callee param count {param_count}", op.mask);
                 }
                 // L7. The runtime writes captured values with the slot's
                 // `(size, align)` and reads them back at the callee parameter's
@@ -1037,24 +972,14 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                     if slot.size != param_slot.size {
                         fail!(
                             self,
-                            Some(pc),
-                            "PackClosure: captured[{}].size {} != callee param_slots[{}].size {}",
-                            k,
+                            pc,
+                            "PackClosure: captured[{k}].size {} != callee param_slots[{i}].size {}",
                             slot.size,
-                            i,
                             param_slot.size
                         );
                     }
                     if slot.align != param_slot.align {
-                        fail!(
-                            self,
-                            Some(pc),
-                            "PackClosure: captured[{}].align {} != callee param_slots[{}].align {}",
-                            k,
-                            slot.align,
-                            i,
-                            param_slot.align
-                        );
+                        fail!(self, pc, "PackClosure: captured[{k}].align {} != callee param_slots[{i}].align {}", slot.align, param_slot.align);
                     }
                 }
             },
@@ -1072,10 +997,9 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             if op.values_size != expected {
                 fail!(
                     self,
-                    Some(pc),
-                    "PackClosure: values_size {} != captured layout size {}",
-                    op.values_size,
-                    expected
+                    pc,
+                    "PackClosure: values_size {} != captured layout size {expected}",
+                    op.values_size
                 );
             }
         }
@@ -1085,10 +1009,10 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     // Frame access
     // -----------------------------------------------------------------------
 
-    fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
+    fn err(&mut self, pc: impl Into<Option<usize>>, msg: impl Into<String>) {
         self.errors.push(WellFormednessError {
             func_name: self.func.name().to_string(),
-            pc,
+            pc: pc.into(),
             message: msg.into(),
         });
     }
@@ -1139,15 +1063,13 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     fn check_access(&mut self, pc: Option<usize>, offset: FrameOffset, size: u32, align: u32) {
         let offset = offset.0 as usize;
         let Some(end) = offset.checked_add(size as usize) else {
-            return fail!(self, pc, "access at offset {} overflows", offset);
+            return fail!(self, pc, "access at offset {offset} overflows");
         };
         if end > self.func.extended_frame_size {
             return fail!(
                 self,
                 pc,
-                "access [{}, {}) exceeds extended_frame_size {}",
-                offset,
-                end,
+                "access [{offset}, {end}) exceeds extended_frame_size {}",
                 self.func.extended_frame_size
             );
         }
@@ -1157,21 +1079,14 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             fail!(
                 self,
                 pc,
-                "access [{}, {}) overlaps metadata [{}, {})",
-                offset,
-                end,
-                meta_start,
-                meta_end
+                "access [{offset}, {end}) overlaps metadata [{meta_start}, {meta_end})"
             );
         }
         if !offset.is_multiple_of(align as usize) {
             fail!(
                 self,
                 pc,
-                "access [{}, {}) is not {}-byte aligned",
-                offset,
-                end,
-                align
+                "access [{offset}, {end}) is not {align}-byte aligned"
             );
         }
     }
@@ -1180,7 +1095,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// reference type is an unconditional runtime invariant violation.
     fn check_value_type(&mut self, pc: usize, ty: InternedType) {
         if matches!(view_type(ty), Type::ImmutRef { .. } | Type::MutRef { .. }) {
-            self.err(Some(pc), "value comparison on a reference type");
+            self.err(pc, "value comparison on a reference type");
         }
     }
 
@@ -1197,7 +1112,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         if let Some(w) = sorted.windows(2).find(|w| w[0] + width as u64 > w[1]) {
             fail!(
                 self,
-                Some(pc),
+                pc,
                 "{op}: destinations [{}, {}) and [{}, {}) overlap",
                 w[0],
                 w[0] + width as u64,
@@ -1218,13 +1133,11 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         let base = self.func.frame_size();
         let total = abi.total_frame_size();
         match base.checked_add(total as usize) {
-            None => self.err(Some(pc), "native slot region overflows usize"),
+            None => self.err(pc, "native slot region overflows usize"),
             Some(end) if end > self.func.extended_frame_size => fail!(
                 self,
-                Some(pc),
-                "native slot region [{}, {}) exceeds extended_frame_size {}",
-                base,
-                end,
+                pc,
+                "native slot region [{base}, {end}) exceeds extended_frame_size {}",
                 self.func.extended_frame_size
             ),
             Some(_) => {},
@@ -1234,16 +1147,15 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             if off_end > total as u64 {
                 fail!(
                     self,
-                    Some(pc),
-                    "native heap pointer offset {} exceeds the slot region ({})",
-                    off.0,
-                    total
+                    pc,
+                    "native heap pointer offset {} exceeds the slot region ({total})",
+                    off.0
                 );
             }
             if !off.0.is_multiple_of(PTR_ALIGN) {
                 fail!(
                     self,
-                    Some(pc),
+                    pc,
                     "native heap pointer offset {} is not 8-byte aligned",
                     off.0
                 );
@@ -1260,7 +1172,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
             if !inside_arg {
                 fail!(
                     self,
-                    Some(pc),
+                    pc,
                     "native heap pointer offset {} is not inside an argument slot",
                     off.0
                 );
@@ -1268,11 +1180,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         }
         for (i, id) in abi.required_descriptors().iter().enumerate() {
             if self.provider.descriptor(*id).is_none() {
-                fail!(
-                    self,
-                    Some(pc),
-                    "native required descriptor {i} ({id}) is unknown"
-                );
+                fail!(self, pc, "native required descriptor {i} ({id}) is unknown");
             }
         }
     }
@@ -1288,23 +1196,15 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         if callee.param_region_size > region {
             fail!(
                 self,
-                Some(pc),
-                "CallDirect: callee param_region_size {} exceeds the callee region ({})",
-                callee.param_region_size,
-                region
+                pc,
+                "CallDirect: callee param_region_size {} exceeds the callee region ({region})",
+                callee.param_region_size
             );
         }
         for (i, slot) in callee.return_slots.iter().enumerate() {
             let end = slot_end(slot);
             if end > region {
-                fail!(
-                    self,
-                    Some(pc),
-                    "CallDirect: callee return slot {i} [{}, {}) exceeds the callee region ({})",
-                    slot.offset.0,
-                    end,
-                    region
-                );
+                fail!(self, pc, "CallDirect: callee return slot {i} [{}, {end}) exceeds the callee region ({region})", slot.offset.0);
             }
         }
     }
@@ -1325,13 +1225,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         let provider: &'a P = self.provider;
         let inner = provider.descriptor(descriptor_id).map(|d| d.inner());
         if inner.is_none() {
-            fail!(
-                self,
-                Some(pc),
-                "{}: unknown descriptor_id {}",
-                op,
-                descriptor_id
-            );
+            fail!(self, pc, "{op}: unknown descriptor_id {descriptor_id}");
         }
         inner
     }
@@ -1354,23 +1248,13 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
                 elem_pointer_offsets,
             }) if !elem_pointer_offsets.is_empty() => {
                 if *descriptor_elem_size != elem_size {
-                    fail!(
-                        self,
-                        Some(pc),
-                        "{}: elem_size {} does not match Vector descriptor_id {} elem_size {}",
-                        op,
-                        elem_size,
-                        descriptor_id,
-                        descriptor_elem_size
-                    );
+                    fail!(self, pc, "{op}: elem_size {elem_size} does not match Vector descriptor_id {descriptor_id} elem_size {descriptor_elem_size}");
                 }
             },
             Some(_) => fail!(
                 self,
-                Some(pc),
-                "{}: descriptor_id {} is not a non-empty Vector or Trivial",
-                op,
-                descriptor_id
+                pc,
+                "{op}: descriptor_id {descriptor_id} is not a non-empty Vector or Trivial"
             ),
         }
     }
@@ -1382,10 +1266,9 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
         if (target.0 as usize) >= code_len {
             fail!(
                 self,
-                Some(pc),
-                "jump target {} out of bounds (code length {})",
-                target.0,
-                code_len
+                pc,
+                "jump target {} out of bounds (code length {code_len})",
+                target.0
             );
         }
     }
@@ -1393,7 +1276,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// Z1.
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
-            self.err(Some(pc), "size must be > 0");
+            self.err(pc, "size must be > 0");
         }
     }
 
@@ -1401,13 +1284,7 @@ impl<'a, P: WellFormednessProvider + ?Sized> FunctionChecker<'a, P> {
     /// into a heap object or referent cannot wrap.
     fn check_offset_size(&mut self, pc: usize, offset: u32, size: u32) {
         if offset.checked_add(size).is_none() {
-            fail!(
-                self,
-                Some(pc),
-                "offset {} + size {} overflows u32",
-                offset,
-                size
-            );
+            fail!(self, pc, "offset {offset} + size {size} overflows u32");
         }
     }
 }
