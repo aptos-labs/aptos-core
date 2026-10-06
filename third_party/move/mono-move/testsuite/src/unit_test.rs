@@ -153,8 +153,6 @@ fn execute(
         Ok(function) => function,
         Err(err) => return classify_error(&err),
     };
-    // TODO(correctness): remove once the loader verifies lowered functions itself.
-    mono_move_runtime::assert_verified(function, guard);
 
     assert_eq!(
         test.arguments.len(),

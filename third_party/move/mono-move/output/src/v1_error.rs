@@ -837,6 +837,13 @@ mod tests {
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
+            LoaderError::InvariantViolation(LoaderInvariantViolation::MicroOpVerificationFailed {
+                errors: vec![mono_move_core::VerificationError {
+                    func_name: "f".to_string(),
+                    pc: Some(0),
+                    message: "frame access out of bounds".to_string(),
+                }],
+            }),
         ];
         for err in &cases {
             // Exhaustive, so a new variant must be added to `cases`.
