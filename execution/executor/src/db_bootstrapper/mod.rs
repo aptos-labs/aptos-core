@@ -103,6 +103,26 @@ impl GenesisCommitter {
         self.output.ledger_info_opt.as_ref()
     }
 
+    /// Commits genesis, leaving the ledger info alone.
+    ///
+    /// For a node that recorded the epoch-0 ledger info up front to establish
+    /// provenance before it knew whether it would fast sync past genesis. That
+    /// ledger info is already durable and is already the latest, so writing it
+    /// again would be rejected as a gap in epoch history.
+    pub fn commit_without_ledger_info(self) -> Result<()> {
+        self.db.save_transactions(
+            self.output
+                .output
+                .expect_complete_result()
+                .as_chunk_to_commit(),
+            None,
+            true, /* sync_commit */
+        )?;
+        info!("Genesis committed without ledger info.");
+
+        Ok(())
+    }
+
     pub fn commit(self) -> Result<()> {
         self.db.save_transactions(
             self.output

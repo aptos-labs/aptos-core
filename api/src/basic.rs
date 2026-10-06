@@ -147,18 +147,17 @@ impl BasicApi {
 
     /// Check basic node health
     ///
-    /// By default this endpoint returns 200 as long as the node is running.
-    /// It is meant to be used as a liveness check, so a node that is still
+    /// Without `duration_secs`, this endpoint returns 200 as long as the node
+    /// is running. It is a liveness check, so a node that is still
     /// bootstrapping (and therefore has no ledger data yet) still passes: it
     /// is alive and must not be restarted.
     ///
-    /// If the duration_secs param is provided, this endpoint will return a
-    /// 200 if the following condition is true:
+    /// With `duration_secs`, it returns 200 only if
     ///
     /// `server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`
     ///
-    /// That form is a readiness check, and a node that has not caught up (or
-    /// has not bootstrapped at all) fails it.
+    /// which makes it a readiness check instead: a node that has not caught
+    /// up, or has not bootstrapped at all, fails it.
     #[oai(
         path = "/-/healthy",
         method = "get",
@@ -179,7 +178,7 @@ impl BasicApi {
         // is running and must not be restarted. Note that this is specifically
         // the not-bootstrapped case: if the node has data and reading it fails,
         // the error propagates so the liveness check does fail.
-        let ledger_info = if context.is_bootstrapped() {
+        let ledger_info = if context.is_bootstrapped()? {
             api_spawn_blocking(move || context.get_latest_ledger_info()).await?
         } else {
             LedgerInfo::not_bootstrapped(&context.chain_id())
