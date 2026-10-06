@@ -9,8 +9,13 @@
   "target": "aptos_experimental::extracted_bulk_order_utils::new_bulk_order_request_with_sanitization",
   "task_id": "TR-sanitize-028",
   "threshold_seconds": 20,
-  "wall_seconds": 3.6,
+  "wall_seconds": 5.1,
   "well_formed": true,
   "wp_failure_kind": "implementation_failure",
-  "wp_hard": true
+  "wp_hard": true,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

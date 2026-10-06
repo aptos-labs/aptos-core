@@ -15,6 +15,8 @@ subsystems through configuration. Move is configured as follows:
 ```toml
 [subsystems.move]
 roots = ["third_party/move", "aptos-move"]
+excluded_roots = ["third_party/move/lean"]
+e2e_tests = ["lean"]
 ignored_paths = [
     "third_party/move/documentation",
     "third_party/move/move-prover/doc",
@@ -38,6 +40,7 @@ related_test_packages = [
 | `global_test_inputs` | Global only | Select all eligible workspace packages and registered E2E suites. |
 | `unmatched_changes` | Global only | Must be `legacy`: union legacy selection for the full change when any relevant path is unconfigured. |
 | `[e2e_tests.<name>]` | Global only | Define suite dependencies through `affected_packages` and `input_paths`. |
+| `excluded_roots` | Subsystem | Subtrees owned elsewhere; excluded from direct inputs and root-discovered candidates. Explicit related packages remain eligible. |
 | `roots` | Subsystem | Activate the subsystem and discover eligible Cargo packages by directory. |
 | `related_test_roots`, `related_test_packages` | Subsystem | Additional eligible packages; do not activate the subsystem themselves. |
 | `selection` | Subsystem | `affected` intersects dependency impact with eligible packages; `all` selects every candidate. |
@@ -45,6 +48,31 @@ related_test_packages = [
 | `path_rules` | Subsystem | Add package seeds for filesystem dependencies missing from Cargo; matching rules are additive and can activate a subsystem. |
 | `e2e_tests` | Subsystem | Eligible named suites, selected when a declared dependency is affected or an input changes. |
 | `ignored_paths` | Both | Global: repository-wide. Subsystem: within its roots, without suppressing overlapping subsystems. Global inputs and explicit package/E2E mappings take precedence; a mapped path inside an ignored tree seeds only its mapped packages, not the crate containing it. |
+
+Lean owns `third_party/move/lean`, excluded from Move's roots. Its named `lean`
+runner executes the Lake suites, XAST/XIR compiler integration, and linked
+MonoVM smoke/differential tests. Move and Lean both reference that runner;
+its Rust dependency anchors are declared once in `[e2e_tests.lean]`.
+Dependency changes affecting the CLI, compiler tests, or MonoVM adapter select
+Lean even when no Lean file changes. Production Lean IR/Move sources explicitly
+map back to Rust consumer tests; fixture-only changes select the Lean runner
+without broadening Rust tests. Direct inputs of a subsystem's named suite do
+not need a Cargo owner to avoid the all-candidate fallback.
+
+The Lean workflow runs selection for every PR, so transitive Rust dependencies
+are not hidden behind a manually maintained workflow path filter. Selection
+failures fail its result check. During rollout, a trusted base registry without
+`lean` conservatively runs the suite. Push/manual/nightly runs use full coverage.
+
+`Cargo.lock` remains a global input unless parsed lockfiles differ only in the
+dependency lists of existing workspace packages. In that case, subsystem and
+compare modes seed selection with those packages' `Cargo.toml` paths, even if
+only the lockfile changed. External package records are compared in full:
+versions, sources (including Git revisions), checksums, and dependency edges.
+Package additions/removals, other metadata changes, unknown lockfile formats,
+or unavailable lockfiles retain global coverage. The JSON plan preserves the
+original changed paths and explains the refinement in `reasons`. Legacy mode,
+builds, lints, and doc-test gates are unchanged.
 
 Changes are measured from the merge base of HEAD and `--base` (default
 `origin/main`), including tracked staged/unstaged edits, deletions, and both rename
@@ -74,8 +102,9 @@ explicit names are errors.
 
 ## E2E configuration and CI
 
-Move selects **no automatic E2E suites**. Registered runners remain available for
-other subsystems, legacy fallback, global changes, and the nightly backstop.
+Move selects the Lean runner when its dependency anchors are affected. Other
+registered runners remain available for legacy fallback, global changes, and
+the nightly backstop.
 Top-level definitions supply dependencies, for example
 (abbreviated; see the configuration for all input paths):
 
@@ -94,14 +123,22 @@ cargo x list-e2e-tests                  # Also supports --format json
 ```
 
 The shared [registry](../../.github/actions/e2e-test-determinator/registry.json)
-covers CLI/API and Forge E2E and compatibility. Unknown E2E names or missing referenced definitions fail both `subsystem`
+covers CLI/API, Forge E2E and compatibility, smoke tests, batch encryption, and
+Lean cross-language integration.
+Each runner declares whether it consumes the release Docker images. Unknown E2E names or missing referenced definitions fail both `subsystem`
 and `compare` with a nonzero exit. Registry tests verify workflow jobs and required
 nightly coverage. A new runner needs registration, dependencies, workflow wiring,
 and nightly coverage; assigning a registered runner is configuration-only.
 
 The [E2E action](../../.github/actions/e2e-test-determinator/action.yaml) emits
-selected names; consumers gate jobs or set `SKIP_JOB`. Workflow event, label,
-permission, same-repository, image-build, and documentation gates also apply.
+selected names and whether a selected runner needs the release images;
+consumers gate jobs or set `SKIP_JOB`. An unselected runner's job is skipped
+without reserving a runner and still reports its check; a failed selection runs it
+so that the check fails. Lint+Test and the Docker workflow each run the selection.
+A PR skips the release image build when no selected runner needs it and no label
+requests an image build or a label-driven image consumer.
+Workflow event, label, permission, same-repository, image-build, and
+documentation gates also apply.
 Planner failures fail visibly, including required checks. Push/manual/nightly
 runs retain full selection. `CICD:run-all-e2e-tests` bypasses selection, but
 specialized label/permission gates apply. Explicit performance overrides force
@@ -166,6 +203,7 @@ suites fail the aggregate result; independent suites continue.
 
 | Coverage | Execution |
 | --- | --- |
+| Lean integration | Lake suites, compiler XAST/XIR integration, linked MonoVM smoke/differential tests. |
 | Rust baseline | Workspace Nextest (`ci`, three retries), doc tests, VM feature validation, and framework bundle freshness. |
 | Dedicated Rust suites | Eight smoke partitions and batch encryption with Node/pnpm. |
 | Application E2E | CLI against devnet/testnet/mainnet, API specs, and two deployed Forge variants (E2E, compatibility). |
@@ -186,15 +224,17 @@ failed jobs once through the [retry workflow](../../.github/workflows/nightly-fu
 which absorbs lost runners and other infrastructure failures. The final attempt
 posts its result to
 `#cicd-testing` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
-one linked square per night for the last seven completed runs on the branch
+one square per night for the last seven completed runs on the branch
 (green, yellow for passing only after the retry, red, a cross for a cancelled run
 that is not retried, or grey for skipped),
-oldest first, ending with the current run. Failed attempts add one row per failed
-job, including failures outside Move: its square on each night of the bar,
-tonight's linked to the job log, then the failed steps. Skipped suites follow on
+oldest first, ending with the current run. Each square is followed by the night's
+day of month, linked to its run; Slack does not make emoji-only link text
+clickable. Failed attempts add one row per failed
+job, including failures outside Move: its square on each night of the bar, then
+the job name linked to tonight's log and the failed steps. Skipped suites follow on
 one line. A cancelled run lists only jobs that failed before the cancellation.
 Jobs that passed only on the retry get the same row under "Passed on retry",
-tonight's yellow square linked to the failed first attempt. Add a notification
+tonight's square yellow and the name linked to the failed first attempt. Add a notification
 step for any further channel. Missing dispatches or runs cancelled before
 notification need external scheduler monitoring.
 
@@ -233,8 +273,9 @@ for GitHub's `queue: max` setting.
 
 ## Appendix: selection accuracy
 
-Four source-change probes use the configuration above, excluding manual suites
-from selection. An isolated worktree changed one tracked file at a time,
+These historical source-change probes predate registration of the Lean runner;
+their zero-E2E results are not current expectations for compiler or MonoVM
+changes. They exclude manual suites from selection. An isolated worktree changed one tracked file at a time,
 with all-features base metadata cached and `--base HEAD` excluding implementation
 changes. An empty-diff control selected zero Rust packages.
 

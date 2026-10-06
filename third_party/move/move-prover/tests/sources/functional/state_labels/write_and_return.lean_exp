@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/write_and_return.move:88:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/functional/state_labels/write_and_return.move:86:5: error: leaner verification failed: the automatic verification of `test_write_return_wrong` failed; provide a proof: `verify test_write_return_wrong by …` in `tests/sources/functional/state_labels/write_and_return.proof.lean` (`verify test_write_return_wrong by skip` shows the obligations it leaves)
+tests/sources/functional/state_labels/write_and_return.move:126:9: error: the specification clause `ensures result == old(global<Counter>(addr).value)` is not established
+tests/sources/functional/state_labels/write_and_return.move:123:5: error: leaner verification failed: the automatic verification of `test_incr_return_wrong` failed; provide a proof: `verify test_incr_return_wrong by …` in `tests/sources/functional/state_labels/write_and_return.proof.lean` (`verify test_incr_return_wrong by skip` shows the obligations it leaves)

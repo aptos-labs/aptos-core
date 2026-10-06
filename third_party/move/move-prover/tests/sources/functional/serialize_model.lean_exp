@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/serialize_model.move:18:9: error: the specification clause `ensures result == spec.result[1] ==> v1 == v2` is not established
+tests/sources/functional/serialize_model.move:16:5: error: leaner verification failed: the automatic verification of `bcs_test1` failed; provide a proof: `verify bcs_test1 by …` in `tests/sources/functional/serialize_model.proof.lean` (`verify bcs_test1 by skip` shows the obligations it leaves)
+tests/sources/functional/serialize_model.move:35:9: error: the specification clause `ensures result.length > 0` is not established
+tests/sources/functional/serialize_model.move:34:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/serialize_model.move:32:5: error: leaner verification failed: the automatic verification of `bcs_test1_incorrect` failed; provide a proof: `verify bcs_test1_incorrect by …` in `tests/sources/functional/serialize_model.proof.lean` (`verify bcs_test1_incorrect by skip` shows the obligations it leaves)

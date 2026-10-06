@@ -1,0 +1,7 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_without_opaque.move:12:9: error: the specification clause `ensures result == x` is not established
+tests/sources/functional/intrinsic_without_opaque.move:10:5: error: leaner verification failed: the automatic verification of `bounded` failed; provide a proof: `verify bounded by …` in `tests/sources/functional/intrinsic_without_opaque.proof.lean` (`verify bounded by skip` shows the obligations it leaves)
+tests/sources/functional/intrinsic_without_opaque.move:20:9: error: the specification clause `ensures result == x` is not established
+tests/sources/functional/intrinsic_without_opaque.move:19:5: error: leaner verification failed: the automatic verification of `caller` failed; provide a proof: `verify caller by …` in `tests/sources/functional/intrinsic_without_opaque.proof.lean` (`verify caller by skip` shows the obligations it leaves)
+tests/sources/functional/intrinsic_without_opaque.move:28:9: error: the specification clause `ensures result == x` is not established
+tests/sources/functional/intrinsic_without_opaque.move:27:5: error: leaner verification failed: the automatic verification of `caller_expecting_the_body` failed; provide a proof: `verify caller_expecting_the_body by …` in `tests/sources/functional/intrinsic_without_opaque.proof.lean` (`verify caller_expecting_the_body by skip` shows the obligations it leaves)

@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_set` belongs to a map whose representation is not carried
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_set` belongs to a map whose representation is not carried
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_del` belongs to a map whose representation is not carried
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_del` belongs to a map whose representation is not carried
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_set` belongs to a map whose representation is not carried

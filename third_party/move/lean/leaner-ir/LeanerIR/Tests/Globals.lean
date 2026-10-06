@@ -136,9 +136,9 @@ private def fixture : RawUnit where
             mutable := false, loc := ⟨29⟩ }]
       }] }]
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 private def preparationHasDiagnosticAt (raw : RawUnit) (code : String) (loc : LocId) : Bool :=
   match validate #[schema] raw with
@@ -223,7 +223,7 @@ private def handle (id : Nat) : FunctionHandle := {
 
 #guard match executable? with
   | none => false
-  | some executable => match LeanerIR.Interpreter.run executable 48 (handle 0) #[] with
+  | some ⟨_, executable⟩ => match LeanerIR.Interpreter.run executable 48 (handle 0) #[] with
     | .ok (state, outcome) =>
         outcome.value == .returned #[.nominal
           { namespaceId := ⟨0⟩, structId := 0 } none #[.integer 9]] &&
@@ -232,7 +232,7 @@ private def handle (id : Nat) : FunctionHandle := {
 
 #guard match executable? with
   | none => false
-  | some executable => match LeanerIR.Interpreter.run executable 32 (handle 1) #[] with
+  | some ⟨_, executable⟩ => match LeanerIR.Interpreter.run executable 32 (handle 1) #[] with
     | .ok (state, outcome) =>
         outcome.value == .threw .abort #[] && state.globals.entries.isEmpty
     | .error _ => false
@@ -241,14 +241,14 @@ private def handle (id : Nat) : FunctionHandle := {
 -- field settles into its holder before the holder writes back.
 #guard match executable? with
   | none => false
-  | some executable => match LeanerIR.Interpreter.run executable 48 (handle 2) #[] with
+  | some ⟨_, executable⟩ => match LeanerIR.Interpreter.run executable 48 (handle 2) #[] with
     | .ok (state, outcome) =>
         outcome.value == .returned #[.nominal
           { namespaceId := ⟨0⟩, structId := 0 } none #[.integer 9]] &&
           state.globals.entries.isEmpty && state.pending.isEmpty
     | .error _ => false
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
 private theorem successfulRunHasDerivation (function : FunctionHandle) (fuel : Nat)
     (success : (LeanerIR.Interpreter.run prepared fuel function #[]).isOk) :

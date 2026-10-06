@@ -1,6 +1,6 @@
 {
   "schema": "move-xast-module",
-  "version": 4,
+  "version": 9,
   "address": "0x42",
   "address_alias": null,
   "name": "account",
@@ -64,7 +64,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       }
     },
     {
@@ -91,7 +93,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       }
     }
   ],
@@ -122,7 +126,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 5,
@@ -217,7 +223,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -432,7 +440,9 @@
             "update_target": null
           }
         ],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 0,
@@ -836,7 +846,9 @@
           "reads": [],
           "modifies_all": false,
           "reads_all": false
-        }
+        },
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 5,
@@ -999,7 +1011,9 @@
         "loc": null,
         "pragmas": [],
         "conditions": [],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 8,
@@ -1325,7 +1339,9 @@
             "update_target": null
           }
         ],
-        "frame": null
+        "frame": null,
+        "access_of": [],
+        "proof": null
       },
       "body": {
         "ty": 5,
@@ -1556,6 +1572,8 @@
   "spec_funs": [],
   "spec_vars": [],
   "invariants": [],
+  "lemmas": [],
+  "labels": [],
   "skipped": [],
   "comments": [],
   "sources": [

@@ -60,10 +60,10 @@ deriving instance ToJson, FromJson for
   DataOperation, MemoryRange, TraceKind, BehaviorKind, SpecOperation, Operation, Place,
   QuantifierKind, MatchArm, QuantifierBinder, ConditionKind, Condition, Frame,
   SpecBlock, ExprKind, Expr, PatternKind, Pattern, BinderKind, GenericBinder,
-  Parameter, LocalDecl, Signature, FunctionContract, ConstantDecl, FieldDecl,
+  Parameter, LocalDecl, Signature, ParameterFrame, FunctionContract, ConstantDecl, FieldDecl,
   VariantDecl, StructDecl, FunctionDecl, AssociatedItemKind, AssociatedItemDecl,
   TraitDecl, AssociatedItemValue, AssociatedItemBinding, ImplDecl,
-  SpecFunctionDecl, SpecVarDecl, NamespaceInvariant, IntrinsicBinding,
+  SpecFunctionDecl, LemmaDecl, SpecVarDecl, NamespaceInvariant, IntrinsicBinding,
   IntrinsicDecl, Namespace
 
 namespace Import
@@ -74,7 +74,7 @@ deriving instance ToJson, FromJson for
   RawNamespaceInterface, ImportEvidence, RawUnit
 
 /-- The only schema version this decoder constructs. -/
-def jsonVersion : Version := { major := 1, minor := 1 }
+def jsonVersion : Version := {}
 
 /-- Encode a raw unit using the canonical compact JSON representation. Object
 keys are emitted deterministically and source arrays retain their input order. -/
@@ -187,7 +187,8 @@ private def decodeVersion (json : Json) : Except String Version := do
   let minor ← versionJson.getObjValAs? Nat "minor"
   let version := { major, minor }
   unless version == jsonVersion do
-    throw s!"unsupported raw LIR JSON version {major}.{minor}; expected 1.1"
+    throw s!"unsupported raw LIR JSON version {major}.{minor}; expected \
+      {jsonVersion.major}.{jsonVersion.minor}"
   pure version
 
 /-- Reject object fields which the typed RawUnit encoder does not know. The

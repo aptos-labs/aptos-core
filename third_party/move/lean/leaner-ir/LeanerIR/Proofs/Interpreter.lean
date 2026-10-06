@@ -28,22 +28,32 @@ private def statementsResult : Internal.StatementsEvaluation → BigStep.Stateme
   | .control state frame control => .control state frame control.value
 
 private structure SoundAt (fuel : Nat) : Prop where
-  function : ∀ executable handle typeInstantiation state arguments result,
+  function : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      handle typeInstantiation state arguments result,
     Internal.evalFunction fuel executable handle typeInstantiation state arguments = .ok result →
       BigStep.EvalFunction executable handle typeInstantiation state arguments
         result.state result.outcome.value
-  expression : ∀ executable namespaceId frame state exprId result,
+  expression : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state exprId result,
     Internal.evalExpr fuel executable namespaceId frame state exprId = .ok result →
       BigStep.EvalExpr executable namespaceId frame state exprId
         result.frame result.state result.control.value
-  values : ∀ executable namespaceId frame state expressions result,
+  node : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state exprId result,
+    Internal.evalNode fuel executable namespaceId frame state exprId = .ok result →
+      BigStep.EvalNode executable namespaceId frame state exprId
+        result.frame result.state result.control.value
+  values : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state expressions result,
     Internal.evalValues fuel executable namespaceId frame state expressions = .ok result →
       BigStep.EvalValues executable namespaceId frame state expressions (valuesResult result)
-  statements : ∀ executable namespaceId frame state statements result,
+  statements : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId frame state statements result,
     Internal.evalStatements fuel executable namespaceId frame state statements = .ok result →
       BigStep.EvalStatements executable namespaceId frame state statements
         (statementsResult result)
-  arms : ∀ executable namespaceId ns ownerLoc frame state value arms result,
+  arms : ∀ {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+      namespaceId ns ownerLoc frame state value arms result,
     Internal.evalArms fuel executable namespaceId ns ownerLoc frame state value arms = .ok result →
       BigStep.EvalArms executable namespaceId ns frame state value arms
         result.frame result.state result.control.value
@@ -52,8 +62,9 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
   | 0 => {
       function := by simp [Internal.evalFunction, failAt]
       expression := by simp [Internal.evalExpr, failAt]
+      node := by simp [Internal.evalNode, failAt]
       values := by
-        intro executable namespaceId frame state expressions result h
+        intro unit executable namespaceId frame state expressions result h
         cases expressions with
         | nil =>
             change Except.ok (.values state frame []) = .ok result at h
@@ -61,7 +72,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
             exact .nil _ _ _
         | cons expression expressions => simp [Internal.evalValues, failAt] at h
       statements := by
-        intro executable namespaceId frame state statements result h
+        intro unit executable namespaceId frame state statements result h
         cases statements with
         | nil =>
             change Except.ok (.done state frame) = .ok result at h
@@ -69,15 +80,24 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
             exact .nil _ _ _
         | cons statement statements => simp [Internal.evalStatements, failAt] at h
       arms := by
-        intro executable namespaceId ns ownerLoc frame state value arms result h
-        cases arms <;> simp [Internal.evalArms, failAt] at h }
+        intro unit executable namespaceId ns ownerLoc frame state value arms result h
+        cases arms with
+        | nil =>
+            cases mismatch_eq : patternMismatchThrow? ns.profile with
+            | none => simp [Internal.evalArms, failAt, mismatch_eq] at h
+            | some mismatch =>
+                obtain ⟨kind, arguments⟩ := mismatch
+                simp [Internal.evalArms, mismatch_eq] at h
+                cases h
+                exact BigStep.EvalArms.exhausted _ _ _ _ _ _ _ mismatch_eq
+        | cons arm arms => simp [Internal.evalArms, failAt] at h }
   | fuel + 1 =>
       let previous := soundAt fuel
       {
         function := by
-          intro executable handle typeInstantiation state arguments result h
+          intro unit executable handle typeInstantiation state arguments result h
           simp only [Internal.evalFunction] at h
-          cases namespace_eq : executable.unit.namespaces[handle.namespaceId.index]? with
+          cases namespace_eq : unit.namespaces[handle.namespaceId.index]? with
           | none => simp [namespace_eq, failAt] at h
           | some ns =>
               cases declaration_eq : ns.functions[handle.functionId.index]? with
@@ -94,11 +114,17 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               failAt] at h
                         | some native =>
                             obtain ⟨finalState, outcome⟩ := native
-                            simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq] at h
-                            cases h
-                            exact BigStep.EvalFunction.native handle typeInstantiation state arguments
-                              ns declaration finalState outcome namespace_eq declaration_eq
-                              (by simpa using arity_ne) body_eq native_eq
+                            cases hole_eq : outcome.holeFree with
+                            | false =>
+                                simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq,
+                                  hole_eq, failAt] at h
+                            | true =>
+                                simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq,
+                                  hole_eq] at h
+                                cases h
+                                exact BigStep.EvalFunction.native handle typeInstantiation state
+                                  arguments ns declaration finalState outcome namespace_eq
+                                  declaration_eq (by simpa using arity_ne) body_eq native_eq hole_eq
                     | structured root =>
                         cases frame_eq : initialFrame? declaration arguments typeInstantiation with
                         | none =>
@@ -121,8 +147,15 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                         simp [namespace_eq, declaration_eq, arity_ne, frame_eq,
                                           body_eq, evaluation_eq, control_eq, unpack_eq, failAt] at h
                                     | some values =>
+                                      cases hole_eq : (Outcome.returned values).holeFree with
+                                      | false =>
                                         simp [namespace_eq, declaration_eq, arity_ne, frame_eq,
-                                          body_eq, evaluation_eq, control_eq, unpack_eq] at h
+                                          body_eq, evaluation_eq, control_eq, unpack_eq, hole_eq,
+                                          failAt] at h
+                                      | true =>
+                                        simp [namespace_eq, declaration_eq, arity_ne, frame_eq,
+                                          body_eq, evaluation_eq, control_eq, unpack_eq,
+                                          hole_eq] at h
                                         cases h
                                         exact BigStep.EvalFunction.body
                                           (evaluatedState := evaluation.state)
@@ -132,6 +165,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           (body_step := by simpa [control_eq] using body_sound)
                                           (outcome_eq := by
                                             simp [finishControl?, unpack_eq])
+                                          (hole_free := hole_eq)
                                           (finalize_eq := rfl)
                                 | return_ values =>
                                     by_cases result_arity_ne :
@@ -143,16 +177,21 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                       have result_arity_eq :
                                           values.size = declaration.signature.results.size := by
                                         simpa using result_arity_ne
-                                      cases h
-                                      exact BigStep.EvalFunction.body
-                                        (evaluatedState := evaluation.state)
-                                        (namespace_eq := namespace_eq)
-                                        (declaration_eq := declaration_eq)
-                                        (frame_eq := frame_eq) (body_eq := body_eq)
-                                        (body_step := by simpa [control_eq] using body_sound)
-                                        (outcome_eq := by
-                                          simp [finishControl?, result_arity_eq])
-                                        (finalize_eq := rfl)
+                                      cases hole_eq : (Outcome.returned values).holeFree with
+                                      | false => simp [hole_eq, failAt] at h
+                                      | true =>
+                                        simp [hole_eq] at h
+                                        cases h
+                                        exact BigStep.EvalFunction.body
+                                          (evaluatedState := evaluation.state)
+                                          (namespace_eq := namespace_eq)
+                                          (declaration_eq := declaration_eq)
+                                          (frame_eq := frame_eq) (body_eq := body_eq)
+                                          (body_step := by simpa [control_eq] using body_sound)
+                                          (outcome_eq := by
+                                            simp [finishControl?, result_arity_eq])
+                                          (hole_free := hole_eq)
+                                          (finalize_eq := rfl)
                                 | throw_ kind thrown =>
                                     simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
                                       evaluation_eq, control_eq] at h
@@ -164,6 +203,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                       (frame_eq := frame_eq) (body_eq := body_eq)
                                       (body_step := by simpa [control_eq] using body_sound)
                                       (outcome_eq := by simp [finishControl?])
+                                      (hole_free := rfl)
                                       (finalize_eq := rfl)
                                 | break_ nest value =>
                                     simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
@@ -172,9 +212,23 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
                                       evaluation_eq, control_eq, failAt] at h
         expression := by
-          intro executable namespaceId frame state exprId result h
-          simp only [Internal.evalExpr] at h
-          cases namespace_eq : executable.unit.namespaces[namespaceId.index]? with
+          intro unit executable namespaceId frame state exprId result h
+          simp only [Internal.evalExpr, bind, Except.bind] at h
+          split at h
+          · cases h
+          · rename_i evaluation node_eq
+            cases h
+            exact BigStep.EvalExpr.node
+              (startFrame := (settleLoans (loanDeathsAt unit namespaceId exprId).before
+                frame state).1)
+              (startState := (settleLoans (loanDeathsAt unit namespaceId exprId).before
+                frame state).2)
+              (before_eq := rfl) (node_step := previous.node _ _ _ _ _ evaluation node_eq)
+              (after_eq := rfl)
+        node := by
+          intro unit executable namespaceId frame state exprId result h
+          simp only [Internal.evalNode] at h
+          cases namespace_eq : unit.namespaces[namespaceId.index]? with
           | none => simp [namespace_eq, failAt] at h
           | some ns =>
               cases expression_eq : ns.expressions[exprId.index]? with
@@ -188,17 +242,17 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                       | some runtimeValue =>
                           simp [namespace_eq, expression_eq, kind_eq, value_eq] at h
                           cases h
-                          exact BigStep.EvalExpr.value
+                          exact BigStep.EvalNode.value
                             (frame := frame) (state := state)
                             (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                             (kind_eq := kind_eq) (value_eq := value_eq)
                   | constant reference =>
-                      cases resolve_eq : resolveConstant? executable.unit namespaceId reference with
+                      cases resolve_eq : resolveConstant? unit namespaceId reference with
                       | none =>
                           simp [namespace_eq, expression_eq, kind_eq, resolve_eq, failAt] at h
                       | some handle =>
                           cases target_namespace_eq :
-                              executable.unit.namespaces[handle.namespaceId.index]? with
+                              unit.namespaces[handle.namespaceId.index]? with
                           | none =>
                               simp [namespace_eq, expression_eq, kind_eq, resolve_eq,
                                 target_namespace_eq, failAt] at h
@@ -223,7 +277,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                             target_namespace_eq, declaration_eq, initializer_eq,
                                             control_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.constantValue
+                                          exact BigStep.EvalNode.constantValue
                                             (frame := frame)
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -237,7 +291,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                             target_namespace_eq, declaration_eq, initializer_eq,
                                             control_eq, Located.pushCaller] at h
                                           cases h
-                                          exact BigStep.EvalExpr.constantControl
+                                          exact BigStep.EvalNode.constantControl
                                             (frame := frame)
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -251,7 +305,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                             target_namespace_eq, declaration_eq, initializer_eq,
                                             control_eq, Located.pushCaller] at h
                                           cases h
-                                          exact BigStep.EvalExpr.constantControl
+                                          exact BigStep.EvalNode.constantControl
                                             (frame := frame)
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -265,7 +319,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                             target_namespace_eq, declaration_eq, initializer_eq,
                                             control_eq, Located.pushCaller] at h
                                           cases h
-                                          exact BigStep.EvalExpr.constantControl
+                                          exact BigStep.EvalNode.constantControl
                                             (frame := frame)
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -279,7 +333,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                             target_namespace_eq, declaration_eq, initializer_eq,
                                             control_eq, Located.pushCaller] at h
                                           cases h
-                                          exact BigStep.EvalExpr.constantControl
+                                          exact BigStep.EvalNode.constantControl
                                             (frame := frame)
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -295,7 +349,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                       | some runtimeValue =>
                           simp [namespace_eq, expression_eq, kind_eq, local_eq] at h
                           cases h
-                          exact BigStep.EvalExpr.localVar
+                          exact BigStep.EvalNode.localVar
                             (frame := frame) (state := state)
                             (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                             (kind_eq := kind_eq) (local_eq := local_eq)
@@ -315,19 +369,19 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   | control operandState operandFrame control =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.callArgumentsControl
+                                      exact BigStep.EvalNode.callArgumentsControl
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound)
                                   | values operandState operandFrame values =>
-                                      cases resolve_eq : resolveFunction? executable.unit namespaceId
+                                      cases resolve_eq : resolveFunction? unit namespaceId
                                           reference with
                                       | none =>
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             resolve_eq, failAt] at h
                                       | some handle =>
                                           let calleeInstantiation := callTypeInstantiation
-                                            executable.unit handle operandFrame.typeInstantiation
+                                            unit handle operandFrame.typeInstantiation
                                               instantiations
                                           cases callee_eq : Internal.evalFunction fuel executable handle
                                               calleeInstantiation operandState values.toArray with
@@ -345,7 +399,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                               cases outcome_eq : calleeResult.outcome.value with
                                               | returned results =>
                                                   simpa [Internal.callResult, outcome_eq] using
-                                                    (BigStep.EvalExpr.callReturned
+                                                    (BigStep.EvalNode.callReturned
                                                       (namespace_eq := namespace_eq)
                                                       (expression_eq := expression_eq)
                                                       (kind_eq := kind_eq) (operands := operands_sound)
@@ -354,7 +408,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                                         simpa [outcome_eq] using callee_sound))
                                               | threw kind thrown =>
                                                   simpa [Internal.callResult, outcome_eq] using
-                                                    (BigStep.EvalExpr.callThrew
+                                                    (BigStep.EvalNode.callThrew
                                                       (namespace_eq := namespace_eq)
                                                       (expression_eq := expression_eq)
                                                       (kind_eq := kind_eq) (operands := operands_sound)
@@ -373,12 +427,12 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   | control operandState operandFrame control =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.constructorArgumentsControl
+                                      exact BigStep.EvalNode.constructorArgumentsControl
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound)
                                   | values operandState operandFrame values =>
-                                      cases construct_eq : constructNominal? executable.unit namespaceId
+                                      cases construct_eq : constructNominal? unit namespaceId
                                           reference variant values.toArray with
                                       | none =>
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
@@ -387,7 +441,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             construct_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.constructorValue
+                                          exact BigStep.EvalNode.constructorValue
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (construct_eq := construct_eq)
@@ -403,7 +457,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   | control operandState operandFrame control =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.destructorArgumentsControl
+                                      exact BigStep.EvalNode.destructorArgumentsControl
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound)
@@ -415,7 +469,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                       | cons value tail =>
                                           cases tail with
                                           | nil =>
-                                              cases destruct_eq : destructNominal? executable.unit
+                                              cases destruct_eq : destructNominal? unit
                                                   namespaceId reference variant value with
                                               | none =>
                                                   simp [namespace_eq, expression_eq, kind_eq,
@@ -424,7 +478,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                                   simp [namespace_eq, expression_eq, kind_eq,
                                                     operands_eq, destruct_eq] at h
                                                   cases h
-                                                  exact BigStep.EvalExpr.destructorValue
+                                                  exact BigStep.EvalNode.destructorValue
                                                     (namespace_eq := namespace_eq)
                                                     (expression_eq := expression_eq)
                                                     (kind_eq := kind_eq)
@@ -433,7 +487,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           | cons next rest =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
-                          | closure reference =>
+                          | closure reference mask =>
                               cases operands_eq : Internal.evalValues fuel executable namespaceId
                                   frame state arguments.toList with
                               | error error =>
@@ -445,12 +499,12 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   | control operandState operandFrame control =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.closureArgumentsControl
+                                      exact BigStep.EvalNode.closureArgumentsControl
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound)
                                   | values operandState operandFrame values =>
-                                      cases resolve_eq : resolveFunction? executable.unit namespaceId
+                                      cases resolve_eq : resolveFunction? unit namespaceId
                                           reference with
                                       | none =>
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
@@ -459,7 +513,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             resolve_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.closureValue
+                                          exact BigStep.EvalNode.closureValue
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (resolve_eq := resolve_eq)
@@ -475,7 +529,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   | control operandState operandFrame control =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.invokeArgumentsControl
+                                      exact BigStep.EvalNode.invokeArgumentsControl
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound)
@@ -486,38 +540,45 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                             failAt] at h
                                       | cons callable arguments =>
                                           cases callable with
-                                          | closure handle captures =>
+                                          | closure handle mask typeInstantiation captures =>
+                                              cases compose_eq : ClosureMask.compose mask
+                                                  captures.toList arguments with
+                                              | none =>
+                                                  simp [namespace_eq, expression_eq, kind_eq,
+                                                    operands_eq, compose_eq, failAt] at h
+                                              | some composed =>
                                               cases callee_eq : Internal.evalFunction fuel executable
-                                                  handle operandFrame.typeInstantiation operandState
-                                                    (captures ++ arguments.toArray) with
+                                                  handle typeInstantiation operandState
+                                                    composed.toArray with
                                               | error error =>
                                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                                    callee_eq, Located.pushCaller] at h
+                                                    compose_eq, callee_eq, Located.pushCaller] at h
                                               | ok calleeResult =>
                                                   have callee_sound := previous.function executable handle
-                                                    operandFrame.typeInstantiation operandState
-                                                      (captures ++ arguments.toArray)
+                                                    typeInstantiation operandState composed.toArray
                                                       calleeResult callee_eq
                                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                                    callee_eq] at h
+                                                    compose_eq, callee_eq] at h
                                                   cases h
                                                   cases outcome_eq : calleeResult.outcome.value with
                                                   | returned results =>
                                                       simpa [Internal.callResult, outcome_eq] using
-                                                        (BigStep.EvalExpr.invokeReturned
+                                                        (BigStep.EvalNode.invokeReturned
                                                           (namespace_eq := namespace_eq)
                                                           (expression_eq := expression_eq)
                                                           (kind_eq := kind_eq)
                                                           (operands := operands_sound)
+                                                          (compose_eq := compose_eq)
                                                           (calleeStep := by
                                                             simpa [outcome_eq] using callee_sound))
                                                   | threw kind thrown =>
                                                       simpa [Internal.callResult, outcome_eq] using
-                                                        (BigStep.EvalExpr.invokeThrew
+                                                        (BigStep.EvalNode.invokeThrew
                                                           (namespace_eq := namespace_eq)
                                                           (expression_eq := expression_eq)
                                                           (kind_eq := kind_eq)
                                                           (operands := operands_sound)
+                                                          (compose_eq := compose_eq)
                                                           (calleeStep := by
                                                             simpa [outcome_eq] using callee_sound))
                                           | unit =>
@@ -571,23 +632,34 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   | control operandState operandFrame control =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationArgumentsControl
+                                      exact BigStep.EvalNode.operationArgumentsControl
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound)
                                   | values operandState operandFrame values =>
-                                      cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                      cases evaluate_eq : evaluatePlaceOperation? unit ns
                                           expression.typeId exprId (.call (.extension value targets))
                                           values.toArray operandFrame operandState with
                                       | none =>
-                                          simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                            evaluate_eq, failAt] at h
+                                          cases mismatch : variantMismatch? unit ns (.call (.extension value targets)) values.toArray
+                                              operandFrame operandState with
+                                          | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                          | true =>
+                                              cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                              | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                              | some thrown =>
+                                                  obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                                  simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                                  cases h
+                                                  exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                    (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                    (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                       | some evaluated =>
                                           rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.operationValue
+                                          exact BigStep.EvalNode.operationValue
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -603,7 +675,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.profileArgumentsControl
+                                  exact BigStep.EvalNode.profileArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
@@ -619,7 +691,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.profileValue
+                                          exact BigStep.EvalNode.profileValue
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -628,7 +700,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.profileThrow
+                                          exact BigStep.EvalNode.profileThrow
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -644,7 +716,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.primitiveArgumentsControl
+                                  exact BigStep.EvalNode.primitiveArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
@@ -661,7 +733,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.primitiveValue
+                                          exact BigStep.EvalNode.primitiveValue
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -670,7 +742,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.primitiveThrow
+                                          exact BigStep.EvalNode.primitiveThrow
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -686,23 +758,34 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.reference referenceOperation)
                                       values.toArray operandFrame operandState with
                                   | none =>
-                                      simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                        evaluate_eq, failAt] at h
+                                      cases mismatch : variantMismatch? unit ns (.reference referenceOperation) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -718,21 +801,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluateDataOperation? executable.unit
+                                  cases evaluate_eq : evaluateDataOperation? unit
                                       ns.identity dataOperation values.toArray with
                                   | none =>
-                                      simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                        evaluate_eq, failAt] at h
+                                      cases mismatch : variantMismatch? unit ns (.data dataOperation) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := by simp [evaluatePlaceOperation?, evaluate_eq])
+                                                (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some runtimeValue =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound) (evaluate_eq := by
@@ -749,23 +844,34 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.specification specificationOperation)
                                       values.toArray operandFrame operandState with
                                   | none =>
-                                      simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                        evaluate_eq, failAt] at h
+                                      cases mismatch : variantMismatch? unit ns (.specification specificationOperation) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -781,12 +887,12 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.globalArgumentsControl
+                                  exact BigStep.EvalNode.globalArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluateGlobalOperation? executable.unit ns expression.typeId exprId
+                                  cases evaluate_eq : evaluateGlobalOperation? unit ns expression.typeId exprId
                                       globalKind instantiations values.toArray operandFrame operandState with
                                   | none =>
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
@@ -797,7 +903,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.globalValue
+                                          exact BigStep.EvalNode.globalValue
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -805,7 +911,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                             evaluate_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.globalThrow
+                                          exact BigStep.EvalNode.globalThrow
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (operands := operands_sound) (evaluate_eq := evaluate_eq)
@@ -821,7 +927,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.assertArgumentsControl
+                                  exact BigStep.EvalNode.assertArgumentsControl
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (operands := operands_sound)
@@ -843,7 +949,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                                   simp [namespace_eq, expression_eq, kind_eq,
                                                     operands_eq] at h
                                                   cases h
-                                                  exact BigStep.EvalExpr.assertFalse
+                                                  exact BigStep.EvalNode.assertFalse
                                                     (namespace_eq := namespace_eq)
                                                     (expression_eq := expression_eq)
                                                     (kind_eq := kind_eq)
@@ -852,7 +958,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                                   simp [namespace_eq, expression_eq, kind_eq,
                                                     operands_eq] at h
                                                   cases h
-                                                  exact BigStep.EvalExpr.assertTrue
+                                                  exact BigStep.EvalNode.assertTrue
                                                     (namespace_eq := namespace_eq)
                                                     (expression_eq := expression_eq)
                                                     (kind_eq := kind_eq)
@@ -887,7 +993,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           | nominal _ _ _ =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
-                                          | closure _ _ =>
+                                          | closure _ _ _ _ =>
                                               simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                                 failAt] at h
                                           | borrow _ _ =>
@@ -907,21 +1013,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.move place) values.toArray operandFrame
                                       operandState with
-                                  | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                      evaluate_eq, failAt] at h
+                                  | none =>
+                                      cases mismatch : variantMismatch? unit ns (.move place) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                         (kind_eq := kind_eq) (operands := operands_sound)
                                         (evaluate_eq := evaluate_eq)
@@ -936,21 +1054,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.copy place) values.toArray operandFrame
                                       operandState with
-                                  | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                      evaluate_eq, failAt] at h
+                                  | none =>
+                                      cases mismatch : variantMismatch? unit ns (.copy place) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                         (kind_eq := kind_eq) (operands := operands_sound)
                                         (evaluate_eq := evaluate_eq)
@@ -965,21 +1095,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.borrow borrowKind place) values.toArray
                                       operandFrame operandState with
-                                  | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                      evaluate_eq, failAt] at h
+                                  | none =>
+                                      cases mismatch : variantMismatch? unit ns (.borrow borrowKind place) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                         (kind_eq := kind_eq) (operands := operands_sound)
                                         (evaluate_eq := evaluate_eq)
@@ -994,21 +1136,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.read place) values.toArray operandFrame
                                       operandState with
-                                  | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                      evaluate_eq, failAt] at h
+                                  | none =>
+                                      cases mismatch : variantMismatch? unit ns (.read place) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                         (kind_eq := kind_eq) (operands := operands_sound)
                                         (evaluate_eq := evaluate_eq)
@@ -1023,21 +1177,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.write place) values.toArray operandFrame
                                       operandState with
-                                  | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                      evaluate_eq, failAt] at h
+                                  | none =>
+                                      cases mismatch : variantMismatch? unit ns (.write place) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                         (kind_eq := kind_eq) (operands := operands_sound)
                                         (evaluate_eq := evaluate_eq)
@@ -1052,21 +1218,33 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | control operandState operandFrame control =>
                                   simp [namespace_eq, expression_eq, kind_eq, operands_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.operationArgumentsControl
+                                  exact BigStep.EvalNode.operationArgumentsControl
                                     (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                     (kind_eq := kind_eq) (operands := operands_sound)
                               | values operandState operandFrame values =>
-                                  cases evaluate_eq : evaluatePlaceOperation? executable.unit ns
+                                  cases evaluate_eq : evaluatePlaceOperation? unit ns
                                       expression.typeId exprId (.drop place) values.toArray operandFrame
                                       operandState with
-                                  | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq,
-                                      evaluate_eq, failAt] at h
+                                  | none =>
+                                      cases mismatch : variantMismatch? unit ns (.drop place) values.toArray
+                                          operandFrame operandState with
+                                      | false => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, failAt] at h
+                                      | true =>
+                                          cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                          | none => simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq, failAt] at h
+                                          | some thrown =>
+                                              obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                              simp [namespace_eq, expression_eq, kind_eq, operands_eq, evaluate_eq, mismatch, mismatch_eq] at h
+                                              cases h
+                                              exact BigStep.EvalNode.operationMismatch (namespace_eq := namespace_eq)
+                                                (expression_eq := expression_eq) (kind_eq := kind_eq) (operands := operands_sound)
+                                                (evaluate_eq := evaluate_eq) (mismatch := mismatch) (mismatch_eq := mismatch_eq)
                                   | some evaluated =>
                                       rcases evaluated with ⟨finalFrame, finalState, runtimeValue⟩
                                       simp [namespace_eq, expression_eq, kind_eq, operands_eq,
                                         evaluate_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.operationValue
+                                      exact BigStep.EvalNode.operationValue
                                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                         (kind_eq := kind_eq) (operands := operands_sound)
                                         (evaluate_eq := evaluate_eq)
@@ -1082,7 +1260,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                           | control finalState finalFrame control =>
                               simp [namespace_eq, expression_eq, kind_eq, statements_eq] at h
                               cases h
-                              exact BigStep.EvalExpr.blockControl
+                              exact BigStep.EvalNode.blockControl
                                 (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                 (kind_eq := kind_eq) (steps := statements_sound)
                           | done statementState statementFrame =>
@@ -1090,7 +1268,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | none =>
                                   simp [namespace_eq, expression_eq, kind_eq, statements_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.blockUnit
+                                  exact BigStep.EvalNode.blockUnit
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (steps := statements_sound)
@@ -1106,7 +1284,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                       cases control_eq : childResult.control.value <;>
                                         simp [namespace_eq, expression_eq, kind_eq, statements_eq,
                                           child_eq, control_eq] at h <;> cases h <;>
-                                        exact BigStep.EvalExpr.blockResult
+                                        exact BigStep.EvalNode.blockResult
                                           (namespace_eq := namespace_eq)
                                           (expression_eq := expression_eq) (kind_eq := kind_eq)
                                           (steps := statements_sound)
@@ -1122,7 +1300,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                 body bodyResult body_eq
                               cases control_eq : bodyResult.control.value <;>
                                 simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq] at h <;>
-                                cases h <;> exact BigStep.EvalExpr.letNoValue
+                                cases h <;> exact BigStep.EvalNode.letNoValue
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (body_step := by simpa [control_eq] using body_sound)
@@ -1136,10 +1314,23 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                 frame state initializer initialized initializer_eq
                               cases control_eq : initialized.control.value with
                               | value runtimeValue =>
-                                  cases bind_eq : bindPattern executable.unit ns initialized.frame pattern runtimeValue with
+                                  cases bind_eq : bindPattern unit ns initialized.frame pattern runtimeValue with
                                   | none =>
-                                      simp [namespace_eq, expression_eq, kind_eq, initializer_eq,
-                                        control_eq, bind_eq, failAt] at h
+                                      cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                      | none =>
+                                          simp [namespace_eq, expression_eq, kind_eq, initializer_eq,
+                                            control_eq, bind_eq, mismatch_eq, failAt] at h
+                                      | some mismatch =>
+                                          obtain ⟨kind, arguments⟩ := mismatch
+                                          simp [namespace_eq, expression_eq, kind_eq, initializer_eq,
+                                            control_eq, bind_eq, mismatch_eq] at h
+                                          cases h
+                                          exact BigStep.EvalNode.letMismatch
+                                            (namespace_eq := namespace_eq)
+                                            (expression_eq := expression_eq) (kind_eq := kind_eq)
+                                            (initializer_step := by
+                                              simpa [control_eq] using initializer_sound)
+                                            (bind_eq := bind_eq) (mismatch_eq := mismatch_eq)
                                   | some boundFrame =>
                                       cases body_eq : Internal.evalExpr fuel executable namespaceId
                                           boundFrame initialized.state body with
@@ -1152,7 +1343,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           cases body_control_eq : bodyResult.control.value <;>
                                             simp [namespace_eq, expression_eq, kind_eq, initializer_eq,
                                               control_eq, bind_eq, body_eq, body_control_eq] at h <;>
-                                            cases h <;> exact BigStep.EvalExpr.letValue
+                                            cases h <;> exact BigStep.EvalNode.letValue
                                               (namespace_eq := namespace_eq)
                                               (expression_eq := expression_eq) (kind_eq := kind_eq)
                                               (initializer_step := by
@@ -1165,7 +1356,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.letValueControl
+                                    (BigStep.EvalNode.letValueControl
                                       (control := .break_ nest value)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1177,7 +1368,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.letValueControl
+                                    (BigStep.EvalNode.letValueControl
                                       (control := .continue_ nest)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1189,7 +1380,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.letValueControl
+                                    (BigStep.EvalNode.letValueControl
                                       (control := .return_ values)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1201,7 +1392,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.letValueControl
+                                    (BigStep.EvalNode.letValueControl
                                       (control := .throw_ kind arguments)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1227,7 +1418,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                             control_eq] at h
                                           cases h
-                                          exact BigStep.EvalExpr.ifFalseUnit
+                                          exact BigStep.EvalNode.ifFalseUnit
                                             (namespace_eq := namespace_eq)
                                             (expression_eq := expression_eq) (kind_eq := kind_eq)
                                             (condition_step := by
@@ -1245,7 +1436,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                               cases branch_control_eq : branchResult.control.value <;>
                                                 simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                                   control_eq, branch_eq, branch_control_eq] at h <;>
-                                                cases h <;> exact BigStep.EvalExpr.ifFalse
+                                                cases h <;> exact BigStep.EvalNode.ifFalse
                                                   (namespace_eq := namespace_eq)
                                                   (expression_eq := expression_eq)
                                                   (kind_eq := kind_eq)
@@ -1266,7 +1457,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           cases branch_control_eq : branchResult.control.value <;>
                                             simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                               control_eq, branch_eq, branch_control_eq] at h <;>
-                                            cases h <;> exact BigStep.EvalExpr.ifTrue
+                                            cases h <;> exact BigStep.EvalNode.ifTrue
                                               (namespace_eq := namespace_eq)
                                               (expression_eq := expression_eq) (kind_eq := kind_eq)
                                               (condition_step := by
@@ -1303,7 +1494,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | nominal _ _ _ =>
                                   simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                     control_eq, failAt] at h
-                              | closure _ _ =>
+                              | closure _ _ _ _ =>
                                   simp [namespace_eq, expression_eq, kind_eq, condition_eq,
                                     control_eq, failAt] at h
                               | borrow _ _ =>
@@ -1316,7 +1507,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, condition_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.ifControl (control := .break_ nest value)
+                                (BigStep.EvalNode.ifControl (control := .break_ nest value)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (condition_step := by simpa [control_eq] using condition_sound)
@@ -1325,7 +1516,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, condition_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.ifControl (control := .continue_ nest)
+                                (BigStep.EvalNode.ifControl (control := .continue_ nest)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (condition_step := by simpa [control_eq] using condition_sound)
@@ -1334,7 +1525,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, condition_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.ifControl (control := .return_ values)
+                                (BigStep.EvalNode.ifControl (control := .return_ values)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (condition_step := by simpa [control_eq] using condition_sound)
@@ -1343,7 +1534,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, condition_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.ifControl (control := .throw_ kind arguments)
+                                (BigStep.EvalNode.ifControl (control := .throw_ kind arguments)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (condition_step := by simpa [control_eq] using condition_sound)
@@ -1371,7 +1562,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   cases arm_control_eq : armResult.control.value <;>
                                     simp [namespace_eq, expression_eq, kind_eq, scrutinee_eq,
                                       control_eq, arms_eq, arm_control_eq] at h <;> cases h <;>
-                                    exact BigStep.EvalExpr.matchValue
+                                    exact BigStep.EvalNode.matchValue
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
                                       (scrutinee_step := by
@@ -1381,7 +1572,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, scrutinee_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.matchControl (control := .break_ nest value)
+                                (BigStep.EvalNode.matchControl (control := .break_ nest value)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (scrutinee_step := by simpa [control_eq] using scrutinee_sound)
@@ -1390,7 +1581,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, scrutinee_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.matchControl (control := .continue_ nest)
+                                (BigStep.EvalNode.matchControl (control := .continue_ nest)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (scrutinee_step := by simpa [control_eq] using scrutinee_sound)
@@ -1399,7 +1590,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, scrutinee_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.matchControl (control := .return_ values)
+                                (BigStep.EvalNode.matchControl (control := .return_ values)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (scrutinee_step := by simpa [control_eq] using scrutinee_sound)
@@ -1408,7 +1599,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, scrutinee_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.matchControl (control := .throw_ kind arguments)
+                                (BigStep.EvalNode.matchControl (control := .throw_ kind arguments)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (scrutinee_step := by simpa [control_eq] using scrutinee_sound)
@@ -1422,18 +1613,18 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                             bodyResult body_eq
                           cases control_eq : bodyResult.control.value with
                           | value runtimeValue =>
-                              cases repeat_eq : Internal.evalExpr fuel executable namespaceId
+                              cases repeat_eq : Internal.evalNode fuel executable namespaceId
                                   bodyResult.frame bodyResult.state exprId with
                               | error error =>
                                   simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq,
                                     repeat_eq] at h
                               | ok repeated =>
-                                  have repeat_sound := previous.expression executable namespaceId
+                                  have repeat_sound := previous.node executable namespaceId
                                     bodyResult.frame bodyResult.state exprId repeated repeat_eq
                                   simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq,
                                     repeat_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.loopRepeatValue
+                                  exact BigStep.EvalNode.loopRepeatValue
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (body_step := by simpa [control_eq] using body_sound)
@@ -1441,18 +1632,18 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                           | continue_ nest =>
                               cases nest with
                               | zero =>
-                                  cases repeat_eq : Internal.evalExpr fuel executable namespaceId
+                                  cases repeat_eq : Internal.evalNode fuel executable namespaceId
                                       bodyResult.frame bodyResult.state exprId with
                                   | error error =>
                                       simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq,
                                         repeat_eq] at h
                                   | ok repeated =>
-                                      have repeat_sound := previous.expression executable namespaceId
+                                      have repeat_sound := previous.node executable namespaceId
                                         bodyResult.frame bodyResult.state exprId repeated repeat_eq
                                       simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq,
                                         repeat_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.loopRepeatContinue
+                                      exact BigStep.EvalNode.loopRepeatContinue
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (body_step := by simpa [control_eq] using body_sound)
@@ -1460,7 +1651,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | succ nest =>
                                   simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.loopOuterContinue
+                                  exact BigStep.EvalNode.loopOuterContinue
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (body_step := by simpa [control_eq] using body_sound)
@@ -1469,14 +1660,14 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | zero =>
                                   simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.loopBreak
+                                  exact BigStep.EvalNode.loopBreak
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (body_step := by simpa [control_eq] using body_sound)
                               | succ nest =>
                                   simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.loopOuterBreak
+                                  exact BigStep.EvalNode.loopOuterBreak
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (body_step := by simpa [control_eq] using body_sound)
@@ -1484,7 +1675,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.loopReturn
+                                (BigStep.EvalNode.loopReturn
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (body_step := by simpa [control_eq] using body_sound))
@@ -1492,7 +1683,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, body_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.loopThrow
+                                (BigStep.EvalNode.loopThrow
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (body_step := by simpa [control_eq] using body_sound))
@@ -1501,7 +1692,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                       | none =>
                           simp [namespace_eq, expression_eq, kind_eq] at h
                           cases h
-                          exact BigStep.EvalExpr.breakNone
+                          exact BigStep.EvalNode.breakNone
                             (frame := frame) (state := state)
                             (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                             (kind_eq := kind_eq)
@@ -1516,7 +1707,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               | value runtimeValue =>
                                   simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.breakValue
+                                  exact BigStep.EvalNode.breakValue
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (child_step := by simpa [control_eq] using child_sound)
@@ -1524,7 +1715,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.breakControl
+                                    (BigStep.EvalNode.breakControl
                                       (control := .break_ innerNest value)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1534,7 +1725,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.breakControl
+                                    (BigStep.EvalNode.breakControl
                                       (control := .continue_ innerNest)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1544,7 +1735,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.breakControl (control := .return_ values)
+                                    (BigStep.EvalNode.breakControl (control := .return_ values)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
                                       (child_step := by simpa [control_eq] using child_sound)
@@ -1553,7 +1744,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                                   cases h
                                   simpa [control_eq] using
-                                    (BigStep.EvalExpr.breakControl
+                                    (BigStep.EvalNode.breakControl
                                       (control := .throw_ kind arguments)
                                       (namespace_eq := namespace_eq)
                                       (expression_eq := expression_eq) (kind_eq := kind_eq)
@@ -1562,7 +1753,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                   | continue_ nest =>
                       simp [namespace_eq, expression_eq, kind_eq] at h
                       cases h
-                      exact BigStep.EvalExpr.continue_
+                      exact BigStep.EvalNode.continue_
                         (frame := frame) (state := state)
                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                         (kind_eq := kind_eq)
@@ -1578,13 +1769,13 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                           | values finalState finalFrame runtimeValues =>
                               simp [namespace_eq, expression_eq, kind_eq, values_eq] at h
                               cases h
-                              exact BigStep.EvalExpr.returnValues
+                              exact BigStep.EvalNode.returnValues
                                 (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                 (kind_eq := kind_eq) (values_step := values_sound)
                           | control finalState finalFrame control =>
                               simp [namespace_eq, expression_eq, kind_eq, values_eq] at h
                               cases h
-                              exact BigStep.EvalExpr.returnControl
+                              exact BigStep.EvalNode.returnControl
                                 (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                 (kind_eq := kind_eq) (values_step := values_sound)
                   | throw_ kind arguments =>
@@ -1599,13 +1790,13 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                           | values finalState finalFrame runtimeValues =>
                               simp [namespace_eq, expression_eq, kind_eq, values_eq] at h
                               cases h
-                              exact BigStep.EvalExpr.throwValues
+                              exact BigStep.EvalNode.throwValues
                                 (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                 (kind_eq := kind_eq) (values_step := values_sound)
                           | control finalState finalFrame control =>
                               simp [namespace_eq, expression_eq, kind_eq, values_eq] at h
                               cases h
-                              exact BigStep.EvalExpr.throwControl
+                              exact BigStep.EvalNode.throwControl
                                 (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                 (kind_eq := kind_eq) (values_step := values_sound)
                   | assign place child =>
@@ -1617,11 +1808,31 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                             child childResult child_eq
                           cases control_eq : childResult.control.value with
                           | value runtimeValue =>
-                              cases resolve_eq : resolvePlace? executable.unit ns childResult.frame
+                              cases resolve_eq : resolvePlace? unit ns childResult.frame
                                   childResult.state place with
                               | none =>
-                                  simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq,
-                                    resolve_eq, failAt] at h
+                                  cases mismatch : placeVariantMismatchFuel? unit ns
+                                      childResult.frame childResult.state (2 * ns.places.size + 3)
+                                      place with
+                                  | false =>
+                                      simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq,
+                                        resolve_eq, mismatch, failAt] at h
+                                  | true =>
+                                      cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                      | none =>
+                                          simp [namespace_eq, expression_eq, kind_eq, child_eq,
+                                            control_eq, resolve_eq, mismatch, mismatch_eq, failAt] at h
+                                      | some thrown =>
+                                          obtain ⟨thrownKind, thrownValues⟩ := thrown
+                                          simp [namespace_eq, expression_eq, kind_eq, child_eq,
+                                            control_eq, resolve_eq, mismatch, mismatch_eq] at h
+                                          cases h
+                                          exact BigStep.EvalNode.assignMismatch
+                                            (namespace_eq := namespace_eq)
+                                            (expression_eq := expression_eq) (kind_eq := kind_eq)
+                                            (child_step := by simpa [control_eq] using child_sound)
+                                            (resolve_eq := resolve_eq) (mismatch := mismatch)
+                                            (mismatch_eq := mismatch_eq)
                               | some resolved =>
                                   cases write_eq : writeRuntimePlace? childResult.frame childResult.state
                                       resolved runtimeValue with
@@ -1633,7 +1844,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                       simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq,
                                         resolve_eq, write_eq] at h
                                       cases h
-                                      exact BigStep.EvalExpr.assignValue
+                                      exact BigStep.EvalNode.assignValue
                                         (namespace_eq := namespace_eq)
                                         (expression_eq := expression_eq) (kind_eq := kind_eq)
                                         (child_step := by simpa [control_eq] using child_sound)
@@ -1642,7 +1853,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignControl (control := .break_ nest value)
+                                (BigStep.EvalNode.assignControl (control := .break_ nest value)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (child_step := by simpa [control_eq] using child_sound)
@@ -1651,7 +1862,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignControl (control := .continue_ nest)
+                                (BigStep.EvalNode.assignControl (control := .continue_ nest)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (child_step := by simpa [control_eq] using child_sound)
@@ -1660,7 +1871,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignControl (control := .return_ values)
+                                (BigStep.EvalNode.assignControl (control := .return_ values)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
                                   (child_step := by simpa [control_eq] using child_sound)
@@ -1669,7 +1880,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignControl
+                                (BigStep.EvalNode.assignControl
                                   (control := .throw_ kind arguments)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
@@ -1684,15 +1895,27 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                             child childResult child_eq
                           cases control_eq : childResult.control.value with
                           | value runtimeValue =>
-                              cases bind_eq : bindPattern executable.unit ns childResult.frame pattern runtimeValue with
+                              cases bind_eq : bindPattern unit ns childResult.frame pattern runtimeValue with
                               | none =>
-                                  simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq,
-                                    bind_eq, failAt] at h
+                                  cases mismatch_eq : patternMismatchThrow? ns.profile with
+                                  | none =>
+                                      simp [namespace_eq, expression_eq, kind_eq, child_eq,
+                                        control_eq, bind_eq, mismatch_eq, failAt] at h
+                                  | some mismatch =>
+                                      obtain ⟨kind, arguments⟩ := mismatch
+                                      simp [namespace_eq, expression_eq, kind_eq, child_eq,
+                                        control_eq, bind_eq, mismatch_eq] at h
+                                      cases h
+                                      exact BigStep.EvalNode.assignPatternMismatch
+                                        (namespace_eq := namespace_eq)
+                                        (expression_eq := expression_eq) (kind_eq := kind_eq)
+                                        (child_step := by simpa [control_eq] using child_sound)
+                                        (bind_eq := bind_eq) (mismatch_eq := mismatch_eq)
                               | some finalFrame =>
                                   simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq,
                                     bind_eq] at h
                                   cases h
-                                  exact BigStep.EvalExpr.assignPatternValue
+                                  exact BigStep.EvalNode.assignPatternValue
                                     (namespace_eq := namespace_eq)
                                     (expression_eq := expression_eq) (kind_eq := kind_eq)
                                     (child_step := by simpa [control_eq] using child_sound)
@@ -1701,7 +1924,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignPatternControl
+                                (BigStep.EvalNode.assignPatternControl
                                   (control := .break_ nest value)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
@@ -1711,7 +1934,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignPatternControl
+                                (BigStep.EvalNode.assignPatternControl
                                   (control := .continue_ nest)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
@@ -1721,7 +1944,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignPatternControl
+                                (BigStep.EvalNode.assignPatternControl
                                   (control := .return_ values)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
@@ -1731,7 +1954,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                               simp [namespace_eq, expression_eq, kind_eq, child_eq, control_eq] at h
                               cases h
                               simpa [control_eq] using
-                                (BigStep.EvalExpr.assignPatternControl
+                                (BigStep.EvalNode.assignPatternControl
                                   (control := .throw_ kind arguments)
                                   (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                                   (kind_eq := kind_eq)
@@ -1742,12 +1965,12 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                   | spec block =>
                       simp [namespace_eq, expression_eq, kind_eq] at h
                       cases h
-                      exact BigStep.EvalExpr.spec
+                      exact BigStep.EvalNode.spec
                         (frame := frame) (state := state)
                         (namespace_eq := namespace_eq) (expression_eq := expression_eq)
                         (kind_eq := kind_eq)
         values := by
-          intro executable namespaceId frame state expressions result h
+          intro unit executable namespaceId frame state expressions result h
           cases expressions with
           | nil =>
               change Except.ok (.values state frame []) = .ok result at h
@@ -1814,7 +2037,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                           (head_step := by simpa [control_eq] using head_sound)
                           (abrupt := BigStep.Abrupt.throw_ kind arguments))
         statements := by
-          intro executable namespaceId frame state statements result h
+          intro unit executable namespaceId frame state statements result h
           cases statements with
           | nil =>
               change Except.ok (.done state frame) = .ok result at h
@@ -1873,12 +2096,19 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                           (head_step := by simpa [control_eq] using head_sound)
                           (abrupt := BigStep.Abrupt.throw_ kind arguments))
         arms := by
-          intro executable namespaceId ns ownerLoc frame state value arms result h
+          intro unit executable namespaceId ns ownerLoc frame state value arms result h
           cases arms with
-          | nil => simp [Internal.evalArms, failAt] at h
+          | nil =>
+              cases mismatch_eq : patternMismatchThrow? ns.profile with
+              | none => simp [Internal.evalArms, failAt, mismatch_eq] at h
+              | some mismatch =>
+                  obtain ⟨kind, arguments⟩ := mismatch
+                  simp [Internal.evalArms, mismatch_eq] at h
+                  cases h
+                  exact BigStep.EvalArms.exhausted _ _ _ _ _ _ _ mismatch_eq
           | cons arm arms =>
               simp only [Internal.evalArms] at h
-              cases bind_eq : bindPattern executable.unit ns frame arm.pattern value with
+              cases bind_eq : bindPattern unit ns frame arm.pattern value with
               | none =>
                   cases tail_eq : Internal.evalArms fuel executable namespaceId ns ownerLoc
                       frame state value arms with
@@ -1932,7 +2162,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
                               | nominal _ _ _ =>
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
-                              | closure _ _ =>
+                              | closure _ _ _ _ =>
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
                               | borrow _ _ =>
                                   simp [bind_eq, guard_eq, guard_step_eq, control_eq, failAt] at h
@@ -2009,7 +2239,8 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
 
 /-- Foundational M1 theorem: every successful fuelled invocation is related
 by the authoritative, fuel-free function semantics. -/
-theorem run_sound (executable : ExecutableUnit) (fuel : Nat) (function : FunctionHandle)
+theorem run_sound {unit : ValidatedUnit} (executable : ExecutableUnit unit) (fuel : Nat)
+    (function : FunctionHandle)
     (arguments : Array RuntimeValue) (state finalState : RuntimeState)
     (outcome : LocatedOutcome)
     (execution : run executable fuel function arguments state = .ok (finalState, outcome)) :

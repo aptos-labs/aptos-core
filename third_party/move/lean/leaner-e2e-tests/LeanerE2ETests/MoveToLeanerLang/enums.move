@@ -44,4 +44,19 @@ module 0x42::enums {
     fun make(flag: bool, amount: u64): Action {
         if (flag) Action::Transfer { amount } else Action::Idle
     }
+
+    enum Slot has copy, drop {
+        Number(u64),
+        Flag(bool),
+    }
+
+    fun number(slot: Slot): u64 {
+        match (slot) {
+            Slot::Number(value) => value,
+            Slot::Flag(_) => 0,
+        }
+    }
+    spec number {
+        ensures (slot is Number) ==> result == slot.Number.0;
+    }
 }

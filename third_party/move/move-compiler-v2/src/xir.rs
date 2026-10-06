@@ -9,6 +9,8 @@
 //! compiler-v2 stackless checks, optimizations, file-format generator, and
 //! verifier own all later compilation stages.
 
+mod typing;
+
 use crate::env_pipeline::function_checker::call_access_error;
 use anyhow::{bail, ensure, Context, Result};
 use codespan::Span;
@@ -17,6 +19,7 @@ use move_command_line_common::files::FileHash;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
+    function::ClosureMask,
     identifier::Identifier,
 };
 use move_model::{
@@ -289,6 +292,11 @@ fn validate_type_parameters(ty: &Ty, count: usize, owner: &str) -> Result<()> {
         Ty::Vector(element) | Ty::Ref(element) | Ty::MutRef(element) => {
             validate_type_parameters(element, count, owner)?;
         },
+        Ty::Function(params, results, _) => {
+            for ty in params.iter().chain(results) {
+                validate_type_parameters(ty, count, owner)?;
+            }
+        },
         Ty::Bool
         | Ty::U8
         | Ty::U16
@@ -327,6 +335,7 @@ fn validate_operation_type_parameters(
         | Oper::MoveFromInst(_, args)
         | Oper::ExistsInst(_, args)
         | Oper::FunctionInst(_, args)
+        | Oper::ClosureInst(_, _, args)
         | Oper::BorrowFieldInst(_, args)
         | Oper::BorrowGlobalInst(_, args)
         | Oper::BorrowVariantFieldInst(_, _, args)
@@ -426,28 +435,57 @@ fn external_structs(env: &GlobalEnv, xir: &XirModule) -> Result<Vec<QualifiedId<
         .collect()
 }
 
+/// The number of type parameters of each struct in a module's scope, in
+/// [`StructScope`] order.
+fn struct_arities(
+    env: &GlobalEnv,
+    xir: &XirModule,
+    external: &[QualifiedId<StructId>],
+) -> Vec<usize> {
+    xir.structs
+        .iter()
+        .map(|decl| decl.type_parameters.len())
+        .chain(
+            external
+                .iter()
+                .map(|qid| env.get_struct(*qid).get_type_parameters().len()),
+        )
+        .collect()
+}
+
 /// The structs a module's types may mention: its own, then the external
 /// ones, in table order.
 struct StructScope<'a> {
     module_id: ModuleId,
     local: &'a [StructId],
     external: &'a [QualifiedId<StructId>],
+    arities: &'a [usize],
 }
 
 impl StructScope<'_> {
-    fn resolve(&self, id: usize, kind: &str) -> Result<(ModuleId, StructId)> {
-        if let Some(struct_id) = self.local.get(id) {
-            return Ok((self.module_id, *struct_id));
-        }
-        let external_id = id
-            .checked_sub(self.local.len())
-            .with_context(|| format!("{kind} id underflow"))?;
-        self.external
-            .get(external_id)
-            .map(|qid| (qid.module_id, qid.id))
-            .with_context(|| {
-                format!("{kind} id {id} is outside the local and external struct tables")
-            })
+    /// Resolves a struct type with `args` type arguments, which must match
+    /// the struct's type parameters. Whether the document says struct or
+    /// enum is not checked: the model has one type for both.
+    fn resolve(&self, id: usize, kind: &str, args: usize) -> Result<(ModuleId, StructId)> {
+        let resolved = if let Some(struct_id) = self.local.get(id) {
+            (self.module_id, *struct_id)
+        } else {
+            let external_id = id
+                .checked_sub(self.local.len())
+                .with_context(|| format!("{kind} id underflow"))?;
+            self.external
+                .get(external_id)
+                .map(|qid| (qid.module_id, qid.id))
+                .with_context(|| {
+                    format!("{kind} id {id} is outside the local and external struct tables")
+                })?
+        };
+        let expected = self.arities[id];
+        ensure!(
+            args == expected,
+            "{kind} id {id} takes {expected} type arguments, but {args} are given"
+        );
+        Ok(resolved)
     }
 }
 
@@ -570,10 +608,12 @@ fn import_source(
         .map(|decl| FunId::new(env.symbol_pool().make(&decl.name)))
         .collect::<Vec<_>>();
     let external_struct_ids = external_structs(env, xir)?;
+    let arities = struct_arities(env, xir, &external_struct_ids);
     let scope = StructScope {
         module_id,
         local: &struct_ids,
         external: &external_struct_ids,
+        arities: &arities,
     };
 
     let mut structs = vec![];
@@ -586,7 +626,8 @@ fn import_source(
                 loc: loc.clone(),
                 offset,
                 variant: None,
-                ty: model_type(&field.ty, &scope)?,
+                ty: model_value_type(&field.ty, &scope)
+                    .with_context(|| format!("field `{}` of `{}`", field.name, decl.name))?,
                 is_ghost: false,
                 init: None,
             });
@@ -609,7 +650,9 @@ fn import_source(
                         loc: loc.clone(),
                         offset,
                         variant: Some(variant_symbol),
-                        ty: model_type(&field.ty, &scope)?,
+                        ty: model_value_type(&field.ty, &scope).with_context(|| {
+                            format!("field `{}` of `{}`", field.name, decl.name)
+                        })?,
                         is_ghost: false,
                         init: None,
                     });
@@ -670,7 +713,10 @@ fn import_source(
         let local_types = decl
             .locals
             .iter()
-            .map(|ty| model_type(ty, &scope))
+            .enumerate()
+            .map(|(id, ty)| {
+                model_type(ty, &scope).with_context(|| format!("local l{id} of `{}`", decl.name))
+            })
             .collect::<Result<Vec<_>>>()?;
         let params = local_types
             .iter()
@@ -690,18 +736,14 @@ fn import_source(
                 )
             })
             .collect();
-        let returns = Type::tuple(
-            decl.returns
-                .iter()
-                .map(|ty| model_type(ty, &scope))
-                .collect::<Result<Vec<_>>>()?,
-        );
+        let returns = model_tuple(&decl.returns, &scope)
+            .with_context(|| format!("return type of `{}`", decl.name))?;
         let acquired = decl
             .acquires
             .iter()
             .map(|id| struct_at(&struct_ids, *id, &decl.name))
             .collect::<Result<BTreeSet<_>>>()?;
-        let called = called_functions(env, xir, decl, module_id, &function_ids)?;
+        let (used, called) = used_functions(env, xir, decl, module_id, &function_ids)?;
         functions.push(ModelXirFunctionData {
             name: fun_id.symbol(),
             loc: function_loc.clone(),
@@ -721,6 +763,7 @@ fn import_source(
             params,
             result_type: returns,
             acquired_structs: acquired,
+            used_funs: used,
             called_funs: called,
         });
     }
@@ -748,19 +791,24 @@ fn import_source(
             decl,
             qid,
         )?;
-        // The call graph is what the translated code calls, including the
-        // calls it lowers operations to.
-        let called = data
-            .code
-            .iter()
-            .filter_map(|bytecode| match bytecode {
+        // The call graph is what the translated code uses and calls, including
+        // the calls it lowers operations to; a closure's target is used
+        // without being called.
+        let mut used = BTreeSet::new();
+        let mut called = BTreeSet::new();
+        for bytecode in &data.code {
+            match bytecode {
                 Bytecode::Call(_, _, StacklessOperation::Function(module, fun, _), _, _) => {
-                    Some(module.qualified(*fun))
+                    called.insert(module.qualified(*fun));
                 },
-                _ => None,
-            })
-            .collect();
-        env.set_xir_called_functions(qid, called);
+                Bytecode::Call(_, _, StacklessOperation::Closure(module, fun, _, _), _, _) => {
+                    used.insert(module.qualified(*fun));
+                },
+                _ => {},
+            }
+        }
+        used.extend(called.iter().copied());
+        env.set_xir_used_functions(qid, used, called);
         targets.insert_target_data(&qid, FunctionVariant::Baseline, data);
     }
     add_transitive_callee_targets(env, module_id, targets);
@@ -881,43 +929,71 @@ fn model_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
             Type::TypeParameter(*index as u16)
         },
         Ty::Struct(id) => {
-            let (module_id, struct_id) = scope.resolve(*id, "struct")?;
+            let (module_id, struct_id) = scope.resolve(*id, "struct", 0)?;
             Type::Struct(module_id, struct_id, vec![])
         },
         Ty::StructInst(id, args) => {
-            let (module_id, struct_id) = scope.resolve(*id, "struct")?;
+            let (module_id, struct_id) = scope.resolve(*id, "struct", args.len())?;
             Type::Struct(
                 module_id,
                 struct_id,
                 args.iter()
-                    .map(|arg| model_type(arg, scope))
+                    .map(|arg| model_value_type(arg, scope))
                     .collect::<Result<Vec<_>>>()?,
             )
         },
         Ty::Enum(id) => {
-            let (module_id, struct_id) = scope.resolve(*id, "enum")?;
+            let (module_id, struct_id) = scope.resolve(*id, "enum", 0)?;
             Type::Struct(module_id, struct_id, vec![])
         },
         Ty::EnumInst(id, args) => {
-            let (module_id, struct_id) = scope.resolve(*id, "enum")?;
+            let (module_id, struct_id) = scope.resolve(*id, "enum", args.len())?;
             Type::Struct(
                 module_id,
                 struct_id,
                 args.iter()
-                    .map(|arg| model_type(arg, scope))
+                    .map(|arg| model_value_type(arg, scope))
                     .collect::<Result<Vec<_>>>()?,
             )
         },
-        Ty::Vector(element) => Type::Vector(Box::new(model_type(element, scope)?)),
+        Ty::Vector(element) => Type::Vector(Box::new(model_value_type(element, scope)?)),
         Ty::Ref(referent) => Type::Reference(
             ReferenceKind::Immutable,
-            Box::new(model_type(referent, scope)?),
+            Box::new(model_value_type(referent, scope)?),
         ),
         Ty::MutRef(referent) => Type::Reference(
             ReferenceKind::Mutable,
-            Box::new(model_type(referent, scope)?),
+            Box::new(model_value_type(referent, scope)?),
+        ),
+        Ty::Function(params, results, abilities) => Type::function(
+            model_tuple(params, scope)?,
+            model_tuple(results, scope)?,
+            parse_ability_set(abilities).context("on a function type")?,
         ),
     })
+}
+
+/// A type that cannot be a reference: a field, or a type nested in another.
+/// Move has references only as the type of a local, a return value, or a
+/// function type's parameter or result.
+fn model_value_type(ty: &Ty, scope: &StructScope) -> Result<Type> {
+    let model = model_type(ty, scope)?;
+    ensure!(
+        !model.is_reference(),
+        "`{ty:?}` is a reference, which cannot be a field or nested in a type"
+    );
+    Ok(model)
+}
+
+/// The types of a function's or function type's parameters or results, as a
+/// tuple; each may be a reference.
+fn model_tuple(types: &[Ty], scope: &StructScope) -> Result<Type> {
+    Ok(Type::tuple(
+        types
+            .iter()
+            .map(|ty| model_type(ty, scope))
+            .collect::<Result<Vec<_>>>()?,
+    ))
 }
 
 fn function_at(
@@ -958,23 +1034,60 @@ fn function_at(
     Ok(module.get_id().qualified(function.get_id()))
 }
 
-fn called_functions(
+/// The functions a declaration uses and, among them, those it calls; a
+/// closure's target is used without being called.
+fn used_functions(
     env: &GlobalEnv,
     xir: &XirModule,
     decl: &FunctionDecl,
     module_id: ModuleId,
     functions: &[FunId],
-) -> Result<BTreeSet<QualifiedId<FunId>>> {
-    // The explicit calls; the translated code adds the ones it lowers to.
+) -> Result<(BTreeSet<QualifiedId<FunId>>, BTreeSet<QualifiedId<FunId>>)> {
+    // The explicit uses; the translated code adds the calls it lowers to.
+    let mut used = BTreeSet::new();
     let mut called = BTreeSet::new();
     for block in &decl.blocks {
         for instr in &block.instrs {
-            if let Instr::Call(_, Oper::Function(id) | Oper::FunctionInst(id, _), _) = instr {
-                called.insert(function_at(env, xir, module_id, functions, *id)?);
+            match instr {
+                Instr::Call(_, Oper::Function(id) | Oper::FunctionInst(id, _), _) => {
+                    called.insert(function_at(env, xir, module_id, functions, *id)?);
+                },
+                Instr::Call(_, Oper::Closure(id, _) | Oper::ClosureInst(id, _, _), _) => {
+                    used.insert(function_at(env, xir, module_id, functions, *id)?);
+                },
+                _ => {},
             }
         }
     }
-    Ok(called)
+    used.extend(called.iter().copied());
+    Ok((used, called))
+}
+
+/// The XIR width of a model type, if it is a Move integer.
+fn int_type_of(ty: &Type) -> Option<IntType> {
+    let Type::Primitive(primitive) = ty else {
+        return None;
+    };
+    match primitive {
+        PrimitiveType::U8 => Some(IntType::U8),
+        PrimitiveType::U16 => Some(IntType::U16),
+        PrimitiveType::U32 => Some(IntType::U32),
+        PrimitiveType::U64 => Some(IntType::U64),
+        PrimitiveType::U128 => Some(IntType::U128),
+        PrimitiveType::U256 => Some(IntType::U256),
+        PrimitiveType::I8 => Some(IntType::I8),
+        PrimitiveType::I16 => Some(IntType::I16),
+        PrimitiveType::I32 => Some(IntType::I32),
+        PrimitiveType::I64 => Some(IntType::I64),
+        PrimitiveType::I128 => Some(IntType::I128),
+        PrimitiveType::I256 => Some(IntType::I256),
+        PrimitiveType::Bool
+        | PrimitiveType::Address
+        | PrimitiveType::Signer
+        | PrimitiveType::Num
+        | PrimitiveType::Range
+        | PrimitiveType::EventStore => None,
+    }
 }
 
 fn struct_at(structs: &[StructId], id: usize, function: &str) -> Result<StructId> {
@@ -995,10 +1108,12 @@ fn translate_function(
     qid: QualifiedId<FunId>,
 ) -> Result<TargetFunctionData> {
     let func_env = env.get_function(qid);
+    let struct_arities = struct_arities(env, xir, external_struct_ids);
     let scope = StructScope {
         module_id,
         local: struct_ids,
         external: external_struct_ids,
+        arities: &struct_arities,
     };
     let mut translator = FunctionTranslator {
         env,
@@ -1006,6 +1121,7 @@ fn translate_function(
         module_id,
         struct_ids,
         external_struct_ids,
+        struct_arities: &struct_arities,
         function_ids,
         decl,
         qid,
@@ -1021,6 +1137,7 @@ fn translate_function(
         next_attr: 0,
         next_label: decl.blocks.len(),
     };
+    translator.check_types()?;
     translator.emit(|attr| Bytecode::Jump(attr, Label::new(decl.entry)))?;
     for (block_id, block) in decl.blocks.iter().enumerate() {
         let block_source_map = decl
@@ -1144,6 +1261,7 @@ struct FunctionTranslator<'a> {
     module_id: ModuleId,
     struct_ids: &'a [StructId],
     external_struct_ids: &'a [QualifiedId<StructId>],
+    struct_arities: &'a [usize],
     function_ids: &'a [FunId],
     decl: &'a FunctionDecl,
     /// The function being translated.
@@ -1175,6 +1293,22 @@ impl FunctionTranslator<'_> {
         self.local_types
             .get(id)
             .with_context(|| format!("local l{id} is out of range in `{}`", self.decl.name))
+    }
+
+    /// Checks that local `id` has the annotated width. Stackless arithmetic
+    /// carries none, so a mismatch would otherwise be lost here.
+    fn check_width(&self, oper: &Oper, width: IntType, id: usize) -> Result<()> {
+        let ty = self.local(id)?;
+        ensure!(
+            int_type_of(ty) == Some(width),
+            "{oper:?} is annotated {width:?}, but l{id} is `{}`",
+            self.show(ty)
+        );
+        Ok(())
+    }
+
+    fn show(&self, ty: &Type) -> String {
+        ty.display(&self.env.get_type_display_ctx()).to_string()
     }
 
     fn block(&self, id: usize) -> Result<&Block> {
@@ -1626,22 +1760,25 @@ impl FunctionTranslator<'_> {
 
     fn operation(&self, dsts: &[usize], oper: &Oper, srcs: &[usize]) -> Result<StacklessOperation> {
         Ok(match oper {
-            Oper::Add(_)
-            | Oper::Sub(_)
-            | Oper::Mul(_)
-            | Oper::Div(_)
-            | Oper::Mod(_)
-            | Oper::BitAnd(_)
-            | Oper::BitOr(_)
-            | Oper::BitXor(_)
-            | Oper::Shl(_)
-            | Oper::Shr(_)
-            | Oper::Lt
-            | Oper::Le
-            | Oper::Eq
-            | Oper::And
-            | Oper::Or => {
+            Oper::Add(width)
+            | Oper::Sub(width)
+            | Oper::Mul(width)
+            | Oper::Div(width)
+            | Oper::Mod(width)
+            | Oper::BitAnd(width)
+            | Oper::BitOr(width)
+            | Oper::BitXor(width)
+            | Oper::Shl(width)
+            | Oper::Shr(width) => {
                 arity(dsts, srcs, 1, 2, oper)?;
+                // Operands and result share the annotated type, except a
+                // shift's amount, which is a `u8` the annotation does not cover.
+                let is_shift = matches!(oper, Oper::Shl(_) | Oper::Shr(_));
+                self.check_width(oper, *width, srcs[0])?;
+                self.check_width(oper, *width, dsts[0])?;
+                if !is_shift {
+                    self.check_width(oper, *width, srcs[1])?;
+                }
                 match oper {
                     Oper::Add(_) => StacklessOperation::Add,
                     Oper::Sub(_) => StacklessOperation::Sub,
@@ -1653,6 +1790,12 @@ impl FunctionTranslator<'_> {
                     Oper::BitXor(_) => StacklessOperation::Xor,
                     Oper::Shl(_) => StacklessOperation::Shl,
                     Oper::Shr(_) => StacklessOperation::Shr,
+                    _ => unreachable!(),
+                }
+            },
+            Oper::Lt | Oper::Le | Oper::Eq | Oper::And | Oper::Or => {
+                arity(dsts, srcs, 1, 2, oper)?;
+                match oper {
                     Oper::Lt => StacklessOperation::Lt,
                     Oper::Le => StacklessOperation::Le,
                     Oper::Eq => StacklessOperation::Eq,
@@ -1663,6 +1806,8 @@ impl FunctionTranslator<'_> {
             },
             Oper::Cast(target) => {
                 arity(dsts, srcs, 1, 1, oper)?;
+                // A cast's width names its result, not its operand.
+                self.check_width(oper, *target, dsts[0])?;
                 match target {
                     IntType::U8 => StacklessOperation::CastU8,
                     IntType::U16 => StacklessOperation::CastU16,
@@ -1842,6 +1987,38 @@ impl FunctionTranslator<'_> {
                 );
                 StacklessOperation::Function(target.module_id, target.id, type_args)
             },
+            Oper::Closure(id, mask) | Oper::ClosureInst(id, mask, _) => {
+                let target =
+                    function_at(self.env, self.xir, self.module_id, self.function_ids, *id)?;
+                let type_args = match oper {
+                    Oper::ClosureInst(_, _, args) => self.type_args(args)?,
+                    _ => vec![],
+                };
+                let callee = self.env.get_function(target);
+                ensure!(
+                    callee.get_type_parameter_count() == type_args.len(),
+                    "function `{}` takes {} type arguments, but the closure supplies {}",
+                    callee.get_full_name_str(),
+                    callee.get_type_parameter_count(),
+                    type_args.len()
+                );
+                let mask = ClosureMask::new(*mask);
+                ensure!(
+                    mask.max_captured()
+                        .is_none_or(|index| index < callee.get_parameter_count()),
+                    "closure mask {mask} captures beyond the parameters of `{}`",
+                    callee.get_full_name_str()
+                );
+                arity(dsts, srcs, 1, mask.captured_count() as usize, oper)?;
+                StacklessOperation::Closure(target.module_id, target.id, type_args, mask)
+            },
+            Oper::Invoke => {
+                ensure!(
+                    !srcs.is_empty(),
+                    "invoke expects the function value as its last source"
+                );
+                StacklessOperation::Invoke
+            },
             Oper::BorrowLoc => {
                 arity(dsts, srcs, 1, 1, oper)?;
                 StacklessOperation::BorrowLoc
@@ -1941,11 +2118,7 @@ impl FunctionTranslator<'_> {
     }
 
     fn type_args(&self, args: &[Ty]) -> Result<Vec<Type>> {
-        let scope = StructScope {
-            module_id: self.module_id,
-            local: self.struct_ids,
-            external: self.external_struct_ids,
-        };
+        let scope = self.scope();
         args.iter().map(|arg| model_type(arg, &scope)).collect()
     }
 
@@ -2966,6 +3139,359 @@ mod tests {
 
     fn load_instruction(instr: Instr) -> Result<()> {
         import_module(&instruction_module(instr)).map(|_| ())
+    }
+
+    fn two_operand_ops(width: IntType) -> Vec<Oper> {
+        vec![
+            Oper::Add(width),
+            Oper::Sub(width),
+            Oper::Mul(width),
+            Oper::Div(width),
+            Oper::Mod(width),
+            Oper::BitAnd(width),
+            Oper::BitOr(width),
+            Oper::BitXor(width),
+        ]
+    }
+
+    #[test]
+    fn a_consistent_width_annotation_loads() {
+        let mut cases: Vec<(Vec<usize>, Oper, Vec<usize>)> = two_operand_ops(IntType::U64)
+            .into_iter()
+            .map(|oper| (vec![2], oper, vec![0, 1]))
+            .collect();
+        cases.extend([
+            // A shift's amount is a `u8` the annotation does not describe.
+            (vec![2], Oper::Shl(IntType::U64), vec![0, 3]),
+            (vec![2], Oper::Shr(IntType::U64), vec![0, 3]),
+            // A cast's annotation names its result; the operand may be any width.
+            (vec![3], Oper::Cast(IntType::U8), vec![0]),
+            (vec![0], Oper::Cast(IntType::U64), vec![3]),
+        ]);
+        let rejected: Vec<_> = cases
+            .into_iter()
+            .filter_map(|(dsts, oper, srcs)| {
+                load_instruction(Instr::Call(dsts, oper.clone(), srcs))
+                    .err()
+                    .map(|error| format!("{oper:?}: {error:#}"))
+            })
+            .collect();
+        assert!(rejected.is_empty(), "rejected: {rejected:#?}");
+    }
+
+    #[test]
+    fn a_width_annotation_must_match_the_locals() {
+        let mut cases: Vec<(Vec<usize>, Oper, Vec<usize>)> = two_operand_ops(IntType::I64)
+            .into_iter()
+            .map(|oper| (vec![2], oper, vec![0, 1]))
+            .collect();
+        cases.extend([
+            (vec![2], Oper::Add(IntType::U64), vec![4, 1]), // first operand
+            (vec![2], Oper::Add(IntType::U64), vec![0, 4]), // second operand
+            (vec![3], Oper::Add(IntType::U64), vec![0, 1]), // destination
+            (vec![2], Oper::Shl(IntType::U64), vec![3, 3]), // shl value
+            (vec![2], Oper::Shr(IntType::U64), vec![3, 3]), // shr value
+            (vec![0], Oper::Cast(IntType::U8), vec![3]),    // cast result
+        ]);
+        let accepted: Vec<_> = cases
+            .into_iter()
+            .filter(|(dsts, oper, srcs)| {
+                load_instruction(Instr::Call(dsts.clone(), oper.clone(), srcs.clone())).is_ok()
+            })
+            .map(|(dsts, oper, srcs)| format!("{oper:?} {dsts:?} <- {srcs:?}"))
+            .collect();
+        assert!(accepted.is_empty(), "accepted: {accepted:?}");
+    }
+
+    /// Each integer width, with a local of that type: the matching annotation
+    /// loads and a neighbouring width does not. This pins every arm of
+    /// `int_type`, not just `u64`.
+    #[test]
+    fn every_width_is_checked_against_its_own_type() {
+        let widths = [
+            (3, IntType::U8, IntType::U16),
+            (5, IntType::U16, IntType::U32),
+            (6, IntType::U32, IntType::U64),
+            (0, IntType::U64, IntType::U128),
+            (7, IntType::U128, IntType::U256),
+            (8, IntType::U256, IntType::U8),
+        ];
+        let mut wrong = vec![];
+        for (local, width, neighbour) in widths {
+            let load =
+                |w| load_instruction(Instr::Call(vec![local], Oper::Add(w), vec![local, local]));
+            if load(width).is_err() {
+                wrong.push(format!("{width:?} over its own type was rejected"));
+            }
+            if load(neighbour).is_ok() {
+                wrong.push(format!("{neighbour:?} over {width:?} was accepted"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// An operand that is not an integer at all is rejected, whatever its kind.
+    #[test]
+    fn a_non_integer_operand_is_rejected() {
+        let accepted: Vec<_> = [4, 9, 10, 11, 12] // address, bool, vector, reference, struct
+            .into_iter()
+            .filter(|&operand| {
+                load_instruction(Instr::Call(vec![2], Oper::Add(IntType::U64), vec![
+                    operand, 1,
+                ]))
+                .is_ok()
+            })
+            .collect();
+        assert!(
+            accepted.is_empty(),
+            "accepted non-integer locals: {accepted:?}"
+        );
+    }
+
+    #[test]
+    fn a_width_mismatch_names_the_operation_and_the_local() {
+        let error = load_instruction(Instr::Call(vec![2], Oper::Div(IntType::I64), vec![0, 1]))
+            .unwrap_err();
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("Div(I64)") && message.contains("l0") && message.contains("`u64`"),
+            "{message}"
+        );
+    }
+
+    /// Why `assign` is checked: `l1 := l0` puts a `u8` in a `u64` local, so
+    /// the `u64` shift passes `check_width`. Unchecked, the optimizer
+    /// propagates the copy and the verifier accepts a truncating `u8` shift.
+    #[test]
+    fn an_ill_typed_assign_cannot_change_a_shift_width() {
+        let mut module = account_module();
+        let function = &mut module.functions[0];
+        function.params = 1;
+        function.locals = vec![Ty::U8, Ty::U64, Ty::U64, Ty::U64];
+        function.local_names = vec![];
+        function.returns = vec![Ty::U64];
+        function.source_map = None;
+        function.entry = 0;
+        function.blocks = vec![Block {
+            instrs: vec![
+                Instr::Assign(1, 0),
+                Instr::Call(vec![2], Oper::Shl(IntType::U64), vec![1, 0]),
+                Instr::Call(vec![3], Oper::Cast(IntType::U64), vec![2]),
+            ],
+            term: Term::Ret(vec![3]),
+        }];
+        let message = format!("{:#}", import_module(&module).unwrap_err());
+        assert!(
+            message.contains("instruction 0") && message.contains("assign"),
+            "{message}"
+        );
+    }
+
+    /// A reference is the type of a local or a return value, never a field
+    /// or part of another type.
+    #[test]
+    fn a_reference_is_only_the_type_of_a_local_or_a_return_value() {
+        #[derive(Debug, Clone, Copy)]
+        enum Place {
+            Local,
+            Return,
+            Field,
+            VariantField,
+        }
+        use Place::*;
+        let r = |ty: Ty| Ty::Ref(Box::new(ty));
+        let v = |ty: Ty| Ty::Vector(Box::new(ty));
+        // `G<T> { x: T }` and `enum GE<T> { A { x: T } }`, at indices 2 and 3
+        // after the golden module's two structs.
+        let g = |ty: Ty| Ty::StructInst(2, vec![ty]);
+        let ge = |ty: Ty| Ty::EnumInst(3, vec![ty]);
+        let field = |ty: Ty| move_model_exchange::Field {
+            name: "x".to_owned(),
+            ty,
+        };
+        let declaration = |name: &str, fields, variants| StructDecl {
+            name: name.to_owned(),
+            visibility: XirVisibility::Private,
+            abilities: vec!["copy".to_owned(), "drop".to_owned()],
+            type_parameters: vec![],
+            fields,
+            variants,
+            attributes: vec![],
+        };
+        let module = |place: Place, ty: Ty| {
+            let mut module = instruction_module(Instr::Nop);
+            assert_eq!(module.structs.len(), 2);
+            let parameter = TypeParameterDecl {
+                name: "T".to_owned(),
+                abilities: vec![],
+                phantom: false,
+            };
+            let mut generic = declaration("G", vec![field(Ty::TypeParameter(0))], None);
+            generic.type_parameters = vec![parameter.clone()];
+            module.structs.push(generic);
+            let mut generic_enum = declaration(
+                "GE",
+                vec![],
+                Some(vec![move_model_exchange::Variant {
+                    name: "A".to_owned(),
+                    fields: vec![field(Ty::TypeParameter(0))],
+                }]),
+            );
+            generic_enum.type_parameters = vec![parameter];
+            module.structs.push(generic_enum);
+            let function = &mut module.functions[0];
+            match place {
+                Local => function.locals.push(ty),
+                Return => {
+                    function.locals.push(ty.clone());
+                    function.returns = vec![ty];
+                    function.blocks[0].term = Term::Ret(vec![function.locals.len() - 1]);
+                },
+                Field => module.structs.push(declaration("H", vec![field(ty)], None)),
+                VariantField => module.structs.push(declaration(
+                    "V",
+                    vec![],
+                    Some(vec![move_model_exchange::Variant {
+                        name: "A".to_owned(),
+                        fields: vec![field(ty)],
+                    }]),
+                )),
+            }
+            module
+        };
+        let cases = [
+            (true, Local, r(Ty::U64)),
+            (true, Local, Ty::MutRef(Box::new(g(Ty::U64)))),
+            (true, Local, g(v(Ty::U64))),
+            (false, Local, v(r(Ty::U64))),
+            (false, Local, r(r(Ty::U64))),
+            (false, Local, Ty::MutRef(Box::new(r(Ty::U64)))),
+            (true, Local, ge(Ty::U64)),
+            (false, Local, ge(r(Ty::U64))),
+            (false, Local, g(r(Ty::U64))),
+            (false, Local, r(g(v(r(Ty::U64))))),
+            (true, Return, r(Ty::U64)),
+            (false, Return, v(r(Ty::U64))),
+            (true, Field, v(Ty::U64)),
+            (false, Field, r(Ty::U64)),
+            (false, Field, g(r(Ty::U64))),
+            (true, VariantField, v(Ty::U64)),
+            (false, VariantField, r(Ty::U64)),
+        ];
+        let wrong: Vec<_> = cases
+            .into_iter()
+            .filter_map(|(ok, place, ty)| {
+                let result = import_module(&module(place, ty.clone())).map(|_| ());
+                let as_expected = match &result {
+                    Ok(()) => ok,
+                    Err(error) => !ok && format!("{error:#}").contains("is a reference"),
+                };
+                (!as_expected).then(|| format!("{place:?} {ty:?}: {result:?}"))
+            })
+            .collect();
+        assert!(wrong.is_empty(), "{wrong:#?}");
+    }
+
+    /// A struct type has as many type arguments as its struct declares,
+    /// wherever it is written, including a struct of another module.
+    #[test]
+    fn a_struct_type_has_its_declared_number_of_type_arguments() {
+        #[derive(Debug, Clone, Copy)]
+        enum Place {
+            Local,
+            Return,
+            Field,
+            TypeArgument,
+        }
+        use Place::*;
+        // Structs 0 and 1 are the golden module's, 2 is `G<T> { x: T }`, and
+        // 3 is the standard library's `Option<Element>`.
+        let module = |place: Place, ty: Ty| {
+            let mut module = instruction_module(Instr::Nop);
+            assert_eq!(module.structs.len(), 2);
+            let mut generic = module.structs[0].clone();
+            generic.name = "G".to_owned();
+            generic.type_parameters = vec![TypeParameterDecl {
+                name: "T".to_owned(),
+                abilities: vec![],
+                phantom: false,
+            }];
+            generic.fields[0].ty = Ty::TypeParameter(0);
+            module.structs.push(generic.clone());
+            module.external_structs = vec![move_model_exchange::XirExternalStruct {
+                address: "0x1".to_owned(),
+                module: "option".to_owned(),
+                name: "Option".to_owned(),
+            }];
+            let function = &mut module.functions[0];
+            match place {
+                Local => function.locals.push(ty),
+                Return => {
+                    function.locals.push(ty.clone());
+                    function.returns = vec![ty];
+                    function.blocks[0].term = Term::Ret(vec![function.locals.len() - 1]);
+                },
+                Field => {
+                    let mut with_field = generic;
+                    with_field.name = "H".to_owned();
+                    with_field.type_parameters = vec![];
+                    with_field.fields[0].ty = ty;
+                    module.structs.push(with_field);
+                },
+                // `exists<G<ty>>(l4)` into the `bool` l9.
+                TypeArgument => {
+                    function.blocks[0].instrs =
+                        vec![Instr::Call(vec![9], Oper::ExistsInst(2, vec![ty]), vec![4])]
+                },
+            }
+            module
+        };
+        let load = |module: &XirModule| -> Result<()> {
+            let options = Options {
+                dependencies: move_stdlib::move_stdlib_files(),
+                named_address_mapping: vec!["std=0x1".to_owned()],
+                ..Options::default()
+            };
+            let mut env = crate::run_checker(options)?;
+            let source = parse_source(
+                PathBuf::from("test.xir.json"),
+                String::new(),
+                &serde_json::to_string(module).unwrap(),
+            )?;
+            import_sources(&mut env, &[source], &mut FunctionTargetsHolder::default())
+        };
+        let g = |args: Vec<Ty>| Ty::StructInst(2, args);
+        let option = |args: Vec<Ty>| Ty::StructInst(3, args);
+        let cases = [
+            (true, Local, g(vec![Ty::U64])),
+            (false, Local, Ty::Struct(2)),
+            (false, Local, g(vec![Ty::U64, Ty::U64])),
+            (false, Local, Ty::StructInst(0, vec![Ty::U64])),
+            (false, Local, Ty::Vector(Box::new(Ty::Struct(2)))),
+            (false, Local, Ty::Ref(Box::new(g(vec![])))),
+            (false, Local, Ty::Enum(2)),
+            (true, Local, option(vec![Ty::U64])),
+            (false, Local, Ty::Struct(3)),
+            (false, Local, option(vec![g(vec![])])),
+            (true, Return, g(vec![Ty::U64])),
+            (false, Return, Ty::Struct(2)),
+            (true, Field, g(vec![Ty::U64])),
+            (false, Field, Ty::Struct(2)),
+            (true, TypeArgument, g(vec![Ty::U64])),
+            (false, TypeArgument, Ty::Struct(2)),
+        ];
+        let wrong: Vec<_> = cases
+            .into_iter()
+            .filter_map(|(ok, place, ty)| {
+                let result = load(&module(place, ty.clone()));
+                let as_expected = match &result {
+                    Ok(()) => ok,
+                    Err(error) => !ok && format!("{error:#}").contains("type arguments, but"),
+                };
+                (!as_expected).then(|| format!("{place:?} {ty:?}: {result:?}"))
+            })
+            .collect();
+        assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
     /// `<` on an integer is a native comparison and loads without the

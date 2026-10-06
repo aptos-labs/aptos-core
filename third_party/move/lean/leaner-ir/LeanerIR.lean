@@ -2,11 +2,16 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import LeanerIR.Import.Json
+import LeanerIR.Import.ReferencePatterns
 import LeanerIR.Validation.Check
 import LeanerIR.Validation.Initialization
 import LeanerIR.Validation.Capability
 import LeanerIR.Validation.InstantiationCertificate
 import LeanerIR.Validation.Link
+import LeanerIR.Validation.SemanticTypes
+import LeanerIR.Validation.StaticTyping
+import LeanerIR.Validation.RequiredTypes
+import LeanerIR.Validation.StaticTypingSubst
 import LeanerIR.Semantics.Runtime
 import LeanerIR.Semantics.Operations
 import LeanerIR.Semantics.Frames
@@ -14,6 +19,13 @@ import LeanerIR.Semantics.BigStep
 import LeanerIR.Interpreter.Interpreter
 import LeanerIR.Proofs.Interpreter
 import LeanerIR.Semantics.Typing
+import LeanerIR.Semantics.ValueTyping
+import LeanerIR.Semantics.StateTyping
+import LeanerIR.Semantics.LoanTyping
+import LeanerIR.Semantics.FrameInstantiation
+import LeanerIR.Semantics.Preservation
+import LeanerIR.Semantics.LoanRenamingFunctions
+import LeanerIR.Semantics.LoanRenamingPrimitives
 import LeanerIR.Proofs.Fuel
 import LeanerIR.Proofs.Completeness
 import LeanerIR.Proofs.Order
@@ -23,3 +35,5 @@ import LeanerIR.Proofs.Representation
 import LeanerIR.Proofs.Contract
 import LeanerIR.Proofs.Typed
 import LeanerIR.Proofs.Meaning
+import LeanerIR.Proofs.GlobalTyping
+import LeanerIR.Proofs.ClosureTyping

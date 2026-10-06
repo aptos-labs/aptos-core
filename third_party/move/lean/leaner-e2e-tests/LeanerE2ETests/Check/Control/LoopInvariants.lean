@@ -4,8 +4,9 @@
 import LeanerLang
 import LeanerE2ETests.CheckSupport
 
-/-! Loop invariants: scalar loop state, a while loop, and a
-mutable aggregate whose unrelated field and vector length are preserved. -/
+/-! Loop invariants: scalar loop state, a while loop, an invariant opening
+the loop's body, and a mutable aggregate whose unrelated field and vector
+length are preserved. -/
 
 namespace LeanerLang.Tests.Check.Control.LoopInvariants
 
@@ -36,6 +37,18 @@ leaner module 0x42::loop_invariants where
       invariant i <= n && total == i
     total
   spec sum_ones where
+    ensures result == n
+    aborts_if false
+
+  fun count_from_head(n : u64) -> u64 := do
+    let mut i : u64 := 0
+    loop do
+      spec invariant i <= n
+      if !(i < n) then break
+      i := i + 1
+    spec assert i == n
+    i
+  spec count_from_head where
     ensures result == n
     aborts_if false
 

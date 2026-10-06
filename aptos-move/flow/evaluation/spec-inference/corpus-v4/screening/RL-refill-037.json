@@ -9,8 +9,13 @@
   "target": "aptos_framework::extracted_rate_limiter::refill",
   "task_id": "RL-refill-037",
   "threshold_seconds": 20,
-  "wall_seconds": 5.5,
+  "wall_seconds": 10.3,
   "well_formed": true,
   "wp_failure_kind": null,
-  "wp_hard": false
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
 }

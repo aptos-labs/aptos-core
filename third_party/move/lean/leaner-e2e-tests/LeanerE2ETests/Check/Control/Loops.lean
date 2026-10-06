@@ -28,6 +28,15 @@ leaner module 0x42::loops where
     ensures result == 0
     aborts_if false
 
+  -- Every local changes, so the default invariant fixes only the memory.
+  fun halve_both(n : u64, e : u64) -> u64 := do
+    while 1 < e do
+      e := e / 2
+      n := n / 2
+    n
+  spec halve_both where
+    aborts_if false
+
   fun skip_evens(n : u64, acc : u64) -> u64 := do
     let mut remaining := n
     let mut total := acc
@@ -189,7 +198,8 @@ run_cmd do
     ⟨"early", #[.bool false], .returned #[.integer 8], {}⟩,
     ⟨"return_in_loop", #[.integer 5], .returned #[.integer 1], {}⟩,
     ⟨"return_in_loop", #[.integer 2], .returned #[.integer 0], {}⟩,
-    ⟨"countdown_tail", #[.integer 100, .integer 40], .returned #[.integer 140], {}⟩]
+    ⟨"countdown_tail", #[.integer 100, .integer 40], .returned #[.integer 140], {}⟩,
+    ⟨"halve_both", #[.integer 40, .integer 8], .returned #[.integer 5], {}⟩]
   let initial ← singleResourceState `«0x42».loops "Counter" "0x3" #[.integer 4]
   let final ← singleResourceState `«0x42».loops "Counter" "0x3" #[.integer 0] 2
   assertRunsState `«0x42».loops #[
@@ -202,7 +212,7 @@ run_cmd do
   let some unit := LeanerLang.registeredUnit? env `«0x42».loops
     | throwError "missing loop module"
   let ns := unit.namespaces[0]!
-  unless ns.functions.size == 15 do
+  unless ns.functions.size == 16 do
     throwError "loops introduced helper functions: {ns.functions.size}"
   -- Loops stay structured, without helper or self calls. The shared
   -- IR retains structured loops; check the corresponding representation.

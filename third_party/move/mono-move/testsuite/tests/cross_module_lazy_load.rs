@@ -62,7 +62,6 @@ fn call_indirect_triggers_lazy_module_load() {
         .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
         .expect("bar::main should resolve");
     assert_eq!(interp.read_set().len(), 1, "only bar loaded so far");
-    mono_move_runtime::assert_verified(main_fn, &guard);
     let mut call = interp
         .build_call(main_fn)
         .expect("the root frame fits on the stack");

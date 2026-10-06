@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/cast.move:54:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/cast.move:53:5: error: leaner verification failed: the automatic verification of `aborting_u8_cast_incorrect` failed; provide a proof: `verify aborting_u8_cast_incorrect by …` in `tests/sources/functional/cast.proof.lean` (`verify aborting_u8_cast_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/cast.move:68:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/cast.move:67:5: error: leaner verification failed: the automatic verification of `aborting_u16_cast_incorrect` failed; provide a proof: `verify aborting_u16_cast_incorrect by …` in `tests/sources/functional/cast.proof.lean` (`verify aborting_u16_cast_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/cast.move:82:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/cast.move:81:5: error: leaner verification failed: the automatic verification of `aborting_u32_cast_incorrect` failed; provide a proof: `verify aborting_u32_cast_incorrect by …` in `tests/sources/functional/cast.proof.lean` (`verify aborting_u32_cast_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/cast.move:96:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/cast.move:95:5: error: leaner verification failed: the automatic verification of `aborting_u64_cast_incorrect` failed; provide a proof: `verify aborting_u64_cast_incorrect by …` in `tests/sources/functional/cast.proof.lean` (`verify aborting_u64_cast_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/cast.move:110:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/cast.move:109:5: error: leaner verification failed: the automatic verification of `aborting_u128_cast_incorrect` failed; provide a proof: `verify aborting_u128_cast_incorrect by …` in `tests/sources/functional/cast.proof.lean` (`verify aborting_u128_cast_incorrect by skip` shows the obligations it leaves)

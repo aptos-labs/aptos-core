@@ -91,8 +91,9 @@ pub const XIR_SCHEMA: &str = "move-xir-module";
 /// `is_native` function flag and permits bodyless native declarations;
 /// version 4 transports source spans for declarations and stackless code;
 /// version 5 adds user-facing local names; version 6 adds the external struct
-/// table; version 7 adds struct visibility.
-pub const XIR_VERSION: u64 = 7;
+/// table; version 7 adds struct visibility; version 8 adds function types and
+/// the closure operations.
+pub const XIR_VERSION: u64 = 8;
 
 /// Index of a local of a function (a `LocalIndex` in move-model terms).
 /// Parameters come first.
@@ -199,12 +200,7 @@ impl XirModule {
         if self.schema != XIR_SCHEMA {
             return Err(format!("unsupported XIR schema `{}`", self.schema));
         }
-        if self.version != 3
-            && self.version != 4
-            && self.version != 5
-            && self.version != 6
-            && self.version != XIR_VERSION
-        {
+        if !(3..=XIR_VERSION).contains(&self.version) {
             return Err(format!("unsupported XIR version {}", self.version));
         }
         Ok(())
@@ -532,6 +528,9 @@ pub enum Type {
     Ref(Box<Type>),
     /// `{"mut_ref": type}` — mutable reference.
     MutRef(Box<Type>),
+    /// `{"function": [[parameters], [results], [abilities]]}` — a function
+    /// value type.
+    Function(Vec<Type>, Vec<Type>, Vec<String>),
 }
 
 /// A declaration-scoped Move type parameter.
@@ -725,6 +724,14 @@ pub enum Oper {
     /// `{"function": fun}` — call a function of the same module.
     Function(FunId),
     FunctionInst(FunId, Vec<Type>),
+    /// `{"closure": [fun, mask]}` — build a function value of `fun` from the
+    /// operands, which are the captured arguments; bit `i` of `mask` marks
+    /// parameter `i` as captured.
+    Closure(FunId, u64),
+    ClosureInst(FunId, u64, Vec<Type>),
+    /// `"invoke"` — call the function value in the last operand with the
+    /// preceding operands.
+    Invoke,
     /// The reference operations below are transported for completeness;
     /// consumers may reject them (the Lean model executes them; verifying
     /// borrow-based code goes through its reference elimination).
@@ -1117,6 +1124,22 @@ mod tests {
             serde_json::to_value(Type::Enum(1)).unwrap(),
             json!({"enum": 1})
         );
+        assert_eq!(
+            serde_json::to_value(Type::Function(vec![Type::U64], vec![Type::Bool], vec![
+                "copy".to_string()
+            ]))
+            .unwrap(),
+            json!({"function": [["u64"], ["bool"], ["copy"]]})
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::Closure(3, 2)).unwrap(),
+            json!({"closure": [3, 2]})
+        );
+        assert_eq!(
+            serde_json::to_value(Oper::ClosureInst(3, 2, vec![Type::U8])).unwrap(),
+            json!({"closure_inst": [3, 2, ["u8"]]})
+        );
+        assert_eq!(serde_json::to_value(Oper::Invoke).unwrap(), json!("invoke"));
         assert_eq!(
             serde_json::to_value(Oper::PackVariant(2)).unwrap(),
             json!({"pack_variant": 2})

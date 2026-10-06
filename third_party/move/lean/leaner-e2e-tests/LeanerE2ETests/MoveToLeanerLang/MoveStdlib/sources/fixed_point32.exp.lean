@@ -236,6 +236,7 @@ leaner module std::fixed_point32 where
   Rounds up the given FixedPoint32 to the next largest integer.
   -/
   public fun ceil(self : FixedPoint32) -> u64 := do
+    proof split self.value == self.value >> 32 << 32
     let floored_num := self.floor() << 32u8
     if self.value == floored_num then return floored_num >> 32u8;
     let val := floored_num as u128 + (1u128 << 32u8)

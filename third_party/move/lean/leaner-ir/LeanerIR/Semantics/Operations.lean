@@ -249,7 +249,8 @@ def destructNominal? (unit : ValidatedUnit) (sourceNamespace : NamespaceId)
 /-- Apply the exact pure-operation implementation selected during semantic
 preparation. `none` means that the prepared registry and interpreter disagree,
 which is reported as an internal capability failure by the interpreter. -/
-def evaluateProfileOperation? (executable : ExecutableUnit) (ns : ValidatedNamespace)
+def evaluateProfileOperation? {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (ns : ValidatedNamespace)
     (resultType : TypeId) (operation : ProfileValue) (arguments : Array RuntimeValue) :
     Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) := do
   let semantics ← semanticProfile? executable.semantics operation.profile
@@ -553,6 +554,37 @@ private def reverseVectorRange : Nat → Nat → Nat → Array RuntimeValue → 
       reverseVectorRange count (left + 1) (right - 1)
         (elements.swapIfInBounds left right)
 
+/-- Reversal only moves elements. -/
+theorem mem_reverseVectorRange : ∀ (count left right : Nat) (elements : Array RuntimeValue)
+    (value : RuntimeValue), value ∈ reverseVectorRange count left right elements →
+      value ∈ elements
+  | 0, _, _, _, _, member => member
+  | count + 1, left, right, elements, value, member => by
+      have swapped := mem_reverseVectorRange count (left + 1) (right - 1) _ value member
+      rw [Array.swapIfInBounds_def] at swapped
+      split at swapped
+      · split at swapped
+        · exact (Array.swap_perm _ _).mem_iff.mp swapped
+        · exact swapped
+      · exact swapped
+
+/-- Reversal commutes with a map of the elements. -/
+theorem reverseVectorRange_map (f : RuntimeValue → RuntimeValue) :
+    ∀ (count left right : Nat) (elements : Array RuntimeValue),
+      reverseVectorRange count left right (elements.map f) =
+        (reverseVectorRange count left right elements).map f
+  | 0, _, _, _ => rfl
+  | count + 1, left, right, elements => by
+      have swapped : (elements.map f).swapIfInBounds left right =
+          (elements.swapIfInBounds left right).map f := by
+        apply Array.ext
+        · simp
+        · intro k _ _
+          simp only [Array.getElem_map, Array.getElem_swapIfInBounds, Array.size_map]
+          split <;> (try split) <;> simp_all
+      rw [reverseVectorRange, reverseVectorRange, swapped]
+      exact reverseVectorRange_map f count (left + 1) (right - 1) _
+
 /-- Raw range reversal. Move library range/error policy is represented by
 its guards before invoking this kernel, just as for insertion and removal. -/
 def reverseSliceVector? (arguments : Array RuntimeValue) :
@@ -573,6 +605,18 @@ private def findVectorIndex (elements : Array RuntimeValue) (needle : RuntimeVal
   | count + 1, index =>
       if elements[index]?.any (· == needle) then some index
       else findVectorIndex elements needle count (index + 1)
+
+/-- Search is unchanged by a map that preserves equality. -/
+theorem findVectorIndex_map (f : RuntimeValue → RuntimeValue)
+    (beq_eq : ∀ left right, (f left == f right) = (left == right))
+    (elements : Array RuntimeValue) (needle : RuntimeValue) :
+    ∀ (count index : Nat), findVectorIndex (elements.map f) (f needle) count index =
+      findVectorIndex elements needle count index
+  | 0, _ => rfl
+  | count + 1, index => by
+      rw [findVectorIndex, findVectorIndex, Array.getElem?_map,
+        findVectorIndex_map f beq_eq elements needle count (index + 1)]
+      cases elements[index]? <;> simp [beq_eq]
 
 def checkVectorIndex? (failure : ThrowKind) (arguments : Array RuntimeValue) :
     Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue) :=
@@ -633,6 +677,15 @@ def variantRank (orders : Array (Array (Array String))) (source : StructHandle)
   ((orders[source.namespaceId.index]?.bind (·[source.structId]?)).bind
     (·.findIdx? (· == variant))).getD 0
 
+/-- The position of a function in the order of qualified names. -/
+def functionRank (ranks : Array (Array Nat)) (function : FunctionHandle) : Nat :=
+  ((ranks[function.namespaceId.index]?).bind (·[function.functionId.index]?)).getD 0
+
+/-- The ranks the order of runtime values reads, from a namespace's view of
+the unit's value orders. -/
+def valueRanks (orders : ValueOrders) : ValueRanks :=
+  ⟨variantRank orders.variants, functionRank orders.functions⟩
+
 /-- Deterministic meaning of the shared Move/Rust pure primitive vocabulary. -/
 def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
     (operation : PrimitiveOperation) (arguments : Array RuntimeValue)
@@ -659,7 +712,7 @@ def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
   | .containsVector => containsVector? arguments
   | .compare => match arguments.toList with
       | [left, right] => some (.ok (.integer
-          (orderValue (RuntimeValue.order (variantRank ns.variantOrders) left right))))
+          (orderValue (RuntimeValue.order (valueRanks ns.orders) left right))))
       | _ => none
   | .checkVectorIndex failure => checkVectorIndex? failure arguments
   | .indexOfVector =>
@@ -770,7 +823,7 @@ def evaluatePrimitiveOperation? (ns : ValidatedNamespace) (resultType : TypeId)
 
 /-! ## Concrete places and references -/
 
-private def subsliceBounds? (length start stop : Nat) (fromEnd : Bool) : Option (Nat × Nat) :=
+def subsliceBounds? (length start stop : Nat) (fromEnd : Bool) : Option (Nat × Nat) :=
   if fromEnd then
     if start + stop <= length then some (start, length - stop) else none
   else if start <= stop && stop <= length then some (start, stop) else none
@@ -835,6 +888,33 @@ def writeProjections? (value : RuntimeValue)
       let updated ← writeProjections? current rest replacement
       return .borrow loan updated
 
+theorem readProjections?_append (value : RuntimeValue)
+    (first second : List RuntimeProjection) :
+    readProjections? value (first ++ second) =
+      (readProjections? value first).bind (readProjections? · second) := by
+  induction first generalizing value with
+  | nil => simp [readProjections?]
+  | cons projection rest ih =>
+      cases projection <;> cases value <;> simp [readProjections?, ih, Option.bind_assoc]
+      split <;> (try split) <;> simp
+
+/-- Writing along a joined path writes the second part into the value the
+first reaches, and that back along the first. -/
+theorem writeProjections?_append (value : RuntimeValue)
+    (first second : List RuntimeProjection) (replacement : RuntimeValue) :
+    writeProjections? value (first ++ second) replacement =
+      (readProjections? value first).bind fun part =>
+        (writeProjections? part second replacement).bind (writeProjections? value first ·) := by
+  induction first generalizing value with
+  | nil => simp [readProjections?, writeProjections?]
+  | cons projection rest ih =>
+      cases projection <;> cases value <;>
+        simp [readProjections?, writeProjections?, ih, Option.bind_assoc]
+      all_goals
+        simp only [Option.bind]
+        repeat' split
+        all_goals simp_all
+
 def sourceFieldName? (ns : ValidatedNamespace) (field : NameId) : Option String :=
   (ns.tables.names[field.index]?).map (·.name)
 
@@ -870,18 +950,83 @@ def handleFieldIndex? (unit : ValidatedUnit) (handle : StructHandle)
   let (targetNs, fields) ← handleFields? unit handle variant
   fieldIndexIn targetNs fieldName fields.toList 0
 
-/-- Resolve a variant-field name set to its closed per-variant payload
-offsets.  Variants without any requested field are omitted. -/
+private theorem fieldIndexIn_find (ns : ValidatedNamespace) (fieldName : String) :
+    ∀ (fields : List FieldDecl) (start index : Nat),
+      fieldIndexIn ns fieldName fields start = some index →
+        start ≤ index ∧ ∃ field, fields[index - start]? = some field ∧
+          fields.find? (fun field =>
+            (ns.tables.names[field.name.index]?).any (·.name == fieldName)) = some field
+  | [], _, _, found => by simp [fieldIndexIn] at found
+  | field :: rest, start, index, found => by
+      unfold fieldIndexIn at found
+      split at found
+      · rename_i matched
+        simp only [Option.some.injEq] at found
+        subst found
+        exact ⟨Nat.le_refl _, field, by simp, by simp [matched]⟩
+      · rename_i unmatched
+        obtain ⟨le, found, member, find_eq⟩ := fieldIndexIn_find ns fieldName rest (start + 1) index found
+        refine ⟨by omega, found, ?_, ?_⟩
+        · have shift : index - start = (index - (start + 1)) + 1 := by omega
+          rw [shift]
+          simpa using member
+        · simp [unmatched, find_eq]
+
+/-- A field's position in a handle's payload holds the first field of that
+name. -/
+theorem handleFieldIndex?_find {unit : ValidatedUnit} {handle : StructHandle}
+    {variant : Option String} {fieldName : String} {index : Nat}
+    (found : handleFieldIndex? unit handle variant fieldName = some index) :
+    ∃ targetNs fields field, handleFields? unit handle variant = some (targetNs, fields) ∧
+      fields[index]? = some field ∧
+      fields.toList.find? (fun field =>
+        (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field := by
+  simp only [handleFieldIndex?, Option.bind_eq_bind, Option.bind_eq_some_iff] at found
+  obtain ⟨⟨targetNs, fields⟩, handle_eq, found⟩ := found
+  obtain ⟨-, field, member, find_eq⟩ := fieldIndexIn_find targetNs fieldName fields.toList 0 index found
+  refine ⟨targetNs, fields, field, handle_eq, ?_, find_eq⟩
+  simpa using member
+
+/-- Resolve `(variant, field)` pairs to their closed per-variant payload
+offsets, in declaration order.  Unlisted variants are omitted; a listed
+variant or field the declaration lacks has no choice. -/
 def variantFieldChoices? (unit : ValidatedUnit) (handle : StructHandle)
-    (fields : Array String) : Option (Array (String × Nat)) := do
+    (fields : Array (String × String)) : Option (Array (String × Nat)) := do
   let targetNs ← unit.namespaces[handle.namespaceId.index]?
   let declaration ← targetNs.structs[handle.structId]?
   return declaration.variants.filterMap fun variant => do
     let variantName ← targetNs.tables.names[variant.name.index]?
-    let field ← fields.find? fun field =>
-      (fieldIndexIn targetNs field variant.fields.toList 0).isSome
-    let index ← fieldIndexIn targetNs field variant.fields.toList 0
+    let selected ← fields.find? (·.1 == variantName.name)
+    let index ← fieldIndexIn targetNs selected.2 variant.fields.toList 0
     some (variantName.name, index)
+
+/-- A choice names a listed variant, at the position of the first field of
+its listed name. -/
+theorem variantFieldChoices?_mem {unit : ValidatedUnit} {handle : StructHandle}
+    {fields : Array (String × String)} {choices : Array (String × Nat)} {choice : String × Nat}
+    (choices_eq : variantFieldChoices? unit handle fields = some choices)
+    (member : choice ∈ choices) :
+    ∃ targetNs declaration variant name fieldName field,
+      unit.namespaces[handle.namespaceId.index]? = some targetNs ∧
+      targetNs.structs[handle.structId]? = some declaration ∧
+      variant ∈ declaration.variants ∧
+      targetNs.tables.names[variant.name.index]? = some name ∧ choice.1 = name.name ∧
+      (name.name, fieldName) ∈ fields ∧ variant.fields[choice.2]? = some field ∧
+      variant.fields.toList.find? (fun field =>
+        (targetNs.tables.names[field.name.index]?).any (·.name == fieldName)) = some field := by
+  simp only [variantFieldChoices?, Option.bind_eq_bind, Option.bind_eq_some_iff, pure,
+    Option.some.injEq] at choices_eq
+  obtain ⟨targetNs, namespace_eq, declaration, declaration_eq, rfl⟩ := choices_eq
+  obtain ⟨variant, variant_mem, chosen⟩ := Array.mem_filterMap.mp member
+  simp only [Option.bind_eq_some_iff, Option.some.injEq] at chosen
+  obtain ⟨name, name_eq, ⟨listed, fieldName⟩, listed_eq, index, index_eq, rfl⟩ := chosen
+  have listed_name : listed = name.name := by simpa using Array.find?_some listed_eq
+  subst listed_name
+  obtain ⟨-, field, field_eq, find_eq⟩ :=
+    fieldIndexIn_find targetNs fieldName variant.fields.toList 0 index index_eq
+  exact ⟨targetNs, declaration, variant, name, fieldName, field, namespace_eq, declaration_eq,
+    variant_mem, name_eq, rfl, Array.mem_of_find?_eq_some listed_eq, by simpa using field_eq,
+    find_eq⟩
 
 /-- Select through a closed per-variant payload map. -/
 def selectNominalVariantFieldAt? (owner : StructHandle)
@@ -1010,11 +1155,8 @@ theorem evaluateDataOperation?_select_at
           case nominal actualSource actualVariant fields =>
             by_cases source_eq : actualSource = handle
             · subst actualSource
-              by_cases variant_eq : actualVariant = variant <;>
-                simp [evaluateDataOperation?, selectNominalFieldAt?, list_eq,
-                  resolved_eq, index_eq, variant_eq]
-            · simp [evaluateDataOperation?, selectNominalFieldAt?, list_eq,
-                resolved_eq, bne_iff_ne, source_eq]
+              by_cases variant_eq : actualVariant = variant <;> simp [index_eq, variant_eq]
+            · simp [source_eq]
       | cons second tail =>
           simp [evaluateDataOperation?, selectNominalFieldAt?, list_eq]
 
@@ -1022,7 +1164,7 @@ theorem evaluateDataOperation?_select_at
 unique variant and payload offset containing that name. -/
 theorem evaluateDataOperation?_selectVariants_at
     {unit : ValidatedUnit} {sourceNamespace : NamespaceId}
-    {reference : QualifiedRef} {fields : Array String} {handle : StructHandle}
+    {reference : QualifiedRef} {fields : Array (String × String)} {handle : StructHandle}
     {choices : Array (String × Nat)}
     (resolved_eq : resolveStruct? unit sourceNamespace reference = some handle)
     (choices_eq : variantFieldChoices? unit handle fields = some choices)
@@ -1053,7 +1195,7 @@ theorem evaluateDataOperation?_select {unit : ValidatedUnit}
           values[index]?) := rfl
 
 theorem evaluateDataOperation?_selectVariants {unit : ValidatedUnit}
-    {sourceNamespace : NamespaceId} {reference : QualifiedRef} {fields : Array String}
+    {sourceNamespace : NamespaceId} {reference : QualifiedRef} {fields : Array (String × String)}
     {source : StructHandle} {variant : String} {values : Array RuntimeValue} :
     evaluateDataOperation? unit sourceNamespace (.selectVariants reference fields)
         #[.nominal source (some variant) values]
@@ -1181,9 +1323,9 @@ mutual
         | .nominal name variant fields =>
             (rewriteFirstList f fields.toList).map fun rewritten =>
               .nominal name variant rewritten.toArray
-        | .closure function captures =>
+        | .closure function mask instantiation captures =>
             (rewriteFirstList f captures.toList).map fun rewritten =>
-              .closure function rewritten.toArray
+              .closure function mask instantiation rewritten.toArray
         | .borrow loanInstance current =>
             (rewriteFirst f current).map (.borrow loanInstance)
         | _ => none
@@ -1218,7 +1360,7 @@ mutual
         match value with
         | .vector elements | .tuple elements => findFirstList f elements.toList
         | .nominal _ _ fields => findFirstList f fields.toList
-        | .closure _ captures => findFirstList f captures.toList
+        | .closure _ _ _ captures => findFirstList f captures.toList
         | .borrow _ current => findFirst f current
         | _ => none
   termination_by sizeOf value
@@ -1252,7 +1394,7 @@ mutual
         match value with
         | .vector elements | .tuple elements => collectPrunedList f elements.toList
         | .nominal _ _ fields => collectPrunedList f fields.toList
-        | .closure _ captures => collectPrunedList f captures.toList
+        | .closure _ _ _ captures => collectPrunedList f captures.toList
         | .borrow _ current => collectPruned f current
         | _ => #[]
   termination_by sizeOf value
@@ -1583,7 +1725,7 @@ def holeInGlobals (state : RuntimeState) (loan : Nat) : Bool :=
 Structural recursion keeps searches over lowered literal rows transparent;
 `Array.findIdx?`/`List.findIdx?` use well-founded recursion and are opaque to
 the proof-facing reduction path. -/
-@[simp] private def indexOfFrom {α : Type} (accepts : α → Bool) :
+@[simp] def indexOfFrom {α : Type} (accepts : α → Bool) :
     List α → Nat → Option Nat
   | [], _ => none
   | entry :: rest, index =>
@@ -1591,7 +1733,7 @@ the proof-facing reduction path. -/
 
 /-- Relate the evaluator's structural search to a public list certificate.
 The executable search itself remains unchanged. -/
-private theorem indexOfFrom_eq_findIdx? {α : Type} (accepts : α → Bool)
+theorem indexOfFrom_eq_findIdx? {α : Type} (accepts : α → Bool)
     (xs : List α) (offset : Nat) :
     indexOfFrom accepts xs offset = (xs.findIdx? accepts).map (· + offset) := by
   induction xs generalizing offset with
@@ -1692,7 +1834,7 @@ theorem LoanDiscipline.of_transfer {initial final : RuntimeState}
       if_pos, transfer_eq]
   exact LoanDiscipline.of_registered spelled transferred_minted live
 
-/-- Retarget the caller's explicit lexical death marker when a callee turns
+/-- Retarget the caller's lexical loan row when a callee turns
 one live loan into a returned reborrow. Ordinary write-backs contain no hole
 and simply retire the completed dynamic loan. -/
 def transferActiveLoan (activeLoans : Array (ExprId × Nat))
@@ -1704,7 +1846,7 @@ def transferActiveLoan (activeLoans : Array (ExprId × Nat))
   | _, _ => retained
 
 /-- Retarget the optional native address index in parallel with the lexical
-death marker. This index remains an optimization: the semantic identity of
+loan row. This index remains an optimization: the semantic identity of
 the transferred loan came from the hole carried in `replacement`. -/
 def transferLoanLocation (loanLocations : Array (Nat × RuntimePlace))
     (loan : Nat) (replacement : RuntimeValue) : Array (Nat × RuntimePlace) :=
@@ -1717,7 +1859,7 @@ def transferLoanLocation (loanLocations : Array (Nat × RuntimePlace))
 /-- Fill a registered local hole directly.  The location was recorded when
 the hole was created, so no frame-wide search is involved.  Reconciliation
 also retires the dynamic loan from both native indexes: retaining its
-lexical-site row would make a later `endLoans?` try to rediscover a borrow
+lexical-site row would make a later `settleLoans` try to rediscover a borrow
 that the callee has already returned. -/
 def fillLocalLoanHole? (frame : RuntimeFrame) (state : RuntimeState)
     (loan : Nat) (replacement : RuntimeValue) :
@@ -1754,15 +1896,17 @@ def fillVisibleHole (frame : RuntimeFrame) (state : RuntimeState)
     -- the scrutinee: the branch is decided without a case analysis.
     match globalLoanKey? state loan with
     | some key =>
-        let filled :=
-          match state.globals.lookup key with
-          | some stored => (fillHole? loan replacement stored).getD replacement
-          | none => replacement
-        (frame,
-          { state with
-            globals := state.globals.insert key filled
-            globalLoans := transferGlobalLoan state.globalLoans loan key replacement },
-          true)
+        -- A slot that no longer holds the loan's hole has nothing visible to
+        -- fill; borrow discipline excludes it, and the value is exported as
+        -- any invisible write-back is.
+        match (state.globals.lookup key).bind (fillHole? loan replacement) with
+        | some filled =>
+            (frame,
+              { state with
+                globals := state.globals.insert key filled
+                globalLoans := transferGlobalLoan state.globalLoans loan key replacement },
+              true)
+        | none => (frame, state, false)
     | none => (frame, state, false)
 
 /-- Reunite one loan's hole with its final value, or export the write-back
@@ -1809,19 +1953,23 @@ theorem applyWriteBack_empty (state : RuntimeState) (loan : Nat)
     applyWriteBack ({} : RuntimeFrame) state loan value =
       match globalLoanKey? state loan with
       | some key =>
-          let filled :=
-            match state.globals.lookup key with
-            | some stored => (fillHole? loan value stored).getD value
-            | none => value
-          (({} : RuntimeFrame),
-            { state with
-              globals := state.globals.insert key filled
-              globalLoans := transferGlobalLoan state.globalLoans loan key value })
+          match (state.globals.lookup key).bind (fillHole? loan value) with
+          | some filled =>
+              (({} : RuntimeFrame),
+                { state with
+                  globals := state.globals.insert key filled
+                  globalLoans := transferGlobalLoan state.globalLoans loan key value })
+          | none =>
+              (({} : RuntimeFrame),
+                { state with pending := state.pending.push (loan, value) })
       | none =>
           (({} : RuntimeFrame),
             { state with pending := state.pending.push (loan, value) }) := by
-  cases lookup_eq : globalLoanKey? state loan <;>
-    simp [applyWriteBack, fillVisibleHole, holeInFrame, lookup_eq]
+  cases lookup_eq : globalLoanKey? state loan with
+  | none => simp [applyWriteBack, fillVisibleHole, holeInFrame, lookup_eq]
+  | some key =>
+      cases filled_eq : (state.globals.lookup key).bind (fillHole? loan value) <;>
+        simp [applyWriteBack, fillVisibleHole, holeInFrame, lookup_eq, filled_eq]
 
 /-- Reconcile one write-back which has already crossed a function boundary.
 Such an entry can only target an ancestor frame: global loans are keyed and
@@ -2355,8 +2503,8 @@ mutual
     | .tuple elements => .tuple (maskReturnedBorrowList loans elements.toList).toArray
     | .nominal source variant fields =>
         .nominal source variant (maskReturnedBorrowList loans fields.toList).toArray
-    | .closure function captures =>
-        .closure function (maskReturnedBorrowList loans captures.toList).toArray
+    | .closure function mask instantiation captures =>
+        .closure function mask instantiation (maskReturnedBorrowList loans captures.toList).toArray
     | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ |
         .string _ | .bytes _ | .loanHole _ => value
   termination_by sizeOf value
@@ -3076,7 +3224,7 @@ theorem exportFrameLoans_twoIntegers_state
     noLeft, noRight]
 
 mutual
-  private def simpleIndexFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+  def simpleIndexFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (frame : RuntimeFrame) (state : RuntimeState) (fuel : Nat)
       (expressionId : ExprId) : Option Nat := do
     match fuel with
@@ -3095,7 +3243,7 @@ mutual
       if value < 0 then none else some value.toNat
   termination_by structural fuel
 
-  private def resolvePlaceFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+  def resolvePlaceFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       (frame : RuntimeFrame) (state : RuntimeState) (fuel : Nat)
       (placeId : PlaceId) : Option RuntimePlace := do
     match fuel with
@@ -3106,8 +3254,12 @@ mutual
       | .localVar localId =>
           if localId.index < frame.locals.size then some { root := .local localId } else none
       | .deref base =>
-          -- Shared dereferences are erased at preparation; a residual
-          -- dereference projects into a live mutable borrow.
+          -- A shared reference is the observed value itself, so a place
+          -- dereferencing one is its base; any other dereference projects
+          -- into a live mutable borrow.
+          if sharedDereference unit ns.identity placeId then
+            resolvePlaceFuel? unit ns frame state fuel base
+          else
           let basePlace ← resolvePlaceFuel? unit ns frame state fuel base
           let .borrow _ _ ← readRuntimePlace? frame state basePlace | none
           some { basePlace with
@@ -3190,6 +3342,7 @@ inductive DerefLocalFieldPath (unit : ValidatedUnit)
     PlaceId → List NominalFieldStep → Type where
   | deref {place base : PlaceId} {localId : LocalId}
       (place_eq : ns.places[place.index]? = some (.deref base))
+      (unshared : sharedDereference unit ns.identity place = false)
       (base_eq : ns.places[base.index]? = some (.localVar localId)) :
       DerefLocalFieldPath unit ns place []
   | field {place base : PlaceId} {reversed : List NominalFieldStep}
@@ -3250,7 +3403,7 @@ private theorem resolvePlaceFuel?_of_derefLocalFieldPath
     resolvePlaceFuel? unit ns frame state fuel place =
       resolveDerefLocalFieldPath? path.localId reversed.reverse frame state := by
   induction path generalizing fuel with
-  | @deref place base localId place_eq base_eq =>
+  | @deref place base localId place_eq unshared base_eq =>
       cases fuel with
       | zero => omega
       | succ fuel =>
@@ -3258,7 +3411,7 @@ private theorem resolvePlaceFuel?_of_derefLocalFieldPath
         | zero => omega
         | succ fuel =>
           simp only [DerefLocalFieldPath.localId, List.reverse_nil]
-          simp [resolvePlaceFuel?, place_eq, base_eq, readRuntimePlace?,
+          simp [resolvePlaceFuel?, place_eq, unshared, base_eq, readRuntimePlace?,
             readRoot?, readProjections?]
           by_cases in_bounds : localId.index < frame.locals.size
           · simp only [in_bounds, ↓reduceIte, RuntimePlace.writable]
@@ -3315,7 +3468,8 @@ private theorem resolvePlaceFuel?_of_derefLocalFieldPath
 expressions admit integer literals, local reads, copies of local places, and
 the exact length-minus-offset form emitted for a from-end Rust slice index.
 A dereference is a projection into the borrow value at the base place; its
-writability follows the borrow's kind. The place arena is acyclic, so a
+writability follows the borrow's kind. A dereference of a shared reference is
+its base, since the reference is the observed value itself. The place arena is acyclic, so a
 fuel of one unit per arena slot is exact rather than an approximation; the
 constant beyond it is what reduction peels, one step per level of the
 shapes lowering emits, and a field projection of a dereferenced local is
@@ -3324,6 +3478,51 @@ def resolvePlace? (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (frame : RuntimeFrame) (state : RuntimeState) (placeId : PlaceId) :
     Option RuntimePlace :=
   resolvePlaceFuel? unit ns frame state (2 * ns.places.size + 3) placeId
+
+/-- Whether a place fails to resolve because an enum value on its way holds
+another variant than a step needs: a field the variant lacks, or a downcast
+to another variant. Every step before it resolves. -/
+def placeVariantMismatchFuel? (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (frame : RuntimeFrame) (state : RuntimeState) : Nat → PlaceId → Bool
+  | 0, _ => false
+  | fuel + 1, placeId =>
+      match ns.places[placeId.index]? with
+      | some (.field base owner field) =>
+          match resolvePlaceFuel? unit ns frame state fuel base with
+          | none => placeVariantMismatchFuel? unit ns frame state fuel base
+          | some basePlace =>
+              match readRuntimePlace? frame state basePlace, resolveStruct? unit ns.identity owner,
+                  sourceFieldName? ns field with
+              | some (.nominal source (some variant) _), some declared, some fieldName =>
+                  source == declared && (handleFieldIndex? unit declared (some variant) fieldName).isNone
+              | _, _, _ => false
+      | some (.downcast base variant) =>
+          match resolvePlaceFuel? unit ns frame state fuel base with
+          | none => placeVariantMismatchFuel? unit ns frame state fuel base
+          | some basePlace =>
+              match readRuntimePlace? frame state basePlace, sourceFieldName? ns variant with
+              | some (.nominal _ (some actual) _), some expected => actual != expected
+              | _, _ => false
+      | some (.deref base) | some (.index base _) | some (.subslice base ..) =>
+          (resolvePlaceFuel? unit ns frame state fuel base).isNone &&
+            placeVariantMismatchFuel? unit ns frame state fuel base
+      | some (.localVar _) | none => false
+
+/-- Whether an operation fails because an enum value holds another variant
+than a variant-field access needs, in a selection or on the way of a place. -/
+def variantMismatch? (unit : ValidatedUnit) (ns : ValidatedNamespace) (operation : Operation)
+    (arguments : Array RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) : Bool :=
+  match operation with
+  | .data (.selectVariants reference fields) =>
+      match arguments.toList, resolveStruct? unit ns.identity reference with
+      | [.nominal source (some variant) _], some declared =>
+          source == declared && match variantFieldChoices? unit declared fields with
+            | some choices => !choices.any (·.1 == variant)
+            | none => false
+      | _, _ => false
+  | .copy place | .read place | .move place | .borrow _ place | .write place | .drop place =>
+      placeVariantMismatchFuel? unit ns frame state (2 * ns.places.size + 3) place
+  | _ => false
 
 /-- Resolve the indexed element of a vector or tuple held directly in a
 local.  Lowering has already classified the index expression as a local
@@ -3474,6 +3673,7 @@ theorem resolvePlace?_derefLocalLiteralIndex {unit : ValidatedUnit}
     (place_eq : ns.places[placeId.index]? =
       some (.index basePlaceId indexExpr))
     (base_eq : ns.places[basePlaceId.index]? = some (.deref localPlaceId))
+    (unshared : sharedDereference unit ns.identity basePlaceId = false)
     (local_eq : ns.places[localPlaceId.index]? = some (.localVar base))
     (index_eq : placeIndexForm? ns indexExpr =
       some (.literal (index : Int))) :
@@ -3483,14 +3683,14 @@ theorem resolvePlace?_derefLocalLiteralIndex {unit : ValidatedUnit}
     Int.not_lt_of_ge (Int.ofNat_nonneg index)
   by_cases in_bounds : base.index < frame.locals.size
   · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
-    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+    simp [resolvePlace?, resolvePlaceFuel?, unshared, simpleIndexFuel?, place_eq, base_eq,
       local_eq, index_eq, resolveLocalLiteralIndex?, readRuntimePlace?,
       readRoot?, readProjections?, in_bounds, not_out_of_bounds, nonnegative]
     cases value_eq : readLocal? frame base with
     | none => simp [value_eq]
     | some value => cases value <;> simp [value_eq, readProjections?]
   · have out_of_bounds : frame.locals.size ≤ base.index := by omega
-    simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+    simp [resolvePlace?, resolvePlaceFuel?, unshared, simpleIndexFuel?, place_eq, base_eq,
       local_eq, index_eq, resolveLocalLiteralIndex?, in_bounds, out_of_bounds]
 
 /-- Dynamic indexing through a borrowed local agrees with the same source
@@ -3501,6 +3701,7 @@ theorem resolvePlace?_derefLocalDynamicIndex {unit : ValidatedUnit}
     {base index : LocalId}
     (place_eq : ns.places[placeId.index]? = some (.index basePlaceId indexExpr))
     (base_eq : ns.places[basePlaceId.index]? = some (.deref localPlaceId))
+    (unshared : sharedDereference unit ns.identity basePlaceId = false)
     (local_eq : ns.places[localPlaceId.index]? = some (.localVar base))
     (index_eq : placeIndexForm? ns indexExpr = some (.local index) ∨
       placeIndexForm? ns indexExpr = some (.copyLocal index)) :
@@ -3510,7 +3711,7 @@ theorem resolvePlace?_derefLocalDynamicIndex {unit : ValidatedUnit}
   all_goals
     by_cases in_bounds : base.index < frame.locals.size
     · have not_out_of_bounds : ¬ frame.locals.size ≤ base.index := by omega
-      simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+      simp [resolvePlace?, resolvePlaceFuel?, unshared, simpleIndexFuel?, place_eq, base_eq,
         local_eq, index_eq, resolveLocalDynamicIndex?, resolveLocalLiteralIndex?,
         readRuntimePlace?, readRoot?, readProjections?, in_bounds, not_out_of_bounds]
       cases index_value : readLocal? frame index with
@@ -3523,7 +3724,7 @@ theorem resolvePlace?_derefLocalDynamicIndex {unit : ValidatedUnit}
             | none => simp [base_value]
             | some value => cases value <;> simp [base_value, readProjections?]
     · have out_of_bounds : frame.locals.size ≤ base.index := by omega
-      simp [resolvePlace?, resolvePlaceFuel?, simpleIndexFuel?, place_eq, base_eq,
+      simp [resolvePlace?, resolvePlaceFuel?, unshared, simpleIndexFuel?, place_eq, base_eq,
         local_eq, index_eq, resolveLocalDynamicIndex?, resolveLocalLiteralIndex?,
         in_bounds, out_of_bounds]
 
@@ -3596,6 +3797,7 @@ theorem resolvePlace?_fieldOfDerefLocal {unit : ValidatedUnit}
     {variant : Option String} {index : Nat}
     (place_eq : ns.places[placeId.index]? = some (.field baseId owner field))
     (base_eq : ns.places[baseId.index]? = some (.deref localPlaceId))
+    (unshared : sharedDereference unit ns.identity baseId = false)
     (local_eq : ns.places[localPlaceId.index]? = some (.localVar localId))
     (resolved_eq : resolveStruct? unit ns.identity owner = some handle)
     (name_eq : sourceFieldName? ns field = some fieldName)
@@ -3618,11 +3820,11 @@ theorem resolvePlace?_fieldOfDerefLocal {unit : ValidatedUnit}
   by_cases in_bounds : localId.index < frame.locals.size
   · cases local_value : readLocal? frame localId with
     | none =>
-        simp [resolvePlace?, resolvePlaceFuel?, place_eq, base_eq, local_eq,
+        simp [resolvePlace?, resolvePlaceFuel?, unshared, place_eq, base_eq, local_eq,
           readRuntimePlace?, readRoot?, readProjections?, in_bounds, local_value]
     | some value =>
         cases value <;>
-          simp [resolvePlace?, resolvePlaceFuel?, place_eq, base_eq, local_eq,
+          simp [resolvePlace?, resolvePlaceFuel?, unshared, place_eq, base_eq, local_eq,
             readRuntimePlace?, readRoot?, readProjections?, in_bounds,
             local_value, resolved_eq, name_eq]
         case borrow loan current =>
@@ -3635,7 +3837,7 @@ theorem resolvePlace?_fieldOfDerefLocal {unit : ValidatedUnit}
               by_cases variant_eq : actualVariant = variant <;>
                 simp [index_eq, variant_eq, bne_iff_ne]
             · simp [bne_iff_ne, source_eq]
-  · simp [resolvePlace?, resolvePlaceFuel?, place_eq, base_eq, local_eq,
+  · simp [resolvePlace?, resolvePlaceFuel?, unshared, place_eq, base_eq, local_eq,
       readRuntimePlace?, readRoot?, readProjections?, in_bounds]
 
 /-- A dereference rooted at a direct local slot has a native runtime-place
@@ -3646,6 +3848,7 @@ theorem resolvePlace?_derefLocal {unit : ValidatedUnit}
     {ns : ValidatedNamespace} {frame : RuntimeFrame} {state : RuntimeState}
     {placeId baseId : PlaceId} {localId : LocalId}
     (place_eq : ns.places[placeId.index]? = some (.deref baseId))
+    (unshared : sharedDereference unit ns.identity placeId = false)
     (base_eq : ns.places[baseId.index]? = some (.localVar localId)) :
     resolvePlace? unit ns frame state placeId =
       if localId.index < frame.locals.size then
@@ -3655,7 +3858,7 @@ theorem resolvePlace?_derefLocal {unit : ValidatedUnit}
             projections := #[.deref] }
         | _ => none
       else none := by
-  simp [resolvePlace?, resolvePlaceFuel?, place_eq, base_eq,
+  simp [resolvePlace?, resolvePlaceFuel?, unshared, place_eq, base_eq,
     readRuntimePlace?, readRoot?, readProjections?]
   by_cases in_bounds : localId.index < frame.locals.size
   · simp only [in_bounds, ↓reduceIte, RuntimePlace.writable]
@@ -4028,15 +4231,15 @@ theorem evaluateGlobalOperation?_typeArg (unit : ValidatedUnit)
 boundary: result types and loan rows are direct arguments, never table or
 arena lookups. -/
 
+/-- Observe a live mutable borrow's current value. A shared reference is the
+observed value itself and is dereferenced by its site (`sharedOperandAt`);
+any other value here is a reference whose loan has ended, which borrow
+discipline never dereferences. -/
 def dereferenceBorrow? (arguments : Array RuntimeValue)
     (frame : RuntimeFrame) (state : RuntimeState) :
     Option (RuntimeFrame × RuntimeState × RuntimeValue) :=
   match arguments.toList with
   | [.borrow _ current] => some (frame, state, current)
-  -- Shared references are represented by the observed value itself.  The
-  -- static reference type distinguishes this case; no runtime wrapper or
-  -- loan reconciliation is needed.
-  | [value] => some (frame, state, value)
   | _ => none
 
 def freezeBorrow? (resultType : ReferenceType) (arguments : Array RuntimeValue)
@@ -4058,15 +4261,18 @@ def mutateBorrow? (arguments : Array RuntimeValue)
           some (frame, state, .unit)
   | _ => none
 
-def endLoans? (loans : Array LoanId) (arguments : Array RuntimeValue)
-    (frame : RuntimeFrame) (state : RuntimeState) :
-    Option (RuntimeFrame × RuntimeState × RuntimeValue) :=
-  /- The certificate lists a marker's loans in minting order, and a
+/-- End the loans whose deaths the borrow certificates anchor at a node:
+reunite each named live loan's hole with its current value. A loan not
+created on this path, or already reconciled through a call boundary, is a
+no-op. -/
+def settleLoans (loans : Array LoanId) (frame : RuntimeFrame) (state : RuntimeState) :
+    RuntimeFrame × RuntimeState :=
+  /- The certificate lists an anchor's loans in minting order, and a
   reborrow is minted after the loan it projects.  Folding from the right
   therefore reconciles innermost first: a hole settles before the value
   holding it moves, where the forward order would write a lender back
   still carrying it. -/
-  let (frame, state) := loans.foldr (init := (frame, state))
+  loans.foldr (init := (frame, state))
     fun lexical (frame, state) =>
       match frame.activeLoans.find? (·.1 == ⟨lexical.index⟩) with
       | none => (frame, state)
@@ -4078,93 +4284,67 @@ def endLoans? (loans : Array LoanId) (arguments : Array RuntimeValue)
               let (frame, state) := clearBorrowValue frame state loanInstance
               applyWriteBack frame state loanInstance current
           | none => (frame, state)
-  match arguments.toList with
-  | [value] => some (frame, state, value)
-  | [] => some (frame, state, .unit)
-  | _ => none
 
-/-- Execute the explicit borrow-analysis death marker for a returned scalar
-reborrow.  The marker removes the resting returned borrow, fills its hole in
-the lender, and retires the lexical row.  Its cached address is deliberately
-irrelevant here: loan identity and death both come from the validated marker
-and the prophetic value graph. -/
-theorem endLoans?_returnedReborrow_zero
+/-- End the loans anchored after a node once it produced a value; control
+leaving the node abruptly skips them. -/
+def settleAfter (loans : Array LoanId) (control : Control) (frame : RuntimeFrame)
+    (state : RuntimeState) : RuntimeFrame × RuntimeState :=
+  match control with
+  | .value _ => settleLoans loans frame state
+  | _ => (frame, state)
+
+/-- End a returned scalar reborrow at its recorded death: remove the
+resting returned borrow, fill its hole in the lender, and retire the lexical
+row.  Its cached address is deliberately irrelevant here: loan identity and
+death both come from the borrow certificate and the prophetic value graph. -/
+theorem settleLoans_returnedReborrow_zero
     (state : RuntimeState) (outerLoan loan : Nat) (current : RuntimeValue)
     (loanLocations : Array (Nat × RuntimePlace))
     (separate : outerLoan ≠ loan) :
-    endLoans? #[(⟨0⟩ : LoanId)] #[]
+    settleLoans #[(⟨0⟩ : LoanId)]
         { locals := #[some (.borrow outerLoan (.loanHole loan)),
             some (.borrow loan current)]
           activeLoans := #[(⟨0⟩, loan)]
           loanLocations }
         state =
-      some
         ({ locals := #[some (.borrow outerLoan current), some .unit]
            activeLoans := #[]
            loanLocations },
-         state, .unit) := by
+         state) := by
   have siteSelf : ((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true := by
     decide
   have siteNotDifferent : ((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false := by
     decide
-  simp [endLoans?, findBorrowValue?, findFirst,
+  simp [settleLoans, findBorrowValue?, findFirst,
     clearBorrowValue, rewriteFirst, indexOfFrom,
     applyWriteBack, fillVisibleHole, holeInFrame, holeWithin, fillHole?, Array.filter,
     separate, siteSelf, siteNotDifferent]
 
-/-- Pass-through form of `endLoans?_returnedReborrow_zero`.  Validation can
-attach the same explicit death marker to a value-producing expression; the
-marker reconciles the loan and returns that value unchanged. -/
-theorem endLoans?_returnedReborrow_zero_value
-    (state : RuntimeState) (outerLoan loan : Nat) (current argument : RuntimeValue)
-    (loanLocations : Array (Nat × RuntimePlace))
-    (separate : outerLoan ≠ loan) :
-    endLoans? #[(⟨0⟩ : LoanId)] #[argument]
-        { locals := #[some (.borrow outerLoan (.loanHole loan)),
-            some (.borrow loan current)]
-          activeLoans := #[(⟨0⟩, loan)]
-          loanLocations }
-        state =
-      some
-        ({ locals := #[some (.borrow outerLoan current), some .unit]
-           activeLoans := #[]
-           loanLocations },
-         state, argument) := by
-  have siteSelf : ((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true := by
-    decide
-  have siteNotDifferent : ((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false := by
-    decide
-  simp [endLoans?, findBorrowValue?, findFirst,
-    clearBorrowValue, rewriteFirst, indexOfFrom,
-    applyWriteBack, fillVisibleHole, holeInFrame, holeWithin, fillHole?, Array.filter,
-    separate, siteSelf, siteNotDifferent]
-
-/-- End a field-projected returned reborrow.  The explicit analysis marker
-selects the dynamic loan; write-back fills the matching prophecy hole inside
+/-- End a field-projected returned reborrow.  The recorded death selects
+the dynamic loan; write-back fills the matching prophecy hole inside
 the nominal lender, without consulting an owning projection path. -/
-theorem endLoans?_returnedProjectedReborrow_zero
+theorem settleLoans_returnedProjectedReborrow_zero
     (state : RuntimeState) (outerLoan loan : Nat) (name : StructHandle)
     (right : Int) (current : RuntimeValue)
     (loanLocations : Array (Nat × RuntimePlace))
     (separate : outerLoan ≠ loan) :
-    endLoans? #[(⟨0⟩ : LoanId)] #[.unit]
+    settleLoans #[(⟨0⟩ : LoanId)]
         { locals := #[some (.borrow outerLoan
               (.nominal name none #[.loanHole loan, .integer right])),
             some (.borrow loan current)]
           activeLoans := #[(⟨0⟩, loan)]
           loanLocations }
         state =
-      some
         ({ locals := #[some (.borrow outerLoan
               (.nominal name none #[current, .integer right])), some .unit]
            activeLoans := #[]
            loanLocations },
-         state, .unit) := by
+         state) := by
   have siteSelf : ((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true := by
     decide
   have siteNotDifferent : ((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false := by
     decide
-  simp [endLoans?, findBorrowValue?, findFirst, findFirstList,
+  simp [settleLoans, findBorrowValue?, findFirst, findFirstList,
     clearBorrowValue, rewriteFirst, rewriteFirstList, indexOfFrom,
     applyWriteBack, fillVisibleHole, holeInFrame, holeWithin, fillHole?,
     Array.filter, separate, siteSelf, siteNotDifferent]
@@ -4174,12 +4354,12 @@ updated it.  The caller retains only the dynamic loan in its local and the
 lexical-to-dynamic row emitted by borrow analysis.  Settlement discovers the
 prophecy hole in the global value itself; no path back to the owning key is
 stored on the reference. -/
-theorem endLoans?_returnedGlobalProjection_zero
+theorem settleLoans_returnedGlobalProjection_zero
     (globals : GlobalMap) (rest : List (Nat × GlobalKey))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (name : StructHandle)
     (right current : Int) :
-    endLoans? #[(⟨0⟩ : LoanId)] #[.unit]
+    settleLoans #[(⟨0⟩ : LoanId)]
         { locals := #[some (.address address), some (.borrow loan (.integer current))]
           activeLoans := #[(⟨0⟩, loan)] }
         { globals := globals.insert key
@@ -4187,7 +4367,6 @@ theorem endLoans?_returnedGlobalProjection_zero
           globalLoans := (loan, key) :: rest
           nextLoan
           pending } =
-      some
         ({ locals := #[some (.address address), some .unit]
            activeLoans := #[] },
          { globals := (globals.insert key
@@ -4195,13 +4374,12 @@ theorem endLoans?_returnedGlobalProjection_zero
                (.nominal name none #[.integer current, .integer right])
            globalLoans := rest
            nextLoan
-           pending },
-         .unit) := by
+           pending }) := by
   have siteSelf : ((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true := by
     decide
   have siteNotDifferent : ((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false := by
     decide
-  simp [endLoans?, findBorrowValue?, findFirst, findFirstList,
+  simp [settleLoans, findBorrowValue?, findFirst, findFirstList,
     clearBorrowValue, rewriteFirst, rewriteFirstList, indexOfFrom,
     applyWriteBack, fillVisibleHole, holeInFrame, holeInGlobals,
     holeWithin, fillHole?, globalLoanKey?, globalLoanKeyIn?,
@@ -4212,12 +4390,12 @@ theorem endLoans?_returnedGlobalProjection_zero
 lexical rows supply the dynamic identities; folding right-to-left settles
 each returned current into its lender hole before clearing the resting
 borrow local. -/
-theorem endLoans?_twoReturnedReborrows
+theorem settleLoans_twoReturnedReborrows
     (state : RuntimeState) (leftOuter rightOuter nextLoan : Nat)
     (left right : Int)
     (leftPrior : leftOuter < nextLoan)
     (rightPrior : rightOuter < nextLoan) :
-    endLoans? #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)] #[.unit]
+    settleLoans #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)]
         { locals := #[some (.borrow leftOuter (.loanHole (nextLoan + 1 + 1))),
             some (.borrow rightOuter (.loanHole (nextLoan + 1 + 1 + 1))),
             some (.borrow (nextLoan + 1 + 1) (.integer left)),
@@ -4234,7 +4412,6 @@ theorem endLoans?_twoReturnedReborrows
               (nextLoan + 1 + 1 + 1,
                 (⟨.local (⟨1⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
         state =
-      some
         ({ locals := #[some (.borrow leftOuter (.integer left)),
               some (.borrow rightOuter (.integer right)),
               some .unit, some .unit]
@@ -4248,7 +4425,7 @@ theorem endLoans?_twoReturnedReborrows
                  (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace)),
                (nextLoan + 1 + 1 + 1,
                  (⟨.local (⟨1⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] },
-         state, .unit) := by
+         state) := by
   have leftSeparateFirst : leftOuter ≠ nextLoan + 1 + 1 := by omega
   have leftSeparateSecond : leftOuter ≠ nextLoan + 1 + 1 + 1 := by omega
   have rightSeparateFirst : rightOuter ≠ nextLoan + 1 + 1 := by omega
@@ -4261,7 +4438,7 @@ theorem endLoans?_twoReturnedReborrows
   have siteZeroNotOne : ((⟨0⟩ : ExprId) != (⟨1⟩ : ExprId)) = true := by decide
   have siteOneNotZero : ((⟨1⟩ : ExprId) != (⟨0⟩ : ExprId)) = true := by decide
   have siteOneNotOne : ((⟨1⟩ : ExprId) != (⟨1⟩ : ExprId)) = false := by decide
-  simp [endLoans?, Array.find?, List.find?, findBorrowValue?, findFirst, findFirstList,
+  simp [settleLoans, Array.find?, List.find?, findBorrowValue?, findFirst, findFirstList,
     clearBorrowValue, rewriteFirst, rewriteFirstList, indexOfFrom,
     applyWriteBack, fillVisibleHole, fillLocalLoanHole?, localLoanPlace?,
     readRuntimePlace?, readRoot?, readLocal?, readProjections?,
@@ -4275,12 +4452,12 @@ theorem endLoans?_twoReturnedReborrows
 /-- Execute the explicit function-exit death of a global borrow held in the
 third local. The global-loan registry supplies the write-back key directly;
 the reference contains only its dynamic loan and prophetic current value. -/
-theorem endLoans?_globalBorrowThirdLocal
+theorem settleLoans_globalBorrowThirdLocal
     (globals : GlobalMap) (rest : List (Nat × GlobalKey))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (argument : Int)
     (current : RuntimeValue) :
-    endLoans? #[(⟨0⟩ : LoanId)] #[.unit]
+    settleLoans #[(⟨0⟩ : LoanId)]
         { locals := #[some (.address address), some (.integer argument),
             some (.borrow loan current)]
           activeLoans := #[(⟨0⟩, loan)]
@@ -4289,7 +4466,6 @@ theorem endLoans?_globalBorrowThirdLocal
           globalLoans := (loan, key) :: rest
           nextLoan
           pending } =
-      some
         ({ locals := #[some (.address address), some (.integer argument),
               some .unit]
            activeLoans := #[]
@@ -4298,30 +4474,29 @@ theorem endLoans?_globalBorrowThirdLocal
                current
            globalLoans := transferGlobalLoan ((loan, key) :: rest) loan key current
            nextLoan
-           pending },
-         .unit) := by
+           pending }) := by
   have siteSelf :
       (((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true) := by
     decide
   have siteNotDifferent :
       (((⟨0⟩ : ExprId) != (⟨0⟩ : ExprId)) = false) := by
     decide
-  simp [endLoans?, findBorrowValue?, findFirst,
+  simp [settleLoans, findBorrowValue?, findFirst,
     clearBorrowValue, rewriteFirst, indexOfFrom, applyWriteBack,
     fillVisibleHole, holeInFrame, holeWithin, globalLoanKey?, globalLoanKeyIn?,
     removeGlobalLoan, transferGlobalLoan, transferredLoan?, fillHole?,
     rewriteFirstList, Array.filter, siteSelf, siteNotDifferent]
 
-/-- Execute the paired deaths of a field-focused global borrow.  The marker
+/-- Execute the paired deaths of a field-focused global borrow.  The anchor
 lists the enclosing resource loan before the projected field loan, so
-`endLoans?` settles the field first and then writes the reconstructed resource
+`settleLoans` settles the field first and then writes the reconstructed resource
 to the key recorded in the global-loan registry. -/
-theorem endLoans?_focusedGlobalNominal
+theorem settleLoans_focusedGlobalNominal
     (globals : GlobalMap) (rest : List (Nat × GlobalKey))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount value : Int)
-    (outerName innerName : StructHandle) (argument : RuntimeValue) :
-    endLoans? #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)] #[argument]
+    (outerName innerName : StructHandle) :
+    settleLoans #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)]
         { locals := #[some (.address address), some (.integer amount),
             some (.borrow (loan + 1) (.integer value)),
             some (.borrow loan
@@ -4336,7 +4511,6 @@ theorem endLoans?_focusedGlobalNominal
           globalLoans := (loan, key) :: rest
           nextLoan
           pending } =
-      some
         ({ locals := #[some (.address address), some (.integer amount),
               some .unit, some .unit]
            activeLoans := #[]
@@ -4349,8 +4523,7 @@ theorem endLoans?_focusedGlobalNominal
                  #[.nominal innerName none #[.integer value]])
            globalLoans := rest
            nextLoan
-           pending },
-         argument) := by
+           pending }) := by
   have outer_ne_inner : loan ≠ loan + 1 := by omega
   have inner_ne_outer : loan + 1 ≠ loan := by omega
   have zero_eq_zero :
@@ -4369,7 +4542,7 @@ theorem endLoans?_focusedGlobalNominal
       (((⟨0⟩ : ExprId) != (⟨1⟩ : ExprId)) = true) := by decide
   have one_ne_zero :
       (((⟨1⟩ : ExprId) != (⟨0⟩ : ExprId)) = true) := by decide
-  simp [endLoans?, Array.find?, List.find?, findBorrowValue?, findFirst,
+  simp [settleLoans, Array.find?, List.find?, findBorrowValue?, findFirst,
     findFirstList,
     clearBorrowValue, rewriteFirst, indexOfFrom, applyWriteBack,
     fillVisibleHole, holeInFrame, holeWithin, fillHole?, rewriteFirstList,
@@ -4378,15 +4551,15 @@ theorem endLoans?_focusedGlobalNominal
     outer_ne_inner, inner_ne_outer, zero_eq_zero, one_eq_one, zero_eq_one,
     one_eq_zero, zero_ne_zero, one_ne_one, zero_ne_one, one_ne_zero]
 
-/-- Saved-value variant of `endLoans?_focusedGlobalNominal`.  Reading the
+/-- Saved-value variant of `settleLoans_focusedGlobalNominal`.  Reading the
 field before mutation leaves one scalar local between the focused reference
 and its enclosing global holder. -/
-theorem endLoans?_focusedGlobalNominalSaved
+theorem settleLoans_focusedGlobalNominalSaved
     (globals : GlobalMap) (rest : List (Nat × GlobalKey))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount saved value : Int)
-    (outerName innerName : StructHandle) (argument : RuntimeValue) :
-    endLoans? #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)] #[argument]
+    (outerName innerName : StructHandle) :
+    settleLoans #[(⟨0⟩ : LoanId), (⟨1⟩ : LoanId)]
         { locals := #[some (.address address), some (.integer amount),
             some (.borrow (loan + 1) (.integer value)), some (.integer saved),
             some (.borrow loan
@@ -4401,7 +4574,6 @@ theorem endLoans?_focusedGlobalNominalSaved
           globalLoans := (loan, key) :: rest
           nextLoan
           pending } =
-      some
         ({ locals := #[some (.address address), some (.integer amount),
               some .unit, some (.integer saved), some .unit]
            activeLoans := #[]
@@ -4414,8 +4586,7 @@ theorem endLoans?_focusedGlobalNominalSaved
                  #[.nominal innerName none #[.integer value]])
            globalLoans := rest
            nextLoan
-           pending },
-         argument) := by
+           pending }) := by
   have outer_ne_inner : loan ≠ loan + 1 := by omega
   have inner_ne_outer : loan + 1 ≠ loan := by omega
   have zero_eq_zero :
@@ -4434,7 +4605,7 @@ theorem endLoans?_focusedGlobalNominalSaved
       (((⟨0⟩ : ExprId) != (⟨1⟩ : ExprId)) = true) := by decide
   have one_ne_zero :
       (((⟨1⟩ : ExprId) != (⟨0⟩ : ExprId)) = true) := by decide
-  simp [endLoans?, Array.find?, List.find?, findBorrowValue?, findFirst,
+  simp [settleLoans, Array.find?, List.find?, findBorrowValue?, findFirst,
     findFirstList,
     clearBorrowValue, rewriteFirst, indexOfFrom, applyWriteBack,
     fillVisibleHole, holeInFrame, holeWithin, fillHole?, rewriteFirstList,
@@ -4488,21 +4659,24 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
         some (frame, state, .unit)
       else some (frame, state, .unit)
   | .reference .dereference =>
-      -- Shared dereferences are erased at preparation; a residual
-      -- dereference observes a live mutable borrow's current value.
-      dereferenceBorrow? arguments frame state
+      -- A shared reference is the observed value itself, so dereferencing
+      -- one reads it; any other dereference observes a live mutable
+      -- borrow's current value.
+      if sharedOperandAt ns site then
+        let #[value] := arguments | none
+        some (frame, state, value)
+      else dereferenceBorrow? arguments frame state
   | .reference (.freeze _) =>
-      -- A shared-source freeze is erased at preparation. Freezing a
-      -- mutable borrow is a shared reborrow: the result is the bare
-      -- observation of the current value, and the loan stays live until
-      -- its holder's death ends it.
+      -- Freezing a shared reference reads it. Freezing a mutable borrow is
+      -- a shared reborrow: the result is the bare observation of the
+      -- current value, and the loan stays live until its holder's death
+      -- ends it.
+      if sharedOperandAt ns site then
+        let #[value] := arguments | none
+        some (frame, state, value)
+      else
       let .reference resultReference ← ns.tables.types[resultType.index]? | none
       freezeBorrow? resultReference arguments frame state
-  | .reference (.endLoan loans) =>
-      -- Reunite each named live loan's hole with its current value. A loan
-      -- not created on this path, or already reconciled through a call
-      -- boundary, is a no-op.
-      endLoans? loans arguments frame state
   | .reference .mutate =>
       -- Mutation through a reference value updates the live borrow wherever
       -- it rests; a consumed temporary has no resting place and reconciles
@@ -4513,10 +4687,190 @@ def evaluatePlaceOperation? (unit : ValidatedUnit) (ns : ValidatedNamespace)
       some (frame, state, value)
   | _ => none
 
+/-! Equations for the operations matching an array literal of operands, which
+do not receive useful automatically generated equations. -/
+
+theorem evaluatePlaceOperation?_write (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (resultType : TypeId) (site : ExprId) (place : PlaceId) (value : RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    evaluatePlaceOperation? unit ns resultType site (.write place) #[value] frame state =
+      (resolvePlace? unit ns frame state place).bind fun resolved =>
+        (writeRuntimePlace? frame state resolved value).bind fun written =>
+          some (written.1, written.2, .unit) := rfl
+
+/-- A place whose variant step mismatches fails to resolve. -/
+theorem placeVariantMismatchFuel?_resolve (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    ∀ fuel placeId, placeVariantMismatchFuel? unit ns frame state fuel placeId = true →
+      resolvePlaceFuel? unit ns frame state fuel placeId = none
+  | 0, _, mismatch => by simp [placeVariantMismatchFuel?] at mismatch
+  | fuel + 1, placeId, mismatch => by
+      have ih := placeVariantMismatchFuel?_resolve unit ns frame state fuel
+      simp only [placeVariantMismatchFuel?] at mismatch
+      simp only [resolvePlaceFuel?, Option.bind_eq_bind]
+      cases place_eq : ns.places[placeId.index]? with
+      | none => rfl
+      | some place =>
+          simp only [place_eq] at mismatch
+          simp only [Option.bind_some]
+          cases place with
+          | localVar => simp at mismatch
+          | field base owner field =>
+              simp only at mismatch
+              cases base_eq : resolvePlaceFuel? unit ns frame state fuel base with
+              | none => simp [base_eq]
+              | some basePlace =>
+                  simp only [base_eq] at mismatch
+                  simp only [base_eq, Option.bind_some]
+                  revert mismatch
+                  cases readRuntimePlace? frame state basePlace with
+                  | none => simp
+                  | some value =>
+                      intro mismatch
+                      cases value <;> try simp at mismatch
+                      rename_i source variant fields
+                      cases variant
+                      · simp at mismatch
+                      cases declared_eq : resolveStruct? unit ns.identity owner
+                      · simp [declared_eq] at mismatch
+                      cases name_eq : sourceFieldName? ns field
+                      · simp [declared_eq, name_eq] at mismatch
+                      simp only [declared_eq, name_eq, Bool.and_eq_true, beq_iff_eq,
+                        Option.isNone_iff_eq_none] at mismatch
+                      obtain ⟨rfl, missing⟩ := mismatch
+                      simp [missing]
+          | downcast base variant =>
+              simp only at mismatch
+              cases base_eq : resolvePlaceFuel? unit ns frame state fuel base with
+              | none => simp [base_eq]
+              | some basePlace =>
+                  simp only [base_eq] at mismatch
+                  simp only [base_eq, Option.bind_some]
+                  revert mismatch
+                  cases readRuntimePlace? frame state basePlace with
+                  | none => simp
+                  | some value =>
+                      intro mismatch
+                      cases value <;> try simp at mismatch
+                      rename_i source actual fields
+                      cases actual
+                      · simp at mismatch
+                      cases name_eq : sourceFieldName? ns variant
+                      · simp [name_eq] at mismatch
+                      simp only [name_eq, bne_iff_ne, ne_eq] at mismatch
+                      simp [mismatch]
+          | deref base =>
+              simp only [Bool.and_eq_true, Option.isNone_iff_eq_none] at mismatch
+              simp [mismatch.1]
+          | index base _ =>
+              simp only [Bool.and_eq_true, Option.isNone_iff_eq_none] at mismatch
+              simp [mismatch.1]
+          | subslice base _ _ _ =>
+              simp only [Bool.and_eq_true, Option.isNone_iff_eq_none] at mismatch
+              simp [mismatch.1]
+
+
+/-- An operation whose variant-field access mismatches fails. -/
+theorem variantMismatch?_evaluate_none {unit : ValidatedUnit} {ns : ValidatedNamespace}
+    {resultType : TypeId} {site : ExprId} {operation : Operation}
+    {arguments : Array RuntimeValue} {frame : RuntimeFrame} {state : RuntimeState}
+    (mismatch : variantMismatch? unit ns operation arguments frame state = true) :
+    evaluatePlaceOperation? unit ns resultType site operation arguments frame state = none := by
+  have resolve : ∀ place, placeVariantMismatchFuel? unit ns frame state
+      (2 * ns.places.size + 3) place = true → resolvePlace? unit ns frame state place = none :=
+    fun place => placeVariantMismatchFuel?_resolve unit ns frame state _ place
+  cases operation with
+  | copy place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
+  | read place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
+  | move place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
+  | borrow kind place =>
+      simp [variantMismatch?] at mismatch
+      simp only [evaluatePlaceOperation?, resolve place mismatch]
+      cases arguments.isEmpty <;> simp
+      intro type _
+      cases type <;> rfl
+  | write place =>
+      simp [variantMismatch?] at mismatch
+      rcases arguments with ⟨_ | ⟨value, _ | ⟨other, rest⟩⟩⟩
+      · rfl
+      · rw [show (⟨[value]⟩ : Array RuntimeValue) = #[value] from rfl,
+          evaluatePlaceOperation?_write]
+        simp [resolve place mismatch]
+      · rfl
+  | drop place => simp [variantMismatch?] at mismatch; simp [evaluatePlaceOperation?, resolve place mismatch]
+  | data kind =>
+      cases kind with
+      | selectVariants reference fields =>
+          revert mismatch
+          rcases arguments with ⟨_ | ⟨value, _ | ⟨other, rest⟩⟩⟩
+          · simp [variantMismatch?]
+          · cases value
+            case nominal source variant fields' =>
+              cases variant
+              · simp [variantMismatch?]
+              rename_i variant
+              cases declared_eq : resolveStruct? unit ns.identity reference
+              · simp [variantMismatch?, declared_eq]
+              rename_i declared
+              cases choices_eq : variantFieldChoices? unit declared fields
+              · simp [variantMismatch?, declared_eq, choices_eq]
+              rename_i choices
+              simp only [variantMismatch?, declared_eq, choices_eq, Bool.and_eq_true, beq_iff_eq,
+                Bool.not_eq_true', Array.any_eq_false]
+              rintro ⟨rfl, missing⟩
+              have none_eq : choices.find? (fun choice => choice.1 == variant) = none :=
+                Array.find?_eq_none.mpr fun choice member => by
+                  obtain ⟨i, h, rfl⟩ := Array.mem_iff_getElem.mp member
+                  simpa using missing i h
+              simp [evaluatePlaceOperation?, evaluateDataOperation?, declared_eq, choices_eq,
+                selectNominalVariantFieldAt?, none_eq]
+            all_goals simp [variantMismatch?]
+          · simp [variantMismatch?]
+      | _ => simp [variantMismatch?] at mismatch
+  | _ => simp [variantMismatch?] at mismatch
+
+theorem evaluatePlaceOperation?_dereference (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (resultType : TypeId) (site : ExprId) (value : RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    evaluatePlaceOperation? unit ns resultType site (.reference .dereference) #[value] frame
+        state =
+      if sharedOperandAt ns site then some (frame, state, value)
+      else dereferenceBorrow? #[value] frame state := rfl
+
+theorem evaluatePlaceOperation?_freeze (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (resultType : TypeId) (site : ExprId) (explicit : Bool) (value : RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    evaluatePlaceOperation? unit ns resultType site (.reference (.freeze explicit)) #[value] frame
+        state =
+      if sharedOperandAt ns site then some (frame, state, value)
+      else (ns.tables.types[resultType.index]?).bind fun
+        | .reference resultReference => freezeBorrow? resultReference #[value] frame state
+        | _ => none := rfl
+
+theorem freezeBorrow?_single (resultType : ReferenceType) (value : RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    freezeBorrow? resultType #[value] frame state = match value with
+      | .borrow _ current => if resultType.kind != .shared then none else some (frame, state, current)
+      | _ => none := by
+  cases value <;> rfl
+
+theorem evaluatePlaceOperation?_mutate (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (resultType : TypeId) (site : ExprId) (arguments : Array RuntimeValue)
+    (frame : RuntimeFrame) (state : RuntimeState) :
+    evaluatePlaceOperation? unit ns resultType site (.reference .mutate) arguments frame state =
+      mutateBorrow? arguments frame state := rfl
+
+theorem evaluatePlaceOperation?_data (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (resultType : TypeId) (site : ExprId) (operation : DataOperation)
+    (arguments : Array RuntimeValue) (frame : RuntimeFrame) (state : RuntimeState) :
+    evaluatePlaceOperation? unit ns resultType site (.data operation) arguments frame state =
+      (evaluateDataOperation? unit ns.identity operation arguments).bind fun value =>
+        some (frame, state, value) := rfl
+
 /-- Bind a pattern row pointwise through `bind`.  Structural recursion over
 the lists so head reduction executes it — `Array.zip` and `Array.foldlM` are
 well-founded recursions symbolic execution cannot unfold. -/
-private def bindPatternRow
+def bindPatternRow
     (bind : PatternId → RuntimeValue → RuntimeFrame → Option RuntimeFrame) :
     List PatternId → List RuntimeValue → RuntimeFrame → Option RuntimeFrame
   | [], [], frame => some frame
@@ -4651,7 +5005,7 @@ def lowerPattern? (unit : ValidatedUnit) (ns : ValidatedNamespace)
   let pattern ← lowerPatternFuel? unit ns fuel patternId
   some { fuel, pattern }
 
-private def bindPatternFuel (unit : ValidatedUnit) (ns : ValidatedNamespace)
+def bindPatternFuel (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (frame : RuntimeFrame) (fuel : Nat) (patternId : PatternId)
     (value : RuntimeValue) : Option RuntimeFrame := do
   match fuel with
@@ -6529,7 +6883,8 @@ transaction boundary to a completed function. Move-style aborts can hide all
 mutations made by the invocation; Rust-style panics and ordinary returns
 expose the evaluated nonlocal state. Missing semantics cannot occur for an
 `ExecutableUnit` and conservatively preserve that state. -/
-def finalizeFunctionState (executable : ExecutableUnit) (profile : Profile)
+def finalizeFunctionState {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (profile : Profile)
     (initialState evaluatedState : RuntimeState) (frame : RuntimeFrame) : Outcome → RuntimeState
   | .returned results => exportReturnedFrameLoans results frame evaluatedState
   | .threw kind _ =>

@@ -4,8 +4,11 @@
 //! Integration tests for acquiring execution or maintenance guards from global
 //! context.
 
-use mono_move_core::Interner;
-use mono_move_global_context::GlobalContext;
+use mono_move_core::{
+    types::{view_type, Type},
+    Interner,
+};
+use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use move_core_types::{account_address::AccountAddress, ident_str};
 use std::{
     sync::{Arc, Barrier},
@@ -107,6 +110,14 @@ fn test_block_execution_simulation() {
 #[test]
 fn test_global_arena_reset() {
     let mut ctx = GlobalContext::with_num_execution_workers(1);
+    // A fresh context already holds the framework symbols.
+    let (base_identifiers, base_module_ids) = {
+        let guard = ctx.maintenance_context();
+        (
+            guard.interned_identifiers_count(),
+            guard.interned_module_ids_count(),
+        )
+    };
 
     {
         let guard = ctx.try_execution_context(0).unwrap();
@@ -115,12 +126,43 @@ fn test_global_arena_reset() {
     }
 
     let mut guard = ctx.maintenance_context();
-    assert_eq!(guard.interned_identifiers_count(), 2);
-    assert_eq!(guard.interned_module_ids_count(), 1);
+    assert_eq!(guard.interned_identifiers_count(), base_identifiers + 2);
+    assert_eq!(guard.interned_module_ids_count(), base_module_ids + 1);
 
+    // A reset starts the interner over and reinterns only the framework symbols.
     guard.reset_arena_pool();
-    assert_eq!(guard.interned_identifiers_count(), 0);
-    assert_eq!(guard.interned_module_ids_count(), 0);
+    assert_eq!(guard.interned_identifiers_count(), base_identifiers);
+    assert_eq!(guard.interned_module_ids_count(), base_module_ids);
+}
+
+/// The framework symbols are installed on a fresh context and again after a
+/// reset, and agree with what interning the names yields.
+#[test]
+fn test_framework_symbols_installed_and_reinstalled() {
+    fn check(guard: &ExecutionGuard<'_>) {
+        let symbols = guard.framework_symbols();
+        assert_eq!(
+            symbols.object,
+            guard.module_id_of(&AccountAddress::ONE, ident_str!("object"))
+        );
+        assert_eq!(
+            symbols.object_struct,
+            guard.identifier_of(ident_str!("Object"))
+        );
+        let Type::Nominal {
+            module_id, name, ..
+        } = view_type(symbols.object_core)
+        else {
+            panic!("ObjectCore is a nominal type");
+        };
+        assert_eq!(*module_id, symbols.object);
+        assert_eq!(*name, guard.identifier_of(ident_str!("ObjectCore")));
+    }
+
+    let mut ctx = GlobalContext::with_num_execution_workers(1);
+    check(&ctx.try_execution_context(0).unwrap());
+    ctx.maintenance_context().reset_arena_pool();
+    check(&ctx.try_execution_context(0).unwrap());
 }
 
 /// A preinstalled value is read by every guard until the arenas are reset.
@@ -139,10 +181,11 @@ fn test_preinstalled_values() {
         assert_eq!(guard.preinstalled::<Symbols>().unwrap().0, foo);
     }
 
+    // The framework symbols are preinstalled too, and survive the reset.
     let mut guard = ctx.maintenance_context();
-    assert_eq!(guard.preinstalled_count(), 1);
+    assert_eq!(guard.preinstalled_count(), 2);
     guard.reset_arena_pool();
-    assert_eq!(guard.preinstalled_count(), 0);
+    assert_eq!(guard.preinstalled_count(), 1);
 }
 
 #[test]

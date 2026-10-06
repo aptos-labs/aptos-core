@@ -1,6 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import LeanerLang.Modifiers
 import LeanerMove.Intrinsics
 
 /-!
@@ -93,6 +94,7 @@ def schema : ProfileSchema where
   checkSurface := checkTag "surface" #[]
   checkProperty := checkTag "property" propertyTags
   checkIntrinsic := Intrinsics.check
+  storableTarget := LeanerLang.moveStorableTarget
 
 def propertyValue (tag : String) (payload : String := "") : ProfileValue :=
   { profile := .move, tag, payload }

@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    process::Command,
     str::FromStr,
     sync::LazyLock,
 };
@@ -34,6 +35,8 @@ pub struct E2eRunner {
     workflow: String,
     job: String,
     nightly_jobs: Vec<String>,
+    /// Whether the runner consumes the PR's release Docker images.
+    docker_images: bool,
 }
 
 static E2E_REGISTRY: LazyLock<BTreeMap<String, E2eRunner>> = LazyLock::new(|| {
@@ -130,6 +133,8 @@ struct Config {
 #[serde(deny_unknown_fields)]
 struct Subsystem {
     roots: Vec<String>,
+    #[serde(default)]
+    excluded_roots: Vec<String>,
     #[serde(default)]
     ignored_paths: Vec<Glob>,
     selection: Selection,
@@ -316,7 +321,29 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
     let paths = args.compute_changed_files(&plan.base)?;
     plan.changed_paths = paths.iter().map(|p| p.to_string()).collect();
     plan.changed_paths.sort();
+    // Capture the working lockfile before Cargo metadata can regenerate it.
+    let lockfiles = (mode != Mode::Legacy && plan.changed_paths.iter().any(|p| p == "Cargo.lock"))
+        .then(|| read_lockfiles(&plan.base));
     let head = head_package_graph()?;
+    let mut selection_paths = plan.changed_paths.clone();
+    if let Some(lockfiles) = lockfiles {
+        match lockfiles
+            .and_then(|(base, current)| workspace_lockfile_inputs(&base, &current, &head))
+        {
+            Ok(inputs) => {
+                selection_paths.retain(|p| p != "Cargo.lock");
+                selection_paths.extend(inputs);
+                selection_paths.sort();
+                selection_paths.dedup();
+                plan.reasons.push(
+                    "Cargo.lock changes only workspace dependency lists: selecting from package manifests".into(),
+                );
+            },
+            Err(error) => plan
+                .reasons
+                .push(format!("Cargo.lock retains global coverage: {error:#}")),
+        }
+    }
     plan.package_specs = head
         .workspace()
         .iter()
@@ -335,7 +362,7 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
             let config = load_config(args, head.workspace().root())?;
             config.validate(&head, None)?;
             // Global inputs and an empty diff need no historical dependency graph.
-            if matches_any(&config.global_test_inputs, &plan.changed_paths) {
+            if matches_any(&config.global_test_inputs, &selection_paths) {
                 config.validate(&head, Some(&head))?;
                 plan.reasons.push(GLOBAL_INPUT_REASON.into());
                 let selected = global_selection(&head);
@@ -343,9 +370,9 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
                 plan.finish(selected.packages);
                 return Ok(plan);
             }
-            if plan.changed_paths.is_empty() {
+            if selection_paths.is_empty() {
                 config.validate(&head, Some(&head))?;
-                plan.reasons.push("No tracked changes".into());
+                plan.reasons.push("No relevant tracked changes".into());
                 return Ok(plan);
             }
             let base = args.base_package_graph(&plan.base)?;
@@ -353,7 +380,7 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
                 &config,
                 &base,
                 &head,
-                &plan.changed_paths,
+                &selection_paths,
                 &mut plan.subsystems,
                 &mut plan.reasons,
             )?;
@@ -374,7 +401,7 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
                     &config,
                     &base,
                     &head,
-                    &plan.changed_paths,
+                    &selection_paths,
                     &mut plan.subsystems,
                     &mut plan.reasons,
                 )
@@ -400,6 +427,100 @@ pub fn plan(args: &SelectedPackageArgs) -> Result<TestPlan> {
         },
     }
     Ok(plan)
+}
+
+/// Read both versions without a checkout or network access. Any failure leaves
+/// Cargo.lock in the normal global-input path.
+fn read_lockfiles(base: &str) -> Result<(String, String)> {
+    let old = Command::new("git")
+        .args(["show", &format!("{base}:Cargo.lock")])
+        .output()?;
+    ensure!(old.status.success(), "base lockfile unavailable");
+    let root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()?;
+    ensure!(root.status.success(), "workspace root unavailable");
+    let root = String::from_utf8(root.stdout)?;
+    Ok((
+        String::from_utf8(old.stdout)?,
+        fs::read_to_string(Utf8Path::new(root.trim()).join("Cargo.lock"))?,
+    ))
+}
+
+/// Only dependency-list edits in existing workspace records are exempt from
+/// global coverage. Compare everything else, including external dependency
+/// edges, checksums, sources, package additions/removals and lockfile metadata.
+fn workspace_lockfile_inputs(old: &str, new: &str, head: &PackageGraph) -> Result<Vec<String>> {
+    let workspace: BTreeMap<_, _> = head
+        .workspace()
+        .iter_by_path()
+        .map(|(path, package)| {
+            (
+                (package.name().to_owned(), package.version().to_string()),
+                path.join("Cargo.toml").to_string(),
+            )
+        })
+        .collect();
+    let normalize = |text: &str| -> Result<(toml::Value, BTreeMap<String, toml::Value>)> {
+        let mut lock: toml::Value = toml::from_str(text)?;
+        ensure!(
+            matches!(
+                lock.get("version").and_then(toml::Value::as_integer),
+                Some(3 | 4)
+            ),
+            "unsupported lockfile version"
+        );
+        let packages = lock
+            .get_mut("package")
+            .and_then(toml::Value::as_array_mut)
+            .context("missing lockfile packages")?;
+        let mut dependencies = BTreeMap::new();
+        let mut identities = BTreeSet::new();
+        for package in packages.iter_mut() {
+            let record = package.as_table_mut().context("invalid package record")?;
+            let name = record
+                .get("name")
+                .and_then(toml::Value::as_str)
+                .context("missing package name")?;
+            let version = record
+                .get("version")
+                .and_then(toml::Value::as_str)
+                .context("missing package version")?;
+            ensure!(
+                identities.insert((
+                    name.to_owned(),
+                    version.to_owned(),
+                    record.get("source").map(ToString::to_string)
+                )),
+                "duplicate package record"
+            );
+            if !record.contains_key("source") {
+                if let Some(path) = workspace.get(&(name.to_owned(), version.to_owned())) {
+                    let deps = record
+                        .remove("dependencies")
+                        .unwrap_or_else(|| toml::Value::Array(vec![]));
+                    ensure!(
+                        deps.as_array()
+                            .is_some_and(|values| values.iter().all(|v| v.as_str().is_some())),
+                        "invalid dependency list"
+                    );
+                    dependencies.insert(path.clone(), deps);
+                }
+            }
+        }
+        packages.sort_by_key(ToString::to_string);
+        Ok((lock, dependencies))
+    };
+    let (old_lock, old_dependencies) = normalize(old)?;
+    let (new_lock, new_dependencies) = normalize(new)?;
+    ensure!(
+        old_lock == new_lock,
+        "changes extend beyond workspace dependency lists"
+    );
+    Ok(new_dependencies
+        .into_iter()
+        .filter_map(|(path, deps)| (old_dependencies.get(&path) != Some(&deps)).then_some(path))
+        .collect())
 }
 
 const GLOBAL_INPUT_REASON: &str =
@@ -507,7 +628,12 @@ impl Config {
                 !name.is_empty() && !subsystem.roots.is_empty(),
                 "Subsystem must have a name and roots"
             );
-            for root in subsystem.roots.iter().chain(&subsystem.related_test_roots) {
+            for root in subsystem
+                .roots
+                .iter()
+                .chain(&subsystem.related_test_roots)
+                .chain(&subsystem.excluded_roots)
+            {
                 validate_path(root)?;
                 ensure!(
                     !root.contains(['*', '?', '[', ']']),
@@ -597,7 +723,8 @@ fn select(
         let candidates: BTreeSet<_> = current
             .iter()
             .filter(|(_, root)| {
-                under(root.as_str(), &subsystem.roots)
+                (under(root.as_str(), &subsystem.roots)
+                    && !under(root.as_str(), &subsystem.excluded_roots))
                     || under(root.as_str(), &subsystem.related_test_roots)
             })
             .map(|(name, _)| name.clone())
@@ -609,6 +736,9 @@ fn select(
         // additive mappings and bypasses the engine's implicit path ignores.
         let mut rules = DeterminatorRules::parse("use-default-rules = false")?;
         for path in changed.iter().filter(|p| !ignored.contains(*p)) {
+            if under(path, &subsystem.excluded_roots) {
+                continue;
+            }
             let mappings: Vec<_> = subsystem
                 .path_rules
                 .iter()
@@ -648,7 +778,7 @@ fn select(
                 seeds.extend(mapping.affects_packages.iter().cloned());
             }
             report.seeds.extend(seeds.iter().cloned());
-            if old_owner.is_none() && new_owner.is_none() && mappings.is_empty() {
+            if old_owner.is_none() && new_owner.is_none() && mappings.is_empty() && !e2e_input {
                 coarse = true;
                 report
                     .reasons
@@ -813,6 +943,45 @@ mod tests {
         }
     }
 
+    #[test]
+    fn lockfile_workspace_edges_and_external_changes() {
+        let graph = Fixture::new().graph();
+        let old = "version = 4\n[[package]]\nname = 'core'\nversion = '0.1.0'\ndependencies = ['external']\n[[package]]\nname = 'external'\nversion = '1.0.0'\nsource = 'registry+https://example.com'\nchecksum = 'abc'\ndependencies = ['other']\n";
+        let new = old.replace("dependencies = ['external']", "dependencies = ['other']");
+        assert_eq!(workspace_lockfile_inputs(old, &new, &graph).unwrap(), vec![
+            "move/core/Cargo.toml"
+        ]);
+        assert!(
+            workspace_lockfile_inputs(old, &format!("# formatting\n{old}"), &graph)
+                .unwrap()
+                .is_empty()
+        );
+        // External records must match completely, not just by name/version.
+        for changed in [
+            new.replace("1.0.0", "1.0.1"),
+            new.replace(
+                "registry+https://example.com",
+                "git+https://example.com#123",
+            ),
+            new.replace("checksum = 'abc'", "checksum = 'def'"),
+            new.replace(
+                "dependencies = ['other']\n",
+                "dependencies = ['different']\n",
+            ),
+            format!("{new}\n[[package]]\nname = 'added'\nversion = '1.0.0'\n"),
+            new.replace("version = 4", "version = 5"),
+            new.replace("name = 'core'", "name = 'unknown-path-package'"),
+            "invalid toml [".into(),
+        ] {
+            assert!(
+                workspace_lockfile_inputs(old, &changed, &graph).is_err(),
+                "{changed}"
+            );
+        }
+        assert!(workspace_lockfile_inputs(&new, old, &graph).is_ok());
+        assert!(workspace_lockfile_inputs(old, "version = 4", &graph).is_err());
+    }
+
     fn config() -> Config {
         toml::from_str("version = 1\nunmatched_changes = 'legacy'\nglobal_test_inputs = ['Cargo.lock']\nignored_paths = ['**/*.md']\n[subsystems.move]\nroots = ['move']\nselection = 'affected'\nrelated_test_roots = ['api']\n").unwrap()
     }
@@ -961,6 +1130,7 @@ mod tests {
         ])
         .contains_key("cli-e2e"));
         config.subsystems.insert("other".into(), Subsystem {
+            excluded_roots: vec![],
             ignored_paths: vec![],
             roots: vec!["move".into()],
             selection: Selection::Affected,
@@ -1063,6 +1233,90 @@ mod tests {
             ]),
             set(&["consumer", "related"])
         );
+    }
+
+    #[test]
+    fn lean_subsystem_selects_both_sides_of_cross_language_boundaries() {
+        let fixture = Fixture::new();
+        fixture.package("move/compiler", "move-compiler-v2", &[("core", "../core")]);
+        fixture.package(
+            "move/compiler-tests",
+            "move-compiler-v2-transactional-tests",
+            &[("move-compiler-v2", "../compiler")],
+        );
+        fixture.package("move/framework", "aptos-framework", &[("core", "../core")]);
+        fixture.package("move/cli", "aptos-move-cli", &[(
+            "aptos-framework",
+            "../framework",
+        )]);
+        fixture.package("move/lean-link", "mono-move-lean-link", &[(
+            "bridge",
+            "../../outside/bridge",
+        )]);
+        fixture.package("move/independent", "independent", &[]);
+        // A nested Lake tree is not a Cargo workspace package.
+        fs::create_dir_all(fixture.dir.path().join("move/lean")).unwrap();
+        let manifest = fixture.dir.path().join("Cargo.toml");
+        let text = fs::read_to_string(&manifest).unwrap();
+        fs::write(&manifest, format!("{text}exclude = ['move/lean']\n")).unwrap();
+        let graph = fixture.graph();
+        let mut config: Config = toml::from_str(
+            &include_str!("../../../.config/test-subsystems.toml")
+                .replace("third_party/move", "move"),
+        )
+        .unwrap();
+        config.e2e_tests.retain(|name, _| name == "lean");
+        let move_subsystem = config.subsystems.get_mut("move").unwrap();
+        move_subsystem.roots = vec!["move".into(), "outside".into()];
+        move_subsystem.related_test_packages.clear();
+        move_subsystem.path_rules.clear();
+        for path in [
+            "move/lean/leaner-e2e-tests/LeanerE2ETests/Check/example.lean",
+            "move/lean/leaner-e2e-tests/shim/monovm_shim.c",
+            "move/lean/leaner-rust/rust-exporter/src/main.rs",
+        ] {
+            let selected = run(&config, &graph, &graph, &[path]);
+            assert!(
+                selected.packages.is_empty(),
+                "{path}: {:?}",
+                selected.packages
+            );
+            assert_eq!(selected.e2e_tests.into_keys().collect::<Vec<_>>(), vec![
+                "lean"
+            ]);
+        }
+        // Lean producers activate the mapped Rust consumers as well as Lake.
+        let selected = run(&config, &graph, &graph, &[
+            "move/lean/leaner-move/LeanerMove/Xir/Lower.lean",
+        ]);
+        assert_eq!(
+            selected.packages,
+            set(&[
+                "move-compiler-v2",
+                "move-compiler-v2-transactional-tests",
+                "aptos-framework"
+            ])
+        );
+        assert!(selected.e2e_tests.contains_key("lean"));
+        // A transitive MonoVM dependency and the XAST producer each activate Lake.
+        for path in ["outside/bridge/src/lib.rs", "move/compiler/src/lib.rs"] {
+            let selected = run(&config, &graph, &graph, &[path]);
+            assert_eq!(selected.e2e_tests.into_keys().collect::<Vec<_>>(), vec![
+                "lean"
+            ]);
+            assert!(!selected.packages.contains("independent"));
+        }
+        let selected = run(&config, &graph, &graph, &["move/independent/src/lib.rs"]);
+        assert_eq!(selected.packages, set(&["independent"]));
+        assert!(selected.e2e_tests.is_empty());
+        let mixed = run(&config, &graph, &graph, &[
+            "move/independent/src/lib.rs",
+            "move/lean/leaner-e2e-tests/Main.lean",
+        ]);
+        assert_eq!(mixed.packages, set(&["independent"]));
+        assert_eq!(mixed.e2e_tests.into_keys().collect::<Vec<_>>(), vec![
+            "lean"
+        ]);
     }
 
     #[test]
@@ -1249,6 +1503,7 @@ mod tests {
             .always_test_packages
             .push("unrelated".into());
         config.subsystems.insert("bridge-tests".into(), Subsystem {
+            excluded_roots: vec![],
             roots: vec!["move/core".into()],
             ignored_paths: vec![],
             selection: Selection::Affected,

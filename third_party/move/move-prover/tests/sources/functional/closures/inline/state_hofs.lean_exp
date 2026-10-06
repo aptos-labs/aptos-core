@@ -1,0 +1,115 @@
+Move prover returns: exiting with verification errors
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:35:41
+   │
+35 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+46 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+47 │ │ │             let r = &mut R[a];
+48 │ │ │             r.v = r.v + 1;
+49 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:35:41
+   │
+35 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+63 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+64 │ │ │             let R { v: _ } = move_from<R>(a);
+65 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:35:41
+   │
+35 │                 invariant forall j in 0..i: ensures_of<f>(v[j]);
+   │                                             ^^^^^^^^^^^^^^^^^^^
+   ·
+79 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+80 │ │ │             let r = &mut R[a];
+81 │ │ │             r.v = r.v + 1;
+82 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:36:42
+   │
+36 │                 invariant forall j in 0..i: !aborts_of<f>(v[j]);
+   │                                              ^^^^^^^^^^^^^^^^^^
+   ·
+46 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+47 │ │ │             let r = &mut R[a];
+48 │ │ │             r.v = r.v + 1;
+49 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:36:42
+   │
+36 │                 invariant forall j in 0..i: !aborts_of<f>(v[j]);
+   │                                              ^^^^^^^^^^^^^^^^^^
+   ·
+63 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+64 │ │ │             let R { v: _ } = move_from<R>(a);
+65 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/state_hofs.move:36:42
+   │
+36 │                 invariant forall j in 0..i: !aborts_of<f>(v[j]);
+   │                                              ^^^^^^^^^^^^^^^^^^
+   ·
+79 │ ╭           for_each_addr(v, |a| {
+   │ │ ╭──────────────────────────'
+80 │ │ │             let r = &mut R[a];
+81 │ │ │             r.v = r.v + 1;
+82 │ │ │         });
+   │ ╰─│──────────' from a call inlined at this callsite
+   │   ╰─────────' lambda argument
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/state_hofs.move:124:41
+    │
+124 │             invariant forall j in 0..i: ensures_of<f>(v[j]);
+    │                                         ^^^^^^^^^^^^^^^^^^^
+    ·
+135 │         for_each_addr_framed(v, |a| bump(a));
+    │         ------------------------------------
+    │         │                       │
+    │         │                       lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `aborts_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/state_hofs.move:125:42
+    │
+125 │             invariant forall j in 0..i: !aborts_of<f>(v[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^
+    ·
+135 │         for_each_addr_framed(v, |a| bump(a));
+    │         ------------------------------------
+    │         │                       │
+    │         │                       lambda argument
+    │         from a call inlined at this callsite
+
+tests/sources/functional/closures/inline/state_hofs.move:22:1: error: a loop invariant at entry is not established
+tests/sources/functional/closures/inline/state_hofs.move:51:5: error: leaner verification failed: the automatic verification of `bump_all` failed; provide a proof: `verify bump_all by …` in `tests/sources/functional/closures/inline/state_hofs.proof.lean` (`verify bump_all by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/state_hofs.move:22:1: error: a loop invariant at entry is not established
+tests/sources/functional/closures/inline/state_hofs.move:67:5: error: leaner verification failed: the automatic verification of `remove_all` failed; provide a proof: `verify remove_all by …` in `tests/sources/functional/closures/inline/state_hofs.proof.lean` (`verify remove_all by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/state_hofs.move:22:1: error: a loop invariant at entry is not established
+tests/sources/functional/closures/inline/state_hofs.move:84:5: error: leaner verification failed: the automatic verification of `bump_all_wrong` failed; provide a proof: `verify bump_all_wrong by …` in `tests/sources/functional/closures/inline/state_hofs.proof.lean` (`verify bump_all_wrong by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/state_hofs.move:22:1: error: a loop invariant at entry is not established
+tests/sources/functional/closures/inline/state_hofs.move:137:5: error: leaner verification failed: the automatic verification of `bump_all_via_call` failed; provide a proof: `verify bump_all_via_call by …` in `tests/sources/functional/closures/inline/state_hofs.proof.lean` (`verify bump_all_via_call by skip` shows the obligations it leaves)

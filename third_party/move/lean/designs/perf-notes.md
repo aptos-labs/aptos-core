@@ -96,7 +96,11 @@ first waits for a certificate. Use all four instruments below.
    of 1.7G heartbeats once pointed at the bound collector). To see the
    state a step leaves, print the goal and its hypotheses under the same
    option at the end of that step; a residual printed by `certifyDebug` is
-   the leaf's state before its deciders, not after.
+   the leaf's state before its deciders, not after. The goals `denoteDebug`
+   prints cost heartbeats themselves; `-Dleaner.denoteProfile=true` instead
+   prints, per target, the closer's stages and, per step label, its runs and
+   the heartbeats of its succeeding and of its failing runs, with no goal
+   printed.
 7. **The benchmark problems.** `scripts/leaner-bench.py run [--only …]`
    builds `leaner-bench`, measures the standard problems natively, by
    phase, records the run in the local history, and prints each problem's
@@ -132,8 +136,8 @@ ones; any it lists that the change did not mean to touch is a regression.
   - `Array.foldl`, `find?`, and `contains` over an index range are
     quadratic.
 
-  The preparation certificates (`marked_eq`, the erasure chunks) and
-  `compiled_eq` are evaluated by the kernel, so they must:
+  The compile certificates (`compiled_eq`, the compile views) and the
+  frame certificates are evaluated by the kernel, so they must:
   - iterate `toList`;
   - read arenas through an `IndexedArena`, a balanced tree built in one
     pass by `IndexedArena.build`;
@@ -218,11 +222,10 @@ Leads, most promising first:
    with its literal, or from the `List.Nodup` decisions of enum types.
    Split the certificate's cost into evaluation and comparison before
    changing anything.
-2. **`marked_eq`**, about 2.6s per module.
-3. **Carrier unfolding in `simp`.** Carriers whose instances are stated at
+2. **Carrier unfolding in `simp`.** Carriers whose instances are stated at
    the row type would avoid smart unfolding, which is a deeper change to
    `Types.lean`.
-4. **Leaves that no decider closes.** Each saturation round over a large
+3. **Leaves that no decider closes.** Each saturation round over a large
    context costs 8–18M heartbeats.
 
 ## Resume here (2026-09-28, stdlib budgets)
@@ -598,8 +601,8 @@ Where the time still goes (`ordered_map` 82 s, with the client 113 s):
   (`erasureIndexedChunks_eq` 5.5 s, `marked_eq` 2.3 s,
   `erasureIndexes_eq` 1.1 s, `expressionArenasIndexed_eq` 0.6 s,
   `compileView` 1 s), then the key map and the first frame (~3 s). Every
-  importer re-checks them for the linked unit. Next: prove the preparation
-  once, generically (below).
+  importer re-checks them for the linked unit. Removed since: the
+  semantics reads the validated unit (below).
 - `iter_walk_mut` 28 s: two leaves of the loop step fall through to
   `leaner_denote_pipeline`, 134M and 150M heartbeats. Timed by stage over
   the four leaves that reach it: `leaner_denote_saturate` 109M, the
@@ -619,70 +622,172 @@ Where the time still goes (`ordered_map` 82 s, with the client 113 s):
 - The other tests take at most 7 s each.
 
 
-## Plan: the preparation proved once (2026-09-30, not started)
+## No preparation to certify (2026-09-30)
 
-The semantics runs on the prepared unit, `(prepareSemantics unit).1`:
-loan-death marking (`markLoanDeaths`) and shared-reference erasure
-(`eraseSharedReferences`) applied to the validated unit. The validated unit
-itself is quoted as a literal and not re-checked. Every unit publishes the
-prepared unit as a second literal (`semantics`) and proves them equal by
-replaying both passes in the kernel (`marked_eq`, the `erasure*_eq`
-chain, `semantics_eq`), over every body of the unit, the linked
-dependencies' included, in every module and again in every importer.
-Every per-target certificate (`compiledSemantics`, frames, the typed
-theorem) then reaches the prepared literal through `semantics_eq`.
+The semantics ran on a prepared unit: loan-death marking and
+shared-reference erasure applied to the validated unit. Every module
+quoted the prepared unit as a second literal and proved it equal to the
+preparation by replaying both passes in the kernel (`marked_eq`, the
+`erasure*_eq` chain, `semantics_eq`), over every body of the unit and
+again in every importer. The first target of a module waited for it in
+its "semantics" stage.
 
-The chain is a proof about one unit of a fact that holds for all units.
-The goal is to prove it once: compiling a function of the prepared unit is
-compiling it from the validated unit with the preparation applied, locally,
-at the nodes the function reaches. The kernel then evaluates only the
-bodies a target reaches, as the per-target compile certificates already
-do, and the chain disappears.
+The plan was to prove once, generically, that compiling the prepared unit
+is compiling the validated unit with the preparation applied locally.
+Both passes turned out to be local decisions, so the semantics now takes
+them in place and reads the validated unit itself; there is nothing left
+to relate:
 
-What stands in the way:
+- **Loan deaths at their anchors.** Marking replaced an anchor by a block
+  of an `endLoan` marker and the anchor moved to the end of the arena, so
+  prepared indexes differed from validated ones. The big-step relation
+  now ends the loans the certificates record before a node, evaluates it
+  (`EvalNodeWith`; a loop repeats its node), and ends those recorded after
+  it once it produced a value (`EvalExprWith`). The interpreter and
+  compilation do the same; `endLoan` left the syntax.
+- **Shared references in place.** A dereference or freeze of a shared
+  operand reads it, decided by the operand's recorded type. A place
+  dereferencing a shared reference is its base; that decision needs the
+  owning function's local types, so validation records the places in the
+  function's borrow certificate (`sharedDereferences`).
 
-- **Erasure is local.** It rewrites nodes in place, so indexes are
-  stable, and each decision reads only the dereference's operand type and
-  the owning function's locals. Compilation can take the same decision at
-  the node.
-- **Marking renumbers.** `markLoanDeaths` replaces a death's anchor node
-  by a block that sequences an `endLoan` marker and the anchor's original
-  node, both appended at the end of the namespace's expression arena. An
-  anchor's index in the prepared unit therefore depends on the markers of
-  every function before it, and compiled bodies carry expression indexes
-  (`loopSite` keys loops and their invariants). An equivalence over the
-  appended form would need a relation between the two numberings.
+`prepareExecution` wraps the validated unit, which indexes the executable
+unit's type, so the certificates are stated at the `unit` literal. The compile view of a namespace
+carries its death and shared-dereference indexes.
 
-Steps:
+Measured on `ordered_map` and its one-function client (same machine,
+sequential runs): the file 124 s to 95 s; the first target's "semantics"
+stage 14.3 s to 0.1 s in each module; the `ordered_map` targets 87 s to
+72 s, the client's 33 s to 17 s.
 
-1. **Index-stable loan deaths.** Record each function's deaths in a sparse
-   table keyed by anchor (before or after it, and the loan), derived from
-   the borrow certificates, instead of appending nodes. The interpreter,
-   the big-step relation, and compilation end the loans at the anchor. The
-   prepared unit keeps every index of the validated one.
-2. **Erasure at compilation.** Compilation reads a dereference or freeze of
-   a shared reference as a copy, and a place dereferencing a shared-typed
-   base as that base, by the decision the pass takes; the runtime keeps
-   the pass or takes the same decision in place.
-3. **The lemma, once.** `compileFunction (prepareSemantics unit).1 handle`
-   equals compilation from the validated unit with the local preparation,
-   by induction over compilation. The other readers of the prepared unit
-   get lemmas that preparation leaves what they read unchanged:
-   signatures, the certificates `prepareExecution` passes through, and the
-   frames. Marking refreshes every namespace's tables from the unit's,
-   appending the unit type when it is absent (`ensureUnitType`): existing
-   type ids stay, and a frame folds over one more type, which instantiates
-   to itself and adds no pair.
-4. **Remove the chain.** Per-target certificates rewrite through the lemma
-   to the validated literal; the compile views are taken over it. The
-   `semantics` literal, `marked`, and the erasure indexes, chunks, plan,
-   and arenas with their equations go.
+A node now costs two units of interpreter fuel, its deaths and its
+evaluation.
 
-Expected: the ~10 s of chain kernel time per module, and the waits of the
-first target behind it, leave `ordered_map` and every importer; what a
-target pays is the compilation of what it reaches, as now. Step 1 changes
-the runtime's view of the unit, so the interpreter, the MonoVM
-differential tests, and the tests of `markLoanDeaths` move with it.
-Measure with the stage log: the first target's "compiled and contracts"
-stage and the gap before the second.
 
+## `grind` over prepared leaves (2026-10-01)
+
+Omega reads a product or quotient of variables as an atom, so it misses
+what congruence gives: `pool_u64::balance` had `result.val = lookup.asInt`
+and `MAX < result.val * c / s` in the context of the goal
+`MAX < lookup.asInt * c / s`, and its three undecided leaves cost 870M of
+the target's 931M heartbeats. Core `grind` (congruence closure with linear
+integer arithmetic) is now the last of the prepared deciders
+(`leaner_denote_decide_written`): it closes each of those leaves in about
+3M, and `balance` verifies in 137M. On a raw leaf, before `prepare`, it
+closed none of them at 2–4M each, so it runs only on the prepared form.
+
+`aptos-stdlib` as one package run (`leaner-move verify`, its dependencies
+read whole), with and without it, concurrently on one machine: the
+verification phase 173 s to 127 s, one target more verified (`balance`),
+the same failures otherwise; certification (~215 s) is unchanged. The
+`DenotePerformance` gate and the Check fixtures do not change, their leaves
+being closed before it; the `ordered_map` file takes 202 s instead of
+187 s, from leaves where it fails before the pipeline closes them.
+
+`grind` is also the last decider of a case the write split leaves
+(`leaner_denote_decide_split`), and the map laws are its lemmas, as the
+SMT solver's map axioms are the Prover's: `hasKey`, `valueAt`, and `size`
+over `update`, `remove`, and `empty` (`grind =`), validity preserved by
+them, and a present key's rank below the size (`Maps.lean`). With them
+`pool_u64::add_shares` verifies (19 s): after `push_back` of a shareholder
+the map lacks, the split cases of the distinctness and membership
+invariants follow by congruence from the invariants' instances. The
+package run then reaches `buy_in`, which exceeds its budget in `whnf`.
+
+A failing `grind` cost up to 91M heartbeats per attempt, and the write
+split tries it in every case it leaves: `deduct_shares` spent 1.1G in
+them. `grind` now runs within the 20M of an attempt
+(`leaner_denote_grind`), after clearing the callees' contracts, which the
+call rule has consumed and which `grind` would instantiate as theorems, and
+the continuations bound in the context. Its cost on a large leaf is its
+preprocessing (17M on a `deduct_shares` leaf, the same under every search
+setting). An E-matching lemma needs a term to match: `rank_nonneg`'s
+conclusion normalizes to a pattern that never occurs, so it is keyed on
+`rank map key` (`grind_pattern`), which decides `deduct_shares`' abort
+clauses; the codecs' scalar readings (`asInt`, `asBool`, `asString` of an
+encoded scalar) are lemmas too. `ordered_map` takes 189 s again and
+`test_verify_iter_collect_symbolic` verifies; the package run takes 318 s
+(verification 142 s).
+
+A leaf without a quantified hypothesis or a written vector is prepared
+too when it observes a map, and decided by `grind` (`leaner_denote_observes_map`);
+any other still goes to the pipeline, as `prepare` and a failing `grind`
+before it cost the storage targets of the gate up to 26%. With the law that
+an ordered removal shifts the keys after the removed one
+(`keyAt_remove_ordered`) and the positions of a valid map holding distinct
+keys (`keyAt_eq_keyAt_iff`, keyed on two `keyAt` terms), `ordered_map`'s
+`ground_enum_123` (whose second leaf exhausted the budget in the pipeline)
+and `test_verify_remove_shift_symbolic` verify; the file has 4 failing
+targets of 7 (`new_from` tests, `drain`, which now exhausts its budget, and
+`iter_sum`, which needs a recursive specification function unfolded) and
+takes 241 s.
+
+`grind`'s cost on a map leaf is its internalization of the terms, the same
+under every search setting: an ordered map's discipline carries the
+structural order's rank tables (`valueRanks` of a literal) in every map
+term. Abstracted to variables before `grind` (no lemma reads inside one),
+they cost 55–60% less on `drain`'s leaves (44M to 18M, 171M to 76M, 95M to
+41M); abstracting the aggregate encoders as well gains nothing. Named
+constants in the contracts instead of literals would not do: the compiled
+bodies carry the same literal, and the closer relies on the two being the
+same term. With `hasKey_keyAt` and `rank_keyAt` as lemmas, `grind` closes
+every residual leaf of `drain` in an authored proof (`all_goals grind`);
+the automatic run still exceeds its budget, one leaf needing more than an
+attempt's 20M (100M did not suffice) before the pipeline spends 1.38G on
+it. The `ordered_map` file takes 220 s.
+
+## Benchmark regressions, attributed (2026-10-04)
+
+Against the local run of 2026-10-03 the benchmark's verified problems cost
+4.9% more heartbeats, concentrated on a few targets. Snapshots of four
+intermediate commits, built and run on the same problems, attributed them;
+the closer's step profile (`leaner.denoteDebug`, through `LEANER_OPTIONS`
+for a package problem) located the cost within a target.
+
+- Division facts (`757379d637`): at every quotient or remainder with a
+  non-literal divisor the leaf got the division algorithm with its
+  remainder bound as an implication (`0 < d → r < d`). `omega` splits on
+  the implication, and the identity adds atoms; division-heavy targets
+  cost 45–136% more (`fixed_point32::create_from_rational` 34M→52M,
+  `pool_u64::balance` 142M→333M). Now the identity is asserted only where
+  the leaf reads the remainder or a product with the divisor or the
+  quotient (it constrains nothing else linearly), the remainder's bound
+  outright from a hypothesis making the divisor positive (`¬ d = 0` with
+  the certified `0 ≤ d`), and as the implication only where the remainder
+  is read. The targets are back within 2% of the base.
+- Element bounds (`1532c6533e`): the bounds of the unsigned elements a
+  goal's comparisons read were extended from the comparison's operands to
+  every read nested anywhere in them, also under bitwise operations and
+  conversions, which `omega` reads as atoms; `features::set` cost 93M→123M
+  with no fixture needing it. Now a comparison's reads are collected
+  through its linear operators only.
+- Proof blocks (`b1e86e5d20`): a Move `proof { split c; }` is a case split
+  over the rest of the body, so `fixed_point32::ceil` verifies twice
+  (8→16 leaves, 22M→35M), although its automatic proof needs no hint. Open:
+  whether a proof block's steps should be applied only when the automatic
+  proof fails.
+- The typed-carrier series (C1–C3c) costs 2–4% on most targets, 10% on
+  `capability` (phantom type arguments on `Cap<F>`), as the regenerated
+  cost gate records.
+
+## Recursion depth at closure facts (2026-10-04)
+
+Six functions of `behavioral_predicates_examples.move` failed with
+`maximum recursion depth has been reached` (needing 600–1024 against the
+default 512) where they had verified or timed out before, in `obtain` and
+`split`, on goals only 31 deep. Instrumenting the closer's stages with
+`tryCatchRuntimeEx` found the stages; `trace.Meta.isDefEq` and
+`trace.Meta.whnf` on the failing step found the mechanism: a closure node
+carried its facts (`closureRows? unit h m = some rows`, `closureShared`,
+`closureFaithful`) as `Eq.refl` behind a type hint (`mkExpectedTypeHint`),
+left to the kernel's evaluation. A normalization that strips the hint
+leaves an `Eq.refl` whose inferred type is `some rows = some rows`; when
+the closer then compares the stripped copy with the original, proof
+irrelevance compares their types, `closureRows? unit h m =?= some rows`,
+and `whnf` evaluates the unit computation in the elaborator, indexing the
+unit's function array by unary list steps — depth proportional to the
+target's index in the module. Marking the computations `irreducible` does
+not help: the types differ, so delta is the only way to agree. Such facts
+are now auxiliary theorems (`mkAuxTheorem`, kernel-checked once, cached by
+statement): constants nothing rewrites, whose comparisons are syntactic.
+Same shape as `compiled_eq` and the pointer-width fact.

@@ -38,6 +38,8 @@ structure ResolutionIndex where
   nominals : Array (Option TypeDeclId)
   traits : Array (Option TraitDeclId)
   specFunctions : Array (Option SpecFunctionId)
+  /-- Lemmas, by their position in their namespace. -/
+  lemmas : Array (Option Nat)
   dependencyInterfaces : Array Bool
   externallyDeclared : Array Bool
   deriving Repr, BEq, Inhabited
@@ -68,6 +70,9 @@ def trait? (index : ResolutionIndex) (name : NameId) : Option TraitDeclId :=
 
 def specFunction? (index : ResolutionIndex) (name : NameId) : Option SpecFunctionId :=
   index.entry? index.specFunctions name
+
+def lemma? (index : ResolutionIndex) (name : NameId) : Option Nat :=
+  index.entry? index.lemmas name
 
 /-- Whether an external name is covered by its namespace's dependency
 interface: listed in a nonempty export list, or any name of an interface
@@ -137,6 +142,8 @@ def build {β : Type} (tables : Tables) (namespaces : Array (Namespace β))
       (fun ns => ns.traits) (fun declaration => declaration.name)).map (·.map (⟨·⟩))
     specFunctions := (declarationEntries canonical nameCount namespaces
       (fun ns => ns.specFunctions) (fun declaration => declaration.name)).map (·.map (⟨·⟩))
+    lemmas := declarationEntries canonical nameCount namespaces
+      (fun ns => ns.lemmas) (fun declaration => declaration.name)
     dependencyInterfaces
     externallyDeclared }
 
@@ -150,6 +157,7 @@ private inductive TargetKind where
   | nominal
   | trait
   | specFunction
+  | lemma
   | callable
 
 private def TargetKind.description : TargetKind → String
@@ -158,6 +166,7 @@ private def TargetKind.description : TargetKind → String
   | .nominal => "struct or enum"
   | .trait => "trait"
   | .specFunction => "specification function"
+  | .lemma => "lemma"
   | .callable => "function or specification function"
 
 private def TargetKind.resolves (kind : TargetKind) (index : ResolutionIndex)
@@ -168,6 +177,7 @@ private def TargetKind.resolves (kind : TargetKind) (index : ResolutionIndex)
   | .nominal => (index.nominal? name).isSome
   | .trait => (index.trait? name).isSome
   | .specFunction => (index.specFunction? name).isSome
+  | .lemma => (index.lemma? name).isSome
   | .callable => (index.function? name).isSome || (index.specFunction? name).isSome
 
 /-- Resolve one semantic name use. Owned names must resolve to the required
@@ -196,7 +206,7 @@ private def operationTargetDiagnostics (tables : Tables) (index : ResolutionInde
     (ownedCount : Nat) (loc : LocId) : Operation → Array Diagnostic
   | .call (.function callee) =>
       targetDiagnostics tables index ownedCount (some loc) "call target" .function callee.name
-  | .call (.closure callee) =>
+  | .call (.closure callee _) =>
       targetDiagnostics tables index ownedCount (some loc) "closure target" .function callee.name
   | .call (.constructor callee _) =>
       targetDiagnostics tables index ownedCount (some loc) "constructor target" .nominal callee.name
@@ -218,6 +228,8 @@ private def operationTargetDiagnostics (tables : Tables) (index : ResolutionInde
       -- logical view of an executable function.
       targetDiagnostics tables index ownedCount (some loc) "specification call target"
         .callable reference.name
+  | .specification (.lemma reference _) =>
+      targetDiagnostics tables index ownedCount (some loc) "lemma application" .lemma reference.name
   | _ => #[]
 
 private def traitRefDiagnostics (tables : Tables) (index : ResolutionIndex)
@@ -267,6 +279,8 @@ def resolveUseSites {β : Type} (tables : Tables) (index : ResolutionIndex)
       ds ++ signatureDiagnostics tables index ownedCount function.loc function.signature
     let specFunctionErrors := ns.specFunctions.foldl (init := #[]) fun ds function =>
       ds ++ signatureDiagnostics tables index ownedCount function.loc function.signature
+    let specFunctionErrors := ns.lemmas.foldl (init := specFunctionErrors) fun ds lemma =>
+      ds ++ signatureDiagnostics tables index ownedCount lemma.loc lemma.signature
     let structErrors := ns.structs.foldl (init := #[]) fun ds struct =>
       ds ++ binderDiagnostics tables index ownedCount struct.generics
     let specVarErrors := ns.specVars.foldl (init := #[]) fun ds specVar =>

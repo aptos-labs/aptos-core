@@ -22,7 +22,6 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use cfg_if::cfg_if;
-use mono_move_aptos_transaction_executor::AptosTransactionExecutor;
 use mono_move_global_context::GlobalContext;
 use move_binary_format::{
     errors::{Location, VMError},
@@ -36,11 +35,9 @@ use move_vm_types::code::WithSize;
 use parking_lot::{Mutex, MutexGuard};
 use std::{hash::Hash, ops::Deref, sync::Arc};
 
-/// A global context with everything the MonoMove executor reads preinstalled.
+/// A global context for the MonoMove executor.
 fn new_global_context(num_workers: usize) -> Arc<GlobalContext> {
-    let mut ctx = GlobalContext::with_num_execution_workers(num_workers);
-    AptosTransactionExecutor::preinstall(&mut ctx);
-    Arc::new(ctx)
+    Arc::new(GlobalContext::with_num_execution_workers(num_workers))
 }
 
 /// Raises an alert with the specified message. In case we run in testing mode, instead prints the
@@ -905,6 +902,24 @@ mod test {
             num_interned_tys_before,
             num_interned_ty_vecs_before,
         );
+    }
+
+    #[test]
+    fn test_check_ready_does_not_flush_ty_tag_cache() {
+        let (_, _, mut manager) = cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        let runtime_environment = manager.environment.as_ref().unwrap().runtime_environment();
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 3);
     }
 
     #[test]

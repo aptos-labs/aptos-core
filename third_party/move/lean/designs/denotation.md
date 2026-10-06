@@ -105,8 +105,12 @@ cheap deciders close what they can without rewriting the context),
 direct monomorphic calls through the callee's published theorem, the Rust profile's modular
 `+`/`-`/`*` (`Term.modular`, wrapping as the runtime's `modularInteger`),
 tuples, structs, enums with
-variant tests and payload selection (a `match` arrives as those), shared
-borrows of locals, mutable references (`NTy.ref`: a loan with the native
+variant tests and payload selection (a field of another variant, selected
+or reached by a place, makes the profile's mismatch throw), matches and destructuring bindings over
+values (`Term.caseOf`: typed patterns `Pat`, arms with guards, and the
+profile's mismatch throw where no arm is taken; a binding by a row of
+binders stays a direct destructuring, any other one is a match of one arm),
+shared borrows of locals, mutable references (`NTy.ref`: a loan with the native
 current value; parameters, in-place mutation, typed projection paths,
 local lenders, reborrowed call arguments settled from the callee's
 exports), and storage over the runtime's keyed global map (`globalRead`,
@@ -121,7 +125,7 @@ writing back by key), and the vector primitives `push`, `insert`, `remove`,
 Signed bitwise operations, `bytes` and fixed-length vectors, the
 generic residuals listed under D3, unspecified pure
 callees used as summaries (`plus_one`), references inside an aggregate,
-and nested destructuring patterns.
+and range patterns over characters.
 
 ### Rules the implementation settled
 
@@ -130,11 +134,44 @@ and nested destructuring patterns.
   definition `f.spec` over its bundled arguments, by well-founded recursion
   on the measure: each recursive call's decrease is proved by `omega` from
   the conditions on its path (its conditionals are dependent), and
-  `f.spec.unfold` unfolds it once. A recursive call is never expanded, so a
-  proof about it is authored, with lemmas about `f.spec` that are items of
-  the module (see module items below). A Boolean
+  `f.spec.unfold` unfolds it once. A recursive call is never expanded in a
+  contract. A leaf instantiates `f.spec.unfold` once at each application it
+  holds, as a solver instantiates a definitional axiom at its trigger terms,
+  and keeps the instances whose guards the context decides
+  (`leaner_denote_unfold_specs`, again after `prepare`); `grind` relates the
+  applications by congruence. A proof needing induction is authored, with
+  lemmas about `f.spec` that are items of the module (see module items
+  below). A Boolean
   result is a proposition; a type-parameter argument or result is a runtime
   value.
+
+- Mutually recursive `spec fun`s (a strongly connected component of the
+  call graph) are defined together: one well-founded fixpoint over the sum
+  of their bundles (`PSum`, nested), whose measure is each member's
+  measure on its own summand, and each member `f.spec` is the fixpoint at
+  its injection. A call between members is a recursive call: its decrease,
+  the callee's measure at the arguments below the caller's at its own, is
+  proved (or guarded) as a call to itself is. Each member's measure is
+  chosen as a single function's, among the combinations of the members'
+  candidates, and each member unfolds once by `f.spec.unfold`, its body
+  with the members' calls to their definitions.
+
+- A recursive `spec fun` or a lemma whose statement reads storage takes
+  the memory and, before it, the family (`Skolems`) its reads resolve
+  resource types at; an application passes its own frame. A Boolean
+  parameter is a `Bool`, as the body reads it; a Boolean result is a
+  proposition.
+
+- A lemma's parameter, and a quantifier's binder over a type, of an
+  aggregate type with a native type τ ranges over the values of τ, as the
+  Move Prover assumes of it. A quantifier binds the native values, and the
+  pattern's local is their encoding. A lemma's premise states that the
+  parameter encodes a native value (`∃ x, NTy.encode τ x = v`), as it
+  states an integer parameter's bounds, at the family the lemma takes; an
+  application owes it, and the closer witnesses such an existential by the
+  value its body's equations assemble. A proof obtains the native value,
+  whose reads carry their types' bounds: the elements a leaf compares,
+  and those a definition it unfolds reads, are bounded so.
 
 - `compare` (`std::cmp::compare`) is the structural order of runtime values
   (`RuntimeValue.order`): primitives by their natural order, vectors,
@@ -253,8 +290,8 @@ and nested destructuring patterns.
   now collected by a traversal from the function root.
 - The kernel reads an array through its list: `a[i]?` walks `i` cells,
   `size` the whole list, and an indexed `foldl` or `find?` is quadratic.
-  Kernel-evaluated certificates (`marked_eq`, the erasure chunks,
-  `compiled_eq`) therefore iterate lists, read arenas through an
+  Kernel-evaluated certificates (`compiled_eq`, the frame instantiations)
+  therefore iterate lists, read arenas through an
   `IndexedArena` built in one pass, and count sizes once; an `_eq` lemma
   ties each indexed form to the native array traversal (2026-09-27: Check
   kernel checking −19%, `ReturnedMutRefs` 68s to 31s). Measurement notes:
@@ -420,6 +457,30 @@ and nested destructuring patterns.
   rewritten before the next decision; state facts are retried after every
   round. A literal integer decoding is decided outright by a pre-simproc
   (`decodeIntegerLiteral`), so no conditional is left for a split.
+- A concrete state is computed rather than reasoned about (2026-10-03,
+  the OrderedMap scenarios once data invariants are owed where mutations
+  end). Substitution reaches what an equation fixes besides a local: an
+  integer local the context bounds above and below by one literal
+  (`pinnedInteger?`), a vector local whose elements an equation states,
+  destructured (`vectorEquation?`), and a caller's value an inlined generic
+  callee's equation fixes, `x = toSkolem θ τ v` restated in the caller's
+  view as `ofSkolem θ τ x = v` (`NTy.eq_toSkolem_iff`), whose types the
+  family canonicalization spells as the caller does, `NTy.subst` evaluated
+  at literal type arguments. Where a contract call returns a result its
+  contract fixes to a few literal values (a lower bound over a literal
+  vector), the traversal decides it there, once for every leaf after it:
+  pinned, or split on its values with the cases closed whose instantiated
+  facts the normalization refutes (`leaner_denote_call_result_cases`). A
+  leaf whose positions range over a few literal values, such as a
+  quantified goal's binders, is decided value by value
+  (`leaner_denote_split_range`), the hypotheses quantified over a literal
+  range expanded into their instances (`leaner_denote_expand_ranges`). The
+  normalization evaluates what these leave: lists updated at positions
+  not known literally, integer and boolean order, literal comparisons, and
+  transport round trips. The discharger proves a side condition from the
+  hypotheses connected to it through shared variables, the negated
+  condition included (2026-10-03: OrderedMap 82 s → 51 s, its scenarios
+  verified with every mutation end checked).
 - Rows are a mutual family `NTy`/`NRow`/`NRows` (a nested inductive cannot
   derive decidable equality); an enum carries the distinctness of its
   variant names. Aggregate arguments are introduced destructured, one goal
@@ -434,7 +495,17 @@ stating that the native evaluation of the verified checker
 `Std.Tactic.BVDecide.Reflect.verifyBVExpr` on its certificate is `true`:
 such a proof trusts the Lean compiler for that evaluation, as the Move
 Prover trusts its SMT solver. The audit accepts them for such a function
-only. Nothing else is admitted.
+only. Nothing else is admitted. The public theorem states two assumptions
+as hypotheses that no proof discharges: `GlobalsPreserved`, which static
+typing is to establish, and, for a function whose proof reads `result_of`
+of a known function value, `Terminating`: runs of the unit's functions
+end, as the Move Prover assumes of every function (decided 2026-10-02).
+A function stating an in-body `assume` is verified of the reading in which
+its runs pass each assumption only where its condition holds
+(`Meanings.assumption`, `Term.assume`), and its theorems take that its
+assumptions hold, `AssumptionsHold`: every outcome of a run of it is an
+outcome of that reading (decided 2026-10-02). A caller using its theorem
+takes the same hypothesis; a caller inlining it assumes nothing of it.
 
 ### Next
 
@@ -480,7 +551,8 @@ measured number.
 1. **The goal contains the mathematics, not the machinery.** The term a
    `verify` reasons over mentions only what the source mentions: values of
    native carriers, Lean binders for locals, prophecy values for `&mut`,
-   the typed family store for globals. No `RuntimeFrame`, row, loan
+   the typed family store for globals ([`static-memory.md`](static-memory.md)).
+   No `RuntimeFrame`, row, loan
    registry, arena, expression id, or string occurs in it. *Evidence:*
    `deposit` was term-bound because the focused loan, the registry, and the
    keyed hole rode through every goal (audit F4, F7); v0's goals carried
@@ -590,7 +662,7 @@ one of the three per-construct pieces. The proof-facing `Proofs/` tree is
 Two definitions and one theorem, all written once:
 
 ```
-denote : ExecutableUnit → FunctionHandle →
+denote : ExecutableUnit unit → FunctionHandle →
   Array RuntimeValue → Spec RuntimeState Failure (Array RuntimeValue)
 
 denote_agrees : ∀ unit function arguments,

@@ -13,14 +13,12 @@ Each supported nominal declaration of a registered unit gets a Lean twin: a
 structure or inductive whose fields carry the certified specification
 representation of the declared field types (`SpecInt` for integers, plain
 Lean scalars for the rest, nested twins for nominal fields), together with its
-`erase`/`decode?` pair, their roundtrip, and — for a `key` struct whose
-family appears in the type table — the keyed accessors a contract clause
-reads storage through.
+`erase`/`decode?` pair and their roundtrip.
 
 Generation is driven by the validated unit, not by surface syntax, so any
 frontend that registers a unit gets the same twins.  A declaration with
 content the representation does not support yet (closures or references)
-gets no twin; a clause or family that needs the missing twin is a
+gets no twin; a clause that needs the missing twin is a
 loud diagnostic downstream, never a silent degradation.
 -/
 
@@ -71,19 +69,6 @@ structure TwinInfo where
   variants : Array VariantInfo := #[]
   deriving Repr, Inhabited
 
-/-- One storable family: a `key` struct together with the type-table entry
-that identifies it at global-operation sites. -/
-structure FamilyInfo where
-  info : TwinInfo
-  /-- Index of the family's `.nominal` spelling in the shared type table. -/
-  typeIndex : Nat
-  /-- Native arguments applied to the generic twin at this spelling. -/
-  arguments : Array FieldRep := #[]
-  /-- Root of this spelling's generated `key`/`read`/`get`/`contains`
-  declarations. Generic heads can have several distinct type-table
-  spellings, so the head name alone is not unique. -/
-  accessor : Name := .anonymous
-  deriving Repr, Inhabited
 
 /-- The interned spelling of a name id, if any. -/
 private def nameOf? (unit : ValidatedUnit) (name : LeanerIR.NameId) :
@@ -128,9 +113,10 @@ private partial def fieldRep? (unit : ValidatedUnit) (twinName : QualifiedName �
   | _ => none
 
 /-- Whether a nominal declaration supports a twin, following nominal fields
-through the acyclic declaration graph. -/
+through the declaration graph; a declaration on a cycle has none. -/
 private partial def structSupported (unit : ValidatedUnit)
-    (qualified : QualifiedName) : Bool :=
+    (qualified : QualifiedName) (visiting : List QualifiedName := []) : Bool :=
+  if visiting.contains qualified then false else
   match structOf? unit qualified with
   | none => false
   | some (namespaceIndex, _, declaration) =>
@@ -138,7 +124,8 @@ private partial def structSupported (unit : ValidatedUnit)
         declaration.variants.flatMap fun variant => variant.fields
       declaration.generics.all (fun binder => binder.kind == .typeArg) &&
         fields.all fun field =>
-          (fieldRep? unit (fun _ => Name.anonymous) (structSupported unit)
+          (fieldRep? unit (fun _ => Name.anonymous)
+            (structSupported unit · (qualified :: visiting))
             field.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))).isSome
 
 /-- The generated Lean name of a struct's twin under the registered path:
@@ -203,37 +190,6 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
             fields, variants }
           emitted := emitted.push qualified
   return ordered
-
-/-- The storable families of the unit: `key` structs with a twin whose
-non-generic nominal spelling appears in the shared type table.  A `key`
-struct without a twin, or with an ambiguous spelling, yields no family; the
-missing representation surfaces as a loud diagnostic wherever a contract
-needs it. -/
-def familyInfos (unit : ValidatedUnit) (twins : Array TwinInfo) :
-    Array FamilyInfo := Id.run do
-  let mut families : Array FamilyInfo := #[]
-  for info in twins do
-    let some (_, _, declaration) := structOf? unit info.qualified | continue
-    unless declaration.abilities.contains .key do continue
-    let spellings := unit.tables.types.zipIdx.filterMap fun (ty, index) => do
-      match ty with
-      | .nominal name arguments =>
-          guard (nameOf? unit name == some info.qualified)
-          guard (arguments.size == info.typeParameterCount)
-          let arguments ← arguments.mapM fun argument => match argument with
-            | .typeArg value => fieldRep? unit
-                (fun qualified => (twins.find? (·.qualified == qualified)).map
-                  (·.twin) |>.getD .anonymous)
-                (structSupported unit) value.typeId
-                (unit.namespaces[info.namespaceIndex]?.bind (·.profile))
-            | .const _ | .lifetime _ | .evidence _ => none
-          some (index, arguments)
-      | _ => none
-    for (typeIndex, arguments) in spellings do
-      let accessor := if info.typeParameterCount == 0 then info.twin else
-        info.twin ++ Name.mkSimple s!"family{typeIndex}"
-      families := families.push { info, typeIndex, arguments, accessor }
-  return families
 
 /-! ## Command generation -/
 
@@ -347,31 +303,6 @@ partial def FieldRep.codec (rep : FieldRep) (codecs? : Option Lean.Expr) :
   | .nominal twin arguments => do
       let argumentCodecs ← arguments.mapM (·.codec codecs?)
       mkAppM (twin ++ `codec) argumentCodecs
-
-/-- Applied native type represented by this resource-family spelling. -/
-def FamilyInfo.leanType (family : FamilyInfo) (carrier? : Option Lean.Expr) :
-    MetaM Lean.Expr :=
-  (FieldRep.nominal family.info.twin family.arguments).leanType carrier?
-
-/-- Applied erasure represented by this resource-family spelling. -/
-def FamilyInfo.erase (family : FamilyInfo) (codecs? : Option Lean.Expr) :
-    MetaM Lean.Expr := do
-  let argumentCodecs ← family.arguments.mapM (·.codec codecs?)
-  mkAppM (family.info.twin ++ `erase) argumentCodecs
-
-/-- Codec arguments expected by a parameterized family accessor, in outer
-carrier-index order. -/
-def FamilyInfo.outerCodecs (family : FamilyInfo) (codecs? : Option Lean.Expr) :
-    MetaM (Array Lean.Expr) := do
-  let count := family.arguments.foldl
-    (fun count argument => max count argument.parameterCount) 0
-  if count == 0 then return #[]
-  let some codecs := codecs?
-    | throwError "a parameterized resource family has no codec family"
-  return (Array.range count).map fun index => mkApp codecs (toExpr index)
-
-def FamilyInfo.accessorName (family : FamilyInfo) (suffix : Name) : Name :=
-  family.accessor ++ suffix
 
 /-- Codec syntax of a represented value. -/
 partial def FieldRep.codecSyntax (codecs : Array Term := #[]) :
@@ -547,12 +478,6 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
       $(← rep.typeSyntax typeParameters)))
   let literalErasures ← info.fields.mapIdxM fun index (_, rep) =>
     rep.eraseSyntax fieldVars[index]! codecTerms
-  let mapName := rootIdent (info.twin ++ `decode?_map_erase)
-  elabTheorem (← `(command| @[simp] theorem $mapName:ident
-      $implicitTypeBinders* $codecBinders* (contents : Option $twinType) :
-      Option.bind (Option.map ($eraseName $codecIds*) contents)
-        ($decodeName $codecIds*) = contents :=
-    LeanerIR.map_erase_bind_decode ($roundtripName $codecIds*) contents))
 
   let codecName := rootIdent (info.twin ++ `codec)
   elabCommand (← `(def $codecName:ident $implicitTypeBinders* $codecBinders* :
@@ -644,12 +569,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
       ($value:ident : $twin) :
       $decodeName $literal = some $value :=
     $roundtripName $value))
-  let mapName := rootIdent (info.twin ++ `decode?_map_erase)
-  elabTheorem (← `(command| @[simp] theorem $mapName:ident
-      (contents : Option $twin) :
-      Option.bind (Option.map $eraseName contents) $decodeName = contents :=
-    LeanerIR.map_erase_bind_decode $roundtripName contents))
-  elabCommand (← `(attribute [lir_denote_norm] $mapName:ident $roundtripName:ident
+  elabCommand (← `(attribute [lir_denote_norm] $roundtripName:ident
     $literalRoundtripName:ident))
   /- The decoder belongs to the simp phase, not to reduction.  Symbolic
   execution that unfolds it splits the range test of every certified
@@ -790,12 +710,6 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       $implicitTypeBinders* $codecBinders* ($value:ident : $twinType) :
       $decodeName $codecIds* ($eraseName $codecIds* $value) = some $value := by
     cases $value:ident <;> simp [$eraseName:ident, $decodeName:ident]))
-  let mapName := rootIdent (info.twin ++ `decode?_map_erase)
-  elabTheorem (← `(command| @[simp] theorem $mapName:ident
-      $implicitTypeBinders* $codecBinders* (contents : Option $twinType) :
-      Option.bind (Option.map ($eraseName $codecIds*) contents)
-        ($decodeName $codecIds*) = contents :=
-    LeanerIR.map_erase_bind_decode ($roundtripName $codecIds*) contents))
 
   for variant in info.variants do
     -- A raw constructor literal must select its variant before field
@@ -868,103 +782,12 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
 private def emitTwin (info : TwinInfo) : CommandElabM Unit := do
   if info.variants.isEmpty then emitStructTwin info else emitEnumTwin info
 
-/-- Emit one family's keyed accessors: the key, the typed read, the junk-
-totalized read a clause uses, and the existence test. -/
-private def emitFamily (family : FamilyInfo) : CommandElabM Unit := do
-  if (← getEnv).contains (family.accessor ++ `key) then return
-  let keyName := rootIdent (family.accessor ++ `key)
-  let keyAtName := rootIdent (family.accessor ++ `keyAt)
-  elabCommand (← `(def $keyAtName:ident
-      (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
-      (key : LeanerIR.RuntimeValue) :
-      LeanerIR.GlobalKey :=
-    ⟨⟨$(natLit family.info.namespaceIndex)⟩,
-      LeanerIR.SemanticOperations.instantiatedTypeId typeInstantiation
-        ⟨$(natLit family.typeIndex)⟩,
-      LeanerIR.RuntimeValue.storageKey key⟩))
-  elabCommand (← `(def $keyName:ident (key : LeanerIR.RuntimeValue) :
-      LeanerIR.GlobalKey := $keyAtName #[] key))
-  let parameterCount := family.arguments.foldl
-    (fun count argument => max count argument.parameterCount) 0
-  let parameters := (Array.range parameterCount).map fun index =>
-    mkIdent (Name.mkSimple s!"Outer{index}")
-  let typeBinders ← parameters.mapM fun parameterType =>
-    `(bracketedBinder| {$parameterType:ident : Type})
-  let codecIds := (Array.range parameterCount).map fun index =>
-    mkIdent (Name.mkSimple s!"outerCodec{index}")
-  let codecBinders ← (parameters.zip codecIds).mapM fun (parameterType, codec) =>
-    `(bracketedBinder| ($codec:ident :
-      LeanerIR.Proofs.Codec $parameterType LeanerIR.RuntimeValue))
-  let codecTerms : Array Term := codecIds.map fun codec => ⟨codec.raw⟩
-  let typeArguments ← family.arguments.mapM (FieldRep.typeSyntax parameters)
-  let twin := rootIdent family.info.twin
-  let valueType ← if typeArguments.isEmpty then
-    pure (⟨twin.raw⟩ : Term)
-  else `(term| $twin:ident $typeArguments*)
-  let argumentCodecs ← family.arguments.mapM (FieldRep.codecSyntax codecTerms)
-  let decode := rootIdent (family.info.twin ++ `decode?)
-  let readName := rootIdent (family.accessor ++ `read)
-  let readAtName := rootIdent (family.accessor ++ `readAt)
-  elabCommand (← `(def $readAtName:ident $typeBinders* $codecBinders*
-      (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
-      (globals : LeanerIR.GlobalMap) (key : LeanerIR.RuntimeValue) :
-      Option $valueType :=
-    Option.bind (globals.lookup ($keyAtName typeInstantiation key))
-      ($decode $argumentCodecs*)))
-  elabCommand (← `(def $readName:ident $typeBinders* $codecBinders*
-      (globals : LeanerIR.GlobalMap) (key : LeanerIR.RuntimeValue) :
-      Option $valueType :=
-    $readAtName $codecIds* #[] globals key))
-  let getName := rootIdent (family.accessor ++ `get)
-  let getAtName := rootIdent (family.accessor ++ `getAt)
-  let inhabitedBinders ← parameters.mapM fun parameterType =>
-    `(bracketedBinder| [Inhabited $parameterType])
-  let defaults ← family.info.fields.mapM fun (_, rep) =>
-    (rep.instantiate family.arguments).defaultSyntax parameters
-  let defaultValue ← `(term| (⟨$defaults,*⟩ : $valueType))
-  elabCommand (← `(def $getAtName:ident $typeBinders* $inhabitedBinders*
-      $codecBinders* (globals : LeanerIR.GlobalMap)
-      (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
-      (key : LeanerIR.RuntimeValue) : $valueType :=
-    ($readAtName $codecIds* typeInstantiation globals key).getD $defaultValue))
-  elabCommand (← `(def $getName:ident $typeBinders* $inhabitedBinders*
-      $codecBinders* (globals : LeanerIR.GlobalMap)
-      (key : LeanerIR.RuntimeValue) : $valueType :=
-    $getAtName $codecIds* globals #[] key))
-  let containsName := rootIdent (family.accessor ++ `contains)
-  let containsAtName := rootIdent (family.accessor ++ `containsAt)
-  elabCommand (← `(def $containsAtName:ident
-      (typeInstantiation : Array (LeanerIR.TypeId × LeanerIR.TypeId))
-      (globals : LeanerIR.GlobalMap) (key : LeanerIR.RuntimeValue) : Bool :=
-    (globals.lookup ($keyAtName typeInstantiation key)).isSome))
-  elabCommand (← `(def $containsName:ident (globals : LeanerIR.GlobalMap)
-      (key : LeanerIR.RuntimeValue) : Bool :=
-    $containsAtName #[] globals key))
-  -- A clause's read and the program's read of one key meet in the closing
-  -- normalization only if both unfold to the same keyed lookup.
-  elabCommand (← `(attribute [lir_denote_norm]
-    $keyAtName:ident $keyName:ident $readAtName:ident $readName:ident
-    $getAtName:ident $getName:ident $containsAtName:ident $containsName:ident))
-
-/-- Ensure every twin and family accessor of a registered unit exists, and
-return the family row a contract builds against. -/
+/-- Ensure every twin of a registered unit exists, and return them. -/
 def ensureSpecTypes (segments : Array String) (unit : ValidatedUnit) :
-    CommandElabM (Array TwinInfo × Array FamilyInfo) := do
+    CommandElabM (Array TwinInfo) := do
   let twins := twinInfos segments unit
   for info in twins do
     emitTwin info
-  let families := familyInfos unit twins
-  for family in families do
-    emitFamily family
-  -- A storable family without a representation cannot be reasoned about;
-  -- say so once here rather than silently weakening every contract.
-  for ns in unit.namespaces do
-    for declaration in ns.structs do
-      if declaration.abilities.contains .key then
-        if let some qualified := nameOf? unit declaration.name then
-          unless families.any (·.info.qualified == qualified) do
-            logWarning m!"resource `{qualified.name}` has no typed \
-              specification twin; contracts over its storage will not verify"
-  return (twins, families)
+  return twins
 
 end LeanerLang.SpecTypes

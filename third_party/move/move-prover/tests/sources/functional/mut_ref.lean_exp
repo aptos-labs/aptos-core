@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/mut_ref.move:83:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/mut_ref.move:83:5: error: leaner verification failed: the automatic verification of `call_return_ref_different_path_vec` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify call_return_ref_different_path_vec by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/mut_ref.move:106:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/mut_ref.move:106:5: error: leaner verification failed: the automatic verification of `call_return_ref_different_path_vec2` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify call_return_ref_different_path_vec2 by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec2 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/mut_ref.move:125:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/mut_ref.move:125:5: error: leaner verification failed: the automatic verification of `call_return_ref_different_path_vec2_incorrect` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify call_return_ref_different_path_vec2_incorrect by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec2_incorrect by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

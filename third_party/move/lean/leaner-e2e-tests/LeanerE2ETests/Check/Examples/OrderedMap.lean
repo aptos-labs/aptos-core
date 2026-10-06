@@ -518,6 +518,10 @@ leaner module 0x42::ordered_map where
     let key : u64 := 20
     let removed := remove::<u64, u64>(&mut map, &key)
     if contains::<u64, u64>(&map, &key) then 0 else removed
+  -- Every insertion and removal is computed on the concrete map, its order
+  -- owed where each mutation ends.
+  spec remove_scenario where
+    pragma heartbeats = 300
 
   fun duplicate_scenario() -> u64 := do
     let mut map := empty::<u64, u64>()
@@ -565,6 +569,8 @@ leaner module 0x42::ordered_map where
     let middle_key : u64 := 2
     let middle := *borrow::<u64, u64>(&map, &middle_key)
     first + last + middle
+  spec remove_edges_scenario where
+    pragma heartbeats = 300
 
 -- Run the functions on concrete inputs in the interpreter and compare the
 -- outcomes at `u64` and `Bool` keys.

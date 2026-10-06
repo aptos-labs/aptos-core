@@ -125,8 +125,26 @@ private def testSource (environment : Lean.Environment) (source : System.FilePat
   let expectation := Baseline.expectationPath source "lean"
   Baseline.check expectation actual
 
-/-- Relocation is lossless on a package: every owned namespace, extracted,
-linked back into the unit, and extracted again, is the object it was. -/
+/-- A namespace with every type argument of its type table written at the
+namespace's own location, extracted again. The type table is
+location-free: a type two namespaces share keeps the location of whichever
+was relocated first. -/
+private def atOwnLocation (object : LeanerIR.Validation.RelocatableNamespace) :
+    Except String LeanerIR.Validation.RelocatableNamespace := do
+  let own := object.body.loc
+  let types := object.tables.types.map fun
+    | .nominal name arguments => .nominal name (arguments.map fun
+        | .typeArg value => .typeArg { value with loc := own }
+        | argument => argument)
+    | type => type
+  let unit ← LeanerIR.Validation.assemble object.profiles
+    #[{ object with tables := { object.tables with types } }]
+  LeanerIR.Validation.extract unit ⟨0⟩
+
+/-- Relocation is lossless on a package up to the locations of type
+arguments: every owned namespace, extracted, linked back into the unit, and
+extracted again, is the object it was, or the same with the type arguments
+of both written at the namespace's own location. -/
 private def checkRelocation (directory : System.FilePath)
     (unit : LeanerIR.Validation.ValidatedUnit) : IO Unit := do
   let extractAll (unit : LeanerIR.Validation.ValidatedUnit) :=
@@ -140,8 +158,15 @@ private def checkRelocation (directory : System.FilePath)
     | .error message => throw <| IO.userError s!"{directory}: linking failed: {message}"
   let again ← extractAll relinked
   for (object, index) in objects.zipIdx do
-    unless again[index]? == some object do
-      throw <| IO.userError s!"{directory}: namespace {index} changed under relocation"
+    let some relinked := again[index]?
+      | throw <| IO.userError s!"{directory}: namespace {index} was lost under relocation"
+    if relinked == object then continue
+    match atOwnLocation object, atOwnLocation relinked with
+    | .ok left, .ok right =>
+        unless left == right do
+          throw <| IO.userError s!"{directory}: namespace {index} changed under relocation"
+    | .error message, _ | _, .error message =>
+        throw <| IO.userError s!"{directory}: namespace {index} did not relink alone: {message}"
 
 private def testPackage (environment : Lean.Environment) (directory : System.FilePath) : IO Nat := do
   let some parent := directory.parent

@@ -6,7 +6,8 @@ import LeanerLang
 /-!
 # Global and nested borrows
 
-Six verified functions: whole-resource global borrows, a nested field borrow,
+Seven verified functions: whole-resource global borrows, a nested field
+borrow, a field written from its own value without a named borrow,
 vector-element borrowing through a mutable parameter, disjoint sibling
 borrows, and an element-field borrow of an owned vector.
 -/
@@ -40,6 +41,14 @@ leaner module 0x42::global_borrows where
     let value := &mut counter.value
     *value := *value + 1
   spec bump_through where
+    requires exists<Counter>(addr)
+    modifies global<Counter>(addr)
+    ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + 1
+    aborts_if old(global<Counter>(addr).value) + 1 > MAX_U64
+
+  public entry fun bump_in_place(addr : Address) -> Unit := do
+    Counter[addr].value := Counter[addr].value + 1
+  spec bump_in_place where
     requires exists<Counter>(addr)
     modifies global<Counter>(addr)
     ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + 1

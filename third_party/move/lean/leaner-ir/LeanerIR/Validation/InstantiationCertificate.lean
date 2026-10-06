@@ -18,22 +18,11 @@ which a checker verifies against the map with logarithmic reads.
 
 namespace LeanerIR
 
-/-! ## Erasing type-argument locations
+/-! ## Fingerprints
 
 The nominal search compares type arguments by their type identifiers and
-everything else structurally; erasing the locations of type arguments makes
-every search an equality of erased types (`GenericArgument.eraseLoc`). -/
-
-def Ty.eraseLocs : Ty → Ty
-  | .nominal name arguments => .nominal name ⟨arguments.toList.map GenericArgument.eraseLoc⟩
-  | type => type
-
-theorem Ty.eraseLocs_nominal (name : NameId) (arguments : Array GenericArgument) :
-    (Ty.nominal name arguments).eraseLocs = .nominal name (arguments.map GenericArgument.eraseLoc) := by
-  simp only [Ty.eraseLocs, Ty.nominal.injEq, true_and]
-  apply Array.ext' ; simp
-
-/-! ## Fingerprints
+everything else structurally, so every search is an equality of erased
+types (`Ty.eraseLocs`).
 
 The kernel's cost per evaluation step grows with the body of the
 definition it unfolds; `Ty.beq` and `Ty.eraseLocs` are 21-way matchers, so a
@@ -59,6 +48,13 @@ def limbs (value : Nat) : List Nat :=
 
 /-- Bytes behind their count. -/
 def byteList (bytes : List UInt8) : List Nat := bytes.length :: bytes.map UInt8.toNat
+
+/-- An ability by its declaration position. -/
+def Ability.fingerprint : Ability → Nat
+  | .copy => 0
+  | .drop => 1
+  | .store => 2
+  | .key => 3
 
 mutual
 def ConstValue.fingerprint : ConstValue → List Nat
@@ -111,8 +107,9 @@ def Ty.fingerprintList : Ty → List Nat
   | .stateDomain => [15]
   | .nominal name arguments => 16 :: name.index ::
       (arguments.toList.map GenericArgument.fingerprint).flatten
-  | .function arguments result abilities => 17 :: result.index :: abilities.size ::
-      arguments.toList.map TypeId.index
+  | .function arguments result abilities => 17 :: result.index ::
+      (abilities.size :: abilities.toList.map Ability.fingerprint) ++
+      arguments.size :: arguments.toList.map TypeId.index
   | .typeParameter index => [18, index]
   | .reference value => [19, value.referent.index, value.lifetime.index]
   | .profile _ => [20]

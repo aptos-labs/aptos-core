@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/aborts_if.move:170:5: error: condition kind `LeanerIR.ConditionKind.abortsWith` is outside the current LeanerLang parser

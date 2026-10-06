@@ -1,0 +1,2 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/verify_iterator_validity.move: LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_leaf_iter_valid` target has an incompatible physical signature

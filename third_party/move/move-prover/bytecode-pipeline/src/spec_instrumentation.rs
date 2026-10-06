@@ -1298,6 +1298,28 @@ impl<'a> Instrumenter<'a> {
                 true,
             );
 
+            // The aggregated behavioral predicates assumed on the success
+            // path (see below) take the callee's pre-state arguments, which
+            // for `&mut` arguments are gone once the call havocs them: save
+            // those too.
+            let callee_is_higher_order = callee_env
+                .get_parameters()
+                .iter()
+                .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+            let entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+            let emits_behavior_aggregate = entry_label.is_some() && !callee_is_higher_order;
+            if emits_behavior_aggregate {
+                for src in &srcs {
+                    if self.builder.data.local_types[*src].is_mutable_reference() {
+                        let ty = self.builder.get_local_type(*src).skip_reference().clone();
+                        callee_spec
+                            .saved_params
+                            .entry(*src)
+                            .or_insert_with(|| self.builder.new_temp(ty));
+                    }
+                }
+            }
+
             // Emit saves for parameters used in old(..) context. Those can be referred
             // to in aborts conditions, and must be initialized before evaluating those.
             self.emit_save_for_old(&callee_spec.saved_params);
@@ -1535,14 +1557,20 @@ impl<'a> Instrumenter<'a> {
             // the assertion's at the caller's exit). For callees the
             // enclosing spec doesn't mention, our assume would have nothing
             // to discharge and risks using a mismatched label.
-            let callee_is_higher_order = callee_env
-                .get_parameters()
-                .iter()
-                .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
-            let entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
-            if entry_label.is_some() && !callee_is_higher_order {
-                let arg_exps: Vec<Exp> =
-                    srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+            if emits_behavior_aggregate {
+                // Pre-state arguments: a `&mut` argument holds its post-state
+                // here, its pre-state was saved before the call.
+                let arg_exps: Vec<Exp> = srcs
+                    .iter()
+                    .map(|s| {
+                        let pre = if self.builder.data.local_types[*s].is_mutable_reference() {
+                            callee_spec.saved_params[s]
+                        } else {
+                            *s
+                        };
+                        self.builder.mk_temporary(pre)
+                    })
+                    .collect();
                 let (closure_exp, _) =
                     self.builder
                         .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);

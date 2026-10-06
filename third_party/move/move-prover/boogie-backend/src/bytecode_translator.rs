@@ -3069,13 +3069,24 @@ impl<'env> BoogieTranslator<'env> {
             }
 
             // A concrete target without a specification publishes no contract,
-            // and there is no sound default for one. A sound encoding may exist
-            // (e.g. via uninterpreted functions); for now this is restricted.
-            // A predicate over this function type reaches every target of the
-            // type through the evaluator, however the value is named -- as a
-            // closure, parameter, local, or struct field.
+            // and there is no sound default for one, unless its own body
+            // describes its behavior exactly, which then interprets the
+            // predicates. A predicate over this function type reaches every
+            // target of the type through the evaluator, however the value is
+            // named -- as a closure, parameter, local, or struct field. An
+            // intrinsic whose aborts the prover's model defines publishes that
+            // model instead.
+            let qid = info.fun.to_qualified_id();
+            let modeled_intrinsic = self
+                .env
+                .get_intrinsics()
+                .get_decl_for_move_fun(&qid)
+                .is_some()
+                && spec_derivation::spec_aborts_are_exact(self.env, qid);
             if closure_spec.conditions.is_empty()
                 && !fun_env.is_native()
+                && !modeled_intrinsic
+                && !spec_derivation::has_derived_behavior(self.env, qid, &info.fun.inst)
                 && self.named_by_behavioral_predicate(&info.fun.to_qualified_id())
             {
                 self.env.error(
@@ -3478,14 +3489,37 @@ impl<'env> BoogieTranslator<'env> {
             None
         };
 
+        // Without a specification, the body's exact behavior interprets
+        // `ensures_of` (and through it `result_of`); see the matching check
+        // where evaluators are emitted.
+        let derived_ensures = if kind == BehaviorKind::EnsuresOf
+            && closure_spec.conditions.is_empty()
+            && spec_derivation::has_derived_behavior(
+                self.env,
+                fun_env.get_qualified_id(),
+                type_inst,
+            ) {
+            spec_derivation::derive_fun_ensures_conditions(
+                self.env,
+                fun_env.get_qualified_id(),
+                type_inst,
+            )
+        } else {
+            None
+        };
+
         // The expressions to translate, paired with the condition kind they
-        // are phrased as. Derived abort conditions carry no spec `let`s.
-        let items: Vec<(ConditionKind, Exp)> = match derived_aborts.as_ref() {
-            Some(exps) => exps
+        // are phrased as. Derived conditions carry no spec `let`s.
+        let items: Vec<(ConditionKind, Exp)> = match (derived_aborts.as_ref(), derived_ensures) {
+            (Some(exps), _) => exps
                 .iter()
                 .map(|exp| (ConditionKind::AbortsIf, exp.clone()))
                 .collect(),
-            None => conditions
+            (None, Some(exps)) => exps
+                .into_iter()
+                .map(|exp| (ConditionKind::Ensures, exp))
+                .collect(),
+            (None, None) => conditions
                 .iter()
                 .map(|cond| (cond.kind.clone(), cond.exp.clone()))
                 .collect(),

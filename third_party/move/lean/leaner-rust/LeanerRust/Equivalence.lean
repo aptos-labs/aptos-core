@@ -1409,8 +1409,8 @@ mutual
             pure s!"constructor:{← liftProjection <| qualifiedProjection unit reference}:{repr variant}"
         | .destructor reference variant =>
             pure s!"destructor:{← liftProjection <| qualifiedProjection unit reference}:{repr variant}"
-        | .closure reference =>
-            pure s!"closure:{← liftProjection <| qualifiedProjection unit reference}"
+        | .closure reference mask =>
+            pure s!"closure:{← liftProjection <| qualifiedProjection unit reference}:{mask}"
         | .invoke => pure "invoke"
         | .extension value targets =>
             let targets ← liftProjection <| targets.mapM (qualifiedProjection unit)

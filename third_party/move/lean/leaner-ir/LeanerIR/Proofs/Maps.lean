@@ -20,7 +20,7 @@ namespace LeanerIR.Maps
 
 /-- Equality of runtime values decided by the structural order. -/
 @[reducible] def decEq : DecidableEq RuntimeValue := fun a b =>
-  decidable_of_iff (RuntimeValue.order (fun _ _ => 0) a b = .eq)
+  decidable_of_iff (RuntimeValue.order ⟨fun _ _ => 0, fun _ => 0⟩ a b = .eq)
     ⟨RuntimeValue.eq_of_order, fun h => h ▸ RuntimeValue.order_self _ a⟩
 
 attribute [local instance] decEq
@@ -346,11 +346,11 @@ theorem get_seqDel {entries : Entries} (distinct : Distinct entries) (key probe 
 /-! ## The ordered discipline -/
 
 /-- The keys are strictly ascending. -/
-def Ascending (rank : StructHandle → String → Nat) (entries : Entries) : Prop :=
+def Ascending (rank : ValueRanks) (entries : Entries) : Prop :=
   entries.Pairwise fun earlier later => RuntimeValue.order rank earlier.1 later.1 = .lt
 
 /-- Update in place, or insert at the key's position. -/
-def ordSet (rank : StructHandle → String → Nat) (key value : RuntimeValue) : Entries → Entries
+def ordSet (rank : ValueRanks) (key value : RuntimeValue) : Entries → Entries
   | [] => [(key, value)]
   | entry :: rest =>
       match RuntimeValue.order rank key entry.1 with
@@ -366,7 +366,7 @@ def ordDel (key : RuntimeValue) : Entries → Entries
 /-! ## Laws of the ordered discipline -/
 
 section OrderedLaws
-variable (rank : StructHandle → String → Nat)
+variable (rank : ValueRanks)
 
 theorem ne_of_order_lt {a b : RuntimeValue} (h : RuntimeValue.order rank a b = .lt) : a ≠ b := by
   rintro rfl; rw [RuntimeValue.order_self] at h; cases h
@@ -544,6 +544,17 @@ theorem get_ordDel (entries : Entries) (key probe : RuntimeValue) (differs : pro
         simp [get, this]
       · simp only [get, ih]
 
+/-- Removing a key removes the entry at its position; nothing without one. -/
+theorem ordDel_eq_eraseIdx (key : RuntimeValue) (entries : Entries) :
+    ordDel key entries = entries.eraseIdx (indexOf entries key) := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest ih =>
+      simp only [ordDel, indexOf]
+      split
+      · rfl
+      · rw [ih]; rfl
+
 theorem length_ordDel (entries : Entries) (key : RuntimeValue) :
     (ordDel key entries).length = if containsB entries key then entries.length - 1 else entries.length := by
   induction entries with
@@ -569,7 +580,7 @@ theorem length_ordDel (entries : Entries) (key : RuntimeValue) :
 /-- How a map keeps its entries. -/
 inductive Discipline where
   | sequence
-  | ordered (rank : StructHandle → String → Nat)
+  | ordered (rank : ValueRanks)
 
 /-- The entries with a key's value updated. -/
 def Discipline.set : Discipline → Entries → RuntimeValue → RuntimeValue → Entries
@@ -592,12 +603,12 @@ def Discipline.Valid : Discipline → Entries → Prop
     Discipline.sequence.del entries key = seqDel entries key := rfl
 @[simp] theorem Discipline.valid_sequence (entries : Entries) :
     Discipline.sequence.Valid entries = Distinct entries := rfl
-@[simp] theorem Discipline.set_ordered (rank : StructHandle → String → Nat) (entries : Entries)
+@[simp] theorem Discipline.set_ordered (rank : ValueRanks) (entries : Entries)
     (key value : RuntimeValue) :
     (Discipline.ordered rank).set entries key value = ordSet rank key value entries := rfl
-@[simp] theorem Discipline.del_ordered (rank : StructHandle → String → Nat) (entries : Entries)
+@[simp] theorem Discipline.del_ordered (rank : ValueRanks) (entries : Entries)
     (key : RuntimeValue) : (Discipline.ordered rank).del entries key = ordDel key entries := rfl
-@[simp] theorem Discipline.valid_ordered (rank : StructHandle → String → Nat) (entries : Entries) :
+@[simp] theorem Discipline.valid_ordered (rank : ValueRanks) (entries : Entries) :
     (Discipline.ordered rank).Valid entries = Ascending rank entries := rfl
 
 /-! ## Layouts -/
@@ -669,7 +680,14 @@ theorem rank_bounds (map key : RuntimeValue) : 0 ≤ rank map key ∧ rank map k
   simp only [rank, size]; exact ⟨by omega, by exact_mod_cast indexOf_le_length _ key⟩
 
 /-- An integer reads as itself. -/
-theorem asInt_integer (value : Int) : RuntimeValue.asInt (.integer value) = value := rfl
+@[grind =] theorem asInt_integer (value : Int) : RuntimeValue.asInt (.integer value) = value := rfl
+
+/-- A Boolean reads as itself. -/
+@[grind =] theorem asBool_bool (value : Bool) : RuntimeValue.asBool (.bool value) = value := rfl
+
+/-- An address reads as itself. -/
+@[grind =] theorem asString_address (value : String) :
+    RuntimeValue.asString (.address value) = value := rfl
 
 /-- The keys of a map value lie in the image of a scalar encoding `write`,
 which `read` inverts: a specification reading a key at a scalar type and
@@ -719,14 +737,14 @@ theorem address_asString_keyAt {map : RuntimeValue} {index : Int}
 its reading. -/
 theorem order_keyAt_integer {map : RuntimeValue} {index : Int}
     (keys : KeysRead RuntimeValue.asInt RuntimeValue.integer map) (nonneg : 0 ≤ index)
-    (bound : index < size map) (rank : StructHandle → String → Nat) (other : Int) :
+    (bound : index < size map) (rank : ValueRanks) (other : Int) :
     RuntimeValue.order rank (keyAt map index) (.integer other) =
       compare (keyAt map index).asInt other := by
   rw [← RuntimeValue.order_integer rank, integer_asInt_keyAt keys nonneg bound]
 
 theorem order_integer_keyAt {map : RuntimeValue} {index : Int}
     (keys : KeysRead RuntimeValue.asInt RuntimeValue.integer map) (nonneg : 0 ≤ index)
-    (bound : index < size map) (rank : StructHandle → String → Nat) (other : Int) :
+    (bound : index < size map) (rank : ValueRanks) (other : Int) :
     RuntimeValue.order rank (.integer other) (keyAt map index) =
       compare other (keyAt map index).asInt := by
   rw [← RuntimeValue.order_integer rank, integer_asInt_keyAt keys nonneg bound]
@@ -735,7 +753,7 @@ theorem order_keyAt_keyAt {map other : RuntimeValue} {index position : Int}
     (keys : KeysRead RuntimeValue.asInt RuntimeValue.integer map) (nonneg : 0 ≤ index)
     (bound : index < size map)
     (otherKeys : KeysRead RuntimeValue.asInt RuntimeValue.integer other) (low : 0 ≤ position)
-    (high : position < size other) (rank : StructHandle → String → Nat) :
+    (high : position < size other) (rank : ValueRanks) :
     RuntimeValue.order rank (keyAt map index) (keyAt other position) =
       compare (keyAt map index).asInt (keyAt other position).asInt := by
   rw [← RuntimeValue.order_integer rank, integer_asInt_keyAt keys nonneg bound,
@@ -757,31 +775,31 @@ def remove (layout : Layout) (discipline : Discipline) (map key : RuntimeValue) 
 def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
   discipline.Valid (entriesOf map)
 
-@[simp, lir_denote_norm] theorem size_empty (layout : Layout) : size (empty layout) = 0 := by
+@[simp, lir_denote_norm, grind =] theorem size_empty (layout : Layout) : size (empty layout) = 0 := by
   simp [size, empty]
 
-@[simp, lir_denote_norm] theorem hasKey_empty (layout : Layout) (key : RuntimeValue) :
+@[simp, lir_denote_norm, grind =] theorem hasKey_empty (layout : Layout) (key : RuntimeValue) :
     hasKey (empty layout) key = false := by
   simp [hasKey, empty]
 
-@[simp, lir_denote_norm] theorem valid_empty (layout : Layout) (discipline : Discipline) : Valid discipline (empty layout) := by
+@[simp, lir_denote_norm, grind .] theorem valid_empty (layout : Layout) (discipline : Discipline) : Valid discipline (empty layout) := by
   cases discipline <;> simp [Valid, empty, Distinct, Ascending]
 
 /-! Updates and removals, for either discipline. -/
 
-@[simp, lir_denote_norm] theorem hasKey_update (layout : Layout) (discipline : Discipline)
+@[simp, lir_denote_norm, grind =] theorem hasKey_update (layout : Layout) (discipline : Discipline)
     (map key value probe : RuntimeValue) :
     hasKey (update layout discipline map key value) probe =
       (decide (key = probe) || hasKey map probe) := by
   cases discipline <;> simp [hasKey, update, containsB_ordSet]
 
-@[simp, lir_denote_norm] theorem valueAt_update (layout : Layout) (discipline : Discipline)
+@[simp, lir_denote_norm, grind =] theorem valueAt_update (layout : Layout) (discipline : Discipline)
     (map key value probe : RuntimeValue) :
     valueAt (update layout discipline map key value) probe =
       if probe = key then value else valueAt map probe := by
   cases discipline <;> simp [valueAt, update, get_ordSet]
 
-@[lir_denote_norm] theorem size_update (layout : Layout) {discipline : Discipline}
+@[lir_denote_norm, grind =] theorem size_update (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key value : RuntimeValue) :
     size (update layout discipline map key value) =
       if hasKey map key then size map else size map + 1 := by
@@ -794,7 +812,7 @@ def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
       rw [length_ordSet rank valid]
       split <;> simp
 
-@[lir_denote_norm] theorem valid_update (layout : Layout) {discipline : Discipline}
+@[lir_denote_norm, grind .] theorem valid_update (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key value : RuntimeValue) :
     Valid discipline (update layout discipline map key value) := by
   cases discipline with
@@ -807,7 +825,7 @@ theorem distinct_of_valid {discipline : Discipline} {entries : Entries}
   | sequence => exact valid
   | ordered rank => exact distinct_of_ascending rank valid
 
-@[lir_denote_norm] theorem hasKey_remove (layout : Layout) {discipline : Discipline}
+@[lir_denote_norm, grind =] theorem hasKey_remove (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key probe : RuntimeValue) :
     hasKey (remove layout discipline map key) probe = (!decide (key = probe) && hasKey map probe) := by
   have distinct := distinct_of_valid valid
@@ -815,14 +833,14 @@ theorem distinct_of_valid {discipline : Discipline} {entries : Entries}
   | sequence => simpa [hasKey, remove] using containsB_seqDel distinct key probe
   | ordered _ => simpa [hasKey, remove] using containsB_ordDel distinct key probe
 
-@[lir_denote_norm] theorem valueAt_remove (layout : Layout) {discipline : Discipline}
+@[lir_denote_norm, grind =] theorem valueAt_remove (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key probe : RuntimeValue)
     (differs : probe ≠ key) : valueAt (remove layout discipline map key) probe = valueAt map probe := by
   cases discipline with
   | sequence => simpa [valueAt, remove] using get_seqDel valid key probe differs
   | ordered _ => simpa [valueAt, remove] using get_ordDel (entriesOf map) key probe differs
 
-@[simp, lir_denote_norm] theorem size_remove (layout : Layout) (discipline : Discipline)
+@[simp, lir_denote_norm, grind =] theorem size_remove (layout : Layout) (discipline : Discipline)
     (map key : RuntimeValue) :
     size (remove layout discipline map key) = if hasKey map key then size map - 1 else size map := by
   have positive (present : containsB (entriesOf map) key = true) : 0 < (entriesOf map).length := by
@@ -841,7 +859,7 @@ theorem distinct_of_valid {discipline : Discipline} {entries : Entries}
       · have := positive ‹_›; omega
       · rfl
 
-@[lir_denote_norm] theorem valid_remove (layout : Layout) {discipline : Discipline}
+@[lir_denote_norm, grind .] theorem valid_remove (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key : RuntimeValue) :
     Valid discipline (remove layout discipline map key) := by
   cases discipline with
@@ -879,7 +897,7 @@ theorem map_fst_seqSet_present {entries : Entries} {key : RuntimeValue} (value :
     (seqSet entries key value).map Prod.fst = entries.map Prod.fst := by
   simp [seqSet, present, map_fst_replaceFirst]
 
-theorem map_fst_ordSet_present (rank : StructHandle → String → Nat) {entries : Entries}
+theorem map_fst_ordSet_present (rank : ValueRanks) {entries : Entries}
     {key : RuntimeValue} (value : RuntimeValue) (present : containsB entries key = true)
     (ascending : Ascending rank entries) :
     (ordSet rank key value entries).map Prod.fst = entries.map Prod.fst := by
@@ -902,7 +920,7 @@ theorem map_fst_ordSet_present (rank : StructHandle → String → Nat) {entries
 
 /-! Positions, over map values. -/
 
-theorem rank_lt_size {map key : RuntimeValue} (present : hasKey map key = true) :
+@[grind →] theorem rank_lt_size {map key : RuntimeValue} (present : hasKey map key = true) :
     rank map key < size map := by
   simp only [rank, size]; exact_mod_cast indexOf_lt_length present
 
@@ -932,7 +950,9 @@ theorem indexOf_eq_length {entries : Entries} {key : RuntimeValue}
 @[lir_denote_norm] theorem rank_nonneg (map key : RuntimeValue) : 0 ≤ rank map key := by
   simp [rank]
 
-@[lir_denote_norm] theorem keyAt_rank {map key : RuntimeValue} (present : hasKey map key = true) :
+grind_pattern rank_nonneg => rank map key
+
+@[lir_denote_norm, grind →] theorem keyAt_rank {map key : RuntimeValue} (present : hasKey map key = true) :
     keyAt map (rank map key) = key := by
   have bound := indexOf_lt_length present
   simp only [keyAt, rank, Int.natCast_nonneg, Int.not_lt.mpr, if_false, Int.toNat_natCast,
@@ -963,7 +983,7 @@ theorem keyAt_asInt_congr (map : RuntimeValue) (first second : Int) :
   intro below above; rw [show first = second by omega]; exact Int.le_refl _
 
 /-- The keys of a valid ordered map ascend with their positions. -/
-theorem order_keyAt_lt {rank : StructHandle → String → Nat} {map : RuntimeValue}
+theorem order_keyAt_lt {rank : ValueRanks} {map : RuntimeValue}
     (valid : Valid (.ordered rank) map) {first second : Int} (low : 0 ≤ first)
     (before : first < second) (high : second < size map) :
     RuntimeValue.order rank (keyAt map first) (keyAt map second) = .lt := by
@@ -975,7 +995,7 @@ theorem order_keyAt_lt {rank : StructHandle → String → Nat} {map : RuntimeVa
   exact List.pairwise_iff_getElem.mp valid _ _ firstBound secondBound (by omega)
 
 /-- The same for integer keys, at their readings. -/
-theorem keyAt_asInt_lt {rank : StructHandle → String → Nat} {map : RuntimeValue}
+theorem keyAt_asInt_lt {rank : ValueRanks} {map : RuntimeValue}
     (valid : Valid (.ordered rank) map) (keys : KeysRead RuntimeValue.asInt RuntimeValue.integer map)
     {first second : Int} : 0 ≤ first → first < second → second < size map →
       (keyAt map first).asInt < (keyAt map second).asInt := by
@@ -1016,6 +1036,31 @@ theorem keyAt_eq_keyAt_iff {discipline : Discipline} {map : RuntimeValue}
   · rfl
   · rw [← List.getElem?_map, keys, List.getElem?_map]
 
+grind_pattern keyAt_eq_keyAt_iff => Valid discipline map, keyAt map first, keyAt map second
+
+grind_pattern hasKey_keyAt => keyAt map index
+
+grind_pattern rank_keyAt => Valid discipline map, rank map (keyAt map index)
+
+/-- After an ordered removal, the positions from the removed key's on hold
+the keys one position further. -/
+@[lir_denote_norm, grind =] theorem keyAt_remove_ordered (layout : Layout) (order : ValueRanks)
+    (map key : RuntimeValue) (index : Int) :
+    keyAt (remove layout (.ordered order) map key) index =
+      keyAt map (if index < rank map key then index else index + 1) := by
+  have nonneg : 0 ≤ rank map key := by simp [rank]
+  simp only [keyAt, remove, Discipline.del_ordered, entriesOf_build, ordDel_eq_eraseIdx,
+    List.getElem?_eraseIdx, rank] at nonneg ⊢
+  by_cases negative : index < 0
+  · have : index < (indexOf (entriesOf map) key : Int) := by omega
+    simp [negative, this]
+  · by_cases before : index < (indexOf (entriesOf map) key : Int)
+    · have : index.toNat < indexOf (entriesOf map) key := by omega
+      simp [negative, before, this]
+    · have : ¬index.toNat < indexOf (entriesOf map) key := by omega
+      have shifted : (index + 1).toNat = index.toNat + 1 := by omega
+      simp [negative, before, this, shifted, show ¬index + 1 < 0 by omega]
+
 /-! ## Enumeration and bulk operations
 
 The remaining roles of `designs/intrinsic-maps.md`, over the entries in the
@@ -1033,12 +1078,12 @@ def keysOf (map : RuntimeValue) : RuntimeValue := .vector ((entriesOf map).map P
 def valuesOf (map : RuntimeValue) : RuntimeValue := .vector ((entriesOf map).map Prod.snd).toArray
 
 /-- The largest key below a key, under the order. -/
-def prevKey? (rank : StructHandle → String → Nat) (map key : RuntimeValue) : Option RuntimeValue :=
+def prevKey? (rank : ValueRanks) (map key : RuntimeValue) : Option RuntimeValue :=
   (((entriesOf map).filter fun entry => RuntimeValue.order rank entry.1 key == .lt).getLast?).map
     Prod.fst
 
 /-- The smallest key above a key, under the order. -/
-def nextKey? (rank : StructHandle → String → Nat) (map key : RuntimeValue) : Option RuntimeValue :=
+def nextKey? (rank : ValueRanks) (map key : RuntimeValue) : Option RuntimeValue :=
   ((entriesOf map).find? fun entry => RuntimeValue.order rank entry.1 key == .gt).map Prod.fst
 
 /-- The map with the keys of one vector set to the values of another, in

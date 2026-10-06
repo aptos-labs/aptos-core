@@ -8,7 +8,7 @@ use crate::tests::common;
 /// function of the file verifies automatically.
 #[test]
 fn prove_lean_proof() {
-    if !aptos_framework::leaner::verifier_available() {
+    if !move_prover::leaner::verifier_available() {
         eprintln!("skipping prove --lean test: the Leaner Move verifier is not built");
         return;
     }

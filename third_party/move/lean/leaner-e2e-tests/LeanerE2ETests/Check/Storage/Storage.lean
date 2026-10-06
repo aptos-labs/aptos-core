@@ -4,14 +4,12 @@
 import LeanerLang
 
 /-!
-# Storage verification through the typed spec-level state
+# Storage verification over the typed memory
 
-The first storage-reading contracts verified end-to-end: each function's
-generated contract quantifies over the typed contents of the unit's storable
-families, tied to runtime memory by `FamilyRepresentation`, so a resource
-read out of memory is the erasure of a typed value — constructor shape by
-reduction, range facts from the certified fields — and every proof below is
-the generated script with no manual steps.
+Storage-reading contracts verified end to end: the denotation's global
+memory holds a value of each resource type at its slots, a clause reads a
+slot as the encoding of the value it holds, and every proof below is the
+generated script with no manual steps.
 -/
 
 namespace LeanerLang.Tests.Check.Storage.Storage

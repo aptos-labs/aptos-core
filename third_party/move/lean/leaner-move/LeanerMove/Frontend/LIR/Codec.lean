@@ -93,7 +93,7 @@ private def lirMemoryRange (range : Xast.MemoryRange) : LeanerIR.MemoryRange :=
 private def xastMemoryRange (range : LeanerIR.MemoryRange) : Xast.MemoryRange :=
   { pre := range.pre, post := range.post }
 
-private def lirBehaviorKind : Xast.BehaviorKind → LeanerIR.BehaviorKind
+def lirBehaviorKind : Xast.BehaviorKind → LeanerIR.BehaviorKind
   | .requiresOf => .requiresOf
   | .abortsOf => .abortsOf
   | .ensuresOf => .ensuresOf
@@ -119,6 +119,7 @@ def specOperation? : Xast.Operation → Option LeanerIR.SpecOperation
   | .resourceDomain => some .resourceDomain
   | .stateDomain => some .stateDomain
   | .global label => some (.global label)
+  | .exists label => some (.exists label)
   | .canModify => some .canModify
   | .old => some .old
   | .saveStateAnchor label => some (.saveStateAnchor label)
@@ -165,6 +166,7 @@ def specOperation? : Xast.Operation → Option LeanerIR.SpecOperation
 
 def specXastOperation : LeanerIR.SpecOperation → Except String Xast.Operation
   | .functionCall .. => .error "specification function target requires namespace decoding"
+  | .lemma .. => .error "a lemma instance has no XAST expression form"
   | .behavior kind range => pure (.behavior (xastBehaviorKind kind) (xastMemoryRange range))
   | .result index => pure (.result index)
   | .typeValue => pure .typeValue
@@ -172,6 +174,7 @@ def specXastOperation : LeanerIR.SpecOperation → Except String Xast.Operation
   | .resourceDomain => pure .resourceDomain
   | .stateDomain => pure .stateDomain
   | .global label => pure (.global label)
+  | .exists label => pure (.exists label)
   | .canModify => pure .canModify
   | .old => pure .old
   | .final => .error "`final` has no Move specification form"
@@ -266,6 +269,14 @@ def decodeNamedAddress (payload : String) : Except String NamedAddress := do
   | #[name, address] => return { name, address }
   | _ => .error "named-address payload has the wrong arity"
 
+def encodeVariantField (variant field : String) : String :=
+  pack #[variant, field]
+
+def decodeVariantField (payload : String) : Except String (String × String) := do
+  match ← unpack payload with
+  | #[variant, field] => return (variant, field)
+  | _ => .error "variant-field payload has the wrong arity"
+
 def encodeMemoryRange (range : MemoryRange) : String :=
   pack #[encodeOption toString range.pre, encodeOption toString range.post]
 
@@ -306,10 +317,13 @@ private def oneTarget (tag : String) (target : QualifiedName) (fields : Array St
 
 def encodeOperation : Operation → EncodedOperation
   | .moveFunction name => oneTarget "moveFunction" name
+  | .closure name mask => oneTarget "closure" name #[toString mask]
   | .pack name variant => oneTarget "pack" name #[encodeOption id variant]
   | .tuple => noPayload "tuple"
   | .select name field => oneTarget "select" name #[field]
-  | .selectVariants name fields => oneTarget "selectVariants" name #[pack fields.toArray]
+  | .selectVariants name fields =>
+      oneTarget "selectVariants" name #[pack (fields.toArray.map fun (variant, field) =>
+        encodeVariantField variant field)]
   | .testVariants name variants => oneTarget "testVariants" name #[pack variants.toArray]
   | .specFunction name range => oneTarget "specFunction" name #[encodeMemoryRange range]
   | .behavior kind range => {
@@ -381,13 +395,15 @@ def decodeOperation (tag payload : String) (targets : Array QualifiedName) : Exc
   let none (operation : Operation) := expectNoTargets targets *> pure operation
   match tag with
   | "moveFunction" => return .moveFunction (← expectOneTarget targets)
+  | "closure" => return .closure (← expectOneTarget targets) (← decodeNat (← expectFields payload 1)[0]!)
   | "pack" =>
       let fields ← expectFields payload 1
       return .pack (← expectOneTarget targets) (← decodeOption pure fields[0]!)
   | "tuple" => none .tuple
   | "select" => return .select (← expectOneTarget targets) (← expectFields payload 1)[0]!
   | "selectVariants" =>
-      return .selectVariants (← expectOneTarget targets) (← unpack (← expectFields payload 1)[0]!).toList
+      let fields ← (← unpack (← expectFields payload 1)[0]!).mapM decodeVariantField
+      return .selectVariants (← expectOneTarget targets) fields.toList
   | "testVariants" =>
       return .testVariants (← expectOneTarget targets) (← unpack (← expectFields payload 1)[0]!).toList
   | "specFunction" =>
@@ -468,25 +484,28 @@ def lirConditionKind : Xast.ConditionKind → LeanerIR.ConditionKind
   | .axiom parameters => .axiom_ parameters.toArray
   | .update => .update
 
-def xastConditionKind : LeanerIR.ConditionKind → Xast.ConditionKind
-  | .letPost name => .letPost name
-  | .letPre name => .letPre name
-  | .assertion => .assert
-  | .assumption => .assume
-  | .decreases => .decreases
-  | .abortsIf => .abortsIf
-  | .abortsWith => .abortsWith
-  | .succeedsIf => .succeedsIf
-  | .emits => .emits
-  | .ensures => .ensures
-  | .requires => .requires
-  | .structInvariant => .structInvariant
-  | .functionInvariant => .functionInvariant
-  | .loopInvariant => .loopInvariant
-  | .globalInvariant parameters => .globalInvariant parameters.toList
-  | .globalInvariantUpdate parameters => .globalInvariantUpdate parameters.toList
-  | .schemaInvariant => .schemaInvariant
-  | .axiom_ parameters => .axiom parameters.toList
-  | .update => .update
+/-- A proof step (`apply`, `split`) has no XAST condition form: XAST keeps
+proofs as `Proof` statements. -/
+def xastConditionKind : LeanerIR.ConditionKind → Except String Xast.ConditionKind
+  | .letPost name => pure (.letPost name)
+  | .letPre name => pure (.letPre name)
+  | .assertion => pure (.assert)
+  | .assumption => pure (.assume)
+  | .decreases => pure (.decreases)
+  | .abortsIf => pure (.abortsIf)
+  | .abortsWith => pure (.abortsWith)
+  | .succeedsIf => pure (.succeedsIf)
+  | .emits => pure (.emits)
+  | .ensures => pure (.ensures)
+  | .requires => pure (.requires)
+  | .structInvariant => pure (.structInvariant)
+  | .functionInvariant => pure (.functionInvariant)
+  | .loopInvariant => pure (.loopInvariant)
+  | .globalInvariant parameters => pure (.globalInvariant parameters.toList)
+  | .globalInvariantUpdate parameters => pure (.globalInvariantUpdate parameters.toList)
+  | .schemaInvariant => pure (.schemaInvariant)
+  | .axiom_ parameters => pure (.axiom parameters.toList)
+  | .update => pure (.update)
+  | .apply | .split => .error "a proof step has no XAST condition form"
 
 end LeanerMove.Frontend.LIR.Codec

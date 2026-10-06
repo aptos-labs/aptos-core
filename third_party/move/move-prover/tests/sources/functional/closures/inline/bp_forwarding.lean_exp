@@ -1,0 +1,3 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/closures/inline/bp_forwarding.move: LIR-SEMANTIC-TYPE: in fun set_values: function call result differs from the callee signature at [3981, 4001)
+LIR-SEMANTIC-TYPE: in fun set_values_wrong: function call result differs from the callee signature at [3981, 4001)

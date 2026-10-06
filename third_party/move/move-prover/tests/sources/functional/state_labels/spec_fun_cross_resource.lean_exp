@@ -1,0 +1,3 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/state_labels/spec_fun_cross_resource.move: LIR-SEMANTIC-TYPE: in spec fun $flip_flag: borrow result is not a reference type at [1660, 1670)
+LIR-SEMANTIC-TYPE: in spec fun $increment: borrow result is not a reference type at [1303, 1316)

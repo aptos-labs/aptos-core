@@ -55,15 +55,15 @@ private def fixture : RawUnit where
       origin := ⟨0⟩
       alignment := ⟨0⟩ }] }]
 
-private def prepare? (raw : RawUnit) : Option ExecutableUnit := do
+private def prepare? (raw : RawUnit) : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] raw).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
-private def executable? : Option ExecutableUnit := prepare? fixture
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := prepare? fixture
 private def handle : FunctionHandle := { namespaceId := ⟨0⟩, functionId := ⟨0⟩ }
 
 #guard match executable? with
-  | some executable => match Interpreter.run executable 16 handle #[] with
+  | some ⟨_, executable⟩ => match Interpreter.run executable 16 handle #[] with
       | .ok (_, { value := .returned #[.integer 42], .. }) => true
       | _ => false
   | none => false
@@ -272,7 +272,7 @@ private def crossProfileCallFixture (closure : Bool := false) : RawUnit :=
   let first := fixture.namespaces[0]!
   let root : ExprId := ⟨first.expressions.size⟩
   let target : QualifiedRef := { namespaceId := ⟨1⟩, name := ⟨3⟩ }
-  let callKind : CallKind := if closure then .closure target else .function target
+  let callKind : CallKind := if closure then .closure target 0 else .function target
   let resultType : TypeId := if closure then ⟨3⟩ else ⟨2⟩
   let second : RawNamespace := {
     loc := ⟨8⟩
@@ -515,13 +515,13 @@ private def crossNamespaceGenericConstantFixture : RawUnit :=
         fields := #[{ loc := ⟨5⟩, name := ⟨4⟩, type := typeUse 4 5 }] }] }, second] }
 
 #guard match prepare? crossNamespaceGenericConstantFixture with
-  | some executable => match Interpreter.run executable 24
+  | some ⟨_, executable⟩ => match Interpreter.run executable 24
       { namespaceId := ⟨1⟩, functionId := ⟨0⟩ } #[] with
     | .ok (_, { value := .returned #[.nominal _ none #[.bool true]], .. }) => true
     | _ => false
   | none => false
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
 
 private theorem successfulRunHasDerivation (success :
     (Interpreter.run prepared 16 handle #[]).isOk) :

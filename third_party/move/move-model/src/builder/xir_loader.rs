@@ -55,6 +55,8 @@ pub struct XirFunctionData {
     pub params: Vec<Parameter>,
     pub result_type: Type,
     pub acquired_structs: BTreeSet<StructId>,
+    /// The called functions and the targets of closures.
+    pub used_funs: BTreeSet<QualifiedId<FunId>>,
     pub called_funs: BTreeSet<QualifiedId<FunId>>,
 }
 
@@ -138,6 +140,7 @@ impl GlobalEnv {
                             decl.result_type,
                             None,
                             Some(decl.acquired_structs),
+                            Some(decl.used_funs),
                             Some(decl.called_funs),
                         ),
                     )
@@ -163,12 +166,14 @@ impl GlobalEnv {
         ))
     }
 
-    /// Replaces the functions an XIR function calls with those of its
-    /// translated code. Calls the reader lowers, such as vector operations and
-    /// a generic `<`, exist only there.
-    pub fn set_xir_called_functions(
+    /// Replaces the functions an XIR function uses and calls with those of
+    /// its translated code. Calls the reader lowers, such as vector operations
+    /// and a generic `<`, exist only there; a closure's target is used without
+    /// being called.
+    pub fn set_xir_used_functions(
         &mut self,
         fun: QualifiedId<FunId>,
+        used: BTreeSet<QualifiedId<FunId>>,
         called: BTreeSet<QualifiedId<FunId>>,
     ) {
         let data = self
@@ -176,7 +181,7 @@ impl GlobalEnv {
             .function_data
             .get_mut(&fun.id)
             .expect("the XIR function is loaded");
-        data.used_funs = Some(called.clone());
+        data.used_funs = Some(used);
         data.called_funs = Some(called);
         // As for `set_function_def`: cached call-graph entries may now be stale.
         self.call_graph_cache.invalidate();

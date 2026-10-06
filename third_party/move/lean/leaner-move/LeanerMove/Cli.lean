@@ -19,7 +19,7 @@ open LeanerLang.SourceVerify
 private def usage : String :=
   "usage: leaner-move verify <source.move | package directory> [--output <generated.lean>] \
    [--export <xast directory>] [--filter <file name part>] [--modules <a::m>,...] \
-   [--heartbeats <thousands>] [--render-only]"
+   [--heartbeats <thousands>] [--render-only] [--dev]"
 
 private def fail (message : String) : IO α := throw <| IO.userError s!"{message}\n{usage}"
 
@@ -39,6 +39,9 @@ private structure VerifyOptions where
   /-- Only these modules of the package are verified, and only what
   verifying them reads is exported. -/
   modules : Array String := #[]
+  /-- The package is compiled in dev mode, with its `[dev-addresses]` and
+  `[dev-dependencies]`. -/
+  dev : Bool := false
 
 private partial def parseOptions : List String → VerifyOptions → IO VerifyOptions
   | [], options => pure options
@@ -52,6 +55,7 @@ private partial def parseOptions : List String → VerifyOptions → IO VerifyOp
       if options.filter.isSome then fail "--filter may be specified only once"
       else parseOptions rest { options with filter := some part }
   | "--render-only" :: rest, options => parseOptions rest { options with renderOnly := true }
+  | "--dev" :: rest, options => parseOptions rest { options with dev := true }
   | "--modules" :: names :: rest, options =>
       if !options.modules.isEmpty then fail "--modules may be specified only once"
       else parseOptions rest { options with modules := (names.splitOn ",").toArray }
@@ -66,14 +70,18 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
   unless options.modules.isEmpty do
     if options.filter.isSome then fail "--modules and --filter exclude each other"
     if options.exported.isSome then fail "--modules exports the package itself; drop --export"
+  if options.dev && options.exported.isSome then
+    fail "--dev compiles the package itself; drop --export"
   let start ← IO.monoNanosNow
   let output := options.output.getD (source.addExtension "lean")
   let environment ← LeanerLang.Perf.withPhase .load importLeanerLang
   let reports ← LeanerMove.SourceVerify.verifySource environment source output
     options.exported options.filter options.renderOnly options.heartbeats options.modules
+    options.dev
   for report in reports do IO.println report.render
-  IO.println s!"leaner-move: generated {output}"
-  -- The wall time per phase is a report on the run, not one of its messages.
+  -- The rendering and the wall time per phase are reports on the run, not
+  -- its messages.
+  IO.eprintln s!"leaner-move: generated {output}"
   IO.eprintln s!"leaner-move: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
   pure <| if reports.any (·.severity == .error) then 1 else 0
 

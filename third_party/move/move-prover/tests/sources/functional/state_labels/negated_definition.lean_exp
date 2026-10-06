@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/negated_definition.move:7:1: error: specification operation LeanerIR.Operation.specification
+  (LeanerIR.SpecOperation.update { pre := none, post := some 4 }) is not supported in generated contracts
+tests/sources/functional/state_labels/negated_definition.move:7:1: error: specification operation LeanerIR.Operation.specification
+  (LeanerIR.SpecOperation.update { pre := none, post := some 4 }) is not supported in generated contracts

@@ -375,6 +375,11 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSInvalidEnumTag { .. }
         | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
 
+        E::MalformedStringArgument
+        | E::ObjectArgumentDoesNotExist
+        | E::ObjectArgumentLacksResource => return V1Equivalent::V1StatusUnknown,
+        E::ArgumentStorageRead(inner) => return describe(inner),
+
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,
 
@@ -832,6 +837,13 @@ mod tests {
             },
             LoaderError::GlobalContext(std::fmt::Error.into()),
             LoaderError::InvariantViolation(LoaderInvariantViolation::EntryAlreadyExists),
+            LoaderError::InvariantViolation(LoaderInvariantViolation::MicroOpVerificationFailed {
+                errors: vec![mono_move_core::VerificationError {
+                    func_name: "f".to_string(),
+                    pc: Some(0),
+                    message: "frame access out of bounds".to_string(),
+                }],
+            }),
         ];
         for err in &cases {
             // Exhaustive, so a new variant must be added to `cases`.

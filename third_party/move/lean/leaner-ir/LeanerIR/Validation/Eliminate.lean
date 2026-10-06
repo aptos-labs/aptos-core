@@ -5,108 +5,78 @@ import LeanerIR.Validation.IndexedArena
 import LeanerIR.Validation.Validated
 
 /-!
-# Loan-death materialization
+# Loan deaths
 
-Turns the death records of accepted borrow certificates into explicit
-`endLoan` markers in the expression arenas, per
+The borrow certificates record where each mutable loan dies: before an
+anchor expression runs, or after it produced a value, per
 [`designs/prophetic-references.md`](../../../designs/prophetic-references.md).
+The semantics reads them at the anchor (`loanDeathsAt`), so the validated
+unit is the one every consumer reads: its expression indexes are the ones
+the interpreter, the big-step relation, and compilation see.
 
-Marking runs at semantic preparation, not at validation: the validated unit
-stays the marker-free authority the printers and exchange consumers read,
-while everything that executes or verifies a body receives the marked copy.
-Two marker shapes cover the two death flavors:
-
-- an after-death at anchor `a` wraps the anchor: the slot becomes
-  `endLoan loans (a')` with the original node moved to a fresh index `a'`,
-  so the write-back runs right after the anchor's value is produced;
-- a before-death becomes a zero-operand `endLoan` statement in a synthesized
-  block around the anchor, so the write-back runs first.
-
-Both rewrites are value-transparent, and markers are conditional at run
-time, so the recorded over-approximation of branch-dependent deaths is
-sound. Marked arenas contain parent-to-appended-child forward references;
-every arena consumer is fuel- or relation-based, and the raw-stage
-children-precede-parents invariant is deliberately not re-established.
+Deaths are conditional at run time: ending a loan the path did not create is
+a no-op, so the recorded over-approximation of branch-dependent deaths is
+sound.
 -/
 
 namespace LeanerIR.Validation
 
-/-- Death records of one namespace, grouped per anchor. -/
-private structure AnchorMarks where
-  anchor : ExprId
+/-- The loans that end at one anchor: `before` ones before its node runs,
+`after` ones once it produced a value, each in minting order. -/
+structure AnchorDeaths where
   before : Array LoanId := #[]
   after : Array LoanId := #[]
+  deriving Repr, BEq, Inhabited
 
 private def pushLoan (loans : Array LoanId) (loan : LoanId) : Array LoanId :=
   if loans.contains loan then loans else loans.push loan
 
-/-- Record a death at its anchor's group, opening a group after the others
-for a new anchor. The groups are a list: the preparation certificates
-evaluate this in the kernel, which reads an array element by walking the
-array's list to it. -/
-private def addMark : List AnchorMarks → ExprId → Bool → LoanId → List AnchorMarks
-  | [], anchor, before, loan =>
-      [if before then { anchor, before := #[loan] } else { anchor, after := #[loan] }]
-  | mark :: rest, anchor, before, loan =>
-      if mark.anchor == anchor then
-        (if before then { mark with before := pushLoan mark.before loan }
-          else { mark with after := pushLoan mark.after loan }) :: rest
-      else mark :: addMark rest anchor before loan
+/-- Record a loan's death at an anchor. -/
+def AnchorDeaths.add (deaths : AnchorDeaths) (before : Bool) (loan : LoanId) : AnchorDeaths :=
+  if before then { deaths with before := pushLoan deaths.before loan }
+  else { deaths with after := pushLoan deaths.after loan }
 
-/-- Expression ids consumed as place indexes; their arena slots must keep
-their literal or local shape, so they may never be wrapped. Death anchors
-are operation, branch, or statement nodes, so a collision is an internal
-error rather than an expected case. -/
+/-- The deaths a function's loans record at an anchor. -/
+def loanDeathsIn (loans : Array CheckedLoanFact) (anchor : ExprId) (deaths : AnchorDeaths := {}) :
+    AnchorDeaths :=
+  loans.toList.zipIdx.foldl (init := deaths) fun deaths (loan, index) =>
+    loan.deaths.toList.foldl (init := deaths) fun deaths death =>
+      if death.anchor == anchor then deaths.add death.before ⟨index⟩ else deaths
+
+/-- The loan deaths anchored at an expression of a namespace, recorded by
+the borrow certificates of its functions. -/
+def loanDeathsAt (unit : ValidatedUnit) (namespaceId : NamespaceId) (anchor : ExprId) :
+    AnchorDeaths :=
+  unit.borrowCertificates.foldl (init := {}) fun deaths certificate =>
+    if certificate.namespaceId == namespaceId then loanDeathsIn certificate.loans anchor deaths
+    else deaths
+
+/-- Expression ids consumed as place indexes. A place reads its index in
+place, so a death anchored there would never run. -/
 private def placeIndexIds (ns : ValidatedNamespace) : List ExprId :=
   ns.places.toList.foldl (init := []) fun ids place =>
     match place with
     | .index _ index => index :: ids
     | _ => ids
 
-/-- Wrap one anchor slot with its markers. `unitType` types the synthesized
-zero-operand marker statements. -/
-private def markAnchor (expressions : Array Expr) (unitType : TypeId)
-    (mark : AnchorMarks) : Array Expr × Bool :=
-  match expressions[mark.anchor.index]? with
-  | none => (expressions, false)
-  | some node =>
-      let expressions := expressions
-      -- After-deaths: the anchor moves to a fresh slot and the marker takes
-      -- its place, forwarding the value.
-      let (expressions, current) :=
-        if mark.after.isEmpty then (expressions, node) else
-          let moved : ExprId := ⟨expressions.size⟩
-          let wrapper := { node with
-            kind := .operation (.reference (.endLoan mark.after)) #[] #[moved] }
-          (expressions.push node |>.set! mark.anchor.index wrapper, wrapper)
-      -- Before-deaths: a marker statement precedes the (possibly wrapped)
-      -- anchor inside a synthesized block.
-      if mark.before.isEmpty then (expressions, true) else
-        let moved : ExprId := ⟨expressions.size⟩
-        let marker : Expr := {
-          loc := node.loc
-          typeId := unitType
-          kind := .operation (.reference (.endLoan mark.before)) #[] #[] }
-        let markerId : ExprId := ⟨expressions.size + 1⟩
-        let wrapper := { node with kind := .block #[markerId] (some moved) }
-        (expressions.push current |>.push marker |>.set! mark.anchor.index wrapper,
-          true)
-
-/-- Structural scan for the `unit` type: the nested `Ty` inductive's
-derived equality does not reduce under whnf, and semantic preparation must
-stay a computable value for symbolic execution. -/
-private def unitTypeIndex? : List Ty → Nat → Option Nat
-  | [], _ => none
-  | .unit :: _, index => some index
-  | _ :: rest, index => unitTypeIndex? rest (index + 1)
-
-/-- Ensure the tables contain the `unit` type, appending it if absent.
-Appending follows the stated tables-append invariant: existing ids stay
-stable, and every namespace's cached copy is refreshed. -/
-private def ensureUnitType (tables : Tables) : Tables × TypeId :=
-  match unitTypeIndex? tables.types.toList 0 with
-  | some index => (tables, ⟨index⟩)
-  | none => ({ tables with types := tables.types.push .unit }, ⟨tables.types.size⟩)
+/-- Deaths the semantics would never reach: anchored outside their
+namespace's arena, or at a place index. Borrow analysis anchors deaths at
+operation, branch, or statement nodes, so either is an internal error. -/
+def loanDeathDiagnostics (unit : ValidatedUnit) : Array Diagnostic :=
+  unit.borrowCertificates.foldl (init := #[]) fun diagnostics certificate =>
+    match unit.namespaces[certificate.namespaceId.index]? with
+    | none => diagnostics
+    | some ns =>
+        let reserved := placeIndexIds ns
+        certificate.loans.foldl (init := diagnostics) fun diagnostics loan =>
+          loan.deaths.foldl (init := diagnostics) fun diagnostics death =>
+            if ns.expressions.size ≤ death.anchor.index then
+              diagnostics.push (.error "LIR-SEMANTIC-LOAN-DEATH"
+                s!"internal: loan-death anchor {death.anchor.index} is out of range" none)
+            else if reserved.contains death.anchor then
+              diagnostics.push (.error "LIR-SEMANTIC-LOAN-DEATH"
+                s!"internal: loan-death anchor {death.anchor.index} is a place index" none)
+            else diagnostics
 
 private def mergeByIndex {α : Type} :
     Nat → List (Nat × α) → List (Nat × α) → List (Nat × α)
@@ -134,119 +104,23 @@ kernel-checked preparation certificates without an accessibility proof. -/
 def sortByIndex {α : Type} (entries : List (Nat × α)) : List (Nat × α) :=
   sortByIndexFuel entries.length entries
 
-private def replacePlaceCopies : Nat → List Place → List (Nat × Place) → List Place
-  | _, [], _ => []
-  | index, node :: rest, patches =>
-      match patches with
-      | (anchor, replacement) :: tail =>
-          if index == anchor then
-            replacement :: replacePlaceCopies (index + 1) rest
-              (tail.dropWhile fun entry => entry.1 == anchor)
-          else node :: replacePlaceCopies (index + 1) rest patches
-      | [] => node :: rest
-
-/-- Apply ordered copies between place slots, reading each source from the
-state established by preceding copies. Keep a sparse overlay until the final
-arena merge, so kernel reduction never replays a chain of full-array updates.
-The changed-slot bits avoid searching the overlay for untouched source slots.
-Stable sorting retains the newest replacement at a repeatedly written slot. -/
-def applyPlaceCopies (original : Array Place) (copies : List (Nat × PlaceId)) : Array Place :=
-  let (_, patches) := copies.foldl (init := (0, ([] : List (Nat × Place))))
-    fun (changed, patches) (index, base) =>
-      if index < original.size then
-        let value := if base.index < original.size && changed / 2 ^ base.index % 2 != 0 then
-            ((patches.find? fun entry => entry.1 == base.index).map (·.2)).getD
-              original[base.index]!
-          else original[base.index]!
-        let changed := if changed / 2 ^ index % 2 == 0 then changed + 2 ^ index else changed
-        (changed, (index, value) :: patches)
-      else (changed, patches)
-  (replacePlaceCopies 0 original.toList (sortByIndex patches)).toArray
-
-/-- Merge unique, sorted replacement slots in one traversal of the original
-arena. Repeated `Array.set!` on the growing arena duplicates the computation
-of previous updates during kernel reduction. -/
-private def replaceAnchors : Nat → List Expr → List (Nat × Expr) → List Expr
-  | _, [], _ => []
-  | index, node :: rest, patches =>
-      match patches with
-      | (anchor, replacement) :: tail =>
-          if index == anchor then replacement :: replaceAnchors (index + 1) rest tail
-          else node :: replaceAnchors (index + 1) rest patches
-      | [] => node :: rest
-
-/-- Batch valid, grouped anchors while preserving the original append order
-and therefore every synthesized expression id. Only the final merge touches
-the full original arena; each marker reads its original slot through a
-balanced index, which kernel reduction builds once. -/
-private def markAnchorsBatched (original : Array Expr) (unitType : TypeId)
-    (reserved : List ExprId) (marks : List AnchorMarks)
-    (diagnostics : Array Diagnostic) : Array Expr × Array Diagnostic :=
-  let indexed := IndexedArena.ofArray original
-  let (_, appended, patches, diagnostics) := marks.foldl
-    (init := (original.size, ([] : List Expr), ([] : List (Nat × Expr)), diagnostics))
-    fun (next, appended, patches, diagnostics) mark =>
-      if reserved.contains mark.anchor then
-        (next, appended, patches, diagnostics.push (.error "LIR-SEMANTIC-LOAN-MARKER"
-          s!"internal: loan-death anchor {mark.anchor.index} is a place index" none))
-      else
-        let node := (indexed.get? mark.anchor.index).getD default
-        let (next, appended, current) := if mark.after.isEmpty then
-            (next, appended, node)
-          else
-            (next + 1, node :: appended, { node with
-              kind := .operation (.reference (.endLoan mark.after)) #[] #[⟨next⟩] })
-        let (next, appended, current) := if mark.before.isEmpty then
-            (next, appended, current)
-          else
-            let marker : Expr := {
-              loc := node.loc
-              typeId := unitType
-              kind := .operation (.reference (.endLoan mark.before)) #[] #[] }
-            (next + 2, marker :: current :: appended,
-              { node with kind := .block #[⟨next + 1⟩] (some ⟨next⟩) })
-        (next, appended, (mark.anchor.index, current) :: patches, diagnostics)
-  let sorted := sortByIndex patches
-  ((replaceAnchors 0 original.toList sorted ++ appended.reverse).toArray, diagnostics)
-
-/-- Materialize the death records of every certificate as `endLoan` markers.
-The result is the semantic view of the unit; the input stays the marker-free
-surface authority. -/
-def markLoanDeaths (unit : ValidatedUnit) : ValidatedUnit × Array Diagnostic :=
-  let (tables, unitType) := ensureUnitType unit.tables
-  let (namespaces, diagnostics) :=
-    unit.namespaces.zipIdx.foldl (init := (#[], #[])) fun (namespaces, diagnostics) (ns, index) =>
-      let namespaceId : NamespaceId := ⟨index⟩
-      -- Lists throughout: the kernel evaluates this pass in a certificate.
-      let marks := unit.borrowCertificates.toList.foldl (init := []) fun marks certificate =>
-        if certificate.namespaceId != namespaceId then marks else
-          certificate.loans.toList.zipIdx.foldl (init := marks) fun marks (loan, loanIndex) =>
-            loan.deaths.toList.foldl (init := marks) fun marks death =>
-              addMark marks death.anchor death.before ⟨loanIndex⟩
-      let reserved := placeIndexIds ns
-      let size := ns.expressions.size
-      let (expressions, diagnostics) :=
-        if marks.all (fun mark => mark.anchor.index < size) then
-          markAnchorsBatched ns.expressions unitType reserved marks diagnostics
-        else
-        -- Retain the established malformed-certificate diagnostics, including
-        -- their ordering, on the uncommon out-of-range path.
-        marks.foldl (init := (ns.expressions, diagnostics)) fun (expressions, diagnostics) mark =>
-          if reserved.contains mark.anchor then
-            (expressions, diagnostics.push (.error "LIR-SEMANTIC-LOAN-MARKER"
-              s!"internal: loan-death anchor {mark.anchor.index} is a place index"
-              none))
-          else
-            let (expressions, applied) := markAnchor expressions unitType mark
-            if applied then (expressions, diagnostics)
-            else (expressions, diagnostics.push (.error "LIR-SEMANTIC-LOAN-MARKER"
-              s!"internal: loan-death anchor {mark.anchor.index} is out of range"
-              none))
-      (namespaces.push { ns with expressions, tables }, diagnostics)
-  let marked := Internal.mkValidatedUnit tables unit.profiles namespaces
-    unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses
-    unit.resolution unit.initializationCertificates unit.borrowCertificates
-    unit.borrowRejections
-  (marked, diagnostics)
+/-- The loan deaths of a namespace indexed by anchor, answering what
+`loanDeathsAt` does at each: a compilation the kernel evaluates looks an
+anchor up in logarithmic time instead of scanning every certificate. -/
+def deathIndex (unit : ValidatedUnit) (namespaceId : NamespaceId) : KeyTree AnchorDeaths :=
+  let entries := unit.borrowCertificates.toList.foldl (init := []) fun entries certificate =>
+    if certificate.namespaceId != namespaceId then entries else
+    certificate.loans.toList.zipIdx.foldl (init := entries) fun entries (loan, index) =>
+      loan.deaths.toList.foldl (init := entries) fun entries death =>
+        (death.anchor.index, (death.before, (⟨index⟩ : LoanId))) :: entries
+  -- The sort is stable: an anchor's loans stay in the order `loanDeathsAt`
+  -- visits them.
+  let groups := (sortByIndex entries.reverse).foldl (init := []) fun groups (anchor, before, loan) =>
+    match groups with
+    | (last, deaths) :: rest =>
+        if last == anchor then (last, deaths.add before loan) :: rest
+        else (anchor, AnchorDeaths.add {} before loan) :: groups
+    | [] => [(anchor, AnchorDeaths.add {} before loan)]
+  KeyTree.ofSorted groups.reverse
 
 end LeanerIR.Validation

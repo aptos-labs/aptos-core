@@ -662,6 +662,12 @@ primitive family. Unsupported static obligations remain explicit capability
 diagnostics, not profile-string dispatch.
 Value-level borrow, dereference, and freeze use a typed reference-operation
 family until checked place normalization can select the stronger place nodes.
+A direct local read is non-consuming. Validation infers the access of one of a
+value type without `Copy` in executable code: a selection or index of it with
+`Copy` copies its place, the operand of an observer (discriminant, variant test,
+length, index check) reads its place, and otherwise the local is moved. A
+reference local keeps its read, which reference operations take at rest.
+Frontends therefore spell a Move or LeanerLang by-value use as a local read.
 Field/variant operations carry strong qualified references in a typed data
 family. Enum variants may record their observable integer discriminant, which
 is distinct from variant-array position; the value-producing discriminant
@@ -1330,12 +1336,14 @@ Encoding is deterministic:
 decodeRaw(encodeRaw(normalizeRaw(r))) = normalizeRaw(r)
 ```
 
-The version is currently spelled in four independent places: the codec's
-`jsonVersion`, validation's `checkVersion`, `RawUnit.version`'s default, and
-the Rust exporter's literal. Raising 1.0 to 1.1 for the field-place owner
-therefore took four separate fixes, each surfaced by a different failing
-suite. One Lean-side source read by the other two, and a generated constant
-for the exporter, would make the next bump a single edit.
+The version is spelled in two places: the defaults of `Version`, which the
+codec's `jsonVersion` and validation's `checkVersion` read, and the Rust
+exporter's literal. Version 1.2 added the closure mask
+(`CallKind.closure function mask`); version 1.3 the parameter frames of a
+function contract (`FunctionContract.parameterFrames`, Move's
+`modifies_of`); version 1.5 the variant of each field a variant field
+selection reads (`DataOperation.selectVariants`). A generated constant for the exporter
+would make the next bump a single edit.
 
 XAST v4 remains a compatibility frontend and converts immediately to raw LIR.
 The Rust MIR exchange similarly decodes immediately to a Rust-profile raw CFG

@@ -1,0 +1,3 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/bp_with_state_labels.move:19:5: error: operation `LeanerIR.Operation.data
+  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 2 } } "v")` is outside the current LeanerLang parser

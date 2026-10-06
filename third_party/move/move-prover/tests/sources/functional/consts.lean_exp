@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+consts.lean:44:29: error: LEANER-INTEGER-CONTEXT: an integer literal appears in a non-integer context

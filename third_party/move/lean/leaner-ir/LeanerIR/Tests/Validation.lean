@@ -745,7 +745,10 @@ private def badSpecVectorRangeUnit : RawUnit :=
         diagnostic.message.endsWith "vector range result is not a range"
   | .ok _ => false
 
-private def badSpecLogicalVectorIndexUnit (operation : SpecOperation) : RawUnit :=
+/-- A specification vector operation indexing with `index`: a Bool, or an
+integer of a fixed width, which a specification reads as a number. -/
+private def badSpecLogicalVectorIndexUnit (operation : SpecOperation)
+    (index : ExprId := ⟨0⟩) : RawUnit :=
   let ns := logicalDeclarationUnit.namespaces[0]!
   { logicalDeclarationUnit with
     tables := { logicalDeclarationUnit.tables with
@@ -756,22 +759,32 @@ private def badSpecLogicalVectorIndexUnit (operation : SpecOperation) : RawUnit 
           kind := .value (.vector #[.bool true]) },
         { loc := ⟨0⟩, typeId := if operation == .updateVector then ⟨2⟩ else ⟨0⟩,
           kind := .operation (.specification operation) #[]
-            (if operation == .updateVector then #[⟨2⟩, ⟨1⟩, ⟨0⟩]
-             else #[⟨2⟩, ⟨1⟩]) }]
+            (if operation == .updateVector then #[⟨2⟩, index, ⟨0⟩]
+             else #[⟨2⟩, index]) }]
       functions := #[{ ns.functions[0]! with contract := {
         modifies := #[⟨3⟩] } }] }] }
 
 #guard match validate #[schema] (badSpecLogicalVectorIndexUnit .updateVector) with
   | .error diagnostics => diagnostics.any fun diagnostic =>
       diagnostic.code == "LIR-SEMANTIC-TYPE" &&
-        diagnostic.message.endsWith "specification vector update index is not logical num"
+        diagnostic.message.endsWith "specification vector update index is not an integer"
   | .ok _ => false
 
 #guard match validate #[schema] (badSpecLogicalVectorIndexUnit .inVectorRange) with
   | .error diagnostics => diagnostics.any fun diagnostic =>
       diagnostic.code == "LIR-SEMANTIC-TYPE" &&
-        diagnostic.message.endsWith "vector in-range index is not logical num"
+        diagnostic.message.endsWith "vector in-range index is not an integer"
   | .ok _ => false
+
+#guard match validate #[schema] (badSpecLogicalVectorIndexUnit .updateVector ⟨1⟩) with
+  | .error diagnostics => !diagnostics.any fun diagnostic =>
+      diagnostic.message.endsWith "specification vector update index is not an integer"
+  | .ok _ => true
+
+#guard match validate #[schema] (badSpecLogicalVectorIndexUnit .inVectorRange ⟨1⟩) with
+  | .error diagnostics => !diagnostics.any fun diagnostic =>
+      diagnostic.message.endsWith "vector in-range index is not an integer"
+  | .ok _ => true
 
 private def badAbortCodeTypeUnit : RawUnit :=
   let ns := logicalDeclarationUnit.namespaces[0]!
@@ -826,7 +839,7 @@ private def badSpecMaxValueUnit : RawUnit :=
 #guard match validate #[schema] badSpecMaxValueUnit with
   | .error diagnostics => diagnostics.any fun diagnostic =>
       diagnostic.code == "LIR-SEMANTIC-TYPE" &&
-        diagnostic.message.contains "unsigned fixed-width integer u8"
+        diagnostic.message.contains "neither u8 nor logical num"
   | .ok _ => false
 
 private def badSpecCanModifyUnit : RawUnit :=
@@ -1052,7 +1065,7 @@ private def callKindsUnit : RawUnit :=
         { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation (.call (.function callable)) #[] #[] },
         { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation (.call (.constructor callable)) #[] #[] },
         { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation (.call (.destructor callable)) #[] #[] },
-        { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation (.call (.closure callable)) #[] #[] },
+        { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation (.call (.closure callable 0)) #[] #[] },
         { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation (.call .invoke) #[] #[⟨0⟩] },
         { loc := ⟨0⟩, typeId := ⟨0⟩, kind := .operation
             (.call (.extension { profile := testProfile, tag := "add" })) #[] #[] }] }] }
@@ -2031,6 +2044,15 @@ private def parameterT : Parameter := { name := "x", typeUse := { typeId := ⟨1
 -- `T := Bool` from the argument and result occurrences.
 #guard (validate #[schema] (elidedCallUnit #[genericBinderT] #[parameterT]
   #[{ typeId := ⟨1⟩, loc := ⟨0⟩ }] ⟨0⟩ #[⟨0⟩] ⟨0⟩)).isOk
+
+-- The solved instantiation is stored on the call, so the target runs under
+-- `T := Bool` rather than in its symbolic frame.
+#guard match validate #[schema] (elidedCallUnit #[genericBinderT] #[parameterT]
+    #[{ typeId := ⟨1⟩, loc := ⟨0⟩ }] ⟨0⟩ #[⟨0⟩] ⟨0⟩) with
+  | .ok unit => match unit.namespaces[0]!.expressions[1]!.kind with
+      | .operation (.call (.function _)) #[.typeArg value] _ _ => value.typeId == ⟨0⟩
+      | _ => false
+  | .error _ => false
 
 -- A caller result that contradicts the argument-solved slot is a type
 -- mismatch: `T` binds `Bool` from the argument, but the call claims `signer`.

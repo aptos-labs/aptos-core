@@ -42,9 +42,10 @@ inductive Plain : RuntimeValue → Prop
   | nominal (source : StructHandle) (variant : Option String)
       (fields : Array RuntimeValue) (plain : ∀ field ∈ fields, Plain field) :
       Plain (.nominal source variant fields)
-  | closure (function : FunctionHandle) (captures : Array RuntimeValue)
+  | closure (function : FunctionHandle) (mask : Nat)
+      (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue)
       (plain : ∀ capture ∈ captures, Plain capture) :
-      Plain (.closure function captures)
+      Plain (.closure function mask typeInstantiation captures)
 
 /-- A nominal value over a literal field row is plain when its fields are:
 the form a generated erasure has. -/
@@ -52,6 +53,71 @@ theorem Plain.ofFields (source : StructHandle) (variant : Option String)
     (fields : List RuntimeValue) (plain : ∀ field ∈ fields, Plain field) :
     Plain (.nominal source variant fields.toArray) :=
   .nominal source variant fields.toArray (by simpa using plain)
+
+mutual
+/-- Whether a value is loan-free, decided structurally. -/
+def plain? : RuntimeValue → Bool
+  | .vector elements | .tuple elements | .nominal _ _ elements | .closure _ _ _ elements =>
+      plainList? elements.toList
+  | .borrow .. | .loanHole _ => false
+  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .bytes _ => true
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
+
+/-- Whether every value of a list is loan-free. -/
+def plainList? : List RuntimeValue → Bool
+  | [] => true
+  | value :: values => plain? value && plainList? values
+termination_by values => sizeOf values
+decreasing_by all_goals (simp_wf; omega)
+end
+
+/-- The decision of plainness below a size bound; by induction on the bound. -/
+private theorem plain?_iff_below : (bound : Nat) →
+    (∀ value : RuntimeValue, sizeOf value < bound → (plain? value = true ↔ Plain value)) ∧
+    (∀ values : List RuntimeValue, sizeOf values < bound →
+      (plainList? values = true ↔ ∀ value ∈ values, Plain value))
+  | 0 => ⟨fun _ small => absurd small (Nat.not_lt_zero _),
+      fun _ small => absurd small (Nat.not_lt_zero _)⟩
+  | bound + 1 => by
+      obtain ⟨values, lists⟩ := plain?_iff_below bound
+      constructor
+      · intro value small
+        cases value
+        case vector elements | tuple elements | nominal _ _ elements | closure _ _ _ elements =>
+          simp only [RuntimeValue.vector.sizeOf_spec, RuntimeValue.tuple.sizeOf_spec,
+            RuntimeValue.nominal.sizeOf_spec, RuntimeValue.closure.sizeOf_spec,
+            Array.sizeOf_eq_toList] at small
+          rw [plain?, lists _ (by omega)]
+          constructor
+          · intro plain
+            first
+              | exact .vector _ fun element member => plain element (by simpa using member)
+              | exact .tuple _ fun element member => plain element (by simpa using member)
+              | exact .nominal _ _ _ fun element member => plain element (by simpa using member)
+              | exact .closure _ _ _ _ fun element member => plain element (by simpa using member)
+          · intro plain element member
+            cases plain <;> rename_i all <;> exact all element (by simpa using member)
+        case borrow | loanHole =>
+          simp only [plain?, Bool.false_eq_true, false_iff]
+          intro plain
+          cases plain
+        all_goals
+          simp only [plain?, true_iff]
+          constructor
+      · intro list small
+        cases list
+        case nil => simp [plainList?]
+        case cons value rest =>
+          simp only [List.cons.sizeOf_spec] at small
+          simp only [plainList?, Bool.and_eq_true, values value (by omega), lists rest (by omega),
+            List.mem_cons, forall_eq_or_imp]
+
+theorem plain?_iff (value : RuntimeValue) : plain? value = true ↔ Plain value :=
+  (plain?_iff_below (sizeOf value + 1)).1 value (by omega)
+
+instance : DecidablePred Plain := fun value => decidable_of_iff _ (plain?_iff value)
 
 /-- Collecting outer borrows from a list known to contain only plain values
 is empty.  Keeping this structural fact separate avoids unfolding the
@@ -78,7 +144,7 @@ theorem Plain.collectPruned_borrowEntry?_eq_empty {value : RuntimeValue}
   | vector elements fields ih
   | tuple elements fields ih
   | nominal _ _ elements fields ih
-  | closure _ elements fields ih =>
+  | closure _ _ _ elements fields ih =>
       simp only [collectPruned, borrowEntry?]
       apply collectPrunedList_borrowEntry?_eq_empty
       · simpa using fields
@@ -108,7 +174,7 @@ theorem Plain.maskReturnedBorrows_eq_self {value : RuntimeValue}
   | vector elements fields ih
   | tuple elements fields ih
   | nominal _ _ elements fields ih
-  | closure _ elements fields ih =>
+  | closure _ _ _ elements fields ih =>
       simp only [maskReturnedBorrows]
       rw [maskReturnedBorrowList_eq_self loans elements.toList
         (fun value mem => ih value (by simpa using mem))]
@@ -221,8 +287,9 @@ theorem findFirst_eq_none_of_plain {α : Type} {f : RuntimeValue → Option α}
       rw [findFirst.eq_def, matcher.nominal]
       dsimp only
       exact findFirstList_eq_none fun x mem => ih x (by simpa using mem)
-  | closure function captures plain ih =>
-      rw [findFirst.eq_def, matcher.plain (Plain.closure function captures plain)]
+  | closure function mask typeInstantiation captures plain ih =>
+      rw [findFirst.eq_def,
+        matcher.plain (Plain.closure function mask typeInstantiation captures plain)]
       dsimp only
       exact findFirstList_eq_none fun x mem => ih x (by simpa using mem)
 
@@ -260,8 +327,9 @@ theorem rewriteFirst_eq_none_of_plain {f : RuntimeValue → Option RuntimeValue}
       dsimp only
       rw [rewriteFirstList_eq_none fun x mem => ih x (by simpa using mem)]
       rfl
-  | closure function captures plain ih =>
-      rw [rewriteFirst.eq_def, matcher.plain (Plain.closure function captures plain)]
+  | closure function mask typeInstantiation captures plain ih =>
+      rw [rewriteFirst.eq_def,
+        matcher.plain (Plain.closure function mask typeInstantiation captures plain)]
       dsimp only
       rw [rewriteFirstList_eq_none fun x mem => ih x (by simpa using mem)]
       rfl
@@ -678,16 +746,6 @@ theorem writeProjections?_focusValue (steps : List FocusStep)
   | nil => rfl
   | cons step rest ih =>
       simp [FocusStep.fill, writeProjections?, ih]
-
-theorem readProjections?_append (value : RuntimeValue)
-    (first second : List RuntimeProjection) :
-    readProjections? value (first ++ second) =
-      (readProjections? value first).bind (readProjections? · second) := by
-  induction first generalizing value with
-  | nil => simp [readProjections?]
-  | cons projection rest ih =>
-      cases projection <;> cases value <;> simp [readProjections?, ih, Option.bind_assoc]
-      split <;> (try split) <;> simp
 
 /-- Resolving the path's field steps from a place that reads the focused
 resource appends the path's projections. -/

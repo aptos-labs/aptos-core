@@ -27,27 +27,9 @@ set_option maxHeartbeats 1000 in
 example {α : Type} (a b c d : α) :
     sortByIndex [(3, a), (1, b), (2, c), (1, d)] =
       [(1, b), (1, d), (2, c), (3, a)] := by
-  -- Match preparation's certificate path: emit reflexivity and let the
+  -- Match a compilation certificate's path: emit reflexivity and let the
   -- kernel check reduction, without a duplicate elaborator conversion.
   run_tac (← Lean.Elab.Tactic.getMainGoal).refl (check := false)
-
-set_option maxHeartbeats 1000 in
-example (a b c : Place) :
-    applyPlaceCopies #[a, b, c] [(1, ⟨0⟩), (2, ⟨1⟩)] = #[a, a, a] := by
-  run_tac (← Lean.Elab.Tactic.getMainGoal).refl (check := false)
-
-/- An independent sequential oracle covers both copy orders, transitive
-copies, and overwrites of the same slot. Place contents are not inspected. -/
-#guard Id.run do
-  let original : Array Place := #[.localVar ⟨0⟩, .deref ⟨0⟩, .localVar ⟨1⟩, .deref ⟨2⟩]
-  let events := (List.range 4).flatMap fun index =>
-    (List.range 4).map fun base => (index, (⟨base⟩ : PlaceId))
-  return events.all fun first => events.all fun second =>
-    let copies := [first, second]
-    applyPlaceCopies original copies == copies.foldl
-      (fun places (index, base) => places.set! index places[base.index]!) original
-
-#guard applyPlaceCopies #[.localVar ⟨0⟩] [(3, ⟨0⟩)] == #[.localVar ⟨0⟩]
 
 private def config : ProfileConfig := { profile := .rust, name := "rust-test" }
 private def schema : ProfileSchema := { profile := .rust, name := "rust-test" }
@@ -124,7 +106,7 @@ private def fixture : RawUnit where
       }] }]
 
 /- Duplicate edges, cycles, unreachable places, and place-index expressions
-exercise the queue-once bound independently of type-directed erasure. -/
+exercise the queue-once bound independently of the shared-reference typing. -/
 #guard match validate #[schema] fixture with
   | .error _ => false
   | .ok checked => Id.run do
@@ -146,12 +128,12 @@ exercise the queue-once bound independently of type-directed erasure. -/
         places := ns.places.push (.index ⟨0⟩ ⟨2⟩) }
       return reachableDereferences indexed ⟨0⟩ == [(3, ⟨2⟩)]
 
-private def executable? : Option ExecutableUnit := do
+private def executable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] fixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
-/- The erasure precheck must look through containers and mutable references:
-their projected contents can still be shared references. -/
+/- The shared-dereference precheck must look through containers and mutable
+references: their projected contents can still be shared references. -/
 #guard [3, 4, 5, 6].all fun rootType => Id.run do
   let shared : Ty := .reference {
     profile := .rust, kind := .shared, referent := ⟨1⟩, lifetime := ⟨0⟩ }
@@ -181,7 +163,9 @@ their projected contents can still be shared references. -/
           { function.locals[1]! with type := typeUse rootType 10 } },
         { source.functions[1]! with body := .absent }] }] }
   let some checked := (validate #[schema] raw).toOption | return false
-  return sharedReferenceErasureChunks checked == #[#[[(2, ⟨1⟩)], []]]
+  let ns := checked.namespaces[0]!
+  return sharedDereferenceSites checked ns ns.functions[0]! == #[⟨2⟩] &&
+    checked.borrowCertificates.all (·.sharedDereferences == #[⟨2⟩])
 
 private def verifiable? : Option VerifiableUnit := do
   let checked ← (validate #[schema] fixture).toOption
@@ -189,7 +173,7 @@ private def verifiable? : Option VerifiableUnit := do
 
 #guard match executable? with
   | none => false
-  | some executable =>
+  | some ⟨_, executable⟩ =>
       executable.borrowCertificates == #[
         {
           namespaceId := ⟨0⟩
@@ -215,27 +199,27 @@ private def verifiable? : Option VerifiableUnit := do
         }]
 
 #guard match executable?, verifiable? with
-  | some executable, some verifiable =>
+  | some ⟨_, executable⟩, some verifiable =>
       verifiable.borrowCertificates == executable.borrowCertificates
   | _, _ => false
 
 /-! A loan that dies mid-function, with the lender consumed afterwards: the
-analysis records the death, preparation materializes an `endLoan` marker,
-and the marker is value-transparent to execution. -/
+analysis records the death, the semantics ends the loan at its anchor, and
+ending it is value-transparent to execution. -/
 
-private def markerFixture : RawUnit where
+private def deathFixture : RawUnit where
   tables := {
-    files := #[{ name := "marker.rs" }]
+    files := #[{ name := "death.rs" }]
     locations := (Array.range 20).map fun index => {
       primary := some { file := ⟨0⟩, startByte := index, endByte := index + 1 } }
     origins := #[{ kind := .rustMir, location := ⟨0⟩ }]
-    alignments := #[{ source := ⟨0⟩, trust := .checked, description := "marker fixture" }]
+    alignments := #[{ source := ⟨0⟩, trust := .checked, description := "death fixture" }]
     lifetimes := #[{ kind := .local, loc := ⟨0⟩ }]
     types := #[
       .unit,
       .integer (.bits 64) true,
       .reference { profile := .rust, kind := .mutable, referent := ⟨1⟩, lifetime := ⟨0⟩ }]
-    namespaces := #[{ segments := #["test", "Marker"] }]
+    namespaces := #[{ segments := #["test", "Death"] }]
     names := #[{ namespaceId := ⟨0⟩, name := "mutate_then_move" }] }
   profiles := #[config]
   namespaces := #[{
@@ -269,16 +253,16 @@ private def markerFixture : RawUnit where
           { id := ⟨1⟩, name := "reference", type := typeUse 2 10, mutable := false, loc := ⟨10⟩ }]
       }] }]
 
-private def markerExecutable? : Option ExecutableUnit := do
-  let checked ← (validate #[schema] markerFixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+private def deathExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
+  let checked ← (validate #[schema] deathFixture).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
--- An independent sequential reference for the batched preparation pass.
--- It pins the complete arena, not just marker counts or execution results.
-private def sequentialMarkers (unit : ValidatedUnit) (ns : ValidatedNamespace) : Array Expr := Id.run do
+-- An independent sequential reference for the deaths at each anchor.
+private def sequentialDeaths (unit : ValidatedUnit) (namespaceId : NamespaceId) :
+    Array (ExprId × AnchorDeaths) := Id.run do
   let mut marks : Array (ExprId × Array LoanId × Array LoanId) := #[]
   for certificate in unit.borrowCertificates do
-    if certificate.namespaceId != ns.identity then continue
+    if certificate.namespaceId != namespaceId then continue
     for (loan, index) in certificate.loans.zipIdx do
       for death in loan.deaths do
         let position := (marks.findIdx? (·.1 == death.anchor)).getD marks.size
@@ -290,27 +274,10 @@ private def sequentialMarkers (unit : ValidatedUnit) (ns : ValidatedNamespace) :
         marks := marks.set! position
           (anchor, if death.before then insert before else before,
             if death.before then after else insert after)
-  let mut expressions := ns.expressions
-  for (anchor, before, after) in marks do
-    let node := expressions[anchor.index]!
-    let mut current := node
-    if !after.isEmpty then
-      let moved : ExprId := ⟨expressions.size⟩
-      current := { node with kind := .operation (.reference (.endLoan after)) #[] #[moved] }
-      expressions := expressions.push node |>.set! anchor.index current
-    if !before.isEmpty then
-      let moved : ExprId := ⟨expressions.size⟩
-      let markerId : ExprId := ⟨expressions.size + 1⟩
-      let marker : Expr := {
-        loc := node.loc
-        typeId := ⟨0⟩
-        kind := .operation (.reference (.endLoan before)) #[] #[] }
-      let wrapper := { node with kind := .block #[markerId] (some moved) }
-      expressions := expressions.push current |>.push marker |>.set! anchor.index wrapper
-  return expressions
+  return marks.map fun (anchor, before, after) => (anchor, { before, after })
 
-private def manyMarkerFixture (count : Nat) : RawUnit := Id.run do
-  let source := markerFixture.namespaces[0]!
+private def manyDeathFixture (count : Nat) : RawUnit := Id.run do
+  let source := deathFixture.namespaces[0]!
   let mut expressions := #[]
   let mut functions := #[]
   for index in [:count] do
@@ -326,45 +293,47 @@ private def manyMarkerFixture (count : Nat) : RawUnit := Id.run do
     functions := functions.push { source.functions[0]! with
       name := ⟨index⟩
       body := .structured (expr 7) }
-  return { markerFixture with
-    tables := { markerFixture.tables with names := (Array.range count).map fun index =>
-      { namespaceId := ⟨0⟩, name := s!"marker_{index}" } }
+  return { deathFixture with
+    tables := { deathFixture.tables with names := (Array.range count).map fun index =>
+      { namespaceId := ⟨0⟩, name := s!"death_{index}" } }
     namespaces := #[{ source with expressions, functions }] }
 
-#guard [fixture, markerFixture, manyMarkerFixture 32].all fun raw =>
+-- The semantics reads each anchor's deaths as the reference groups them, and
+-- the index compilation reads agrees at every expression of every function.
+#guard [fixture, deathFixture, manyDeathFixture 32].all fun raw =>
   match (validate #[schema] raw).toOption with
   | none => false
   | some unit =>
-      let (marked, diagnostics) := markLoanDeaths unit
-      diagnostics.isEmpty &&
-        (unit.namespaces.zip marked.namespaces).all fun (before, after) =>
-          after.expressions == sequentialMarkers unit before
+      (loanDeathDiagnostics unit).isEmpty &&
+      (unit.namespaces.zipIdx.all fun (ns, index) =>
+        let expected := sequentialDeaths unit ⟨index⟩
+        (List.range ns.expressions.size).all fun anchor =>
+          loanDeathsAt unit ⟨index⟩ ⟨anchor⟩ ==
+            ((expected.find? (·.1 == ⟨anchor⟩)).map (·.2)).getD {}) &&
+      unit.namespaces.zipIdx.all fun (ns, index) =>
+        let deaths := deathIndex unit ⟨index⟩
+        (List.range ns.expressions.size).all fun anchor =>
+          (deaths.find? anchor).getD {} == loanDeathsAt unit ⟨index⟩ ⟨anchor⟩
 
 -- The analysis records the death before the lender's consuming move.
-#guard match (validate #[schema] markerFixture).toOption with
+#guard match (validate #[schema] deathFixture).toOption with
   | some checked =>
       (checked.borrowCertificates.map BorrowCertificate.loans) == #[#[{
         expression := ⟨1⟩, lifetime := ⟨0⟩, holders := #[⟨1⟩]
         deaths := #[{ anchor := ⟨4⟩, before := true }] }]]
   | none => false
 
--- Preparation materializes exactly one endLoan marker in the arena, and the
--- validated unit itself stays marker-free.
-#guard match (validate #[schema] markerFixture).toOption, markerExecutable? with
-  | some checked, some executable =>
-      let markers (ns : ValidatedNamespace) :=
-        ns.expressions.filter fun expression =>
-          match expression.kind with
-          | .operation (.reference (.endLoan _)) _ _ _ => true
-          | _ => false
-      (checked.namespaces.map fun ns => (markers ns).size) == #[0] &&
-        (executable.unit.namespaces.map fun ns => (markers ns).size) == #[1]
+-- The death is read at its anchor: preparation keeps every expression index.
+#guard match (validate #[schema] deathFixture).toOption, deathExecutable? with
+  | some checked, some ⟨unit, _⟩ =>
+      unit.namespaces.map (·.expressions) == checked.namespaces.map (·.expressions) &&
+        loanDeathsAt checked ⟨0⟩ ⟨4⟩ == { before := #[⟨0⟩] }
   | _, _ => false
 
--- The marker is value-transparent: the mutation through the reference is
--- observed by the moved-out lender.
-#guard match markerExecutable? with
-  | some executable =>
+-- Ending the loan is value-transparent: the mutation through the reference
+-- is observed by the moved-out lender.
+#guard match deathExecutable? with
+  | some ⟨_, executable⟩ =>
       match Interpreter.run executable 32 { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[] with
       | .ok (_, { value := .returned #[.integer 9], .. }) => true
       | _ => false
@@ -373,7 +342,7 @@ private def manyMarkerFixture (count : Nat) : RawUnit := Id.run do
 /-- An unrelated specification must not keep every old reference live.
 The first borrow is dead before its successor, despite the spec statement. -/
 private def successorBorrowFixture : RawUnit :=
-  let ns := markerFixture.namespaces[0]!
+  let ns := deathFixture.namespaces[0]!
   let expressions := ns.expressions.set! 4 {
     loc := ⟨4⟩, typeId := ⟨2⟩, kind := .operation (.borrow .mutable ⟨0⟩) #[] #[] }
   let expressions := expressions.set! 5 {
@@ -386,21 +355,21 @@ private def successorBorrowFixture : RawUnit :=
   let expressions := expressions.push {
     loc := ⟨13⟩, typeId := ⟨0⟩, kind := .spec {
       loc := ⟨13⟩, conditions := #[{ loc := ⟨13⟩, kind := .assertion, expression := ⟨9⟩ }] } }
-  { markerFixture with
-    tables := { markerFixture.tables with types := markerFixture.tables.types.push .bool }
+  { deathFixture with
+    tables := { deathFixture.tables with types := deathFixture.tables.types.push .bool }
     namespaces := #[{ ns with expressions }] }
 
 #guard match (validate #[schema] successorBorrowFixture).toOption with
   | none => false
-  | some checked => match (prepareExecution #[semantics] checked).toOption with
+  | some unit => match (prepareExecution #[semantics] unit).toOption with
     | none => false
-    | some executable =>
-      executable.unit.borrowCertificates.any (·.loans.size == 2) &&
-      executable.unit.borrowCertificates.all fun certificate =>
+    | some _ =>
+      unit.borrowCertificates.any (·.loans.size == 2) &&
+      unit.borrowCertificates.all fun certificate =>
         certificate.loans.zipIdx.all fun (loan, index) =>
-          SemanticOperations.certificateLoanId? executable.unit certificate.namespaceId
+          SemanticOperations.certificateLoanId? unit certificate.namespaceId
             loan.expression == some index &&
-          (match executable.unit.namespaces[certificate.namespaceId.index]?.bind
+          (match unit.namespaces[certificate.namespaceId.index]?.bind
               (·.expressions[loan.expression.index]?) with
            | some { kind := .operation (.borrow ..) .., .. } => true
            | _ => false)
@@ -427,7 +396,7 @@ private def lifetimeClosureFixture : RawUnit :=
 
 #guard match executable? with
   | none => false
-  | some executable => match LeanerIR.Interpreter.run executable 32
+  | some ⟨_, executable⟩ => match LeanerIR.Interpreter.run executable 32
       { namespaceId := ⟨0⟩, functionId := ⟨0⟩ } #[] with
     | .ok (state, outcome) =>
         -- Frame-local loans die with the frame: nothing is exported.
@@ -2740,12 +2709,12 @@ private def valueOperationFixture : RawUnit :=
       expressions
       functions := ns.functions.push function }] }
 
-private def valueExecutable? : Option ExecutableUnit := do
+private def valueExecutable? : Option ((unit : ValidatedUnit) × ExecutableUnit unit) := do
   let checked ← (validate #[schema] valueOperationFixture).toOption
-  (prepareExecution #[semantics] checked).toOption
+  (prepareExecution #[semantics] checked).toOption.map (⟨checked, ·⟩)
 
 #guard match valueExecutable? with
-  | some executable => match LeanerIR.Interpreter.run executable 32
+  | some ⟨_, executable⟩ => match LeanerIR.Interpreter.run executable 32
       { namespaceId := ⟨0⟩, functionId := ⟨2⟩ } #[] with
     | .ok (state, outcome) =>
         outcome.value == .returned #[.integer 9] && state.pending.isEmpty
@@ -2870,10 +2839,10 @@ private def badDirectCallArgumentFixture : RawUnit :=
 
 #guard validationHasDiagnosticAt badDirectCallArgumentFixture "LIR-SEMANTIC-TYPE" ⟨11⟩
 
-private def prepared : ExecutableUnit := executable?.get (by native_decide)
-private def valuePrepared : ExecutableUnit := valueExecutable?.get (by native_decide)
+private def prepared := (executable?.get (by native_decide)).2
+private def valuePrepared := (valueExecutable?.get (by native_decide)).2
 
-private theorem successfulRunHasDerivation (executable : ExecutableUnit)
+private theorem successfulRunHasDerivation {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     (fuel : Nat) (function : FunctionHandle) (arguments : Array RuntimeValue)
     (success : (LeanerIR.Interpreter.run executable fuel function arguments).isOk) :
     ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
@@ -2899,5 +2868,37 @@ example : ∃ (finalState : RuntimeState) (outcome : LocatedOutcome),
   apply successfulRunHasDerivation valuePrepared 32
     { namespaceId := ⟨0⟩, functionId := ⟨2⟩ } #[]
   native_decide
+
+/-! Cases borrow discipline excludes are stuck, or exported, rather than
+arbitrary: a reference whose loan ended is not dereferenced, and a global
+loan whose slot lost its hole does not overwrite the slot. -/
+
+#guard (dereferenceBorrow? #[.unit] {} {}).isNone
+#guard ((dereferenceBorrow? #[.borrow 0 (.integer 1)] {} {}).map (·.2.2)) == some (.integer 1)
+
+private def heldKey : GlobalKey := { namespaceId := ⟨0⟩, typeId := ⟨5⟩, key := .integer 1 }
+
+private def holelessSlot : RuntimeState :=
+  { globals := ({} : GlobalMap).insert heldKey (.integer 5)
+    globalLoans := [(0, heldKey)]
+    nextLoan := 1 }
+
+-- The value goes to the pending set; the slot keeps what it holds.
+#guard match applyWriteBack {} holelessSlot 0 (.integer 7) with
+  | (_, state) => state.pending == #[(0, .integer 7)] &&
+      state.globals.lookup heldKey == some (.integer 5)
+
+-- A slot holding the hole is filled.
+#guard match applyWriteBack {} { holelessSlot with
+    globals := ({} : GlobalMap).insert heldKey (.loanHole 0) } 0 (.integer 7) with
+  | (_, state) => state.pending.isEmpty && state.globals.lookup heldKey == some (.integer 7)
+
+-- A function returns no hole outside a borrow: a hole anywhere in a result
+-- makes the outcome one no run returns, a hole in a borrow's current is its
+-- lender's.
+#guard (Outcome.returned #[.integer 1, .tuple #[.bool true, .borrow 0 (.loanHole 1)]]).holeFree
+#guard !(Outcome.returned #[.nominal ⟨⟨0⟩, 0⟩ none #[.integer 1, .loanHole 0]]).holeFree
+#guard !(Outcome.returned #[.loanHole 0]).holeFree
+#guard (Outcome.threw .abort #[.loanHole 0]).holeFree
 
 end LeanerIR.Tests.References

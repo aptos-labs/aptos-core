@@ -29,49 +29,24 @@ lean_lib LeanerE2ETests where
 private def repoRoot (pkg : NPackage __name__) : System.FilePath :=
   pkg.dir.join ".." |>.join ".." |>.join ".." |>.join ".."
 
-/-- Lists every file under `dir`, recursively, sorted by path for a stable
-hash order. -/
-private partial def walkFiles : System.FilePath → IO (Array System.FilePath)
-  | dir => do
-    let mut out : Array System.FilePath := #[]
-    for entry in (← dir.readDir) do
-      if ← entry.path.isDir then
-        out := out ++ (← walkFiles entry.path)
-      else
-        out := out.push entry.path
-    return out.qsort (fun a b => a.toString < b.toString)
-
-/-- Mixes the hashes of the adapter crate's sources, the workspace lockfile,
-and the toolchain and build-identity strings into the staticlib's dependency
-trace, so a change on any of them relinks the driver. -/
-private def staticlibTrace (pkg : NPackage __name__) : IO Hash := do
-    let files :=
-      (← walkFiles (repoRoot pkg |>.join "third_party" |>.join "move" |>.join "mono-move"
-        |>.join "lean-link"))
-        ++ #[repoRoot pkg |>.join "Cargo.lock", repoRoot pkg |>.join "rust-toolchain.toml"]
-    let mut hash := Hash.ofString "mono-move-lean-link release abi-1"
-    for file in files do
-      let fileHash ← computeFileHash file
-      hash := Hash.mk (mixHash hash.val fileHash.val)
-    return hash
-
 /-- Builds the MonoVM adapter staticlib with Cargo, in the explicitly
 selected release profile, from the same checkout this package builds from.
 Cargo's own target directory under `.lake` keeps its incremental cache. -/
 target monovm_staticlib pkg : System.FilePath := Job.async do
   let targetDir := pkg.dir.join ".lake" |>.join "cargo-target"
   let archive := targetDir.join "release" |>.join "libmono_move_lean_link.a"
-  let depTrace := BuildTrace.ofHash (← staticlibTrace pkg)
-  let traceFile := System.FilePath.mk (archive.toString ++ ".trace")
-  buildUnlessUpToDate archive depTrace traceFile do
-    createParentDirs archive
-    proc (quiet := false) {
-      cmd := "cargo",
-      args := #[
-        "build", "-p", "mono-move-lean-link", "--profile", "release",
-        "--manifest-path", (repoRoot pkg |>.join "Cargo.toml").toString,
-        "--target-dir", targetDir.toString ],
-      cwd := repoRoot pkg }
+  -- Always let Cargo check its complete dependency graph. A Lake trace of
+  -- just the adapter sources misses changes in the runtime and its dependencies.
+  createParentDirs archive
+  proc (quiet := false) {
+    cmd := "cargo",
+    args := #[
+      "build", "--locked", "-p", "mono-move-lean-link", "--profile", "release",
+      "--manifest-path", (repoRoot pkg |>.join "Cargo.toml").toString,
+      "--target-dir", targetDir.toString ],
+    cwd := repoRoot pkg }
+  -- Propagate the resulting archive's identity to the executable link job.
+  setTrace (← computeTrace archive)
   return archive
 
 /-- Compiles the C shim against the pinned Lean toolchain's `lean/lean.h`. -/

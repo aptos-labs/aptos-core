@@ -1,0 +1,24 @@
+step 0: 0x4e::moves::pass(3, 4)
+  mono:       returned 7
+  LIR:        returned 7
+  round trip: returned 7
+
+step 1: 0x4e::moves::fields(3, 4)
+  mono:       returned 15
+  LIR:        returned 15
+  round trip: returned 15
+
+step 2: 0x4e::moves::moved(5)
+  mono:       returned 6
+  LIR:        returned 6
+  round trip: returned 6
+
+step 3: 0x4e::moves::unpacked(9, 4)
+  mono:       returned 5
+  LIR:        returned 5
+  round trip: returned 5
+
+step 4: 0x4e::moves::shapes(2, 5)
+  mono:       returned 37
+  LIR:        returned 37
+  round trip: returned 37

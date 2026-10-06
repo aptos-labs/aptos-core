@@ -120,4 +120,40 @@ theorem get?_of_index_eq {values : Array α} {tree : IndexedArena α}
   rw [← get?_ofArray, certificate]
 
 end IndexedArena
+
+/-- A search tree over sparse natural keys: an index of a few entries of a
+large key space, such as the anchors of a function's loan deaths. -/
+inductive KeyTree (α : Type) where
+  | leaf
+  | node (left : KeyTree α) (key : Nat) (value : α) (right : KeyTree α)
+  deriving Repr, Inhabited
+
+namespace KeyTree
+
+def find? : KeyTree α → Nat → Option α
+  | .leaf, _ => none
+  | .node left key value right, probe =>
+      if Nat.blt probe key then left.find? probe
+      else if Nat.blt key probe then right.find? probe
+      else some value
+
+/-- The balanced tree of the first `count` entries of a list sorted by key,
+and the entries after them, built in one traversal. -/
+def build : Nat → Nat → List (Nat × α) → KeyTree α × List (Nat × α)
+  | 0, _, entries => (.leaf, entries)
+  | _ + 1, 0, entries => (.leaf, entries)
+  | _ + 1, _ + 1, [] => (.leaf, [])
+  | fuel + 1, count + 1, entries@(_ :: _) =>
+      let (left, entries) := build fuel (count / 2) entries
+      match entries with
+      | [] => (left, [])
+      | (key, value) :: entries =>
+          let (right, entries) := build fuel (count - count / 2) entries
+          (.node left key value right, entries)
+
+/-- The tree of entries sorted by key, without duplicate keys. -/
+def ofSorted (entries : List (Nat × α)) : KeyTree α :=
+  (build entries.length entries.length entries).1
+
+end KeyTree
 end LeanerIR.Validation

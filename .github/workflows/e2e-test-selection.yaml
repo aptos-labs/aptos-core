@@ -15,6 +15,12 @@ on:
       selected_e2e_tests:
         description: JSON list of selected test names
         value: ${{ jobs.select.outputs.selected_e2e_tests }}
+      known_e2e_tests:
+        description: JSON list of runners known to the trusted planner
+        value: ${{ jobs.select.outputs.known_e2e_tests }}
+      docker_images:
+        description: Whether a selected test consumes the release Docker images
+        value: ${{ jobs.select.outputs.docker_images }}
       mode:
         description: Effective selection mode (legacy, compare, or subsystem)
         value: ${{ jobs.select.outputs.mode }}
@@ -26,7 +32,9 @@ jobs:
     env:
       E2E_MODE: ${{ (inputs.FORCE_FULL || (github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests') || contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf')) && 'legacy' || vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
     outputs:
+      known_e2e_tests: ${{ steps.registry.outputs.known_e2e_tests }}
       selected_e2e_tests: ${{ steps.selection.outputs.selected_e2e_tests }}
+      docker_images: ${{ steps.selection.outputs.docker_images }}
       mode: ${{ env.E2E_MODE }}
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +44,16 @@ jobs:
           # revisions predating the planner.
           ref: ${{ env.E2E_MODE == 'legacy' && github.workflow_sha || github.event.pull_request.base.sha || github.workflow_sha }}
           fetch-depth: 1
+      - name: List trusted runner registry
+        id: registry
+        run: |
+          python3 - <<'PYREG'
+          import json, os
+          with open('.github/actions/e2e-test-determinator/registry.json') as registry:
+              names = sorted(json.load(registry))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'known_e2e_tests={json.dumps(names)}\n')
+          PYREG
       - uses: ./.github/actions/e2e-test-determinator
         id: selection
         with:

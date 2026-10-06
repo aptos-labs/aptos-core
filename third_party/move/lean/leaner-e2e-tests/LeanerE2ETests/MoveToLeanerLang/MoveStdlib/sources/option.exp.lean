@@ -6,7 +6,6 @@ import LeanerLang
 /-! This module defines the Option type and its methods to represent and handle an optional value. -/
 leaner module std::option where
   use std::mem::replace
-  use std::vector
   use std::vector::singleton
 
   pragma aborts_if_is_strict
@@ -66,7 +65,7 @@ leaner module std::option where
     mut vec : Vector<Element>
   ) -> Option<Element> := do
     assert!(vec.length <= 1, EOPTION_VEC_TOO_LONG)
-    if vec.is_empty() then
+    if vec.length == 0 then
       core.prim.destroyEmptyVector(vec)
       new Option<Element>::None {}
     else
@@ -148,7 +147,10 @@ leaner module std::option where
   public fun borrow_with_default {Element}(
     self : &Option<Element>, default_ref : &Element
   ) -> &Element :=
-    if self is None then default_ref else self.e
+    if self is None then default_ref
+    else
+      let e := &self.e
+      e
 
   spec borrow_with_default where
     pragma opaque
@@ -162,7 +164,10 @@ leaner module std::option where
   public fun get_with_default {Element has Copy, Drop}(
     self : &Option<Element>, default : Element
   ) -> Element :=
-    if self is None then default else self.e
+    if self is None then default
+    else
+      let e := &self.e
+      *e
 
   spec get_with_default where
     pragma opaque

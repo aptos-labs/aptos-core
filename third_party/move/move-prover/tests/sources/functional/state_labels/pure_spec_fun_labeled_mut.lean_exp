@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:26:9: error: the specification clause `ensures ∃ (S : StateDomain),
+        (..S |~ small(old(c), c)) && (S.. |~ small(old(c), c))` is not established
+tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.move:23:5: error: leaner verification failed: the automatic verification of `inc_twice` failed; provide a proof: `verify inc_twice by …` in `tests/sources/functional/state_labels/pure_spec_fun_labeled_mut.proof.lean` (`verify inc_twice by skip` shows the obligations it leaves)

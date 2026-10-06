@@ -14,7 +14,7 @@ private def emptyUnit : RawUnit where
   namespaces := #[]
 
 private def emptyUnitJson : String :=
-  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":1}}"
+  "{\"dependencies\":[],\"evidence\":[],\"namespaces\":[],\"profiles\":[],\"tables\":{\"alignments\":[],\"files\":[],\"lifetimes\":[],\"locations\":[],\"names\":[],\"namespaces\":[],\"origins\":[],\"types\":[]},\"version\":{\"major\":1,\"minor\":5}}"
 
 #guard encodeJson emptyUnit == emptyUnitJson
 
@@ -31,8 +31,8 @@ private def jsonWithUnknownTopLevelField : String :=
 
 private def jsonWithUnknownNestedField : String :=
   (encodeJson emptyUnit).replace
-    "\"version\":{\"major\":1,\"minor\":1}"
-    "\"version\":{\"major\":1,\"minor\":1,\"patch\":0}"
+    "\"version\":{\"major\":1,\"minor\":5}"
+    "\"version\":{\"major\":1,\"minor\":5,\"patch\":0}"
 
 #guard match decodeJson jsonWithUnknownNestedField with
   | .error message => message == "unknown raw LIR JSON field `$.version.patch`"
@@ -40,13 +40,13 @@ private def jsonWithUnknownNestedField : String :=
 
 #guard match decodeJson
     ((encodeJson emptyUnit).replace
-      "\"version\":{\"major\":1,\"minor\":1}"
-      "\"version\":{\"major\":1,\"major\":1,\"minor\":1}") with
+      "\"version\":{\"major\":1,\"minor\":5}"
+      "\"version\":{\"major\":1,\"major\":1,\"minor\":5}") with
   | .error message => message.contains "duplicate JSON object field `major`"
   | .ok _ => false
 
 #guard match decodeJson
-    ("{\"version\":{\"major\":1,\"minor\":1}," ++ (encodeJson emptyUnit).drop 1) with
+    ("{\"version\":{\"major\":1,\"minor\":5}," ++ (encodeJson emptyUnit).drop 1) with
   | .error message => message.contains "duplicate JSON object field `version`"
   | .ok _ => false
 
@@ -80,8 +80,8 @@ private def malformedDocuments : Array String := #[
   (encodeJson emptyUnit).replace "\"tables\":{" "\"tables\":[",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":-1",
   (encodeJson emptyUnit).replace "\"major\":1" "\"major\":1.5",
-  (encodeJson emptyUnit).replace "\"minor\":1" "\"minor\":\"0\"",
-  (encodeJson emptyUnit).replace "\"minor\":1" "\"patch\":0",
+  (encodeJson emptyUnit).replace "\"minor\":5" "\"minor\":\"0\"",
+  (encodeJson emptyUnit).replace "\"minor\":5" "\"patch\":0",
   (encodeJson profiledUnit).replace "\"profile\":\"rust\"" "\"profile\":\"unknown\""
 ]
 
@@ -568,7 +568,7 @@ private def classifyCallKind : CallKind → Nat
   | .function _ => 0
   | .constructor _ _ => 1
   | .destructor _ _ => 2
-  | .closure _ => 3
+  | .closure _ _ => 3
   | .invoke => 4
   | .extension _ _ => 5
 
@@ -648,7 +648,6 @@ private def classifyReferenceOperation : ReferenceOperation → Nat
   | .dereference => 1
   | .freeze _ => 2
   | .mutate => 3
-  | .endLoan _ => 4
 
 private def classifyDataOperation : DataOperation → Nat
   | .select _ _ => 0
@@ -681,6 +680,7 @@ private def classifySpecOperation : SpecOperation → Nat
   | .stateDomain => 6
   | .global _ => 7
   | .canModify => 8
+  | .exists _ => 45
   | .old => 9
   | .saveStateAnchor _ => 10
   | .withStateAnchor _ => 11
@@ -716,6 +716,7 @@ private def classifySpecOperation : SpecOperation → Nat
   | .eventStoreIncludedIn => 41
   | .noOp => 42
   | .final => 43
+  | .lemma _ _ => 44
 
 private def classifyOperation : Operation → Nat
   | .move _ => 0
@@ -760,6 +761,8 @@ private def classifyConditionKind : ConditionKind → Nat
   | .schemaInvariant => 16
   | .axiom_ _ => 17
   | .update => 18
+  | .apply => 19
+  | .split => 20
 
 private def classifyExprKind : ExprKind → Nat
   | .value _ _ => 0
@@ -792,7 +795,7 @@ private def allCallKinds : Array CallKind := #[
   .function qref,
   .constructor qref (some "Variant"),
   .destructor qref (some "Variant"),
-  .closure qref,
+  .closure qref 5,
   .invoke,
   .extension extensionValue #[qref]]
 
@@ -817,7 +820,7 @@ private def allReferenceOperations : Array ReferenceOperation := #[
 
 private def allDataOperations : Array DataOperation := #[
   .select qref "field",
-  .selectVariants qref #["left", "right"],
+  .selectVariants qref #[("Left", "left"), ("Right", "right")],
   .testVariants qref #["Variant"],
   .discriminant qref,
   .updateField qref "field"]
@@ -835,7 +838,7 @@ private def allSpecOperations : Array SpecOperation := #[
   .inVectorRange, .vectorRange, .maxValue 128, .bitVectorToInt,
   .intToBitVector, .abortFlag, .abortCode, .wellFormed, .boxValue,
   .unboxValue, .emptyEventStore, .extendEventStore, .eventStoreIncludes,
-  .eventStoreIncludedIn, .noOp, .final]
+  .eventStoreIncludedIn, .noOp, .final, .lemma qref { pre := some 0 }, .exists (some 0)]
 
 private def operationRepresentatives : Array Operation := #[
   .move ⟨0⟩,
@@ -868,7 +871,7 @@ private def allConditionKinds : Array ConditionKind := #[
   .letPost "x", .letPre "x", .assertion, .assumption, .decreases, .abortsIf,
   .abortsWith, .succeedsIf, .emits, .ensures, .requires, .structInvariant,
   .functionInvariant, .loopInvariant, .globalInvariant #["T"],
-  .globalInvariantUpdate #["T"], .schemaInvariant, .axiom_ #["T"], .update]
+  .globalInvariantUpdate #["T"], .schemaInvariant, .axiom_ #["T"], .update, .apply, .split]
 
 private def allConditions : Array Condition :=
   allConditionKinds.map fun kind => {
@@ -932,10 +935,10 @@ private def operationConstructorUnit : RawUnit :=
 #guard #[TraceKind.user, .automatic, .subAutomatic].map classifyTraceKind == Array.range 3
 #guard #[BehaviorKind.requiresOf, .abortsOf, .ensuresOf, .resultOf,
     .unchangedOf, .foldsOf, .writeOf 1].map classifyBehaviorKind == Array.range 7
-#guard allSpecOperations.map classifySpecOperation == Array.range 44
+#guard allSpecOperations.map classifySpecOperation == Array.range 46
 #guard operationRepresentatives.map classifyOperation == Array.range 14
 #guard allQuantifierKinds.map classifyQuantifierKind == Array.range 5
-#guard allConditionKinds.map classifyConditionKind == Array.range 19
+#guard allConditionKinds.map classifyConditionKind == Array.range 21
 #guard exprKindRepresentatives.map classifyExprKind == Array.range 17
 
 #guard match decodeJson (encodeJson operationConstructorUnit) with
@@ -965,7 +968,10 @@ private def populatedContract : FunctionContract := {
   hasFrame := true
   modifiesAll := true
   readsAll := true
-  pragmas := allAttributes }
+  pragmas := allAttributes
+  parameterFrames := #[{
+    loc := ⟨0⟩, parameter := ⟨0⟩, formals := #[⟨1⟩], modifies := #[⟨0⟩],
+    modifiesAll := true }] }
 
 private def associatedItemKinds : Array AssociatedItemKind := #[
   .type allGenericPredicates (some typeUse),
@@ -1058,6 +1064,11 @@ private def declarationConstructorUnit : RawUnit :=
           loc := ⟨0⟩, role := "execute", target := qref }],
         specBindings := #[{
           loc := ⟨0⟩, role := "spec", target := qref }] }]
+      lemmas := #[{
+        loc := ⟨0⟩, name := ⟨0⟩, doc := "lemma", profile := .rust,
+        signature := { generics := allBinderKinds, predicates := allGenericPredicates },
+        origin := ⟨0⟩, locals := #[localDecl], contract := populatedContract,
+        proof := allConditions, profileData := #[extensionValue] }]
       comments := #[{
         loc := ⟨0⟩, text := "comment", isDoc := true, ownLine := true }] }] }
 

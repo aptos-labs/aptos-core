@@ -40,8 +40,10 @@ module 0x42::state_labels {
     }
     spec publish_resource(account: &signer, value: u64) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Resource[signer::address_of(account)];
+        ensures [inferred] publish<Resource>(signer::address_of(account), Resource{value: value});
+        aborts_if [inferred] exists<Resource>(signer::address_of(account));
     }
 
 
@@ -88,9 +90,10 @@ module 0x42::state_labels {
     }
     spec call_publish(account: &signer, value: u64) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Resource[signer::address_of(account)];
         ensures [inferred] ensures_of<publish_resource>(account, value);
+        aborts_if [inferred] aborts_of<publish_resource>(account, value);
     }
 
 
@@ -112,11 +115,17 @@ module 0x42::state_labels {
     }
     spec swap_resources(account: &signer, addr: address): Resource {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Container[signer::address_of(account)];
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]);
-        ensures [inferred] remove<Resource>(addr);
+        ensures [inferred] {
+            let a = signer::address_of(account);
+            let b = Container{inner: old(Resource[addr]).value};
+            S1.. |~ publish<Container>(a, b)
+        };
+        ensures [inferred] ..S1 |~ remove<Resource>(addr);
+        aborts_if [inferred] S1 |~ (exists<Container>(signer::address_of(account)));
         aborts_if [inferred] !exists<Resource>(addr);
     }
 
@@ -156,8 +165,10 @@ module 0x42::state_labels {
     }
     spec safe_publish(account: &signer, addr: address, value: u64) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Resource[signer::address_of(account)];
+        ensures [inferred] !old(exists<Resource>(addr)) ==> publish<Resource>(signer::address_of(account), Resource{value: value});
+        aborts_if [inferred] !exists<Resource>(addr) && exists<Resource>(signer::address_of(account));
     }
 
 
@@ -179,10 +190,16 @@ module 0x42::state_labels {
     }
     spec increment_resource(account: &signer, addr: address) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Resource[signer::address_of(account)];
         modifies Resource[addr];
-        ensures [inferred] remove<Resource>(addr);
+        ensures [inferred] {
+            let a = signer::address_of(account);
+            let b = Resource{value: old(Resource[addr]).value + 1};
+            S1.. |~ publish<Resource>(a, b)
+        };
+        ensures [inferred] ..S1 |~ remove<Resource>(addr);
+        aborts_if [inferred] S1 |~ (exists<Resource>(signer::address_of(account)));
         aborts_if [inferred] !exists<Resource>(addr);
         aborts_if [inferred] Resource[addr].value == MAX_U64;
     }
@@ -272,10 +289,15 @@ module 0x42::state_labels {
     }
     spec create_then_read_same(account: &signer, addr: address): u64 {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Resource[signer::address_of(account)];
         ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr));
+        ensures [inferred] {
+            let a = signer::address_of(account);
+            ..S1 |~ publish<Resource>(a, Resource{value: 42})
+        };
         aborts_if [inferred] S1 |~ (aborts_of<read_resource>(addr));
+        aborts_if [inferred] exists<Resource>(signer::address_of(account));
     }
 
 
@@ -332,11 +354,13 @@ module 0x42::state_labels {
     }
     spec nested_publish(account1: &signer, account2: &signer, v1: u64, v2: u64) {
         use 0x1::signer;
-        pragma opaque = true, aborts_if_is_partial = true;
+        pragma opaque = true;
         modifies Resource[signer::address_of(account2)];
         modifies Resource[signer::address_of(account1)];
         ensures [inferred] S1.. |~ (ensures_of<publish_resource>(account2, v2));
         ensures [inferred] ..S1 |~ (ensures_of<publish_resource>(account1, v1));
+        aborts_if [inferred] S1 |~ (aborts_of<publish_resource>(account2, v2));
+        aborts_if [inferred] aborts_of<publish_resource>(account1, v1);
     }
 
 
@@ -400,89 +424,5 @@ module 0x42::state_labels {
 
 }
 /*
-Inference diagnostics:
-warning: WP could not characterize the aborts of `state_labels::publish_resource` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-   ┌─ tests/inference/state_labels.move:30:5
-   │
-30 │ ╭     fun publish_resource(account: &signer, value: u64) {
-31 │ │         move_to(account, Resource { value });
-32 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `state_labels::call_publish` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = callee `0x42::state_labels::publish_resource` has no trusted complete abort summary
-   ┌─ tests/inference/state_labels.move:59:5
-   │
-59 │ ╭     fun call_publish(account: &signer, value: u64) {
-60 │ │         publish_resource(account, value)
-61 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `state_labels::swap_resources` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-   ┌─ tests/inference/state_labels.move:74:5
-   │
-74 │ ╭     fun swap_resources(account: &signer, addr: address): Resource acquires Resource {
-75 │ │         let r = move_from<Resource>(addr);
-76 │ │         move_to(account, Container { inner: r.value });
-77 │ │         r
-78 │ │     }
-   │ ╰─────^
-
-warning: WP could not characterize the aborts of `state_labels::safe_publish` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-    ┌─ tests/inference/state_labels.move:100:5
-    │
-100 │ ╭     fun safe_publish(account: &signer, addr: address, value: u64) {
-101 │ │         if (!exists<Resource>(addr)) {
-102 │ │             move_to(account, Resource { value });
-103 │ │         }
-104 │ │     }
-    │ ╰─────^
-
-warning: WP could not characterize the aborts of `state_labels::increment_resource` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-    ┌─ tests/inference/state_labels.move:116:5
-    │
-116 │ ╭     fun increment_resource(account: &signer, addr: address) acquires Resource {
-117 │ │         let r = move_from<Resource>(addr);
-118 │ │         let new_value = r.value + 1;
-119 │ │         let Resource { value: _ } = r;
-120 │ │         move_to(account, Resource { value: new_value });
-121 │ │     }
-    │ ╰─────^
-
-warning: WP could not characterize the aborts of `state_labels::create_then_read_same` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = an abort condition would have introduced a new module dependency
-    ┌─ tests/inference/state_labels.move:175:5
-    │
-175 │ ╭     fun create_then_read_same(account: &signer, addr: address): u64 acquires Resource {
-176 │ │         // Creates resource at account's address
-177 │ │         move_to(account, Resource { value: 42 });
-178 │ │         // Then reads from addr (which may be same or different)
-179 │ │         read_resource(addr)
-180 │ │     }
-    │ ╰─────^
-
-warning: WP could not characterize the aborts of `state_labels::nested_publish` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
-  = callee `0x42::state_labels::publish_resource` has no trusted complete abort summary
-    ┌─ tests/inference/state_labels.move:206:5
-    │
-206 │ ╭     fun nested_publish(account1: &signer, account2: &signer, v1: u64, v2: u64) {
-207 │ │         // First publish - evaluated at @pre
-208 │ │         publish_resource(account1, v1);
-209 │ │         // Second publish - should be evaluated at intermediate state after first
-210 │ │         publish_resource(account2, v2);
-211 │ │     }
-    │ ╰─────^
-
-Verification: exiting with condition generation errors
-error: this function has no specification but is referenced by a behavioral predicate
-   ┌─ state_labels.enriched.move:38:5
-   │
-38 │ ╭     fun publish_resource(account: &signer, value: u64) {
-39 │ │         move_to(account, Resource { value });
-40 │ │     }
-   │ ╰─────^
+Verification: Succeeded.
 */

@@ -7,7 +7,7 @@ use crate::tests::common;
 /// clause in the Move source.
 #[test]
 fn prove_lean_failure() {
-    if !aptos_framework::leaner::verifier_available() {
+    if !move_prover::leaner::verifier_available() {
         eprintln!("skipping prove --lean test: the Leaner Move verifier is not built");
         return;
     }

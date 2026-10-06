@@ -55,7 +55,7 @@ private def isTypeSyntax (stx : Syntax) : Bool :=
     ``leanerU128Type, ``leanerU256Type,
     ``leanerI8Type, ``leanerI16Type, ``leanerI32Type, ``leanerI64Type,
     ``leanerI128Type, ``leanerI256Type, ``leanerUSizeType, ``leanerISizeType,
-    ``leanerNatType, ``leanerIntType, ``leanerRangeType,
+    ``leanerNatType, ``leanerIntType, ``leanerRangeType, ``leanerStateDomainType,
     ``leanerVectorType, ``leanerFixedVectorType, ``leanerFunctionType,
     ``leanerReferenceType, ``leanerTupleType, ``leanerAppliedType,
     ``leanerStandardAppliedType,
@@ -121,9 +121,9 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``leanerSpecificationWithStateExpr, ``leanerSpecificationWithStateBuiltinExpr,
     ``leanerSpecificationOldExpr, ``leanerSpecificationInlineCallSummaryExpr,
     ``leanerSpecificationResultExpr,
-    ``leanerBehaviorExpr, ``leanerBehaviorAtExpr,
-    ``leanerBehaviorPreRangeExpr, ``leanerBehaviorPostRangeExpr,
-    ``leanerBehaviorFullRangeExpr,
+    ``leanerBehaviorExpr, ``leanerLabeledExpr,
+    ``leanerSpecificationPublishExpr, ``leanerSpecificationRemoveExpr,
+    ``leanerSpecificationUpdateExpr,
     ``leanerSpecificationVectorExpr, ``leanerSpecificationEmptyVectorBuiltinExpr,
     ``leanerSpecificationGlobalExpr, ``leanerSpecificationGlobalSurfaceExpr,
     ``leanerSpecificationInRangeExpr,
@@ -131,7 +131,8 @@ private def isExprSyntax (stx : Syntax) : Bool :=
     ``leanerSpecificationIntToBitVectorExpr,
     ``leanerSpecificationIntToBitVectorInferExpr, ``leanerRuntimeAssertExpr,
     ``leanerRuntimeAssertMacroExpr, ``leanerThrowSurfaceExpr,
-    ``leanerSpecBlockExpr, ``leanerSingleSpecExpr,
+    ``leanerSpecBlockExpr, ``leanerSingleSpecExpr, ``leanerProofBlockExpr,
+    ``leanerSingleProofExpr,
     ``leanerBlockExpr, ``leanerGenericCallExpr, ``leanerDirectGenericCallExpr,
     ``leanerTypedCallExpr,
     ``leanerTypedGenericCallExpr, ``leanerTypedCallSurfaceExpr,
@@ -200,7 +201,7 @@ private partial def blockEntries (stx : Syntax) : Array Syntax :=
 
 private def isPlaceSyntax (stx : Syntax) : Bool :=
   [``leanerLocalPlace, ``leanerParenPlace, ``leanerDerefPlace,
-    ``leanerFieldPlace].contains stx.getKind
+    ``leanerFieldPlace, ``leanerDowncastPlace].contains stx.getKind
 
 private def isModifierSyntax (stx : Syntax) : Bool :=
   [``leanerPrivateModifier, ``leanerPublicModifier, ``leanerPackageModifier,
@@ -213,10 +214,11 @@ private def isClauseSyntax (stx : Syntax) : Bool :=
     ``leanerRequiresClause, ``leanerEnsuresClause,
     ``leanerAbortsIfClause, ``leanerInvariantClause,
     ``leanerModifiesClause, ``leanerLooseModifiesClause, ``leanerModifiesAllClause,
+    ``leanerModifiesOfClause, ``leanerModifiesOfAllClause,
     ``leanerReadsClause, ``leanerReadsAllClause].contains stx.getKind
 
 private def isPragmaSyntax (stx : Syntax) : Bool :=
-  stx.isOfKind ``leanerPragmaClause
+  stx.isOfKind ``leanerPragmaClause || stx.isOfKind ``leanerQualifiedPragmaClause
 
 private def isAbilitySyntax (stx : Syntax) : Bool :=
   [``leanerCopyAbility, ``leanerDropAbility, ``leanerStoreAbility,
@@ -227,15 +229,17 @@ private def isGenericBinderSyntax (stx : Syntax) : Bool :=
     ``leanerConstBinder, ``leanerTypedConstBinder, ``leanerLifetimeBinder,
     ``leanerEvidenceBinder].contains stx.getKind
 
+/-- The abilities a declaration or function type lists itself; those of a
+type inside it, such as a field's function type, are that type's. -/
 private partial def declarationAbilities (stx : Syntax) : Array Syntax :=
   stx.getArgs.foldl (fun found child =>
-    if isGenericBinderSyntax child then found
+    if isGenericBinderSyntax child || isTypeSyntax child then found
     else if isAbilitySyntax child then found.push child
     else found ++ declarationAbilities child) #[]
 
 private def isItemSyntax (stx : Syntax) : Bool :=
   [``leanerUseItem, ``leanerFriendItem, ``leanerNamespacePragmaItem, ``leanerConstantItem, ``leanerStructItem, ``leanerEnumItem,
-    ``leanerFunctionItem, ``leanerSpecFunctionItem, ``leanerContractItem,
+    ``leanerFunctionItem, ``leanerSpecFunctionItem, ``leanerLemmaItem, ``leanerContractItem,
     ``leanerContractWhereItem, ``leanerNamespaceInvariantItem].contains stx.getKind
 
 /-- The Leaner items of a module, not descending into its Lean items. -/
@@ -504,6 +508,13 @@ private partial def placeOf (stx : Syntax) : Except String Place := do
     pure <| name.splitOn "." |>.map unquoteIdentifier |>.foldl
       (fun place field => .field place field span)
       (← placeOf base)
+  else if stx.isOfKind ``leanerDowncastPlace then
+    let some base := (placeChildren stx)[0]? | throw "a downcast place has no base"
+    let some path := (pathChildren stx)[0]? | throw "a downcast place names no variant"
+    let segments := (pathSegments path).map unquoteIdentifier
+    let some variant := segments.back? | throw "a downcast place names no variant"
+    if segments.size < 2 then throw "a downcast place names its variant as `Enum::Variant`"
+    pure (.downcast (← placeOf base) segments.pop variant span)
   else
     throw s!"unknown Leaner place syntax `{stx.getKind}`"
 
@@ -585,6 +596,7 @@ private partial def typeOf (stx : Syntax) : Except String (Located Ty) := do
     else if stx.isOfKind ``leanerNatType then pure .nat
     else if stx.isOfKind ``leanerIntType then pure .int
     else if stx.isOfKind ``leanerRangeType then pure .range
+    else if stx.isOfKind ``leanerStateDomainType then pure .stateDomain
     else if stx.isOfKind ``leanerVectorType then
       let some element := (typeChildren stx)[0]?
         | throw "`Vector` requires an element type"
@@ -599,7 +611,7 @@ private partial def typeOf (stx : Syntax) : Except String (Located Ty) := do
       let some result := types.back? | throw "a function type requires a result type"
       let arguments ← (types.pop).mapM typeOf
       pure (.function arguments (← typeOf result)
-        (← (childrenWhere isAbilitySyntax stx).mapM abilityOf))
+        (← (declarationAbilities stx).mapM abilityOf))
     else if stx.isOfKind ``leanerReferenceType then
       let some referent := (typeChildren stx)[0]?
         | throw "a reference requires a referent type"
@@ -863,6 +875,36 @@ private partial def blockExpressionOfEntries (entries : Array Syntax) (span : Sp
         | .letDecl .. => throw "an internal bare-expression entry became a declaration"
   pure (.block ordered result span)
 
+/-- The specification statements of a `spec` block or a lemma's proof, in
+source order. -/
+private partial def specStatementsOf (stx : Syntax) :
+    Except String (Array (SpecificationConditionKind × Expr)) := do
+  let statements := childrenWhere (fun child =>
+    child.isOfKind ``leanerSpecLetStatement ||
+    child.isOfKind ``leanerAssertStatement ||
+    child.isOfKind ``leanerAssumeStatement ||
+    child.isOfKind ``leanerLoopInvariantStatement ||
+    child.isOfKind ``leanerApplyStatement ||
+    child.isOfKind ``leanerSplitStatement) stx
+    |>.qsort fun left right => (spanOf left).startByte < (spanOf right).startByte
+  statements.mapM fun statement => do
+    let some condition := (exprChildren statement)[0]?
+      | throw "an in-body specification member must contain an expression"
+    let kind ← if statement.isOfKind ``leanerSpecLetStatement then
+        let some name := (identifiers statement)[0]?
+          | throw "an in-body specification binding must have a name"
+        pure <| SpecificationConditionKind.let_ (unquoteIdentifier name)
+      else if statement.isOfKind ``leanerAssertStatement then
+        pure SpecificationConditionKind.assertion
+      else if statement.isOfKind ``leanerLoopInvariantStatement then
+        pure SpecificationConditionKind.loopInvariant
+      else if statement.isOfKind ``leanerApplyStatement then
+        pure SpecificationConditionKind.apply
+      else if statement.isOfKind ``leanerSplitStatement then
+        pure SpecificationConditionKind.split
+      else pure SpecificationConditionKind.assumption
+    pure (kind, ← expressionOf condition)
+
 private partial def ifBranchExpressionOf (stx : Syntax) : Except String Expr := do
   if stx.isOfKind ``leanerInlineIfBranch then
     let some expression := (exprChildren stx)[0]?
@@ -972,11 +1014,36 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       | throw "a runtime assertion requires a condition and an abort code"
     pure (.ifElse (← expressionOf condition) (.unit span)
       (some (.throw_ .abort #[← expressionOf code] span)) span)
-  else if stx.isOfKind ``leanerBehaviorExpr ||
-      stx.isOfKind ``leanerBehaviorAtExpr ||
-      stx.isOfKind ``leanerBehaviorPreRangeExpr ||
-      stx.isOfKind ``leanerBehaviorPostRangeExpr ||
-      stx.isOfKind ``leanerBehaviorFullRangeExpr then
+  else if stx.isOfKind ``leanerLabeledExpr then
+    -- The range node's identifiers are the labels, in order; its kind says
+    -- which states they name.
+    let some range := (stx.getArgs.find? fun node =>
+        node.isOfKind ``leanerStateRangeAtSyntax || node.isOfKind ``leanerStateRangePreSyntax ||
+          node.isOfKind ``leanerStateRangePostSyntax ||
+          node.isOfKind ``leanerStateRangeBothSyntax)
+      | throw "a labeled expression requires a state range"
+    let labels := range.getArgs.filterMap fun node =>
+      if node.isIdent then some node.getId.getString! else none
+    let (pre, post) ← match range.getKind, labels.toList with
+      | ``leanerStateRangeAtSyntax, [label] => pure (some label, some label)
+      | ``leanerStateRangePreSyntax, [label] => pure (some label, none)
+      | ``leanerStateRangePostSyntax, [label] => pure (none, some label)
+      | ``leanerStateRangeBothSyntax, [pre, post] => pure (some pre, some post)
+      | _, _ => throw "a state range names one or two labels"
+    let some body := (exprChildren stx).back?
+      | throw "a labeled expression requires a body"
+    pure (.labeled pre post (← expressionOf body) span)
+  else if stx.isOfKind ``leanerSpecificationPublishExpr ||
+      stx.isOfKind ``leanerSpecificationRemoveExpr ||
+      stx.isOfKind ``leanerSpecificationUpdateExpr then
+    let some resource := (typeChildren stx)[0]?
+      | throw "a state-change predicate requires a resource type"
+    let operation := if stx.isOfKind ``leanerSpecificationPublishExpr then
+        SpecificationOperation.publish
+      else if stx.isOfKind ``leanerSpecificationRemoveExpr then .remove else .update
+    pure (.specification operation #[← typeOf resource] (← (exprChildren stx).mapM expressionOf)
+      span)
+  else if stx.isOfKind ``leanerBehaviorExpr then
     let expressions := exprChildren stx
     let some target := expressions[0]?
       | throw "a behavior predicate requires a function-value target"
@@ -991,24 +1058,9 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
         | some index => pure (.writeOf index)
         | none => throw "write_of requires a mutable-reference result index"
       else throw "unknown behavior predicate"
-    let range : SpecificationMemoryRange ←
-      if stx.isOfKind ``leanerBehaviorAtExpr ||
-          stx.isOfKind ``leanerBehaviorPreRangeExpr then
-        match numbers[0]? with
-        | some pre => pure { pre := some pre }
-        | none => throw "a pre-state behavior predicate requires a numeric state label"
-      else if stx.isOfKind ``leanerBehaviorPostRangeExpr then
-        match numbers[0]? with
-        | some post => pure { post := some post }
-        | none => throw "a post-state behavior predicate requires a numeric state label"
-      else if stx.isOfKind ``leanerBehaviorFullRangeExpr then
-        match numbers[0]?, numbers[1]? with
-        | some pre, some post => pure { pre := some pre, post := some post }
-        | _, _ => throw "a ranged behavior predicate requires pre- and post-state labels"
-      else pure {}
     let target ← expressionOf target
     let values ← (expressions.drop 1).mapM expressionOf
-    pure (.specification (.behavior kind range) #[] (#[target] ++ values) span)
+    pure (.specification (.behavior kind) #[] (#[target] ++ values) span)
   else if let some operation := operatorOfSyntax? stx.getKind then
     let some info := Operators.info? operation
       | throw s!"operator `{repr operation}` is missing from the shared table"
@@ -1055,8 +1107,11 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
         -- `x : T` quantifies over the whole type's domain.
         let some element := (typeChildren binder)[0]?
           | throw "a quantifier type binder must contain a type"
-        let domain : Expr :=
-          .specification .typeDomain #[← typeOf element] #[] (spanOf binder)
+        let elementType ← typeOf element
+        -- `S : StateDomain` binds a state label over all memories.
+        let domain : Expr := if elementType.value == .stateDomain then
+            .specification .stateDomain #[] #[] (spanOf binder)
+          else .specification .typeDomain #[elementType] #[] (spanOf binder)
         pure (← bindingPatternOf pattern, domain)
       else
         let some domain := (exprChildren binder)[0]?
@@ -1165,26 +1220,9 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       else .publish
     pure (.global operation (← typeOf resource) (← (exprChildren stx).mapM expressionOf) span)
   else if stx.isOfKind ``leanerSpecBlockExpr || stx.isOfKind ``leanerSingleSpecExpr then
-    let statements := childrenWhere (fun child =>
-      child.isOfKind ``leanerSpecLetStatement ||
-      child.isOfKind ``leanerAssertStatement ||
-      child.isOfKind ``leanerAssumeStatement ||
-      child.isOfKind ``leanerLoopInvariantStatement) stx
-      |>.qsort fun left right => (spanOf left).startByte < (spanOf right).startByte
-    let conditions ← statements.mapM fun statement => do
-      let some condition := (exprChildren statement)[0]?
-        | throw "an in-body specification member must contain an expression"
-      let kind ← if statement.isOfKind ``leanerSpecLetStatement then
-          let some name := (identifiers statement)[0]?
-            | throw "an in-body specification binding must have a name"
-          pure <| SpecificationConditionKind.let_ (unquoteIdentifier name)
-        else if statement.isOfKind ``leanerAssertStatement then
-          pure SpecificationConditionKind.assertion
-        else if statement.isOfKind ``leanerLoopInvariantStatement then
-          pure SpecificationConditionKind.loopInvariant
-        else pure SpecificationConditionKind.assumption
-      pure (kind, ← expressionOf condition)
-    pure (.specBlock conditions span)
+    pure (.specBlock (← specStatementsOf stx) span)
+  else if stx.isOfKind ``leanerProofBlockExpr || stx.isOfKind ``leanerSingleProofExpr then
+    pure (.specBlock (← specStatementsOf stx) span (proof := true))
   else if stx.isOfKind ``leanerConstructExpr then
     let some path := (pathChildren stx)[0]?
       | throw "a constructor expression must name its nominal target"
@@ -1271,10 +1309,13 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
   else if stx.isOfKind ``leanerSelectVariantsExpr then
     let some owner := (typeChildren stx)[0]?
       | throw "a variant-field selection must name its nominal type"
-    let fields ← (childrenOfKind ``leanerFieldNameSyntax stx).mapM fun field => do
-      let some fieldIdentifier := (fieldIdentifierChildren field)[0]?
-        | throw "a variant-field selection has an invalid field name"
-      fieldIdentifierOf fieldIdentifier
+    let fields ← (childrenOfKind ``leanerVariantFieldNameSyntax stx).mapM fun field => do
+      let some name := (identifiers field)[0]?
+        | throw "a variant-field selection has an invalid variant field"
+      match firstNat? field, name.splitOn "." |>.map unquoteIdentifier with
+      | some index, [variant] => pure (variant, toString index)
+      | none, [variant, field] => pure (variant, field)
+      | _, _ => throw s!"a variant-field selection names `Variant.field`, not `{name}`"
     if fields.isEmpty then throw "a variant-field selection must name at least one field"
     let some value := (exprChildren stx)[0]?
       | throw "a variant-field selection must have one operand"
@@ -1383,8 +1424,17 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
       | throw "core.closure must carry its residual function type"
     let some path := pathOutsideTypes? stx
       | throw "core.closure must name its target function"
-    pure (.closure (← pathOf path) (← typeOf result)
-      (← (exprChildren stx).mapM expressionOf) span)
+    let types ← match (childrenOfKind ``leanerTypeArgumentsSyntax stx)[0]? with
+      | none => pure #[]
+      | some arguments => (typeChildren arguments).mapM typeOf
+    let slots := childrenWhere (fun child =>
+      child.isOfKind ``leanerCapturedSlot || child.isOfKind ``leanerSuppliedSlot) stx
+    let captures ← slots.mapM fun slot =>
+      if slot.isOfKind ``leanerSuppliedSlot then pure none
+      else match (exprChildren slot)[0]? with
+        | some capture => some <$> expressionOf capture
+        | none => throw "a closure capture must be an expression"
+    pure (.closure (← pathOf path) types (← typeOf result) captures span)
   else if stx.isOfKind ``leanerRawPlaceBorrowExpr then
     let some place := (exprChildren stx)[0]?
       | throw "core.borrowPlace must contain a place expression"
@@ -1540,7 +1590,9 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
             child.isOfKind ``leanerSpecLetStatement ||
             child.isOfKind ``leanerAssertStatement ||
             child.isOfKind ``leanerAssumeStatement ||
-            child.isOfKind ``leanerLoopInvariantStatement) member)[0]?
+            child.isOfKind ``leanerLoopInvariantStatement ||
+            child.isOfKind ``leanerApplyStatement ||
+            child.isOfKind ``leanerSplitStatement) member)[0]?
           | throw "a loop specification member is malformed"
         let some expression := (exprChildren statement)[0]?
           | throw "a loop specification member must contain an expression"
@@ -1552,7 +1604,10 @@ private partial def expressionOf (stx : Syntax) : Except String Expr := do
             pure SpecificationConditionKind.assertion
           else if statement.isOfKind ``leanerAssumeStatement then
             pure SpecificationConditionKind.assumption
-          else pure SpecificationConditionKind.loopInvariant
+          else if statement.isOfKind ``leanerLoopInvariantStatement then
+            pure SpecificationConditionKind.loopInvariant
+          else throw "a loop specification states invariants, assertions, assumptions, \
+            and bindings"
         pure (kind, ← expressionOf expression)
       -- A trailing `where` region belongs to this loop. Anchor it in the
       -- condition, matching LIR's verifier-oriented representation and
@@ -1641,6 +1696,15 @@ private def modifiersOf (syntaxes : Array Syntax) : Except String FunctionModifi
 private def clauseOf (stx : Syntax) : Except String ContractClause := do
   let span := spanOf stx
   if stx.isOfKind ``leanerModifiesAllClause then return .modifiesAll span
+  if stx.isOfKind ``leanerModifiesOfAllClause || stx.isOfKind ``leanerModifiesOfClause then
+    let some parameter := stx.getArgs.find? (·.isIdent)
+      | throw "a `modifies_of` clause names a parameter"
+    let parameter := parameter.getId.getString!
+    if stx.isOfKind ``leanerModifiesOfAllClause then return .modifiesOfAll parameter span
+    let formals ← (childrenOfKind ``leanerParameterSyntax stx).mapM parameterOf
+    let targets ← (exprChildren stx).mapM expressionOf
+    if targets.isEmpty then throw "a `modifies_of` clause names a target"
+    return .modifiesOf parameter formals targets span
   if stx.isOfKind ``leanerReadsAllClause then return .readsAll span
   if stx.isOfKind ``leanerReadsClause then
     let some type := (typeChildren stx)[0]? | throw "a reads clause requires a type"
@@ -1668,6 +1732,12 @@ private def clauseOf (stx : Syntax) : Except String ContractClause := do
   else throw s!"unknown contract clause `{stx.getKind}`"
 
 private def pragmaOf (stx : Syntax) : Except String Pragma := do
+  if stx.isOfKind ``leanerQualifiedPragmaClause then
+    let some name := (identifiers stx)[0]? | throw "a pragma must have a name"
+    let some path := stx.getArgs.find? (·.isOfKind ``leanerQualifiedNameSyntax)
+      | throw "a qualified pragma must name a path"
+    return { name, qualified := some (String.intercalate "::" (pathSegments path).toList)
+             span := spanOf stx }
   let name ← match (identifiers stx)[0]? with
     | some name => pure name
     | none => if containsAtom "opaque" stx then pure "opaque" else throw "a pragma must have a name"
@@ -1807,6 +1877,32 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
       body := ← expressions.back?.mapM expressionOf
       attributes := ← (childrenWhere isAttributeSyntax stx).mapM attributeOf
       span := spanOf stx }))
+  else if stx.isOfKind ``leanerLemmaItem then
+    let some name := stx.getArgs.find? (·.isIdent)
+      | throw "a lemma must have a name"
+    -- A tuple measure decreases lexicographically.
+    let decreases ← match ← ((childrenOfKind ``leanerSpecDecreasesSyntax stx)[0]?.bind
+        (exprChildren · |>.back?)).mapM expressionOf with
+      | some (.primitive .tuple components _) => pure components
+      | some measure => pure #[measure]
+      | none => pure #[]
+    let clauses ← (childrenWhere isClauseSyntax stx).mapM clauseOf
+    for clause in clauses do
+      unless clause matches .requires .. | .ensures .. do
+        throw s!"lemma `{name.getId}` states only `requires` and `ensures` clauses"
+    let proof ← specStatementsOf stx
+    for (kind, _) in proof do
+      unless kind matches .assertion | .assumption | .apply | .split do
+        throw s!"a step of lemma `{name.getId}` asserts, assumes, applies lemmas, or splits \
+          cases"
+    pure (.item (.lemma {
+      name := name.getId.getString!
+      generics := ← (childrenWhere isGenericBinderSyntax stx).mapM binderOf
+      parameters := ← (childrenOfKind ``leanerParameterSyntax stx).mapM parameterOf
+      decreases
+      contract := clauses
+      proof
+      span := spanOf stx }))
   else if stx.isOfKind ``leanerNamespaceInvariantItem then
     let members := childrenWhere (fun member =>
       member.isOfKind ``LeanerLang.leanerNamespaceInvariantMemberSyntax ||
@@ -1874,6 +1970,22 @@ private def pathName (segments : Array String) : Name :=
 private def rangeSyntax (startByte endByte : Nat) : Syntax :=
   Syntax.atom (SourceInfo.synthetic ⟨startByte⟩ ⟨endByte⟩) ""
 
+/-- Log diagnostics, each as its byte range, severity, and message, at its
+range or at the command when it has none. A body and its specification
+projection share source ranges, so a diagnostic of both is logged once. -/
+private def logDiagnostics (stx : Syntax)
+    (diagnostics : Array (Option (Nat × Nat) × MessageSeverity × String)) :
+    CommandElabM Unit := do
+  let mut logged := #[]
+  for diagnostic in diagnostics do
+    if logged.contains diagnostic then continue
+    logged := logged.push diagnostic
+    let (range, severity, message) := diagnostic
+    let ref := match range with
+      | some (startByte, endByte) => rangeSyntax startByte endByte
+      | none => stx
+    logAt ref message severity
+
 /-- Lower and validate a unit, reporting each diagnostic at its source range,
 or at the command when it has none. -/
 def compileAt (stx : Syntax) (unit : CompilationUnit) :
@@ -1881,28 +1993,24 @@ def compileAt (stx : Syntax) (unit : CompilationUnit) :
   let raw ← match lower unit with
     | Except.ok raw => pure raw
     | Except.error diagnostics =>
-        for diagnostic in diagnostics do
-          let ref := match diagnostic.span with
-            | some span => rangeSyntax span.startByte span.endByte
-            | none => stx
-          let message := s!"{diagnostic.code}: {diagnostic.message}"
-          match diagnostic.severity with
-          | .error => logErrorAt ref message
-          | .warning => logWarningAt ref message
+        logDiagnostics stx <| diagnostics.map fun diagnostic =>
+          (diagnostic.span.map fun span => (span.startByte, span.endByte),
+            match diagnostic.severity with
+            | .error => .error
+            | .warning => .warning,
+            s!"{diagnostic.code}: {diagnostic.message}")
         throwAbortCommand
   match validate raw with
   | Except.ok validated => pure validated
   | Except.error diagnostics =>
-      for diagnostic in diagnostics do
-        let range := diagnostic.primary.bind (raw.tables.locations[·.index]?) |>.bind (·.primary)
-        let ref := match range with
-          | some range => rangeSyntax range.startByte range.endByte
-          | none => stx
-        let message := s!"{diagnostic.code}: {diagnostic.message}"
-        match diagnostic.severity with
-        | .error => logErrorAt ref message
-        | .warning => logWarningAt ref message
-        | .info => logInfoAt ref message
+      logDiagnostics stx <| diagnostics.map fun diagnostic =>
+        (diagnostic.primary.bind (raw.tables.locations[·.index]?) |>.bind (·.primary)
+            |>.map fun range => (range.startByte, range.endByte),
+          match diagnostic.severity with
+          | .error => .error
+          | .warning => .warning
+          | .info => .information,
+          s!"{diagnostic.code}: {diagnostic.message}")
       throwAbortCommand
 
 /-- Convert one parsed Leaner namespace/module command into the frontend AST used

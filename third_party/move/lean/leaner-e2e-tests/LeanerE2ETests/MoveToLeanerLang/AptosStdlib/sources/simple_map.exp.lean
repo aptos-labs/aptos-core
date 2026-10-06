@@ -171,8 +171,8 @@ leaner module aptos_std::simple_map where
     values : Vector<Value>
   ) -> Unit := do
     let mut (self', v2) := (keys, values)
-    self'.reverse()
-    v2.reverse()
+    self' := core.prim.reverseSliceVector(*&self', 0, self'.length)
+    v2 := core.prim.reverseSliceVector(*&v2, 0, v2.length)
     let mut (self', v2) := (self', v2)
     spec assume folds_capture_anchor!(69)
     let len := self'.length
@@ -341,7 +341,7 @@ leaner module aptos_std::simple_map where
     let mut values := vector<Value>[]
     let SimpleMap<«Key», Value> { data := data } := self
     let mut self := data
-    self.reverse()
+    self := core.prim.reverseSliceVector(self, 0, self.length)
     let mut self := self
     spec assume folds_capture_anchor!(84)
     spec assume folds_capture_anchor!(83)
@@ -465,6 +465,7 @@ leaner module aptos_std::simple_map where
   -- This doesn't cost a O(2N) run time as index_of scans from left to right and stops when the element is found,
   -- while remove would continue from the identified index to the end of the vector.
   -- We need to reverse the vector to consume it efficiently
+  @[weight = 50]
   spec fun «spec_fold$gen$1» {T0} {T1}(
     «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : Int,
     _fold_anchor_ctx_0 : Vector<Element<T0, T1> >

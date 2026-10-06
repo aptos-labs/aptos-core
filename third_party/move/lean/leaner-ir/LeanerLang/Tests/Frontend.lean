@@ -180,6 +180,83 @@ run_cmd do
   unless printed == formatted do
     throwError "typed enum patterns are not a fixed point:\n{formatted}"
 
+-- A branch without an `else` is a statement, whose value is discarded where
+-- the `if` supplies none: in a function's tail and among statements alike.
+leaner module 0x42::discarded_branches where
+  fun take(x : u64) -> u64 := x + 1
+  fun tail(x : u64, flag : Bool) -> Unit := if flag then take(x)
+  fun statement(x : u64, flag : Bool) -> u64 := do
+    if flag then take(x)
+    x
+
+run_cmd do
+  let some unit := LeanerLang.registeredUnit? (← getEnv) `«0x42».discarded_branches
+    | throwError "the discarded branch fixture was not registered"
+  let ns := unit.namespaces[0]!
+  let discards := ns.expressions.filter fun expression => match expression.kind with
+    | .block #[statement] none =>
+        ns.expressions[statement.index]?.any (·.kind matches .operation (.call (.function _)) ..)
+    | _ => false
+  unless discards.size == 2 do
+    throwError s!"expected both branches to discard the call's value, found {discards.size}"
+
+-- A type's abilities are its own: the struct does not adopt its field's, nor
+-- the outer function type its parameter's, and an ability list ends before
+-- the next parameter.
+leaner module 0x42::function_type_abilities where
+  struct Op has Drop where
+    f : Fn(u64) -> u64 has Copy, Drop, Store
+  fun apply(g : Fn(u64) -> u64 has Copy, Drop, f : Fn(Fn(u64) -> u64 has Copy, Drop) -> u64) -> u64 :=
+    invoke(f, g)
+
+run_cmd do
+  let some unit := LeanerLang.registeredUnit? (← getEnv) `«0x42».function_type_abilities
+    | throwError "the function type abilities fixture was not registered"
+  let ns := unit.namespaces[0]!
+  unless ns.structs[0]!.abilities == #[.drop] do
+    throwError s!"the struct adopted its field's abilities: {repr ns.structs[0]!.abilities}"
+  let outer := unit.tables.types.any fun
+    | .function #[_] _ abilities => abilities.isEmpty
+    | _ => false
+  unless outer do
+    throwError "the outer function type adopted its parameter's abilities"
+
+-- A direct read of a local without `Copy` is a move, a selection from it
+-- copies the selected place, and a variant test reads the local in place;
+-- the specification keeps its logical selection.
+leaner module 0x42::local_access where
+  struct Inner has Drop where
+    v : u64
+  enum Shape has Drop where
+    | Circle (r : u64)
+    | Square (side : u64)
+  fun take(s : Inner) -> u64 := s.v
+  spec take where
+    ensures result == s.v
+  fun pass(x : u64) -> u64 := do
+    let s := new Inner { v := x }
+    take(s)
+  fun round(shape : Shape) -> Bool := shape is Circle
+
+run_cmd do
+  let some unit := LeanerLang.registeredUnit? (← getEnv) `«0x42».local_access
+    | throwError "the local access fixture was not registered"
+  let ns := unit.namespaces[0]!
+  let shape (place : LeanerIR.PlaceId) : String := match ns.places[place.index]? with
+    | some (.localVar _) => "local"
+    | some (.field ..) => "field"
+    | _ => "other"
+  let accesses := ns.expressions.filterMap fun expression => match expression.kind with
+    | .operation (.move place) _ _ _ => some s!"move {shape place}"
+    | .operation (.copy place) _ _ _ => some s!"copy {shape place}"
+    | .operation (.read place) _ _ _ => some s!"read {shape place}"
+    | _ => none
+  for expected in ["move local", "copy field", "read local"] do
+    unless accesses.contains expected do
+      throwError s!"no `{expected}` access among {accesses}"
+  unless ns.expressions.any (·.kind matches .operation (.data (.select ..)) ..) do
+    throwError "the specification lost its logical selection"
+
 -- Mutation holders are semantic lowering artifacts, not extra source lets.
 -- Pin the first print as well as the fixed point, including a holder nested
 -- after an ordinary declaration and an explicitly shared user reference.
@@ -281,9 +358,9 @@ leaner module 0x42::specification_declarations where
 
 leaner module 0x42::behavior_summaries where
   spec fun summarized_result(f : Fn(Int) -> Int, value : Int) : Int :=
-    @1..@2 |~ result_of<f>(value)
+    S..T |~ result_of<f>(value)
   spec fun summarized_aborts(f : Fn(Int) -> Int, value : Int) : Bool :=
-    @1 |~ aborts_of<f>(value)
+    S |~ aborts_of<f>(value)
   spec fun summarized_requires(f : Fn(Int) -> Int, value : Int) : Bool :=
     requires_of<f>(value)
   spec fun summarized_ensures(f : Fn(Int) -> Int, value : Int, result_value : Int) : Bool :=
@@ -345,6 +422,7 @@ leaner module 0x42::contract_surface where
 
 leaner module 0x42::nominal_contracts where
   pragma aborts_if_is_strict;
+  pragma verify = false;
   struct Bounded where
     value : UInt<64>
   spec Bounded where
@@ -808,8 +886,8 @@ elab "#guard_leaner_frontend" : command => do
   match LeanerLang.Print.render env behaviorSummaries with
   | .error error => throwError "behavior summaries did not render: {error}"
   | .ok printed =>
-      unless printed.contains "@1..@2 |~ result_of<f>(value)" &&
-          printed.contains "@1 |~ aborts_of<f>(value)" &&
+      unless printed.contains "S..T |~ result_of<f>(value)" &&
+          printed.contains "S |~ aborts_of<f>(value)" &&
           printed.contains "requires_of<f>(value)" &&
           printed.contains "ensures_of<f>(value, result_value)" &&
           printed.contains "unchanged_of<f>(value)" &&
@@ -902,7 +980,8 @@ elab "#guard_leaner_frontend" : command => do
     | throwError "the nominal-contract fixture lost its structure"
   let some state := nominalNamespace.structs[1]?
     | throwError "the nominal-contract fixture lost its enum"
-  unless nominalNamespace.pragmas.size == 1 && bounded.locals.size == 1 &&
+  -- The structure invariant's locals: the field, then the whole value.
+  unless nominalNamespace.pragmas.size == 2 && bounded.locals.size == 2 &&
       bounded.contract.conditions.size == 1 &&
       bounded.contract.conditions[0]!.kind == .structInvariant &&
       bounded.contract.pragmas.size == 1 && state.variants.size == 2 &&
@@ -916,6 +995,7 @@ elab "#guard_leaner_frontend" : command => do
     "import LeanerLang\n\n" ++
     "leaner module 0x42::nominal_contracts where\n" ++
     "  pragma aborts_if_is_strict\n\n" ++
+    "  pragma verify = false\n\n" ++
     "  struct Bounded where\n" ++
     "    value : u64\n\n" ++
     "  spec Bounded where\n" ++

@@ -43,10 +43,9 @@ module 0x42::sequential_mutation {
     }
     spec add_twice(c: &mut Counter, a: u64, b: u64) {
         pragma opaque = true;
-        ensures [inferred] ..S1 |~ (ensures_of<add_amount>(old(c), a));
-        ensures [inferred] S1.. |~ (ensures_of<add_amount>(c, b, c));
-        aborts_if [inferred] S1 |~ (aborts_of<add_amount>(c, b));
+        ensures [inferred = sathard] exists x: Counter: (..S1 |~ ensures_of<add_amount>(old(c), a, x)) && (S1.. |~ ensures_of<add_amount>(x, b, c));
         aborts_if [inferred] aborts_of<add_amount>(c, a);
+        aborts_if [inferred = sathard] exists x: Counter: (..S1 |~ ensures_of<add_amount>(c, a, x)) && (S1 |~ aborts_of<add_amount>(x, b));
     }
 
 }

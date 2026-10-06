@@ -43,6 +43,9 @@ partial def Ty.toJson : Ty → Json
   | .vector element => tagged "vector" element.toJson
   | .ref referent => tagged "ref" referent.toJson
   | .mutRef referent => tagged "mut_ref" referent.toJson
+  | .function parameters results abilities =>
+      tagged "function" (Json.arr #[Json.arr (parameters.map Ty.toJson),
+        Json.arr (results.map Ty.toJson), Json.arr (abilities.map Json.str)])
 
 private def types (arguments : Array Ty) : Json := Json.arr (arguments.map Ty.toJson)
 
@@ -131,6 +134,9 @@ def Oper.toJson : Oper → Json
       instantiated "move_from" (some (nat struct)) arguments #[nat struct]
   | .exists struct arguments => instantiated "exists" (some (nat struct)) arguments #[nat struct]
   | .function id arguments => instantiated "function" (some (nat id)) arguments #[nat id]
+  | .closure id mask arguments =>
+      instantiated "closure" (some (nats #[id, mask])) arguments #[nat id, nat mask]
+  | .invoke => "invoke"
   | .borrowLoc => "borrow_loc"
   | .borrowField field arguments =>
       instantiated "borrow_field" (some (nat field)) arguments #[nat field]

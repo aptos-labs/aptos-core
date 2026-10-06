@@ -16,7 +16,8 @@ use aptos_jellyfish_merkle::JellyfishMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure,
     state_store::{
-        state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
+        positions::PositionOverlay, state::State, state_summary::StateSummary,
+        state_view::hot_state_view::HotStateView,
     },
     AptosDbError, BlockHeight, DbReader, LedgerSummary, Result, StateKind, MAX_REQUEST_LIMIT,
 };
@@ -93,6 +94,21 @@ impl DbReader for AptosDB {
                 .as_ref()
                 .and_then(|bundle| bundle.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone())
+                .ok_or_else(|| {
+                    AptosDbError::Other(
+                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
+                         storage is not initialized (ENABLE_TRADING_NATIVE is off)"
+                            .to_string(),
+                    )
+                })
+        })
+    }
+
+    fn get_pre_committed_positions(&self) -> Result<PositionOverlay> {
+        gauged_api("get_pre_committed_positions", || {
+            self.position
+                .as_ref()
+                .map(|bundle| bundle.positions.lock().clone())
                 .ok_or_else(|| {
                     AptosDbError::Other(
                         "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
@@ -706,11 +722,16 @@ impl DbReader for AptosDB {
                 .as_ref()
                 .and_then(|bundle| bundle.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone());
+            let positions = self
+                .position
+                .as_ref()
+                .map(|bundle| bundle.positions.lock().clone());
             Ok(LedgerSummary {
                 state,
                 state_summary,
                 transaction_accumulator,
                 position_state_summary,
+                positions,
             })
         })
     }

@@ -247,7 +247,7 @@ impl ProverOptions {
         }
         if lean {
             let output = package_path.join("build").join("leaner-verify.lean");
-            return crate::leaner::verify(
+            return move_prover::leaner::verify(
                 &model,
                 package_path,
                 filter.as_deref(),

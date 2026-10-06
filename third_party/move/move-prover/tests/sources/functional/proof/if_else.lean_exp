@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/if_else.move:17:13
+   │
+17 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/if_else.move:24:13
+   │
+24 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/sources/functional/proof/if_else.move:159:18: error: the assertion `!(a <= b) ==> _result == a` does not hold
+tests/sources/functional/proof/if_else.move:152:5: error: leaner verification failed: the automatic verification of `min` failed; provide a proof: `verify min by …` in `tests/sources/functional/proof/if_else.proof.lean` (`verify min by skip` shows the obligations it leaves)

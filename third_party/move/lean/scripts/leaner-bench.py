@@ -50,11 +50,21 @@ VERSION = 1
 WORKFLOW = "leaner-bench.yaml"
 ARTIFACT = "leaner-bench-results"
 KINDS = ("move", "lean", "rust")
+# The page's group of a problem that is not a Move problem, by kind; a Move
+# problem is grouped by its package's name.
+KIND_GROUPS = {"move": "Move", "lean": "LeanerLang", "rust": "Rust"}
 DEFAULT_TIMEOUT = 20 * 60
 DEFAULT_THREADS = 8
 SPARKS = "▁▂▃▄▅▆▇█"
 # The report's groups of phases, in chart order.
 GROUPS = (("elaboration", "Elaboration"), ("verification", "Verification"), ("overall", "Overall"))
+# The units heartbeats are written in, largest first.
+BEAT_UNITS = ((1e9, "G"), (1e6, "M"), (1e3, "k"))
+BEAT_POWERS = {"G": "10⁹", "M": "10⁶", "k": "10³"}
+# The most of an error message a result records: residual goals run to thousands of lines;
+# the problem's log keeps the whole message.
+ERROR_LINES = 4
+ERROR_CHARS = 600
 
 
 def fail(message):
@@ -94,10 +104,14 @@ def load_manifest(path):
         names.add(name)
         if problem.get("kind") not in KINDS:
             fail(f"{path}: `{name}` has kind {problem.get('kind')!r}, not one of {KINDS}")
-        if problem["kind"] == "move" and not (problem.get("package") and problem.get("modules")):
-            fail(f"{path}: the move problem `{name}` needs `package` and `modules`")
-        if problem["kind"] != "move" and not problem.get("file"):
-            fail(f"{path}: the {problem['kind']} problem `{name}` needs `file`")
+        if problem["kind"] == "move":
+            if not (problem.get("package") and problem.get("modules")):
+                fail(f"{path}: the move problem `{name}` needs `package` and `modules`")
+        else:
+            if "dev" in problem:
+                fail(f"{path}: only a move problem has `dev`")
+            if not problem.get("file"):
+                fail(f"{path}: the {problem['kind']} problem `{name}` needs `file`")
     return problems
 
 
@@ -107,6 +121,14 @@ def input_paths(problem):
     if problem.get("spec"):
         paths.append(problem["spec"])
     return paths + problem.get("inputs", [])
+
+
+def group_of(problem):
+    """The group the page lists a problem under."""
+    if problem["kind"] != "move":
+        return KIND_GROUPS[problem["kind"]]
+    with open(REPO / problem["package"] / "Move.toml", "rb") as file:
+        return tomllib.load(file)["package"]["name"]
 
 
 def input_id(problem):
@@ -146,8 +168,11 @@ def bench_environment(package, threads):
 def command_of(problem, executable, out):
     kind = problem["kind"]
     if kind == "move":
-        return [str(executable), kind, str(REPO / problem["package"]),
-                "--modules", ",".join(problem["modules"]), "--out", str(out)]
+        command = [str(executable), kind, str(REPO / problem["package"]),
+                   "--modules", ",".join(problem["modules"]), "--out", str(out)]
+        if problem.get("dev"):
+            command.append("--dev")
+        return command
     command = [str(executable), kind, str(REPO / problem["file"]), "--out", str(out)]
     if problem.get("spec"):
         command[3:3] = ["--spec", str(REPO / problem["spec"])]
@@ -201,7 +226,7 @@ def attempt(problem, executable, env, workdir):
                 "cpu_ms": cpu_ms, "error_messages": [repository_relative(line) for line in tail]}
     result = json.loads(out.read_text())
     result["cpu_ms"] = cpu_ms
-    result["error_messages"] = [repository_relative(message)
+    result["error_messages"] = [error_excerpt(repository_relative(message))
                                 for message in result.get("error_messages", [])]
     return result
 
@@ -227,8 +252,8 @@ def measure(problem, executable, env, workdir):
                 "cpu_ms": [result["cpu_ms"] for result in finished],
                 "heartbeats": [result["heartbeats"]["total"] for result in finished],
             }
-    return {"name": problem["name"], "kind": problem["kind"], "input": input_id(problem),
-            **chosen}
+    return {"name": problem["name"], "kind": problem["kind"], "group": group_of(problem),
+            "input": input_id(problem), **chosen}
 
 
 def cpu_model():
@@ -283,7 +308,7 @@ def run(args):
         wall = result["wall_ms"]["total"] / 1000
         beats = result.get("heartbeats", {}).get("total")
         print(f"[{index}/{len(problems)}] {problem['name']}: {result['status']}, {wall:.1f} s"
-              + (f", {beats / 1e6:.0f}M heartbeats" if beats is not None else ""),
+              + (f", {beat_count(beats)} heartbeats" if beats is not None else ""),
               file=sys.stderr, flush=True)
     results = {
         "schema": SCHEMA,
@@ -441,6 +466,20 @@ def problem_names(points):
     return names
 
 
+def problem_groups(points):
+    """The problems by group, in the order of `problem_names`. A problem's
+    group is the one its latest result records; a result from before groups
+    were recorded is grouped by its kind."""
+    groups = {}
+    for name in problem_names(points):
+        results = [result for result in (result_of(point, name) for point in reversed(points))
+                   if result]
+        group = next((result["group"] for result in results if result.get("group")),
+                     KIND_GROUPS.get(results[0].get("kind"), "Other"))
+        groups.setdefault(group, []).append(name)
+    return groups
+
+
 def result_of(point, name):
     return next((problem for problem in point["problems"] if problem["name"] == name), None)
 
@@ -473,8 +512,26 @@ def seconds(ms):
     return "–" if ms is None else f"{ms / 1000:.1f}"
 
 
-def millions(beats):
-    return "–" if beats is None else f"{beats / 1e6:,.0f}M"
+def beat_unit(beats):
+    """The largest of k, M, and G of which `beats` is at least one."""
+    return next((unit for unit in BEAT_UNITS if beats >= unit[0]), BEAT_UNITS[-1])
+
+
+def beat_count(beats):
+    """Heartbeats to three digits in the unit that fits them: 254k, 9.10M."""
+    if beats is None:
+        return "–"
+    divisor, suffix = beat_unit(beats)
+    value = beats / divisor
+    return f"{value:.0f}{suffix}" if value >= 100 else f"{value:.{1 if value >= 10 else 2}f}{suffix}"
+
+
+def error_excerpt(message):
+    """The head of an error message, at most `ERROR_LINES` lines and `ERROR_CHARS` characters."""
+    head = "\n".join(message.split("\n", ERROR_LINES)[:ERROR_LINES])[:ERROR_CHARS]
+    if head == message:
+        return head
+    return f"{head} … ({len(message) - len(head)} more characters)"
 
 
 def sparkline(values):
@@ -636,14 +693,31 @@ STYLE = """
 body { margin: 0; background: var(--page); }
 .viz-root { background: var(--page); color: var(--text-primary); padding: 16px;
   font: 14px system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 1400px; margin: 0 auto; }
-h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 0 0 8px; }
+h1 { font-size: 20px; margin: 0 0 4px; } h2, h3 { font-size: 16px; margin: 0 0 8px; }
+h2.group { font-size: 18px; margin: 24px 0 8px; }
 .meta { color: var(--text-secondary); margin-bottom: 16px; }
+.layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; }
+.index { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px);
+  overflow-y: auto; font-size: 13px; }
+.index ul { list-style: none; margin: 0; padding: 0; }
+.index li { margin: 2px 0; } .index ul ul { margin: 0 0 8px 12px; }
+.index a { color: var(--text-primary); text-decoration: none; }
+.index a:hover { text-decoration: underline; }
+.index a.group { display: block; margin-top: 8px; font-weight: 600; }
+.index .status { margin-left: 4px; }
+[id] { scroll-margin-top: 16px; }
+@media (max-width: 800px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .index { position: static; max-height: none; }
+  .index ul ul { display: flex; flex-wrap: wrap; gap: 0 12px; } }
 section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
   padding: 12px 16px; margin-bottom: 16px; }
 .charts { display: flex; flex-wrap: wrap; gap: 16px; }
 .chart { position: relative; flex: 1 1 420px; min-width: 0; }
 .chart svg { width: 100%; height: auto; display: block; }
-.legend { display: flex; gap: 16px; color: var(--text-secondary); font-size: 12px; margin: 4px 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-secondary);
+  font-size: 12px; margin: 4px 0; }
+.legend strong { color: var(--text-primary); font-weight: 600; }
 .legend span::before { content: ""; display: inline-block; width: 14px; height: 2px;
   margin-right: 6px; vertical-align: middle; background: var(--swatch); }
 .status { font-size: 12px; color: var(--text-secondary); margin-left: 8px; }
@@ -678,7 +752,7 @@ document.querySelectorAll('.chart').forEach(chart => {
       const value = document.createElement('strong');
       const v = series.values[best];
       value.textContent = v === null ? '–'
-        : (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(v >= 1 ? 1 : 2)) + ' ' + data.unit;
+        : (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(v >= 1 ? 1 : 2)) + data.unit;
       row.append(value, document.createTextNode(' ' + series.name));
       tip.append(row);
     });
@@ -714,11 +788,12 @@ def axis(maximum):
     return step * steps, step, decimals
 
 
-def chart(title, unit, labels, series, notes, band=None):
-    """A line chart of up to three series over the window: gridlines, the
-    series with markers and direct labels at their ends, change markers,
-    and a crosshair the page script drives. A series is named by its group,
-    whose slot gives its color on every chart."""
+def chart(subject, caption, unit, labels, series, notes, band=None):
+    """A line chart of up to three series over the window, captioned with
+    its measure and unit: gridlines, the series with markers and direct
+    labels at their ends, change markers, and a crosshair the page script
+    drives. A series is named by its group, whose slot gives its color on
+    every chart; a value is written with `unit` appended."""
     width, height = 640, 220
     left, right, top, bottom = 52, 128, 12, 24
     plot_w, plot_h = width - left - right, height - top - bottom
@@ -733,7 +808,8 @@ def chart(title, unit, labels, series, notes, band=None):
     def y_of(value):
         return top + plot_h - value / y_max * plot_h
 
-    parts = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title)}">']
+    parts = [f'<svg viewBox="0 0 {width} {height}" role="img" '
+             f'aria-label="{html.escape(f"{subject}: {caption}")}">']
     for tick in range(round(y_max / y_step) + 1):
         value = y_step * tick
         y = y_of(value)
@@ -773,7 +849,7 @@ def chart(title, unit, labels, series, notes, band=None):
                              f'fill="{color}" stroke="var(--surface-1)" stroke-width="2"/>')
         last = max((index for index, value in enumerate(values) if value is not None), default=None)
         if last is not None:
-            labels_at.append([y_of(values[last]), color, f"{name} {short(values[last])}"])
+            labels_at.append([y_of(values[last]), color, f"{name} {short(values[last])}{unit}"])
     # Direct labels at the line ends, spread apart and kept beside the plot.
     labels_at.sort(key=lambda label: label[0])
     for index in range(1, len(labels_at)):
@@ -800,11 +876,12 @@ def chart(title, unit, labels, series, notes, band=None):
     data = {"xs": xs, "labels": labels, "unit": unit,
             "notes": {index: ", ".join(changed) for index, changed in notes.items()},
             "series": [{"name": name, "values": values} for name, values in series]}
-    # A single series is named by its chart's heading.
+    # A single series is named by its section's heading.
     legend = "".join(f'<span style="--swatch: var(--series-{slot_of(name)})">{html.escape(name)}</span>'
                      for name, _ in series) if len(series) > 1 else ""
     return (f'<div class="chart" data-points="{html.escape(json.dumps(data))}">'
-            f'<div class="legend">{legend}</div>{"".join(parts)}'
+            f'<div class="legend"><strong>{html.escape(caption)}</strong>{legend}</div>'
+            f'{"".join(parts)}'
             f'<div class="tooltip"></div></div>')
 
 
@@ -829,7 +906,9 @@ def problem_section(points, name):
     beats = [group_values(result, "heartbeats") for result in results]
     wall_series = [(title, [None if value[key] is None else value[key] / 1000 for value in walls])
                    for key, title in GROUPS]
-    beat_series = [(title, [None if value[key] is None else value[key] / 1e6 for value in beats])
+    divisor, suffix = beat_unit(max((value["overall"] for value in beats
+                                     if value["overall"] is not None), default=0))
+    beat_series = [(title, [None if value[key] is None else value[key] / divisor for value in beats])
                    for key, title in GROUPS]
     band = [(min(result["repeats"]["wall_ms"]) / 1000, max(result["repeats"]["wall_ms"]) / 1000)
             if result and result.get("repeats") else (None, None) for result in results]
@@ -838,19 +917,20 @@ def problem_section(points, name):
     targets = sorted((latest or {}).get("targets", []), key=lambda t: -t["wall_ms"])[:8]
     target_rows = "".join(
         f"<tr><td>{html.escape(target['target'])}</td><td>{target['wall_ms'] / 1000:.1f}</td>"
-        f"<td>{target['heartbeats'] / 1e6:,.0f}</td></tr>" for target in targets)
+        f"<td>{beat_count(target['heartbeats'])}</td></tr>" for target in targets)
     errors = "".join(f"<li>{html.escape(message)}</li>"
                      for message in (latest or {}).get("error_messages", []))
     rows = [(f"{title} s", [seconds(value[key]) for value in walls]) for key, title in GROUPS]
-    rows += [("Heartbeats", [millions(value["overall"]) for value in beats]),
+    rows += [("Heartbeats", [beat_count(value["overall"]) for value in beats]),
              ("Status", [result["status"] if result else "–" for result in results])]
     return (
-        f'<section><h2>{html.escape(name)}<span class="status">{html.escape(status)}</span></h2>'
+        f'<section id="{anchor(name)}"><h3>{html.escape(name)}'
+        f'<span class="status">{html.escape(status)}</span></h3>'
         f'<div class="charts">'
-        f'{chart(f"{name}: seconds", "s", labels, wall_series, notes, band if any(b[1] for b in band) else None)}'
-        f'{chart(f"{name}: heartbeats", "M", labels, beat_series, notes)}</div>'
+        f'{chart(name, "Wall time (s)", " s", labels, wall_series, notes, band if any(b[1] for b in band) else None)}'
+        f'{chart(name, f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, beat_series, notes)}</div>'
         + (f"<details open><summary>Most expensive targets, latest run</summary><table>"
-           f"<tr><th>Target</th><th>Seconds</th><th>Heartbeats (M)</th></tr>{target_rows}"
+           f"<tr><th>Target</th><th>Seconds</th><th>Heartbeats</th></tr>{target_rows}"
            f"</table></details>" if targets else "")
         + (f"<details open><summary>Errors, latest run</summary><ul>{errors}</ul></details>"
            if errors else "")
@@ -863,23 +943,49 @@ def suite_section(points):
         return [None if value is None else value / unit
                 for value in (suite_value(point, measure) for point in points)]
     wall = scaled("wall_ms", 1000)
-    beats = scaled("heartbeats", 1e6)
+    divisor, suffix = beat_unit(max((value for value in scaled("heartbeats", 1)
+                                     if value is not None), default=0))
+    beats = scaled("heartbeats", divisor)
     if all(value is None for value in wall):
-        return ('<section><h2>Suite</h2><p class="meta">No full run in this window: the '
-                "suite total compares full runs only.</p></section>")
+        return ('<section id="suite"><h2>Suite</h2><p class="meta">No full run in this '
+                "window: the suite total compares full runs only.</p></section>")
     return (
-        '<section><h2>Suite<span class="status">problems verified completely, '
+        '<section id="suite"><h2>Suite<span class="status">problems verified completely, '
         'full runs</span></h2>'
         '<div class="charts">'
-        f'{chart("Suite: seconds", "s", labels, [("Overall", wall)], {})}'
-        f'{chart("Suite: heartbeats", "M", labels, [("Overall", beats)], {})}'
+        f'{chart("Suite", "Wall time (s)", " s", labels, [("Overall", wall)], {})}'
+        f'{chart("Suite", f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, [("Overall", beats)], {})}'
         "</div></section>")
+
+
+def anchor(name, prefix="problem"):
+    return html.escape(f"{prefix}-{name}".replace(" ", "-"))
+
+
+def index(points, groups, local_table):
+    """The page's index: the suite, the local comparison, and the problems
+    by group, each problem marked with its latest status unless verified."""
+    def entry(name):
+        latest = result_of(points[-1], name)
+        status = latest["status"] if latest else "absent"
+        mark = "" if status == "verified" else f' <span class="status">{html.escape(status)}</span>'
+        return f'<li><a href="#{anchor(name)}">{html.escape(name)}</a>{mark}</li>'
+    top = '<li><a href="#suite">Suite</a></li>' + (
+        '<li><a href="#local">Local run</a></li>' if local_table else "")
+    body = "".join(
+        f'<li><a class="group" href="#{anchor(group, "group")}">{html.escape(group)}</a>'
+        f'<ul>{"".join(entry(name) for name in names)}</ul></li>'
+        for group, names in groups.items())
+    return f'<nav class="index" aria-label="Index"><ul>{top}{body}</ul></nav>'
 
 
 def page(points, local_table):
     latest = points[-1]
-    sections = [suite_section(points)] + [problem_section(points, name)
-                                          for name in problem_names(points)]
+    groups = problem_groups(points)
+    sections = suite_section(points) + "".join(
+        f'<h2 class="group" id="{anchor(group, "group")}">{html.escape(group)}</h2>'
+        + "".join(problem_section(points, name) for name in names)
+        for group, names in groups.items())
     return (
         "<!doctype html><html><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -888,8 +994,9 @@ def page(points, local_table):
         f'<div class="meta">{len(points)} runs, latest {html.escape(label_of(latest))}, '
         f'runner {html.escape(str(latest.get("runner")))}, {latest.get("threads")} threads, '
         f'{html.escape(latest.get("toolchain", ""))}</div>'
-        + local_table + "".join(sections)
-        + f"</div><script>{SCRIPT}</script></body></html>\n")
+        f'<div class="layout">{index(points, groups, local_table)}<main>'
+        + local_table + sections
+        + f"</main></div></div><script>{SCRIPT}</script></body></html>\n")
 
 
 # --------------------------------------------------------------------------
@@ -937,7 +1044,7 @@ def local_text(base, rows):
               f" {'time share CI':>14} {'local':>7}")
     lines = [title, "", header]
     for name, beats_before, beats_after, share_before, share_after in rows:
-        lines.append(f"{name:<24} {millions(beats_before):>14} {millions(beats_after):>10} "
+        lines.append(f"{name:<24} {beat_count(beats_before):>14} {beat_count(beats_after):>10} "
                      f"{percent(change(beats_after, beats_before)):>9} "
                      f"{share_before * 100:>13.1f}% {share_after * 100:>6.1f}%")
     return "\n".join(lines)
@@ -947,11 +1054,11 @@ def local_html(base, rows):
     if base is None:
         return ""
     body = "".join(
-        f"<tr><td>{html.escape(name)}</td><td>{millions(before)}</td><td>{millions(after)}</td>"
+        f"<tr><td>{html.escape(name)}</td><td>{beat_count(before)}</td><td>{beat_count(after)}</td>"
         f"<td>{percent(change(after, before))}</td><td>{share_before * 100:.1f} %</td>"
         f"<td>{share_after * 100:.1f} %</td></tr>"
         for name, before, after, share_before, share_after in rows)
-    return (f"<section><h2>Local run against CI run {base['run']['id']}"
+    return (f"<section id=\"local\"><h2>Local run against CI run {base['run']['id']}"
             f'<span class="status">{html.escape(base["commit"][:10])}, at or before the merge '
             "base</span></h2><table><tr><th>Problem</th><th>Heartbeats CI</th><th>Local</th>"
             "<th>Change</th><th>Time share CI</th><th>Local</th></tr>"
@@ -1009,14 +1116,14 @@ def compare(args):
         if old and new and old["status"] == new["status"] == "verified":
             common.append((wall, beats))
         print(f"{name:<24} {status:>20} {seconds(wall[0]):>7} → {seconds(wall[1]):>6} "
-              f"{percent(change(wall[1], wall[0])):>9} {millions(beats[0]):>7} → "
-              f"{millions(beats[1]):>6} {percent(change(beats[1], beats[0])):>9}")
+              f"{percent(change(wall[1], wall[0])):>9} {beat_count(beats[0]):>7} → "
+              f"{beat_count(beats[1]):>6} {percent(change(beats[1], beats[0])):>9}")
     # The problems both runs verified completely, so subsets compare too.
     wall = [sum(pair[0][side] for pair in common) for side in (0, 1)]
     beats = [sum(pair[1][side] for pair in common) for side in (0, 1)]
     print(f"{f'verified in both ({len(common)})':<24} {'':>20} {seconds(wall[0]):>7} → "
           f"{seconds(wall[1]):>6} {percent(change(wall[1], wall[0])):>9} "
-          f"{millions(beats[0]):>7} → {millions(beats[1]):>6} "
+          f"{beat_count(beats[0]):>7} → {beat_count(beats[1]):>6} "
           f"{percent(change(beats[1], beats[0])):>9}")
 
 

@@ -1,4 +1,4 @@
-LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:16:4: error: the specification clause `ensures ∃ (i in 0 .. n), i >= result` is not established
-LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:13:7: error: leaner verification failed: the automatic verification of `below` failed; provide a proof: `verify below by …` in the module (`verify below by skip` shows the obligations it leaves)
-LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:22:4: error: the specification clause `ensures ∃ (y in v), true` is not established
-LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:20:7: error: leaner verification failed: the automatic verification of `length_of` failed; provide a proof: `verify length_of by …` in the module (`verify length_of by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:17:4: error: the specification clause `ensures ∃ (i in 0 .. n), i >= result` is not established
+LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:14:7: error: leaner verification failed: the automatic verification of `below` failed; provide a proof: `verify below by …` in the module (`verify below by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:23:4: error: the specification clause `ensures ∃ (y in v), true` is not established
+LeanerE2ETests/Check/Specifications/DomainQuantifiers.lean:21:7: error: leaner verification failed: the automatic verification of `length_of` failed; provide a proof: `verify length_of by …` in the module (`verify length_of by skip` shows the obligations it leaves)

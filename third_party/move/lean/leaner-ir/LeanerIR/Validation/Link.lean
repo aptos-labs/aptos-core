@@ -78,7 +78,8 @@ values and are interned; every other entry keeps its identity and is
 appended once. -/
 private structure RelocState where
   target : Tables
-  /-- Where each interned type and name is in the target. -/
+  /-- Where each interned type and name is in the target; a type by its
+  erasure, as the type table is location-free (`Ty.eraseLocs`). -/
   typeIndex : Std.HashMap Ty Nat := {}
   nameIndex : Std.HashMap QualifiedName Nat := {}
   files : Std.HashMap Nat FileId := {}
@@ -170,11 +171,11 @@ private partial def relocateType (source : Tables) (id : TypeId) : RelocM TypeId
   let some ty := source.types[id.index]? | return id
   let ty ← remap ty (relocation source)
   let state ← get
-  let (state, index) := match state.typeIndex[ty]? with
+  let (state, index) := match state.typeIndex[ty.eraseLocs]? with
     | some index => (state, index)
     | none => let index := state.target.types.size
         ({ state with target := { state.target with types := state.target.types.push ty }
-                      typeIndex := state.typeIndex.insert ty index }, index)
+                      typeIndex := state.typeIndex.insert ty.eraseLocs index }, index)
   let result : TypeId := ⟨index⟩
   set { state with types := state.types.insert id.index result }
   return result
@@ -470,13 +471,6 @@ private def checkBoundary (tables : Tables) (path : Array String)
         declared.abilities == linked.abilities do
       throw (located "type" name)
 
-/-- The variant names of every nominal declaration, as validation caches
-them. -/
-private def variantOrdersOf (tables : Tables) (namespaces : Array (Namespace FunctionBody)) :
-    Array (Array (Array String)) :=
-  namespaces.map fun ns => ns.structs.map fun declaration =>
-    declaration.variants.map fun variant => nameOf tables variant.name
-
 /-- Link relocatable namespaces into a validated unit. A namespace at a path
 the unit declares replaces that namespace, the bodiless interface the unit
 was validated against, after the boundary check; any other is added. The
@@ -500,18 +494,22 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
   -- unit's namespaces, so each sits at its index.
   let mut state : RelocState := { target := { namespaces := refs } }
   let mut placed : Array Placed := #[]
-  let mut boundaries : Array (Namespace FunctionBody × Nat) := #[]
   for ((identity, object?), index) in baseEntries.zipIdx do
     let some own := placedIn base identity | throw "a base namespace is missing"
-    let (relocated, next) := (relocatePlaced own ⟨index⟩).run state
-    state := next
     match object? with
-    | none => placed := placed.push relocated
+    | none =>
+        let (relocated, next) := (relocatePlaced own ⟨index⟩).run state
+        state := next
+        placed := placed.push relocated
     | some object =>
-        boundaries := boundaries.push (relocated.body, index)
         let (linked, next) := (relocatePlaced object.placed ⟨index⟩).run state
         state := next
         placed := placed.push linked
+        -- The interface the unit was checked against is relocated beside the
+        -- namespace for the boundary check only, not into the unit.
+        let (interface, checking) := (relocatePlaced own ⟨index⟩).run state
+        checkBoundary checking.target ((refs[index]?.map (·.segments)).getD #[]) interface.body
+          linked.body
   for (object, offset) in added.zipIdx do
     let (linked, next) := (relocatePlaced object.placed ⟨baseEntries.size + offset⟩).run state
     state := next
@@ -524,13 +522,10 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
     state := next
     pure dependencies
   let tables := state.target
-  for (interface, index) in boundaries do
-    let some linked := placed[index]? | throw "a linked namespace is missing"
-    checkBoundary tables ((refs[index]?.map (·.segments)).getD #[]) interface linked.body
   let namespaces := placed.map (·.body)
-  let variantOrders := variantOrdersOf tables namespaces
+  let orders := valueOrdersOf tables namespaces
   let validated := namespaces.map fun ns =>
-    ({ toNamespace := ns, tables, variantOrders } : ValidatedNamespace)
+    ({ toNamespace := ns, tables, orders } : ValidatedNamespace)
   let rawDependencies : Array Import.RawNamespaceInterface := dependencies.map fun dep => {
     namespaceId := dep.namespaceId, profile := dep.profile, exportedNames := dep.exportedNames
     structs := dep.structs

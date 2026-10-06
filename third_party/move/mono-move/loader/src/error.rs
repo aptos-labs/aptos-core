@@ -3,7 +3,7 @@
 
 //! Loader subsystem error types.
 
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError};
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VerificationError};
 use move_binary_format::errors::VMError;
 use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
@@ -79,6 +79,15 @@ impl IntoExecutionError for LoaderError {
     }
 }
 
+/// Joins the verifier's findings into a single diagnostic line.
+fn format_verification_errors(errors: &[VerificationError]) -> String {
+    errors
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// Read-set state-machine and cache-consistency assertions raised by the
 /// loader. Surfaced rather than panicked so callers can produce a clean
 /// per-transaction outcome and alert operationally on
@@ -136,6 +145,13 @@ pub enum LoaderInvariantViolation {
 
     #[error("Mandatory dependencies must always be lazy")]
     MandatoryDepsNotLazy,
+
+    // ---- lowering ----
+    /// The specializer produced a function the micro-op verifier rejects.
+    /// The bytecode already passed the Move bytecode verifier, so this is a
+    /// bug in the lowering pipeline, not in the user's code.
+    #[error("Lowered function failed micro-op verification: {}", format_verification_errors(.errors))]
+    MicroOpVerificationFailed { errors: Vec<VerificationError> },
 }
 
 /// Returns from the enclosing function with a [`LoaderError::InvariantViolation`]

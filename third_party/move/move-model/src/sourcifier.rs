@@ -5,7 +5,7 @@ use crate::{
     ast::{
         AbortKind, AccessSpecifierKind, AddressSpecifier, Condition, ConditionKind, Exp, ExpData,
         FrameSpec, LambdaCaptureKind, MemoryRange, Operation, Pattern, PropertyBag, PropertyValue,
-        QuantKind, ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
+        QuantKind, ResourceSpecifier, Spec, SpecBlockTarget, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -355,7 +355,7 @@ impl<'a> Sourcifier<'a> {
     pub fn print_exp_for_fun_spec(&self, fun_env: &FunctionEnv, exp: &Exp) {
         let exp_sourcifier =
             ExpSourcifier::for_fun_spec(self, fun_env, fun_env.get_type_display_ctx(), self.amend);
-        exp_sourcifier.print_exp(Prio::General, false, exp);
+        exp_sourcifier.print_exp(Prio::General, false, &exp.restore_lambda_calls(self.env()));
     }
 
     /// Destructs and returns the result
@@ -1468,7 +1468,10 @@ impl<'a> Sourcifier<'a> {
         fun_env: &FunctionEnv,
         signature_tctx: TypeDisplayContext<'_>,
     ) {
-        let spec = fun_env.get_spec();
+        let spec = fun_env.get_spec().restore_lambda_calls(
+            self.env(),
+            &SpecBlockTarget::Function(fun_env.module_env.get_id(), fun_env.get_id()),
+        );
         let has_frame = spec
             .frame_spec
             .as_ref()

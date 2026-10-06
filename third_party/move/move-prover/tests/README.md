@@ -76,6 +76,7 @@ Currently, the following features are available:
 - `no_opaque`: runs tests in a special mode where the `opaque` pragma is ignored. This increases the load on the prover,
   and functions as a stress test.
 - `cvc5`: runs tests configured to use the cvc5 solver as a backend.
+- `lean`: runs tests with the Lean-based Leaner verifier (`--lean`), only on request and not in CI. See below.
 
 ## Conventions
 
@@ -84,6 +85,21 @@ mixed in a file. The first type of test cases are "correct" Move functions which
 type of test cases are incorrect Move functions which are expected to be disproven, with the created errors stored in
 so-called 'expectation baseline files' (`.exp`). The incorrect functions have suffix `_incorrect` in their names, by
 convention. It is expected that only errors for functions with this suffix appear in `.exp` files.
+
+## Leaner Verifier Tests
+
+`MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite` verifies each test with the Leaner verifier
+(`third_party/move/lean/leaner-move`, built with `lake build leaner-move` in that directory; without it, the tests are
+skipped). Its messages differ from Boogie's, so its baselines are `.lean_exp` files.
+
+- Each function's verification has a tight budget of 25 thousand `maxHeartbeats` (`--heartbeats=25`). A function that
+  verifies but needs more raises its own budget with `pragma heartbeats = N;` in its spec block.
+  `MVP_TEST_FLAGS=--heartbeats=N` runs with another default budget.
+- A function the automatic verification does not prove, e.g. where Boogie relies on a Move `proof` block or on
+  nonlinear arithmetic, is proved in a LeanerLang proof file beside the test, `foo.proof.lean` for `foo.move`. The
+  failure message names the file, and `verify f by skip` there shows the obligations left. Only a file declaring a
+  single module can have one.
+- The run uses every core, and each verifier process takes up to about 2 GB of memory.
 
 ## Debugging Long Running Tests
 

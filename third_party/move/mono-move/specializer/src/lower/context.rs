@@ -32,9 +32,10 @@ use mono_move_core::{
         EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
-    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
-    Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule, SizedSlot,
-    SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset,
+    FrameworkSymbols, Function, Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule,
+    SizedSlot, SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE,
+    MAX_ALIGN,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -926,8 +927,13 @@ pub trait SpecializerContext: LayoutProvider {
         pointer_offsets: &[FrameOffset],
     ) -> DescriptorId;
 
-    /// Publishes `layout` for `ty` and returns its assigned id. Idempotent.
-    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId;
+    /// Publishes `layout` for the type it was built for and returns its
+    /// assigned id. Idempotent. [`None`] if the layout carries no type, which
+    /// only variant bodies and the reserved reference and function layouts do.
+    fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId>;
+
+    /// The framework symbols, interned once per context.
+    fn framework_symbols(&self) -> &FrameworkSymbols;
 
     /// Publishes the variant-body layouts of `enum_ty` (one per variant, in tag
     /// order), returning their ids. Idempotent on `enum_ty`: re-publishing the
@@ -1359,13 +1365,15 @@ fn layout_inline_fields(
 
 /// Builds the [`ValueLayout`] for an inline aggregate — a struct, or one enum
 /// variant body — from its field layouts and the published layout id of each
-/// field. `total`/`align` are the aggregate's in-memory size and alignment.
+/// field. `ty` is the struct's type, or [`None`] for a variant body.
+/// `total`/`align` are the aggregate's in-memory size and alignment.
 ///
 /// Returns `Ok(None)` when any field's layout is not yet published (the
 /// aggregate is deferred, mirroring a deferred struct). Errors only on an
 /// internal inconsistency (a published id that does not resolve to a layout).
 fn try_build_inline_value_layout(
     ctx: &impl SpecializerContext,
+    ty: Option<InternedType>,
     field_layouts: &[VariantFieldLayout],
     field_ids: &[Option<LayoutId>],
     total: u32,
@@ -1417,6 +1425,7 @@ fn try_build_inline_value_layout(
         }
     }
     Ok(Some(ValueLayout::struct_layout(
+        ty,
         total,
         align,
         fixed_bcs_size,
@@ -1445,6 +1454,37 @@ fn chain_path_is_inline_contained<SlotForm>(
             .subst_type(module.interned_field_type_at(field_handle), *ty_args)
             .is_ok_and(|field_ty| field_ty == next_owner)
     })
+}
+
+/// Publishes the layout and struct descriptor of the resources an
+/// `0x1::object::Object<T>` is read through: `T` itself and
+/// `0x1::object::ObjectCore`. A no-op for every other nominal.
+///
+/// Neither is reachable from the object's own fields, but checking an object
+/// argument reads both from storage.
+//
+// TODO(completeness): hard-coded here, like `resource_types_for_native`.
+fn discover_object_resource_types(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    module_id: InternedModuleId,
+    name: InternedIdentifier,
+    ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
+) -> VMResult<()> {
+    let &[resource] = view_type_list(ty_args) else {
+        return Ok(());
+    };
+    let symbols = ctx.framework_symbols();
+    if module_id != symbols.object || name != symbols.object_struct {
+        return Ok(());
+    }
+    for ty in [resource, symbols.object_core] {
+        discover_type_metadata(ctx, interner, ty, EMPTY_TYPE_LIST, visited, descriptors)?;
+        publish_struct_descriptor_for(ctx, ty, &mut descriptors.structs)?;
+    }
+    Ok(())
 }
 
 /// Recursive post-order DFS that visits every nominal reachable from the given
@@ -1531,8 +1571,11 @@ fn discover_type_metadata(
             // uses), so `descriptor_id` is always valid on the layout.
             match (elem_id, descriptor_id) {
                 (Some(elem_id), Some(descriptor_id)) => {
-                    let layout = ValueLayout::vector(elem_id, descriptor_id);
-                    Ok(Some(ctx.publish_layout(ty, layout)))
+                    let layout = ValueLayout::vector(ty, elem_id, descriptor_id);
+                    let id = ctx
+                        .publish_layout(layout)
+                        .ok_or(LoweringError::LayoutWithoutType)?;
+                    Ok(Some(id))
                 },
                 _ => Ok(None),
             }
@@ -1550,6 +1593,15 @@ fn discover_type_metadata(
             if !is_closed_type(ty) {
                 return Ok(None);
             }
+            discover_object_resource_types(
+                ctx,
+                interner,
+                *module_id,
+                *name,
+                *nominal_ty_args,
+                visited,
+                descriptors,
+            )?;
             match ctx.get_fields(module_id, name)? {
                 None => {
                     // The context does not have field information for this
@@ -1591,6 +1643,7 @@ fn discover_type_metadata(
                     // deferred), before recording any nominal layout.
                     let Some(value_layout) = try_build_inline_value_layout(
                         &*ctx,
+                        Some(ty),
                         &field_layouts,
                         &field_ids,
                         total,
@@ -1599,7 +1652,10 @@ fn discover_type_metadata(
                     else {
                         return Ok(None);
                     };
-                    Ok(Some(ctx.publish_layout(ty, value_layout)))
+                    let id = ctx
+                        .publish_layout(value_layout)
+                        .ok_or(LoweringError::LayoutWithoutType)?;
+                    Ok(Some(id))
                 },
                 Some(FieldTypes::Enum(variants)) => {
                     // An enum is an 8-byte heap pointer at the type level.
@@ -1667,6 +1723,7 @@ fn discover_type_metadata(
                         if all_value_layouts {
                             match try_build_inline_value_layout(
                                 &*ctx,
+                                None,
                                 &variant_layout,
                                 &field_ids,
                                 variant_size,
@@ -1710,8 +1767,11 @@ fn discover_type_metadata(
                             let variant_ids =
                                 ctx.publish_variant_layouts(ty, variant_value_layouts);
                             let value_layout =
-                                ValueLayout::frozen_enum(descriptor_id, variant_ids, size);
-                            return Ok(Some(ctx.publish_layout(ty, value_layout)));
+                                ValueLayout::frozen_enum(ty, descriptor_id, variant_ids, size);
+                            let id = ctx
+                                .publish_layout(value_layout)
+                                .ok_or(LoweringError::LayoutWithoutType)?;
+                            return Ok(Some(id));
                         }
                     }
 

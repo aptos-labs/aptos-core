@@ -30,7 +30,7 @@ use crate::{
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, valid_pragmas_for_block,
         CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
-        INTRINSIC_PRAGMA,
+        INTRINSIC_PRAGMA, WEIGHT_PROP,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -3756,7 +3756,7 @@ impl ModuleBuilder<'_, '_> {
         // Stash `[weight = N]` in the spec fun's properties for the Boogie backend.
         if let Some(n) = weight {
             use num::BigInt;
-            let weight_sym = self.symbol_pool().make("weight");
+            let weight_sym = self.symbol_pool().make(WEIGHT_PROP);
             self.spec_funs[self.spec_fun_index]
                 .spec
                 .borrow_mut()

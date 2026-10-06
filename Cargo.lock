@@ -2041,7 +2041,6 @@ dependencies = [
  "move-core-types",
  "move-docgen",
  "move-model",
- "move-model-exchange",
  "move-package",
  "move-prover",
  "move-prover-boogie-backend",
@@ -3260,6 +3259,7 @@ dependencies = [
  "move-model",
  "move-model-exchange",
  "move-package",
+ "move-prover",
  "move-prover-test-utils",
  "move-stackless-bytecode",
  "move-symbol-pool",
@@ -4467,10 +4467,12 @@ dependencies = [
 name = "aptos-storage-interface"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "anyhow",
  "aptos-config",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
@@ -12998,6 +13000,7 @@ dependencies = [
  "move-model",
  "move-value-view",
  "serde",
+ "shared-dsa",
  "thiserror 1.0.69",
 ]
 
@@ -13714,6 +13717,7 @@ dependencies = [
  "move-command-line-common",
  "move-compiler-v2",
  "move-model",
+ "move-model-exchange",
  "move-package",
  "move-prover-boogie-backend",
  "move-prover-bytecode-pipeline",
