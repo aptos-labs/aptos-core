@@ -130,7 +130,3 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
-
-  # Run aptos-batch-encryption (i.e., with TypeScript/Node.js). This is a PR required job.
-  # A skipped job satisfies the required check, so an unselected run reserves no
-  # runner, while a failed prerequisite runs the job to fail it visibly.
