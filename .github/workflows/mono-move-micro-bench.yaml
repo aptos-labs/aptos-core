@@ -1,11 +1,8 @@
 name: "mono-move-micro-bench"
 on:
   workflow_dispatch:
-  # Untrusted PR code runs on a self-hosted runner. Restricted to same-repo PRs
-  # with the `mono-move` label (forks excluded below); re-runs on each push so a
-  # fix shows new numbers.
-  pull_request:
-    types: [labeled, opened, synchronize, reopened]
+  pull_request_target:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
 
 concurrency:
   group: mono-move-micro-bench-${{ github.event.pull_request.number || github.ref }}
@@ -13,83 +10,125 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write # Post the sticky benchmark comment.
+  pull-requests: read
 
 jobs:
-  mono-move-micro-bench:
-    # Dispatch, or a same-repo (non-fork) PR carrying the `mono-move` label.
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (
-        contains(github.event.pull_request.labels.*.name, 'mono-move') &&
-        github.event.pull_request.head.repo.full_name == github.repository
-      )
-    runs-on: benchmark-c3d-60
-    timeout-minutes: 45
-    env:
-      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  # Each output is one expression over the event, so the PR and manual values
+  # sit side by side and no step writes them.
+  compute-authorization:
+    runs-on: ubuntu-latest
+    outputs:
+      approved: ${{ github.event_name == 'workflow_dispatch' || steps.authorize.outputs.approved == 'true' }}
+      run_mode: ${{ github.event_name == 'pull_request_target' && 'pr' || 'manual' }}
+      source_repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+      source_sha: ${{ github.event.pull_request.head.sha || github.sha }}
+      runner: ${{ github.event_name == 'pull_request_target' && 'benchmark-c3d-60-pr' || 'benchmark-c3d-60' }}
+      baseline_ref: aptos-base/main
+      benchmark_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      pr_number: ${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out trusted base authorization code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pin@v4.4.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0 # Full history so the base ref is reachable.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify PR compute authorization
+        id: authorize
+        if: github.event_name == 'pull_request_target'
+        uses: ./.github/actions/compute-authorized
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          required_label: mono-move
+
+  mono-move-micro-bench:
+    needs: compute-authorization
+    if: ${{ needs.compute-authorization.outputs.approved == 'true' }}
+    runs-on: ${{ needs.compute-authorization.outputs.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted source verification action
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: trusted-base
+          persist-credentials: false
+
+      - name: Check out exact benchmark source
+        uses: ./trusted-base/.github/actions/checkout-exact-pr-source
+        with:
+          source_repository: ${{ needs.compute-authorization.outputs.source_repository }}
+          source_sha: ${{ needs.compute-authorization.outputs.source_sha }}
+          path: .
+          fetch-depth: 0
 
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - name: Fetch trusted base main
+        run: |
+          git remote remove aptos-base 2>/dev/null || true
+          git remote add aptos-base "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags aptos-base main:refs/remotes/aptos-base/main
+
+      - name: Stage bench tooling
+        run: |
+          mkdir -p "$RUNNER_TEMP/perf"
+          cp third_party/move/mono-move/testsuite/benches/perf/compare.py \
+             third_party/move/mono-move/testsuite/benches/perf/run.sh \
+             third_party/move/mono-move/testsuite/benches/perf/config.json \
+             third_party/move/mono-move/testsuite/pr_ci_report.py \
+             "$RUNNER_TEMP/perf/"
 
       - name: Run A/B benchmark gate
         id: gate
         env:
-          # The PR's own base branch, so a stacked PR is measured on its own change.
-          BASE_REF: origin/${{ github.event.pull_request.base.ref || 'main' }}
+          BASELINE_REF: ${{ needs.compute-authorization.outputs.baseline_ref }}
+          BENCHMARK_REF: ${{ needs.compute-authorization.outputs.benchmark_ref }}
+          MANUAL_REPORT_PATH: ${{ needs.compute-authorization.outputs.run_mode == 'manual' && format('{0}/mono-move-bench.md', runner.temp) || '' }}
+          PR_CI_REPORT_PATH: ${{ needs.compute-authorization.outputs.run_mode == 'pr' && format('{0}/pr-ci-report-v1.json', runner.temp) || '' }}
+          PR_CI_PR_NUMBER: ${{ needs.compute-authorization.outputs.pr_number }}
+          PR_CI_HEAD_SHA: ${{ needs.compute-authorization.outputs.source_sha }}
+          PR_CI_RUN_ID: ${{ github.run_id }}
         run: |
           set +e
-          # run.sh resolves the merge-base of HEAD_SHA and BASE_REF itself.
-          bash third_party/move/mono-move/testsuite/benches/perf/run.sh ab \
-            "$BASE_REF" "$HEAD_SHA" \
-            --out "$RUNNER_TEMP/mono-move-bench.md"
-          code=$?
-          # compare.py writes the report before reporting a regression, so a
-          # missing report means the run failed rather than regressed.
-          if [ "$code" = 1 ] && [ ! -f "$RUNNER_TEMP/mono-move-bench.md" ]; then
-            code=2
+          report_args=()
+          if [ -n "$MANUAL_REPORT_PATH" ]; then
+            report_args=(--out "$MANUAL_REPORT_PATH")
           fi
+          bash "$RUNNER_TEMP/perf/run.sh" ab "$BASELINE_REF" "$BENCHMARK_REF" "${report_args[@]}"
+          code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
 
-      # Always replace the PR comment, so a gate that never finished (build or
-      # run failure, timeout, cancellation, setup failure) does not leave an
-      # earlier push's report in place.
-      - name: Ensure report exists
-        if: always()
+      - name: Write trusted manual step summary
+        if: ${{ always() && needs.compute-authorization.outputs.run_mode == 'manual' }}
+        env:
+          REPORT_PATH: ${{ runner.temp }}/mono-move-bench.md
         run: |
-          if [ ! -f "$RUNNER_TEMP/mono-move-bench.md" ]; then
-            printf '### mono-move benchmark gate\n\nThe gate did not produce a report (build or run failure, timeout, or setup failure). See the job logs.\n' \
-              > "$RUNNER_TEMP/mono-move-bench.md"
+          if [ -f "$REPORT_PATH" ]; then
+            cat "$REPORT_PATH" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '### mono-move benchmark gate\n\nBenches failed to run. See the job logs.\n' >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Write step summary
-        if: always()
-        run: cat "$RUNNER_TEMP/mono-move-bench.md" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Post sticky PR comment
-        # A read-only token (e.g. fork PRs) cannot comment; don't fail the gate.
-        continue-on-error: true
-        if: ${{ always() && github.event.number != null }}
-        uses: marocchino/sticky-pull-request-comment@39c5b5dc7717447d0cba270cd115037d32d28443 # pin@39c5b5dc7717447d0cba270cd115037d32d2844
+      - name: Upload typed PR report
+        if: ${{ always() && needs.compute-authorization.outputs.run_mode == 'pr' }}
+        uses: actions/upload-artifact@v4
         with:
-          header: mono-move-micro-bench
-          recreate: true
-          path: ${{ runner.temp }}/mono-move-bench.md
+          name: pr-ci-report-v1
+          path: ${{ runner.temp }}/pr-ci-report-v1.json
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Fail on regression or bench error
+      - name: Fail on regression
         if: ${{ steps.gate.outputs.exit_code != '0' }}
         env:
           EXIT_CODE: ${{ steps.gate.outputs.exit_code }}
         run: |
-          if [ "$EXIT_CODE" = "1" ]; then
-            echo "mono-move benchmark gate failed: a gated bench regressed beyond the threshold. See the report above." >&2
+          if [ "$EXIT_CODE" = 2 ]; then
+            echo "mono-move benchmark gate failed: tooling failure. See the job logs." >&2
           else
-            echo "mono-move benchmark gate failed: benches did not build or run cleanly. See the job logs." >&2
+            echo "mono-move benchmark gate failed: regression beyond the threshold." >&2
           fi
           exit 1

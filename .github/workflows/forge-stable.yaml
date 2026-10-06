@@ -41,10 +41,7 @@ name: Continuous Forge Tests - Stable
 # You can find more details about the individual tests below.
 
 permissions:
-  issues: write
-  pull-requests: write
   contents: read
-  id-token: write
 
 on:
   # Allow triggering manually
@@ -95,24 +92,22 @@ on:
         default: 1
 
   # schedule: # NOTE: the schedule is dictated by PIES
-  pull_request:
+  # The workflow file runs from the base branch. PR code comes only from the
+  # exact head SHA, in the pr-lookup-live job at the end of this file.
+  pull_request_target:
     paths:
       - ".github/workflows/forge-stable.yaml"
       - "testsuite/find_latest_image.py"
 
+# Under pull_request_target, github.ref_name and github.sha name the base branch,
+# so PR runs are grouped by PR number.
 concurrency:
-  group: forge-stable-${{ format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA || github.sha || github.head_ref || github.ref, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
+  group: forge-stable-${{ github.event_name == 'pull_request_target' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}-{2}-{3}', github.ref_name, inputs.GIT_SHA || github.sha || github.head_ref || github.ref, inputs.IMAGE_TAG, inputs.TEST_NAME) }}
   cancel-in-progress: true
-
-env:
-  AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  IMAGE_TAG: ${{ inputs.IMAGE_TAG }} # this is only used for workflow_dispatch, otherwise defaults to empty
-  AWS_REGION: us-west-2
 
 jobs:
   generate-matrix:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
@@ -169,8 +164,20 @@ jobs:
   # This job determines the image tag and branch to test, and passes them to the other jobs
   # NOTE: this may be better as a separate workflow as the logic is quite complex but generalizable
   determine-test-metadata:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: 2cpu-gh-ubuntu24-x64
     needs: ["generate-matrix"]
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+      id-token: write
+    env:
+      AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      AWS_REGION: us-west-2
     outputs:
       IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
       IMAGE_TAG_FOR_COMPAT_TEST: ${{ steps.get-last-released-image-tag-for-compat-test.outputs.IMAGE_TAG }}
@@ -181,24 +188,27 @@ jobs:
 
       - name: Determine branch based on cadence
         id: determine-test-branch
+        env:
+          HEAD_OR_REF_NAME: ${{ github.head_ref || github.ref_name }}
         run: |
-          BRANCH=""
           if [[ "${{ github.event_name }}" == "push" ]]; then
-            echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
           elif [[ -n "${{ inputs.GIT_SHA }}" ]]; then
-            echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${{ inputs.GIT_SHA }}" >> "$GITHUB_OUTPUT"
           # if GIT_SHA not provided, use the branch where workflow runs on
           else
-            echo "BRANCH=${{ github.head_ref || github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${HEAD_OR_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
-          echo "Branch: $(grep BRANCH= $GITHUB_OUTPUT)"
+          echo "Branch: $(grep BRANCH= "$GITHUB_OUTPUT")"
       # Use the branch hash instead of the full branch name to stay under kubernetes namespace length limit
       - name: Hash the branch
         id: hash-branch
+        env:
+          BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
         run: |
           # Hashing the branch name
-          echo "BRANCH_HASH=$(echo -n "${{ steps.determine-test-branch.outputs.BRANCH }}" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
+          echo "BRANCH_HASH=$(echo -n "${BRANCH}" | sha256sum | cut -c1-10)" >> "$GITHUB_OUTPUT"
 
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
@@ -225,21 +235,25 @@ jobs:
           variants: ${{ needs.generate-matrix.outputs.imageVariants }}
 
       - name: Write summary
+        env:
+          BRANCH: ${{ steps.determine-test-branch.outputs.BRANCH }}
         run: |
           IMAGE_TAG=${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
-          IMAGE_TAG_FOR_COMPAT_TEST=${{ steps.get-last-released-image-tag-for-compat-test.outputs.IMAGE_TAG }}
-          TARGET_BRANCH_TO_FETCH_IMAGE_FOR_COMPAT_TEST=${{ steps.get-last-released-image-tag-for-compat-test.outputs.TARGET_BRANCH }}
-          BRANCH=${{ steps.determine-test-branch.outputs.BRANCH }}
           if [ -n "${BRANCH}" ]; then
-            echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> $GITHUB_STEP_SUMMARY
+            echo "BRANCH: [${BRANCH}](https://github.com/${{ github.repository }}/tree/${BRANCH})" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> $GITHUB_STEP_SUMMARY
-          echo "To cancel this job, do `pnpm infra ci cancel-workflow ${{ github.run_id }}` from internal-ops" >> $GITHUB_STEP_SUMMARY
+          echo "IMAGE_TAG: [${IMAGE_TAG}](https://github.com/${{ github.repository }}/commit/${IMAGE_TAG})" >> "$GITHUB_STEP_SUMMARY"
+          echo "To cancel this job, do \`pnpm infra ci cancel-workflow ${{ github.run_id }}\` from internal-ops" >> "$GITHUB_STEP_SUMMARY"
 
   run:
     name: forge-${{ matrix.TEST_NAME }}
     needs: [determine-test-metadata, generate-matrix]
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       max-parallel: ${{ inputs.JOB_PARALLELISM && fromJson(inputs.JOB_PARALLELISM) || 1 }}
@@ -257,3 +271,63 @@ jobs:
       POST_TO_SLACK: true
       SEND_RESULTS_TO_TRUNK: true
       FORGE_CONTINUOUS_TEST_MODE: true
+
+  # Credentialed registry lookup uses only the trusted base implementation.
+  # PR lookup changes are tested without credentials in forge-lookup-unit-tests.yaml.
+  pr-lookup-live:
+    name: Trusted registry lookup health
+    if: ${{ github.event_name == 'pull_request_target' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: privileged-pr-ci
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Record the exact approved source
+        env:
+          SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo "## Trusted Forge Stable registry health"
+            echo "This check runs the base implementation. PR lookup changes run in the secretless unit-test workflow."
+            echo "Repository: \`$SOURCE_REPOSITORY\`"
+            echo "PR: \`$PR_NUMBER\`"
+            echo "Exact source SHA: \`$SOURCE_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Full history: the lookup walks HEAD~i of its working directory.
+      - name: Check out the exact trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # pin@v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted-base
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python without a dependency cache
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.10"
+
+      - name: Install the lookup dependencies
+        run: python -m pip install --disable-pip-version-check click==8.3.3 psutil==5.9.8
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@00c9e93efa4e1138c9a7a5c594acd6c75a2fbf0c # pin@v0.3
+        with:
+          version: v0.15.2
+
+      - name: Authenticate to the image registries
+        uses: ./trusted-base/.github/actions/gcp-registry-auth
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+          access_token_lifetime: 900
+          create_credentials_file: false
+
+      - name: Run the trusted image lookup against trusted history
+        working-directory: trusted-base
+        run: python testsuite/find_latest_image.py --variant failpoints

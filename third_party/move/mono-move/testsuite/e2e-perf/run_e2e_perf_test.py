@@ -37,11 +37,16 @@ import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from subprocess import Popen, PIPE, STDOUT
 
 from tabulate import tabulate
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+sys.path.insert(0, str(SCRIPT_DIR.parent))
+
+from e2e_ci_report import write_ci_report_if_requested
 
 from calibrate_e2e_perf_test import (
     CALIBRATED_METRICS,
@@ -251,6 +256,7 @@ SELF_COMPARE = bool(os.environ.get("SELF_COMPARE"))
 RUN_SOURCE = os.environ.get("RUN_SOURCE", default="local")
 RUNNER_NAME = os.environ.get("RUNNER_NAME", default="none")
 REPORT_PATH = os.environ.get("REPORT_PATH")
+PR_CI_REPORT_PATH = os.environ.get("PR_CI_REPORT_PATH")
 HIDE_OUTPUT = bool(os.environ.get("HIDE_OUTPUT"))
 # How long a subprocess may print nothing before it is killed as hung. Silence,
 # not total runtime, is what separates a hang from a slow workload: the
@@ -984,11 +990,18 @@ def main():
             f.write(report)
         print(f"Report written to {REPORT_PATH}")
 
-    if failures:
-        return 1
-    if any(r.verdict == "regression" and r.workload.blocking for r in results):
-        return 1
-    return 0
+    failed = bool(failures) or any(
+        r.verdict == "regression" and r.workload.blocking for r in results
+    )
+    write_ci_report_if_requested(
+        results,
+        failures,
+        "failed" if failed else "passed",
+        report_path=PR_CI_REPORT_PATH,
+        summarize=summarize,
+        verdict_metrics=VERDICT_METRICS,
+    )
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

@@ -18,10 +18,22 @@ larger process-to-process and build-to-build variation.
 
 import argparse
 import json
+import os
 import statistics
 import sys
 import traceback
 from pathlib import Path
+
+# In the repository the report writer lives in testsuite/. The micro-bench
+# workflow stages it beside this file before it changes the checked-out ref.
+SCRIPT_DIR = Path(__file__).resolve().parent
+WRITER_DIR = SCRIPT_DIR if (SCRIPT_DIR / "pr_ci_report.py").is_file() else SCRIPT_DIR.parents[1]
+sys.path.insert(0, str(WRITER_DIR))
+
+from pr_ci_report import (
+    build_report as build_report_envelope,
+    write_report as write_pr_ci_report,
+)
 
 
 # Verdicts. REGRESSION fails the gate; INCOMPLETE, or no PR-side results for any
@@ -218,6 +230,35 @@ def emit_json_lines(results, cfg):
         print(json.dumps(line))
 
 
+def as_percent(ratio):
+    """Convert a relative change (0.05) to percent (5.0); None stays None."""
+    return None if ratio is None else ratio * 100.0
+
+
+def build_pr_ci_report(results, *, pr_number, head_sha, run_id, status):
+    metrics = []
+    for result in results:
+        metrics.append(
+            {
+                "name": result["id"],
+                "verdict": result["verdict"],
+                "mean_percent": as_percent(result["delta"]),
+                "ci_low_percent": None,
+                "ci_high_percent": None,
+                "base_median_ns": result["base_median_ns"],
+                "pr_median_ns": result["head_median_ns"],
+            }
+        )
+    return build_report_envelope(
+        producer="mono-move-micro-bench",
+        run_id=run_id,
+        pr_number=pr_number,
+        head_sha=head_sha,
+        status=status,
+        metrics=metrics,
+    )
+
+
 def cmd_ab(args, cfg):
     workload_changed = {bench_id for bench_id in args.workload_changed.split(",") if bench_id}
     results = evaluate(cfg, Path(args.results_dir), workload_changed)
@@ -232,10 +273,25 @@ def cmd_ab(args, cfg):
 
     verdicts = {result["verdict"] for result in results}
     if REGRESSION in verdicts:
-        return 1
-    if INCOMPLETE in verdicts or no_head_results(results):
-        return 2
-    return 0
+        code = 1
+    elif INCOMPLETE in verdicts or no_head_results(results):
+        code = 2
+    else:
+        code = 0
+
+    report_path = os.environ.get("PR_CI_REPORT_PATH")
+    if report_path:
+        write_pr_ci_report(
+            report_path,
+            build_pr_ci_report(
+                results,
+                pr_number=int(os.environ["PR_CI_PR_NUMBER"]),
+                head_sha=os.environ["PR_CI_HEAD_SHA"],
+                run_id=int(os.environ["PR_CI_RUN_ID"]),
+                status="failed" if code else "passed",
+            ),
+        )
+    return code
 
 
 def no_head_results(results):
