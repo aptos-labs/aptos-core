@@ -1,7 +1,7 @@
 {
   "batch-encryption": {
     "description": "aptos-batch-encryption tests with TypeScript/Node.js",
-    "workflow": ".github/workflows/lint-test.yaml",
+    "workflow": ".github/workflows/lint-test-gated.yaml",
     "job": "rust-batch-encryption-tests",
     "nightly_jobs": [
       "batch-encryption"
@@ -55,7 +55,7 @@
   },
   "smoke-tests": {
     "description": "Local swarm smoke tests in eight partitions",
-    "workflow": ".github/workflows/lint-test.yaml",
+    "workflow": ".github/workflows/lint-test-gated.yaml",
     "job": "rust-smoke-tests-workflow",
     "nightly_jobs": [
       "smoke-tests"

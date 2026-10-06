@@ -104,6 +104,9 @@ class E2eSelectionTest(unittest.TestCase):
                 self.assertIn("- permission-check", body)
                 self.assertIn(label, body)
                 if job == "forge-framework-upgrade-test":
+                    caller_gate = body.split("    uses:", 1)[0]
+                    self.assertIn("CICD:run-e2e-tests", caller_gate)
+                    self.assertIn("CICD:run-all-e2e-tests", caller_gate)
                     self.assertIn("SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') }}", body)
         self.assertTrue({"mono-move-parity", "mono-move-performance",
                          "forge-framework-upgrade", "forge-consensus-only-performance",
@@ -132,7 +135,7 @@ class E2eSelectionTest(unittest.TestCase):
     def test_image_flags_match_selected_consumers(self):
         root = Path(__file__).resolve().parents[3]
         consumers = {}
-        for filename in ("docker-build-test.yaml", "lint-test.yaml", "lean.yaml"):
+        for filename in ("docker-build-test.yaml", "lint-test-gated.yaml", "lean.yaml"):
             workflow = (root / ".github/workflows" / filename).read_text()
             for body in self.workflow_jobs(workflow).values():
                 for name in REGISTRY:
@@ -247,12 +250,13 @@ class E2eSelectionTest(unittest.TestCase):
 
     def test_lint_suites_follow_selection_and_fail_on_failed_prerequisites(self):
         root = Path(__file__).resolve().parents[3]
-        jobs = self.workflow_jobs((root / ".github/workflows/lint-test.yaml").read_text())
+        jobs = self.workflow_jobs((root / ".github/workflows/lint-test-gated.yaml").read_text())
         self.assertIn("e2e-test-selection.yaml", jobs["e2e-test-determinator"])
         self.assertIn("'smoke-tests')", jobs["rust-smoke-tests-workflow"])
         shim = jobs["rust-smoke-tests"]
         self.assertLessEqual(
-            {"file_change_determinator", "e2e-test-determinator"}, self.job_needs(shim)
+            {"gated_file_change_determinator", "e2e-test-determinator"},
+            self.job_needs(shim),
         )
         self.assertIn('[ "$SELECTION_RESULT" != "success" ]', shim)
         batch = jobs["rust-batch-encryption-tests"]
@@ -268,6 +272,21 @@ class E2eSelectionTest(unittest.TestCase):
         self.assertIn("CICD:run-all-e2e-tests", gates[0])
         self.assertEqual(gates[0], gates[1])
         self.assertEqual(gates[0], gates[2])
+
+    def test_lint_gate_events_do_not_replace_code_change_checks(self):
+        root = Path(__file__).resolve().parents[3] / ".github/workflows"
+        static = (root / "lint-test.yaml").read_text()
+        gated = (root / "lint-test-gated.yaml").read_text()
+        self.assertIn("types: [opened, synchronize, reopened]", static)
+        self.assertNotIn("auto_merge_enabled", static)
+        self.assertIn(
+            "types: [labeled, opened, synchronize, reopened, auto_merge_enabled]",
+            gated,
+        )
+        self.assertNotIn("rust-targeted-unit-tests", gated)
+        self.assertNotIn("general-lints", gated)
+        self.assertIn("gated_file_change_determinator", gated)
+        self.assertNotEqual(static.splitlines()[0], gated.splitlines()[0])
 
     def test_full_run_label_reaches_compat_prerequisite(self):
         root = Path(__file__).resolve().parents[3]
