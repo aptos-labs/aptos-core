@@ -44,6 +44,8 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
+use regex::Regex;
+use std::sync::LazyLock;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
@@ -410,18 +412,12 @@ struct SpecRow {
     rationale: String,
 }
 
-/// Splits a markdown table row into trimmed cells.
-fn cells(line: &str) -> Vec<String> {
-    let inner = line.trim().trim_start_matches('|').trim_end_matches('|');
-    inner.split('|').map(|c| c.trim().to_string()).collect()
-}
-
-fn is_check_id(id: &str) -> bool {
-    let mut chars = id.chars();
-    matches!(chars.next(), Some(c) if c.is_ascii_uppercase())
-        && !chars.as_str().is_empty()
-        && chars.all(|c| c.is_ascii_digit())
-}
+static GROUP_HEADING: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^## (.+)$").unwrap());
+static TABLE_ROW: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\|(.*)\|$").unwrap());
+static SEPARATOR_ROW: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\|(\s*:?-+:?\s*\|)+$").unwrap());
+static CELL_SPLIT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*\|\s*").unwrap());
+static CHECK_ID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Z]\d+$").unwrap());
 
 /// Parses every table whose header starts with an `Id` column.
 fn parse_tables(lines: &[String]) -> Result<Vec<SpecRow>, String> {
@@ -430,44 +426,47 @@ fn parse_tables(lines: &[String]) -> Result<Vec<SpecRow>, String> {
     let mut header: Option<Vec<String>> = None;
     for raw in lines {
         let line = raw.trim();
-        if let Some(h) = line.strip_prefix("## ") {
-            group = h.trim().to_string();
+        if let Some(h) = GROUP_HEADING.captures(line) {
+            group = h[1].trim().to_string();
             header = None;
             continue;
         }
-        if !line.starts_with('|') {
+        let Some(row) = TABLE_ROW.captures(line) else {
             header = None;
             continue;
+        };
+        if SEPARATOR_ROW.is_match(line) {
+            continue;
         }
-        let c = cells(line);
-        if c.iter().all(|x| x.chars().all(|ch| ch == '-')) {
-            continue; // separator row
-        }
+        let cells: Vec<String> = CELL_SPLIT
+            .split(row[1].trim())
+            .map(str::to_string)
+            .collect();
         match &header {
             None => {
-                if c.first().map(String::as_str) == Some("Id") {
+                if cells.first().map(String::as_str) == Some("Id") {
                     for required in ["Property", "Condition"] {
-                        if !c.iter().any(|x| x == required) {
+                        if !cells.iter().any(|c| c == required) {
                             return Err(format!(
                                 "table in group `{group}` lacks a `{required}` column"
                             ));
                         }
                     }
-                    header = Some(c);
+                    header = Some(cells);
                 }
             },
             Some(h) => {
-                if c.len() != h.len() {
+                if cells.len() != h.len() {
                     return Err(format!(
                         "row `{}` has {} cells but its table has {} columns",
-                        c.first().cloned().unwrap_or_default(),
-                        c.len(),
+                        cells[0],
+                        cells.len(),
                         h.len()
                     ));
                 }
-                let col = |name: &str| h.iter().position(|x| x == name).map(|i| c[i].clone());
-                let id = c[0].clone();
-                if !is_check_id(&id) {
+                let col = |name: &str| h.iter().position(|x| x == name).map(|i| cells[i].clone());
+                let id = cells[0].clone();
+                if !CHECK_ID.is_match(&id) {
                     return Err(format!(
                         "`{id}` is not a check id (an uppercase letter followed by digits)"
                     ));
