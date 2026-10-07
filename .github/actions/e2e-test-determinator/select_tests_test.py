@@ -285,8 +285,24 @@ class E2eSelectionTest(unittest.TestCase):
         )
         self.assertNotIn("rust-targeted-unit-tests", gated)
         self.assertNotIn("general-lints", gated)
+        # Release PRs run all unit tests on code changes only.
+        self.assertIn("'-release-'", self.workflow_job(static, "rust-unit-tests"))
+        self.assertNotIn("  rust-unit-tests:", gated)
         self.assertIn("gated_file_change_determinator", gated)
         self.assertNotEqual(static.splitlines()[0], gated.splitlines()[0])
+
+    def test_docker_gate_events_share_concurrency_with_code_changes(self):
+        root = Path(__file__).resolve().parents[3] / ".github/workflows"
+        workflow = (root / "docker-build-test.yaml").read_text()
+        concurrency = workflow.split("\nconcurrency:\n", 1)[1].split("\nenv:\n", 1)[0]
+        group = re.search(r"^  group: (.*)$", concurrency, re.M).group(1)
+        # All PR events share caches and Forge namespaces. Neither the action
+        # nor the head SHA may partition the concurrency group for those events.
+        self.assertEqual(
+            group,
+            "${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}",
+        )
+        self.assertIn("cancel-in-progress: true", concurrency)
 
     def test_full_run_label_reaches_compat_prerequisite(self):
         root = Path(__file__).resolve().parents[3]

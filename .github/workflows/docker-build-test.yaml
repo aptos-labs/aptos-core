@@ -47,8 +47,8 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
 # cancel redundant builds
 concurrency:
   # for push and workflow_dispatch events we use `github.sha` in the concurrency group and don't really cancel each other out/limit concurrency
-  # Keep gate events from cancelling a code-change run for the same PR.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}-${{ (github.event.action == 'labeled' || github.event.action == 'auto_merge_enabled') && 'gate' || 'code' }}
+  # PR events share Docker caches and Forge namespaces, so newer runs must cancel older runs regardless of the triggering action.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:

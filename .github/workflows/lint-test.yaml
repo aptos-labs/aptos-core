@@ -130,3 +130,24 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
+
+  # Run all rust unit tests. This is not a PR required job.
+  rust-unit-tests:
+    if: | # Only run when an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.base.ref, '-release-')
+      )
+    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      # Install Move Prover tools
+      - name: Run dev_setup.sh
+        run: |
+          scripts/dev_setup.sh -b -y
+      - name: Run rust unit tests
+        uses: ./.github/actions/rust-unit-tests
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
