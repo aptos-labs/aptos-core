@@ -31,12 +31,9 @@ Interpret the result per function:
 - **Transparent callee without a complete opaque contract:** a callee without
   any specification is named through `result_of`/`ensures_of`/`aborts_of`,
   which its body interprets when it has no loops and no global memory access.
-  Otherwise WP cannot complete the caller. If the named callee is in the
-  editable scope (for example, in the current module), complete its opaque
-  contract (or resolve the diagnostics WP reported for it) first, then rerun
-  WP on the caller. If it is outside the editable scope, report the dependency as a
-  corpus/package blocker: its owner must provide a complete verified opaque
-  contract. Never use this case to justify `aborts_if_is_partial` on the caller.
+  Otherwise WP cannot complete the caller: write the caller's contract directly
+  from both bodies. Never use this case to justify `aborts_if_is_partial` on
+  the caller.
 - **Write through a reference a callee returns:** when the callee selects the
   vector element, map entry, or one of several places the reference points
   to, no contract states that choice, so WP infers nothing for the caller.

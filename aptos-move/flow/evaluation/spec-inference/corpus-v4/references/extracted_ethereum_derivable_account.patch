@@ -1,12 +1,18 @@
 --- a/sources/framework/extracted_ethereum_derivable_account.move
 +++ b/sources/framework/extracted_ethereum_derivable_account.move
-@@ -26,0 +27,4 @@
+@@ -14,0 +15,6 @@ module aptos_framework::extracted_ethereum_derivable_account {
++    spec is_alpha {
++        pragma opaque;
++        aborts_if false;
++        ensures result == ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a));
++    }
++
+@@ -26,0 +33,4 @@ module aptos_framework::extracted_ethereum_derivable_account {
 +        } spec {
 +            invariant len == std::vector::length(scheme);
 +            invariant 1 <= i && i <= len;
 +            invariant forall k in 1..i: allowed(scheme[k]);
-@@ -27,0 +32,16 @@
-+    }
+@@ -28,0 +39,16 @@ module aptos_framework::extracted_ethereum_derivable_account {
 +
 +    spec module {
 +        /// The characters allowed after the first: letters, digits, `+`, `-`, `.`.
@@ -22,3 +28,4 @@
 +        // or one of three punctuation marks.
 +        aborts_if !is_alpha(scheme[0]);
 +        aborts_if exists k in 1..len(scheme): !allowed(scheme[k]);
++    }

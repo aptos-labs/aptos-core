@@ -3,7 +3,7 @@
     {
       "anchor": {
         "length": 38,
-        "offset": 1215,
+        "offset": 1459,
         "sha256": "8190f11dd1cb3a1e0c90a9bf1dab7789b538774650b500a4a5e2ec7893a7191a"
       },
       "edit": {
@@ -35,7 +35,7 @@
     {
       "anchor": {
         "length": 33,
-        "offset": 1035,
+        "offset": 1279,
         "sha256": "0320a2b1567cc87ef6afbb77a5878179a00a8e7f607541d781e3491101297113"
       },
       "edit": {
@@ -67,7 +67,7 @@
     {
       "anchor": {
         "length": 44,
-        "offset": 953,
+        "offset": 1197,
         "sha256": "e37d97e3c31139c778788fff506749bb672ee55a8555e22a742c011cae263e52"
       },
       "edit": {
@@ -97,6 +97,6 @@
       }
     }
   ],
-  "reference_sha256": "234968f457e3570fc018729fb39f27771608ff1f71e8f7ab9393f3787cf11ba0",
+  "reference_sha256": "7f2a21dde79157dd2cb82ae185588384fe71ab20775e9a1a3ff8d70e822e50c9",
   "task_id": "PT-taker-034"
 }

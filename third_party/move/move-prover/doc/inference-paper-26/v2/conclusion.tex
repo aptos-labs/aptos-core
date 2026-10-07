@@ -4,48 +4,36 @@
 
 \SubSection{Interpreting the Results}
 
-The evaluation has three results. An agent with no mechanical help produced a complete
-specification in 93\% of its cells under both models. With the \WP tool the rate is
-97\%, and the remaining failures occur on the one target whose contract has to pin down a
-data structure. And the effect on cost depends on the model, from parity under Sol~5.6
-to 0.8$\times$ under Terra~5.6.
+The evaluation has three results. An agent without mechanical help completes 99\% of its
+cells under the frontier model and 93\% under the mid-tier model. \WP does not change
+completeness, but it lowers the cost wherever it derives the contract by itself. And the
+mid-tier model nearly reaches the results of the frontier model, at a cost that follows
+its lower price.
 
-\Paragraph{Agent-only does surprisingly well}
-Given no \WP tool at all, the direct tactic found the same recursive spec helpers,
-lemmas, and loop invariants as the hybrids, under both models. Its method was
-consistent: it wrote its own mutation probes and repaired the contract from the
-counterexamples. It failed in two ways. On the control that
-never aborts it stated an abort condition anyway, in six cells under Sol~5.6 and
-Terra~5.6; \WP derives the absence of an abort exactly, and no hybrid cell made that
-mistake. On the partition it pinned a scalar --- where the partition point lands --- and
-left the vector's contents unconstrained, which a mutant that permutes them exposes; the
-hybrids, which start from the exact postcondition \WP derives, fail there at about the
-same rate, because the permutation argument is beyond \WP as well.
-Two caveats apply. The targets are individual functions of a few dozen lines, and
-while several need invention, none requires reasoning across a module or a call
-graph of any depth. And the hybrids' cost is highest on exactly the invention-heavy
-targets, where the mechanically derived contract is large and the model re-reads it on
-every turn. We expect both effects to grow with the size of the target.
+\Paragraph{Where \WP pays off}
+On targets without loops, \WP needs no help: it derives the complete contract, and the
+agent only checks it, at 36--60\% of the cost of writing the contract directly. Half of
+this corpus is of this kind, including four of the five compositions over callee
+contracts and eight of the nine targets with global state. On loop targets the agent still has to find the
+invariant, and \WP's quantified output adds context that is re-read on every turn, so
+the hybrids cost slightly more there. With \WP, the first candidate check is accepted more
+often, most for the mid-tier model (from 37\% to 63--65\% of cells).
 
-\Paragraph{Cheaper models with \WP}
-Most of what \WP supplies is a diagnosis --- \emph{this loop has no invariant, and here
-are its first iterations} --- plus an exact contract that costs context to carry. A model
-that finds the invariant unaided pays for the context and gains only completeness: under
-Sol~5.6 the hybrids cost 1.03--1.09$\times$ the agent alone, with the intervals reaching
-one. A model that would otherwise search saves more than the context costs: under
-Terra~5.6 the hybrids cost 0.80$\times$ and 0.88$\times$, both intervals below one,
-finish faster, and complete as many cells as Sol~5.6 at 55\% of its cost, whereas without
-the tool Terra spends 40\% more tokens than Sol for the same result. On this corpus, \WP
-thus makes the frontier model unnecessary: the exact contract, the named loop, and the
-loop-head facts are what the smaller model cannot reliably reconstruct on its own, and
-\WP supplies them cheaply.
-We expect this to extend to models that are cheaper still. The one cost \WP adds is
-context: its output is re-read on every turn, and at API prices this accounts for the
-hybrids' additional cost under Sol~5.6. For a local model that cost is latency rather
-than money, and a model specialized to this workflow, trained to read \WP output
-directly, should need fewer rounds with the tool. The completeness effect does not
-depend on the model: the failures \WP removes --- the vacuous postcondition after a
-havocked loop, the invented abort condition --- occur under both models.
+\Paragraph{Where it does not}
+The partition needs a permutation argument that \WP cannot supply, and every tactic fails
+on it, the mid-tier model more often. The two scans that leave their loop early fail only
+in the hybrid tactics: the agent accepted the contract that \WP derived from its prefix
+invariants once it verified, and a mutant on the exit path survived. A derived contract
+that verifies can thus still be incomplete, and the tool's diagnostics, which report a
+missing invariant, do not detect this case.
+
+\Paragraph{Mid-tier and frontier models}
+Both models spend about the same number of tokens per cell, so the cost of the mid-tier
+model follows its price. Apart from the permutation target, it handles the loop
+invariants, compositions, and global state of the corpus as well as the frontier model.
+We expect the cost advantage of \WP to extend to cheaper models: for a local model, the
+context \WP adds costs latency rather than money, and a model trained to read \WP output
+should need fewer rounds with the tool.
 
 \Paragraph{Carrying over to prophecies}
 The reverse mapping of Sec.~\ref{sec:reverse} relies on the elimination being
@@ -65,12 +53,11 @@ not know yet whether that always yields a readable contract.
 
 \Paragraph{Open questions}
 The evaluation leaves the questions of scale open. Its targets are functions, not
-modules; its corpus is one codebase in one domain; its two models are of one family;
-and its cost measure is dollars under their price schedules. We plan to apply inference
-retrospectively to \Anon{the Aptos Framework~\cite{AptosFrameworkBook}}{a public
-blockchain framework}, which already carries hand-written specifications, and to
-compare the inferred contracts against them --- a comparison this round cannot make,
-since its targets deliberately have no specification of their own.
+modules; its corpus comes from one codebase; its two models are of one family; and its
+cost measure is dollars under their price schedules. We plan to apply inference to the
+parts of the Aptos framework~\cite{AptosFrameworkBook} that already carry hand-written
+specifications and to compare the inferred contracts with them --- a comparison this
+corpus cannot make, since its targets were selected for having no specification.
 
 \SubSection{Related Work}
 
@@ -88,7 +75,7 @@ Aeneas~\cite{Aeneas} compiles Rust to a pure functional model in a target prover
 Neither infers specifications --- in Aeneas the user writes them in the target prover, against the translated model --- and both consume the reference-free form only in the forward direction.
 Our use of the transformation is the opposite: \WP runs on the reference-free form, and the conditions it derives are carried \emph{back} through the elimination.
 To our knowledge this inversion has not been described before.
-Our backend IVL, Boogie~\cite{boogie,boogieIVL}, also performs \WP on the procedural code passed in~\cite{BL05} and passes the result on to the SMT solver; the difference is that Boogie's \WP is not intended for external consumption, whereas ours has to be read, which is reflected in the reverse mapping and in the effort spent on simplification.
+Boogie~\cite{boogie,boogieIVL}, the intermediate verification language that \MVP translates to, also computes weakest preconditions of the procedures it is given~\cite{BL05} and passes them to the SMT solver; the difference is that Boogie's \WP is not intended for external consumption, whereas ours has to be read, which is reflected in the reverse mapping and in the effort spent on simplification.
 
 Two aspects thus distinguish our setup from the work above.
 First, to our knowledge, no prior LLM-based spec-inference system uses a sound mechanical baseline alongside the LLM.
@@ -98,10 +85,10 @@ Second, the workflow is delivered as a plugin to a general-purpose, interactive 
 \SubSection{Conclusion}
 \label{sec:conclusion}
 
-We have presented a specification inference for the Move Prover that runs \WP on reference-eliminated bytecode, where backward propagation is substitution and the derived contracts can be mapped back to the references of the source, and we have combined it with a coding agent that supplies what \WP cannot: loop invariants, simplification, and proof hints. The prover checks both.
+We have presented a specification inference approach for the Move Prover that runs \WP on reference-eliminated bytecode, where backward propagation is substitution and the derived contracts can be mapped back to the references of the source, and we have combined it with a coding agent that supplies what \WP cannot: loop invariants, simplification, and proof hints. The prover checks both.
 Reference elimination was introduced for verification; this work shows that it serves inference as well, and the approach should carry over to verifiers for Rust-like languages that eliminate references along paths.
-A controlled comparison on 20 targets drawn from a private perpetual-trading codebase --- three tactics, four replicates each, two models --- found that a pure agent produces a complete specification in 93\% of its cells, even where lemmas and helper functions have to be invented; that with \WP more cells are complete under both models, the failures that remain confined to the one target whose contract has to pin down a data structure; and that the hybrids cost about the same as the agent alone under the frontier model and 20\% less under the mid-tier model, which then matches the frontier model's completeness at 55\% of its cost.
-With \WP, a cheaper model suffices, and we expect local and specialized models, for which the additional context costs least, to benefit further.
+A controlled comparison on 26 targets, 24 of them from public code of the Aptos framework without specifications --- three tactics, four replicates each, two models --- found that a pure agent produces a complete specification in 93--99\% of its cells; that \WP leaves completeness unchanged but lowers the cost by 11--21\%, all of it on targets without loops, where the hybrids cost 36--60\% of the agent alone; and that the mid-tier model costs 53--59\% of the frontier model and falls behind it mainly on one target.
+We expect local and specialized models, for which the additional context costs least, to benefit further from \WP.
 
 %%% Local Variables:
 %%% mode: latex

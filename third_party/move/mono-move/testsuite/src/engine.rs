@@ -221,8 +221,6 @@ pub fn with_mono_function<'guard, 'ctx, R>(
         // recover the typed error.
         Err(err) => return Err(Error::new(err).context("failed to load function")),
     };
-    // TODO(correctness): remove once the loader verifies lowered functions itself.
-    mono_move_runtime::assert_verified(function, guard);
 
     let mut runner = MonoRunner {
         interp,

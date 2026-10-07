@@ -77,7 +77,22 @@ impl<Slot: Clone + Send + Sync + 'static> ShardedJmtState<Slot> {
         self.shards[0].is_descendant_of(&rhs.shards[0])
     }
 
-    pub fn extend(&self, new_version: Version, updates: Vec<(HashValue, Slot)>) -> Self {
+    /// Push one layer per shard atop `self`, built over `floor` — the
+    /// persisted state. A layer links to nothing at or below its floor, so
+    /// a delta can only be taken from a snapshot at or above it; the
+    /// persisted state is always at or below the last snapshot, which is
+    /// what keeps `make_delta(last_snapshot)` viewable however many layers
+    /// the chain has grown since.
+    pub fn extend(
+        &self,
+        floor: &Self,
+        new_version: Version,
+        updates: Vec<(HashValue, Slot)>,
+    ) -> Self {
+        assert!(
+            self.is_descendant_of(floor),
+            "extending a JMT state over a floor it does not descend from"
+        );
         let mut per_shard: [Vec<(HashValue, Slot)>; NUM_STATE_SHARDS] = arr![Vec::new(); 16];
         for (key_hash, slot) in updates {
             per_shard[usize::from(key_hash.nibble(0))].push((key_hash, slot));
@@ -86,9 +101,9 @@ impl<Slot: Clone + Send + Sync + 'static> ShardedJmtState<Slot> {
             .shards
             .iter()
             .enumerate()
-            .map(|(shard_id, base_layer)| {
-                let view = base_layer.view_layers_after(base_layer);
-                view.new_layer(&per_shard[shard_id])
+            .map(|(shard_id, top)| {
+                top.view_layers_after(&floor.shards[shard_id])
+                    .new_layer(&per_shard[shard_id])
             })
             .collect();
         let new_shards: [MapLayer<HashValue, Slot>; NUM_STATE_SHARDS] = new_shards
@@ -141,11 +156,13 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
         self.summary().root_hash()
     }
 
+    /// Extend over `base`, the persisted state: the SMT freezes against its
+    /// summary and the JMT layers are built over its state.
     pub fn extend(
         &self,
         new_version: Version,
         updates: Vec<(HashValue, Slot)>,
-        base_summary: &StateSummary,
+        base: &Self,
         proof_reader: &impl ProofRead,
     ) -> Result<Self> {
         let smt_updates: Vec<(HashValue, Option<HashValue>)> =
@@ -155,7 +172,7 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
         } else {
             self.summary()
                 .global_state_summary
-                .freeze(&base_summary.global_state_summary)
+                .freeze(&base.summary().global_state_summary)
                 .batch_update(smt_updates.iter(), proof_reader)
                 .map_err(|e| {
                     AptosDbError::Other(format!("scratchpad SMT batch_update failed: {e:?}"))
@@ -163,7 +180,7 @@ impl<Slot: Clone + Send + Sync + LeafEntry + 'static> StateAndSummary<ShardedJmt
                 .unfreeze()
         };
         let new_summary = StateSummary::new_global_only(new_version, new_global);
-        let new_state = self.state().extend(new_version, updates);
+        let new_state = self.state().extend(base.state(), new_version, updates);
         Ok(Self::new(new_state, new_summary))
     }
 
@@ -208,4 +225,46 @@ where
         shards[usize::from(key_hash.nibble(0))].push((key_hash, leaf));
     }
     shards
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn key(i: u8) -> HashValue {
+        HashValue::new([i; 32])
+    }
+
+    fn slot(i: u8) -> PositionSlot {
+        PositionSlot {
+            state_key: StateKey::raw(&[i]),
+            value_hash: Some(key(i)),
+            value: None,
+        }
+    }
+
+    fn keys(delta: &[(HashValue, PositionSlot)]) -> Vec<HashValue> {
+        let mut keys: Vec<_> = delta.iter().map(|(k, _)| *k).collect();
+        keys.sort();
+        keys
+    }
+
+    /// Layers are built over the persisted floor, so a delta can be taken
+    /// from any snapshot at or above it — not only from the parent, which
+    /// is all a layer built over itself allowed.
+    #[test]
+    fn delta_from_a_snapshot_several_layers_back() {
+        let persisted = ShardedJmtState::<PositionSlot>::new_empty("test");
+        let s1 = persisted.extend(&persisted, 0, vec![(key(1), slot(1))]);
+        let s2 = s1.extend(&persisted, 1, vec![(key(2), slot(2))]);
+        let s3 = s2.extend(&persisted, 2, vec![(key(3), slot(3))]);
+
+        assert_eq!(keys(&s3.make_delta(&persisted)), vec![
+            key(1),
+            key(2),
+            key(3)
+        ]);
+        assert_eq!(keys(&s3.make_delta(&s1)), vec![key(2), key(3)]);
+        assert!(s3.make_delta(&s3).is_empty());
+    }
 }

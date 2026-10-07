@@ -12,7 +12,6 @@ mod native_context;
 mod types;
 mod value_cmp;
 mod value_conv;
-mod verifier;
 
 pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
@@ -24,11 +23,13 @@ pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
     write_u64, MemoryRegion,
 };
-pub use mono_move_core::{ObjectDescriptor, ObjectDescriptorTable};
+pub use mono_move_core::{
+    assert_verified, verify_function, verify_program, ObjectDescriptor, ObjectDescriptorTable,
+    VerificationError,
+};
 pub use native_context::{
     ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,
     ProductionNativeRegistry,
 };
 pub use types::{DEFAULT_HEAP_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use value_conv::bcs::{deserialize_into, serialize};
-pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};

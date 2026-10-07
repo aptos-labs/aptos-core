@@ -62,12 +62,6 @@ pub struct GlobalOpts {
     /// MOVE_FLOW_ABORTS_IF_IS_STRICT.
     #[arg(long, global = true)]
     pub aborts_if_is_strict: bool,
-
-    /// When WP runs on a single function, also infer that function's callees
-    /// which have no specification. The CLI overrides
-    /// MOVE_FLOW_INFER_UNSPECIFIED_HELPERS.
-    #[arg(long, global = true)]
-    pub infer_unspecified_helpers: bool,
 }
 
 impl GlobalOpts {
@@ -77,7 +71,6 @@ impl GlobalOpts {
             self.evaluation_mode,
             self.feedback_level,
             self.aborts_if_is_strict,
-            self.infer_unspecified_helpers,
         )
     }
 }

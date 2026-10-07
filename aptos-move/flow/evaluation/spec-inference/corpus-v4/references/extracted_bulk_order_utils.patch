@@ -1,26 +1,56 @@
+--- a/sources/trading/extracted_bulk_order_types.move
++++ b/sources/trading/extracted_bulk_order_types.move
+@@ -38,0 +39,14 @@ module aptos_trading::extracted_bulk_order_types {
++
++    spec new_bulk_order_request {
++        pragma opaque;
++        aborts_if false;
++        ensures result == BulkOrderRequest::V1 {
++            account,
++            order_sequence_number: sequence_number,
++            bid_prices,
++            bid_sizes,
++            ask_prices,
++            ask_sizes,
++            metadata
++        };
++    }
 --- a/sources/trading/extracted_bulk_order_utils.move
 +++ b/sources/trading/extracted_bulk_order_utils.move
-@@ -99,0 +100,3 @@
+@@ -28,0 +29,6 @@ module aptos_experimental::extracted_bulk_order_utils {
++    spec get_price_from_match_details {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.price;
++    }
++
+@@ -32,0 +39,6 @@ module aptos_experimental::extracted_bulk_order_utils {
++    spec get_remaining_size_from_match_details {
++        pragma opaque;
++        aborts_if false;
++        ensures result == self.remaining_size;
++    }
++
+@@ -99,0 +112,3 @@ module aptos_experimental::extracted_bulk_order_utils {
 +        } spec {
 +            invariant i <= len(sizes);
 +            invariant forall j in 0..i: sizes[j] != 0;
-@@ -121,0 +125,6 @@
+@@ -121,0 +137,6 @@ module aptos_experimental::extracted_bulk_order_utils {
 +        } spec {
 +            invariant len(prices) > 0;
 +            invariant i <= len(prices) - 1;
 +            invariant forall j: u64 where j < i:
 +                if (is_descending) { prices[j] > prices[j + 1] }
 +                else { prices[j] < prices[j + 1] };
-@@ -139,0 +149,3 @@
+@@ -139,0 +161,3 @@ module aptos_experimental::extracted_bulk_order_utils {
 +            } spec {
 +                invariant i <= len(prices);
 +                invariant forall j: u64 where j < i: !stops_at(prices, best_price, is_bid, j);
-@@ -189,0 +202,3 @@
+@@ -189,0 +214,3 @@ module aptos_experimental::extracted_bulk_order_utils {
 +        } spec {
 +            invariant i <= len(prices);
 +            invariant forall j: num where 0 <= j && j < i: prices[j] != price;
-@@ -191,0 +207,157 @@
-+    }
+@@ -192,0 +220,157 @@ module aptos_experimental::extracted_bulk_order_utils {
 +
 +    spec module {
 +        /// The strict adjacent ordering the scan checks. A pair is compared in
@@ -177,3 +207,4 @@
 +                && (forall j: num where first_index(old(prices), price) <= j && j < len(sizes):
 +                        sizes[j] == old(sizes)[j + 1])
 +        );
++    }

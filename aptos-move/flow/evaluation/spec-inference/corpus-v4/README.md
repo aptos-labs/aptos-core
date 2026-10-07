@@ -3,85 +3,118 @@
 A public benchmark. Every target is either extracted from public `aptos-core`
 code at a pinned commit or authored for the corpus, so the package, the
 reference specifications, the mutants and every round built on them can be
-published as an artifact. V3.2 measured the same kind of task on private Etna
-code that cannot be redistributed.
+published as an artifact.
 
 [`REPRODUCE.md`](REPRODUCE.md) explains how to verify the corpus and a
 published round, and how to rerun the experiment.
 
-The selection criterion is the one V3.2 already stated: **specification
-absence, not code privacy**. A model may know public code, but it cannot recall
-a specification nobody wrote. No target has a specification upstream; the
-trading code in `aptos-experimental` and `aptos-trading` carries exactly one
-spec block, and that is not on a target.
+The selection criterion is **specification absence, not code privacy**. A model
+may know public code, but it cannot recall a specification nobody wrote. No
+target has a specification upstream; the trading code in `aptos-experimental`
+and `aptos-trading` carries exactly one spec block, and that is not on a target.
+
+## Corpus at a glance
+
+Twenty-six tasks from twelve modules. Each asks for the complete contract of
+one target function: every task requires both a normal-result and an abort
+condition.
+
+| area | source | modules | tasks | with loops | without loops |
+| --- | --- | --- | ---: | ---: | ---: |
+| Trading | `aptos-experimental` | `bulk_order_utils`, `price_time_index`, `dead_mans_switch_tracker` | 10 | 4 | 6 |
+| Accounts and authentication | `aptos-framework` | `multisig_account`, `ethereum_derivable_account`, `sui_derivable_account`, `jwks` | 6 | 4 | 2 |
+| Rate and stake limits | `aptos-framework` | `rate_limiter`, `transaction_limits` | 7 | 2 | 5 |
+| Standard library | `move-stdlib` | `vector` | 1 | 1 | 0 |
+| Authored | this corpus | `selection_machine`, `lomuto_partition` | 2 | 2 | 0 |
+| **Total** | | 12 modules | **26** | **13** | **13** |
+
+This document names a task by its target function, which is unique in the
+corpus. Data files and run directories key a task by an internal id; the
+[Targets](#targets) table gives both.
+
+A loop counts when the agent has to find its invariant.
+`find_min_stake_required` searches with the inline `vector::find`, whose loop
+carries its own invariants, and is counted without a loop. The program features
+the targets exercise, counted per task (a task can have several):
+
+| feature | tasks |
+| --- | ---: |
+| loop that needs an invariant | 13 |
+| calls a helper whose contract the task tree provides | 10 |
+| reads global state (4 of them also write it) | 9 |
+| quantified contract | 7 |
+| composition: the contract is built from callee contracts | 5 |
+| table or intrinsic map | 4 |
+| mutable reference or in-place update | 4 |
+| function values or an inline higher-order function | 2 |
+| permutation proved with lemmas | 1 |
+
+Twenty-three targets are rated hard to guess and three serve as guessable
+controls (`validate_not_zero_sizes`, `is_taker_order`,
+`available_transaction_queue_capacity`).
+
+`partition` is the one target whose complete contract needs lemmas: that the
+partitioned vector is a permutation of the input is stated through element
+counts, and the reference proves it with `count_swap`, a lemma that a swap
+preserves every count, built on a second lemma, `count_agree`. No other
+reference uses a lemma.
 
 ## Targets
 
-Twenty-six tasks. Five are carried over unchanged from V3.2 (`TR-order-010`,
-`TR-discard-011`, `TR-cancel-026` from the public `bulk_order_utils`, and the
-two authored targets `SM-select-022`, `QP-part-025`), keeping their ids. New
-tasks continue V3.2's numbering from 028, so an id never names two targets.
+Twenty-six tasks. Each target links to its source: the upstream file in this
+repository, where the function is unchanged since the pinned commit, or, for the
+two authored targets, `build.py`, which embeds them.
 
-| task | target | probes | guess |
-|---|---|---|---|
-| `TR-order-010` | `extracted_bulk_order_utils::validate_price_ordering` | adjacent-pair scan with an early return, strict both ways | hard |
-| `TR-discard-011` | `extracted_bulk_order_utils::discard_price_crossing_levels` | least non-crossing index -- a prefix fact, not a fold | hard |
-| `TR-cancel-026` | `extracted_bulk_order_utils::cancel_at_price_level` | removal from two coupled vectors; zero for absent and for an empty level | hard |
-| `TR-sanitize-028` | `extracted_bulk_order_utils::new_bulk_order_request_with_sanitization` | **composition** -- eleven assertions, four through helpers that need exact contracts | hard |
-| `TR-match-029` | `extracted_bulk_order_utils::match_order_and_get_next_from_bulk_order` | tuple of options; three aborts the source never states | hard |
-| `TR-reinsert-030` | `extracted_bulk_order_utils::reinsert_order_into_bulk_order` | merge or prepend; unchecked addition, unguarded read | hard |
-| `TR-nonzero-031` | `extracted_bulk_order_utils::validate_not_zero_sizes` | linear scan, one quantifier | guessable |
-| `PT-taker-034` | `extracted_price_time_index::is_taker_order` | option-guarded inclusive comparisons | guessable |
-| `DM-keepalive-035` | `extracted_dead_mans_switch_tracker::keep_alive` | map update reading the global clock; strict expiry | hard |
-| `DM-valid-036` | `extracted_dead_mans_switch_tracker::is_order_valid` | strict session start, inclusive expiry, defaulted time | hard |
-| `RL-refill-037` | `extracted_rate_limiter::refill` | token bucket; five unstated aborts, remainder carry | hard |
-| `TL-tiers-038` | `extracted_transaction_limits::validate_tiers` | pairwise order, inclusive in one field and strict in the other | hard |
-| `TL-build-039` | `extracted_transaction_limits::new_tiers` | **composition** of a per-element range check and the pairwise order | hard |
-| `TL-find-040` | `extracted_transaction_limits::find_min_stake_required` | search through the inline `vector::find` | hard |
-| `EA-scheme-041` | `extracted_ethereum_derivable_account::validate_scheme` | a contract that is only an abort condition over a character class | hard |
-| `VR-range-042` | `extracted_vector_range::range_with_step` | overflow of an increment whose value is never used | hard |
-| `RL-request-043` | `extracted_rate_limiter::request` | **composition** over `refill` | hard |
-| `TL-enough-044` | `extracted_transaction_limits::validate_enough_stake` | **composition** over a global configuration, only aborts | hard |
-| `SU-split-045` | `extracted_sui_derivable_account::split_signature_bytes` | two loops sharing one index | hard |
-| `MS-pending-046` | `extracted_multisig_account::get_pending_transactions` | loop over a table range; overflow and missing-entry aborts | hard |
-| `MS-timelock-047` | `extracted_multisig_account::can_execute_with_timelock` | two resources, a table and the clock; aborts the threshold does not avoid | hard |
-| `MS-capacity-048` | `extracted_multisig_account::available_transaction_queue_capacity` | clamp over a subtraction that can underflow | guessable |
-| `JW-upsert-049` | `extracted_jwks::upsert_provider_jwks` | stop-and-insert scan under an uninterpreted comparator | hard |
-| `TL-update-050` | `extracted_transaction_limits::update_config` | **composition** with a signer check and a create-or-replace global write | hard |
-| `SM-select-022` | `selection_machine::select` | **function values** | hard |
-| `QP-part-025` | `lomuto_partition::partition` | **in-place permutation** | hard |
+| target | module | probes | guess | id |
+|---|---|---|---|---|
+| [`validate_price_ordering`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L181) | `bulk_order_utils` | adjacent-pair scan with an early return, strict both ways | hard | `TR-order-010` |
+| [`discard_price_crossing_levels`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L209) | `bulk_order_utils` | least non-crossing index -- a prefix fact, not a fold | hard | `TR-discard-011` |
+| [`cancel_at_price_level`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L303) | `bulk_order_utils` | removal from two coupled vectors; zero for absent and for an empty level | hard | `TR-cancel-026` |
+| [`new_bulk_order_request_with_sanitization`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L38) | `bulk_order_utils` | **composition** -- eleven assertions, four through helpers that need exact contracts | hard | `TR-sanitize-028` |
+| [`match_order_and_get_next_from_bulk_order`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L272) | `bulk_order_utils` | tuple of options; three aborts the source never states | hard | `TR-match-029` |
+| [`reinsert_order_into_bulk_order`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L237) | `bulk_order_utils` | merge or prepend; unchecked addition, unguarded read | hard | `TR-reinsert-030` |
+| [`validate_not_zero_sizes`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/bulk_order_utils.move#L164) | `bulk_order_utils` | linear scan, one quantifier | guessable | `TR-nonzero-031` |
+| [`is_taker_order`](/aptos-move/framework/aptos-experimental/sources/trading/order_book/price_time_index.move#L171) | `price_time_index` | option-guarded inclusive comparisons | guessable | `PT-taker-034` |
+| [`keep_alive`](/aptos-move/framework/aptos-experimental/sources/trading/market/dead_mans_switch_tracker.move#L295) | `dead_mans_switch_tracker` | map update reading the global clock; strict expiry | hard | `DM-keepalive-035` |
+| [`is_order_valid`](/aptos-move/framework/aptos-experimental/sources/trading/market/dead_mans_switch_tracker.move#L207) | `dead_mans_switch_tracker` | strict session start, inclusive expiry, defaulted time | hard | `DM-valid-036` |
+| [`refill`](/aptos-move/framework/aptos-framework/sources/account/rate_limiter.move#L43) | `rate_limiter` | token bucket; five unstated aborts, remainder carry | hard | `RL-refill-037` |
+| [`validate_tiers`](/aptos-move/framework/aptos-framework/sources/transaction_limits.move#L119) | `transaction_limits` | pairwise order, inclusive in one field and strict in the other | hard | `TL-tiers-038` |
+| [`new_tiers`](/aptos-move/framework/aptos-framework/sources/transaction_limits.move#L142) | `transaction_limits` | **composition** of a per-element range check and the pairwise order | hard | `TL-build-039` |
+| [`find_min_stake_required`](/aptos-move/framework/aptos-framework/sources/transaction_limits.move#L170) | `transaction_limits` | search through the inline `vector::find` | hard | `TL-find-040` |
+| [`validate_scheme`](/aptos-move/framework/aptos-framework/sources/account/common_account_abstractions/ethereum_derivable_account.move#L91) | `ethereum_derivable_account` | a contract that is only an abort condition over a character class | hard | `EA-scheme-041` |
+| [`range_with_step`](/aptos-move/framework/move-stdlib/sources/vector.move#L828) | `vector_range` | overflow of an increment whose value is never used | hard | `VR-range-042` |
+| [`request`](/aptos-move/framework/aptos-framework/sources/account/rate_limiter.move#L32) | `rate_limiter` | **composition** over `refill` | hard | `RL-request-043` |
+| [`validate_enough_stake`](/aptos-move/framework/aptos-framework/sources/transaction_limits.move#L226) | `transaction_limits` | **composition** over a global configuration, only aborts | hard | `TL-enough-044` |
+| [`split_signature_bytes`](/aptos-move/framework/aptos-framework/sources/account/common_account_abstractions/sui_derivable_account.move#L136) | `sui_derivable_account` | two loops sharing one index | hard | `SU-split-045` |
+| [`get_pending_transactions`](/aptos-move/framework/aptos-framework/sources/multisig_account.move#L446) | `multisig_account` | loop over a table range; overflow and missing-entry aborts | hard | `MS-pending-046` |
+| [`can_execute_with_timelock`](/aptos-move/framework/aptos-framework/sources/multisig_account.move#L501) | `multisig_account` | two resources, a table and the clock; aborts the threshold does not avoid | hard | `MS-timelock-047` |
+| [`available_transaction_queue_capacity`](/aptos-move/framework/aptos-framework/sources/multisig_account.move#L581) | `multisig_account` | clamp over a subtraction that can underflow | guessable | `MS-capacity-048` |
+| [`upsert_provider_jwks`](/aptos-move/framework/aptos-framework/sources/jwks.move#L587) | `jwks` | stop-and-insert scan under an uninterpreted comparator | hard | `JW-upsert-049` |
+| [`update_config`](/aptos-move/framework/aptos-framework/sources/transaction_limits.move#L195) | `transaction_limits` | **composition** with a signer check and a create-or-replace global write | hard | `TL-update-050` |
+| [`select`](build.py#L704) | `selection_machine` | **function values** | hard | `SM-select-022` |
+| [`partition`](build.py#L732) | `lomuto_partition` | **in-place permutation** | hard | `QP-part-025` |
 
-Families: `TR` `bulk_order_utils`, `PT` `price_time_index`, `DM`
-`dead_mans_switch_tracker` (all trading code); `RL` `rate_limiter`, `TL`
-`transaction_limits`, `EA` `ethereum_derivable_account`, `SU`
-`sui_derivable_account`, `MS` `multisig_account`, `JW` `jwks` (framework); `VR`
-`vector` (standard library); `SM`, `QP` authored.
-
-Compared with V3.2 the corpus adds what its private pool structurally lacked:
-global state (the clock in `DM-*`, `RL-*` and `MS-timelock-047`, account
-resources in `MS-*`, a configuration read by `TL-enough-044` and written by
-`TL-update-050`), an intrinsic map
-(`DM-*`), tables (`MS-*`), inline higher-order iteration (`TL-find-040`), and
-more composition targets.
+Besides computations over vectors, the corpus covers global state (the clock in
+`dead_mans_switch_tracker`, `rate_limiter` and `can_execute_with_timelock`,
+account resources in `multisig_account`, a configuration read by
+`validate_enough_stake` and written by `update_config`), an intrinsic map
+(`dead_mans_switch_tracker`), tables (`multisig_account`), inline higher-order
+iteration (`find_min_stake_required`), and composition targets.
 
 ### Excluded targets
 
-Code built on `vector::fold` is kept out. `fold`'s lambda both writes its
+Two kinds of target are kept out because the prover cannot prove their complete
+contracts. Code built on `vector::fold`: `fold`'s lambda both writes its
 captured accumulator and forwards to the user's function, and the prover's
 `folds_of` derivation cannot split that effect across the forwarding
-([#20383](https://github.com/aptos-labs/aptos-core/issues/20383)), so no
-complete contract for such a target can be proved. Id 032, its one
-candidate, is unused for that reason.
-
-Id 033 was `price_time_index::get_slippage_price`, whose result is an
-`Option<u64>` computed by arithmetic. Spec arithmetic is typed `num`, so the
-natural contract `result == option::spec_some(mid + slippage)` compares an
-`Option<u64>` with an `Option<num>`. The type checker accepts that, but the
-prover's Boogie translation does not
-([#20672](https://github.com/aptos-labs/aptos-core/issues/20672)), and Flow
-reports the failure as infrastructure, which invalidated a pilot cell. The
-target returns when that is fixed. `TR-match-029` also returns options, but of
-values read from vectors, which keep their `u64` type.
+([#20383](https://github.com/aptos-labs/aptos-core/issues/20383)). And a
+function whose result is an `Option<u64>` computed by arithmetic: spec
+arithmetic is typed `num`, so the natural contract compares an `Option<u64>`
+with an `Option<num>`, which the type checker accepts but the prover's Boogie
+translation does not
+([#20672](https://github.com/aptos-labs/aptos-core/issues/20672)).
+`match_order_and_get_next_from_bulk_order` also returns options, but of values
+read from vectors, which keep their `u64` type.
 
 ## Extraction
 
@@ -101,8 +134,8 @@ and every change, and the changes are of three kinds only:
   returning a pair of mutable references. Here the two vectors are parameters.
 - **Reduced carriers.** A struct is reduced to the fields a target reads: the
   matched order passed to `reinsert_order_into_bulk_order`, and the price index
-  of `get_slippage_price` and `is_taker_order`, which upstream holds two
-  ordered maps and is observed only through its best bid and ask.
+  of `is_taker_order`, which upstream holds two ordered maps and is observed
+  only through its best bid and ask.
 - **Reduced modules.** `timestamp`, `event` and `system_addresses` keep only
   what the targets call.
 
@@ -112,25 +145,45 @@ or where it is hard; that is what the task asks for.
 ## References
 
 A reference is the package with one module's complete specification written in.
-As in V3.2 only the specification is committed, as an add-only patch under
+Only the specification is committed, as an add-only patch under
 [`references/`](references/), checked by `build_references.py` to add
-specification and no pragma beyond `opaque`.
+specification and no pragma beyond `opaque`. Every helper a target calls in the
+corpus code has a complete opaque contract there, proved against its body: the
+helpers of its own module, `new_bulk_order_request` of
+`extracted_bulk_order_types` in the `extracted_bulk_order_utils` reference, and
+`get_transaction`, whose upstream contract the multisig reference only marks
+`opaque`.
+
+## Task trees
+
+A task asks for its target's specification and nothing else. It starts from
+the package with the reference contracts of every function its target calls in
+the module, transitively, together with their loop invariants and the spec
+functions they use. The target's own reference -- its contract and the loop
+invariants in its body -- is withheld, and so is every other function's: a
+caller's contract can restate what the target does. A callee without a
+reference contract is read through its body. `prepare_tasks.py` derives these
+trees from the references, takes the call closure from `move-flow`'s package
+inventory, records each as a preparation patch under [`patches/`](patches/),
+pins it in the manifest, and rebases the mutant anchors onto it. It refuses a
+module whose reference, removed entirely, does not give back the package.
 
 ```text
 python3 corpus-v4/build.py                 # generate package/sources from the pinned commit
 python3 corpus-v4/build.py --verify        # regenerate in memory and compare with the manifest
 python3 corpus-v4/build_references.py      # assemble references/build/
+python3 corpus-v4/prepare_tasks.py         # task trees: patches/, manifest pins, mutant anchors
+python3 corpus-v4/prepare_tasks.py --verify
 python3 corpus-v4/compose.py               # per-task view into corpus-v4/inspect/
 ```
 
 ## Mutants
 
-Two disjoint sets of three mutants per task, as in V3.2: a refutation set
+Two disjoint sets of three mutants per task: a refutation set
 ([`mutants/`](mutants/)) shown to the agent as obligation categories, and a
 held-out scoring set ([`mutants-scoring/`](mutants-scoring/)). Readable
 descriptions are in [`mutant-specs/`](mutant-specs/); `author_mutants.py`
-anchors them. The five carried-over tasks keep V3.2's mutants, re-anchored to
-the V4 sources.
+anchors them.
 
 ```text
 python3 corpus-v4/author_mutants.py --role refutation --spec corpus-v4/mutant-specs/refutation.json \
@@ -147,26 +200,26 @@ module kills it, after the reference itself has proved, passed the
 inconsistency check, and been confirmed to carry the corpus implementation
 unchanged. A mutant must rewrite the target's own body. One placed in an opaque
 callee, or in a function the reference specification calls, is not observed
-and survives; three first drafts were replaced for that reason.
+and survives.
 
 ## Screening and round selection
 
 `harness.screen_v3 --all-ready` admits all twenty-six ready tasks (records in
-[`screening/`](screening/)): each is well-formed and its reference proves
-within the 20-second threshold, in under 11 seconds of wall time per task.
-Nineteen are `wp_hard`. For thirteen, unaided WP stops at a loop without an
-invariant. For five, it stops at a helper with a loop or global memory access
-and no contract yet, so the hybrid arms have to specify the helper before the
-target, the composition step V3.2 asked of `VS-redeem-004`. In `TL-find-040`,
-WP's output carries clauses it flags as untrusted.
+[`screening/`](screening/)): each is well-formed and its reference proves within
+the 20-second threshold, in under 12 seconds of wall time per task. Sixteen are
+`wp_hard`. For thirteen, unaided WP stops at a loop without an invariant. In the
+other three, WP's output carries clauses it flags as untrusted: top-level
+quantifiers in `new_bulk_order_request_with_sanitization` and
+`find_min_stake_required`, and an existential over the limiter the `refill`
+callee updates in `request`.
 
 The round runs all twenty-six: `select_round.py --size 26 --max-guessable 3
 --keep-redundant` selects every ready task, covering all 32 feature strata,
-fourteen tasks with loops, twelve modules and three guessable controls. The
-selection still reports the one near-duplicate pair, `TR-nonzero-031` and
-`TR-cancel-026` (source similarity 0.55), and the families are uneven --
-seven `TR` and five `TL` tasks -- so a round reports per task as well as
-pooled.
+thirteen tasks with a loop that needs an invariant, twelve modules and three
+guessable controls. The selection reports one near-duplicate pair,
+`validate_not_zero_sizes` and `cancel_at_price_level` (source similarity 0.55),
+and the modules are uneven -- seven from `bulk_order_utils` and five from
+`transaction_limits` -- so a round reports per task as well as pooled.
 
 ```text
 python3 -m harness.screen_v3 --manifest corpus-v4/manifest.json \
@@ -174,12 +227,3 @@ python3 -m harness.screen_v3 --manifest corpus-v4/manifest.json \
   --results-dir corpus-v4/screening --output corpus-v4/screening/summary.json --all-ready
 python3 corpus-v4/select_round.py --size 26 --max-guessable 3 --keep-redundant --write
 ```
-
-## Prover requirements
-
-`VR-range-042` needs `old(p)` of a value parameter `p` in a loop invariant: the
-loop advances the parameter, and only its entry value relates the elements
-pushed so far. Inline properties now accept it; a function-level `old(p)` is
-still rejected, since there a parameter already denotes its entry value. The
-screen and the references must run with a `move-flow` that includes this, and
-so must any round that includes `VR-range-042`.

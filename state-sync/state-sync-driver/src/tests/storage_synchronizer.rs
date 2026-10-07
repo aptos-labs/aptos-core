@@ -44,7 +44,7 @@ use aptos_types::{
 use claims::assert_matches;
 use futures::StreamExt;
 use mockall::predicate::always;
-use std::{sync::Arc, time::Duration};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 // Useful test constants
@@ -865,19 +865,42 @@ async fn test_finalize_fast_sync_dropped_commit_listener() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_save_states_invalid_chunk() {
-    // Setup the mock snapshot receiver to always return errors
+    // Setup the mock snapshot receiver to return an error. It must not receive
+    // any more chunks.
     let mut snapshot_receiver = create_mock_receiver();
     snapshot_receiver
         .expect_add_chunk()
         .with(always(), always())
+        .times(1)
         .returning(|_, _| Err(AptosDbError::Other("Invalid chunk!".to_string())));
 
-    // Setup the mock db writer
+    // Setup a new snapshot receiver that writes the retried snapshot to completion
+    let mut new_snapshot_receiver = create_mock_receiver();
+    new_snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+    new_snapshot_receiver
+        .expect_finish_box()
+        .times(1)
+        .returning(|| Ok(()));
+
+    // Setup the mock db writer to hand out the receivers in order
+    let receivers = Mutex::new(VecDeque::from([snapshot_receiver, new_snapshot_receiver]));
     let mut db_writer = create_mock_db_writer();
     db_writer
         .expect_get_state_snapshot_receiver()
         .with(always(), always(), always())
-        .return_once(move |_, _, _| Ok(Box::new(snapshot_receiver)));
+        .times(2)
+        .returning(move |_, _, _| {
+            Ok(Box::new(
+                receivers
+                    .lock()
+                    .pop_front()
+                    .expect("Only two receivers are expected!"),
+            ))
+        });
 
     // Create the storage synchronizer
     let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
@@ -886,7 +909,7 @@ async fn test_save_states_invalid_chunk() {
     );
 
     // Initialize the snapshot synchronizer
-    let _join_handle = storage_synchronizer
+    let state_synchronizer_handle = storage_synchronizer
         .initialize_snapshot_synchronizer(
             create_epoch_ending_ledger_info(),
             HashValue::random(),
@@ -907,6 +930,106 @@ async fn test_save_states_invalid_chunk() {
         .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
+
+    // Retry the snapshot and verify a new receiver writes it to completion
+    storage_synchronizer
+        .save_state_values(
+            1,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
+        .await
+        .unwrap();
+    state_synchronizer_handle.await.unwrap();
+    verify_no_pending_data(&storage_synchronizer);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_save_states_finish_error() {
+    // Setup the mock snapshot receiver to fail finishing the snapshot
+    let mut snapshot_receiver = create_mock_receiver();
+    snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+    snapshot_receiver
+        .expect_finish_box()
+        .times(1)
+        .returning(|| Err(AptosDbError::Other("Invalid snapshot!".to_string())));
+
+    // Setup a new snapshot receiver that writes the retried snapshot to completion
+    let mut new_snapshot_receiver = create_mock_receiver();
+    new_snapshot_receiver
+        .expect_add_chunk()
+        .with(always(), always())
+        .times(1)
+        .returning(|_, _| Ok(()));
+    new_snapshot_receiver
+        .expect_finish_box()
+        .times(1)
+        .returning(|| Ok(()));
+
+    // Setup the mock db writer to hand out the receivers in order
+    let receivers = Mutex::new(VecDeque::from([snapshot_receiver, new_snapshot_receiver]));
+    let mut db_writer = create_mock_db_writer();
+    db_writer
+        .expect_get_state_snapshot_receiver()
+        .with(always(), always(), always())
+        .times(2)
+        .returning(move |_, _, _| {
+            Ok(Box::new(
+                receivers
+                    .lock()
+                    .pop_front()
+                    .expect("Only two receivers are expected!"),
+            ))
+        });
+
+    // Create the storage synchronizer
+    let (_, mut error_listener, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
+        create_mock_executor(),
+        create_mock_reader_writer(None, Some(db_writer)),
+    );
+
+    // Initialize the snapshot synchronizer
+    let state_synchronizer_handle = storage_synchronizer
+        .initialize_snapshot_synchronizer(
+            create_epoch_ending_ledger_info(),
+            HashValue::random(),
+            SnapshotKind::MAIN_STATE,
+        )
+        .unwrap();
+
+    // Save the last state chunk and verify we get an error notification
+    let notification_id = 0;
+    storage_synchronizer
+        .save_state_values(
+            notification_id,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
+        .await
+        .unwrap();
+    verify_error_notification(&mut error_listener, notification_id).await;
+
+    // Retry the snapshot and verify a new receiver writes it to completion
+    storage_synchronizer
+        .save_state_values(
+            1,
+            SnapshotChunk::States(
+                StateKind::MainState,
+                create_state_value_chunk_with_proof(true),
+            ),
+        )
+        .await
+        .unwrap();
+    state_synchronizer_handle.await.unwrap();
+    verify_no_pending_data(&storage_synchronizer);
 }
 
 #[tokio::test]

@@ -16,7 +16,7 @@ from typing import Any
 from .identifiers import require_plain_name
 from .artifacts import canonical_json, load_object, sha256_file, tree_hash, write_json
 from .config import ExperimentConfig
-from .materialize import materialize_task
+from .materialize import materialize_task, preparation_patch
 
 
 ARMS = ("agent_only", "hybrid_guided", "hybrid_flexible")
@@ -76,7 +76,7 @@ def build_schedule(
     recipes: dict[str, tuple[Path, Path, str]] = {}
     for task in selected:
         shared = (corpus_path.parent / task["shared_package_path"]).resolve()
-        patch = (corpus_path.parent / task["preparation_patch"]).resolve()
+        patch = preparation_patch(corpus_path.parent, task)
         expected_hash = task.get("prepared_sha256")
         if (
             not expected_hash

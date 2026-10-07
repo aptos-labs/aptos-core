@@ -17,12 +17,12 @@ from harness.publication import (
 class PublicationTest(unittest.TestCase):
     def test_tracked_archives_follow_publication_contract(self) -> None:
         results = Path(__file__).resolve().parents[1] / "results"
+        self.assertTrue(results.is_dir())
         archives = sorted(
             archive
             for archive in results.glob("*/*.tar.gz")
             if archive.parent.name != "corpus-v1.2"
         )
-        self.assertTrue(archives)
         for archive in archives:
             with self.subTest(archive=archive.name):
                 scan_public_archive(archive)

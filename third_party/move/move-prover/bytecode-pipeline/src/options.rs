@@ -108,16 +108,12 @@ pub struct ProverOptions {
     /// inherited from a callee whose own contract is partial.
     #[arg(long)]
     pub aborts_if_is_strict: bool,
-    /// When inference is scoped to a single function, also infer that
-    /// function's callees which have no specification, before it.
-    #[arg(long)]
-    pub infer_unspecified_helpers: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
     pub borrow_natives: Vec<String>,
     /// Targets to exclude from verification. Each entry must be
-    /// `VerificationScope::Only(name)` or `VerificationScope::OnlyModule(name)`.
+    /// `VerificationScope::Only(names)` or `VerificationScope::OnlyModule(name)`.
     #[arg(skip)]
     pub verify_exclude: Vec<VerificationScope>,
     /// Inline spec let bindings by substituting the expression directly into conditions,
@@ -150,7 +146,6 @@ impl Default for ProverOptions {
             no_inference_opaque: false,
             uninvariant_loop_is_error: false,
             aborts_if_is_strict: false,
-            infer_unspecified_helpers: false,
             borrow_natives: vec![],
             verify_exclude: vec![],
             inline_spec_lets: false,

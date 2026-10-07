@@ -13,7 +13,7 @@ mod spec_check;
 
 use super::package_data::VerifiedScope;
 use move_model::model::{GlobalEnv, VerificationScope};
-use std::path::Path;
+use std::{collections::BTreeSet, path::Path};
 
 /// Load prover options for an MCP call.
 ///
@@ -81,7 +81,7 @@ pub(crate) fn resolve_excludes(excludes: Option<&[String]>) -> Vec<VerificationS
         .iter()
         .map(|entry| {
             if entry.contains("::") {
-                VerificationScope::Only(entry.clone())
+                VerificationScope::Only(vec![entry.clone()])
             } else {
                 VerificationScope::OnlyModule(entry.clone())
             }
@@ -135,7 +135,7 @@ pub(crate) fn resolve_filter(
         let qid = func.get_qualified_id();
         Ok((
             VerifiedScope::Function(qid),
-            VerificationScope::Only(filter.to_string()),
+            VerificationScope::Only(vec![filter.to_string()]),
         ))
     } else {
         // Module filter: "module_name"
@@ -143,6 +143,43 @@ pub(crate) fn resolve_filter(
             VerifiedScope::Module(module.get_id()),
             VerificationScope::OnlyModule(filter.to_string()),
         ))
+    }
+}
+
+/// Resolve a list of targets: none is the whole package, one is an ordinary
+/// filter, and several are functions verified together.
+pub(crate) fn resolve_filters(
+    env: &GlobalEnv,
+    filters: &[String],
+) -> Result<(VerifiedScope, VerificationScope), rmcp::ErrorData> {
+    match filters {
+        [] => resolve_filter(env, None),
+        [filter] => resolve_filter(env, Some(filter)),
+        _ => {
+            let mut functions = BTreeSet::new();
+            for filter in filters {
+                match resolve_filter(env, Some(filter))? {
+                    (VerifiedScope::Function(qid), _) => {
+                        functions.insert(qid);
+                    },
+                    (
+                        VerifiedScope::Package
+                        | VerifiedScope::Module(_)
+                        | VerifiedScope::Functions(_),
+                        _,
+                    ) => {
+                        return Err(rmcp::ErrorData::invalid_params(
+                            format!("`{filter}` does not name a function; list functions only"),
+                            None,
+                        ))
+                    },
+                }
+            }
+            Ok((
+                VerifiedScope::Functions(functions),
+                VerificationScope::Only(filters.to_vec()),
+            ))
+        },
     }
 }
 

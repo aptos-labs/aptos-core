@@ -28,9 +28,9 @@ use mono_move_core::{
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols, Function, FunctionPtr,
-    GasMeter, Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError,
-    VMResult, ValueLayout,
+    verify_function, DescriptorId, ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols,
+    Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider,
+    VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -435,7 +435,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
-        // TODO(metering): the lowering work needs to be charged deterministically.
+        // TODO(metering): the lowering work, including micro-op verification
+        // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
@@ -482,8 +483,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }))
             },
         };
-        // TODO(security, metering): run the micro-op verifier on `function`
-        // here, once per cached lowering.
+        // Verify once per lowering, before the function is leaked into a
+        // cache: a rejected function is dropped here and never executed.
+        let errors = verify_function(&function, self.guard);
+        if !errors.is_empty() {
+            invariant_violation!(MicroOpVerificationFailed { errors });
+        }
         Ok((function, function_ms))
     }
 }

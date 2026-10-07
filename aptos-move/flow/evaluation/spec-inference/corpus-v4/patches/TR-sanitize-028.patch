@@ -1,0 +1,85 @@
+diff --git a/sources/trading/extracted_bulk_order_types.move b/sources/trading/extracted_bulk_order_types.move
+index ec0dcaf3fd..2f99c71505 100644
+--- a/sources/trading/extracted_bulk_order_types.move
++++ b/sources/trading/extracted_bulk_order_types.move
+@@ -36,4 +36,18 @@ module aptos_trading::extracted_bulk_order_types {
+             metadata
+         }
+     }
++
++    spec new_bulk_order_request {
++        pragma opaque;
++        aborts_if false;
++        ensures result == BulkOrderRequest::V1 {
++            account,
++            order_sequence_number: sequence_number,
++            bid_prices,
++            bid_sizes,
++            ask_prices,
++            ask_sizes,
++            metadata
++        };
++    }
+ }
+diff --git a/sources/trading/extracted_bulk_order_utils.move b/sources/trading/extracted_bulk_order_utils.move
+index 0c7a6f44d6..c0698eaf2c 100644
+--- a/sources/trading/extracted_bulk_order_utils.move
++++ b/sources/trading/extracted_bulk_order_utils.move
+@@ -97,6 +97,9 @@ module aptos_experimental::extracted_bulk_order_utils {
+                 return false;
+             };
+             i += 1;
++        } spec {
++            invariant i <= len(sizes);
++            invariant forall j in 0..i: sizes[j] != 0;
+         };
+         true
+     }
+@@ -119,6 +122,12 @@ module aptos_experimental::extracted_bulk_order_utils {
+                 };
+             };
+             i += 1;
++        } spec {
++            invariant len(prices) > 0;
++            invariant i <= len(prices) - 1;
++            invariant forall j: u64 where j < i:
++                if (is_descending) { prices[j] > prices[j + 1] }
++                else { prices[j] < prices[j + 1] };
+         };
+         true
+     }
+@@ -190,4 +199,34 @@ module aptos_experimental::extracted_bulk_order_utils {
+         };
+         0 // Price not found
+     }
++
++    spec module {
++        /// The strict adjacent ordering the scan checks. A pair is compared in
++        /// one direction only, so this is strict in both cases: equal
++        /// neighbours are rejected.
++        fun strictly_ordered(prices: vector<u64>, is_descending: bool): bool {
++            forall j: u64 where j + 1 < len(prices):
++                if (is_descending) { prices[j] > prices[j + 1] }
++                else { prices[j] < prices[j + 1] }
++        }
++
++        /// Whether every size is nonzero.
++        fun all_nonzero(sizes: vector<u64>): bool {
++            forall j in 0..len(sizes): sizes[j] != 0
++        }
++    }
++
++    spec validate_not_zero_sizes {
++        pragma opaque;
++        aborts_if false;
++        ensures result == all_nonzero(sizes);
++    }
++
++    spec validate_price_ordering {
++        pragma opaque;
++        // The `length() - 1` would underflow on an empty vector; the early
++        // return is what keeps this total.
++        aborts_if false;
++        ensures result == strictly_ordered(prices, is_descending);
++    }
+ }

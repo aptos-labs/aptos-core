@@ -31,10 +31,10 @@
 \begin{abstract}
 Formal verification suffers from the cost of specification: to establish high-level facts, contracts have to be written for supporting functions, many of them mechanical and low-level. 
 Specification inference derives such contracts from the program. 
-We present a hybrid agentic-mechanical inference approach for the Move smart contract language, which has many similaritiers with Rust, and is integrated with the Move Prover.
-An agent controls inference and verification via a tool which offers, beside calling the Move Prover, deriving specs from code via weakest precondition analysis. 
-Equipped with this tool, and loop invariants guessed by AI, the agent is capable to derive complete specs for non-trivial problems.
-We evaluate the approach on 20 verification targets extracted from a private production codebase, with completeness checked by withheld mutants, under a frontier model, Sol~5.6, and a mid-tier model of the same family, Terra~5.6. The unaided agent completes 93\% of its cells. With \WP, both models complete more, and the mid-tier model completes as many as the frontier model at 55\% of its cost.
+We present a hybrid of agentic and mechanical inference for Move, a smart contract language similar to Rust, integrated with the Move Prover.
+An agent controls inference and verification through a tool that, besides calling the Move Prover, derives specifications from code by weakest-precondition analysis.
+With this tool, and with loop invariants it proposes itself, the agent derives complete specifications for non-trivial problems.
+We evaluate the approach on 26 verification targets, 24 of them extracted from public Move code of the Aptos framework that has no specification, under a frontier model, Sol~5.6, and a mid-tier model of the same family, Terra~5.6. Without \WP, the agent completes 99\% of its cells under the frontier model and 93\% under the mid-tier model. \WP leaves completeness unchanged and lowers the cost by 11--21\%; on targets without loops, the hybrid tactics cost 36--60\% of the agent alone. The mid-tier model costs 53--59\% of the frontier model and falls behind it mainly on one target that needs a permutation argument.
 
 	\keywords{Specification inference \and Weakest precondition \and Reference elimination \and LLM agents \and Move Prover}
 \end{abstract}
@@ -47,8 +47,8 @@ We evaluate the approach on 20 verification targets extracted from a private pro
 \input{conclusion}
 
 \subsubsection*{Data Availability Statement.}
-The round archives behind every table and figure --- per-cell costs, token counters, wall times, and mutant-gate outcomes --- and the scripts that produce them from the archives are published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}.
-The corpus targets are extracted from a private codebase and are not published; the two targets written for the corpus are included.
+The corpus is published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}: the package extracted from a pinned commit of the Aptos repository, the reference specifications, and both mutant sets.
+The round archives behind every table and figure --- per-cell costs, token counters, wall times, and mutant outcomes --- and the scripts that produce them from the archives are published there as well; \Anon{\cite{SpecInferenceCorpus}}{\cite{MoveFlowAnon}} explains how to verify the corpus, re-score a round, and rerun the experiment.
 
 \bibliography{biblio}
 
@@ -56,23 +56,24 @@ The corpus targets are extracted from a private codebase and are not published; 
 \Section{Per-Target Results}
 \label{sec:appendix}
 
-Tables~\ref{tab:sol} and~\ref{tab:terra} give, for each target and arm, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification killed every withheld mutant in all four replicates (\Checkmark) or a mutant survived (\XSolidBrush, subscripted with the count where more than one replicate failed); $\circ$ marks a cell whose scoring stayed inconclusive.
-Input counts include uncached, cached, and cache-creation tokens.
+Tables~\ref{tab:sol} and~\ref{tab:terra} give, for each target and arm, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification killed every withheld mutant in all four replicates (\Checkmark) or a mutant survived (\XSolidBrush, subscripted with the count where more than one replicate failed); $\circ$ marks an unmeasured cell.
+Input counts include cached tokens.
+The targets above the middle rule have no loop that needs an invariant.
 
 \begin{sidewaystable}
 \centering
-\caption{Sol~5.6 by target. Summed over the 20 targets the arms cost \$26.65, \$27.44, and \$28.97.}
+\caption{Sol~5.6 by target. Summed over the 26 targets the arms cost \$36.72, \$31.67, and \$31.81.}
 \label{tab:sol}
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{2.2pt}
 \input{tables/sol}
 \end{sidewaystable}
 
 \begin{sidewaystable}
 \centering
-\caption{Terra~5.6 by target. Summed over the 20 targets the arms cost \$18.84, \$15.01, and \$16.60.}
+\caption{Terra~5.6 by target. Summed over the 26 targets the arms cost \$21.05, \$16.71, and \$18.79.}
 \label{tab:terra}
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{2.2pt}
 \input{tables/terra}
 \end{sidewaystable}

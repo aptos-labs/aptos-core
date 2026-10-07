@@ -905,6 +905,24 @@ mod test {
     }
 
     #[test]
+    fn test_check_ready_does_not_flush_ty_tag_cache() {
+        let (_, _, mut manager) = cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        let runtime_environment = manager.environment.as_ref().unwrap().runtime_environment();
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 3);
+    }
+
+    #[test]
     fn test_try_lock_inner_single_thread() {
         let manager = AptosModuleCacheManager::new(BlockExecutorLocalConfig::default());
 
