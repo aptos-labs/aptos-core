@@ -6,7 +6,7 @@
 
 # This script assumes it runs in the same directory as a Cargo.toml file
 # and sees if this Cargo.toml file can operate without some of its
-# dependencies using repeated `cargo check --all-targets` attempts.
+# dependencies using repeated `cargo check --locked --all-targets` attempts.
 #
 # In order to run this in a directory containing multiple Cargo.toml files,
 # we could suggest:

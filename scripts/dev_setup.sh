@@ -1228,7 +1228,7 @@ if [[ "${BATCH_MODE}" == "false" ]]; then
 Finished installing all dependencies.
 
 You should now be able to build the project by running:
-	cargo build
+	cargo build --locked
 EOF
 fi
 

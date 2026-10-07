@@ -322,7 +322,7 @@ jobs:
       - uses: actions/checkout@v4
       # prebuild aptos-node binary, so that tests don't start before node is built.
       # also prebuild aptos-node binary as a separate step to avoid feature unification issues
-      - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all
+      - run: cargo build --locked --package=aptos-node -F consensus-only-perf-test --release && LOCAL_SWARM_NODE_RELEASE=1 CONSENSUS_ONLY_PERF_TEST=1 cargo nextest run --locked --release --package smoke-test -E "test(test_consensus_only_with_txn_emitter)" --run-ignored all
 
       # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
       - name: Upload smoke test logs for failed and flaky tests
