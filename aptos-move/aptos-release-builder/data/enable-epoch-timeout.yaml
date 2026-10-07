@@ -1,0 +1,13 @@
+---
+remote_endpoint: ~
+name: "2026-10-07-enable-epoch-timeout"
+proposals:
+  - name: step_1_enable_epoch_timeout
+    metadata:
+      title: "Enable Epoch Timeout with a 1-Hour Grace Period"
+      description: "Enable the epoch timeout watchdog with a 3600-second (1-hour) grace period from the start of reconfiguration. Once active, it allows an in-progress epoch transition to finish even if ordinary DKG or Chunky DKG remains incomplete. The setting takes effect at the next epoch transition and cannot by itself recover an already-stalled transition."
+      source_code_url: "https://github.com/aptos-foundation/mainnet-proposals/blob/main/sources/2026-10-07-enable-epoch-timeout/step_1_enable_epoch_timeout.move"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/20697"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/enable_epoch_timeout.move
