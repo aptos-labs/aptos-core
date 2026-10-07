@@ -6,6 +6,7 @@
 import math
 import re
 import os
+import statistics
 import tempfile
 import json
 import itertools
@@ -81,6 +82,9 @@ NOISE_LOWER_LIMIT_WARN = 0.9
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
 NOISE_UPPER_LIMIT = 1.15
 NOISE_UPPER_LIMIT_WARN = 1.05
+
+# Below this, the median test is slow and the runner is the likely cause.
+MACHINE_HEALTH_WARN_RATIO = 0.98
 
 SKIP_WARNS = IS_MAINNET
 SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
@@ -171,6 +175,11 @@ CALIBRATION_SEPARATOR = "	"
 # transaction_type	module_working_set_size	executor_type	count	min_ratio	max_ratio	median
 with open('testsuite/single_node_performance_values.tsv', 'r') as file:
     CALIBRATION = file.read()
+
+# Same shape, for the throughput of Block-STM's execute_block alone. End-to-end
+# TPS is set by the commit stage, so it mostly measures RocksDB.
+with open('testsuite/single_node_performance_inner_values.tsv', 'r') as file:
+    INNER_CALIBRATION = file.read()
 
 
 # when adding a new test, add estimated expected_tps to it, as well as waived=True.
@@ -406,6 +415,7 @@ class RunResults:
     fraction_of_execution_in_inner_block_executor: float
     fraction_in_ledger_update: float
     fraction_in_commit: float
+    inner_block_executor_tps: float
 
 
 @dataclass
@@ -432,11 +442,90 @@ class Criteria:
     min_warn_tps: float
     max_tps: float
     max_warn_tps: float
+    # Absent for a test that has no calibrated inner row yet, in which case it
+    # is not gated on.
+    inner_expected_tps: Optional[float] = None
+    inner_min_tps: Optional[float] = None
+    inner_min_warn_tps: Optional[float] = None
+    inner_max_tps: Optional[float] = None
+    inner_max_warn_tps: Optional[float] = None
+
+
+def parse_calibration(calibration: str) -> Mapping[RunGroupKey, CalibrationData]:
+    return {
+        RunGroupKey(
+            transaction_type=parts[0],
+            module_working_set_size=int(parts[1]),
+            executor_type=parts[2],
+        ): CalibrationData(
+            expected_tps=float(parts[CALIBRATED_TPS_INDEX]),
+            count=int(parts[CALIBRATED_COUNT_INDEX]),
+            min_ratio=float(parts[CALIBRATED_MIN_RATIO_INDEX]),
+            max_ratio=float(parts[CALIBRATED_MAX_RATIO_INDEX]),
+        )
+        for line in calibration.split("\n")
+        if len(
+            parts := [
+                part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
+            ]
+        )
+        >= 3
+    }
+
+
+def criteria_from_calibration(calibration: CalibrationData) -> Tuple[float, ...]:
+    """Hard and warning thresholds, as (min, min_warn, max, max_warn)."""
+    min_tps, max_tps = tps_band(
+        calibration.expected_tps,
+        calibration.count,
+        calibration.min_ratio,
+        calibration.max_ratio,
+    )
+    return (
+        min_tps,
+        calibration.expected_tps * pow(calibration.min_ratio, 0.8),
+        max_tps,
+        calibration.expected_tps * pow(calibration.max_ratio, 0.8),
+    )
 
 
 def get_only(values):
     assert len(values) == 1, "Multiple values parsed: " + str(values)
     return values[0]
+
+
+def extract_inner_block_executor_tps(
+    output: str,
+    prefix: str,
+    tps: float,
+    fraction_in_execution: float,
+    fraction_of_execution_in_inner_block_executor: float,
+) -> float:
+    """Throughput of Block-STM's execute_block, excluding the rest of the pipeline.
+
+    The benchmark prints this directly, so prefer the printed value. It goes
+    non-finite when the inner timer is zero, in which case fall back to
+    reconstructing it from the two fractions, which are rounded to 4 decimals.
+    """
+    printed = re.findall(
+        prefix
+        + r" fraction of execution \d+\.?\d* in inner block executor"
+        + r" \(component TPS: ([^)]*)\)",
+        output,
+    )
+    if printed:
+        try:
+            value = float(printed[-1])
+        except ValueError:
+            value = math.nan
+        if math.isfinite(value) and value > 0:
+            return value
+
+    return (
+        tps
+        / max(fraction_in_execution, 0.001)
+        / max(fraction_of_execution_in_inner_block_executor, 0.001)
+    )
 
 
 def extract_run_results(
@@ -464,6 +553,7 @@ def extract_run_results(
         fraction_of_execution_in_inner_block_executor = 0
         fraction_in_ledger_update = 0
         fraction_in_commit = 0
+        inner_block_executor_tps = 0
     else:
         tps = float(get_only(re.findall(prefix + r" TPS: (\d+\.?\d*) txn/s", output)))
         gps = float(get_only(re.findall(prefix + r" GPS: (\d+\.?\d*) gas/s", output)))
@@ -511,6 +601,13 @@ def extract_run_results(
                 output,
             )[-1]
         )
+        inner_block_executor_tps = extract_inner_block_executor_tps(
+            output,
+            prefix,
+            tps,
+            fraction_in_execution,
+            fraction_of_execution_in_inner_block_executor,
+        )
         fraction_in_ledger_update = float(
             re.findall(
                 prefix + r" fraction of total: (\d+\.?\d*) in ledger update", output
@@ -537,6 +634,7 @@ def extract_run_results(
         fraction_of_execution_in_inner_block_executor=fraction_of_execution_in_inner_block_executor,
         fraction_in_ledger_update=fraction_in_ledger_update,
         fraction_in_commit=fraction_in_commit,
+        inner_block_executor_tps=inner_block_executor_tps,
     )
 
 
@@ -638,6 +736,10 @@ def print_table(
 
 errors = []
 warnings = []
+# (test key, measured / calibrated inner TPS), one entry per gated test. The
+# per-test criteria are loop-scoped and `results` also holds warmup and stage
+# rows, so this has to be collected as the loop runs.
+inner_tps_ratios = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
     move_e2e_benchmark_failed = False
@@ -656,26 +758,10 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 exit(1)
             move_e2e_benchmark_failed = True
 
-    calibrated_expected_tps = {
-        RunGroupKey(
-            transaction_type=parts[0],
-            module_working_set_size=int(parts[1]),
-            executor_type=parts[2],
-        ): CalibrationData(
-            expected_tps=float(parts[CALIBRATED_TPS_INDEX]),
-            count=int(parts[CALIBRATED_COUNT_INDEX]),
-            min_ratio=float(parts[CALIBRATED_MIN_RATIO_INDEX]),
-            max_ratio=float(parts[CALIBRATED_MAX_RATIO_INDEX]),
-        )
-        for line in CALIBRATION.split("\n")
-        if len(
-            parts := [
-                part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
-            ]
-        )
-        >= 3
-    }
+    calibrated_expected_tps = parse_calibration(CALIBRATION)
+    calibrated_inner_expected_tps = parse_calibration(INNER_CALIBRATION)
     print(calibrated_expected_tps)
+    print(calibrated_inner_expected_tps)
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
@@ -713,23 +799,35 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         else:
             assert test.key in calibrated_expected_tps, test
             cur_calibration = calibrated_expected_tps[test.key]
-            min_tps, max_tps = tps_band(
-                cur_calibration.expected_tps,
-                cur_calibration.count,
-                cur_calibration.min_ratio,
-                cur_calibration.max_ratio,
+            min_tps, min_warn_tps, max_tps, max_warn_tps = criteria_from_calibration(
+                cur_calibration
             )
             criteria = Criteria(
                 expected_tps=cur_calibration.expected_tps,
                 min_tps=min_tps,
-                min_warn_tps=cur_calibration.expected_tps
-                * pow(cur_calibration.min_ratio, 0.8),
+                min_warn_tps=min_warn_tps,
                 max_tps=max_tps,
-                max_warn_tps=cur_calibration.expected_tps
-                * pow(cur_calibration.max_ratio, 0.8),
+                max_warn_tps=max_warn_tps,
             )
 
-        # target 250ms blocks, a bit larger than prod
+            inner_calibration = calibrated_inner_expected_tps.get(test.key)
+            if inner_calibration is None:
+                warnings.append(
+                    f"no calibrated inner block executor TPS for {test.key}, not gating on it"
+                )
+            else:
+                (
+                    criteria.inner_min_tps,
+                    criteria.inner_min_warn_tps,
+                    criteria.inner_max_tps,
+                    criteria.inner_max_warn_tps,
+                ) = criteria_from_calibration(inner_calibration)
+                criteria.inner_expected_tps = inner_calibration.expected_tps
+
+        # Target 250ms blocks, a bit larger than prod. This makes the end-to-end
+        # median a benchmark input and not only a threshold, so it has to stay
+        # on `expected_tps`: moving it to the inner median would resize every
+        # block and invalidate both calibrations.
         if test.key_extra.block_size_override is not None:
             cur_block_size = test.key_extra.block_size_override
         else:
@@ -873,8 +971,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     "expected_tps": criteria.expected_tps,
                     "expected_min_tps": criteria.min_tps,
                     "expected_max_tps": criteria.max_tps,
+                    "inner_expected_tps": criteria.inner_expected_tps,
+                    "inner_expected_min_tps": criteria.inner_min_tps,
+                    "inner_expected_max_tps": criteria.inner_max_tps,
                     "waived": test.waived,
                     "tps": single_node_result.tps,
+                    "inner_tps": single_node_result.inner_block_executor_tps,
                     "gps": single_node_result.gps,
                     "gpt": single_node_result.gpt,
                     "fraction_in_sig_verify": single_node_result.fraction_in_sig_verify,
@@ -987,12 +1089,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     (
                         "inner block exe tps",
                         lambda r: round(
-                            r.single_node_result.tps
-                            / max(r.single_node_result.fraction_in_execution, 0.001)
-                            / max(
-                                r.single_node_result.fraction_of_execution_in_inner_block_executor,
-                                0.001,
-                            ),
+                            r.single_node_result.inner_block_executor_tps,
                             1,
                         ),
                     ),
@@ -1023,33 +1120,82 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             and test.key.executor_type not in NON_BLOCKING_EXECUTOR_TYPES
         )
 
-        if single_node_result.tps < criteria.min_tps:
-            text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
-            if is_blocking:
-                errors.append(text)
-            else:
+        inner_tps = single_node_result.inner_block_executor_tps
+        if criteria.inner_expected_tps is not None:
+            inner_tps_ratios.append(
+                (test.key, inner_tps / criteria.inner_expected_tps)
+            )
+
+            if inner_tps < criteria.inner_min_tps:
+                text = f"regression detected {inner_tps}, expected median {criteria.inner_expected_tps}, threshold: {criteria.inner_min_tps}), {test.key} didn't meet inner block executor TPS requirements"
+                if is_blocking:
+                    errors.append(text)
+                else:
+                    warnings.append(text)
+            elif inner_tps < criteria.inner_min_warn_tps:
+                text = f"potential (but within normal noise) regression detected {inner_tps}, expected median {criteria.inner_expected_tps}, threshold: {criteria.inner_min_warn_tps}), {test.key} didn't meet inner block executor TPS requirements"
                 warnings.append(text)
-        elif single_node_result.tps < criteria.min_warn_tps:
-            text = f"potential (but within normal noise) regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_warn_tps}), {test.key} didn't meet TPS requirements"
-            warnings.append(text)
+            elif (
+                not SKIP_PERF_IMPROVEMENT_NOTICE
+                and inner_tps > criteria.inner_max_tps
+            ):
+                text = f"perf improvement detected {inner_tps}, expected median {criteria.inner_expected_tps}, threshold: {criteria.inner_max_tps}), {test.key} exceeded inner block executor TPS requirements, increase TPS requirements to match new baseline"
+                if is_blocking:
+                    errors.append(text)
+                else:
+                    warnings.append(text)
+            elif (
+                not SKIP_PERF_IMPROVEMENT_NOTICE
+                and inner_tps > criteria.inner_max_warn_tps
+            ):
+                text = f"potential (but within normal noise) perf improvement detected {inner_tps}, expected median {criteria.inner_expected_tps}, threshold: {criteria.inner_max_warn_tps}), {test.key} exceeded inner block executor TPS requirements, increase TPS requirements to match new baseline"
+                warnings.append(text)
+
+        # End-to-end TPS is reported but does not fail the run. The commit stage
+        # is busy 83-94% of wall time and sets it, so it tracks RocksDB rather
+        # than the VM.
+        if single_node_result.tps < criteria.min_tps:
+            warnings.append(
+                f"end-to-end regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
+            )
         elif (
             not SKIP_PERF_IMPROVEMENT_NOTICE
             and single_node_result.tps > criteria.max_tps
         ):
-            text = f"perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
-            if is_blocking:
-                errors.append(text)
-            else:
-                warnings.append(text)
-        elif (
-            not SKIP_PERF_IMPROVEMENT_NOTICE
-            and single_node_result.tps > criteria.max_warn_tps
-        ):
-            text = f"potential (but within normal noise) perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_warn_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
-            warnings.append(text)
+            warnings.append(
+                f"end-to-end perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_tps}), {test.key} exceeded TPS requirements"
+            )
 
 if HIDE_OUTPUT:
     print_table(results, by_levels=False, only_fields=[])
+
+# A regression moves one row; a slow runner moves the whole table. In the
+# historical runs, 147 of 184 low-side violations came from 6 runs where at
+# least 10 rows went low together. Report the per-row ratios too: a runner that
+# is slow for only part of a long run disappears into the median.
+if inner_tps_ratios:
+    health = statistics.median(ratio for _, ratio in inner_tps_ratios)
+    print(
+        json.dumps(
+            {
+                "grep": "grep_json_single_node_machine_health",
+                "source": SOURCE,
+                "runner_name": RUNNER_NAME,
+                "flow": str(SELECTED_FLOW),
+                "code_perf_version": CODE_PERF_VERSION,
+                "median_inner_tps_ratio": health,
+                "inner_tps_ratios": {
+                    f"{key.transaction_type}/{key.module_working_set_size}/{key.executor_type}": ratio
+                    for key, ratio in inner_tps_ratios
+                },
+            }
+        )
+    )
+    if health < MACHINE_HEALTH_WARN_RATIO:
+        warnings.append(
+            f"machine ran slow: median inner block executor TPS was {health:.3f} of calibrated, "
+            f"over {len(inner_tps_ratios)} tests. Treat individual regressions below with suspicion."
+        )
 
 if warnings:
     print("Warnings: ")
