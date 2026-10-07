@@ -4,6 +4,7 @@
 pub mod checkpoint;
 mod common;
 mod examine;
+mod export_dkg_recovery;
 pub mod ledger;
 pub mod state_kv;
 pub mod state_tree;
@@ -23,6 +24,8 @@ pub enum Cmd {
     StateKv(state_kv::Cmd),
 
     Checkpoint(checkpoint::Cmd),
+
+    ExportDkgRecovery(export_dkg_recovery::Cmd),
 
     #[clap(subcommand)]
     Ledger(ledger::Cmd),
@@ -45,6 +48,7 @@ impl Cmd {
             Cmd::StateTree(cmd) => cmd.run(),
             Cmd::StateKv(cmd) => cmd.run(),
             Cmd::Checkpoint(cmd) => cmd.run(),
+            Cmd::ExportDkgRecovery(cmd) => cmd.run(),
             Cmd::Ledger(cmd) => cmd.run(),
             Cmd::Truncate(cmd) => cmd.run(),
             Cmd::Examine(cmd) => cmd.run(),
