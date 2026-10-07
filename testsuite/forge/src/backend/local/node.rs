@@ -8,7 +8,10 @@ use aptos_config::{
     keys::ConfigKey,
 };
 use aptos_db::{
-    common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
+    common::{
+        HOT_STATE_KV_DB_NAME, HOT_STATE_MERKLE_DB_NAME, LEDGER_DB_NAME, STATE_KV_DB_NAME,
+        STATE_MERKLE_DB_NAME,
+    },
     fast_sync_storage_wrapper::SECONDARY_DB_DIR,
 };
 use aptos_logger::{debug, error, info};
@@ -416,14 +419,23 @@ impl Node for LocalNode {
         let secure_storage_path = node_config.get_working_dir().join(SECURE_STORAGE_FILENAME);
         let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
         let secondary_db_path = node_config.storage.dir().join(SECONDARY_DB_DIR);
+        // Not truncated when reopened with an empty ledger, so leftovers would serve stale
+        // data, e.g., the hot state when `delete_on_restart` is off.
+        let other_state_db_paths = [
+            STATE_KV_DB_NAME,
+            HOT_STATE_MERKLE_DB_NAME,
+            HOT_STATE_KV_DB_NAME,
+        ]
+        .map(|name| node_config.storage.dir().join(name));
 
         debug!(
-            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}, {:?}) for node {:?}",
+            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}, {:?}, {:?}) for node {:?}",
             ledger_db_path.as_path(),
             state_db_path.as_path(),
             secure_storage_path.as_path(),
             state_sync_db_path.as_path(),
             secondary_db_path.as_path(),
+            other_state_db_paths,
             self.name
         );
 
@@ -444,6 +456,13 @@ impl Node for LocalNode {
         fs::remove_dir_all(state_sync_db_path)
             .map_err(anyhow::Error::from)
             .context("Failed to delete state_sync_db_path")?;
+        // Older node versions may not have all of these
+        for path in other_state_db_paths {
+            if path.exists() {
+                fs::remove_dir_all(&path)
+                    .with_context(|| format!("Failed to delete {:?}", path))?;
+            }
+        }
 
         // Remove the secondary DB files
         if secondary_db_path.as_path().exists() {

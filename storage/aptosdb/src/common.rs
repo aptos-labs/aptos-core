@@ -23,6 +23,9 @@ use std::{
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
+pub const STATE_KV_DB_NAME: &str = "state_kv_db";
+pub const HOT_STATE_MERKLE_DB_NAME: &str = "hot_state_merkle_db";
+pub const HOT_STATE_KV_DB_NAME: &str = "hot_state_kv_db";
 
 // TODO: Either implement an iteration API to allow a very old client to loop through a long history
 // or guarantee that there is always a recent enough waypoint and client knows to boot from there.
