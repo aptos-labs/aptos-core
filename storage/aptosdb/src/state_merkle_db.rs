@@ -27,7 +27,7 @@ use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{Cache, Env, DB};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,

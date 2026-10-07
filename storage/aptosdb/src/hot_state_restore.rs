@@ -18,7 +18,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
 use aptos_schemadb::batch::{SchemaBatch, WriteBatch};
-use aptos_storage_interface::{db_other_bail as bail, AptosDbError, Result, StateSnapshotReceiver};
+use aptos_storage_interface::{db_other_bail as bail, Result, StateSnapshotReceiver};
 use aptos_types::{
     state_store::{
         hot_state::HotStateValue, state_key::StateKey, state_storage_usage::StateStorageUsage,
