@@ -192,6 +192,14 @@ static TIMEOUT_PROCEDURE: Lazy<Regex> = Lazy::new(|| {
     .unwrap()
 });
 
+/// A located Boogie error without an `assert_failed` message.
+static UNTAGGED_ERROR: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?m)^\S+\(\d+,\d+\): Error: (?P<msg>.*)$").unwrap());
+
+static ERROR_COUNT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?m)^Boogie program verifier finished with .*?(\d+) errors?").unwrap()
+});
+
 static INCONSISTENCY_DIAG_STARTS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?m)^inconsistency_detected\((?P<args>[^)]*)\)").unwrap());
 
@@ -415,6 +423,7 @@ impl BoogieWrapper<'_> {
             ));
         }
         let mut errors = self.extract_verification_errors(&out);
+        errors.extend(self.extract_untagged_errors(&out));
         errors.extend(self.extract_inconclusive_errors(&out, &timeout_analysis, boogie_file));
         errors.extend(self.extract_inconsistency_errors(&out));
         if self.options.stable_test_output {
@@ -772,6 +781,7 @@ impl BoogieWrapper<'_> {
             if !inbetween.is_empty()
                 && !INCONCLUSIVE_DIAG_STARTS.is_match(inbetween)
                 && !INCONSISTENCY_DIAG_STARTS.is_match(inbetween)
+                && !UNTAGGED_ERROR.is_match(inbetween)
             {
                 // This is unexpected text and we report it as an internal error
                 errors.push(BoogieError {
@@ -813,6 +823,71 @@ impl BoogieWrapper<'_> {
                     model: if model.is_empty() { None } else { Some(model) },
                 });
             }
+        }
+        errors
+    }
+
+    /// Reports Boogie errors without an `assert_failed` message: a call past the inlining depth,
+    /// or a rejection of the generated code. Each is located at the last source position of its
+    /// trace.
+    /// Any error still unaccounted for in Boogie's summary is reported without a location.
+    fn extract_untagged_errors(&self, out: &str) -> Vec<BoogieError> {
+        const HINT: &str = "this is usually a recursive call, direct or through function \
+            values, to a function that is not opaque (mark it `pragma opaque` and give it a \
+            specification)";
+        let mut errors = vec![];
+        for untagged in UNTAGGED_ERROR.captures_iter(out) {
+            let boogie_msg = untagged["msg"].trim();
+            let mut at = untagged.get(0).unwrap().end();
+            self.extract_execution_trace(out, &mut at);
+            let execution_trace = self.extract_augmented_trace(out, &mut at);
+            let loc = execution_trace
+                .iter()
+                .rev()
+                .find_map(|entry| match entry {
+                    TraceEntry::AtLocation(loc) => Some(loc.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| self.env.unknown_loc());
+            // An assertion without a message is the inlining-depth check; any other untagged
+            // error means Boogie rejected the encoding.
+            let (kind, message) = if boogie_msg.contains("could not be proved") {
+                (
+                    BoogieErrorKind::Assertion,
+                    format!("verification failed: {}; {}", boogie_msg, HINT),
+                )
+            } else {
+                (
+                    BoogieErrorKind::Internal,
+                    format!("boogie rejected the generated code: {}", boogie_msg),
+                )
+            };
+            errors.push(BoogieError {
+                kind,
+                loc,
+                message,
+                notes: vec![],
+                execution_trace,
+                model: None,
+            });
+        }
+        let reported: usize = ERROR_COUNT
+            .captures(out)
+            .and_then(|cap| cap[1].parse().ok())
+            .unwrap_or(0);
+        let extracted = VERIFICATION_DIAG_STARTS.find_iter(out).count() + errors.len();
+        if reported > extracted {
+            errors.push(BoogieError {
+                kind: BoogieErrorKind::Internal,
+                loc: self.env.unknown_loc(),
+                message: format!(
+                    "boogie reported {} error(s) that could not be extracted",
+                    reported - extracted
+                ),
+                notes: vec![],
+                execution_trace: vec![],
+                model: None,
+            });
         }
         errors
     }

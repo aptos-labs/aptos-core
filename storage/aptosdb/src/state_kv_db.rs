@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    common::{HOT_STATE_KV_DB_NAME, STATE_KV_DB_NAME},
     db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
@@ -64,9 +65,9 @@ const _: () = assert!(
 
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
-        "hot_state_kv_db"
+        HOT_STATE_KV_DB_NAME
     } else {
-        "state_kv_db"
+        STATE_KV_DB_NAME
     }
 }
 

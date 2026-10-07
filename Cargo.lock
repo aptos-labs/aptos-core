@@ -13753,6 +13753,7 @@ dependencies = [
  "nix 0.29.0",
  "num 0.4.1",
  "once_cell",
+ "petgraph 0.6.5",
  "pretty",
  "regex",
  "serde",
