@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    common::POSITION_MERKLE_DB_FOLDER_NAME,
     db_options::gen_position_merkle_cfds,
     position_db::PositionDb,
     sharded_jmt_merkle_db::{LeafNode, Node as ShardedNode, ShardedJmtMerkleDb},
@@ -32,8 +33,6 @@ use std::{
 };
 
 pub const NUM_POSITION_MERKLE_SHARDS: usize = NUM_STATE_SHARDS;
-
-const POSITION_MERKLE_DB_FOLDER: &str = "position_merkle_db";
 
 #[derive(Debug)]
 pub struct PositionMerkleDb {
@@ -115,7 +114,7 @@ impl PositionMerkleDb {
             false,
             0,
         )?;
-        let cp = cp_root_path.as_ref().join(POSITION_MERKLE_DB_FOLDER);
+        let cp = cp_root_path.as_ref().join(POSITION_MERKLE_DB_FOLDER_NAME);
         info!(cp = %cp.display(), "Creating position_merkle_db checkpoint.");
         std::fs::remove_dir_all(&cp).unwrap_or(());
         std::fs::create_dir_all(&cp)
@@ -265,14 +264,14 @@ impl PositionMerkleDb {
     fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize) -> PathBuf {
         db_root_path
             .as_ref()
-            .join(POSITION_MERKLE_DB_FOLDER)
+            .join(POSITION_MERKLE_DB_FOLDER_NAME)
             .join(format!("shard_{shard_id}"))
     }
 
     fn metadata_db_path<P: AsRef<Path>>(db_root_path: P) -> PathBuf {
         db_root_path
             .as_ref()
-            .join(POSITION_MERKLE_DB_FOLDER)
+            .join(POSITION_MERKLE_DB_FOLDER_NAME)
             .join("metadata")
     }
 }
