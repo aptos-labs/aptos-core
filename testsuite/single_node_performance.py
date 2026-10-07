@@ -86,6 +86,13 @@ NOISE_UPPER_LIMIT_WARN = 1.05
 # Below this, the median test is slow and the runner is the likely cause.
 MACHINE_HEALTH_WARN_RATIO = 0.98
 
+# A runner that is slow for only part of a long run leaves the median alone, so
+# also take the worst median over a sliding window of consecutive tests. Over
+# nine historical CONTINUOUS runs the window bottoms out at 0.942 on a healthy
+# machine and at 0.86/0.80 on the two that ran slow throughout.
+MACHINE_HEALTH_WINDOW = 5
+MACHINE_HEALTH_WINDOW_WARN_RATIO = 0.90
+
 SKIP_WARNS = IS_MAINNET
 SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 
@@ -1171,10 +1178,22 @@ if HIDE_OUTPUT:
 
 # A regression moves one row; a slow runner moves the whole table. In the
 # historical runs, 147 of 184 low-side violations came from 6 runs where at
-# least 10 rows went low together. Report the per-row ratios too: a runner that
-# is slow for only part of a long run disappears into the median.
+# least 10 rows went low together. Report the per-row ratios too, so a run can
+# be re-scored later without re-reading its log.
 if inner_tps_ratios:
-    health = statistics.median(ratio for _, ratio in inner_tps_ratios)
+    ratios = [ratio for _, ratio in inner_tps_ratios]
+    health = statistics.median(ratios)
+
+    # Tests run in list order, so a window of consecutive entries is a window in
+    # time. Skip it on a table short enough that the window would cover most of
+    # it, where it says nothing the median does not.
+    window_health = None
+    if len(ratios) >= 2 * MACHINE_HEALTH_WINDOW:
+        window_health = min(
+            statistics.median(ratios[i : i + MACHINE_HEALTH_WINDOW])
+            for i in range(len(ratios) - MACHINE_HEALTH_WINDOW + 1)
+        )
+
     print(
         json.dumps(
             {
@@ -1184,6 +1203,7 @@ if inner_tps_ratios:
                 "flow": str(SELECTED_FLOW),
                 "code_perf_version": CODE_PERF_VERSION,
                 "median_inner_tps_ratio": health,
+                "worst_window_inner_tps_ratio": window_health,
                 "inner_tps_ratios": {
                     f"{key.transaction_type}/{key.module_working_set_size}/{key.executor_type}": ratio
                     for key, ratio in inner_tps_ratios
@@ -1194,7 +1214,17 @@ if inner_tps_ratios:
     if health < MACHINE_HEALTH_WARN_RATIO:
         warnings.append(
             f"machine ran slow: median inner block executor TPS was {health:.3f} of calibrated, "
-            f"over {len(inner_tps_ratios)} tests. Treat individual regressions below with suspicion."
+            f"over {len(ratios)} tests. Treat individual regressions below with suspicion."
+        )
+    elif (
+        window_health is not None
+        and window_health < MACHINE_HEALTH_WINDOW_WARN_RATIO
+    ):
+        warnings.append(
+            f"machine ran slow for part of the run: {MACHINE_HEALTH_WINDOW} consecutive tests "
+            f"averaged {window_health:.3f} of calibrated inner block executor TPS, while the "
+            f"median over all {len(ratios)} was {health:.3f}. Treat individual regressions "
+            f"below with suspicion, and prefer re-running over recalibrating."
         )
 
 if warnings:
