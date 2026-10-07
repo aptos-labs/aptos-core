@@ -22,7 +22,7 @@ use crate::{
         write_bool, write_enum_tag, write_fat_ptr, write_ptr, write_u32, write_u64, write_u8,
         MemoryRegion,
     },
-    native_context::{ProductionNativeContext, ProductionNativeRegistry},
+    native_context::{LoaderAccess, ProductionNativeContext, ProductionNativeRegistry},
     types::{
         ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
         META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
@@ -33,9 +33,13 @@ use crate::{
 };
 use mono_move_core::{
     captured_values_size,
-    interner::{is_script_module_id, module_id_of, InternedIdentifier, InternedModuleId},
+    interner::{
+        is_script_module_id, module_id_of, InternedFunctionRef, InternedIdentifier,
+        InternedModuleId,
+    },
     native::{
-        NativeABI, NativeExtension, NativeExtensions, NativeIdx, NativeName, NativeStatus, RootPool,
+        FunctionResolutionError, NativeABI, NativeExtension, NativeExtensions, NativeIdx,
+        NativeName, NativeStatus, RootPool,
     },
     next_captured_value_offset,
     storage::resource_provider::InMemoryStorageKey,
@@ -58,7 +62,7 @@ use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     int256::{I256, U256},
     language_storage::ModuleId,
     vm_status::AbortLocation,
@@ -66,7 +70,7 @@ use move_core_types::{
 use move_value_view::MoveValueView;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
-    cell::Ref,
+    cell::{Ref, UnsafeCell},
     fmt,
     ptr::{null, NonNull},
 };
@@ -74,7 +78,7 @@ use std::{
 /// Resolves the resource-group container a resource type belongs to from the
 /// read-set-pinned defining module, or [`None`] for an own storage slot.
 macro_rules! resolve_resource_group {
-    ($ctx:expr, $ty:expr) => {{
+    ($loader:expr, $read_set:expr, $ty:expr) => {{
         let Type::Nominal {
             module_id, name, ..
         } = view_type($ty)
@@ -84,11 +88,77 @@ macro_rules! resolve_resource_group {
                 "resource type must be a nominal type".to_string()
             ));
         };
-        let arena_ref = $ctx.loader.guard().arena_ref_for_module_id(*module_id);
+        let arena_ref = $loader.guard().arena_ref_for_module_id(*module_id);
         Ok::<Option<InternedType>, VMInternalError>(
-            $ctx.read_set.get_loaded(arena_ref)?.resource_group_of(name),
+            $read_set.get_loaded(arena_ref)?.resource_group_of(name),
         )
     }};
+}
+
+/// Writes the `func_ref` enum and the capture `mask` into a freshly allocated
+/// closure heap object.
+///
+/// # Safety
+///
+/// `closure` points at a live closure object, allocated under
+/// [`CLOSURE_DESCRIPTOR_ID`].
+#[inline]
+pub(crate) unsafe fn write_closure_func_ref_and_mask(
+    closure: *mut u8,
+    func_ref: &ClosureFuncRef,
+    mask: u64,
+) {
+    let (tag, payload) = match func_ref {
+        ClosureFuncRef::Resolved(func_ptr) => (
+            FUNC_REF_TAG_RESOLVED,
+            func_ptr.as_non_null().as_ptr() as *const u8,
+        ),
+        ClosureFuncRef::Unresolved(func_ref) => {
+            (FUNC_REF_TAG_UNRESOLVED, func_ref.as_raw_ptr() as *const u8)
+        },
+    };
+    unsafe {
+        *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = tag;
+        write_ptr(
+            closure,
+            CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+            payload,
+        );
+        write_u64(closure, CLOSURE_MASK_OFFSET, mask);
+    }
+}
+
+/// Gives a native call loader access while hiding the loader's lifetimes behind
+/// a trait object. See [`LoaderAccess`].
+struct LoaderAdapter<'a, 'guard> {
+    loader: &'a Loader<'guard, 'guard>,
+    /// Held in an [`UnsafeCell`] because [`LoaderAccess`] takes `&self` but the
+    /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
+    /// at most one borrow is live at a time.
+    read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
+}
+
+impl LoaderAccess for LoaderAdapter<'_, '_> {
+    fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
+        // SAFETY: this is the only borrow of the read-set, and it does not
+        // outlive the call.
+        let read_set = unsafe { &**self.read_set.get() };
+        resolve_resource_group!(self.loader, read_set, ty)
+    }
+
+    fn resolve_function(
+        &self,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+        func_name: &IdentStr,
+        expected_ty: InternedType,
+    ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
+        // SAFETY: this is the only borrow of the read-set, and it does not
+        // outlive the call.
+        let read_set = unsafe { &mut **self.read_set.get() };
+        self.loader
+            .resolve_function(read_set, gas_meter, module_id, func_name, expected_ty)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +442,7 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
                 address: AccountAddress,
                 ty: InternedType,
             ) -> VMResult<bool> {
-                let group = resolve_resource_group!(self, ty)?;
+                let group = resolve_resource_group!(self.loader, self.read_set, ty)?;
                 Ok(self.read_write_set.exists(
                     self.resource_provider,
                     &InMemoryStorageKey::resource(address, ty),
@@ -856,7 +926,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// [`None`] if it lives in its own storage slot. Membership is read from the
     /// resource's defining module, which must be available.
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
-        resolve_resource_group!(self, ty)
+        resolve_resource_group!(self.loader, self.read_set, ty)
     }
 
     /// Returns the transaction's read-set.
@@ -3095,7 +3165,7 @@ impl InterpreterContext<'_> {
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
                 let closure = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
-                self.write_closure_func_ref_and_mask(closure, op);
+                write_closure_func_ref_and_mask(closure, &op.func_ref, op.mask);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
             }
@@ -3112,7 +3182,7 @@ impl InterpreterContext<'_> {
             // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
             let closure_root = self.root_pool.root_object(closure_ptr);
 
-            self.write_closure_func_ref_and_mask(closure_root.ptr(), op);
+            write_closure_func_ref_and_mask(closure_root.ptr(), &op.func_ref, op.mask);
 
             // SAFETY: the verifier guarantees `captured_data_descriptor_id`
             // is `Some` whenever `captured` is non-empty. The values-region
@@ -3162,35 +3232,6 @@ impl InterpreterContext<'_> {
             write_ptr(fp, op.dst, closure);
 
             Ok(())
-        }
-    }
-
-    /// Write the `func_ref` enum and the mask into a freshly allocated closure
-    /// heap object.
-    #[inline]
-    unsafe fn write_closure_func_ref_and_mask(&self, closure: *mut u8, op: &PackClosureOp) {
-        unsafe {
-            match &op.func_ref {
-                ClosureFuncRef::Resolved(func_ptr) => {
-                    *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
-                        FUNC_REF_TAG_RESOLVED;
-                    write_ptr(
-                        closure,
-                        CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
-                        func_ptr.as_non_null().as_ptr() as *const u8,
-                    );
-                },
-                ClosureFuncRef::Unresolved(func_ref) => {
-                    *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
-                        FUNC_REF_TAG_UNRESOLVED;
-                    write_ptr(
-                        closure,
-                        CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
-                        func_ref.as_raw_ptr() as *const u8,
-                    );
-                },
-            }
-            write_u64(closure, CLOSURE_MASK_OFFSET, op.mask);
         }
     }
 
@@ -3584,7 +3625,10 @@ impl InterpreterContext<'_> {
             // — clearer once everything (rws → table natives, gas → all) is
             // wired up.
             let guard = self.loader.guard();
-            let resolve_resource_group = |ty| resolve_resource_group!(self, ty);
+            let loader = LoaderAdapter {
+                loader: &self.loader,
+                read_set: UnsafeCell::new(&mut self.read_set),
+            };
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
@@ -3592,7 +3636,7 @@ impl InterpreterContext<'_> {
                 &mut self.gas_meter,
                 guard,
                 self.resource_provider,
-                &resolve_resource_group,
+                &loader,
                 &mut self.heap,
                 &mut self.read_write_set,
                 &self.extensions,

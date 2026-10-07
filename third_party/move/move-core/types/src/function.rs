@@ -13,6 +13,19 @@ use std::fmt;
 /// Version number for the serialization format of function data.
 pub const FUNCTION_DATA_SERIALIZATION_FORMAT_V1: u16 = 1;
 
+/// Why a function named at runtime cannot be turned into a function value.
+/// Shared by V1 MoveVM and MonoMove.
+///
+/// The discriminants must stay in sync with `std::reflect::ReflectionError`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionResolutionError {
+    Reserved = 0x0,
+    FunctionNotFound = 0x1,
+    FunctionNotAccessible = 0x2,
+    FunctionIncompatibleType = 0x3,
+    FunctionNotInstantiated = 0x4,
+}
+
 //===========================================================================================
 
 /// A `ClosureMask` is a value which determines how to distinguish those function arguments
