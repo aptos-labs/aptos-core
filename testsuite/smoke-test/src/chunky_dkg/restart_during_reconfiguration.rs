@@ -130,7 +130,10 @@ async fn validator_restart_after_randomness_dkg_completion() {
     }
 
     swarm
-        .wait_for_all_nodes_to_catchup(Duration::from_secs(180))
+        .wait_for_all_nodes_to_catchup_to_version(
+            version_before_restart + 1,
+            Duration::from_secs(180),
+        )
         .await
         .unwrap();
     swarm

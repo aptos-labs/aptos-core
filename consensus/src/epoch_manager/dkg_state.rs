@@ -10,8 +10,8 @@ use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateK
 /// consensus's key configuration uses this snapshot; the DKG managers must
 /// continue to see the latest state so they can finish the pending transition.
 /// Requires state-KV history at the epoch boundary. Epoch snapshot retention
-/// does not exempt this read from state-KV pruning; unavailable history is an
-/// error, and callers must not continue with missing keys.
+/// does not exempt this read from state-KV pruning. On error, the original state
+/// is unchanged so callers can preserve the existing configuration fallback.
 pub(super) fn recover_dkg_state<T: OnChainConfig + Default>(
     epoch: u64,
     state: &mut Result<T>,
@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn recovery_errors_are_not_converted_to_missing_keys() {
+    fn recovery_errors_preserve_the_latest_state() {
         for failure in 0..4 {
             let mut db = EpochStartDb::new();
             match failure {

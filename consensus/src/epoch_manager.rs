@@ -1318,7 +1318,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Either DKG can finish while the other still holds up reconfiguration.
         // Recover the session that initialized this epoch before deriving keys.
         if consensus_config.is_vtxn_enabled() && onchain_randomness_config.randomness_enabled() {
-            recover_dkg_state(
+            if let Err(error) = recover_dkg_state(
                 epoch_state.epoch,
                 &mut dkg_state,
                 |state| {
@@ -1328,10 +1328,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .map(|s| s.metadata.dealer_epoch)
                 },
                 self.storage.aptos_db().as_ref(),
-            )
-            .expect(
-                "Failed to recover current-epoch randomness DKG state; refusing to start consensus",
-            );
+            ) {
+                error!(
+                    epoch = epoch_state.epoch,
+                    error = ?error,
+                    "Failed to recover current-epoch randomness DKG state"
+                );
+            }
         }
         let rand_configs = self.try_get_rand_config_for_new_epoch(
             loaded_consensus_key.clone(),
@@ -1382,7 +1385,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             && onchain_chunky_dkg_config.chunky_dkg_enabled()
             && !onchain_chunky_dkg_config.is_shadow_mode()
         {
-            recover_dkg_state(
+            if let Err(error) = recover_dkg_state(
                 epoch_state.epoch,
                 &mut chunky_dkg_state,
                 |state| {
@@ -1392,10 +1395,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .map(|s| s.metadata.dealer_epoch)
                 },
                 self.storage.aptos_db().as_ref(),
-            )
-            .expect(
-                "Failed to recover current-epoch Chunky DKG state; refusing to start consensus",
-            );
+            ) {
+                error!(
+                    epoch = epoch_state.epoch,
+                    error = ?error,
+                    "Failed to recover current-epoch Chunky DKG state"
+                );
+            }
         }
         let secret_share_verifier = match self.try_get_secret_share_config_for_epoch(
             loaded_consensus_key.clone(),
