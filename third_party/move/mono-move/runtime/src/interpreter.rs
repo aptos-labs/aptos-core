@@ -1021,6 +1021,12 @@ impl<'guard> InterpreterContext<'guard> {
         }
 
         let guard = loader.guard();
+        // Before the evacuation, so a demoted copy is no longer a root.
+        //
+        // SAFETY: every read-write-set entry holds initialized values of the
+        // type at its key, and no rollback can follow the session's end.
+        unsafe { read_write_set.drop_unchanged_writes(guard) }?;
+
         // TODO(perf): the evacuated region is never returned to the pool. It
         // outlives the session inside an `Arc<FrozenHeap>`, so returning it
         // needs a hook on the last drop.
