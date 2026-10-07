@@ -87,6 +87,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_safety_rules::{
     safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
 };
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{
@@ -95,20 +96,21 @@ use aptos_types::{
             DIGEST_KEY,
         },
         real_dkg::maybe_dk_from_bls_sk,
-        DKGState, DKGTrait, DefaultDKG,
+        DKGSessionState, DKGState, DKGTrait, DefaultDKG,
     },
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
     on_chain_config::{
         ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, LeaderReputationType,
-        OnChainChunkyDKGConfig, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainChunkyDKGConfig, OnChainConfig, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
         RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     secret_sharing::SecretShareConfig,
+    state_store::state_key::StateKey,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -1064,12 +1066,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let new_epoch = new_epoch_state.epoch;
 
         let dkg_state = maybe_dkg_state.map_err(NoRandomnessReason::DKGStateResourceMissing)?;
-        let dkg_session = dkg_state
-            .last_completed
-            .ok_or_else(|| NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
-        if dkg_session.metadata.dealer_epoch + 1 != new_epoch_state.epoch {
-            return Err(NoRandomnessReason::CompletedSessionTooOld);
-        }
+        let dkg_session =
+            dkg_session_for_epoch(dkg_state, new_epoch, self.storage.aptos_db().as_ref())?;
         let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
         let my_index = new_epoch_state
             .verifier
@@ -2155,6 +2153,68 @@ pub enum NoSecretSharingReason {
     SecretShareSetupFailed(anyhow::Error),
 }
 
+/// Returns the completed randomness DKG session whose output serves `epoch`.
+///
+/// `DKGState.last_completed` normally holds the session dealt in `epoch - 1`. The DKG result for
+/// `epoch + 1` can commit while the reconfiguration still waits for other work (for example,
+/// chunky DKG). In that window, `last_completed` already targets the next epoch. A node that
+/// starts in that window reads `DKGState` as of the ledger info that ended `epoch - 1`. That
+/// state holds the session for `epoch`, which validators that did not restart still use.
+fn dkg_session_for_epoch(
+    dkg_state: DKGState,
+    epoch: u64,
+    db: &dyn DbReader,
+) -> Result<DKGSessionState, NoRandomnessReason> {
+    let session = dkg_state
+        .last_completed
+        .ok_or(NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
+    if session.target_epoch() == epoch {
+        return Ok(session);
+    }
+    if session.metadata.dealer_epoch != epoch {
+        return Err(NoRandomnessReason::CompletedSessionTooOld);
+    }
+
+    // The DKG for the next epoch completed, but the epoch has not changed yet.
+    let epoch_start_dkg_state = dkg_state_at_epoch_start(db, epoch)
+        .map_err(NoRandomnessReason::EpochStartDKGStateUnavailable)?;
+    let session = epoch_start_dkg_state
+        .last_completed
+        .ok_or(NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
+    if session.target_epoch() != epoch {
+        return Err(NoRandomnessReason::CompletedSessionTooOld);
+    }
+    info!(
+        epoch = epoch,
+        "[Randomness] The next epoch's DKG already completed. Using the DKG session from the epoch start state."
+    );
+    Ok(session)
+}
+
+/// Reads `DKGState` as of the ledger info that ended the epoch before `epoch`.
+fn dkg_state_at_epoch_start(db: &dyn DbReader, epoch: u64) -> anyhow::Result<DKGState> {
+    let prev_epoch = epoch
+        .checked_sub(1)
+        .ok_or_else(|| anyhow!("epoch {} has no previous epoch", epoch))?;
+    let proof = db.get_epoch_ending_ledger_infos(prev_epoch, epoch)?;
+    let ledger_info = proof
+        .ledger_info_with_sigs
+        .first()
+        .ok_or_else(|| anyhow!("no ledger info ends epoch {}", prev_epoch))?
+        .ledger_info();
+    ensure!(
+        ledger_info.ends_epoch() && ledger_info.epoch() == prev_epoch,
+        "ledger info at version {} does not end epoch {}",
+        ledger_info.version(),
+        prev_epoch
+    );
+    let state_key = StateKey::on_chain_config::<DKGState>()?;
+    let state_value = db
+        .get_state_value_by_version(&state_key, ledger_info.version())?
+        .ok_or_else(|| anyhow!("DKGState not found at version {}", ledger_info.version()))?;
+    DKGState::deserialize_into_config(state_value.bytes())
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub enum NoRandomnessReason {
@@ -2163,6 +2223,7 @@ pub enum NoRandomnessReason {
     DKGStateResourceMissing(anyhow::Error),
     DKGCompletedSessionResourceMissing,
     CompletedSessionTooOld,
+    EpochStartDKGStateUnavailable(anyhow::Error),
     NotInValidatorSet,
     ErrConvertingConsensusKeyToDecryptionKey(anyhow::Error),
     TranscriptDeserializationError(bcs::Error),
@@ -2172,4 +2233,163 @@ pub enum NoRandomnessReason {
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
+}
+
+#[cfg(test)]
+mod dkg_session_for_epoch_tests {
+    use super::{dkg_session_for_epoch, NoRandomnessReason};
+    use aptos_crypto::HashValue;
+    use aptos_storage_interface::{DbReader, Result as DbResult};
+    use aptos_types::{
+        aggregate_signature::AggregateSignature,
+        block_info::BlockInfo,
+        dkg::{DKGSessionMetadata, DKGSessionState, DKGState},
+        epoch_change::EpochChangeProof,
+        epoch_state::EpochState,
+        ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+        on_chain_config::OnChainRandomnessConfig,
+        state_store::{state_key::StateKey, state_value::StateValue},
+        transaction::Version,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    const EPOCH_START_VERSION: Version = 1_000;
+
+    /// Serves the ledger info that ended `epoch - 1` and `DKGState` at that version.
+    struct MockDb {
+        epoch_start_dkg_state: Option<DKGState>,
+        read: AtomicBool,
+    }
+
+    impl MockDb {
+        fn new(epoch_start_dkg_state: Option<DKGState>) -> Self {
+            Self {
+                epoch_start_dkg_state,
+                read: AtomicBool::new(false),
+            }
+        }
+    }
+
+    impl DbReader for MockDb {
+        fn get_epoch_ending_ledger_infos(
+            &self,
+            start_epoch: u64,
+            end_epoch: u64,
+        ) -> DbResult<EpochChangeProof> {
+            assert_eq!(end_epoch, start_epoch + 1);
+            let block_info = BlockInfo::new(
+                start_epoch,
+                0,
+                HashValue::zero(),
+                HashValue::zero(),
+                EPOCH_START_VERSION,
+                0,
+                Some(EpochState::empty()),
+            );
+            let ledger_info = LedgerInfo::new(block_info, HashValue::zero());
+            Ok(EpochChangeProof::new(
+                vec![LedgerInfoWithSignatures::new(
+                    ledger_info,
+                    AggregateSignature::empty(),
+                )],
+                false,
+            ))
+        }
+
+        fn get_state_value_by_version(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> DbResult<Option<StateValue>> {
+            assert_eq!(state_key, &StateKey::on_chain_config::<DKGState>().unwrap());
+            assert_eq!(version, EPOCH_START_VERSION);
+            self.read.store(true, Ordering::SeqCst);
+            Ok(self
+                .epoch_start_dkg_state
+                .as_ref()
+                .map(|state| StateValue::new_legacy(bcs::to_bytes(state).unwrap().into())))
+        }
+    }
+
+    fn session(dealer_epoch: u64) -> DKGSessionState {
+        DKGSessionState {
+            metadata: DKGSessionMetadata {
+                dealer_epoch,
+                randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+                dealer_validator_set: vec![],
+                target_validator_set: vec![],
+            },
+            start_time_us: dealer_epoch,
+            transcript: vec![dealer_epoch as u8],
+        }
+    }
+
+    fn state(last_completed: Option<DKGSessionState>) -> DKGState {
+        DKGState {
+            last_completed,
+            in_progress: None,
+        }
+    }
+
+    #[test]
+    fn uses_last_completed_when_it_targets_the_current_epoch() {
+        let db = MockDb::new(Some(state(Some(session(3)))));
+        let got = dkg_session_for_epoch(state(Some(session(9))), 10, &db).unwrap();
+        assert_eq!(got, session(9));
+        assert!(!db.read.load(Ordering::SeqCst), "must not read the DB");
+    }
+
+    #[test]
+    fn reads_epoch_start_state_when_next_epoch_dkg_completed() {
+        // Epoch 10 is still running, but the DKG for epoch 11 (dealt in epoch 10) completed.
+        let db = MockDb::new(Some(state(Some(session(9)))));
+        let got = dkg_session_for_epoch(state(Some(session(10))), 10, &db).unwrap();
+        assert_eq!(got, session(9));
+        assert!(db.read.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn fails_when_epoch_start_state_is_unavailable() {
+        let db = MockDb::new(None);
+        let err = dkg_session_for_epoch(state(Some(session(10))), 10, &db).unwrap_err();
+        assert!(matches!(
+            err,
+            NoRandomnessReason::EpochStartDKGStateUnavailable(_)
+        ));
+    }
+
+    #[test]
+    fn fails_when_epoch_start_session_does_not_target_the_current_epoch() {
+        let db = MockDb::new(Some(state(Some(session(7)))));
+        let err = dkg_session_for_epoch(state(Some(session(10))), 10, &db).unwrap_err();
+        assert!(matches!(err, NoRandomnessReason::CompletedSessionTooOld));
+    }
+
+    #[test]
+    fn fails_when_epoch_start_state_has_no_completed_session() {
+        let db = MockDb::new(Some(state(None)));
+        let err = dkg_session_for_epoch(state(Some(session(10))), 10, &db).unwrap_err();
+        assert!(matches!(
+            err,
+            NoRandomnessReason::DKGCompletedSessionResourceMissing
+        ));
+    }
+
+    #[test]
+    fn fails_when_last_completed_is_too_old() {
+        let db = MockDb::new(None);
+        let err = dkg_session_for_epoch(state(Some(session(7))), 10, &db).unwrap_err();
+        assert!(matches!(err, NoRandomnessReason::CompletedSessionTooOld));
+        assert!(!db.read.load(Ordering::SeqCst), "must not read the DB");
+    }
+
+    #[test]
+    fn fails_when_no_session_completed() {
+        let db = MockDb::new(None);
+        let err = dkg_session_for_epoch(state(None), 10, &db).unwrap_err();
+        assert!(matches!(
+            err,
+            NoRandomnessReason::DKGCompletedSessionResourceMissing
+        ));
+    }
 }
