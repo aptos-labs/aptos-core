@@ -18,6 +18,7 @@
 
 pub(crate) use crate::sharded_jmt_merkle_db::{LeafNode, Node};
 use crate::{
+    common::{HOT_STATE_MERKLE_DB_NAME, STATE_MERKLE_DB_NAME},
     db_options::gen_state_merkle_cfds,
     sharded_jmt_merkle_db::ShardedJmtMerkleDb,
     utils::truncation_helper::{get_state_merkle_commit_progress, truncate_state_merkle_db_shards},
@@ -40,9 +41,9 @@ use std::{
 
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
-        "hot_state_merkle_db"
+        HOT_STATE_MERKLE_DB_NAME
     } else {
-        "state_merkle_db"
+        STATE_MERKLE_DB_NAME
     }
 }
 

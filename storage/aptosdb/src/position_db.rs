@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    common::POSITION_DB_NAME,
     db_options::gen_position_cfds,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -28,8 +29,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-const POSITION_DB_FOLDER: &str = "position_db";
 
 pub const NUM_NATIVE_VALUE_SHARDS: usize = NUM_STATE_SHARDS;
 
@@ -104,7 +103,7 @@ impl PositionDb {
             None,
             false,
         )?;
-        let cp = cp_root_path.as_ref().join(POSITION_DB_FOLDER);
+        let cp = cp_root_path.as_ref().join(POSITION_DB_NAME);
         info!(cp = %cp.display(), "Creating position_db checkpoint.");
         std::fs::remove_dir_all(&cp).unwrap_or(());
         std::fs::create_dir_all(&cp)
@@ -161,14 +160,14 @@ impl PositionDb {
     fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize) -> PathBuf {
         db_root_path
             .as_ref()
-            .join(POSITION_DB_FOLDER)
+            .join(POSITION_DB_NAME)
             .join(format!("shard_{shard_id}"))
     }
 
     fn metadata_db_path<P: AsRef<Path>>(db_root_path: P) -> PathBuf {
         db_root_path
             .as_ref()
-            .join(POSITION_DB_FOLDER)
+            .join(POSITION_DB_NAME)
             .join("metadata")
     }
 
