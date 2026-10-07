@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 bcs = { workspace = true }
 hashbrown = { workspace = true }
 mono-move-alloc = { workspace = true }
@@ -27,6 +26,7 @@ shared-dsa = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 move-value-view-derive = { workspace = true }
 num = { workspace = true }
 paste = { workspace = true }

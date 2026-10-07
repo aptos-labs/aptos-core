@@ -24,4 +24,3 @@ rayon = { workspace = true }
 claims = { workspace = true }
 parking_lot = { workspace = true }
 proptest = { workspace = true }
-proptest-derive = { workspace = true }

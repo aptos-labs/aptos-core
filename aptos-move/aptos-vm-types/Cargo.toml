@@ -36,8 +36,6 @@ triomphe = { workspace = true }
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
-aptos-transaction-simulation = { workspace = true }
-aptos-vm = { workspace = true }
 test-case = { workspace = true }
 
 [lints.rust]
