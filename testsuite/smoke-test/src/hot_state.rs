@@ -10,12 +10,14 @@
 //! is the verification oracle these tests lean on. `delete_on_restart` is false
 //! everywhere so restarts reload the persisted hot state rather than wiping it.
 //!
-//! Fast sync and backup/restore are intentionally excluded -- hot state does not
-//! support them yet -- so only apply-outputs and re-execution bootstrapping are
-//! exercised.
+//! Fast sync restores the hot state snapshot only when the target commits a hot
+//! state root, so the fast sync tests always target an epoch where both features
+//! are on. Backup/restore is intentionally excluded since hot state does not
+//! support it yet.
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
+    state_sync::shorten_proposer_history,
     state_sync_utils,
     utils::{
         create_test_accounts, execute_transactions, execute_transactions_and_wait,
@@ -25,19 +27,60 @@ use crate::{
 };
 use aptos::test::CliTestFramework;
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
-use aptos_forge::{LocalSwarm, NodeExt, Swarm};
+use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm};
 use aptos_genesis::builder::InitGenesisConfigFn;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::TransactionFactory,
+    types::{LocalAccount, PeerId},
+};
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
 
+/// Small enough that both the main and the hot state snapshots take several chunks.
+const SMALL_STATE_CHUNK_SIZE: u64 = 30;
+
 fn persist_hot_state(config: &mut NodeConfig) {
     config.storage.hot_state_config.delete_on_restart = false;
+}
+
+fn use_fast_sync(config: &mut NodeConfig) {
+    config.state_sync.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::DownloadLatestStates;
+}
+
+/// Config for a node that serves snapshots to fast syncing peers.
+fn snapshot_server_config(config: &mut NodeConfig) {
+    persist_hot_state(config);
+    config.state_sync.storage_service.max_state_chunk_size = SMALL_STATE_CHUNK_SIZE;
+}
+
+/// Shrinks the hot state so that items get evicted and refreshed every few blocks,
+/// making later hot state roots depend on the LRU order and `hot_since_version`s.
+/// These feed into the hot state root, so every node needs the same values.
+fn use_tiny_hot_state(config: &mut NodeConfig) {
+    config.storage.hot_state_config.max_items_per_shard = 8;
+    config.storage.hot_state_config.refresh_interval_versions = 10;
+}
+
+/// Asserts that the node restored a hot state snapshot of more than one item
+/// through fast sync.
+async fn verify_hot_state_fast_synced(node: &LocalNode) {
+    let last_index = node
+        .inspection_client()
+        .get_node_metric_i64("aptos_state_sync_version{type=synced_hot_states}")
+        .await
+        .unwrap();
+    assert!(
+        last_index.is_some_and(|index| index > 0),
+        "{} did not restore a hot state snapshot, last index: {:?}",
+        node.name(),
+        last_index,
+    );
 }
 
 /// Genesis features for the suite: `HOTNESS_IN_EPILOGUE` is always on;
@@ -142,6 +185,61 @@ async fn run_hot_state_fullnode_sync(
 
     let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, &mut swarm).await;
     state_sync_utils::test_fullnode_sync(vfn_peer_id, &mut swarm, true, true).await;
+}
+
+/// Adds a fresh VFN that fast syncs to the latest epoch ending, and waits for it to
+/// catch up. `node_config` must match the validators' hot state config.
+async fn add_fast_sync_fullnode(
+    swarm: &mut LocalSwarm,
+    node_config: fn(&mut NodeConfig),
+) -> PeerId {
+    let mut vfn_config = NodeConfig::get_default_vfn_config();
+    node_config(&mut vfn_config);
+    use_fast_sync(&mut vfn_config);
+    let vfn_peer_id = state_sync_utils::create_fullnode(vfn_config, swarm).await;
+    wait_for_all_nodes(swarm).await;
+    verify_hot_state_fast_synced(swarm.fullnode(vfn_peer_id).unwrap()).await;
+    vfn_peer_id
+}
+
+/// A fresh fullnode fast syncs to a later epoch with `TRANSACTION_INFO_V1` on from
+/// genesis, then keeps applying outputs, whose hot state roots only match if the
+/// restored hot state is exact. `node_config` applies to every node. Returns the
+/// swarm and the fullnode's peer ID.
+async fn run_hot_state_fullnode_fast_sync(
+    node_config: fn(&mut NodeConfig),
+) -> (LocalSwarm, PeerId) {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(move |_, config, _| node_config(config)))
+        .with_init_genesis_config(hot_state_genesis(true))
+        .build()
+        .await;
+
+    // Build up hot state across a few epochs before the fullnode joins.
+    let validator_client = first_validator_client(&swarm);
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
+
+    let vfn_peer_id = add_fast_sync_fullnode(&mut swarm, node_config).await;
+
+    execute_transactions_and_wait(
+        &mut swarm,
+        &validator_client,
+        &mut account_1,
+        &account_0,
+        true,
+    )
+    .await;
+
+    (swarm, vfn_peer_id)
 }
 
 /// A validator restarts without wiping storage: it must reload hot state from
@@ -380,4 +478,231 @@ async fn test_hot_state_fullnode_sync_across_v1_boundary() {
     )
     .await;
     wait_for_all_nodes(&mut swarm).await;
+}
+
+/// A fresh fullnode restores the hot state snapshot through fast sync.
+#[tokio::test]
+async fn test_hot_state_fullnode_fast_sync() {
+    run_hot_state_fullnode_fast_sync(snapshot_server_config).await;
+}
+
+/// Same as `test_hot_state_fullnode_fast_sync`, but the hot state is tiny, so the
+/// blocks after the fast sync target evict and refresh restored items. The roots
+/// then also depend on the restored LRU order and `hot_since_version`s.
+#[tokio::test]
+async fn test_hot_state_fullnode_fast_sync_with_evictions() {
+    let (swarm, vfn_peer_id) = run_hot_state_fullnode_fast_sync(|config| {
+        snapshot_server_config(config);
+        use_tiny_hot_state(config);
+    })
+    .await;
+
+    // The fullnode started from the restored snapshot, so it only counts evictions
+    // after the fast sync target.
+    let num_evictions = swarm
+        .fullnode(vfn_peer_id)
+        .unwrap()
+        .inspection_client()
+        .get_node_metric_i64("aptos_storage_counter{name=hot_state_evict}")
+        .await
+        .unwrap();
+    assert!(
+        num_evictions.is_some_and(|n| n > 0),
+        "The fullnode evicted no hot state items after fast sync: {:?}",
+        num_evictions,
+    );
+}
+
+/// A fullnode fast syncs, applies some outputs within the same epoch and restarts
+/// without wiping storage. No epoch ends in between, so its latest persisted
+/// snapshot is still the fast sync target: it reloads the restored hot state from
+/// disk and replays the write sets after it.
+#[tokio::test]
+async fn test_hot_state_fullnode_restart_after_fast_sync() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| snapshot_server_config(config)))
+        .with_init_genesis_config(hot_state_genesis(true))
+        .build()
+        .await;
+
+    let validator_client = first_validator_client(&swarm);
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
+
+    let vfn_peer_id = add_fast_sync_fullnode(&mut swarm, snapshot_server_config).await;
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_1,
+        &account_0,
+        10,
+    )
+    .await;
+    wait_for_all_nodes(&mut swarm).await;
+
+    info!("Restarting fullnode after fast sync (storage preserved).");
+    swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .restart()
+        .await
+        .unwrap();
+    wait_for_all_nodes(&mut swarm).await;
+
+    execute_transactions_and_wait(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
+}
+
+/// `TRANSACTION_INFO_V1` and `HOT_STATE_ROOT_IN_TXN_INFO` are enabled via governance
+/// after the chain has run for a while. A fresh fullnode then fast syncs to an epoch
+/// that commits the hot state root, restoring a hot state mostly built before that.
+#[tokio::test]
+async fn test_hot_state_fullnode_fast_sync_after_v1_enabled() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| snapshot_server_config(config)))
+        .with_init_genesis_config(hot_state_genesis(false))
+        .build_with_cli(0)
+        .await;
+
+    let validator_client = first_validator_client(&swarm);
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
+
+    info!("Generating pre-V1 load.");
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    )
+    .await;
+
+    enable_txn_info_v1_via_governance(&mut swarm, &mut cli, &validator_client).await;
+
+    // The epoch of the governance script ends under V0, so end another one to give
+    // the fullnode a target that commits the hot state root.
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_1,
+        &account_0,
+        10,
+    )
+    .await;
+    // The CLI submitted the governance script as root.
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&validator_client)
+        .await
+        .unwrap();
+    aptos_forge::reconfig(
+        &validator_client,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+    )
+    .await;
+
+    add_fast_sync_fullnode(&mut swarm, snapshot_server_config).await;
+
+    generate_load(
+        &validator_client,
+        &transaction_factory,
+        &mut account_0,
+        &account_1,
+        10,
+    )
+    .await;
+    wait_for_all_nodes(&mut swarm).await;
+}
+
+/// A validator is wiped and fast syncs to a later epoch. Another validator is then
+/// stopped, so the chain only makes progress if the fast synced validator's votes,
+/// which commit to its hot state roots, match the others.
+#[tokio::test]
+async fn test_hot_state_validator_fast_sync_and_participate() {
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| snapshot_server_config(config)))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            hot_state_genesis(true)(genesis_config);
+            shorten_proposer_history(genesis_config);
+        }))
+        .build()
+        .await;
+
+    let validator_peer_ids: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
+    let validator_client = first_validator_client(&swarm);
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
+    execute_transactions_and_wait(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
+
+    // Only switch the wiped validator to fast sync, so the others never fast sync to
+    // genesis at startup.
+    let fast_sync_peer_id = validator_peer_ids[1];
+    let validator = swarm.validator_mut(fast_sync_peer_id).unwrap();
+    validator.clear_storage().await.unwrap();
+    use_fast_sync(validator.config_mut());
+    let config_path = validator.config_path();
+    validator.config_mut().save_to_path(&config_path).unwrap();
+
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &mut account_1,
+        &account_0,
+        true,
+    )
+    .await;
+
+    swarm
+        .validator_mut(fast_sync_peer_id)
+        .unwrap()
+        .start()
+        .unwrap();
+    wait_for_all_nodes(&mut swarm).await;
+    verify_hot_state_fast_synced(swarm.validator(fast_sync_peer_id).unwrap()).await;
+
+    // Leader reputation looks at the previous epoch, which the fast synced validator
+    // lacks, so it only agrees on proposers after another epoch change.
+    execute_transactions_and_wait(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
+
+    swarm.validator_mut(validator_peer_ids[3]).unwrap().stop();
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        true,
+    )
+    .await;
 }
