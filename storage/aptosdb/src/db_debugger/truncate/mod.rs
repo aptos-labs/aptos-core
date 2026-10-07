@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use claims::assert_le;
 use clap::Parser;
 use std::{fs, path::PathBuf, sync::Arc};

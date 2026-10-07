@@ -16,7 +16,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_logger::info;
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},

@@ -783,21 +783,21 @@ pub fn jmt_update_refs<K>(
 #[macro_export]
 macro_rules! db_anyhow {
     ($($arg:tt)*) => {
-        AptosDbError::Other(format!($($arg)*))
+        $crate::AptosDbError::Other(format!($($arg)*))
     };
 }
 
 #[macro_export]
 macro_rules! db_not_found_bail {
     ($($arg:tt)*) => {
-        return Err(AptosDbError::NotFound(format!($($arg)*)))
+        return Err($crate::AptosDbError::NotFound(format!($($arg)*)))
     };
 }
 
 #[macro_export]
 macro_rules! db_other_bail {
     ($($arg:tt)*) => {
-        return Err(AptosDbError::Other(format!($($arg)*)))
+        return Err($crate::AptosDbError::Other(format!($($arg)*)))
     };
 }
 
@@ -805,7 +805,7 @@ macro_rules! db_other_bail {
 macro_rules! db_ensure {
     ($cond:expr, $($arg:tt)*) => {
         if !$cond {
-            return Err(AptosDbError::Other(format!($($arg)*)));
+            return Err($crate::AptosDbError::Other(format!($($arg)*)));
         }
     };
 }
