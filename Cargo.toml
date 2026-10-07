@@ -225,6 +225,7 @@ members = [
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
     "third_party/move/mono-move/testsuite",
+    "third_party/move/mono-move/vm-comparison",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -897,6 +898,7 @@ usdt = "0.6.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"
 version-compare = "0.1.1"
+vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
