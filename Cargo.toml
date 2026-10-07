@@ -553,7 +553,7 @@ cfg-if = "1.0.0"
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 chrono-tz = "0.10.1"
 ciborium = "0.2"
-claims = "0.7"
+claims = "0.8"
 clap = { version = "4.3.9", features = [
     "derive",
     "env",
