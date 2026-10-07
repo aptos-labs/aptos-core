@@ -33,6 +33,7 @@ num-traits = { workspace = true }
 once_cell = { workspace = true }
 rand_core = { workspace = true, optional = true }
 ripemd = { workspace = true }
+serde = { workspace = true }
 sha2 = { workspace = true }
 # `crypto_algebra`'s hash-to-curve needs sha2 0.10, while the rest of this crate
 # is on 0.9. Both are linked; using the wrong one silently changes the digest.
