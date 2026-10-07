@@ -466,9 +466,8 @@ impl AptosDB {
         };
         // At replay start the persisted base equals the seed, which is
         // `pipeline_latest` itself — freeze against it.
-        let base_summary = pipeline_latest.summary().clone();
-        let new_latest =
-            pipeline_latest.extend(target_version, updates, &base_summary, &proof_reader)?;
+        let base = pipeline_latest.clone();
+        let new_latest = pipeline_latest.extend(target_version, updates, &base, &proof_reader)?;
 
         // Fold the replayed account-level updates into `PositionOverlay`;
         // this matches the durable JMT state we just extended to.
