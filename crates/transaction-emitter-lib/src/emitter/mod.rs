@@ -32,7 +32,9 @@ use aptos_sdk::{
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
 };
-use aptos_types::account_config::aptos_test_root_address;
+use aptos_types::{
+    account_config::aptos_test_root_address, transaction::IndexedTransactionSummary,
+};
 use futures::future::{join_all, try_join_all, FutureExt};
 use log::{error, info, warn};
 use once_cell::sync::Lazy;
@@ -1098,10 +1100,57 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
+const ORDERLESS_TXN_SUMMARIES_PAGE_SIZE: u16 = 100;
+
+/// Returns the account's transaction summaries from `start_version` onwards (paging forward),
+/// the version to resume from next time, and the ledger timestamp in microseconds.
+///
+/// Without `start_version`, only the latest page is fetched. That page comes back empty while
+/// the account has pre-committed transactions beyond the latest ledger version, which is
+/// almost always the case for an account sending in every block.
+async fn fetch_account_txn_summaries(
+    client: &RestClient,
+    account: AccountAddress,
+    start_version: Option<u64>,
+) -> Result<(Vec<IndexedTransactionSummary>, Option<u64>, u64)> {
+    let Some(mut cursor) = start_version else {
+        let response = FETCH_ACCOUNT_RETRY_POLICY
+            .retry(move || client.get_account_transaction_summaries(account, None, None, None))
+            .await?;
+        let ledger_ts_usecs = response.state().timestamp_usecs;
+        return Ok((response.into_inner(), None, ledger_ts_usecs));
+    };
+    let mut summaries = vec![];
+    loop {
+        let response = FETCH_ACCOUNT_RETRY_POLICY
+            .retry(move || {
+                client.get_account_transaction_summaries(
+                    account,
+                    Some(cursor),
+                    None,
+                    Some(ORDERLESS_TXN_SUMMARIES_PAGE_SIZE),
+                )
+            })
+            .await?;
+        let ledger_ts_usecs = response.state().timestamp_usecs;
+        let page = response.into_inner();
+        let is_full_page = page.len() >= ORDERLESS_TXN_SUMMARIES_PAGE_SIZE as usize;
+        if let Some(last) = page.last() {
+            cursor = last.version() + 1;
+        }
+        summaries.extend(page);
+        if !is_full_page {
+            return Ok((summaries, Some(cursor), ledger_ts_usecs));
+        }
+    }
+}
+
+/// `start_version` is a ledger version from before the transactions were submitted.
 async fn wait_for_orderless_txns(
     start_time: Instant,
     client: &RestClient,
     account_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
+    start_version: Option<u64>,
     txn_expiration_ts_secs: u64,
     sleep_between_cycles: Duration,
 ) -> (HashMap<AccountAddress, HashSet<HashValue>>, u128) {
@@ -1111,30 +1160,32 @@ async fn wait_for_orderless_txns(
     let mut sum_of_completion_timestamps_millis = 0u128;
 
     let mut pending_account_txns = account_orderless_txns.clone();
+    let mut next_versions: HashMap<AccountAddress, Option<u64>> = account_orderless_txns
+        .keys()
+        .map(|account| (*account, start_version))
+        .collect();
     loop {
-        let account_txn_summaries =
-            join_all(pending_account_txns.keys().map(|account| async move {
+        let account_txn_summaries = join_all(pending_account_txns.keys().map(|account| {
+            let account_start_version = next_versions[account];
+            async move {
                 (
                     *account,
-                    FETCH_ACCOUNT_RETRY_POLICY
-                        .retry(move || {
-                            client.get_account_transaction_summaries(*account, None, None, None)
-                        })
-                        .await,
+                    fetch_account_txn_summaries(client, *account, account_start_version).await,
                 )
-            }))
-            .await;
+            }
+        }))
+        .await;
 
         let millis_elapsed = start_time.elapsed().as_millis();
         let mut latest_ledger_ts_secs = u64::MAX;
         for (account, txn_summaries_result) in account_txn_summaries {
             match txn_summaries_result {
-                Ok(response) => {
-                    let ledger_timestamp =
-                        Duration::from_micros(response.state().timestamp_usecs).as_secs();
+                Ok((txn_summaries, next_version, ledger_ts_usecs)) => {
+                    next_versions.insert(account, next_version);
+                    let ledger_timestamp = Duration::from_micros(ledger_ts_usecs).as_secs();
                     latest_ledger_ts_secs = min(ledger_timestamp, latest_ledger_ts_secs);
 
-                    for txn_summary in response.into_inner() {
+                    for txn_summary in txn_summaries {
                         let remove_account =
                             if let Some(txn_hashes) = pending_account_txns.get_mut(&account) {
                                 if txn_hashes.remove(&txn_summary.transaction_hash()) {
