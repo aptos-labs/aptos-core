@@ -77,6 +77,7 @@ const CMP_MODULE: &str = "0x1::cmp";
 mod boogie_helpers;
 pub mod boogie_wrapper;
 pub mod bytecode_translator;
+mod inline_functions;
 pub mod options;
 mod process_group;
 mod prover_task_runner;

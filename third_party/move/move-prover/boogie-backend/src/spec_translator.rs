@@ -19,6 +19,7 @@ use crate::{
         compute_evaluator_memory_union, EmittedEntities, MAX_TUPLE_SIZE,
     },
     bytecode_translator::has_native_equality,
+    inline_functions::InlineFunctions,
     options::BoogieOptions,
 };
 use itertools::Itertools;
@@ -110,6 +111,8 @@ pub struct SpecTranslator<'env> {
     /// mathematical integer, so `Option<num>` and `Option<u64>` describe the same values, but
     /// each instantiation is its own Boogie datatype.
     coercions: Rc<RefCell<BTreeSet<(Type, Type)>>>,
+    /// Inline functions that may form a cycle, emitted by `finalize`.
+    inline_functions: Rc<RefCell<InlineFunctions>>,
     /// The qualified instantiated ID of the function currently being verified, if any.
     /// Used to resolve behavioral predicates on function-typed parameters.
     current_fun_qid: RefCell<Option<QualifiedInstId<FunId>>>,
@@ -197,6 +200,7 @@ impl<'env> SpecTranslator<'env> {
             lifted_choice_infos: Default::default(),
             arbitrary_values: Default::default(),
             coercions: Default::default(),
+            inline_functions: Default::default(),
             current_fun_qid: RefCell::new(None),
             current_fun_baseline: RefCell::new(None),
             current_fun_local_types: RefCell::new(None),
@@ -1027,6 +1031,7 @@ impl SpecTranslator<'_> {
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
+            let body_start = self.writer.process_result(|s| s.len());
 
             // Collect intermediate state labels in the body that need existential binding.
             // Only truly intermediate labels (those that resolve to themselves via
@@ -1086,6 +1091,15 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, ")");
             }
 
+            // A recursive spec function is not inline, so it is on no cycle that Boogie rejects.
+            if !recursive {
+                let body_text = self
+                    .writer
+                    .process_result(|s| s.get(body_start..).unwrap_or_default().to_string());
+                self.inline_functions
+                    .borrow_mut()
+                    .record_emitted(boogie_name, body_text);
+            }
             emitln!(self.writer);
             self.writer.unindent();
             emitln!(self.writer, "}");
@@ -1103,6 +1117,15 @@ impl SpecTranslator<'_> {
         self.translate_choice_functions();
         self.translate_arbitrary_value_functions();
         self.translate_coercion_functions();
+        self.inline_functions.borrow().emit_deferred(self.writer);
+    }
+
+    /// Emits `function {:inline} <name>(<params>): bool { <body> }` in `finalize`, or without a
+    /// body if the function is on a cycle of inline functions.
+    pub(crate) fn defer_inline_predicate(&self, name: String, params: &[String], body: String) {
+        self.inline_functions
+            .borrow_mut()
+            .defer(name, params.join(", "), body);
     }
 
     /// Shares `parent`'s lifted-choice and arbitrary-value collections, so

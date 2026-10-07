@@ -399,6 +399,9 @@ impl BoogieOptions {
         for f in &self.boogie_flags {
             add(&[f.as_str()]);
         }
+        // A call past the inlining depth of an `{:inline N}` procedure fails instead of pruning
+        // its paths. Added after the custom flags so that none overrides it.
+        add(&["-inline:assert"]);
         if let Some(file) = prover_log {
             add(&[&format!("-proverLog:{}", file)]);
         }

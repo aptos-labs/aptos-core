@@ -76,6 +76,7 @@ module 0x42::proof_weight {
         else { n + sum_up_to(n - 1) }
     }
     spec sum_up_to {
+        pragma opaque;
         aborts_if sum(n) > MAX_U64;
         ensures result == sum(n);
     } proof {

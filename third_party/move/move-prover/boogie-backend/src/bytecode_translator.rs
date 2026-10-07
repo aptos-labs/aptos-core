@@ -1151,9 +1151,13 @@ impl<'env> BoogieTranslator<'env> {
             "// Apply procedure for `{}`",
             fun_type.display(&self.env.get_type_display_ctx())
         );
+        // Nested applications of this type that do not reach the same closure target twice fit
+        // in this depth. Nesting one target in itself, even with different captured values, is
+        // recursion through function values; past this depth it is reported.
         emit!(
             self.writer,
-            "procedure {{:inline 1}} {}(",
+            "procedure {{:inline {}}} {}(",
+            closure_infos.len() + 1,
             boogie_fun_apply_name(self.env, fun_type),
         );
         let Type::Fun(params, results, _abilities) = fun_type else {
@@ -1682,6 +1686,56 @@ impl<'env> BoogieTranslator<'env> {
             self.writer.unindent();
             emitln!(self.writer, "}");
         }
+    }
+
+    /// The function types of values reachable from a value of type `ty`, through references,
+    /// vectors, tuples and struct fields.
+    fn fun_types_in(&self, ty: &Type) -> Vec<Type> {
+        fn collect(env: &GlobalEnv, ty: &Type, seen: &mut BTreeSet<Type>, out: &mut Vec<Type>) {
+            if !seen.insert(ty.clone()) {
+                return;
+            }
+            match ty {
+                Type::Fun(..) => out.push(ty.clone()),
+                Type::Reference(_, elem) | Type::Vector(elem) => collect(env, elem, seen, out),
+                Type::Tuple(elems) => elems.iter().for_each(|elem| collect(env, elem, seen, out)),
+                Type::Struct(mid, sid, inst) => {
+                    for field in env.get_struct(mid.qualified(*sid)).get_fields() {
+                        collect(env, &field.get_type().instantiate(inst), seen, out);
+                    }
+                },
+                _ => {},
+            }
+        }
+        let mut out = vec![];
+        collect(self.env, ty, &mut BTreeSet::new(), &mut out);
+        out
+    }
+
+    /// The closure targets a value of function type `ty` may hold: those of `ty`, or for a type
+    /// that is still generic, those of any function type with the same shape.
+    fn closure_targets(&self, ty: &Type) -> Vec<QualifiedId<FunId>> {
+        let fun_infos = &mono_analysis::get_info(self.env).fun_infos;
+        let shape = |ty: &Type| match ty {
+            Type::Fun(args, result, _) => {
+                Some((args.clone().flatten().len(), result.clone().flatten().len()))
+            },
+            _ => None,
+        };
+        let ty = ty.clone().normalize_fun();
+        let infos: Vec<&ClosureInfo> = match fun_infos.get(&ty) {
+            Some(infos) => infos.iter().collect(),
+            None if ty.is_open() => fun_infos
+                .iter()
+                .filter(|(key, _)| shape(key) == shape(&ty))
+                .flat_map(|(_, infos)| infos.iter())
+                .collect(),
+            None => vec![],
+        };
+        infos
+            .into_iter()
+            .map(|info| info.fun.to_qualified_id())
+            .collect()
     }
 
     /// Convert `FrameAccessKind` (with Exp-level addresses) to `ApplyFrameAccess`
@@ -2241,13 +2295,26 @@ impl<'env> BoogieTranslator<'env> {
                         format!("if (f is {ctor}) then ({arm}) else ({rest})")
                     }
                 });
-        emitln!(
-            self.writer,
-            "function {{:inline}} {}({}): bool {{ {} }}",
+        self.spec_translator.defer_inline_predicate(
             boogie_behavioral_eval_fun_name(self.env, fun_type, kind),
-            decls.join(", "),
-            body
+            &decls,
+            body,
         );
+    }
+
+    /// Emits the behavioral predicate `name` with the given body, or uninterpreted without one.
+    fn emit_behavioral_predicate(&self, name: String, params: &[String], body: Option<String>) {
+        match body {
+            Some(body) => self
+                .spec_translator
+                .defer_inline_predicate(name, params, body),
+            None => emitln!(
+                self.writer,
+                "function {}({}): bool;",
+                name,
+                params.join(", ")
+            ),
+        }
     }
 
     /// Build parameter declarations and names for the "data" portion of the
@@ -3135,27 +3202,19 @@ impl<'env> BoogieTranslator<'env> {
                     &info.fun.inst,
                     &inst_old,
                 );
-                if let Some((body, has_existential)) = body {
-                    let inline_attr = if is_higher_order || !has_existential {
-                        "{:inline} "
-                    } else {
-                        ""
-                    };
-                    emitln!(
+                match body {
+                    Some((body, true)) if !is_higher_order => emitln!(
                         self.writer,
-                        "function {}{}({}): bool {{ {} }}",
-                        inline_attr,
+                        "function {}({}): bool {{ {} }}",
                         bp_name,
                         input_param_decls.join(", "),
                         body
-                    );
-                } else {
-                    emitln!(
-                        self.writer,
-                        "function {}({}): bool;",
+                    ),
+                    body => self.emit_behavioral_predicate(
                         bp_name,
-                        input_param_decls.join(", ")
-                    );
+                        &input_param_decls,
+                        body.map(|(body, _)| body),
+                    ),
                 }
             }
 
@@ -3279,23 +3338,11 @@ impl<'env> BoogieTranslator<'env> {
                 let mut ensures_param_decls = input_param_decls.clone();
                 ensures_param_decls.push(format!("r0: {}", all_result_types[0]));
 
-                // Define ensures_of as inline function
-                if let Some(ensures_body) = ensures_body {
-                    emitln!(
-                        self.writer,
-                        "function {{:inline}} {}({}): bool {{ {} }}",
-                        ensures_fun_name,
-                        ensures_param_decls.join(", "),
-                        ensures_body
-                    );
-                } else {
-                    emitln!(
-                        self.writer,
-                        "function {}({}): bool;",
-                        ensures_fun_name,
-                        ensures_param_decls.join(", ")
-                    );
-                }
+                self.emit_behavioral_predicate(
+                    ensures_fun_name.clone(),
+                    &ensures_param_decls,
+                    ensures_body,
+                );
 
                 let ensures_of_with_result = {
                     let mut call_args = all_input_arg_names.clone();
@@ -3350,22 +3397,11 @@ impl<'env> BoogieTranslator<'env> {
                         &inst_old,
                     )
                     .map(|(body, _)| body);
-                if let Some(ensures_body) = ensures_body {
-                    emitln!(
-                        self.writer,
-                        "function {{:inline}} {}({}): bool {{ {} }}",
-                        ensures_fun_name,
-                        full_param_decls.join(", "),
-                        ensures_body
-                    );
-                } else {
-                    emitln!(
-                        self.writer,
-                        "function {}({}): bool;",
-                        ensures_fun_name,
-                        full_param_decls.join(", ")
-                    );
-                }
+                self.emit_behavioral_predicate(
+                    ensures_fun_name.clone(),
+                    &full_param_decls,
+                    ensures_body,
+                );
 
                 let tuple_projections: Vec<String> = (0..all_result_types.len())
                     .map(|i| format!("_r->${}", i))
@@ -3404,22 +3440,11 @@ impl<'env> BoogieTranslator<'env> {
                         &inst_old,
                     )
                     .map(|(body, _)| body);
-                if let Some(ensures_body) = ensures_body {
-                    emitln!(
-                        self.writer,
-                        "function {{:inline}} {}({}): bool {{ {} }}",
-                        ensures_fun_name,
-                        full_param_decls.join(", "),
-                        ensures_body
-                    );
-                } else {
-                    emitln!(
-                        self.writer,
-                        "function {}({}): bool;",
-                        ensures_fun_name,
-                        full_param_decls.join(", ")
-                    );
-                }
+                self.emit_behavioral_predicate(
+                    ensures_fun_name.clone(),
+                    &full_param_decls,
+                    ensures_body,
+                );
             }
         }
     }
@@ -6285,7 +6310,18 @@ impl FunctionTranslator<'_> {
         let (args, rets) = self.generate_function_args_and_returns();
 
         let (suffix, attribs) = match &fun_target.data.variant {
-            FunctionVariant::Baseline => ("".to_string(), "{:inline 1} ".to_string()),
+            FunctionVariant::Baseline => {
+                // The depth covers nesting through each possible closure of the function
+                // parameters once; deeper nesting through one closure target is reported.
+                let depth = 1 + fun_target
+                    .func_env
+                    .get_parameter_types()
+                    .iter()
+                    .flat_map(|ty| self.parent.fun_types_in(&ty.instantiate(self.type_inst)))
+                    .map(|ty| self.parent.closure_targets(&ty).len())
+                    .sum::<usize>();
+                ("".to_string(), format!("{{:inline {}}} ", depth))
+            },
             FunctionVariant::Verification(flavor) => {
                 let mut attribs = vec![format!(
                     "{{:timeLimit {}}} ",
