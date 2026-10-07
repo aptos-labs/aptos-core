@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    common::LEDGER_DB_FOLDER_NAME,
     db_options::{
         gen_event_cfds, gen_ledger_metadata_cfds, gen_persisted_auxiliary_info_cfds,
         gen_transaction_accumulator_cfds, gen_transaction_auxiliary_data_cfds,
@@ -52,7 +53,6 @@ pub(crate) mod write_set_db;
 #[cfg(test)]
 mod write_set_db_test;
 
-pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
 pub const LEDGER_METADATA_DB_NAME: &str = "ledger_metadata_db";
 pub const EVENT_DB_NAME: &str = "event_db";
 pub const PERSISTED_AUXILIARY_INFO_DB_NAME: &str = "persisted_auxiliary_info_db";
