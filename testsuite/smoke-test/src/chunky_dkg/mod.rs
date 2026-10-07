@@ -21,6 +21,7 @@ mod correctness;
 mod enable_feature;
 mod epoch_timeout;
 mod governance_recovery;
+mod redeal_certification;
 mod restart_during_reconfiguration;
 mod shadow_mode;
 mod stall_recovery;

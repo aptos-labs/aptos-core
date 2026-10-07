@@ -217,6 +217,31 @@ impl ChunkyTestSetup {
 
 pub struct DummyNetworkSender;
 
+/// Loopback transport whose RPC responses are controlled by the test.
+pub fn loopback_network(
+    author: AccountAddress,
+) -> (
+    Arc<crate::network::NetworkSender>,
+    aptos_channels::Receiver<aptos_network::protocols::network::Event<DKGMessage>>,
+) {
+    use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+    let client = NetworkClient::new(
+        vec![],
+        vec![],
+        Default::default(),
+        PeersAndMetadata::new(&[]),
+    );
+    let (sender, receiver) = aptos_channels::new_test(16);
+    (
+        Arc::new(crate::network::NetworkSender::new(
+            author,
+            crate::network_interface::DKGNetworkClient::new(client),
+            sender,
+        )),
+        receiver,
+    )
+}
+
 #[async_trait]
 impl RBNetworkSender<DKGMessage> for DummyNetworkSender {
     async fn send_rb_rpc_raw(
