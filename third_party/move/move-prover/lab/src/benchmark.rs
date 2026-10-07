@@ -219,7 +219,7 @@ impl Runner {
 
         // Scope verification to the given function
         let env = fun.module_env.env;
-        self.options.prover.verify_scope = VerificationScope::Only(fun.get_full_name_str());
+        self.options.prover.verify_scope = VerificationScope::Only(vec![fun.get_full_name_str()]);
         ProverOptions::set(env, self.options.prover.clone());
         create_init_num_operation_state(env);
         // Run benchmark

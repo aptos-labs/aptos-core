@@ -1,6 +1,17 @@
 --- a/sources/trading/extracted_dead_mans_switch_tracker.move
 +++ b/sources/trading/extracted_dead_mans_switch_tracker.move
-@@ -141,0 +142,69 @@
+@@ -89,0 +90,10 @@ module aptos_experimental::extracted_dead_mans_switch_tracker {
++    spec disable_keep_alive {
++        pragma opaque;
++        aborts_if false;
++        ensures tracker.min_keep_alive_time_secs == old(tracker.min_keep_alive_time_secs);
++        ensures !aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == old(tracker.state);
++        ensures aptos_std::big_ordered_map::spec_contains_key(old(tracker.state), account) ==>
++            tracker.state == aptos_std::big_ordered_map::spec_remove(old(tracker.state), account);
++    }
++
+@@ -141,0 +152,69 @@ module aptos_experimental::extracted_dead_mans_switch_tracker {
 +
 +    spec module {
 +        /// The clock as `keep_alive` and `is_order_valid` read it.

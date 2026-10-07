@@ -1,6 +1,6 @@
 --- a/sources/framework/extracted_multisig_account.move
 +++ b/sources/framework/extracted_multisig_account.move
-@@ -63,0 +64,11 @@
+@@ -63,0 +64,11 @@ module aptos_framework::extracted_multisig_account {
 +        } spec {
 +            invariant multisig_account.last_executed_sequence_number + 1 <= i;
 +            invariant i <= multisig_account.last_executed_sequence_number + 1 || i <= next_sequence_number;
@@ -12,8 +12,7 @@
 +                );
 +            invariant forall s: u64 where multisig_account.last_executed_sequence_number < s && s < i:
 +                table::spec_contains(multisig_account.transactions, s);
-@@ -95,0 +107,64 @@
-+    }
+@@ -96,0 +108,64 @@ module aptos_framework::extracted_multisig_account {
 +
 +    spec module {
 +        /// The number of pending transactions, which is zero when the next
@@ -77,3 +76,8 @@
 +                && num_approvals >= std::option::spec_borrow(lock.override_threshold))
 +                || now - created >= lock.timelock_period
 +        );
++    }
+--- a/sources/framework/extracted_multisig_account.spec.move
++++ b/sources/framework/extracted_multisig_account.spec.move
+@@ -8,0 +9 @@ spec aptos_framework::extracted_multisig_account {
++        pragma opaque;

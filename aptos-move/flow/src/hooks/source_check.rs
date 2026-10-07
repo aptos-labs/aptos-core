@@ -678,7 +678,7 @@ const DEPRECATED_PATTERNS: &[(&str, &str)] = &[
 ];
 
 /// Return a byte mask for ranges that are not code (comments / string literals).
-fn ignored_context_mask(source: &str) -> Vec<bool> {
+pub(crate) fn ignored_context_mask(source: &str) -> Vec<bool> {
     let bytes = source.as_bytes();
     let mut ignored = vec![false; bytes.len()];
     let mut i = 0;

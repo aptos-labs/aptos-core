@@ -104,7 +104,6 @@ impl DoStateCheckpoint {
             .to_commit
             .state_update_refs()
             .last_inner_checkpoint_index();
-        let base_summary = persisted.summary();
         // No in-memory parent at genesis / first block after enabling: seed
         // from the pre-committed position tip (covers committed writes the
         // merklized snapshot may lag).
@@ -149,7 +148,7 @@ impl DoStateCheckpoint {
             let new_ckpt = parent_latest.extend(
                 checkpoint_version,
                 collect(0..ci + 1),
-                base_summary,
+                persisted.persisted(),
                 persisted,
             )?;
             if ci + 1 == num_txns {
@@ -159,7 +158,7 @@ impl DoStateCheckpoint {
                 let new_latest = new_ckpt.extend(
                     last_version,
                     collect(ci + 1..num_txns),
-                    base_summary,
+                    persisted.persisted(),
                     persisted,
                 )?;
                 (new_latest, new_ckpt)
@@ -170,7 +169,7 @@ impl DoStateCheckpoint {
             let new_latest = parent_latest.extend(
                 last_version,
                 collect(0..num_txns),
-                base_summary,
+                persisted.persisted(),
                 persisted,
             )?;
             (new_latest, parent_last_checkpoint)

@@ -3,7 +3,7 @@
     {
       "anchor": {
         "length": 27,
-        "offset": 3067,
+        "offset": 3582,
         "sha256": "3a0217003ee455b04dd44fb3ee9d6ea15495adc1b6cdd608e1554fa4e83c6979"
       },
       "edit": {
@@ -35,7 +35,7 @@
     {
       "anchor": {
         "length": 45,
-        "offset": 3840,
+        "offset": 4355,
         "sha256": "606cf8f2743d8e9b5569c436784cdd33890442e2d5de495944abb3473e5e768d"
       },
       "edit": {
@@ -67,7 +67,7 @@
     {
       "anchor": {
         "length": 53,
-        "offset": 3438,
+        "offset": 3953,
         "sha256": "b1474c91e045cee9b13e1bc8829fabd4c24574fc713e571263a9e5ca017d581b"
       },
       "edit": {
@@ -97,6 +97,6 @@
       }
     }
   ],
-  "reference_sha256": "7599ba70277ac348e69161e580515119b4cefe61141a383a4de3c1f623bf166e",
+  "reference_sha256": "46d84ea3b60893371baad70db1d57cb71db63e8de4ac72e63ce215cb74aae6be",
   "task_id": "DM-keepalive-035"
 }

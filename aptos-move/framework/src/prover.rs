@@ -305,7 +305,7 @@ impl ProverOptions {
             verbosity_level,
             prover: move_prover_bytecode_pipeline::options::ProverOptions {
                 verify_scope: if let Some(name) = self.only {
-                    VerificationScope::Only(name)
+                    VerificationScope::Only(vec![name])
                 } else {
                     base_opts.prover.verify_scope.clone()
                 },

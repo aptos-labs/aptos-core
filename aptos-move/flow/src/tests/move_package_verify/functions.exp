@@ -1,0 +1,13 @@
+is_error: true
+verification failed:
+error: post-condition does not hold
+   ┌─ <TEMPDIR>/mixed.move:13:9
+   │
+13 │         ensures result == x + 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at <TEMPDIR>/mixed.move:9: bad
+   =         x = <redacted>
+   =     at <TEMPDIR>/mixed.move:10: bad
+   =         result = <redacted>
+   =     at <TEMPDIR>/mixed.move:13: bad (spec)

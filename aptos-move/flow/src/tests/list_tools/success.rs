@@ -52,7 +52,6 @@ fn inventory_at(
         evaluation_mode,
         feedback_level,
         aborts_if_is_strict: false,
-        infer_unspecified_helpers: false,
     })
 }
 

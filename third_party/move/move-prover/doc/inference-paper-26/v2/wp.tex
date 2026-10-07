@@ -5,33 +5,47 @@
 The mechanical half of the system is a weakest-precondition analysis~\cite{dijkstra1975wp} that reads off abort conditions, modifies clauses, and consequence-style postconditions from a function's bytecode.
 \WP itself is textbook.
 Two things make it applicable to a language with Rust-style references and make its output readable: it runs on \MVP's reference-eliminated bytecode, where backward predicate propagation is plain substitution, and a reverse mapping carries the derived predicates back to the references of the source.
-This section describes both, and then what the elimination buys compared to reasoning over references directly.
 
 \SubSection{Reference Elimination}
 \label{sec:refelim}
 
 Move has Rust-style references: |&T| for shared reads and |&mut T| for exclusive writes, both with a stack-bounded lifetime, and the borrow checker guarantees that a live |&mut| is the only access path to its referent.
-\MVP exploits this guarantee to rewrite bytecode into a reference-free form~\cite{DillGPQXZ22}, originally in order to keep the verification conditions first-order and free of a heap model.
+\MVP exploits this guarantee to rewrite bytecode into a form in which references are plain values~\cite{DillGPQXZ22}, originally in order to keep the verification conditions first-order and free of a heap model.
 Two passes perform the elimination.
 Shared references are inlined: |&T| disappears and reads through it become reads of the underlying value.
-A mutable reference becomes a pair of the value it currently denotes and a \emph{borrow path} back to its root --- a local, a |&mut| parameter, or a global resource |R[a]| --- and every mutation is followed by an explicit \emph{write-back} along that path, inserted by a borrow analysis, which rebuilds the parent value with the field or element replaced.
+A mutable reference becomes a pair of the value it currently denotes and a \emph{borrow path} back to its root --- a local, a |&mut| parameter, or a global resource |R[a]| (Sec.~\ref{sec:globals}) --- and a write through the reference updates only this value.
+Where the lifetime of the reference ends, as determined by a borrow analysis, explicit \emph{write-backs} are inserted along the path up to the first ancestor that is still alive; each rebuilds the parent value with the field or element replaced.
 A |&mut| parameter becomes an in/out value parameter: it enters as a plain value and leaves as the value written back last.
 Where the root of a reference is not statically unique, as in |if (c) &mut x else &mut y|, the write-back is guarded by an explicit test of which parent the reference was taken from.
 Before \WP runs, the bytecode further passes through \MVP's specification instrumentation: each function-level |requires|, |aborts_if|, |ensures|, or |modifies| clause and each loop |invariant| becomes an |assume| or |assert| at the appropriate program point, and calls are summarized by the \emph{behavioral predicates} of~\cite{GrieskampEtAl26HO}: |requires_of<f>|, |aborts_of<f>|, |ensures_of<f>|, |modifies_of<f>|, and |result_of<f>| reify a callee's contract as predicates over the call site's arguments and result.
-At the input to \WP, the bytecode is a sequence of assignments over plain values interleaved with |assume| and |assert|.
+At the input to \WP, mutable borrows, writes through references, and write-backs are still instructions of the bytecode, but they operate on values; all other instructions are assignments over plain values, interleaved with |assume| and |assert|.
+
+\SubSection{Global Storage}
+\label{sec:globals}
+
+In addition to Rust's reference semantics, Move has \emph{global storage}, a memory indexed by a type and an address.
+A resource type |R| and an address |a| identify at most one value, written |R[a]|.
+The operations |move_to|, |move_from|, and |exists<R>(a)| publish, remove, and test this value, and |&R[a]| and |&mut R[a]| borrow it.
+The prover models global storage as one map from addresses to values per resource type, and the specification language uses the same notation |R[a]|, with |old(R[a])| for the value at function entry.
+Since the memory is indexed by type, accesses to different resource types never alias, and accesses to the same type alias only when their addresses coincide.
+A function that updates global storage several times passes through several memory states.
+The specification language can name such intermediate states with \emph{state labels} and evaluate a condition at a labeled state |S|, written !S |~ e!; |old(R[a])| refers to the state at function entry.
 
 \SubSection{The Predicate Transformer}
 \label{sec:transformer}
 
 The analysis is a backward dataflow pass over the control-flow graph.
-Its state at a program point is a triple $(E, A, \ell)$: a set $E$ of \emph{ensures} conjuncts that hold on every normal return reached from the point, a set $A$ of \emph{abort} disjuncts under which the function aborts, and a \emph{memory label} $\ell$ naming the memory version the conditions refer to, together with bookkeeping for the |&mut| parameters and global resources that have been written on the way.
+Its state at a program point is a triple $(E, A, \ell)$: a set $E$ of \emph{ensures} conjuncts that hold on every normal return reached from the point, a set $A$ of \emph{abort} disjuncts under which the function aborts, and a state label $\ell$ (Sec.~\ref{sec:globals}) naming the memory state the conditions refer to, together with bookkeeping for the |&mut| parameters and global resources that have been written on the way.
 At a return, $E = \{\,\mathtt{result}_i = t_i\,\}$ for the returned temporaries and $A = \emptyset$; at an |abort|, $A = \{\mathtt{true}\}$.
 Instructions transform the state as follows.
 \begin{Itemize}
 \item \emph{Assignment and operators.}
   $t := e$ substitutes $e$ for $t$ in $E$ and $A$; an operator that can abort --- arithmetic overflow and underflow, division by zero, an index out of range, a cast that truncates, a missing enum variant --- also adds its abort predicate to $A$.
 \item \emph{References.}
-  A borrow $r := \,$|&x| or $r := \,$|&x.f| substitutes |x| or |x.f| for $r$; a write-back along a field edge replaces the parent |x| by |x| with field |f| set to the value written; a global borrow $r := \,$|&mut R[a]| substitutes |R[a]| for $r$ and adds |!exists<R>(a)| to $A$.
+  The central instruction is the write-back, which ends the lifetime of a reference.
+  A write-back of $v$ into a parent |x| replaces |x| by |x| with the field or element of the edge set to $v$.
+  A write $*r := v$ substitutes $v$ for $r$, and a borrow $r := \,$|&mut x.f| substitutes |x.f| for $r$; together with the write-back, a borrow and the writes through it thus become a functional update of the root.
+  A write-back to a global root |R[a]| instead adds |modifies R[a]| and an equation for the new value of |R[a]| at the current state label, and moves $\ell$ to the label before the write-back; the global borrow $r := \,$|&mut R[a]| substitutes |R[a]| for $r$ and adds |!exists<R>(a)| to $A$.
   Since every reference is a path to a named root, no instruction needs a heap.
 \item \emph{Calls.}
   A call $t := f(\bar a)$ substitutes |result_of<f>|$(\bar a)$ for $t$ --- or the callee's specification function, if $f$ is pure --- adds |aborts_of<f>|$(\bar a)$ to $A$, and relates the memory before and after the call through |ensures_of<f>|; when the callee has no abort contract, the abort condition is recorded as \emph{partial} rather than invented.
@@ -42,20 +56,20 @@ Instructions transform the state as follows.
   An |assert| $\varphi$ adds $\varphi$ to $E$ and $\neg\varphi$ to $A$; an |assume| $\varphi$ adds $\varphi$ as an antecedent to both.
   This is how the contracts of callees, user-written conditions, and loop invariants enter the derivation.
 \item \emph{Loops.}
-  Loops are broken at their headers by the cut-point encoding of Barnett and Leino~\cite{BL05}: the back-edge is severed, the loop |invariant| is asserted before and after each iteration, and the loop-modified locations are havoced in between.
+  Loops are broken at their headers by the cut-point encoding of Barnett and Leino~\cite{BL05}: the back-edge is severed, the loop |invariant| is asserted before and after each iteration, and the loop-modified locations are havocked in between.
   \WP of |havoc x| universally quantifies |x| in $E$ and existentially in $A$, so variables that the invariant does not constrain appear quantified in the contract.
 \end{Itemize}
-The pass iterates to a fixpoint in reverse topological order of the acyclic graph that remains, and the state at entry is the raw contract.
-Post-processing then strips the labels of the entry and exit memories, resolves the parent tests of non-unique write-backs into path conditions computed from the dominator tree, adds |p == old(p)| for every |&mut| parameter never written, substitutes the global resources captured through borrows, and simplifies: constant folding, boolean and arithmetic identities, tautology removal, and scoping of quantifiers to the conjuncts that mention their variable.
-Simplification matters more here than in a verifier, where the \WP result goes to the solver and is never shown: the raw predicate of a twenty-line function can have hundreds of terms, and the agent and the user see the simplified one.
+Since the remaining graph is acyclic, the pass visits each block once, in reverse topological order, and the state at entry is the raw contract.
+A post-processing step then maps it back to the source (Sec.~\ref{sec:reverse}) and simplifies it.
+Simplification matters more here than in a verifier, where the \WP result is only passed to the solver: the raw predicate of a twenty-line function can have hundreds of terms, and the agent and the user read the simplified one.
 
 \SubSection{Carrying the Result Back}
 \label{sec:reverse}
 
-The predicate at entry is stated over the eliminated form, whose in/out parameters and rebuilt parent values have no counterpart in the source signature; the contract the user reads must be stated over the original references.
-Three cases arise, and each has a source-level spelling.
+The predicate at entry is stated over the reference-eliminated form, whose in/out parameters have no counterpart in the source signature; the contract the user reads must be stated over the original references.
+Three cases arise.
 A |&T| parameter needs nothing: the specification language already reads a shared reference as its value.
-For a |&mut T| parameter |p|, the in/out parameter's exit value becomes |ensures p == e|, where |e| is the value written back last on the path to the return, and any read of |p| before that write resolves to |old(p)|, the value at entry; an earlier write is folded in by substituting it for |old(p)| in what was already derived, so a sequence of writes chains into one equation.
+For a |&mut T| parameter |p|, the specification language reads |p| as the value at exit and |old(p)| as the value at entry. The last value written to |p| becomes |ensures p == e|, where reads of |p| in |e| refer to |old(p)|. In straight-line code, several writes combine into one equation: |*p = *p + 1; *p = *p * 2| yields |ensures p == (old(p) + 1) * 2|. In a loop, |p| is havocked like any loop-modified variable, and the loop invariant has to relate it to |old(p)|.
 For a global resource, a borrow of |R[a]| that is written back yields |modifies R[a]| together with an equation on the resource's post-state value, with |old(R[a])| for its value at entry.
 Consider the transfer of an amount between two balances:
 
@@ -75,22 +89,22 @@ The derived contract is stated over the resources themselves, and the two borrow
     pragma opaque;
     modifies Balance[from];
     modifies Balance[to];
-    aborts_if [inferred] !exists<Balance>(from);
-    aborts_if [inferred] !exists<Balance>(to);
-    aborts_if [inferred] Balance[from].v < amount;
-    aborts_if [inferred]
+    aborts_if !exists<Balance>(from);
+    aborts_if !exists<Balance>(to);
+    aborts_if Balance[from].v < amount;
+    aborts_if
       from != to && Balance[to].v + amount > MAX_U64;
-    ensures [inferred]
+    ensures
       from == to ==> Balance[from] == old(Balance[from]);
-    ensures [inferred] from != to
+    ensures from != to
       ==> Balance[from].v == old(Balance[from]).v - amount;
-    ensures [inferred] from != to
+    ensures from != to
       ==> Balance[to].v == old(Balance[to]).v + amount;
   }
 \end{MoveBoxTool}
 
 \noindent When a function updates global memory in several steps, an equation on the final memory is not enough: the abort condition of the second |move_to| below depends on the memory after the first.
-The memory labels of the transformer therefore surface as \emph{state labels} naming the intermediate memory states at which a global update happens, and the specification language lets a condition be evaluated at a labeled state, !S |~ e!, or over a range of states, !S1..S2 |~ e!:
+The state labels of the transformer therefore appear in the contract, naming the intermediate memory states at which a global update happens; a condition is evaluated at a labeled state, !S |~ e!, or over a range of states, !S1..S2 |~ e!:
 
 \begin{MoveBoxUser}
   fun split_balance(
@@ -108,19 +122,19 @@ The memory labels of the transformer therefore surface as \emph{state labels} na
     modifies Balance[src];
     modifies Balance[signer::address_of(dst1)];
     modifies Balance[signer::address_of(dst2)];
-    ensures [inferred] result == old(Balance[src]).v / 2;
-    ensures [inferred] ..S1 |~ remove<Balance>(src);
-    ensures [inferred] S1..S2 |~
+    ensures result == old(Balance[src]).v / 2;
+    ensures ..S1 |~ remove<Balance>(src);
+    ensures S1..S2 |~
       publish<Balance>(signer::address_of(dst1),
         Balance { v: old(Balance[src]).v / 2 });
-    ensures [inferred] S2.. |~
+    ensures S2.. |~
       publish<Balance>(signer::address_of(dst2),
         Balance { v: old(Balance[src]).v
                      - old(Balance[src]).v / 2 });
-    aborts_if [inferred] !exists<Balance>(src);
-    aborts_if [inferred]
+    aborts_if !exists<Balance>(src);
+    aborts_if
       S1 |~ exists<Balance>(signer::address_of(dst1));
-    aborts_if [inferred]
+    aborts_if
       S2 |~ exists<Balance>(signer::address_of(dst2));
   }
 \end{MoveBoxTool}
@@ -132,25 +146,24 @@ Without the labels, the memory versions the eliminated form threads through the 
 \label{sec:diagnostics}
 
 \WP is complete only where its inputs are: a loop without an invariant and a callee without an abort contract both leave holes, and the tool reports both instead of silently emitting an incomplete contract.
-After a havoced loop, a condition that quantifies over everything the loop touched carries no information; such \emph{vacuous} conditions are dropped and the loop is reported with \emph{loop-invariant evidence} --- the facts that hold at the first few loop heads on each path, computed by bounded unrolling of the same transformer, as in the |head[k]| listing of Sec.~\ref{sec:example}.
+After a havocked loop, a condition that quantifies over everything the loop touched carries no information; such \emph{vacuous} conditions are dropped and the loop is reported with \emph{loop-invariant evidence} --- the facts that hold at the first few loop heads on each path, computed by bounded unrolling of the same transformer, as in the |head[k]| listing of Sec.~\ref{sec:example}.
 A condition that is exact but existentially quantified, typically an abort condition that says \emph{some} iteration overflows, is kept and marked |sathard|, since its satisfiability will be expensive for the solver.
 An abort condition that could not account for a callee is marked \emph{partial}.
-Every emitted condition carries an |[inferred]| marker, so that re-runs replace their own output and never disturb user-written specifications, and every function that received a contract is made |opaque|, so that callers reason through it.
+Every emitted condition carries an |[inferred]| marker, so that re-runs replace their own output and never disturb user-written specifications (the listings in this paper omit the marker, except where it carries |sathard|).
 The agent's skills are written against these markers: they identify the loop that needs an invariant, the condition to simplify, and the callee to specify first.
 
 \SubSection{What the Elimination Buys}
 \label{sec:advantages}
 
 Reference elimination was introduced to make \emph{verification} of Move tractable~\cite{DillGPQXZ22}: without a heap, the verification conditions stay first-order and the solver needs no frame reasoning.
-Running \WP on the eliminated form is a second use of the same transformation that, to our knowledge, has not been described before, and it avoids the following problems.
+Running \WP on the eliminated form is, to our knowledge, a new use of it.
 A predicate transformer over programs with references has to carry a model of locations: |*r| means the contents of whatever |r| points to, an assignment through one reference may change the value read through another, and the transformer needs either an explicit heap with separation or ownership reasoning to keep the substitutions sound~\cite{RustHorn,Aeneas}.
 Its output is then stated over that model --- heap fragments, prophecy variables, ownership predicates --- and has to be translated before a user can read it.
 On the eliminated form none of this arises.
 Every reference is a path to a named root, so substitution is exact by construction; the only aliasing that survives is between global resources whose addresses may coincide, and it surfaces as an explicit condition such as |from == to| above.
 The derived predicates mention only parameters, results, fields, and resources, which is the vocabulary of the specification language, so the reverse mapping of Sec.~\ref{sec:reverse} reduces to renaming.
 And because inference and verification run on the same pipeline, every inferred contract is checked under the semantics that produced it; the instrumented contracts of callees and the loop invariants are available in-line to both.
-The whole analysis is about nine thousand lines of Rust on top of the existing pipeline, and adds no new semantics to the prover.
-Whether the same holds for a prophecy-based elimination, which is designed for \MVP but not implemented, is open; Sec.~\ref{sec:discussion} returns to it.
+The whole analysis is about nine thousand lines of Rust on top of the existing pipeline, the by far largest part of it simplification of predicates, and adds no new semantics to the Move Prover.
 
 %%% Local Variables:
 %%% mode: latex

@@ -1532,7 +1532,6 @@ fn infer_package(args: &PackageTargetArgs, evaluation: &EvaluationConfig) -> Res
     // one consumer that must not be able to miss it.
     options.prover.uninvariant_loop_is_error = true;
     options.prover.aborts_if_is_strict = evaluation.aborts_if_is_strict;
-    options.prover.infer_unspecified_helpers = evaluation.infer_unspecified_helpers;
     options.output_path = if args.dump_bytecode {
         dump_dir.join("output.bpl")
     } else {
@@ -2608,7 +2607,7 @@ fn verification_scope(filter: Option<&str>) -> VerificationScope {
         return VerificationScope::All;
     };
     if filter.contains("::") {
-        VerificationScope::Only(filter.to_string())
+        VerificationScope::Only(vec![filter.to_string()])
     } else {
         VerificationScope::OnlyModule(filter.to_string())
     }

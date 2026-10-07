@@ -196,6 +196,34 @@ class ApplyMutantTest(unittest.TestCase):
             self.assertIn("\n            i <= n\n", text)
             self.assertIn("assert!(i < n);", text)
 
+    def test_an_edit_at_the_end_of_a_wrapped_guard_applies(self) -> None:
+        # The edit ends at the guard's closing parenthesis, which the wrapper
+        # moves to a later line.
+        source = SOURCE.replace("while (i < n) {", "while (i < n - 1) {")
+        candidate = source.replace(
+            "while (i < n - 1) {",
+            """while ({
+            spec {
+                invariant [inferred] i < n;
+            };
+            i < n - 1
+        }) {""",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            package, baseline = self._packages(Path(tmp), candidate, source)
+            anchor = "while (i < n - 1)"
+            case = _case(
+                anchor,
+                {"kind": "substitute", "at": anchor.index(" - 1"), "length": 4, "to": ""},
+                source,
+            )
+
+            apply_mutant(package, baseline, case)
+
+            text = (package / "sources/m.move").read_text()
+            self.assertIn("\n            i < n\n        }) {", text)
+            self.assertIn("invariant [inferred] i < n;", text)
+
     def test_a_fallback_does_not_mutate_a_different_occurrence(self) -> None:
         source = SOURCE.replace("        i\n", "        assert!(i < n);\n        i\n")
         candidate = source.replace("while (i < n) {", "while (i < 7) {")

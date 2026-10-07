@@ -228,7 +228,6 @@ mod tests {
             evaluation_mode: true,
             feedback_level: crate::evaluation::FeedbackLevel::Acceptance,
             aborts_if_is_strict: false,
-            infer_unspecified_helpers: false,
         };
         let telemetry = Telemetry::new(Some(&path), config).unwrap();
         telemetry.emit("session_start", serde_json::json!({"restart": false}));

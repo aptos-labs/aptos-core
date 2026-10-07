@@ -122,11 +122,12 @@ pub struct Options {
     #[arg(long, value_parser = ["public", "all", "none"], value_name = "SCOPE")]
     #[serde(skip)]
     pub verify: Option<String>,
-    /// Only generate verification condition for one function.
-    /// This overrides verification scope and can be overridden by the pragma verify=false.
+    /// Only generate verification conditions for the given functions; repeat the
+    /// option to verify several. This overrides verification scope and can be
+    /// overridden by the pragma verify=false.
     #[arg(long, value_name = "FUNCTION_NAME")]
     #[serde(skip)]
-    pub verify_only: Option<String>,
+    pub verify_only: Vec<String>,
     /// Only generate verification condition for given function,
     /// and generate a z3 trace file for analysis. The file will be stored
     /// at FUNCTION_NAME.z3log.
@@ -178,7 +179,7 @@ impl Default for Options {
             trace: false,
             severity: None,
             verify: None,
-            verify_only: None,
+            verify_only: vec![],
             z3_trace: None,
             inference: InferenceOptions::default(),
             lean: false,
@@ -247,11 +248,11 @@ impl Options {
                 _ => unreachable!("clap validates verify values"),
             };
         }
-        if let Some(ref name) = self.verify_only {
-            self.prover.verify_scope = VerificationScope::Only(name.clone());
+        if !self.verify_only.is_empty() {
+            self.prover.verify_scope = VerificationScope::Only(self.verify_only.clone());
         }
         if let Some(ref fun_name) = self.z3_trace {
-            self.prover.verify_scope = VerificationScope::Only(fun_name.clone());
+            self.prover.verify_scope = VerificationScope::Only(vec![fun_name.clone()]);
             let short_name = if let Some(i) = fun_name.find("::") {
                 &fun_name[i + 2..]
             } else {
