@@ -32,8 +32,15 @@ impl ThreadLocalIntCounter {
         let now = Instant::now();
         if now.duration_since(self.last_flush) > FLUSH_INTERVAL {
             self.inner.flush();
+            self.last_flush = now;
         }
-        self.last_flush = now;
+    }
+}
+
+impl Drop for ThreadLocalIntCounter {
+    fn drop(&mut self) {
+        // `LocalIntCounter` doesn't flush on drop.
+        self.inner.flush();
     }
 }
 
@@ -69,8 +76,15 @@ impl ThreadLocalIntCounterVec {
         let now = Instant::now();
         if now.duration_since(self.last_flush) > FLUSH_INTERVAL {
             self.inner.flush();
+            self.last_flush = now;
         }
-        self.last_flush = now;
+    }
+}
+
+impl Drop for ThreadLocalIntCounterVec {
+    fn drop(&mut self) {
+        // `LocalIntCounterVec` doesn't flush on drop.
+        self.inner.flush();
     }
 }
 
@@ -132,8 +146,8 @@ impl ThreadLocalHistogramVec {
         let now = Instant::now();
         if now.duration_since(self.last_flush) > FLUSH_INTERVAL {
             self.inner.flush();
+            self.last_flush = now;
         }
-        self.last_flush = now;
     }
 }
 
@@ -242,7 +256,12 @@ macro_rules! make_thread_local_histogram_vec {
 
 #[cfg(test)]
 mod tests {
+    use super::FLUSH_INTERVAL;
     use crate::{IntCounterHelper, IntCounterVecHelper, TimerHelper};
+    use std::{
+        thread,
+        time::{Duration, Instant},
+    };
 
     make_thread_local_int_counter!(
         pub(self),
@@ -265,21 +284,90 @@ mod tests {
         &["label"],
     );
 
+    /// Keeps updating like a busy thread (gaps much shorter than `FLUSH_INTERVAL`) until
+    /// `flushed()` returns true. Returns the number of updates.
+    fn update_until_flushed(update: impl Fn(), flushed: impl Fn() -> bool) -> u64 {
+        let deadline = Instant::now() + 3 * FLUSH_INTERVAL;
+        let mut num_updates = 0;
+        while !flushed() {
+            assert!(Instant::now() < deadline, "Busy thread never flushed.");
+            update();
+            num_updates += 1;
+            thread::sleep(Duration::from_millis(10));
+        }
+        num_updates
+    }
+
+    // Each test runs in a dedicated thread, so that it can check the flush on thread exit.
+
     #[test]
     fn test_thread_local_int_counter() {
-        TEST_INT_COUNTER.inc();
-        TEST_INT_COUNTER.inc_by(2);
+        let get = || __TEST_INT_COUNTER.get();
+        let expected = thread::spawn(move || {
+            TEST_INT_COUNTER.inc();
+            TEST_INT_COUNTER.inc_by(2);
+            assert_eq!(get(), 0);
+
+            let n = update_until_flushed(|| TEST_INT_COUNTER.inc(), || get() > 0);
+            assert_eq!(get(), 3 + n);
+
+            TEST_INT_COUNTER.inc_by(5);
+            3 + n + 5
+        })
+        .join()
+        .unwrap();
+        assert_eq!(get(), expected);
     }
 
     #[test]
     fn test_thread_local_int_counter_vec() {
-        TEST_INT_COUNTER_VEC.inc_with(&["foo"]);
-        TEST_INT_COUNTER_VEC.inc_with_by(&["foo"], 2);
+        let get = |label| __TEST_INT_COUNTER_VEC.with_label_values(&[label]).get();
+        let num_bar = thread::spawn(move || {
+            TEST_INT_COUNTER_VEC.inc_with(&["foo"]);
+            TEST_INT_COUNTER_VEC.inc_with_by(&["foo"], 2);
+            assert_eq!(get("foo"), 0);
+
+            let n = update_until_flushed(
+                || TEST_INT_COUNTER_VEC.inc_with(&["bar"]),
+                || get("bar") > 0,
+            );
+            assert_eq!(get("foo"), 3);
+            assert_eq!(get("bar"), n);
+
+            TEST_INT_COUNTER_VEC.inc_with_by(&["foo"], 5);
+            n
+        })
+        .join()
+        .unwrap();
+        assert_eq!(get("foo"), 8);
+        assert_eq!(get("bar"), num_bar);
     }
 
     #[test]
     fn test_thread_local_histogram_vec() {
-        let _timer = TEST_HISTOGRAM_VEC.timer_with(&["foo"]);
-        TEST_HISTOGRAM_VEC.observe_with(&["bar"], 1.0);
+        let count = |label| {
+            __TEST_HISTOGRAM_VEC
+                .with_label_values(&[label])
+                .get_sample_count()
+        };
+        let num_bar = thread::spawn(move || {
+            drop(TEST_HISTOGRAM_VEC.timer_with(&["foo"]));
+            TEST_HISTOGRAM_VEC.observe_with(&["foo"], 1.0);
+            assert_eq!(count("foo"), 0);
+
+            let n = update_until_flushed(
+                || TEST_HISTOGRAM_VEC.observe_with(&["bar"], 1.0),
+                || count("bar") > 0,
+            );
+            assert_eq!(count("foo"), 2);
+            assert_eq!(count("bar"), n);
+
+            let _timer = TEST_HISTOGRAM_VEC.timer_with(&["foo"]);
+            n
+        })
+        .join()
+        .unwrap();
+        assert_eq!(count("foo"), 3);
+        assert_eq!(count("bar"), num_bar);
     }
 }
