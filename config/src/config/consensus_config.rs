@@ -52,6 +52,9 @@ pub struct ConsensusConfig {
     // Only sync committed transactions but not vote for any pending blocks. This is useful when
     // validators coordinate on the latest version to apply a manual transaction.
     pub sync_only: bool,
+    /// Optional public proof bundle for an already-pruned current-epoch DKG boundary.
+    /// Verified against the local authenticated epoch-ending ledger info.
+    pub dkg_recovery_bundle_path: Option<PathBuf>,
     // The size of the round/recovery manager and proposal buffer channels.
     pub internal_per_key_channel_size: usize,
     pub quorum_store_pull_timeout_ms: u64,
@@ -261,6 +264,7 @@ impl Default for ConsensusConfig {
             round_timeout_backoff_max_exponent: 10,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
+            dkg_recovery_bundle_path: None,
             internal_per_key_channel_size: 10,
             quorum_store_pull_timeout_ms: 400,
             quorum_store_poll_time_ms: 200,
@@ -605,6 +609,23 @@ fn is_consensus_only_perf_test_enabled() -> bool {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn dkg_recovery_bundle_is_opt_in_and_roundtrips() {
+        let legacy: ConsensusConfig = serde_yaml::from_str("sync_only: false\n").unwrap();
+        assert_eq!(legacy.dkg_recovery_bundle_path, None);
+        let configured: ConsensusConfig =
+            serde_yaml::from_str("dkg_recovery_bundle_path: /operator/public-dkg.bcs\n").unwrap();
+        assert_eq!(
+            configured.dkg_recovery_bundle_path,
+            Some(PathBuf::from("/operator/public-dkg.bcs"))
+        );
+        let encoded = serde_yaml::to_string(&configured).unwrap();
+        assert_eq!(
+            serde_yaml::from_str::<ConsensusConfig>(&encoded).unwrap(),
+            configured
+        );
+    }
 
     #[test]
     fn test_config_serialization() {

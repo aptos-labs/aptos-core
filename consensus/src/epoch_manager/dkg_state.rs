@@ -4,19 +4,25 @@
 use anyhow::{ensure, Context, Result};
 use aptos_logger::info;
 use aptos_storage_interface::DbReader;
-use aptos_types::{on_chain_config::OnChainConfig, state_store::state_key::StateKey};
+use aptos_types::{
+    dkg::recovery::DkgRecoveryBundle, on_chain_config::OnChainConfig,
+    state_store::state_key::StateKey,
+};
+use std::{fs::File, path::Path};
 
 /// Restore a DKG resource overwritten by a session for a future epoch. Only
 /// consensus's key configuration uses this snapshot; the DKG managers must
 /// continue to see the latest state so they can finish the pending transition.
-/// Requires state-KV history at the epoch boundary. Epoch snapshot retention
-/// does not exempt this read from state-KV pruning. On error, the original state
-/// is unchanged so callers can preserve the existing configuration fallback.
+/// Uses state-KV history at the epoch boundary, or an explicitly configured
+/// public proof bundle if that read fails. The bundle is verified against the
+/// authenticated local epoch-ending ledger info. No historical state is written
+/// into the DB. On error, the original state remains unchanged.
 pub(super) fn recover_dkg_state<T: OnChainConfig + Default>(
     epoch: u64,
     state: &mut Result<T>,
     completed_dealer_epoch: impl Fn(&T) -> Option<u64>,
     db: &dyn DbReader,
+    recovery_bundle_path: Option<&Path>,
 ) -> Result<()> {
     let Some(dealer_epoch) = state.as_ref().ok().and_then(&completed_dealer_epoch) else {
         return Ok(());
@@ -46,6 +52,22 @@ pub(super) fn recover_dkg_state<T: OnChainConfig + Default>(
     let version = ledger_info.version();
     let value = db
         .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, version)
+        .or_else(|original_error| {
+            let Some(path) = recovery_bundle_path else {
+                return Err(anyhow::Error::from(original_error));
+            };
+            ensure!(
+                std::fs::metadata(path)?.is_file(),
+                "DKG recovery bundle must be a regular file"
+            );
+            let file = File::open(path).context("Cannot open configured DKG recovery bundle")?;
+            ensure!(
+                file.metadata()?.is_file(),
+                "DKG recovery bundle must be a regular file"
+            );
+            let bundle = DkgRecoveryBundle::from_reader(file)?;
+            bundle.verified_value::<T>(epoch, ledger_info)
+        })
         .with_context(|| {
             format!(
                 "Failed to read {} at epoch-start version {version}",
@@ -78,21 +100,27 @@ pub(super) fn recover_dkg_state<T: OnChainConfig + Default>(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use aptos_crypto::HashValue;
+    use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_storage_interface::{errors::AptosDbError, Result as StorageResult};
+    use aptos_temppath::TempPath;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
         dkg::{
             chunky_dkg::{ChunkyDKGSessionMetadata, ChunkyDKGSessionState, ChunkyDKGState},
+            recovery::DkgResourceProof,
             DKGSessionMetadata, DKGSessionState, DKGState,
         },
         epoch_change::EpochChangeProof,
         epoch_state::EpochState,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
         on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig},
+        proof::{
+            SparseMerkleLeafNode, SparseMerkleProof, TransactionAccumulatorProof,
+            TransactionInfoWithProof,
+        },
         state_store::state_value::StateValue,
-        transaction::Version,
+        transaction::{ExecutionStatus, TransactionInfo, Version},
         validator_verifier::ValidatorVerifier,
     };
     use std::collections::HashMap;
@@ -156,12 +184,153 @@ mod tests {
             key: &StateKey,
             version: Version,
         ) -> StorageResult<Option<StateValue>> {
-            assert_eq!(version, EPOCH_START_VERSION);
+            assert_eq!(
+                version,
+                self.proof.ledger_info_with_sigs[0].ledger_info().version()
+            );
             if self.fail_reads {
                 return Err(AptosDbError::Other("epoch-start state pruned".into()));
             }
             Ok(self.values.get(key).cloned())
         }
+    }
+
+    // A donor supplies one included public DKG resource plus a verified absence
+    // for the other. The recipient retains its authenticated boundary ledger info.
+    fn recovery_bundle<T: OnChainConfig>(db: &mut EpochStartDb) -> (TempPath, DkgRecoveryBundle) {
+        let key = StateKey::on_chain_config::<T>().unwrap();
+        let value = db.values.get(&key).unwrap().clone();
+        let leaf = SparseMerkleLeafNode::new(*key.crypto_hash_ref(), value.hash());
+        let info = TransactionInfo::new_placeholder(0, Some(leaf.hash()), ExecutionStatus::Success);
+        let boundary = LedgerInfo::new(
+            BlockInfo::new(
+                EPOCH - 1,
+                1,
+                HashValue::zero(),
+                info.hash(),
+                0,
+                0,
+                Some(EpochState::new(EPOCH, ValidatorVerifier::new(vec![]))),
+            ),
+            HashValue::zero(),
+        );
+        db.proof = EpochChangeProof::new(
+            vec![LedgerInfoWithSignatures::new(
+                boundary,
+                AggregateSignature::empty(),
+            )],
+            false,
+        );
+        let bundle = DkgRecoveryBundle::V1 {
+            epoch: EPOCH,
+            version: 0,
+            transaction: TransactionInfoWithProof::new(
+                TransactionAccumulatorProof::new(vec![]),
+                info,
+            ),
+            randomness: DkgResourceProof {
+                value: (key == StateKey::on_chain_config::<DKGState>().unwrap())
+                    .then(|| value.clone()),
+                proof: SparseMerkleProof::new(Some(leaf), vec![]),
+            },
+            chunky: DkgResourceProof {
+                value: (key == StateKey::on_chain_config::<ChunkyDKGState>().unwrap())
+                    .then_some(value),
+                proof: SparseMerkleProof::new(Some(leaf), vec![]),
+            },
+        };
+        let path = TempPath::new();
+        std::fs::write(path.path(), bcs::to_bytes(&bundle).unwrap()).unwrap();
+        (path, bundle)
+    }
+
+    #[test]
+    fn pruned_history_uses_only_valid_bundle_and_preserves_latest_on_error() {
+        let current = randomness_state(EPOCH - 1);
+        let latest = randomness_state(EPOCH);
+        let mut db = EpochStartDb::new();
+        db.insert(&current);
+        let (path, mut bundle) = recovery_bundle::<DKGState>(&mut db);
+        db.fail_reads = true;
+        let mut state = Ok(latest.clone());
+        recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db, Some(path.path())).unwrap();
+        assert_eq!(state.unwrap(), current);
+        // Latest-state DKG managers still observe the original DB state. The
+        // fallback only replaces this local consensus key-derivation resource.
+        assert_eq!(db.values.len(), 1);
+
+        let DkgRecoveryBundle::V1 { randomness, .. } = &mut bundle;
+        randomness.value = Some(StateValue::from(bcs::to_bytes(&latest).unwrap()));
+        std::fs::write(path.path(), bcs::to_bytes(&bundle).unwrap()).unwrap();
+        let mut state = Ok(latest.clone());
+        assert!(
+            recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db, Some(path.path()))
+                .is_err()
+        );
+        assert_eq!(state.unwrap(), latest);
+    }
+
+    #[test]
+    fn chunky_dkg_recovers_from_pruned_history_with_verified_bundle() {
+        let current = chunky_state(EPOCH - 1);
+        let mut db = EpochStartDb::new();
+        db.insert(&current);
+        let (path, _) = recovery_bundle::<ChunkyDKGState>(&mut db);
+        db.fail_reads = true;
+        let mut state = Ok(chunky_state(EPOCH));
+        recover_dkg_state(EPOCH, &mut state, chunky_dealer, &db, Some(path.path())).unwrap();
+        assert_eq!(state.unwrap(), current);
+    }
+
+    #[test]
+    fn proof_does_not_override_existing_recovered_epoch_checks() {
+        for dealer in [EPOCH - 2, EPOCH] {
+            let mut db = EpochStartDb::new();
+            db.insert(&randomness_state(dealer));
+            let (path, _) = recovery_bundle::<DKGState>(&mut db);
+            db.fail_reads = true;
+            let original = randomness_state(EPOCH);
+            let mut state = Ok(original.clone());
+            let result =
+                recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db, Some(path.path()));
+            if dealer == EPOCH {
+                assert!(result.is_err());
+                assert_eq!(state.unwrap(), original);
+            } else {
+                result.unwrap();
+                let recovered = state.unwrap();
+                assert_eq!(recovered, randomness_state(dealer));
+                assert!(recovered.maybe_last_complete(EPOCH).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn successful_history_read_does_not_open_configured_bundle() {
+        let mut db = EpochStartDb::new();
+        // An authenticated absence must NOT be replaced by donor data.
+        let mut state = Ok(randomness_state(EPOCH));
+        let nonexistent = TempPath::new();
+        recover_dkg_state(
+            EPOCH,
+            &mut state,
+            randomness_dealer,
+            &db,
+            Some(nonexistent.path()),
+        )
+        .unwrap();
+        assert_eq!(state.unwrap(), DKGState::default());
+        db.insert(&randomness_state(EPOCH - 1));
+        let mut state = Ok(randomness_state(EPOCH));
+        recover_dkg_state(
+            EPOCH,
+            &mut state,
+            randomness_dealer,
+            &db,
+            Some(nonexistent.path()),
+        )
+        .unwrap();
+        assert_eq!(state.unwrap(), randomness_state(EPOCH - 1));
     }
 
     fn randomness_state(dealer_epoch: u64) -> DKGState {
@@ -239,8 +408,8 @@ mod tests {
                     .is_none());
             }
 
-            recover_dkg_state(EPOCH, &mut randomness, randomness_dealer, &db).unwrap();
-            recover_dkg_state(EPOCH, &mut chunky, chunky_dealer, &db).unwrap();
+            recover_dkg_state(EPOCH, &mut randomness, randomness_dealer, &db, None).unwrap();
+            recover_dkg_state(EPOCH, &mut chunky, chunky_dealer, &db, None).unwrap();
             assert_eq!(
                 randomness.unwrap().maybe_last_complete(EPOCH),
                 current_randomness.last_completed.as_ref()
@@ -304,20 +473,35 @@ mod tests {
             ))
             .unwrap();
         assert!(next.maybe_last_complete(EPOCH).is_none());
-        let mut recovered = Ok(next);
-        recover_dkg_state(EPOCH, &mut recovered, randomness_dealer, &db).unwrap();
-        let recovered = recovered.unwrap();
-        let session = recovered.maybe_last_complete(EPOCH).unwrap();
-        let params = DefaultDKG::new_public_params(&session.metadata);
-        let transcript = bcs::from_bytes(&session.transcript).unwrap();
-        DefaultDKG::verify_transcript(&params, &transcript).unwrap();
-        let after =
-            DefaultDKG::decrypt_secret_share_from_transcript(&params, &transcript, 2, &decrypt_key)
-                .unwrap();
-        assert_eq!(
-            bcs::to_bytes(&before).unwrap(),
-            bcs::to_bytes(&after).unwrap()
-        );
+        for pruned in [false, true] {
+            let path = pruned.then(|| recovery_bundle::<DKGState>(&mut db).0);
+            db.fail_reads = pruned;
+            let mut recovered = Ok(next.clone());
+            recover_dkg_state(
+                EPOCH,
+                &mut recovered,
+                randomness_dealer,
+                &db,
+                path.as_ref().map(TempPath::path),
+            )
+            .unwrap();
+            let recovered = recovered.unwrap();
+            let session = recovered.maybe_last_complete(EPOCH).unwrap();
+            let params = DefaultDKG::new_public_params(&session.metadata);
+            let transcript = bcs::from_bytes(&session.transcript).unwrap();
+            DefaultDKG::verify_transcript(&params, &transcript).unwrap();
+            let after = DefaultDKG::decrypt_secret_share_from_transcript(
+                &params,
+                &transcript,
+                2,
+                &decrypt_key,
+            )
+            .unwrap();
+            assert_eq!(
+                bcs::to_bytes(&before).unwrap(),
+                bcs::to_bytes(&after).unwrap()
+            );
+        }
     }
 
     #[test]
@@ -331,11 +515,11 @@ mod tests {
             DKGState::default(),
         ] {
             let mut state = Ok(original.clone());
-            recover_dkg_state(EPOCH, &mut state, randomness_dealer, &NoReads).unwrap();
+            recover_dkg_state(EPOCH, &mut state, randomness_dealer, &NoReads, None).unwrap();
             assert_eq!(state.unwrap(), original);
         }
         let mut missing = Err(anyhow::anyhow!("resource missing"));
-        recover_dkg_state(EPOCH, &mut missing, randomness_dealer, &NoReads).unwrap();
+        recover_dkg_state(EPOCH, &mut missing, randomness_dealer, &NoReads, None).unwrap();
         assert_eq!(missing.unwrap_err().to_string(), "resource missing");
     }
 
@@ -351,7 +535,7 @@ mod tests {
                 db.insert(state);
             }
             let mut state = Ok(randomness_state(EPOCH));
-            recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db).unwrap();
+            recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db, None).unwrap();
             let recovered = state.unwrap();
             assert_eq!(recovered, previous.unwrap_or_default());
             assert!(recovered.maybe_last_complete(EPOCH).is_none());
@@ -376,7 +560,7 @@ mod tests {
             }
             let original = randomness_state(EPOCH);
             let mut state = Ok(original.clone());
-            assert!(recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db).is_err());
+            assert!(recover_dkg_state(EPOCH, &mut state, randomness_dealer, &db, None).is_err());
             assert_eq!(state.unwrap(), original);
         }
     }
