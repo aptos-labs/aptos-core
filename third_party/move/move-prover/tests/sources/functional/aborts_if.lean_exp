@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:34:5: error: verification failed with a residual obligation:
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
 prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -9,7 +9,7 @@ initialState✝ : LeanerIR.Proofs.Denote.Memory unit
 assumed permitted : True
 ⊢ _y.val < _x.val
 tests/sources/functional/aborts_if.move:34:5: error: leaner verification failed: the automatic verification of `abort2_incorrect` failed; provide a proof: `verify abort2_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort2_incorrect by skip` shows the obligations it leaves)
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:50:5: error: verification failed with a residual obligation:
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
 prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -30,7 +30,7 @@ a✝ : x.val ≤ y.val
 tests/sources/functional/aborts_if.move:50:5: error: leaner verification failed: the automatic verification of `abort4_incorrect` failed; provide a proof: `verify abort4_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort4_incorrect by skip` shows the obligations it leaves)
 tests/sources/functional/aborts_if.move:60:9: error: the specification clause `aborts_if x < y` is not established
 tests/sources/functional/aborts_if.move:59:5: error: leaner verification failed: the automatic verification of `abort5_incorrect` failed; provide a proof: `verify abort5_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort5_incorrect by skip` shows the obligations it leaves)
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:67:5: error: verification failed with a residual obligation:
 case right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -51,7 +51,7 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultSh
 a✝ : y.val ≤ x.val
 ⊢ y.val < x.val
 tests/sources/functional/aborts_if.move:67:5: error: leaner verification failed: the automatic verification of `abort6_incorrect` failed; provide a proof: `verify abort6_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort6_incorrect by skip` shows the obligations it leaves)
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:89:5: error: verification failed with a residual obligation:
 case right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -78,7 +78,7 @@ tests/sources/functional/aborts_if.move:89:5: error: leaner verification failed:
 tests/sources/functional/aborts_if.move:99:9: error: the specification clause `aborts_if _x < _y` is not established
 tests/sources/functional/aborts_if.move:100:9: error: the specification clause `aborts_if _x == _y` is not established
 tests/sources/functional/aborts_if.move:98:5: error: leaner verification failed: the automatic verification of `multi_abort3_incorrect` failed; provide a proof: `verify multi_abort3_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify multi_abort3_incorrect by skip` shows the obligations it leaves)
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:118:5: error: verification failed with a residual obligation:
 case right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -102,7 +102,7 @@ a✝ : ¬x.val = 0
 tests/sources/functional/aborts_if.move:118:5: error: leaner verification failed: the automatic verification of `multi_abort5_incorrect` failed; provide a proof: `verify multi_abort5_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify multi_abort5_incorrect by skip` shows the obligations it leaves)
 tests/sources/functional/aborts_if.move:142:9: error: the specification clause `aborts_if x == 2` is not established
 tests/sources/functional/aborts_if.move:139:5: error: leaner verification failed: the automatic verification of `abort_at_2_or_3_total_incorrect` failed; provide a proof: `verify abort_at_2_or_3_total_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort_at_2_or_3_total_incorrect by skip` shows the obligations it leaves)
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:148:5: error: verification failed with a residual obligation:
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
 prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -120,7 +120,7 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultSh
 a✝ : ¬(x.val = 2 ∨ x.val = 3)
 ⊢ ¬x.val = 4
 tests/sources/functional/aborts_if.move:148:5: error: leaner verification failed: the automatic verification of `abort_at_2_or_3_spec_incorrect` failed; provide a proof: `verify abort_at_2_or_3_spec_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort_at_2_or_3_spec_incorrect by skip` shows the obligations it leaves)
-tests/sources/functional/aborts_if.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/aborts_if.move:157:5: error: verification failed with a residual obligation:
 case left
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit

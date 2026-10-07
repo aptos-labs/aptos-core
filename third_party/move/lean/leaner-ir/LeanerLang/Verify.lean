@@ -125,6 +125,10 @@ theorem LeanerLang.Contract.selectVariantField_encode_enum {unit : LeanerIR.Vali
   rw [LeanerIR.Proofs.Denote.NTy.encode_enum_payload]; rfl
 
 attribute [lir_denote_norm] LeanerIR.moveArithmeticError LeanerLang.Contract.abortCodeMatches
+attribute [lir_denote_norm] LeanerIR.Proofs.Denote.DataInvariant.withCollections
+  LeanerIR.Proofs.Denote.DataInvariant.collection LeanerIR.Proofs.Denote.DataInvariant.elements
+  LeanerIR.Proofs.Denote.DataInvariant.value LeanerIR.Proofs.Denote.DataInvariant.row
+  LeanerIR.Proofs.Denote.DataInvariant.variant
 attribute [lir_denote_norm] LeanerLang.Contract.updateNominalField
   LeanerLang.Contract.updateFieldIndex
   LeanerLang.Contract.testVariants_encode_enum
@@ -1454,8 +1458,10 @@ Recorded once, with the predicate, for every module that builds contracts
 over the unit. -/
 private initialize storedDeclarations :
     SimplePersistentEnvExtension
-      (Name × Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String))
-      (NameMap (Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String))) ←
+      (Name × Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String) ×
+        Bool × Array (LeanerIR.StructHandle × String))
+      (NameMap (Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String) ×
+        Bool × Array (LeanerIR.StructHandle × String))) ←
   registerSimplePersistentEnvExtension {
     addEntryFn := fun map (name, declarations) => map.insert name declarations
     addImportedFn := fun entries =>
@@ -1468,12 +1474,14 @@ unfolds where it is applied, and record the declarations it covers. -/
 def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
     (twins : Array SpecTypes.TwinInfo) : CommandElabM Contract.StoredInvariants := do
   let name := storedInvariantName segments
-  if let some (carriers, unsupported) := (storedDeclarations.getState (← getEnv)).find? name then
+  if let some (carriers, unsupported, hasCollections, collectionUnsupported) :=
+      (storedDeclarations.getState (← getEnv)).find? name then
     let predicate := if (← getEnv).contains name then some (mkConst name) else none
-    return { predicate, carriers, unsupported }
+    return { predicate, carriers, unsupported, hasCollections, collectionUnsupported }
   let stored ← liftTermElabM (Contract.storedInvariantTerm unit twins)
-  modifyEnv fun env => storedDeclarations.addEntry env (name, stored.carriers, stored.unsupported)
-  if stored.cases.isEmpty then return stored
+  modifyEnv fun env => storedDeclarations.addEntry env
+    (name, stored.carriers, stored.unsupported, stored.hasCollections, stored.collectionUnsupported)
+  if stored.cases.isEmpty && stored.collectionCases.isEmpty then return stored
   liftTermElabM do
     -- Over the unit memory is typed at, then the executable unit where an
     -- invariant reads it.
@@ -1507,6 +1515,12 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
       let constant := name ++ Name.mkSimple s!"case{index}"
       define constant (← withUnit valueProp) case arity
       constants := constants.push constant
+    let argumentsProp ← mkArrow (mkConst ``NRow) valueProp
+    let mut collectionConstants : Array (LeanerIR.StructHandle × Name) := #[]
+    for (owner, case) in stored.collectionCases, index in [0:stored.collectionCases.size] do
+      let constant := name ++ Name.mkSimple s!"collectionCase{index}"
+      define constant (← withUnit argumentsProp) case (arity + 1)
+      collectionConstants := collectionConstants.push (owner, constant)
     let predicate ← withLocalDeclD `unit (mkConst ``ValidatedUnit) fun unitExpr =>
       withLocalDeclD `executable (Contract.executableType unitExpr) fun executable =>
       withLocalDeclD `resource (mkConst ``ResourceType) fun resource =>
@@ -1519,7 +1533,20 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
           for (owner, constant) in (stored.carriers.zip constants).reverse do
             let test ← mkEq handle? (← mkAppM ``Option.some #[toExpr owner])
             selected ← mkAppM ``ite #[test, mkAppN (mkConst constant) leading, selected]
-          mkLambdaFVars (leading ++ #[resource, held]) (mkApp selected held)
+          let globals ← mkLambdaFVars #[resource, held] (mkApp selected held)
+          if collectionConstants.isEmpty then return ← mkLambdaFVars leading globals
+          let declared ← withLocalDeclD `owner (mkConst ``LeanerIR.StructHandle) fun owner =>
+            withLocalDeclD `arguments (mkConst ``NRow) fun arguments =>
+            withLocalDeclD `raw (mkConst ``RuntimeValue) fun raw => do
+              let mut selected ← withLocalDeclD `arguments (mkConst ``NRow) fun arguments =>
+                withLocalDeclD `raw (mkConst ``RuntimeValue) fun raw =>
+                  mkLambdaFVars #[arguments, raw] (mkConst ``True)
+              for (handle, constant) in collectionConstants.reverse do
+                selected ← mkAppM ``ite #[← mkEq owner (toExpr handle),
+                  mkAppN (mkConst constant) leading, selected]
+              mkLambdaFVars #[owner, arguments, raw] (mkApp2 selected arguments raw)
+          mkLambdaFVars leading
+            (← mkAppM ``LeanerIR.Proofs.Denote.DataInvariant.withCollections #[globals, declared])
     define name (← withUnit (← mkArrow (mkConst ``ResourceType) valueProp)) predicate (arity + 1)
   return { stored with predicate := some (mkConst name) }
 
@@ -2616,10 +2643,10 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) : CommandElabM Unit
       -- Rule 1 of the design: a verified function reasons over values,
       -- never over frames or loan bookkeeping.
       if dependency == ``sorryAx || dependency == ``LeanerIR.RuntimeFrame ||
-          dependency == ``LeanerIR.SemanticOperations.FreshGlobalLoanIds ||
+          dependency == ``LeanerIR.SemanticOperations.FreshStorageLoanIds ||
           dependency == ``LeanerIR.SemanticOperations.LoanDiscipline ||
-          dependency == ``LeanerIR.SemanticOperations.globalLoanKeyIn? ||
-          dependency == ``LeanerIR.SemanticOperations.removeGlobalLoan then
+          dependency == ``LeanerIR.SemanticOperations.storageLoanTargetIn? ||
+          dependency == ``LeanerIR.SemanticOperations.removeStorageLoan then
         throwError m!"artifact `{name}` retains forbidden dependency `{dependency}`"
       if base.isPrefixOf dependency || artifacts.isPrefixOf dependency then
         pending := pending.push dependency
@@ -4027,8 +4054,17 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     if script?.isSome then flags := flags.push (← `(closeFlag| residual))
     if Contract.contractBindsStateLabel unit ⟨namespaceIndex⟩ declaration then
       flags := flags.push (← `(closeFlag| labeled))
-    let closeTactic ← `(tactic| leaner_denote_close $flags* [$loopPairs,*] with [$calleePairs,*]
-      using [$instantiationCertificates,*])
+    let unrollBound? := declaration.pragmas.findSome? fun
+      | .assign "unroll" (.constant (.integer bound)) _ =>
+          if 0 ≤ bound then some bound.toNat else none
+      | _ => none
+    let unrollPairs ← match unrollBound?, declaration.body with
+      | some bound, .structured root => (loopSpecifications ns root).mapM fun (site, _) =>
+          `(term| ($(quote (loopSite namespaceIndex site.index)), $(quote bound)))
+      | _, _ => pure #[]
+    -- An obligation no clause locates is reported at the function.
+    let closeTactic ← withRef reference `(tactic| leaner_denote_close $flags* [$loopPairs,*]
+      with [$calleePairs,*] using [$instantiationCertificates,*] unrolling [$unrollPairs,*])
     -- A loop invariant reading `old` needs the function's start: the
     -- arguments and state are recorded as a hypothesis the closer finds.
     let readsStart : Bool := match declaration.body with

@@ -4,7 +4,7 @@ tests/sources/regression/inlined_requires_asserted.move:130:5: error: leaner ver
 tests/sources/regression/inlined_requires_asserted.move:30:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/inlined_requires_asserted.move:29:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)
 tests/sources/regression/inlined_requires_asserted.move:88:9: error: the specification clause `ensures result == 0` is not established
-tests/sources/regression/inlined_requires_asserted.move:66:1: error: the precondition of `g` is not established
+tests/sources/regression/inlined_requires_asserted.move:87:5: error: the precondition of `g` is not established
 tests/sources/regression/inlined_requires_asserted.move:87:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)
 tests/sources/regression/inlined_requires_asserted.move:55:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/inlined_requires_asserted.move:54:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)

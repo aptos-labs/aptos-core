@@ -142,7 +142,7 @@ value, universally quantified in the rule, and threads a ghost environment
   prophecy hole to transfer the dynamic identity; it does not recover an
   owner root or projection path from the reference.
 - **Globals**: `borrow_global_mut` leaves the prophecy (relationally) or the
-  hole (executably) in the global slot. `RuntimeState.globalLoans` separately
+  hole (executably) in the global slot. `RuntimeState.storageLoans` separately
   records the storage key for a live global loan and rekeys it from an outer
   loan to a returned reborrow. The key registry is write-back metadata, not
   part of the reference value; take/publish interact with holes only through
@@ -434,7 +434,7 @@ needed.
   and the native WP uses closed death certificates rather than unfolding a
   generic loan search. Returned local reborrows transfer identity through
   prophecy holes. Returned global reborrows additionally transfer the storage
-  key in the separate `globalLoans` registry from the completed outer loan to
+  key in the separate `storageLoans` registry from the completed outer loan to
   the returned loan. The runtime reference itself remains exactly
   `borrow loan current`, with no owning root or projection path. The native
   fixture covers scalar forwarding, mutation after a call, dynamic selection

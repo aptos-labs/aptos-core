@@ -193,16 +193,16 @@ theorem satisfies_cycle_family {unit : ValidatedUnit} (executable : ExecutableUn
     ⟨index, some (Θ, instantiation)⟩
 
 omit [Skolems unit] in
-/-- Runs of a unit keep global memory encoding a typed memory: from globals
-encoding a memory, every successful run ends in globals encoding one that
+/-- Runs of a unit keep global and Table storage encoding a typed memory: from
+stores encoding a memory, every successful run ends in stores encoding one that
 agrees with it where no runtime key reaches.  A property of the unit's
 semantics that static typing establishes (`designs/static-memory.md`); the
 public theorem states it as a hypothesis. -/
 def GlobalsPreserved {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
   ∀ handle typeInstantiation start arguments results exit memory,
-    Encodes unit memory start.globals →
+    StorageEncodes unit memory start →
     (functionSpecAt executable handle typeInstantiation arguments).ok start results exit →
-    ∃ final, Encodes unit final exit.globals ∧ AgreeUnnamed unit final memory
+    ∃ final, StorageEncodesReturned unit final exit results ∧ AgreeUnnamed unit final memory
 
 end Frames
 
@@ -210,8 +210,8 @@ section Public
 
 /-- The runtime form of a contract over native arguments and typed memory.
 A runtime call lends the argument references under admissible loans from a
-state whose globals encode a memory, and the contract holds for every
-prophecy of theirs and every memory the globals encode.  A successful
+state whose stores encode a memory, and the contract holds for every
+prophecy of theirs and every memory the stores encode.  A successful
 execution satisfies it at the value view: each returned reference's
 prophecy is its current value, and each argument reference's prophecy is
 its export with the returned references' holes filled by their current
@@ -221,38 +221,41 @@ def _root_.LeanerIR.Proofs.Contract.prophetic (unit : ValidatedUnit) [Skolems un
     FunctionContract where
   requires := fun arguments initial =>
     (∃ loans args, Admissible initial loans ∧ lendArguments σs args loans = some arguments) ∧
-      (∃ memory, Encodes unit memory initial.globals) ∧
-      ∀ memory, Encodes unit memory initial.globals →
+      (∃ memory, StorageEncodes unit memory initial) ∧
+      ∀ memory, StorageEncodes unit memory initial →
         ∀ loans args, lendArguments σs args loans = some arguments → contract.requires args memory
   assumes := fun arguments initial =>
-    ∀ memory, Encodes unit memory initial.globals →
+    ∀ memory, StorageEncodes unit memory initial →
       ∀ loans args, lendArguments σs args loans = some arguments → contract.assumes args memory
   ensures := fun arguments initial results final =>
     ∃ memory memory' loans args result returnedLoans,
-      Encodes unit memory initial.globals ∧ Encodes unit memory' final.globals ∧
+      StorageEncodes unit memory initial ∧ StorageEncodesReturned unit memory' final results ∧
       lendArguments σs args loans = some arguments ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some results ∧
       argumentsResolve σs args loans results (exportsAfter initial.pending final.pending) ∧
       contract.ensures args memory result memory'
   aborts := fun arguments initial error =>
-    ∃ memory loans args, Encodes unit memory initial.globals ∧
+    ∃ memory loans args, StorageEncodes unit memory initial ∧
       lendArguments σs args loans = some arguments ∧ contract.aborts args memory error
   mayAbort := fun arguments initial =>
-    ∃ memory loans args, Encodes unit memory initial.globals ∧
+    ∃ memory loans args, StorageEncodes unit memory initial ∧
       lendArguments σs args loans = some arguments ∧ contract.mayAbort args memory
   mustAbort := fun arguments initial =>
-    ∀ memory, Encodes unit memory initial.globals →
+    ∀ memory, StorageEncodes unit memory initial →
       ∀ loans args, lendArguments σs args loans = some arguments → contract.mustAbort args memory
-  frame := fun arguments initial final =>
-    ∃ memory memory' loans args, Encodes unit memory initial.globals ∧
-      Encodes unit memory' final.globals ∧
-      lendArguments σs args loans = some arguments ∧ contract.frame args memory memory'
+  frame := fun arguments initial results final =>
+    ∃ memory memory' loans args result returnedLoans, StorageEncodes unit memory initial ∧
+      StorageEncodesReturned unit memory' final results ∧
+      lendArguments σs args loans = some arguments ∧
+      shape.lend false result returnedLoans = some results ∧
+      shape.lend true result returnedLoans = some results ∧
+      contract.frame args memory result memory'
 
 /-- A contract satisfied by the prophetic run at a runtime type instantiation
 holds of the big-step meaning there in its runtime form, for a unit whose
 runs keep global memory typed.  Every runtime execution from an admissible
-start is a prophetic outcome at the value view from a memory its globals
+start is a prophetic outcome at the value view from a memory its stores
 encode, whose existence the contract's definedness guarantees. -/
 theorem satisfies_run_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable)
@@ -292,8 +295,8 @@ theorem satisfies_run_at {unit : ValidatedUnit} (executable : ExecutableUnit uni
     obtain ⟨ensured, framed, notMust⟩ :=
       (verified resolved memory (assumed memory encoded loans resolved lentResolved)
         (required memory encoded loans resolved lentResolved)).1 result _ outcome
-    refine ⟨fun notMay => ?_, ⟨memory, memory', loans, resolved, encoded, encoded', lentResolved,
-        framed⟩, fun must => notMust (must memory encoded loans resolved lentResolved)⟩
+    refine ⟨fun notMay => ?_, ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
+        lentCurrent, lentProphecy, framed⟩, fun must => notMust (must memory encoded loans resolved lentResolved)⟩
     exact ⟨memory, memory', loans, resolved, result, returnedLoans, encoded, encoded', lentResolved,
       lentCurrent, lentProphecy, resolves,
       ensured fun may => notMay ⟨memory, loans, resolved, encoded, lentResolved, may⟩⟩

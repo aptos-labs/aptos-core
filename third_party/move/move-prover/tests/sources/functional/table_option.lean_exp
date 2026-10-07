@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/table_option.move:1:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried

@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import LeanerIR.Proofs.Denote.Types
+import LeanerIR.Proofs.Denote.TableMemory
 import LeanerIR.Semantics.ValueTyping
 
 /-!
@@ -36,8 +36,16 @@ def resourceOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : Type
       let arguments ← arguments.toList.mapM fun argument => match argument with
         | .typeArg value => ntyOf unit namespaceId value.typeId
         | _ => none
-      some ⟨type, NRow.ofList arguments⟩
+      some ⟨type, NRow.ofList arguments, .value⟩
   | _ => none
+
+/-- Ordinary global resources always use the bounded native value carrier. -/
+theorem resourceOf_kind {namespaceId : NamespaceId} {typeId : TypeId}
+    {resource : ResourceType} (named : resourceOf unit namespaceId typeId = some resource) :
+    resource.kind = .value := by
+  unfold resourceOf at named
+  simp only [bind, Option.bind] at named
+  repeat (first | simp only at named | split at named | cases named) <;> try rfl
 
 /-- Only a closed resource type names a runtime storage key. Open generic
 entries remain templates for frame instantiation (`resourceOf`), but do not
@@ -48,6 +56,18 @@ def runtimeResourceOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId
   guard resource.type.paramFree
   some resource
 
+theorem runtimeResourceOf_kind {namespaceId : NamespaceId} {typeId : TypeId}
+    {resource : ResourceType} (named : runtimeResourceOf unit namespaceId typeId = some resource) :
+    resource.kind = .value := by
+  unfold runtimeResourceOf at named
+  obtain ⟨found, source, named⟩ := Option.bind_eq_some_iff.mp named
+  have ordinary := resourceOf_kind source
+  by_cases closed : found.type.paramFree = true
+  · simp [guard, closed] at named
+    cases named
+    exact ordinary
+  · simp [guard, closed, failure] at named
+
 /-- Runtime global memory holding exactly what a typed memory holds: under
 every key, the encoding of the value at the resource type its type
 identifier denotes, and nothing under a key that denotes none.  Its entries
@@ -55,7 +75,7 @@ are in key order, so the memory determines it. -/
 def Encodes (unit : ValidatedUnit) (memory : Memory unit) (globals : GlobalMap) : Prop :=
   globals.Sorted ∧ ∀ namespaceId typeId key, globals.lookup ⟨namespaceId, typeId, key⟩ =
     match runtimeResourceOf unit namespaceId typeId with
-    | some resource => (memory resource key).map (@NTy.encode (Carriers.runtime unit) resource.type)
+    | some resource => (memory resource key).map (resource.encode (unit := unit))
     | none => none
 
 /-- A memory's runtime encoding is unique. -/
@@ -64,9 +84,26 @@ theorem Encodes.unique {unit : ValidatedUnit} {memory : Memory unit} {left right
   GlobalMap.ext encodes.1 encodes'.1 fun ⟨namespaceId, typeId, key⟩ => by
     rw [encodes.2, encodes'.2]
 
-/-- A resource type no runtime key of the unit names. -/
+/-- The observable runtime stores encode one typed memory. Loan registries
+remain separate; Table allocation history is observable even after destruction. -/
+structure StorageEncodes (unit : ValidatedUnit) (memory : Memory unit)
+    (state : RuntimeState) : Prop where
+  globals : Encodes unit memory state.globals
+  tables : TableMemory.EncodesStorage unit memory state.tables
+
+/-- A memory determines both observable stores, independently of loan IDs. -/
+theorem StorageEncodes.unique {memory : Memory unit} {left right : RuntimeState}
+    (leftEncodes : StorageEncodes unit memory left)
+    (rightEncodes : StorageEncodes unit memory right) :
+    left.globals = right.globals ∧ left.tables = right.tables :=
+  ⟨leftEncodes.globals.unique rightEncodes.globals,
+   leftEncodes.tables.unique rightEncodes.tables⟩
+
+/-- A resource type neither runtime store nor the allocation history names. -/
 def Unnamed (unit : ValidatedUnit) (resource : ResourceType) : Prop :=
-  ∀ namespaceId typeId, runtimeResourceOf unit namespaceId typeId ≠ some resource
+  (∀ namespaceId typeId, runtimeResourceOf unit namespaceId typeId ≠ some resource) ∧
+  (∀ namespaceId typeId, TableMemory.runtimeResourceOf unit namespaceId typeId ≠ some resource) ∧
+  resource ≠ TableMemory.allocationResource
 
 /-- Two memories that agree on every resource type no runtime key names. -/
 def AgreeUnnamed (unit : ValidatedUnit) (left right : Memory unit) : Prop :=
@@ -95,7 +132,7 @@ alone. -/
 def MemoryInvariants (invariant : ResourceType → RuntimeValue → Prop)
     (memory : Memory unit) : Prop :=
   ∀ resource key value, memory resource key = some value →
-    invariant resource (@NTy.encode (Carriers.runtime unit) resource.type value)
+    invariant resource (resource.encode (unit := unit) value)
 
 namespace MemoryInvariants
 
@@ -105,7 +142,7 @@ variable {invariant : ResourceType → RuntimeValue → Prop} {memory : Memory u
 theorem set (holds : MemoryInvariants invariant memory) {resource : ResourceType}
     {key : StorageKey} {value : Option (resource.carrier unit)}
     (stored : ∀ written, value = some written →
-      invariant resource (@NTy.encode (Carriers.runtime unit) resource.type written)) :
+      invariant resource (resource.encode (unit := unit) written)) :
     MemoryInvariants invariant (memory.set resource key value) := by
   intro other otherKey held read
   by_cases same : other = resource
@@ -121,7 +158,7 @@ theorem set (holds : MemoryInvariants invariant memory) {resource : ResourceType
 its own. -/
 theorem set_some (holds : MemoryInvariants invariant memory) {resource : ResourceType}
     {key : StorageKey} {value : resource.carrier unit}
-    (stored : invariant resource (@NTy.encode (Carriers.runtime unit) resource.type value)) :
+    (stored : invariant resource (resource.encode (unit := unit) value)) :
     MemoryInvariants invariant (memory.set resource key (some value)) :=
   holds.set fun _ written => by cases written; exact stored
 
@@ -133,7 +170,7 @@ theorem set_none (holds : MemoryInvariants invariant memory) {resource : Resourc
 /-- A value read from memory satisfies the invariant of its resource type. -/
 theorem read (holds : MemoryInvariants invariant memory) {resource : ResourceType}
     {key : StorageKey} {value : resource.carrier unit} (read : memory resource key = some value) :
-    invariant resource (@NTy.encode (Carriers.runtime unit) resource.type value) :=
+    invariant resource (resource.encode (unit := unit) value) :=
   holds resource key value read
 
 end MemoryInvariants
@@ -181,7 +218,7 @@ variable [Θ : Skolems unit]
 
 /-- A frame's resource type at the runtime family. -/
 @[reducible] def Skolems.resource (type : NTy) (arguments : NRow) : ResourceType :=
-  ⟨Θ.resolve type, arguments.map Θ.resolve⟩
+  ⟨Θ.resolve type, arguments.map Θ.resolve, .value⟩
 
 
 /-- A function's frame agrees with its runtime type instantiation on the
@@ -291,8 +328,9 @@ theorem coherent_runtime (unit : ValidatedUnit) (handle : FunctionHandle) :
     (fun typeId _ resource named _ _ => ?_) (fun typeId _ τ named _ => ?_)
     (fun index _ node found => ?_)
   · rw [instantiatedTypeId_empty, named]
-    show some resource = some ⟨resource.type, resource.arguments.map fun τ => τ⟩
+    show some resource = some ⟨resource.type, resource.arguments.map fun τ => τ, .value⟩
     rw [NRow.map_id]
+    rw [← resourceOf_kind named]
   · rw [instantiatedTypeId_empty, named]
     rfl
   · rw [instantiatedTypeId_empty, ntyOf_paramNode found]

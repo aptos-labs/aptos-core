@@ -116,7 +116,7 @@ partial def steps (proof : Proof) (splitBranches : Bool := false)
           (entry, exit, bindings)
       -- `assume [trusted] true` marks a lemma taken on trust and assumes
       -- nothing.
-      | .assume _ (.mk _ _ (.value (.bool true) _)) => (acc.1, acc.2, bindings)
+      | .assume _ (.mk _ _ (.value (.bool true) _ _)) => (acc.1, acc.2, bindings)
       | .assume loc exp =>
           let (entry, exit) := push acc { loc, guards, action := .assume (close exp) }
           (entry, exit, bindings)

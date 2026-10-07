@@ -44,8 +44,9 @@ structure Contract (σ ε Args Result : Type) where
   mustAbort : Args → σ → Prop := fun _ _ => False
   /-- What a successful execution leaves unchanged.  A specification changes
   only the global memory its `modifies` clause lists, so this defaults to
-  changing nothing at all and is never written by hand. -/
-  frame : Args → σ → σ → Prop := fun _ initial final => final = initial
+  changing nothing at all and is never written by hand. The result supplies
+  the observation of storage behind references returned by a runtime call. -/
+  frame : Args → σ → Result → σ → Prop := fun _ initial _ final => final = initial
 
 /-- A relational computation satisfies its contract for every permitted
 initial state.  Three things hold of every successful execution: the frame,
@@ -60,7 +61,7 @@ def Satisfies (function : Args → Spec σ ε Result)
       (∀ result final, (function args).ok initial result final →
         (¬contract.mayAbort args initial →
           contract.ensures args initial result final) ∧
-        contract.frame args initial final ∧
+        contract.frame args initial result final ∧
         ¬contract.mustAbort args initial) ∧
       (∀ error, (function args).aborts initial error →
         contract.aborts args initial error) ∧
@@ -102,7 +103,7 @@ def Contract.summary (contract : Contract σ ε Args Result) (args : Args) :
   ok := fun initial result final =>
     contract.requires args initial ∧
     (¬contract.mayAbort args initial → contract.ensures args initial result final) ∧
-    contract.frame args initial final ∧ ¬contract.mustAbort args initial
+    contract.frame args initial result final ∧ ¬contract.mustAbort args initial
   aborts := fun initial error =>
     contract.requires args initial ∧ contract.aborts args initial error
   undefined := fun initial => ¬contract.requires args initial
@@ -274,7 +275,7 @@ continuation under what the contract guarantees. -/
       contract.requires args initial ∧
       (∀ result final,
         (¬contract.mayAbort args initial → contract.ensures args initial result final) →
-        contract.frame args initial final → ¬contract.mustAbort args initial →
+        contract.frame args initial result final → ¬contract.mustAbort args initial →
         ensures result final) ∧
       (∀ error, contract.aborts args initial error → aborts error) := by
   constructor
@@ -357,7 +358,7 @@ theorem satisfies_of_wp (function : Args → Spec σ ε Result)
         (fun result final =>
           (¬contract.mayAbort args initial →
             contract.ensures args initial result final) ∧
-          contract.frame args initial final ∧
+          contract.frame args initial result final ∧
           ¬contract.mustAbort args initial)
         (contract.aborts args initial)
         initial) :
@@ -482,7 +483,7 @@ theorem wp_of_satisfies
     wp (function args)
       (fun result final =>
         contract.ensures args initial result final ∧
-        contract.frame args initial final)
+        contract.frame args initial result final)
       (contract.aborts args initial)
       initial :=
   ⟨fun result final execution =>
@@ -529,7 +530,7 @@ theorem satisfies_fix_of_wp
           (fun result final =>
             (¬contract.mayAbort args initial →
               contract.ensures args initial result final) ∧
-            contract.frame args initial final ∧
+            contract.frame args initial result final ∧
             ¬contract.mustAbort args initial)
           (contract.aborts args initial)
           initial) :
@@ -561,7 +562,7 @@ theorem wp_withInvariant_fix {Args Result : Type}
     aborts := fun _ _ error => aborts error
     mayAbort := fun _ _ => False
     mustAbort := fun _ _ => False
-    frame := fun _ _ _ => True }
+    frame := fun _ _ _ _ => True }
   have verified : Satisfies (Spec.fix body) contract := by
     apply satisfies_fix_of_wp body contract
     intro recursive recursiveVerified args store _ permitted
@@ -610,7 +611,7 @@ theorem satisfies_fixFamily_of_wp
           (fun result final =>
             (¬(contracts index).mayAbort args initial →
               (contracts index).ensures args initial result final) ∧
-            (contracts index).frame args initial final ∧
+            (contracts index).frame args initial result final ∧
             ¬(contracts index).mustAbort args initial)
           ((contracts index).aborts args initial)
           initial) :

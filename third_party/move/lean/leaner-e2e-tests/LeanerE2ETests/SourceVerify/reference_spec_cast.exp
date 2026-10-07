@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/reference_spec_cast.move:23:9: error: the specification clause `ensures x == old(x)` is not established
+LeanerE2ETests/SourceVerify/reference_spec_cast.move:19:5: error: leaner verification failed: the automatic verification of `false_increment` failed; provide a proof: `verify false_increment by …` in `LeanerE2ETests/SourceVerify/reference_spec_cast.proof.lean` (`verify false_increment by skip` shows the obligations it leaves)

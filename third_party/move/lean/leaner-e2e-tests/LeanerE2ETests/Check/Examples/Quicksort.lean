@@ -167,7 +167,7 @@ leaner module 0x42::quicksort where
 
   open LeanerIR in
   /-- A lookup in a vector after swapping two of its positions. -/
-  theorem swap_lookup {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j : Int) (a b : α)
+  theorem swap_lookup_found {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j : Int) (a b : α)
       (ha : xs[i.toNat]? = some a) (hb : xs[j.toNat]? = some b) (k : Int) (hi : 0 ≤ i)
       (hj : 0 ≤ j) (hk : 0 ≤ k) :
       (Option.map f ((xs.setIfInBounds i.toNat b).setIfInBounds j.toNat a)[k.toNat]?).getD .unit =
@@ -188,23 +188,35 @@ leaner module 0x42::quicksort where
       · have : ¬i.toNat = k.toNat := by omega
         simp [this, e2]
 
+  open LeanerIR in
+  /-- Lookup through the certified swap used by the denotation. -/
+  theorem swap_lookup {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j k : Int)
+      (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
+      (hi : 0 ≤ i) (hj : 0 ≤ j) (hk : 0 ≤ k) :
+      (Option.map f (xs.swapIfInBounds i.toNat j.toNat)[k.toNat]?).getD .unit =
+        if j = k then (Option.map f xs[i.toNat]?).getD .unit
+        else if i = k then (Option.map f xs[j.toNat]?).getD .unit
+        else (Option.map f xs[k.toNat]?).getD .unit := by
+    rw [Array.swapIfInBounds_def, dif_pos ib, dif_pos jb, Array.swap_def]
+    simpa only [Array.setIfInBounds, dif_pos ib, Array.size_set, dif_pos jb] using
+      (swap_lookup_found f xs i j xs[i.toNat] xs[j.toNat]
+        (Array.getElem?_eq_getElem ib) (Array.getElem?_eq_getElem jb) k hi hj hk)
+
   open LeanerIR Classical in
-  /-- Swapping two found positions inside `[lo, hi)` preserves every count over it. -/
-  theorem count_swap_found {α : Type} (f : α → RuntimeValue) (xs : Array α) (x : RuntimeValue)
-      (i j : Int) (a b : α) (ha : xs[i.toNat]? = some a) (hb : xs[j.toNat]? = some b)
+  /-- A certified swap inside the range preserves counts. -/
+  theorem count_swap_bounded {α : Type} (f : α → RuntimeValue) (xs : Array α) (x : RuntimeValue)
+      (i j : Int) (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
       (lo high : Int) (hlo : 0 ≤ lo) (hi1 : lo ≤ i) (hi2 : i < high) (hj1 : lo ≤ j) (hj2 : j < high) :
-      count.spec
-          (.vector (Array.map f ((xs.setIfInBounds i.toNat b).setIfInBounds j.toNat a)), x, lo,
-            high, ()) =
+      count.spec (.vector (Array.map f (xs.swapIfInBounds i.toNat j.toNat)), x, lo, high, ()) =
         count.spec (.vector (Array.map f xs), x, lo, high, ()) := by
-    obtain ⟨ib, rfl⟩ := Array.getElem?_eq_some_iff.mp ha
-    obtain ⟨jb, rfl⟩ := Array.getElem?_eq_some_iff.mp hb
-    exact count_swap_map f xs x i.toNat j.toNat ib jb lo high hlo (by omega) (by omega) (by omega)
-      (by omega)
+    rw [Array.swapIfInBounds_def, dif_pos ib, dif_pos jb, Array.swap_def]
+    simpa only [Array.setIfInBounds, dif_pos ib, Array.size_set, dif_pos jb] using
+      (count_swap_map f xs x i.toNat j.toNat ib jb lo high hlo (by omega) (by omega) (by omega)
+        (by omega))
 
   verify partition by
     -- A lookup in a swapped vector is a lookup in the vector.
-    all_goals (intros; try (rw [swap_lookup (ha := ?_) (hb := ?_) (hi := ?_) (hj := ?_) (hk := ?_)] <;>
+    all_goals (intros; try (rw [swap_lookup (ib := ?_) (jb := ?_) (hi := ?_) (hj := ?_) (hk := ?_)] <;>
       first | assumption | omega | skip))
     -- A lookup of an element found before is that element's lookup, and an
     -- invariant instance closes the rest.
@@ -216,18 +228,18 @@ leaner module 0x42::quicksort where
       | (rw [‹∀ x : (LeanerIR.Proofs.Denote.NTy.param 0).carrier, count.spec
             (LeanerIR.RuntimeValue.vector (Array.map _ _), _, _, _, ()) = _›]
          symm
-         apply count_swap_found <;> first | assumption | omega)
+         apply count_swap_bounded <;> first | assumption | omega)
     -- The pivot is the original vector's element at the pivot position.
     all_goals (try rw [← lookup_eq (found := ‹original.values[_]? = some _›)])
     all_goals (try first | assumption | leaner_denote_instance)
     case leaf_5.isTrue =>
       rw [show lo.val = pivot_index.val by omega]
       assumption
-    case leaf_8.isTrue =>
+    case leaf_9.isTrue =>
       rw [show lo.val = scan.val by omega,
         ← lookup_eq (found := ‹values.values[scan.val.toNat]? = some _›)]
       assumption
-    case leaf_8.isFalse.isTrue =>
+    case leaf_9.isFalse.isTrue =>
       rw [← lookup_eq (found := ‹values.values[scan.val.toNat]? = some _›)]
       assumption
 

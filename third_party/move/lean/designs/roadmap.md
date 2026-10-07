@@ -15,6 +15,133 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Scalar specification calls (2026-10-07): nonrecursive scalar helpers now share
+representation slots across callers, preserve `num` sinks, and check that the
+signature does not depend on traversal order. Three positive source roots and
+two false-clause controls agree with MVP. Substituting literal scalar inputs
+before arithmetic search fixes a nested-spec-call timeout: 763,888 raw heartbeats
+instead of exhausting approximately 1.5G. All four full Lean suites pass,
+including performance gates. `math_fixed8` gets past import but still exhausts
+the registry's proof budget; the then-ignored unroll pragma is corrected in the
+focused checkpoint described in the handoff, with performance still open. Representation
+guards decrease from 27 to 26. The benchmark/main HTML was refreshed first:
+24 verified, one expected rejection, six import failures, 9,516,016,778 raw
+heartbeats. All 437 normal registry checks pass after recording the newly exposed
+math_fixed8 timeout; this is not a claim that its three functions verify.
+The remaining obligation-preparation issue is recorded in the handoff.
+The Move Prover's bit-vector representation is no longer modeled (user
+decision 2026-10-07, G14): spec arithmetic stays mathematical and `int2bv` is
+exact. The representation guard is gone and all six affected benchmark modules
+verify again (30 verified, one expected rejection). Width-less `int2bv`
+(contextual width) and several newly exposed registry gaps are open; see the
+handoff.
+
+The subsequent checkpoint adds sound bounded unrolling. Literal arithmetic
+results are no longer named, so ground nested unrolling verifies at 25k; an
+outrun bound is reported as such and ends the attempt. All four suites, the
+registry and the benchmark pass (24 verified, one expected rejection, six C17
+import failures, −0.48% heartbeats). `math_fixed8` and unbounded vector loops
+with `pragma unroll` remain open; see the handoff.
+
+Closed scalar-package integration (2026-10-07): production import now connects
+classification, physical binding widths and mathematical rewriting across all
+owned/dependency scalar functions and their derived spec bodies. Unsupported
+declaration families and dynamic narrowing stay guarded. Seven new source
+controls pass both MVP and Leaner; the six false representation regressions now
+reach verification and fail their postconditions. Checked multiplication still
+aborts. Focused analysis/lowering checks and full Move/E2E suites pass. `test_bitvector`
+verifies again, and `bv_mul_overflow` rejects its false no-abort contract;
+representation rejections fall from 29 to 27. The final normal registry recheck passes all 437 tests
+without updates (`/tmp/bv-scalar-registry-final.log`). Benchmark/main HTML was regenerated first: 24 verified, one expected
+rejection, six unchanged import failures, 9,509,422,287 raw heartbeats.
+Recursive/stateful spec-function calls, fields/containers, generics, inline specs/proofs and
+independent arbitrary narrowing declarations remain open.
+
+Numeric lowering builders (2026-10-07): unsigned specification operations now
+have explicit mathematical expansions, including negative-input conversion,
+SMT division/remainder by zero, shift-count widths, and arbitrary-overflow
+narrowing casts. Twenty-four focused guards include 4,116 BitVec comparisons;
+a kernel proof covers conversion for every integer. Six generated backend
+verification controls pass and two false claims are rejected. The production
+importer still needs representation/width integration and independent arbitrary
+declarations before these builders can restore guarded registry cases. Reports
+remain at the last full checkpoint; see `numeric-representation.md`.
+
+Numeric analysis infrastructure (2026-10-07): scalar function classification now
+has shared call slots, distinct body/integer-contract slots and occurrence
+identities. A following width pass resolves nested bitwise spec arithmetic and
+compiler-defaulted literals, retaining explicit suffix/range mismatch errors.
+All 66 focused guards/kernel examples pass; seven exported source regressions
+and the two-module literal registry example additionally exercise the assembled
+analysis. This remains outside the production importer: no new registry
+verification success or benchmark change is claimed. Whole-package collection,
+binder/physical-local widths and representation-aware lowering remain open;
+see `numeric-representation.md` and `/tmp/bv-width-tests.log`.
+
+Table representation revision (2026-10-07): target an owned identity+contents
+value in the denotation, keeping native storage in its runtime agreement boundary.
+The exploratory source-frame extension was removed. `StateView` supplies checked
+state-dependent recovery, preservation of undefined outcomes, and input consistency;
+`TableValueBoundary` connects recursive snapshots and now carries typed retained
+observations, generic transport and two-state argument/result rows (19 focused
+checks pass). Compiler/contract integration, loan reconciliation and native
+allocation/mutation dispatch remain open; see `intrinsic-maps.md`. Existing typed
+footprint laws remain useful for runtime agreement. These are test-only additions
+following the full checkpoint, not new registry successes.
+
+Scalar internal bit-vector support (2026-10-07): opaque `bv_internal` bodies
+can use scalar executable bitwise operations without classifying their ordinary
+contracts or callers. The wrapping registry example now verifies its valid
+function and rejects its false postcondition; general representation propagation
+remains open. Mutable-reference contracts additionally exposed and fixed a
+missing implicit read before specification casts. Positive current/old reference
+checks and a false-postcondition regression agree with MVP. Outgoing calls,
+aggregates/generics, inline specs, concrete clauses and proof blocks remain
+guarded. See C17 in `prover-test-problems.md`.
+Full Move/E2E suites and all 437 registry checks pass without baseline updates
+(`/tmp/bv-internal-validation.log`, exit 0). Benchmark JSON/main HTML was
+regenerated first: 24 verified, one expected rejection, six unchanged import
+failures, 9,509,276,380 raw heartbeats. Core/Rust were unchanged.
+
+Numeric representation follow-up: XAST version 10 now retains the compiler's
+defaulted numeric literal marker, so width inference can distinguish `3` from
+explicit `3u256`. The producer/consumer tests cover this and schema expansion.
+[`numeric-representation.md`](numeric-representation.md) specifies the remaining
+whole-source analysis and lowering. Narrowing bitvector specification casts need
+arbitrary out-of-range values, unlike wrapping `int2bv`; a new source regression
+has positive and negative MVP controls. These are prerequisites for restoring
+the guarded modules, not additional verified registry cases.
+This checkpoint passes 59 exchange tests, full Move/E2E suites and all 437
+registry checks without baseline updates (`/tmp/bv-literals-validation.log`,
+exit 0). Benchmark JSON/main HTML was regenerated before the broad Lean checks:
+24 verified, one expected rejection, six unchanged import failures,
+9,509,559,974 raw heartbeats. The ci CLI and registry executable were rebuilt
+for XAST v10. General representation analysis and lowering remain open.
+
+Source bit-vector soundness correction (2026-10-07): the importer now rejects
+numeric bitwise operators, `bv`/`bv_ret` pragmas and `int2bv`/`bv2int` instead
+of erasing their representation semantics. MVP rejects
+the unsigned overflow claims that Leaner previously accepted. Both conversion
+truncation and subsequent arithmetic wrapping need explicit modeling, including
+generic instantiation. This reopens `features` and affected importing modules;
+restoring them is a priority. See C17 in `prover-test-problems.md` and the
+`SourceVerify/bv_representation_overflow.move` and `bv_representation_arithmetic.move`
+regressions, plus implicit/operator/pragma propagation cases. The expanded
+seed preflight passes full Move/E2E suites and all 437 registry baseline checks
+without updates (`/tmp/bv-seeds-validation.log`, exit 0). The measured benchmark
+has 24 verified, one expected rejection and six import failures at 9.510G raw
+heartbeats. This reflects reduced coverage, not a speed improvement. The
+affected modules are `features`, `cmp`, `math_fixed`, `ristretto255`, `ed25519`
+and framework `ordered_map`; authored LeanerLang `OrderedMap` still verifies.
+Thirty registry files now stop at this boundary. See handoff.md.
+
+Preceding validation (2026-10-07): all four full suites and all 437 registry
+baseline checks pass after the conditional-range change. That benchmark had
+30 verified + one expected rejection at 15.066G raw heartbeats; measured JSON
+and main-relative HTML were refreshed before the suites. Remaining registry
+failures are tracked in `prover-test-problems.md`; baseline agreement is not a
+claim of full MVP parity. See `/tmp/conditional-range-full-tests.log`.
+
 Design: [`denotation.md`](denotation.md), with the reference model of
 [`prophetic-references.md`](prophetic-references.md).
 
@@ -66,6 +193,33 @@ Open:
   A quantified equation among the hypotheses rewrites the goal once at an
   instance whose premises omega proves (`leaner_denote_rewrite_instance`;
   bounded, unlike rewriting with the equations as rules, which cycles).
+  Existing call observations are tried before reconstructing behavioral facts:
+  `aborts_if_at_state_label::caller` and `aliasing::remove_then_try_read` verify
+  at native 25k. The registered StateLabelCallObservations fixture includes
+  an opaque caller and a rejected false postcondition. Focused cost/label
+  gates pass; all four full suites subsequently pass. The registry exposed
+  a constructor-budget regression; restricting eligibility to direct invocation
+  facts restores AMM create_pool's original baseline. The follow-up Boolean
+  observer also verifies intermediate_states::test_config_preserved at 25k
+  (8.794M typed heartbeats), preserving its two intended negative siblings.
+  StateLabelBooleanObservations registers conditional-read coverage. Its
+  refreshed benchmark preserves 30 verified + one expected rejection, and the
+  full registry matches 437/437 baselines. The subsequent aliasing fix makes
+  the complete native aliasing module verify at 25k. StateLabelMemoryEquality
+  checks sequential writes, an opaque caller with only labeled contract facts,
+  and rejection of a wrong update. Conditional self-referential frames remain
+  facts but cannot drive recursive simplification. Focused cost/label checks
+  pass. The refreshed benchmark preserves 30 verified + one expected rejection
+  at 15,696,214,192 raw heartbeats (+0.1242%). All four full suites and all 437
+  registry baseline checks subsequently pass (handoff.md).
+  Optional certified integer reads now normalize with their actual fallback.
+  LiteralOptionalReads covers signed/unsigned and symbolic values. The native
+  vector_hofs_fold sum_concrete, sum_inferred, and sum_scaled verify at 25k
+  using companion proofs; their benchmark and all 437 registry checks pass.
+  The following range-bound congruence fix also verifies product_concrete
+  (23.961M whole typed heartbeats); even-count remains open. Positive and
+  missing-premise regressions and both cost gates pass; its benchmark/registry
+  refresh is running (handoff.md).
   An existential is witnessed by the hypothesis stating its body, by a
   context variable, by a written position, or by a position a lookup fact
   reads, its premises decided by the context (`leaner_denote_witness`,
@@ -173,13 +327,90 @@ Open:
 - **Open (2026-09-29): natives without a specification.** The verifier now
   mirrors the Prover: a native with a Move specification uses it, one
   without uses the model the Boogie prelude gives it, registered by the
-  Move profile (`LeanerMove/Natives.lean`: `hash::sha2_256`, `sha3_256` as
+  Move profile (`LeanerLang/Profile.lean`: `hash::sha2_256`, `sha3_256` as
   uninterpreted 32-byte functions), and any other is rejected. Still
   unmodelled and needed by `aptos-stdlib`: the `table` natives (`add_box`,
   `remove_box`, `borrow_box`, …; the prelude's `table_module`), on which
   `big_vector`, `smart_table`, `smart_vector`, `storage_slots_allocator`
   and `pool_u64*` wait, together with an `Inhabited` twin for structs
   holding a table; and the hashes' injectivity axiom.
+  Table foundation (2026-10-06, [`intrinsic-maps.md`](intrinsic-maps.md)):
+  identity/content snapshots, owned entry reconciliation, logical fresh
+  allocation, and typed content-memory frame laws are kernel-proved. Native
+  contents and allocation history use unbounded typed collections, independently
+  of ordinary Move vector bounds and of a Table variant's cached length field.
+  Table entry borrows are tied to the whole owner by Move's call rule;
+  focused compiler probes confirm conflicts even at distinct keys. Call
+  boundaries and behavioral predicates now encode native storage, including
+  holes observed through returned current/prophecy rows. Result-aware runtime
+  frames constrain the actual returned row; loan independence and labeled
+  post-state uniqueness cover it. Tagged stored-loan targets now route entry
+  write-back into Table contents and preserve unrelated storage and allocation
+  history. Native entry-loan primitives now register those destinations and
+  prove lookup, loan discipline, renaming, and reconciliation. Allocation,
+  insertion, removal and checked retirement primitives now have freshness,
+  frame and renaming proofs. Typed lookup/add/remove agreement and typed mutable
+  entry reconciliation pass the focused operation checks and axiom audit.
+  The separate `SnapshotValue` carrier now preserves nested observations per
+  occurrence, proves physical-codec round trips and generic caller/callee
+  transport, and passes eleven focused regressions plus its axiom audit.
+  Contract translation now carries observations through aggregate expressions,
+  expanded specification functions, old/labeled inputs and functional Table roles.
+  `table_contais_to_length` verifies at its original budget, and its baseline
+  refresh and recheck pass. Source regressions cover caller-side labels and
+  per-occurrence functional snapshots. Five source proofs and six compatibility
+  checks pass. The full benchmark retains 30 verified samples and the expected
+  AMM rejection at 15.808G heartbeats. All four suites pass (125 Check fixtures
+  and both cost gates); all 437 registry checks pass after the scoped baseline
+  refresh. `map_equality_encoding` also verifies. Remaining Table fixtures now
+  reach the native-model/reference-denotation gaps.
+  The canonical-slot follow-up excludes shared-reference aliases and resolves
+  caller/callee names to one owner/type slot, with a uniqueness proof that does
+  not assume interning. Whole-heap insert/erase agreement and the new
+  `TableStorageKeys` source regression pass focused checks. This follow-up has
+  not yet had another full benchmark or suite run (126 Check fixtures now).
+  The next storage increment proves whole-storage allocation/add/remove/retire
+  agreement, including active unrelated loans observed through returned references.
+  Actual entry borrowing and write-back agree with the typed contents update.
+  Five focused test roots and a 31-theorem standard-axiom audit pass; no additional
+  registry fixture is closed by these adapter prerequisites.
+  Shared Table lookup and membership use explicit intrinsic-contract hypotheses.
+  Caller/callee observation transport and snapshot/typed lookup agreement are
+  kernel-proved. `TableReads` covers generic/nested reads, an opaque caller's
+  old-state contract and aggregate payload equality; incorrect lookup and
+  payload-bound claims remain rejected.
+  Generated collection predicates now carry deep stored-entry invariants with
+  resolved generic and phantom arguments. Table calls in code or specifications
+  extend memory reach even for parameters with no global access. Nine
+  `TableStoredInvariants` positive proofs and two false-claim rejections pass at
+  25k. The replacement theorem requires every written key/value's invariant.
+  A frontend rejection guards Table identity against physical-metadata equality;
+  Table identity/content invariants and carrier-dependent generic callbacks
+  still need extensions.
+  `table_option` now verifies at the unchanged native 25k setting. Its obsolete
+  failure baseline was removed by the owning runner; the ordinary recheck
+  passes. Whole typed-theorem cost falls 28.690M → 25.254M raw heartbeats
+  (−11.9749%), with 21,500 proof objects instead of 22,076. The diagnostic sample
+  includes work outside the local proof-budget scope. Both cost gates, all
+  Table invariant positives/rejections, the identity guard, call-range cases,
+  TableReads and TableSnapshots pass (`handoff.md`). The field optimization is
+  restricted to known aggregates so generic observations retain their old form.
+  The first normalization benchmark exposed an ordered_map/OrderedMap
+  regression, so the checkpoint correctly stopped before broad suites. The
+  original call-range eligibility guard is restored; Table's stored-read/aggregate
+  optimizations remain. Native table_option and both cost gates pass. The corrected
+  benchmark has 30 verified plus one expected rejection, no timeouts, at
+  15,646,929,683 heartbeats. Main-relative JSON/HTML are refreshed first. All
+  four builds and full suites pass; all 437 registry baselines match without
+  refresh. Final Table theorem cost with the guard restored is 26,045,418
+  raw heartbeats and 21,500 objects; native 25k verification passes (`handoff.md`).
+  The preceding call-range checkpoint passes all four full suites and all
+  437 registry baselines. The subsequent computed-index benchmark preserves
+  30 verified problems plus one expected AMM rejection at 15,646,803,818
+  heartbeats; main-relative JSON/HTML are refreshed with type_info excluded.
+  Mutating/allocation native contracts and
+  adapters, whole-memory ownership frames, Table type-domain
+  quantification, future `final` contents and pure `spec_new` identity remain open.
 - **Closed (2026-09-30): discarded statement values.** A Move branch that
   discards a value (`v.remove(index);` in `capability::remove_element`,
   `pool_u64::deduct_shares`) failed with LEANER-TYPE-MISMATCH. The exchange
@@ -243,10 +474,14 @@ Design: [`source-verification.md`](source-verification.md).
 
 The package verifies module by module; the baseline
 `leaner-e2e-tests/LeanerE2ETests/SourceVerify/MoveStdlib.exp` lists what
-does not verify yet, and is absent while everything verifies. Every clause
-of every module verifies within the default budget (2026-09-28). Open:
+does not verify yet, and is absent while everything verifies. The former full
+verification claim is superseded by the source bit-vector soundness correction
+above (2026-10-07). Open:
 
-- `features` and `bit_vector` verify completely within the default budget,
+- `features` is now rejected at import because `spec_contains` uses `int2bv`.
+  Its earlier verification erased the conversion semantics and is not a valid
+  completion claim. `bit_vector` still verifies. The earlier measurement for
+  both modules was within the default budget,
   `apply_diff`, `change_feature_flags_internal`, and
   `shift_left_for_verification_only` included: 59 s for the two modules
   (`leaner-move verify` of the framework's `move-stdlib` with
@@ -417,6 +652,22 @@ state-change and invocation-defined labels are memory expressions in
 contracts, including when an opaque callee's contract replaces a call.
 Presence and success conditions remain proof obligations (`DefinedStateLabels`,
 `DefinedStateLabelErrors`, `InvocationStateLabels`, `InvocationStateLabelErrors`).
+The decoded-state follow-up (2026-10-07) verifies `two_state_labels::two_increments`
+at the native 25k limit (18.270M typed heartbeats). Known memory and decoder
+values are normalized before integer range checks. The registered IR fixture
+`StateLabelDecoding` covers an opaque caller without callee program points,
+missing-resource rejection and overflowing-update rejection. All 30 labeled
+registry baselines and both cost gates pass. The regular benchmark passes with
+30 verified + one expected rejection at 15,647,129,560 heartbeats (+0.0013%).
+Main-relative JSON/HTML are refreshed; the prior checkpoint is the latest
+full-suite validation (`handoff.md`).
+The witness-search follow-up verifies `spec_fun_old_param_labeled_with_memory`
+at 25k (24.132M typed heartbeats, down from 30.912M). Constructive/context
+witnesses precede program points; `StateLabelWitnesses`, all 30 state-label
+registry checks and both cost gates pass. The benchmark retains 30 verified
++ one expected rejection at 15,647,293,919 heartbeats (+0.00105%). Main-relative
+JSON/HTML were refreshed before all four builds/full suites and 437/437
+registry checks passed (`handoff.md`).
 Open: the proof budget of `aborts_if_at_state_label::caller`, reads of removed
 resource contents (`unmodified_memory_at_label::swap`, see the design), S4.
 
@@ -450,14 +701,14 @@ files without `verify` targets.
 | Scalars | `Addresses`, `Arithmetic`, `BitVectors`, `Division`, `Integers`, `Literals`, `Order`, `Signed`, `SpecLogicalArithmetic` | `BitVectors`: `pragma bv`; a wrong postcondition and the same leaf without the pragma fail (intended). `Division`: the division algorithm, the remainder's range, and cancellation at a divisor that is not a literal; a strict bound fails (intended). `Order`: an authored proof of transitivity. |
 | Structs | `Abilities`, `Invariants`, `PositionalStructs`, `Tuples` | `Abilities` has no `verify` targets. |
 | Enums | `EnumPatterns`, `EnumPayloads`, `EnumRefContracts`, `EnumRefs`, `EnumResources`, `Enums`, `MatchPatterns`, `VariantFields` | `EnumRefs` is execution only. `MatchPatterns` and `VariantFields`: a value no pattern or field fits aborts with Move's incomplete-match code, in the denotation and at run time. |
-| Vectors | `VectorBounds`, `VectorOperations`, `Vectors` | A target whose guards stay undecided exhausts heartbeats rather than failing fast. |
+| Vectors | `CertifiedReads`, `ElementQuantifiers`, `VectorBounds`, `VectorOperations`, `Vectors`, `GenericSwapRemove` | `CertifiedReads`: signed/unsigned bounds through total integer reads, zero for missing entries, and rejection of a false signed nonnegativity claim at 25k. `ElementQuantifiers`: element-wise preconditions establish indexed-read properties for value/reference vectors, signed integers, Booleans and generic equality predicates; stronger bounds and a missing-entry claim remain rejected at 25k. A target whose guards stay undecided exhausts heartbeats rather than failing fast. |
 | Control | `Aborts`, `ControlForms`, `LiteralLoops`, `LoopControlErrors`, `LoopInvariantErrors`, `LoopInvariants`, `Loops`, `LoopVerification` | `Aborts`: a false contract (intended). `LiteralLoops`: loops over literal vectors with recursive specification functions in their invariants, and a nested loop with a nonlinear invariant; a wrong value fails (intended). `LoopInvariantErrors`: an invariant not established at entry and at an iteration. |
 | References | `BorrowCertificates`, `BorrowChecker`, `BorrowErrors`, `BorrowGlobalErrors`, `CorePrimitives`, `Freeze`, `Loans`, `OperandLoans`, `Prophecies`, `ReferencePatterns`, `References`, `ReturnedMutRefErrors`, `ReturnedMutRefs` | `BorrowCertificates` asserts certificates, no `verify`. `BorrowChecker`: twelve rejections at preparation, the accepted programs verified. |
-| Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors` | `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
+| Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GenericSpecResourceArguments`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors`, `TableReads`, `TableStorageKeys`, `TableStoredInvariants` | `TableStoredInvariants`: nine stored-entry proofs at 25k, including phantom arguments, computed keys and both handle layouts, plus two false-claim rejections. `TableReads`: membership, scalar/generic/nested lookup, opaque caller old-state contract and false-lookup rejection. `TableStorageKeys`: canonical Table slots across caller/callee namespaces, reference exclusion and distinct handles. `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
 | Calls | `AbstractClauses`, `Callees`, `Calls`, `Composition`, `InlinedCallees`, `Modules`, `OpaqueGeneric`, `PreludeNatives`, `Summaries` | Intended negatives: a caller does not see a `[concrete]` result (`AbstractClauses`), an opaque callee's body (`InlinedCallees`), a postcondition a callee of another module refutes (`Modules`). |
 | Generics | `GenericCycles`, `GenericFunctions`, `GenericScalarCalls`, `Generics`, `GenericStorage` | `Generics`: a generic function's public theorem applied at a concrete instantiation, coherent by evaluation. |
 | Closures | `Carriers`, `Frames`, `GenericHofs`, `GenericResources`, `InvariantBehavior`, `Known`, `StoredFrames`, `StoredFrameErrors`, `StoredWriteFrames`, `StoredWriteFrameErrors` | `StoredWriteFrames`: addressed and wildcard frames, generic resource instantiation, opaque results, and captured owners. `StoredWriteFrameErrors`: wrong resource, replacement, and false preservation claims are rejected.  `InvariantBehavior`: construction checks quantified behavioral invariants. `StoredFrames`: default function-field frames survive publication, removal, and invocation. `StoredFrameErrors`: packing and replacement reject memory-writing closures. `Carriers`: a function value the proof does not see is typed by its carrier, without a typing assumption, in a unit declaring a phantom type parameter and resources with function-typed fields; a wrong result fails (intended). `Known`: known closures invoked through their targets' contracts, a generic target included, at a concrete caller and at a generic caller's own parameters, beside a function type over those parameters; a wrong postcondition fails (intended). `Frames`: function-valued parameters keep memory, established from a target's theorem or body, over memory holding an enum resource and an instance of a generic declaration; a closure that changes memory fails (intended). `GenericHofs`: generic higher-order functions invoking a function value over their type parameters, callers at type arguments, and a value passed through; a wrong result fails (intended). |
-| Specifications | `AssertionErrors`, `Assertions`, `CapturedFunctionValues`, `ContractErrors`, `DefinedStateLabelErrors`, `DefinedStateLabels`, `DomainQuantifiers`, `EncodedVectors`, `FieldUpdate`, `GenericEnumPayload`, `Increment`, `InsertionMap`, `InvocationStateLabelErrors`, `InvocationStateLabels`, `Lemmas`, `RecursiveSpecFunctions`, `SpecFunctionErrors`, `SpecFunctions`, `SpecTuples`, `StateLabels`, `VectorSlices`, `WrongIncrement` | `GenericEnumPayload`: a generic opaque callee returns a concrete enum; its index bound supports caller-side arithmetic after payload and carrier-family normalization. `CapturedFunctionValues`: leading and trailing captures compare executable closures with specification literals. `InsertionMap`: insertion-position roles preserve descending sequence order, with both key/rank clauses and implicit validity verified. `InvocationStateLabels`: forward and chained invocation labels, opaque callers of both projections, and invocation through a function-valued parameter. `InvocationStateLabelErrors`: a labeled projection cannot assume that an aborting call succeeds. `DefinedStateLabels`: publication, removal, update, chained definitions, generic resources, lexical lets across clauses, and opaque callers using labeled contracts without callee program points. `DefinedStateLabelErrors`: negation, implication antecedents, and an aborting removal do not supply assumptions (intended failures). `AssertionErrors`: an in-body assertion that does not hold, in a function with and without a specification, a loop body, an inlined callee, a generic function, and over a state anchor. `DomainQuantifiers`: an existential no index satisfies and one over an empty vector (intended); a frame over a vector write verifies; quantifiers over a vector type bind vectors of its element type. `EncodedVectors`: specification functions comparing vectors with literals and with each other, and a quantifier over a literal range, all verify. `Lemmas`: `spec lemma`s, a recursive one by its integer parameters and one by `decreases` with a `split`, applied in functions (`apply`, `∀ … apply`), and a proof's steps at entry and before a return; a false lemma, a false recursive lemma, an unmet premise, and an argument out of a parameter's range are reported (intended); a lemma not established gives no fact, so a function needing its conclusion fails (intended); a lemma over a vector whose induction needs its elements' bounds, and a function needing it fails without it (intended). `RecursiveSpecFunctions`: a lemma by induction and a `verify … by` using it; mutually recursive functions with lemmas recursing through each other; Boolean parameters of a function and a lemma; mutually recursive functions reading storage. `StateLabels`: a quantified state label — an existential split of a two-state specification function over two opaque calls, witnessed at the program point after the first, a one-state read at the label, and the split over two inlined calls through a `&mut` parameter, witnessed by the parameter's value at the point between them; the splits over one call fail (intended). |
+| Specifications | `AssertionErrors`, `Assertions`, `CapturedFunctionValues`, `ContractErrors`, `DefinedStateLabelErrors`, `DefinedStateLabels`, `DomainQuantifiers`, `EncodedVectors`, `FieldUpdate`, `GenericEnumPayload`, `Increment`, `InsertionMap`, `InvocationStateLabelErrors`, `InvocationStateLabels`, `Lemmas`, `RecursiveSpecFunctions`, `SpecFunctionErrors`, `SpecFunctions`, `SpecTuples`, `StateLabels`, `TableSnapshots`, `VectorRanges`, `VectorSlices`, `WrongIncrement` | `VectorRanges`: vector index domains in universal/existential quantifiers and slices, shared generic values, empty/nonempty vectors, old versus current mutable values, and an excluded-upper-endpoint rejection at 25k. `TableSnapshots`: old/nested observations, caller-side quantified state labels, and functional snapshots with equal identity but different contents in one vector. `GenericEnumPayload`: a generic opaque callee returns a concrete enum; its index bound supports caller-side arithmetic after payload and carrier-family normalization. `CapturedFunctionValues`: leading and trailing captures compare executable closures with specification literals. `InsertionMap`: insertion-position roles preserve descending sequence order, with both key/rank clauses and implicit validity verified. `InvocationStateLabels`: forward and chained invocation labels, opaque callers of both projections, and invocation through a function-valued parameter. `InvocationStateLabelErrors`: a labeled projection cannot assume that an aborting call succeeds. `DefinedStateLabels`: publication, removal, update, chained definitions, generic resources, lexical lets across clauses, and opaque callers using labeled contracts without callee program points. `DefinedStateLabelErrors`: negation, implication antecedents, and an aborting removal do not supply assumptions (intended failures). `AssertionErrors`: an in-body assertion that does not hold, in a function with and without a specification, a loop body, an inlined callee, a generic function, and over a state anchor. `DomainQuantifiers`: an existential no index satisfies and one over an empty vector (intended); a frame over a vector write verifies; quantifiers over a vector type bind vectors of its element type. `EncodedVectors`: specification functions comparing vectors with literals and with each other, and a quantifier over a literal range, all verify. `Lemmas`: `spec lemma`s, a recursive one by its integer parameters and one by `decreases` with a `split`, applied in functions (`apply`, `∀ … apply`), and a proof's steps at entry and before a return; a false lemma, a false recursive lemma, an unmet premise, and an argument out of a parameter's range are reported (intended); a lemma not established gives no fact, so a function needing its conclusion fails (intended); a lemma over a vector whose induction needs its elements' bounds, and a function needing it fails without it (intended). `RecursiveSpecFunctions`: a lemma by induction and a `verify … by` using it; mutually recursive functions with lemmas recursing through each other; Boolean parameters of a function and a lemma; mutually recursive functions reading storage. `StateLabels`: a quantified state label — an existential split of a two-state specification function over two opaque calls, witnessed at the program point after the first, a one-state read at the label, and the split over two inlined calls through a `&mut` parameter, witnessed by the parameter's value at the point between them; the splits over one call fail (intended). |
 | Modules | `Attributes`, `EmptyModule`, `IntrinsicErrors`, `LoweringErrors`, `Rust` | `Attributes` and `EmptyModule` have no `verify` targets. |
 | Examples | `Account`, `Corpus`, `OrderedMap`, `Quicksort` | `OrderedMap` and `Quicksort` verify through authored lemmas over arrays; `Quicksort`'s `partition` runs at a raised cap of 400k heartbeats (277M in total). |
 

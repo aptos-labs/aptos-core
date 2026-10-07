@@ -5,4 +5,4 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/regression/vector_theory_boogie_array_intern.move:10:5: error: leaner verification failed: the automatic verification of `f1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f1 by …` in `tests/sources/regression/vector_theory_boogie_array_intern.proof.lean` (`verify f1 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/regression/vector_theory_boogie_array_intern.move:2:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
+tests/sources/regression/vector_theory_boogie_array_intern.move:28:5: error: `f2` calls the native `0x2::table::remove_box`, which has neither a specification nor a prelude model; specify it

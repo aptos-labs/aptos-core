@@ -3,6 +3,40 @@
 
 import LeanerLang
 
+-- Concrete inputs should be substituted before solving nested modular
+-- arithmetic. These shapes arise from calls between bitvector spec helpers.
+set_option maxHeartbeats 10000 in
+example (x : LeanerIR.SpecInt (.bits 8) false) (h : x.val = 255) :
+    ((((((x.val % 256 + 256) % 256 % 256 + 256) % 256 % 256 + 256) % 256 + 1)
+      % 256 + 256) % 256 % 256 + 256) % 256 = 0 := by
+  leaner_denote_decide_cheap
+
+example (x : Int) (h : -3 = x) : (x.tmod 256 + 256).tmod 256 = 253 := by
+  leaner_denote_ground_arithmetic
+
+example (x : Nat) (h : x = 255) : (x + 1) % 256 = 0 := by
+  leaner_denote_ground_arithmetic
+
+example (x : Int) (_h : x = 255) : True := by
+  fail_if_success have : (x + 1) % 256 = 1 := by leaner_denote_ground_arithmetic
+  trivial
+
+example (x y : Int) (_h : x = 255) : True := by
+  fail_if_success have : (x + y) % 256 = 0 := by leaner_denote_ground_arithmetic
+  trivial
+
+-- Conditional equations are proof facts, but expanding their own left side
+-- would loop. Both context simplifiers must retain the fact without using it
+-- as a rewrite rule, including after its condition has been discharged.
+example (x y : Nat) (p : Prop) (hp : p) (h : p → x = x + y) : p ∧ x + y = x := by
+  leaner_denote_simp_by_context
+  have equation := h hp
+  omega
+
+example (x y : Nat) (p : Prop) (hp : p) (h : p → x = x + y) : p ∧ x + y = x := by
+  leaner_simp_all only
+  exact ⟨trivial, (h trivial).symm⟩
+
 -- The fast path proves arithmetic without processing unrelated hypotheses.
 example (x y : Int) (h : x ≤ y) (p : Prop) (_irrelevant : p ∨ ¬p) : x < y + 1 := by
   leaner_denote_arithmetic_only
@@ -54,3 +88,59 @@ example (map : RuntimeValue) (keys : Array String) (key : String)
     Maps.hasKey map (.address key) = true := by
   fail_if_success leaner_denote_map_coverage_prepared
   exact present
+
+-- At the new endpoint the current accumulator equation rewrites inside
+-- a nonlinear term. Old positions still require the quantified invariant.
+example (f g : Int → Int) (acc i j limit : Int)
+    (accumulator : acc = f i)
+    (prior : ∀ k : Int, 0 ≤ k → k < i → f k * g k ≤ limit)
+    (current : acc * g i ≤ limit) (lo : 0 ≤ j) (hi : j < i + 1) :
+    f j * g j ≤ limit := by
+  leaner_denote_range_instance
+
+-- A branch can select a summand before the range invariant is instantiated.
+example (f : Int → Int) (even : Int → Prop) [DecidablePred even]
+    (acc i j limit : Int) (accumulator : acc = f i)
+    (prior : ∀ k : Int, 0 ≤ k → k < i → f k + (if even k then 1 else 0) ≤ limit)
+    (current : acc + (if even i then 1 else 0) ≤ limit)
+    (lo : 0 ≤ j) (hi : j < i + 1) (branch : even j) : f j + 1 ≤ limit := by
+  leaner_denote_range_instance
+
+example (f : Int → Int) (even : Int → Prop) [DecidablePred even]
+    (acc i j limit : Int) (accumulator : acc = f i)
+    (prior : ∀ k : Int, 0 ≤ k → k < i → f k + (if even k then 1 else 0) ≤ limit)
+    (current : acc + (if even i then 1 else 0) ≤ limit)
+    (lo : 0 ≤ j) (hi : j < i + 1) (branch : ¬even j) : f j + 0 ≤ limit := by
+  leaner_denote_range_instance
+
+-- Specializing the conditional cannot manufacture its missing branch or the
+-- bound at the new endpoint.
+example (f : Int → Int) (p : Int → Prop) [DecidablePred p]
+    (i j limit : Int)
+    (_prior : ∀ k : Int, 0 ≤ k → k < i → f k + (if p k then 0 else 1) ≤ limit)
+    (_current : f i + (if p i then 0 else 1) ≤ limit)
+    (_lo : 0 ≤ j) (_hi : j < i + 1) : True := by
+  fail_if_success have : f j + 1 ≤ limit := by leaner_denote_range_instance
+  trivial
+
+example (f : Int → Int) (p : Int → Prop) [DecidablePred p]
+    (i j limit : Int)
+    (_prior : ∀ k : Int, 0 ≤ k → k < i → f k + (if p k then 1 else 0) ≤ limit)
+    (_lo : 0 ≤ j) (_hi : j < i + 1) (_branch : p j) : True := by
+  fail_if_success have : f j + 1 ≤ limit := by leaner_denote_range_instance
+  trivial
+
+-- The fact for the old prefix does not imply the bound at the new endpoint.
+example (f g : Int → Int) (acc i j limit : Int)
+    (_accumulator : acc = f i)
+    (_prior : ∀ k : Int, 0 ≤ k → k < i → f k * g k ≤ limit)
+    (_lo : 0 ≤ j) (_hi : j < i + 1) : True := by
+  fail_if_success have : f j * g j ≤ limit := by leaner_denote_range_instance
+  trivial
+
+-- Nor may an unrelated accumulator supply that bound.
+example (f g : Int → Int) (acc i j limit : Int)
+    (_prior : ∀ k : Int, 0 ≤ k → k < i → f k * g k ≤ limit)
+    (_current : acc * g i ≤ limit) (_lo : 0 ≤ j) (_hi : j < i + 1) : True := by
+  fail_if_success have : f j * g j ≤ limit := by leaner_denote_range_instance
+  trivial

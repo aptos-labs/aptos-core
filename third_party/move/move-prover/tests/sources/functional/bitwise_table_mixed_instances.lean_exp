@@ -1,4 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bitwise_table_mixed_instances.move:4:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
-tests/sources/functional/bitwise_table_mixed_instances.move:4:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
-tests/sources/functional/bitwise_table_mixed_instances.move:4:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/bitwise_table_mixed_instances.move:17:5: error: `structs` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/bitwise_table_mixed_instances.move:26:5: error: `packed` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/bitwise_table_mixed_instances.move:39:5: error: `packed_vec` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it

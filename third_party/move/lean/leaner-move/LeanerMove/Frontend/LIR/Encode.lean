@@ -5,6 +5,7 @@ import LeanerMove.Profile
 import LeanerMove.Frontend.Effects
 import LeanerMove.Frontend.Frames
 import LeanerMove.Frontend.Proofs
+import LeanerMove.Frontend.BitVectorConversion
 import LeanerLang.AddressAlias
 import LeanerMove.Frontend.LIR.Codec
 
@@ -619,6 +620,17 @@ mutual
 
   private partial def addExpr : Exp → BuildM LeanerIR.ExprId
     | .mk ty sourceLoc node => do
+        -- `int2bv` wraps into its result type; `bv2int` reads the value back.
+        match node with
+        | .call .int2Bv _ [value] _ =>
+            match BitVectorConversion.int2bv ty value with
+            | .ok wrapped => return ← addExpr wrapped
+            | .error message => throw message
+        | .call .bv2Int _ [value] _ =>
+            return ← addExpr (if value.ty == ty then value else .mk ty sourceLoc (.call .cast [] [value] none))
+        | .call .int2Bv .. | .call .bv2Int .. =>
+            throw "`int2bv` and `bv2int` take one operand"
+        | _ => pure ()
         let loc ← addLocation sourceLoc
         let typeId ← addType loc ty
         if !(← get).logical then
@@ -633,7 +645,7 @@ mutual
           if let some (_, before) := (← get).oldParameters.find? (·.1 == name) then
             return ← addExprNode loc typeId (.localVar (← localId before ty loc))
         let kind ← match node with
-          | .value value constant => pure <| .value (constValue value) constant
+          | .value value constant _ => pure <| .value (constValue value) constant
           | .«local» name => .localVar <$> localId name ty loc
           | .param index => pure <| .localVar ((← get).parameterLocals[index]?.getD ⟨index⟩)
           | .call operation inst arguments surface => do
@@ -692,6 +704,11 @@ mutual
                 -- length does.
                 | .slice, _, .mk (.reference _ referent) _ _ :: _, some first =>
                     dereferenceFirst referent first
+                -- Specification casts implicitly read reference operands.
+                -- Keep executable casts subject to the ordinary type rules.
+                | .cast, _, .mk (.reference _ referent) _ _ :: _, some first =>
+                    if (← get).logical then dereferenceFirst referent first
+                    else pure arguments
                 | _, _, _, _ => pure arguments
               -- A `std::vector` native is an LIR operation, not a call. Its
               -- vector operand arrives as a reference, so it is dereferenced
@@ -1713,9 +1730,14 @@ private def functionKindProperty : FunctionKind → LeanerIR.ProfileValue
   | .inlineRetained => functionProperty "function.inlineRetained"
   | .native => functionProperty "function.native"
 
-/-- A source declaration which can own ordinary comments. Retained inline
-functions are valid XAST anchors even though compiler-v2 has already expanded
-them and the LIR adapter intentionally omits their declarations. -/
+/-- Non-opaque inline functions have already been expanded at their uses.
+Opaque inline functions still have calls and behavioral references: retain
+their declarations so their bodies can be checked against their contracts. -/
+private def isExpandedInline (function : Xast.Function) : Bool :=
+  function.kind == .inlineRetained && !pragmaTrue function.pragmas "opaque"
+
+/-- A source declaration which can own ordinary comments. Expanded inline
+functions remain XAST anchors even though their LIR declarations are omitted. -/
 private structure CommentAnchor where
   loc : Loc
   retained : Bool
@@ -1726,7 +1748,7 @@ private def commentAnchors (module : Module) (inlineFunctions : List String) :
     module.constants.toArray.map (fun declaration => { loc := declaration.loc, retained := true }) ++
     module.structs.toArray.map (fun declaration => { loc := declaration.loc, retained := true }) ++
     module.functions.toArray.map (fun declaration =>
-      { loc := declaration.loc, retained := declaration.kind != .inlineRetained }) ++
+      { loc := declaration.loc, retained := !isExpandedInline declaration }) ++
     module.specFuns.toArray.map (fun declaration =>
       { loc := declaration.loc,
         retained := !(declaration.isMoveFun && inlineFunctions.contains declaration.name) }) ++
@@ -1910,10 +1932,10 @@ private def buildInterface (module : Module) :
     structs := structs.push { declaration with
       contract := {}, locals := #[], attributes := #[] }
   let inlineFunctions := module.functions.filterMap fun function =>
-    if function.kind == .inlineRetained then some function.name else none
+    if isExpandedInline function then some function.name else none
   let mut functions := #[]
   for function in module.functions do
-    if function.kind == .inlineRetained then continue
+    if isExpandedInline function then continue
     resetLocals
     let functionLoc ← addLocation function.loc
     let parameters ← function.params.toArray.mapM (addParameter · functionLoc)
@@ -2039,10 +2061,10 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
           loc := intrinsicLoc, model := intrinsic.name, owner, profile := .move,
           executableBindings, specBindings }
     let inlineFunctions := module.functions.filterMap fun function =>
-      if function.kind == .inlineRetained then some function.name else none
+      if isExpandedInline function then some function.name else none
     let mut functions : Array (LeanerIR.FunctionDecl LeanerIR.Import.RawBody) := #[]
     for function in module.functions do
-      if function.kind == .inlineRetained then continue
+      if isExpandedInline function then continue
       resetLocals
       let functionLoc ← addLocation function.loc
       let parameters ← function.params.toArray.mapM (addParameter · functionLoc)

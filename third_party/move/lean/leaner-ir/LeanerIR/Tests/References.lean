@@ -2880,7 +2880,7 @@ private def heldKey : GlobalKey := { namespaceId := ⟨0⟩, typeId := ⟨5⟩, 
 
 private def holelessSlot : RuntimeState :=
   { globals := ({} : GlobalMap).insert heldKey (.integer 5)
-    globalLoans := [(0, heldKey)]
+    storageLoans := [(0, .global heldKey)]
     nextLoan := 1 }
 
 -- The value goes to the pending set; the slot keeps what it holds.

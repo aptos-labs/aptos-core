@@ -645,6 +645,10 @@ abbrev shiftEntry {α : Type} (offset : Nat) (entry : Nat × α) : Nat × α :=
 def GlobalMap.shift (offset : Nat) (globals : GlobalMap) : GlobalMap :=
   ⟨globals.entries.map fun slot => { slot with value := slot.value.shift offset }⟩
 
+/-- Native Table contents with loans raised; allocation identities are unchanged. -/
+def NativeTableStorage.shift (offset : Nat) (storage : NativeTableStorage) : NativeTableStorage :=
+  { storage with contents := storage.contents.shift offset }
+
 /-- A frame with its loans raised: its locals' values, the instance each
 site's loan has, and the loans whose places it caches. -/
 def RuntimeFrame.shift (offset : Nat) (frame : RuntimeFrame) : RuntimeFrame :=
@@ -761,14 +765,14 @@ def Outcome.Above (frontier : Nat) : Outcome → Prop
 /-- A loan registry of a second run mirroring one of a first: the first's
 registrations of the loans minted at or beyond `frontier`, raised, before
 entries below each run's start frontier, which no loan of the run reaches. -/
-def RegistryShifted (offset frontier : Nat) (registry registry' : List (Nat × GlobalKey)) :
+def RegistryShifted (offset frontier : Nat) (registry registry' : List (Nat × LoanTarget)) :
     Prop :=
   ∃ minted junk junk', registry = minted ++ junk ∧
     registry' = minted.map (shiftEntry offset) ++ junk' ∧
     (∀ entry ∈ minted, frontier ≤ entry.1) ∧ (∀ entry ∈ junk, entry.1 < frontier) ∧
     ∀ entry ∈ junk', entry.1 < frontier + offset
 
-/-- A state of a second run mirroring one of a first: its global memory, and
+/-- A state of a second run mirroring one of a first: its global memory, Table contents, and
 the write-backs pending past each run's first `inert`, with their loans
 raised by `offset`; its frontier raised by it; and its loan registry the
 first's registrations of the loans minted at or beyond `frontier`, raised,
@@ -777,6 +781,7 @@ state holds outside its inert write-backs is at or beyond `frontier`. -/
 structure StateShifted (offset frontier inert inert' : Nat) (state state' : RuntimeState) :
     Prop where
   globals : state'.globals = state.globals.shift offset
+  tables : state'.tables = state.tables.shift offset
   nextLoan : state'.nextLoan = state.nextLoan + offset
   frontier_le : frontier ≤ state.nextLoan
   inert_le : inert ≤ state.pending.size
@@ -784,8 +789,9 @@ structure StateShifted (offset frontier inert inert' : Nat) (state state' : Runt
   pending : state'.pending.extract inert' state'.pending.size =
     (state.pending.extract inert state.pending.size).map fun entry =>
       (entry.1 + offset, entry.2.shift offset)
-  registry : RegistryShifted offset frontier state.globalLoans state'.globalLoans
+  registry : RegistryShifted offset frontier state.storageLoans state'.storageLoans
   globalsAbove : ∀ slot ∈ state.globals.entries, slot.value.Above frontier
+  tablesAbove : ∀ slot ∈ state.tables.contents.entries, slot.value.Above frontier
   pendingAbove : ∀ entry ∈ state.pending.extract inert state.pending.size,
     frontier ≤ entry.1 ∧ entry.2.Above frontier
 

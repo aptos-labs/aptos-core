@@ -54,12 +54,7 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: leaner verification failed: the automatic verification of `map_double_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify map_double_wrong by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify map_double_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:103:9: error: the specification clause `ensures result ==> v.length > spec.result[1] && v[spec.result[1]] == x` is not established
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: leaner verification failed: the automatic verification of `find_value` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify find_value by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify find_value by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: leaner verification failed: the automatic verification of `find_value` failed; provide a proof: `verify find_value by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify find_value by skip` shows the obligations it leaves)
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:165:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
@@ -90,6 +85,185 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:226:5: error: leaner verification failed: the automatic verification of `clamp_all` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify clamp_all by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify clamp_all by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verification failed with a residual obligation:
+case h_2.right
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+v : (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+a : LeanerIR.Proofs.Denote.NTy.address.carrier
+snd✝¹ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+assumed : True
+recursive✝ :
+  LeanerIR.Proofs.Denote.HEnv
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+        (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                        LeanerIR.Proofs.Denote.NRow.nil))))))))) →
+    LeanerIR.Proofs.Denote.Comp unit
+      (LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                        (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                          LeanerIR.Proofs.Denote.NRow.nil)))))))))
+        Unit)
+state✝ : LeanerIR.Proofs.Denote.Memory unit
+left✝³ :
+  (initialState✝
+        {
+          type :=
+            LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              LeanerIR.Proofs.Denote.NRow.nil
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                LeanerIR.Proofs.Denote.NRow.nil),
+          arguments := LeanerIR.Proofs.Denote.NRow.nil }
+        (LeanerIR.StorageKey.address a)).isSome =
+    true
+right✝¹ :
+  ∀ (i : Int),
+    0 ≤ i →
+      i < ↑v.values.size →
+        (v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
+            ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
+                    (initialState✝
+                      {
+                        type :=
+                          LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            LeanerIR.Proofs.Denote.NRow.nil
+                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                              LeanerIR.Proofs.Denote.NRow.nil),
+                        arguments := LeanerIR.Proofs.Denote.NRow.nil }
+                      (LeanerIR.StorageKey.address a))).getD
+                LeanerIR.RuntimeValue.unit).asInt ≤
+          18446744073709551615
+snd✝ : LeanerIR.Proofs.Denote.HEnv LeanerIR.Proofs.Denote.NRow.nil
+fst✝ : (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+i : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+left✝² : ↑fst✝.values.size = ↑v.values.size
+left✝¹ : i.val ≤ ↑v.values.size
+left✝ : ↑v.values.size = ↑fst✝.values.size
+right✝ :
+  ∀ (j : Int),
+    i.val ≤ j →
+      j < ↑v.values.size →
+        (fst✝.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val = (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val
+a✝ : ↑v.values.size ≤ i.val
+this✝ :
+  LeanerIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
+    ((v, fst✝), a, snd✝¹) initialState✝
+leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      LeanerIR.Proofs.Denote.NRow.nil)))))))))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop := ⋯
+leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      LeanerIR.Proofs.Denote.NRow.nil)))))))))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop := ⋯
+leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      LeanerIR.Proofs.Denote.NRow.nil)))))))))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  leanerContinuation✝¹
+loopHypothesis✝ :
+  ∀
+    (env :
+      LeanerIR.Proofs.Denote.HEnv
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                        (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                          LeanerIR.Proofs.Denote.NRow.nil))))))))))
+    (state : LeanerIR.Proofs.Denote.Memory unit),
+    env.fst = none →
+      env.snd.fst = some a →
+        (∃ a, env.snd.snd.fst = some a ∧ a.snd = fst✝) →
+          env.snd.snd.snd.snd.fst = some (LeanerIR.Proofs.Denote.vectorLength v) →
+            env.snd.snd.snd.snd.snd.fst = none →
+              env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+                env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
+                  (env.snd.snd.fst.elim False fun v_1 =>
+                      env.snd.snd.snd.fst.elim False fun i =>
+                        env.snd.snd.snd.snd.fst.elim False fun n =>
+                          LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13622 13628
+                              (i.val ≤ n.val) ∧
+                            LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13645 13693
+                                (↑v_1.fst.values.size = ↑v.values.size) ∧
+                              LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13710 13723
+                                  (n.val = ↑v_1.fst.values.size) ∧
+                                LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13740 13744
+                                    True ∧
+                                  LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13761 13765
+                                      True ∧
+                                    LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13782 13841
+                                      (∀ (j : Int),
+                                        i.val ≤ j →
+                                          j < n.val →
+                                            (v_1.fst.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+                                              (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
+                    LeanerIR.Proofs.wp (recursive✝ env) leanerContinuation✝
+                      (fun failure =>
+                        LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13977 13992 False)
+                      state
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      LeanerIR.Proofs.Denote.NRow.nil)))))))))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop := ⋯
+x✝ : Option (LeanerIR.Proofs.Denote.NTy.int 64 false).ref.carrier
+⊢ state✝ = initialState✝
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

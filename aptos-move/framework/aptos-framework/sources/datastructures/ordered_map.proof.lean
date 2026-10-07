@@ -106,6 +106,7 @@ theorem duplicate_u64 (keys : SpecVector (SpecInt (.bits 64) false)) :
 
 verify test_aborts_if_new_from_2 by
   all_goals have duplicateLaw := duplicate_u64 keys
+  all_goals simp only [LeanerIR.Proofs.Denote.asInt_getD_map_specInt 64 false (by decide)] at duplicateLaw
   all_goals simp only [LeanerIR.Maps.AbortsNewFrom, LeanerIR.Maps.elementsOf,
     Array.toList_map, List.length_map, Array.length_toList] at *
   all_goals grind only

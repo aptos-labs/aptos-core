@@ -3,9 +3,3 @@ tests/sources/functional/state_labels/intermediate_states.move:99:9: error: the 
 tests/sources/functional/state_labels/intermediate_states.move:97:5: error: leaner verification failed: the automatic verification of `test_two_reads_differ` failed; provide a proof: `verify test_two_reads_differ by …` in `tests/sources/functional/state_labels/intermediate_states.proof.lean` (`verify test_two_reads_differ by skip` shows the obligations it leaves)
 tests/sources/functional/state_labels/intermediate_states.move:144:9: error: the specification clause `ensures result == spec.result[1]` is not established
 tests/sources/functional/state_labels/intermediate_states.move:142:5: error: leaner verification failed: the automatic verification of `test_conditional_always_equals` failed; provide a proof: `verify test_conditional_always_equals by …` in `tests/sources/functional/state_labels/intermediate_states.proof.lean` (`verify test_conditional_always_equals by skip` shows the obligations it leaves)
-tests/sources/functional/state_labels/intermediate_states.move:185:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/state_labels/intermediate_states.move:185:5: error: leaner verification failed: the automatic verification of `test_config_preserved` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test_config_preserved by …` in `tests/sources/functional/state_labels/intermediate_states.proof.lean` (`verify test_config_preserved by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

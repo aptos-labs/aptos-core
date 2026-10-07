@@ -331,8 +331,8 @@ def typed (arguments : Codec NativeArgs RuntimeArgs)
     contract.aborts (arguments.encode args) initial error
   mayAbort := fun args initial => contract.mayAbort (arguments.encode args) initial
   mustAbort := fun args initial => contract.mustAbort (arguments.encode args) initial
-  frame := fun args initial final =>
-    contract.frame (arguments.encode args) initial final
+  frame := fun args initial result final =>
+    contract.frame (arguments.encode args) initial (results.encode result) final
 
 /-- Runtime-row form of a typed contract.  Arguments must be in the image of
 their codec; normal results must decode.  This is the generated
@@ -356,8 +356,9 @@ def runtime (arguments : Codec NativeArgs RuntimeArgs)
     ∃ args, arguments.encode args = runtimeArgs ∧ contract.mayAbort args initial
   mustAbort := fun runtimeArgs initial =>
     ∃ args, arguments.encode args = runtimeArgs ∧ contract.mustAbort args initial
-  frame := fun runtimeArgs initial final =>
-    ∃ args, arguments.encode args = runtimeArgs ∧ contract.frame args initial final
+  frame := fun runtimeArgs initial runtimeResult final =>
+    ∃ args result, arguments.encode args = runtimeArgs ∧
+      results.decode? runtimeResult = some result ∧ contract.frame args initial result final
 
 end Contract
 
@@ -448,7 +449,7 @@ theorem satisfies_runtime
       ⟨runtimeResult, execution, decoded⟩
     obtain ⟨postcondition, framed, notMustAbort⟩ :=
       established.1 result final typedExecution
-    refine ⟨?_, ⟨args, rfl, framed⟩, ?_⟩
+    refine ⟨?_, ⟨args, result, rfl, decoded, framed⟩, ?_⟩
     · intro noRuntimeAbort
       refine ⟨args, result, rfl, decoded, postcondition ?_⟩
       intro typedAbort

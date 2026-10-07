@@ -1,8 +1,8 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bitwise_table.move:1:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
+tests/sources/functional/bitwise_table.move:12:5: error: `add` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
 tests/sources/functional/bitwise_table.move:27:5: error: `add_fail_exists` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/bitwise_table.move:1:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
-tests/sources/functional/bitwise_table.move:51:5: error: `contains_and_length` calls the native `0x2::table::contains_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/bitwise_table.move:1:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
-tests/sources/functional/bitwise_table.move:1:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
-tests/sources/functional/bitwise_table.move:1:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/bitwise_table.move:37:5: error: `remove` calls the native `0x2::table::remove_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/bitwise_table.move:51:5: error: `contains_and_length` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/bitwise_table.move:64:5: error: `borrow` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/bitwise_table.move:79:5: error: no denotation for the callee `0x2::table::borrow_mut`: reference operation is not carried by the denotation
+tests/sources/functional/bitwise_table.move:121:5: error: no denotation for the callee `0x2::table::borrow_mut`: reference operation is not carried by the denotation

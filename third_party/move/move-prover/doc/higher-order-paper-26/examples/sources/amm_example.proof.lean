@@ -68,6 +68,9 @@ verify constant_product_with_fee by
          omega)
 
 verify constant_product_with_fee_non_compliant by
+  -- Abort branches can have an out-of-range fee. Discharge their abort
+  -- condition before deriving the fee bounds needed by successful returns.
+  all_goals (try (simp only [reduceCtorEq, false_or]; omega))
   all_goals
     let fee : LeanerIR.SpecInt (.bits 64) false := by assumption
     have feeBounds : 0 ≤ fee.val ∧ fee.val ≤ 10000 := by

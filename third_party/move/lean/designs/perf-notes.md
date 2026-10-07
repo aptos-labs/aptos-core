@@ -31,6 +31,16 @@ and 86s after them. Its kernel time went from 68s to 47s to 31s.
 
 ## How to measure
 
+Concrete modular arithmetic (2026-10-07): nested bitvector specification helpers
+can leave repeated remainder operations in a leaf even when a precondition fixes
+every input. Sending that expression directly to omega introduces unnecessary
+quotient/remainder constraints. `leaner_denote_ground_arithmetic` first rewrites
+the target using only Int/Nat equalities to literals, then uses the existing
+closed-goal decision tactic. It does not rewrite the full context or admit
+symbolic equalities as rules. The source and cost evidence is recorded in the
+roadmap/handoff; `ArithmeticContext` includes false-claim and unresolved-input
+controls as well as a low-budget nested-modular regression.
+
 Heartbeats do not show the largest cost: the kernel checks without
 heartbeats, and a kernel stall shows up as time inside whichever `simp`
 first waits for a certificate. Use all four instruments below.
@@ -1424,3 +1434,885 @@ Sources: `/tmp/registry-vector-operations-checkpoint-experiment.lean` and
 `/tmp/registry-vector-generic-manual.log`. Resume with the simplifier/continuation
 processing of the pure tuple result; require both the official 25M runner and
 existing vector checks to pass before installing.
+
+### Resumed vector normalization (2026-10-06)
+
+The suspended experiment's generic regression had two causes: a partially
+expanded tuple carrier inferred in the replacement denotation, and dependent
+conditional branches whose continuation remained beneath an unprocessed proof
+binder. The remove rule now states the canonical carrier explicitly. The
+structural split introduces dependent branch assumptions before normalization;
+when ordinary splitting fails, preparation requeues a changed computation.
+This fallback runs only after the ordinary split attempt, preserving the fast
+path (unconditional preparation exceeded the 25M cap again).
+
+The official `bp_pure_callee` runner now accepts `remove_all_found` at the
+unchanged 25k budget. The final production profile records 22.751M raw heartbeats versus
+52.221M for the old automatic proof at a diagnostic 100k budget, a 56.4% reduction.
+The existing VectorOperations check and new generic caller/interpreter check
+pass. Logs: `/tmp/resume-fallback-mvp.log` and
+`/tmp/resume-vector-{build,mvp-update,generic-check,existing-check}.log`.
+The full four-package suites and all 437 registry baseline refreshes pass.
+The full registry audit adds no failed targets; `verify_vector` reports more
+specific residuals but the same failed functions. Logs:
+`/tmp/vector-resumed-<package>-{build,test}.log`,
+`/tmp/vector-resumed-prover-refresh.log`, and
+`/tmp/vector-resumed-registry-audit.{json,log}`.
+
+The first full benchmark exposed authored proofs tied to the old optional
+swap reads and removal result. Quicksort now proves lookup/count laws for
+`swapIfInBounds`; OrderedMap rewrites the removed entry by its earlier lookup.
+The native follow-up verifies both (`/tmp/leaner-benchmark-vector-examples.json`):
+Quicksort is 245M versus 265M at the checkpoint; OrderedMap remains about 1.44G.
+The complete final benchmark `/tmp/leaner-benchmark-vector-final.json` records
+30 verified problems and the expected AMM rejection, with no unexpected failures
+or timeouts. Its 15,845,571,410 total heartbeats are 1.18% below the checkpoint
+on the same 31 problems (16,035,112,646). The owning script regenerated the full
+local JSON/HTML against main after the authored proof repairs.
+
+Performance follow-ups: the initial full run reduces pool `deduct_shares`
+from 764M to 560M and capability `revoke` from 71M to 54M, but increases
+simple-map `add_all` from 159M to 183M, features `apply_diff` from 206M to
+223M, and the ground VectorOperations `swap_remove_value` from 36.6M to
+64.5M. Its isolated stage profile spends 29.7M in prepared `grind`.
+Scratch-only normalization with `Array.getElem_swapIfInBounds` and
+`List.getElem_toArray` reduces that isolated proof from 62.3M to 45.1M;
+these attributes are not installed or validated across symbolic proofs.
+Scratch sources/logs: `/tmp/vector-swap-remove-profile.lean`,
+`/tmp/vector-swap-remove-normalized-literal.{lean,log}`.
+
+### Registry residual budgets and vector companions (2026-10-06)
+
+An authored proof still paid for repeated failed residual attempts before its
+script ran. With a 25M target limit, each attempt could previously spend 20M.
+Residual attempts now use at most 5% of the target's budget, capped at the
+existing 20M allowance. The overall target budget and ordinary solver ceiling
+are unchanged. A fixed small cap regressed larger authored examples and was
+discarded; the proportional cap preserves their larger search allowance.
+
+`verify_vector.proof.lean` proves the generic swap-last/erase-last equation
+and instantiates it for the direct and library-call swap-remove tests. Bounded
+reads normalize through `Array.map`, preserving generic carrier transport.
+The model-call proof drops from 28.419M at a diagnostic higher limit to
+21.313M at the official 25M limit. Both scoped ordinary baseline checks pass.
+The smaller residual allowance exposes one more `count_all` invariant leaf;
+its companion proves it by separating earlier indices from the current read.
+Its ordinary baseline check still reports only the two existing warnings.
+
+A further companion instantiates the no-match prefix invariant for
+`verify_index_of`, closing its exit and preservation goals in 22.520M, below
+the unchanged 25M limit. The official scoped refresh accepts it. Logs:
+`/tmp/vector-residual-{bp,verify-vector}-check.log`,
+`/tmp/vector-index-mvp-update.log`,
+`/tmp/verify-model-swap-remove-production.log`, and
+`/tmp/verify-index-profile.log`. The complete benchmark
+`/tmp/leaner-benchmark-vector-residual.json` verifies 30 problems with one
+expected AMM rejection and no unexpected failures/timeouts. Total cost is
+15,846,440,343 raw heartbeats (+0.0055% against the first vector run). The
+script regenerated local JSON/HTML against main before broad validation.
+The full 437-file registry audit adds no failed targets, and all four full
+suites pass, including both cost gates and the 123 Check fixtures. Logs:
+`/tmp/vector-residual-<package>-{build,test}.log`,
+`/tmp/vector-residual-prover-refresh.log`, and
+`/tmp/vector-residual-registry-audit.{json,log}`.
+
+The next `verify_reverse` diagnostic still exhausts 25M while preparing
+residuals, before an authored script can run (`/tmp/verify-reverse-residual.log`).
+At a diagnostic 100M limit it leaves four proof goals after 37.672M, with
+20.171M in residual processing and 9.259M in loop processing
+(`/tmp/verify-reverse-diagnostic.log`). No higher acceptance limit is installed.
+It needs that preparation cost reduced before adding its proof script.
+
+### Opaque inline declarations (2026-10-06)
+
+The frontend omitted `.inlineRetained` functions even when opaque calls and
+behavioral predicates still named them. Retaining opaque declarations fixes
+the three C12 positive-gap fixtures. Their bodies remain verification targets;
+`verify = false` retains only the existing explicit trusted-contract behavior.
+The negative `inc` body is rejected, and its caller cannot use an unproved
+callee theorem. `behavioral_predicate_inline_fun` is clean.
+
+The loop-sum companion proves nonnegativity of consecutive products, the
+triangular-number recurrence, and a product bound for the u64 addition. Its
+body costs 13.196M at the official 25M limit. The two-call caller needs the
+consecutive product's evenness and costs 5.093M. All positive targets prove;
+the wrong doubled-result postcondition still fails. Logs:
+`/tmp/opaque-inline-*.move-check.log`, `/tmp/opaque-sum-profile.log`, and
+`/tmp/opaque-twice-profile.log`. The fresh full benchmark
+`/tmp/leaner-benchmark-opaque-inline.json` is complete: 30 verified and one
+expected rejection, no unexpected failures/timeouts, 15,846,650,541 raw
+heartbeats. The generated local report compares with main. The Move package
+tests pass after that report refresh. All 437 registry baseline checks pass;
+only the three intended opaque-inline files change, with no regression in
+previously verified targets. Audit: `/tmp/opaque-inline-registry-audit.{json,log}`.
+
+### Literal swap reads (2026-10-06)
+
+The ground `swap_remove_value` proof regressed after certified vector
+normalization because its bounded reads still contained `swapIfInBounds`.
+Expanding that operation's read everywhere lowers the ground proof's cost,
+but pushes `verify_model_swap_remove` past its 25M limit. A simplification
+procedure now applies the standard array lookup theorem only to arrays backed
+by explicit list constructors. Symbolic arrays keep their existing form.
+`List.getElem_toArray` also exposes reads of the resulting literal vector.
+
+The production isolated ground proof costs 45.087M raw heartbeats versus
+62.296M previously (−27.6%). The generic scratch proof costs 21.365M at the
+unchanged 25M limit. Both official `verify_vector` and `bp_pure_callee` ordinary
+baseline checks pass. Logs: `/tmp/literal-swap-ground-production.log`,
+`/tmp/literal-swap-vector-check.log`, `/tmp/literal-swap-bp-check.log`.
+Native benchmark and CLI builds pass; the full benchmark
+`/tmp/leaner-benchmark-literal-swap.json` is complete: 30 verified problems,
+one expected AMM rejection, no unexpected failures/timeouts, and
+15,825,019,985 raw heartbeats. The owning driver regenerated the full local
+JSON/HTML against main before broad tests. All four full package suites pass,
+including both cost gates and the 123 Check fixtures. All 437 registry baseline checks pass, with no baseline changes. Logs:
+`/tmp/literal-swap-<package>-{build,test}.log`,
+`/tmp/literal-swap-prover-refresh.log`, and
+`/tmp/literal-swap-registry-audit.{json,log}`.
+
+In the complete benchmark, `VectorOperations` falls from 272,547,867 to
+252,424,096 heartbeats (−7.4%). Its `swap_remove_value` target falls from
+64,554,891 to 47,189,204 (−26.9%). Suite cost is down 21,630,556 heartbeats (−0.14%)
+against the preceding opaque-inline run.
+
+Reverse remains an open proof-automation problem: neither broad lookup
+normalization, earlier quantified instantiation, nor an explicit swap result
+carrier removes its preparation timeout. Broader rewrites increased its
+branch count. Tighter speculative budgets exposed extra companion obligations
+without getting reverse below 25M, and were removed. The validated five-percent
+per-attempt budget remains. Scratch experiments live under `/tmp/reverse-*`;
+none of those experimental budget, carrier or broad-read changes is installed.
+
+
+### Table snapshot contract integration (2026-10-06)
+
+The full benchmark `/tmp/leaner-benchmark-snapshot-routing.json` retains 30
+verified samples and one expected AMM rejection, with no unexpected failures
+or timeouts. It measures 15,807,887,568 raw heartbeats, +450,576 (+0.0029%) from
+`/tmp/leaner-benchmark-table-contents-final.json`. Framework ordered_map verifies
+all 29 targets at 4,158,157,741 heartbeats; pool_u64 verifies all 22 at
+3,189,643,146. Calculator verifies all eight at 1,066,759,897. The benchmark
+generator refreshed `local_benchmark.json` and main-relative HTML before broad
+suite validation. The local JSON is byte-identical to the measured artifact.
+The new Table source proofs and six focused compatibility checks pass. All four
+full suites pass, including 125 Check fixtures and both cost gates. After reviewing
+and regenerating seven changed Table baselines, all 437 registry checks pass
+(`/tmp/snapshot-routing-full-tests.log`, `/tmp/snapshot-routing-prover-recheck.log`).
+
+### Table shared-read contracts (2026-10-06)
+
+The full benchmark `/tmp/leaner-benchmark-table-reads.json` retains 30 verified
+problems and the expected AMM rejection, with no unexpected failures/timeouts.
+It uses 15,808,054,447 raw heartbeats, +166,879 (+0.0011%) from snapshot-routing.
+Framework `ordered_map` verifies 29/29 at 4,158,162,148; `pool_u64` verifies 22/22
+at 3,189,774,048; calculator verifies 8/8 at 1,066,777,655. The separate LeanerLang
+`OrderedMap` sample uses 1,438,458,701. Local JSON is byte-identical to the artifact,
+and the driver generated HTML relative to main CI 37250691414 (`ea4ecc43e7`).
+Full suites and the registry check were started only after that report refresh.
+All four suites pass, including 127 Check fixtures and both cost gates, as do all
+437 registry baseline checks (`/tmp/table-reads-full-tests.log`,
+`/tmp/table-reads-prover-check.log`). The full diagnostic audit is unchanged.
+
+The newly enabled Table membership/shared-lookup contracts pass five focused
+source proofs and reject a false lookup claim. The registry's `table_option`
+advances from a missing native model to a 25,000-maxHeartbeats proof timeout.
+Scratch normalization reduces two residual goals to the stored Option vector's
+`size ≤ 1`, with no such invariant premise. Deep invariants of external Table
+values and aggregate observation normalization must be supplied; a larger search
+budget would not address the missing invariant. Diagnostic artifacts are recorded
+in `intrinsic-maps.md` under shared Table read contracts.
+
+### Table aggregate observation normalization (2026-10-06)
+
+The full benchmark `/tmp/leaner-benchmark-table-projections.json` retains 30
+verified problems and one expected AMM rejection, with no unexpected failures.
+Its 15,807,844,181 raw heartbeats are 210,266 lower (−0.0013%) than shared reads.
+Framework `ordered_map` verifies 29/29 at 4,157,996,222; `pool_u64` verifies 22/22
+at 3,189,706,932; calculator verifies 8/8 at 1,066,798,157. Local JSON is identical
+to the measured artifact, and the driver regenerated HTML against main CI
+37250691414 (`ea4ecc43e7`) before the cost gates and scoped registry checks.
+
+Known aggregate observations now normalize without splitting unknown snapshots.
+List/array traversal normalization proves equality and length of a nested-vector
+payload read through a Table contract. Six positive source proofs, two intended
+rejections, the existing snapshot checks, and both cost gates pass. Six scoped
+registry baselines match after the owning runner refreshed `table_option`.
+It still times out at its unchanged 25000 budget. Source diagnostic probes using
+the verifier's default budget expose one residual postcondition and two missing
+Option invariants; they are not evidence of a fix at the registry budget.
+The last complete broad-suite checkpoint remains the preceding shared-read run.
+
+### Vector index ranges (2026-10-06)
+
+`/tmp/leaner-benchmark-vector-ranges.json` retains all target outcomes: 30
+verified problems and one expected AMM rejection, no unexpected failures or
+timeouts. Total raw heartbeats are 15,808,427,132, up 582,951 (+0.0037%) from
+the preceding local run. The driver refreshed identical local JSON and generated
+HTML against main CI 37250691414 before both cost gates passed
+(`/tmp/vector-ranges-postcheck.log`). No broad suites were rerun for this increment.
+
+The new `VectorRanges` Check proves five positives at 25k and rejects a false
+upper-endpoint existential; the snapshot-range Check also passes. The scoped
+`macro_verification` baseline update and ordinary recheck pass. Its `foreach`
+now reaches proof search, but even a positive-only diagnostic times out at
+25k. The debug/profile probes show roughly 7.6M raw heartbeats for loop setup,
+then exhaustion while normalizing the unchanged-tail invariant after a mutable
+element write, before the authored tactic runs. No timed `p-clear` stage is
+reported for that leaf; inspect the preceding `leaner_denote_unname` and
+carrier normalization rather than assuming the arithmetic solver is responsible.
+Probes: `/tmp/VectorRangesForeach{Positive,Debug,Profile}.lean` and
+`/tmp/vector-ranges-foreach-{positive,debug,profile}.log`.
+
+### Certified reads and continuation aliases (2026-10-06)
+
+Unused saved-continuation aliases kept their entire definition chain alive
+through leaf simplification. `leaner_denote_clear_computations` now recognizes
+these aliases in context order and tries to clear them in reverse, retaining
+every definition still needed by a hypothesis or goal. `ContinuationCleanup`
+checks both removal and preservation.
+
+A proved normalization rewrites optional encoded integer reads to a certified
+integer's value, with certified zero for a missing entry. Bound collection now
+also recognizes projections of computed certified integers. `CertifiedReads`
+checks signed and unsigned bounds, missing entries, negative values, and an
+intended rejection at 25k. Both cost gates pass without baseline changes.
+The ordered-map duplicate-key companion normalizes its helper fact to this
+same read representation; its isolated target passes.
+
+The same instrumented positive-only `foreach` diagnostic decreases from
+48.483M to 36.190M raw heartbeats (25.4%). These are diagnostic runs at 100k,
+not acceptance-budget results. The uninstrumented 25k positive probe still
+times out. Its remaining profile spends 18.359M in fourteen leaves, including
+6.789M in preparation and 5.917M in written-value deciders. The counters are
+nested and must not be summed as independent costs. Profile artifacts:
+`/tmp/foreach-auto-diagnostic.log`, `/tmp/certified-read-foreach-profile.log`;
+focused checks: `/tmp/certified-read-focused.log`.
+
+The full native benchmark `/tmp/leaner-benchmark-certified-reads-final.json`
+retains all target outcomes: 30 verified problems and one expected AMM rejection.
+It measures 15,727,043,391 raw heartbeats, down 81,383,741 (0.5148%) from vector
+ranges. Comparator falls 21.0% to 120,907,579, bit_vector 3.2% to 364,856,646,
+and features 1.6% to 766,838,269. Framework ordered_map verifies 29/29 at
+4,141,160,834; pool_u64 verifies 22/22 at 3,193,150,321 (+0.1030% locally).
+The local JSON is identical to the measured artifact. HTML compares against
+main CI 37250691414, and its updated roster omits the retired type_info entry.
+The outcome comparison and report freshness checks pass before broad validation
+starts (`/tmp/certified-read-validation.log`).
+
+All four full suites pass, including both cost gates and 129 Check fixtures
+(`/tmp/certified-read-full-tests.log`). The full registry check matches 432/437
+baselines. Its one proof regression is a companion still naming a leaf that
+automation now closes; `bp_pure_callee::count_all` passes again after removing
+that obsolete case, against its unchanged baseline. Four reviewed diagnostic
+baselines were regenerated and pass ordinary rechecks. Their audit finds no
+added failed target: `folds_of_callee_ensures::count_small` newly verifies at
+25k; `find_value` rejects normally rather than timing out; the remaining
+changes are residual normalization or an additional clause diagnostic for an
+already failing target. Logs: `/tmp/certified-read-pure-callee-recheck.log`,
+`/tmp/certified-read-registry-refresh.log`, and
+`/tmp/certified-read-registry-audit.json`. The full 437-file run plus five
+focused ordinary rechecks cover this final state; no second full run is claimed.
+
+### Vector element quantifiers (2026-10-06)
+
+Normalizing the mapped runtime values of an element quantifier exposes the
+native element predicate. Position instantiation now retains the element's
+universal binder and dependent read equation rather than rejecting the binder.
+`ElementQuantifiers` passes four positive proofs and two intended rejections at
+25k; certified reads, vector ranges, Table snapshots and both cost gates also
+pass (`/tmp/element-quantifiers-focused.log`). The ordinary positive-only
+`foreach` probe still times out at 25k.
+
+The full native benchmark `/tmp/leaner-benchmark-element-quantifiers.json`
+preserves all target outcomes: 30 verified problems and one expected AMM
+rejection. Its 15,834,183,512 raw heartbeats are +107,140,121 (+0.6813%) over the
+certified-read checkpoint. The report is generated against main, omits type_info,
+and the local JSON matches the measured artifact. Scoped registry checks follow
+that refresh under `/tmp/element-quantifiers-after-benchmark.py`.
+
+A scratch specialization of `List.forall_mem_map` to runtime-value predicates
+retains all six new checks and also proves a generic-vector equality read at
+25k. In isolated native comparisons it reduces bit_vector's shift target from
+252,685,657 to 248,810,251 heartbeats and features' next-epoch target from
+40,974,012 to 40,297,016 (`/tmp/element-{shift,features}-compare.log`). The
+specialization is now installed, with a fifth generic source proof. All focused
+checks and both cost gates pass (`/tmp/element-final-focused.log`). The scoped
+registry checks exposed one real authored-proof regression in
+`invariants_with_quant`: its literal-element clause now leaves an extra goal.
+The companion explicitly enumerates its three positions, simplifies the reads,
+and passes against the unchanged baseline (`/tmp/element-final-literal-vector-recheck.log`).
+The final full benchmark `/tmp/leaner-benchmark-element-quantifiers-final.json`
+measures 15,744,282,692 raw heartbeats: 89,900,820 below the wider rule, and
+17,239,301 (+0.1096%) above certified reads. All target outcomes remain unchanged
+(30 verified problems and one expected rejection). Framework ordered_map costs
+4,145,558,609 and pool_u64 3,196,518,381. Local data and main-relative HTML were
+refreshed before broad validation; the generated report excludes type_info.
+All four full suites pass with both cost gates and 130 Check fixtures.
+The full registry check matches 436/437 baselines; the sole difference is a
+newly verified `moved_local_in_loop` at 25k. Its obsolete timeout baseline was
+removed by the owning runner and an ordinary focused recheck passes. Logs:
+`/tmp/element-final-full-tests.log`, `/tmp/element-final-registry-check.log`,
+`/tmp/element-final-moved-local-{refresh,recheck}.log`.
+
+Further positive-only foreach profiling (2026-10-07) does not close the 25k
+gap. Quiet automatic profiling at a diagnostic 100k measures 33.353M; the
+current manual decider measures 32.647M. Clearing computations before canonical
+families slightly worsens the automatic result to 33.466M. Clearing before
+unname reduces the manual result to 31.577M, but its ordinary 25k run still
+fails. Neither scratch change was installed. These are nested diagnostic
+counters, not acceptance results. Logs: `/tmp/foreach-quiet-profile.log`,
+`/tmp/foreach-current-manual-profile.log`,
+`/tmp/foreach-early-cleanup-profile.log`, and
+`/tmp/foreach-manual-early-{profile,25k}.log`.
+
+
+## Table stored-value invariants (2026-10-07)
+
+Generated contracts now combine global-resource predicates with deep invariants
+of external collection entries, retaining generic and phantom type arguments.
+The closer obtains the invariant from raw-key membership at the same snapshot
+memory. This avoids reconstructing a native key for an arithmetic expression.
+Both Table handle layouts have codec-to-observation bridges. Native integer
+round trips and vector round trips take priority over decoder expansion, so
+already-certified values do not create duplicate bound checks. Snapshot identity
+comparisons receive a focused closing attempt without globally unfolding unknown
+snapshots or losing their selected memory.
+
+The nine positive source proofs and two false-claim rejections in
+`TableStoredInvariants.lean` pass at 25k. `StoredTableInvariantErrors` rejects a
+stored Table-equality invariant whose meaning a broad physical-input shortcut
+would change: only a bare vector local's length may bypass observation. The
+axiom audit of eight bridge/core laws contains only standard Lean axioms.
+
+The native registry runner still matches `table_option`'s timeout baseline.
+A diagnostic generated-source run closes its proof at approximately 25.99M raw
+heartbeats, above the unchanged 25k acceptance budget; it is not a registry pass.
+That diagnostic predates the final length-only restriction. Its main remaining
+costs are call normalization (6.9M), stored-read facts (2.35M across four uses),
+and two general leaf pipelines (2.96M). Logs are
+`/tmp/table-option-Production-profile.log` and
+`/tmp/table-invariant-native-registry-final.log`. Experimental broad stored-fact
+simplification and broader snapshot dispatch increased cost and were not
+installed. A map-specific integer encoder normalization saved about 0.63M in a
+diagnostic but remained over budget and was also left out.
+
+The full benchmark, run before broad suites, preserves every outcome:
+30 verified problems and one expected AMM rejection, at **15,725,534,459** raw
+heartbeats. This is −18,748,233 (−0.1191%) from the element-quantifier checkpoint.
+Capability improves 283,915,114 → 237,395,590; framework ordered_map changes
+4,145,558,609 → 4,157,454,627; pool_u64 changes
+3,196,518,381 → 3,201,625,758. No target outcome changes. Local JSON is identical
+to `/tmp/leaner-benchmark-table-invariants.json`, and the generator refreshed HTML
+against main with retired type_info absent. All four full suites pass, including
+both cost gates and 131 Check fixtures (`/tmp/table-invariants-full-tests.log`).
+The full registry matches 435/437 baselines. Its two differences are fewer
+diagnostics, not new verified targets: `different_addr_global` finishes with an
+ordinary verification failure, and `verify_remove_with_unroll` still times out.
+A new diagnostic profile after the length-only safety restriction reproduces
+25,986k raw heartbeats for `table_option` (`/tmp/table-option-current-profile.log`).
+
+
+## Snapshot equality follow-up (2026-10-07)
+
+The focused snapshot-identity closer now uses `lir_denote_norm` and the
+context equalities directly. It no longer unfolds the broader `lir_denote`
+and `lir_denote_eval` rule sets or runs a separate scalar-equality pass.
+The installed generated-source diagnostic falls from **25,986k to 24,867k**
+raw heartbeats in `closeGoals` (`/tmp/table-option-normalization-profile.log`).
+This is **not the full theorem cost**: the surrounding theorem elaboration
+costs **29,139,877 raw heartbeats**, with 22,076 distinct proof objects
+(`/tmp/table-option-measured-total.log`). The separate transport theorem costs
+465,869 raw heartbeats.
+The unchanged 25k registry limit still times out, and its ordinary baseline
+check matches (`/tmp/table-option-normalization-registry.log`). Do not infer
+acceptance from a closer-only profile below 25M.
+
+The nine positive and two negative Table invariant checks still pass, as does
+the identity-invariant rejection guard. Logs:
+`/tmp/table-option-normalization-stored-invariants.log` and
+`/tmp/table-option-normalization-identity-guard.log`. The focused `TableSnapshots` and `TableReads` source checks also pass
+(`/tmp/snapshot-equality-TableSnapshots.log`,
+`/tmp/snapshot-equality-TableReads.log`). The complete package-suite
+checkpoint immediately precedes this two-line closer change; it has not been
+rerun after it. The regular benchmark has completed (`/tmp/snapshot-equality-benchmark.log`):
+30 verified plus one expected AMM rejection, **15,725,421,251** raw heartbeats,
+a local decrease of 113,208 (−0.00072%). Outcomes are unchanged. Local JSON is
+byte-identical to `/tmp/leaner-benchmark-snapshot-equality.json`; the generator
+refreshed HTML against main with type_info absent. Both focused cost gates pass after that refresh:
+`/tmp/snapshot-equality-DenotePerformance.log` and
+`/tmp/snapshot-equality-CompositionPerformance.log`.
+
+Instrumentation found only about 5k raw heartbeats each for lookup theorem
+argument unification and closed registration/layout decisions, versus about
+390k for normalization of each Table invariant fact. Replacing the telescope
+with `mkAppM` did not help. Broad early derivation of stored facts increased
+later context-normalization work (about 35.88M closer-only in the scratch
+probe), so it was not installed. A map-specific encoder normalization saves
+about 0.41M with the narrower snapshot closer, but still fails at 25k and was
+not installed. A Lean heartbeat trace (`/tmp/table-option-theorem-profile.log`) separates
+about 1.26M in the initial tactic setup/normalization from about 2.58M in
+kernel checking of `typedVerified`. Tracing adds overhead: its entire theorem
+is about 32.72M, versus 29.14M without tracing. Do not use the traced total as
+an acceptance measurement. Targeted alias-fact normalization and early
+conjunction splitting did not improve the installed implementation; those
+scratch probes are also not installed. The next optimization must reduce
+proof construction/checking as well as leaf search.
+
+
+## Call-range eligibility (2026-10-07)
+
+The call-result case splitter now checks for a possible small literal range
+before copying and normalizing continuation hypotheses. The check preserves
+metavariables and transported views, and collects bounds across expressions
+so equalities connecting locals do not exclude a candidate. It only controls
+whether to try an existing proof procedure; it adds no semantic assumption.
+Eight `CallRangeResults` targets verify at 25k, covering opaque, generic, mutable,
+strict-bound and large-literal results. A simpler scratch guard saved more but
+did not retain the same conservative eligibility; its saving is not the installed
+result.
+
+Installed `table_option` whole-theorem cost is **28,686,998 raw heartbeats**,
+down from 29,139,877, with unchanged 22,076 proof objects. Closer-only cost is
+24,405k; transport costs 465,938. The normal registry check still matches its
+25k timeout baseline. Logs: `/tmp/call-range-guard-table-total.log` and
+`/tmp/call-range-guard-table-option-registry.log`.
+
+The full regular benchmark completes before broad tests: **30 verified plus
+one expected AMM rejection**, **15,624,166,021** raw heartbeats, a decrease of
+101,255,230 (0.6439%). The measured artifact is
+`/tmp/leaner-benchmark-call-range-guard.json`; local JSON matches and generated
+HTML compares with main. All four builds and full suites pass; all 437 registry baselines match
+(`/tmp/call-range-checkpoint-full-tests.log`). No diagnostic baseline refresh
+was needed.
+
+Scratch computed-index investigation: opaque bounds 10 <= result <= 11 suffice
+for a two-element vector read at result - 10, but automatic verification fails
+under both old and new call-range logic. Residual context introduces a separate
+certified integer `named` and the equality `named.val = result.val - 10`. Range
+detection sees the bounded result and index as unrelated. A descendant scan
+inside `Int.toNat` alone is insufficient before scalar-equality rewriting;
+it does close the prepared manual proof. No fix for this gap is installed.
+
+A subsequent scratch scalar-equality rewrite before range detection proves
+all eight computed-index targets and rejects four deliberately false
+postconditions (`/tmp/call-range-computed-scalar{,-negative}.log`). Applying it
+unconditionally costs 30,915,264 whole-theorem heartbeats for table_option in
+the scratch environment, versus 29,800,403 without the rewrite. Restricting it
+to a nonempty literal-bound candidate set costs 29,810,087. These scratch
+figures include elaborator aliases/overrides and are not comparable directly
+to the smaller native installed total. A dependency scan without rewriting
+still fails all three computed-index callers. The guarded rewrite plus
+computed-position recognition is the promising next implementation; keep the
+unchanged proof budget and the false-postcondition guards.
+
+
+The computed-index fix is installed after the call-range full-suite checkpoint.
+The existing scalar-equality tactic was moved before the range tactic and is
+invoked only with literal-bound candidates. Range position detection now looks
+inside the `Int.toNat` argument for the bounded scalar. Native build, both
+cost gates, 16 positive fixture targets and two guarded rejections pass at
+25k. Logs: `/tmp/computed-index-{build,regression,DenotePerformance,CompositionPerformance}.log`.
+Installed table_option costs 28,689,764 typed-theorem heartbeats (only +2,766),
+with unchanged 22,076 objects and 465,938 transport heartbeats. Its ordinary
+native registry check matches the timeout baseline. The subsequent full
+benchmark is pending; the four-full-suite result above predates this increment.
+
+
+## Table normalization experiments (2026-10-07)
+
+The computed-index benchmark completes with 30 verified problems and one
+expected AMM rejection at **15,646,803,818** raw heartbeats (+22,637,797,
++0.1449%). The driver refreshed main-relative HTML; local JSON matches
+`/tmp/leaner-benchmark-computed-index.json`. Focused registry checks for
+table_option and verify_vector match their unchanged baselines.
+
+Further isolated Table experiments, all at a diagnostic budget:
+- Normalizing an invariant schema over a fresh raw variable before instantiation
+  increases the whole theorem to 30,767,376 heartbeats; not installed.
+- Context-only call-range eligibility preserves all 16 positive proofs and two
+  guarded rejections in scratch. It avoids transports from the future program
+  that cannot supply bounds on the current call result.
+- Exact lookup-equality transport plus early physical-field and vector-length
+  rewriting reduces leaf pipeline work. Primitive integer-vector invariants
+  are tautologies under DataInvariant.value and can be eliminated before
+  traversing the stored vector expression.
+- The combined scratch proof costs 27,929,337 heartbeats with 21,212 objects,
+  including substantial scratch declaration/override overhead. This is not
+  an acceptance measurement. The corresponding native batch is now building
+  (`/tmp/table-normalization-build.log`); its real budget check is pending.
+No unused-contract clearing or weakened transport eligibility is installed.
+
+
+The first native normalization batch reduces table_option's whole typed theorem
+to 24,531,222 heartbeats and 21,212 proof objects. The ordinary registry runner
+reports only deletion of the obsolete timeout output: the target verifies at
+25k. However, reversing the physical-field normal form for arbitrary snapshots
+regresses generic `count` (both layouts) and phantom-typed `tagged`. No baseline
+was refreshed for this intermediate state.
+
+Restoring the original unknown-snapshot rule and adding a pre-rule only for a
+known aggregate restores all TableStoredInvariants cases. Scratch table_option
+also passes with both maxHeartbeats and leaner.verifyHeartbeats set to 25000
+(`/tmp/table-option-aggregate-field-budget.log`), despite its recorded whole
+sample being 25,479,304 raw heartbeats: that sample includes work outside the
+local proof-budget scope. Use the actual unchanged-budget native check for
+acceptance, not an inferred cutoff on the broader diagnostic sample. The
+corrected native build is `/tmp/table-normalization-final-build.log`; checks
+and the next benchmark are pending. Generic observation-field bridge lemmas
+alone did not fix these regressions and are not installed.
+
+
+The corrected native batch passes: table_option verifies at the unchanged
+25k setting; the owning runner removes its obsolete baseline and the ordinary
+recheck passes (`/tmp/table-option-fixed-registry-recheck.log`). Whole typed
+cost is **25,254,204 raw heartbeats** (−3,435,560, −11.9749%), with **21,500 proof
+objects** (−576), and 465,850 transport heartbeats. Closer cost is 21,019k;
+leaf pipeline work falls to 920k. The aggregate-only pre-rule retains the
+old generic observation form and fixes the initial three regressions.
+
+Both cost gates, 16 call-range positives/two negatives, nine Table invariant
+positives/two negatives, the Table identity guard, TableReads, TableSnapshots,
+and kernel snapshot/invariant tests pass. Logs have prefix
+`/tmp/table-normalization-final-`. The new lemmas' audit lists only propext and
+Quot.sound. The full regular benchmark and periodic suites are the next checks;
+none is claimed for this batch yet.
+
+
+The first normalization benchmark reveals a guard regression: framework
+`test_verify_upsert` rises 114,337,592 → 423,982,783 heartbeats,
+`test_verify_remove_or_none` rises 63,126,801 → 268,615,937, and
+`test_verify_iter_collect_symbolic` rises 180,692,547 → 223,094,867.
+LeanerLang OrderedMap times out. The measured report records these outcomes;
+the checkpoint assertion stops before the full suites.
+An identical isolated upsert source costs 432,274,533 with the context-only
+guard and 120,693,726 with the original guard (scratch override overhead is
+included). The original conservative target-and-context guard is restored in
+production. It is an eligibility heuristic, not a source of proof premises:
+target transports must remain eligible so subsequent normalization can expose
+facts already held in the context. The remaining Table optimization still
+passes at the actual 25k setting in scratch with that guard restored
+(`/tmp/table-option-restored-guard-budget.log`). Native rebuild, the ordinary
+table_option check and both focused cost gates pass. The corrected regular
+benchmark restores 30 verified problems plus one expected AMM rejection, with
+no timeouts. Total: 15,646,929,683 raw heartbeats, +125,865 (+0.0008044%)
+against the previous good computed-index run. Framework ordered_map returns
+to 4,123,667,100; LeanerLang OrderedMap to 1,433,690,178.
+`/tmp/leaner-benchmark-table-restored.json` matches local JSON and the generated
+HTML compares against main. All four builds and full suites pass, and all 437 registry baselines match
+without refresh (`/tmp/table-restored-full-tests.log`). Final Table measurement
+with the restored guard: 26,045,418 typed raw heartbeats / 21,500 proof objects,
+plus 465,826 transport heartbeats (`/tmp/table-restored-total.log`). The native
+25k check passes; the broader measurement includes work outside that budget.
+
+
+### Decoded state-label updates (2026-10-07)
+
+The registry's two_increments timeout concealed ordinary residual failures at
+200k. Non-aborting reads were destructured as `some value = memory resource key`,
+which the read tactics do not consume, and decoder expansion preceded the
+arithmetic facts needed to prove its range checks. Use the forward witness
+lemma, expose known values without opening the codec, then discharge its range
+conditions. An opaque caller additionally supplies isSome facts and successful
+decoder equations: use the known decoder result before rewriting its input.
+The final native target verifies at the unchanged 25k limit, and the owning
+runner deletes the timeout baseline. All 30 state-label registry baselines
+match. Typed cost: 18,269,904 raw heartbeats, 11,428 objects; transport 367,301.
+The registered StateLabelDecoding fixture has three positive proofs, including
+an opaque caller with no callee program points, and missing-resource/overflow
+rejections. Both cost gates and both focused existing label fixtures pass.
+The regular benchmark passes: 30 verified + one expected rejection, no timeouts,
+15,647,129,560 raw heartbeats (+199,877, +0.0013% against restored-guard).
+`/tmp/leaner-benchmark-state-label-decoded.json` matches local JSON; HTML is
+regenerated against main with type_info absent. Full suites were last run at
+the preceding restored-guard checkpoint.
+
+
+### Constructive state-label witnesses (2026-10-07)
+
+`spec_fun_old_param_labeled_with_memory::inc_under_cap_twice` used 30,912,290
+raw typed heartbeats. Its three impossible branches already closed cheaply;
+the actual success path spent 8.4M in witness search. The intermediate label
+can use the initial memory and a counter value one greater than the input.
+Trying every program point first repeatedly rejects environments before the
+existing arithmetic witness builder constructs this value. Move program-point
+search after the predicate/context candidates. All candidates still require
+proof of the instantiated predicate; labels remain ordinary existentials and
+do not require execution points at callers.
+
+Native typed cost: 24,132,039 raw heartbeats, unchanged 15,523 objects;
+transport 208,976. The original registry and new registered StateLabelWitnesses
+fixture verify at 25k. The state-label registry directory passes 30/30 after
+removing its old timeout baseline. Both cost gates pass, as does StateLabelDecoding;
+StateLabels retains byte-identical intended-negative diagnostics. The regular
+benchmark retains 30 verified + one expected rejection, no timeouts, at
+15,647,293,919 raw heartbeats (+164,359, +0.00105%). Main-relative JSON/HTML
+were refreshed before the broad checkpoint: all four builds/full suites and
+437/437 registry baseline checks pass (handoff.md).
+Scratch-only alternatives: contradictory-branch checks cost more; moving the
+point search only after arithmetic synthesis gives 27.735M; the fully delayed
+scratch version gives 24.670M (native production measurement above is authoritative).
+
+
+### Reusing invocation facts (2026-10-07)
+
+The closer reconstructed a chosen terminating run even when matching
+EnsuresOf, ResultOf and StateOf facts were already available. It also split
+on abort decisions under an encodeFor spelling despite a known decision at
+the definitionally equal encode spelling. Reuse the complete three-fact run,
+and recognize direct positive/negative abort decisions by reducible conversion.
+No premises are assumed: these checks only skip redundant proof search.
+
+The original aborts_if_at_state_label diagnostic now fails only its ensures
+at 102.153M typed heartbeats (formerly 167.735M with multiple failed clauses).
+Its native 25k timeout remains. All 30 labeled registry checks and both cost
+gates pass. The regular benchmark completed with 30 verified + one expected
+AMM rejection, no timeouts, at 15,644,746,679 raw heartbeats (-2,547,240).
+Measured JSON and main-relative HTML are refreshed; the latest broad validation
+still precedes these guards.
+A scratch leaf tactic proves all clauses at 29.391M, but still times out at
+25k, so it is not installed and the registry baseline is unchanged.
+
+
+### Close existing call observations before deriving behavior (2026-10-07)
+
+The call rule already supplies the typed result, abort decision, and contract.
+Trying a bounded leaf proof before terminatingRuns/dispatchBehavior avoids
+re-deriving those facts. Recognize both ResultOf and AbortsOf: excluding aborts
+left a trivial impossible branch spending 5.4M in the ordinary cheap solver.
+All 16 leaves of aborts_if_at_state_label::caller now close from existing call
+observations, at 20,251,470 typed raw heartbeats / 14,523 objects (transport
+396,238). The native 25k runner verifies and removes its timeout baseline.
+
+The speculative attempt is limited to 3M raw heartbeats and restored on failure.
+It adds unsigned/certified bounds but omits generated natAbs facts; ordinary
+assertBounds defaults to full facts, including signed magnitudes. Normalize
+single returned values with packResults_single; preserve tdiv rather than
+unnecessarily converting to ediv. No contract premises are introduced.
+StateLabelCallObservations covers the symbolic quotient, nested labeled result,
+opaque caller, and a rejected false postcondition. Both cost gates and existing
+decoding/witness fixtures pass. The regular benchmark retains 30 verified + one
+expected rejection at 15,677,942,351 raw heartbeats (+33,195,672, +0.2122%).
+Measured JSON and main-relative HTML refreshed before broad suites; those suites
+are running (handoff.md).
+
+
+### Shared Boolean observations and direct-call eligibility (2026-10-07)
+
+The preceding full checkpoint passes all four suites, but the registry reveals
+one constructor regression: amm_example::create_pool pays for the new call
+fast path because its quantified PricingStrategy invariant mentions AbortsOf.
+Require a direct ResultOf equality or direct positive/negative AbortsOf fact
+instead. The native AMM baseline now matches without refreshing it.
+
+intermediate_states::test_config_preserved leaves four implications: for each
+Config.active outcome, both results equal the same value. A bounded attempt
+finds multiple distinct conditional equalities for each polarity, prepares the
+leaf to identify unchanged memories, then splits the shared Bool and simp_all.
+The native 25k proof uses 8,793,754 typed raw heartbeats, 6,552 objects, transport
+366,506. Both intended negative siblings retain their clause diagnostics.
+StateLabelBooleanObservations covers direct conditional opaque reads and the
+incorrect claim that an unconditional reader always returns the same value.
+Both cost gates and all focused label fixtures pass. The benchmark preserves
+30 verified + one expected rejection at 15,676,741,907 raw heartbeats; the full
+registry recheck matches 437/437. The four suites passed just before this follow-up.
+
+
+### Updated memories and conditional frame equations (2026-10-07)
+
+`aliasing::different_addr_global` compares two successive writes. The stored
+structure's opaque empty HList tail remains a local on one side and Unit.unit
+on the other; reflexivity recognizes their definitional equality. A bounded
+3M raw-heartbeat attempt prepares equalities whose two sides are Memory.set,
+then simplifies, tries reflexivity, and uses congruence for residual reads.
+The native target now verifies at 25k, with 19,832,667 typed raw heartbeats,
+13,887 proof objects, and 216,817 transport heartbeats. The owning runner
+removes the whole aliasing failure baseline.
+
+An opaque-caller regression additionally exposed a cyclic conditional frame:
+the post-memory equals writes whose final value reads that same post-memory.
+The generic self-reference filter previously recognized only direct equations.
+It now inspects equations under binders; rejected rewrite rules remain proof
+facts. The decoded-read closer can expose presence witnesses and use encoded
+value observations without expanding the frame. This branch retains the
+existing attempt budget. The caller verifies at 25k, 11,577,355 typed raw
+heartbeats, 8,649 objects, and 298,173 transport heartbeats. A wrong labeled
+update is still rejected. Both cost gates, all five label fixtures, and the
+two conditional-cycle regressions pass. The regular benchmark preserves 30
+verified + one expected rejection at 15,696,214,192 raw heartbeats (+0.1242%).
+Main-relative HTML is regenerated. All four full suites and all 437 registry
+baseline checks subsequently pass; see handoff.md and `/tmp/aliasing-observations-*`.
+
+## Optional integer reads and sum folds (2026-10-07)
+
+The literal certified-read normalizer now also handles optional reads,
+preserving signed values and the actual fallback. Its certificate uses
+`val_getD_getElem?_map_val`; `Option.bind_fun_some` is normalized as well.
+Registered `LiteralOptionalReads` covers unsigned/signed nonzero fallbacks
+and a symbolic stored value. The native `vector_hofs_fold` runner now verifies
+`sum_concrete`, `sum_inferred`, and `sum_scaled` at the unchanged 25k budget.
+Their companion unfolds recursive specifications, rewrites the goal using
+context equations, then decides finite index cases. Whole typed artifacts
+cost 27,897,980 / 27,332,778 / 27,979,895 raw heartbeats respectively; those
+include work outside the native verification-budget scope. No residual-search
+or acceptance-budget change is installed. The owning runner removed exactly
+these three obsolete timeout sections; product and even-count still time out.
+Core/Move builds, both cost gates, optional-read, call-range, and labeled-memory
+fixtures pass. The full benchmark preserves 30 verified + one expected rejection at
+15,688,482,526 raw heartbeats (-0.0493% versus aliasing). Measured JSON and
+main-relative HTML are refreshed, without type_info. All 437 registry
+baselines match without refresh (`/tmp/fold-optional-checkpoint.log`, exit 0). All four full suites passed
+at the preceding aliasing checkpoint; they have not been rerun for this increment.
+
+## Product-fold range-bound follow-up (2026-10-07)
+
+`vector_hofs_fold::product_concrete` now verifies at native 25k. The range
+instance solver tries congruence (`grind only`) at the new endpoint, so an
+accumulator equality also transports a multiplication bound. Previous
+normalization fallbacks remain. ArithmeticContext includes a positive case
+and rejects the same inference without either the current bound or the
+accumulator equality. The original solver fails the positive regression.
+The installed whole typed proof costs **23,960,945 raw heartbeats**, 22,596
+objects, transport 282,210. Native refresh removes only the product timeout;
+`count_even_concrete` is the sole remaining failure in this fold module.
+Core/Move builds and the focused checks pass. The first broad registry check
+exposed two regressions; restricting endpoint congruence to symbolic products
+restores their original behavior. The subsequent pool checkpoint passes all four
+full suites and all 437 registry checks without refresh, retaining this product
+improvement (`/tmp/pool-final-checkpoint.log`).
+
+## Conditional range instances in the even-count fold (2026-10-07)
+
+The range solver now has a fallback for a quantified invariant whose conditional
+has already been split in the goal. It specializes at the goal's integer
+positions and simplifies only those new instances using known guards. Range
+premises are retained. At the new endpoint, known guards also simplify the
+current iteration's bound. The original range path is tried first.
+`ArithmeticContext` covers both branches and rejects missing branch evidence
+and missing endpoint bounds. Its focused build passes
+(`/tmp/conditional-range-build.log`, 116 jobs).
+
+This is a partial fix for `vector_hofs_fold::count_even_concrete`, not a new
+registry success. On the same isolated authored proof at a diagnostic 100k
+budget, closer work falls from 39.076M to 34.551M raw heartbeats; residual work
+falls from 24.137M to 19.610M and normalized leaves from eight to five. The
+remaining proof still exhausts that diagnostic budget. No acceptance budget
+or companion is changed. `/tmp/count-even-conditional-installed.log` records
+the installed result.
+
+Two scratch experiments identify the remaining arithmetic work. Normalizing
+truncating remainder over a nonnegative literal list, together with the
+conditional-range prototype, proves the target in 48,803,217 typed raw
+heartbeats (`/tmp/count-even-conditional.log`). This is still above native
+25k and the remainder normalizer is not installed. An explicit lemma giving
+the six-element prefix count as `n / 2` also proves the target, but costs
+78,885,053 typed raw heartbeats (`/tmp/count-even-prefix-cases.log`), so that
+companion is rejected. The full benchmark/report and cost/regression checks
+for the installed range change pass
+(`/tmp/conditional-range-checkpoint.log`, exit 0). The regular benchmark retains
+30 verified samples plus one expected AMM rejection at 15,066,137,470 raw
+heartbeats (+0.0328%); JSON and main-relative HTML are regenerated. Both cost
+gates and all three focused registry baselines match without refresh.
+All four full builds/suites and all 437 ordinary registry checks subsequently
+pass without baseline refresh (`/tmp/conditional-range-full-tests.log`, exit 0).
+
+With the installed endpoint handling, the scratch nonnegative-remainder
+normalizer alone proves the fold in 44,958,953 typed raw heartbeats
+(`/tmp/count-even-nonnegative-installed.log`). Two further experiments lose:
+evaluating closed recursive applications before residual preparation costs
+51,018,577 (`/tmp/count-even-ground-evaluation.log`), and extending unused
+computation cleanup to `Comp` aliases costs 47,967,311
+(`/tmp/count-even-clear-comp.log`). None of these scratch changes is installed.
+
+## Pool performance attribution (2026-10-07)
+
+The current regular measurement (`/tmp/leaner-benchmark-fold-product.work/pool_u64.json`)
+verifies all 22 functions at 3,185,090,652 total raw heartbeats: verification
+2,929,430,533 (92%), certification 225,676,539. The largest targets are buy_in
+847,944,044; redeem_shares 629,034,382; deduct_shares 571,115,483; transfer_shares
+297,478,947; add_shares 251,910,369. These five consume 88.7% of verification work.
+They are symbolic production proofs, not ground-data tests. Pool's data invariants
+relate the shareholders vector to the shares map: coverage, equal cardinality,
+uniqueness and the shareholder limit.
+
+A fresh read-only profile (`/tmp/pool-investigation-profile.{json,log}`) confirms
+that buy_in spends 600.596M in the closer before its companion takes over,
+535.908M in residual processing across 81 leaves. Failed residual-context
+attempts cost 130.454M; failed cheap attempts 86.977M. The companion already
+clears unused callee summaries and rewrites scalar equations, but only after
+this expensive preparation. redeem_shares has 98 leaves: 245.883M preparing
+45 leaves, including 167.615M renormalization, plus 138.614M successful w-omega
+work. These step figures overlap with their enclosing stages and must not
+be added to those stages. deduct_shares spends 281.430M in the closer before
+its companion, including 228.851M residual processing across 70 leaves; its
+full target is 571.115M. Attribution of the remainder to individual companion
+steps needs separate instrumentation. No pool optimization is installed yet.
+The next measured optimization should target buy_in's repeated failed
+pre-companion search and context growth, rather than assuming its simple
+arithmetic or map runtime representation inherently needs this much proof work.
+
+## Bounded residual search follow-up (2026-10-07)
+
+The first pool optimization reduces the absolute ceiling of speculative
+residual attempts from 20M to 2M raw heartbeats, retaining the five-percent
+limit. Native 25k verification therefore keeps its existing 1.25M per-attempt
+allowance. The target acceptance budget and all specifications are unchanged.
+The installed solver preserves ordinary tactic failure and fallback behavior.
+On the same isolated buy_in rendering, typed proof work falls from 852,580,897
+to 727,871,678 raw heartbeats (14.6%). Closer work falls from 613.109M to
+472.295M; its failed context attempts fall from 131.629M to 21.261M.
+Proof objects change from 109,439 to 109,532. Core/Move builds, ArithmeticContext
+and both cost gates pass. The full benchmark and all-package/registry
+results are recorded below. Focused logs:
+`/tmp/pool-residual-cap-*`, `/tmp/pool-context-checkpoint.log`.
+
+Rejected scratch experiments: clearing callee contracts early did not reduce
+cost, and moving scalar cleanup into automatic residual search spent more on
+failed attempts than it saved. The initial scratch budget override saved more
+(698.316M) but swallowed tactic failures, so that figure is not the production
+result. The ordinary solver run above is the relevant comparison.
+
+The first full run retained every pool outcome and reduced its native total
+from 3,185,090,652 to 3,099,911,251 raw heartbeats. buy_in fell from 847,944,044
+to 729,680,787, but deduct_shares rose from 571,115,483 to 604,298,240.
+The companion now tries map coverage first; a same-rendering interpreted
+comparison verifies at 460,613,609 versus 623,020,988 heartbeats, with fewer
+proof objects (88,098 versus 91,972). The first full run also exposed an AMM
+companion regression: it demanded fee ≤ 10000 on early abort branches whose
+abort condition follows from fee > 10000. Discharging those disjunctions with
+constructor simplification and omega before deriving return-path fee bounds
+restores the isolated proof at 428,297,037 raw heartbeats. No contract was
+changed. The first report records the regression honestly; broad validation
+did not start. The corrected complete checkpoint below is recorded in
+`/tmp/pool-final-checkpoint.log` (session 14303, terminal 0).
+
+The corrected complete benchmark preserves 30 verified + one expected AMM
+rejection at **15,061,197,787 total raw heartbeats**, down 4.03% from the preceding
+15,694,278,677 checkpoint. Pool falls 7.68% to 2,940,369,701; native buy_in is
+729,515,623 and deduct_shares 445,113,352. Ordered_map is 4,031,232,214 and AMM
+1,293,879,404. `/tmp/leaner-benchmark-pool-final.json` matches local_benchmark.json;
+main-relative HTML is regenerated with the global ranking first and no type_info.
+All four package builds and full suites pass; all 437 registry baselines match
+without refresh (146.59s). Both cost gates pass. The subsequent redeem_shares
+manual-preparation probe is rejected: it verifies but costs 1,087,346,931 versus
+642,092,999 isolated typed raw heartbeats. No redeem_shares companion is installed
+(`/tmp/PoolRedeem{Current,Prepared}.lean`, `/tmp/pool-redeem-*.log`).
+
+## Literal results and unrolled paths (2026-10-07)
+
+Checked arithmetic names its result (`∀ named, named.val = e → …`). When `e`
+normalizes to a literal, the name hid the value from the loop condition, so
+every unrolled branch survived to a leaf: the ground 2×2 nested loop had 67
+leaves and 64.5M closer heartbeats. The `namedLiteral` simproc substitutes a
+fitting literal instead (its certificate is decided once); the same loop has one
+leaf and 7.7M. Full benchmark −0.48% (VectorOperations −16.2%); cost-gate targets
+unchanged.
+
+Lean's `split` under the default `backward.split` simplifies with contextual
+`ite` congruence, discharging every nested condition along both branches:
+2^k attempts for a chain of k `if`s. One split of the 11-level inlined
+`spec_pow_raw` takes about 8 s. `backward.split false` avoids the blow-up but
+does not decide branches whose conditions an earlier hypothesis fixes; neither
+is installed. `math_fixed8::pow_raw` also needs `n & 1` as `n % 2`, pinning of
+`n` from omega-derived bounds, and many nonlinear overflow leaves, which is not
+feasible at 25k.

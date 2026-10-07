@@ -103,7 +103,7 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
     (renderOnly : Bool := false) (heartbeats : Option Nat := none)
     (modules : Array String := #[]) (dev : Bool := false) :
     IO (Array Report) := do
-  let (unit, companions, omitted) ← LeanerLang.Perf.withPhase .frontend do
+  let prepared ← LeanerLang.Perf.withPhase .frontend do
     let package ← match exported with
       | some exported =>
           LeanerMove.Frontend.Cli.readExportDir exported source filter
@@ -117,9 +117,15 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
           else LeanerMove.Frontend.Cli.exportMoveFiles [source]
     let package ← withProofFiles package
     match LeanerMove.Frontend.LIR.Backend.fromXast package with
-    | .ok unit => pure (unit, ← companions package unit, ← omissions package)
-    | .error message => throw <| IO.userError s!"{source}: {message}"
-  let reports ← run environment { unit, companions, output, renderOnly, heartbeats }
-  return (if renderOnly then #[] else omitted) ++ reports
+    | .ok unit => pure (Except.ok (unit, ← companions package unit, ← omissions package))
+    | .error message => pure (Except.error message)
+  match prepared with
+  | .error message =>
+      return #[{
+        file := source.toString, line := 1, column := 1
+        severity := .error, text := message }]
+  | .ok (unit, companions, omitted) =>
+      let reports ← run environment { unit, companions, output, renderOnly, heartbeats }
+      return (if renderOnly then #[] else omitted) ++ reports
 
 end LeanerMove.SourceVerify

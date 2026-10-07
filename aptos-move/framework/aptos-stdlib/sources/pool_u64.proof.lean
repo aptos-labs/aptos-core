@@ -13,8 +13,9 @@ verify buy_in by
 
 -- The ignored index_of flag leaves both search branches. Equal cardinality
 -- and distinctness rule out a missing shareholder; a matching removal
--- preserves membership for every surviving shareholder.
+-- preserves membership for every surviving shareholder. Use this argument
+-- before general search on the quantified map facts.
 verify deduct_shares by
   all_goals first
-  | leaner_denote_decide_prepared
   | leaner_denote_map_coverage_prepared
+  | leaner_denote_decide_prepared

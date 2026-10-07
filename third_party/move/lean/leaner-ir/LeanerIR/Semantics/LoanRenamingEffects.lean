@@ -119,10 +119,10 @@ theorem borrowRuntimePlaceAt?_mirror (shifted : StateShifted offset frontier ine
       cases root : place.root with
       | global key =>
           refine ⟨{ writtenState₂ with
-              globalLoans := (state₂.nextLoan, key) :: writtenState₂.globalLoans }, rfl, ?_,
+              storageLoans := (state₂.nextLoan, .global key) :: writtenState₂.storageLoans }, rfl, ?_,
             frame_above', value_above⟩
           rw [shifted.nextLoan]
-          exact writtenShifted.withRegistry (writtenShifted.registry.cons shifted.frontier_le key)
+          exact writtenShifted.withRegistry (writtenShifted.registry.cons shifted.frontier_le (.global key))
       | «local» _ => exact ⟨writtenState₂, rfl, writtenShifted, frame_above', value_above⟩
 
 theorem borrowRuntimePlace?_mirror (shifted : StateShifted offset frontier inert inert' state state₂)

@@ -26,11 +26,11 @@ open LeanerIR.Proofs.Denote in
 theorem set_distinct_struct {unit} [Θ : Skolems unit]
     (memory : Memory unit) {h k : LeanerIR.StructHandle}
     (a b f g xs ys : NRow) (key otherKey : LeanerIR.StorageKey)
-    (value : Option ((⟨Θ.resolve (.struct h a f), xs⟩ : ResourceType).carrier unit))
+    (value : Option ((⟨Θ.resolve (.struct h a f), xs, .value⟩ : ResourceType).carrier unit))
     (different : k ≠ h) :
-    memory.set ⟨Θ.resolve (.struct h a f), xs⟩ key value
-      ⟨Θ.resolve (.struct k b g), ys⟩ otherKey =
-    memory ⟨Θ.resolve (.struct k b g), ys⟩ otherKey := by
+    memory.set ⟨Θ.resolve (.struct h a f), xs, .value⟩ key value
+      ⟨Θ.resolve (.struct k b g), ys, .value⟩ otherKey =
+    memory ⟨Θ.resolve (.struct k b g), ys, .value⟩ otherKey := by
   apply Memory.set_other
   intro eq
   have same := congrArg (fun r : ResourceType => r.type.handle?) eq

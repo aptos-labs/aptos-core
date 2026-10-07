@@ -20,3 +20,8 @@ verify vector_of_proper_positives by
     rcases cases_i with rfl | rfl | rfl
     all_goals rcases cases_j with rfl | rfl | rfl
     all_goals first | rfl | contradiction
+  · intro i lo hi
+    have cases_i : i = 0 ∨ i = 1 ∨ i = 2 := by omega
+    rcases cases_i with rfl | rfl | rfl
+    all_goals rintro x ⟨h, rfl⟩
+    all_goals simp

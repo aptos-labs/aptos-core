@@ -52,7 +52,7 @@ Every frame of a verification shares this one memory, so its type never
 changes across a call.
 
 **State.** The denotation's state is the memory: `Comp α := Spec Memory
-Failure α`. Loan bookkeeping (`globalLoans`, `nextLoan`, `pending`) occurs
+Failure α`. Loan bookkeeping (`storageLoans`, `nextLoan`, `pending`) occurs
 only inside the prophetic meaning of a call, under its existentially
 quantified runtime start (`Admissible`, `exportsAfter`), and leaves the
 denotation's state; `RuntimeState.withLoansOf` goes away.
@@ -100,10 +100,11 @@ Storage no longer keys through the runtime type instantiation
 runtime side of calls and closures.
 
 **Calls.** A callee's run (`propheticRun`) runs the big-step semantics from
-every admissible runtime start whose globals encode the caller's memory and
-yields the memory its exit globals encode (`Encodes`: under every runtime
-key, the encoding of the slot of the closed resource type its type identifier
-denotes, `runtimeResourceOf`). Open generic entries in the type table are
+every admissible runtime start whose stores encode the caller's memory and
+yields the memory its exit stores encode (`StorageEncodes`, combining global
+`Encodes` with `TableMemory.EncodesStorage`). For globals, each runtime
+key holds the encoding of its closed resource type’s slot, as selected by
+`runtimeResourceOf`. Open generic entries in the type table are
 templates, not independent runtime keys. The template lookup (`resourceOf`)
 remains available to frame coherence, which relates a template to its
 instantiated resource. Unnamed-memory agreement uses the same runtime-key
@@ -126,6 +127,30 @@ their loans, which the behavioral predicates (`result_of`, `aborts_of`)
 rely on.
 
 ## Contracts
+
+Table extension in progress (2026-10-06;
+[`intrinsic-maps.md`](intrinsic-maps.md)): runtime state now contains a separate
+native contents heap and allocation history. Their typed-memory encoding is
+defined and proved unique in `Denote/TableMemory.lean`. `StorageEncodes` includes
+both stores in `propheticRun`, call agreement, and behavioral predicates.
+Unnamed-resource preservation excludes native contents and allocation history.
+Loan independence now shifts Table contents while preserving identities, and
+labeled post-state uniqueness covers both stores. Entry-loan reconciliation,
+native operation contracts, and ownership frames remain open before Table roles
+can be enabled. The Table fields stay
+physical handles/metadata; contents are separate typed slots. `ResourceType`
+distinguishes ordinary values from unbounded native collections, preserving
+that distinction through type substitution. Table entries and allocation history
+use the latter; ordinary Move vector values keep their size bounds.
+
+An escaping reference leaves a heap hole. At a successful call boundary,
+`StorageEncodesReturned` observes globals and Table contents by resolving
+those holes with the explicit returned row. Prophetic calls use the prophecy
+row; runtime contracts and behavioral predicates use the current row.
+`Contract.frame` takes the result so its runtime storage observation is tied
+to that row, just like ensures. Source modifies predicates remain unchanged,
+and frames remain unconditional even when abort conditions excuse ensures.
+Loan-renaming and labeled-state uniqueness proofs cover these observations.
 
 - `global<R>(k)` reads the memory slot at the contract frame's resource
   type and reads as the encoding of the value it holds (the clauses'

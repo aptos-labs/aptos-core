@@ -41,10 +41,10 @@ def invocationSpec {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       | none => Spec.bottom
   | _ => Spec.bottom
 
-/-- A start an invocation runs from, as a call's does: globals encoding
-the memory, with loan bookkeeping that lends nothing (`Denote.Admissible`). -/
+/-- A start an invocation runs from, as a call's does: globals and Table
+storage encoding the memory, with loan bookkeeping that lends nothing (`Denote.Admissible`). -/
 def StartsAt {unit : ValidatedUnit} (start : RuntimeState) (memory : Denote.Memory unit) : Prop :=
-  Denote.Encodes unit memory start.globals ∧ Denote.Admissible start []
+  Denote.StorageEncodes unit memory start ∧ Denote.Admissible start []
 
 /-- `aborts_of<f>(x)`: the invocation aborts from a start at `memory`. -/
 def AbortsOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
@@ -59,7 +59,7 @@ def EnsuresOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callabl
     (arguments : List RuntimeValue)
     (results : Array RuntimeValue) (pre post : Denote.Memory unit) : Prop :=
   ∃ start exit, StartsAt start pre ∧ (invocationSpec executable callable arguments).ok start results exit ∧
-    Denote.Encodes unit post exit.globals ∧ Denote.AgreeUnnamed unit post pre
+    Denote.StorageEncodesReturned unit post exit results ∧ Denote.AgreeUnnamed unit post pre
 
 open Classical in
 /-- `result_of<f>(x)`: results the invocation returns from a start at
@@ -230,7 +230,7 @@ theorem ensuresOf_closureOf_verified {unit : ValidatedUnit} {executable : Execut
     (permitted : contract.requires (weave.compose captures args) pre) :
     (¬contract.mayAbort (weave.compose captures args) pre →
         contract.ensures (weave.compose captures args) pre result post) ∧
-      contract.frame (weave.compose captures args) pre post ∧
+      contract.frame (weave.compose captures args) pre result post ∧
       ¬contract.mustAbort (weave.compose captures args) pre :=
   (verified _ pre assumed permitted).1 result post
     (ensuresOf_closureOf weave capturedFree suppliedFree resultFree typeInstantiation coherent
@@ -280,9 +280,12 @@ theorem ensuresOf_of_run {unit : ValidatedUnit} {executable : ExecutableUnit uni
     (runs : (propheticMeaning executable typeInstantiation handle full shape args).ok pre result final) :
     EnsuresOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
       (σs := .nil) ()).encode (HList.encode args) ((resultCodec shape).encode result) pre final := by
-  obtain ⟨-, start, loans, arguments, results, exit, returnedLoans, _, globals, admissible,
-    lent, ran, resultsLent, -, -, encoded, agree⟩ := runs
+  obtain ⟨-, start, loans, arguments, results, exit, returnedLoans, prophecyRow, globals, admissible,
+    lent, ran, resultsLent, prophecyLent, -, encoded, agree⟩ := runs
   obtain ⟨rfl, rfl⟩ := lendArguments_refFree fullFree lent
+  rw [ResultShape.lend_refFree_view shape shapeFree, resultsLent] at prophecyLent
+  have sameRow : prophecyRow = results := (Option.some.inj prophecyLent).symm
+  subst prophecyRow
   have returned : results = (resultCodec shape).encode result := by
     cases shape with
     | none =>

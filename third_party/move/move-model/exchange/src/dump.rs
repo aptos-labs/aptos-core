@@ -1371,6 +1371,11 @@ impl<'a> Ctx<'a> {
             ExpData::Value(_, v) => xast::ExpNode::Value {
                 value: self.value(v)?,
                 constant: self.constant_name(id, v),
+                defaulted_num: matches!(v, Value::Number(_))
+                    && self
+                        .env
+                        .get_extension::<move_model::model::SpecDefaultedNumLocs>()
+                        .is_some_and(|locs| locs.0.contains(&self.env.get_node_loc(id))),
             },
             ExpData::LocalVar(_, name) => {
                 let node = xast::ExpNode::Local {

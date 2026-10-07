@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/stored_fun_values.move:10:1: error: verification failed with a residual obligation:
+tests/sources/functional/closures/stored_fun_values.move:419:5: error: verification failed with a residual obligation:
 case returns.right.left
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -310,7 +310,7 @@ x :
 ⊢ LeanerIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) leanerFinal
 tests/sources/functional/closures/stored_fun_values.move:422:9: error: the specification clause `ensures global<Counter>(s.address) == old(global<Counter>(s.address))` is not established
 tests/sources/functional/closures/stored_fun_values.move:419:5: error: leaner verification failed: the automatic verification of `use_counter_modifier_wrong` failed; provide a proof: `verify use_counter_modifier_wrong by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_counter_modifier_wrong by skip` shows the obligations it leaves)
-tests/sources/functional/closures/stored_fun_values.move:10:1: error: verification failed with a residual obligation:
+tests/sources/functional/closures/stored_fun_values.move:504:5: error: verification failed with a residual obligation:
 case returns.left
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -512,7 +512,7 @@ a✝ :
     true
 ⊢ LeanerIR.Proofs.Denote.MemoryInvariants (storedInvariant unit executable✝) leanerFinal
 tests/sources/functional/closures/stored_fun_values.move:504:5: error: leaner verification failed: the automatic verification of `use_any_modifier` failed; provide a proof: `verify use_any_modifier by …` in `tests/sources/functional/closures/stored_fun_values.proof.lean` (`verify use_any_modifier by skip` shows the obligations it leaves)
-tests/sources/functional/closures/stored_fun_values.move:10:1: error: verification failed with a residual obligation:
+tests/sources/functional/closures/stored_fun_values.move:514:5: error: verification failed with a residual obligation:
 case returns.right.left
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit

@@ -1,2 +1,2 @@
-LeanerE2ETests/SourceVerify/closure_frame_widening.move:4:1: error: the continuation after `increment` is not established
+LeanerE2ETests/SourceVerify/closure_frame_widening.move:64:5: error: the continuation after `increment` is not established
 LeanerE2ETests/SourceVerify/closure_frame_widening.move:64:5: error: leaner verification failed: the automatic verification of `wrong_frame` failed; provide a proof: `verify wrong_frame by …` in `LeanerE2ETests/SourceVerify/closure_frame_widening.proof.lean` (`verify wrong_frame by skip` shows the obligations it leaves)

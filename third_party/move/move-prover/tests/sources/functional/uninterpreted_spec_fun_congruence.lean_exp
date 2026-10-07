@@ -1,3 +1,3 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/uninterpreted_spec_fun_congruence.move: LIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3413, 3420)
+Move prover returns: exiting with verification errors
+tests/sources/functional/uninterpreted_spec_fun_congruence.move:1:1: error: LIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3413, 3420)
 LIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3424, 3431)

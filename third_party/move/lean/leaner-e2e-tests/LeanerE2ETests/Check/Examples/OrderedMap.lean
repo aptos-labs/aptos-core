@@ -497,6 +497,7 @@ leaner module 0x42::ordered_map where
              exact ‹¬_ = _› (LeanerIR.Proofs.Codec.encode_injective _ same)))
       | (apply sorted_erase <;> first | assumption | omega)
       | (have found := ‹(_ : Array _)[_]? = some _›
+         rw [(Array.getElem_of_getElem? found).choose_spec]
          apply erase_at _ _ _ _ _ _ _ _ found <;> first | assumption | omega)
 
   -- ## Scenarios

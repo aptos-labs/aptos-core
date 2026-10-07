@@ -779,7 +779,7 @@ and prophecy resolution:
   carries `rs` with each returned reference's prophecy; the export of every
   argument loan in `s₁.pending`, with each returned loan's hole replaced by
   that reference's prophecy, encodes the argument's prophecy; and `final`
-  is `s₁` with `globalLoans`, `nextLoan`, and `pending` of `initial`.
+  is `s₁` with `storageLoans`, `nextLoan`, and `pending` of `initial`.
 - `aborts initial e` holds when some such start state and loans abort
   with `e`.
 - `undefined initial` holds when some such run returns a value the codecs
@@ -814,7 +814,7 @@ value view below. The transport is proved, not assumed.
   whose contract does not read `final` keeps the value view, which cannot
   relate a later write to the lender, so a caller reasons over its
   denotation through the agreement instead.
-- Loan facts (`FreshGlobalLoanIds`, `LoanDiscipline`, `nextLoan`) leave
+- Loan facts (`FreshStorageLoanIds`, `LoanDiscipline`, `nextLoan`) leave
   the contracts and the closer.
 
 ### Removed
@@ -853,8 +853,8 @@ What the implementation settled:
   equation between variant injections).
 - Callees are collected through every inlined body, since a callee
   returning a reference is inlined and brings its own callees.
-- The rule-1 audit forbids the loan predicates (`FreshGlobalLoanIds`,
-  `LoanDiscipline`, `globalLoanKeyIn?`, `removeGlobalLoan`), not the loan
+- The rule-1 audit forbids the loan predicates (`FreshStorageLoanIds`,
+  `LoanDiscipline`, `storageLoanTargetIn?`, `removeStorageLoan`), not the loan
   fields of `RuntimeState` or the `borrow`/`loanHole` constructors: a store
   update is a record update that names every field, and a case split on a
   runtime value names every constructor.

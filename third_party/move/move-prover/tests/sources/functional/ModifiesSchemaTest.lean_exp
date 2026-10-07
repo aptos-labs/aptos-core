@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ModifiesSchemaTest.move:2:1: error: verification failed with a residual obligation:
+tests/sources/functional/ModifiesSchemaTest.move:33:5: error: verification failed with a residual obligation:
 case h_2.continues.left.isTrue
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit

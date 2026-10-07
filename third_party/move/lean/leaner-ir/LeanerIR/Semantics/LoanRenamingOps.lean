@@ -684,89 +684,89 @@ section Registry
 
 variable {frontier : Nat}
 
-theorem globalLoanKeyIn?_append (first second : List (Nat × GlobalKey)) (loan : Nat) :
-    globalLoanKeyIn? (first ++ second) loan =
-      (globalLoanKeyIn? first loan).or (globalLoanKeyIn? second loan) := by
-  unfold globalLoanKeyIn?
+theorem storageLoanTargetIn?_append (first second : List (Nat × LoanTarget)) (loan : Nat) :
+    storageLoanTargetIn? (first ++ second) loan =
+      (storageLoanTargetIn? first loan).or (storageLoanTargetIn? second loan) := by
+  unfold storageLoanTargetIn?
   rw [List.find?_append]
   cases first.find? (·.1 == loan) <;> rfl
 
-theorem globalLoanKeyIn?_below {junk : List (Nat × GlobalKey)} {bound loan : Nat}
+theorem storageLoanTargetIn?_below {junk : List (Nat × LoanTarget)} {bound loan : Nat}
     (below : ∀ entry ∈ junk, entry.1 < bound) (above : bound ≤ loan) :
-    globalLoanKeyIn? junk loan = none := by
-  unfold globalLoanKeyIn?
+    storageLoanTargetIn? junk loan = none := by
+  unfold storageLoanTargetIn?
   rw [Option.map_eq_none_iff, List.find?_eq_none]
   intro entry member
   have := below entry member
   simp only [beq_iff_eq]
   omega
 
-theorem globalLoanKeyIn?_map_shift (minted : List (Nat × GlobalKey)) (loan : Nat) :
-    globalLoanKeyIn? (minted.map (shiftEntry offset)) (loan + offset) =
-      globalLoanKeyIn? minted loan := by
-  unfold globalLoanKeyIn?
+theorem storageLoanTargetIn?_map_shift (minted : List (Nat × LoanTarget)) (loan : Nat) :
+    storageLoanTargetIn? (minted.map (shiftEntry offset)) (loan + offset) =
+      storageLoanTargetIn? minted loan := by
+  unfold storageLoanTargetIn?
   rw [List.find?_map, Option.map_map]
-  have same : ((fun entry : Nat × GlobalKey => entry.1 == loan + offset) ∘ shiftEntry offset) =
+  have same : ((fun entry : Nat × LoanTarget => entry.1 == loan + offset) ∘ shiftEntry offset) =
       fun entry => entry.1 == loan := by
     funext entry; simp [Nat.add_beq_add]
   rw [same]
   rfl
 
-theorem RegistryShifted.lookup {registry registry' : List (Nat × GlobalKey)}
+theorem RegistryShifted.lookup {registry registry' : List (Nat × LoanTarget)}
     (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
     (above : frontier ≤ loan) :
-    globalLoanKeyIn? registry' (loan + offset) = globalLoanKeyIn? registry loan := by
+    storageLoanTargetIn? registry' (loan + offset) = storageLoanTargetIn? registry loan := by
   obtain ⟨minted, junk, junk', rfl, rfl, -, below, below'⟩ := shifted
-  rw [globalLoanKeyIn?_append, globalLoanKeyIn?_append, globalLoanKeyIn?_map_shift,
-    globalLoanKeyIn?_below below above, globalLoanKeyIn?_below below' (by omega)]
+  rw [storageLoanTargetIn?_append, storageLoanTargetIn?_append, storageLoanTargetIn?_map_shift,
+    storageLoanTargetIn?_below below above, storageLoanTargetIn?_below below' (by omega)]
 
-theorem removeGlobalLoan_append_free (minted junk : List (Nat × GlobalKey)) {loan : Nat}
-    (free : globalLoanKeyIn? junk loan = none) :
-    removeGlobalLoan (minted ++ junk) loan = removeGlobalLoan minted loan ++ junk := by
+theorem removeStorageLoan_append_free (minted junk : List (Nat × LoanTarget)) {loan : Nat}
+    (free : storageLoanTargetIn? junk loan = none) :
+    removeStorageLoan (minted ++ junk) loan = removeStorageLoan minted loan ++ junk := by
   induction minted with
-  | nil => simp [removeGlobalLoan_of_free junk loan free, removeGlobalLoan]
+  | nil => simp [removeStorageLoan_of_free junk loan free, removeStorageLoan]
   | cons entry rest ih =>
-      simp only [List.cons_append, removeGlobalLoan]
+      simp only [List.cons_append, removeStorageLoan]
       split <;> simp [ih]
 
-theorem removeGlobalLoan_map_shift (minted : List (Nat × GlobalKey)) (loan : Nat) :
-    removeGlobalLoan (minted.map (shiftEntry offset)) (loan + offset) =
-      (removeGlobalLoan minted loan).map (shiftEntry offset) := by
+theorem removeStorageLoan_map_shift (minted : List (Nat × LoanTarget)) (loan : Nat) :
+    removeStorageLoan (minted.map (shiftEntry offset)) (loan + offset) =
+      (removeStorageLoan minted loan).map (shiftEntry offset) := by
   induction minted with
   | nil => rfl
   | cons entry rest ih =>
-      simp only [List.map_cons, removeGlobalLoan, shiftEntry, Nat.add_beq_add]
+      simp only [List.map_cons, removeStorageLoan, shiftEntry, Nat.add_beq_add]
       split <;> simp [ih, shiftEntry]
 
-theorem removeGlobalLoan_sublist (registry : List (Nat × GlobalKey)) (loan : Nat) :
-    ∀ entry ∈ removeGlobalLoan registry loan, entry ∈ registry := by
+theorem removeStorageLoan_sublist (registry : List (Nat × LoanTarget)) (loan : Nat) :
+    ∀ entry ∈ removeStorageLoan registry loan, entry ∈ registry := by
   induction registry with
-  | nil => simp [removeGlobalLoan]
+  | nil => simp [removeStorageLoan]
   | cons head rest ih =>
       intro entry member
-      simp only [removeGlobalLoan] at member
+      simp only [removeStorageLoan] at member
       split at member
       · exact List.mem_cons_of_mem _ member
       · rcases List.mem_cons.mp member with rfl | member
         · exact List.mem_cons_self
         · exact List.mem_cons_of_mem _ (ih entry member)
 
-theorem RegistryShifted.remove {registry registry' : List (Nat × GlobalKey)}
+theorem RegistryShifted.remove {registry registry' : List (Nat × LoanTarget)}
     (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
     (above : frontier ≤ loan) :
-    RegistryShifted offset frontier (removeGlobalLoan registry loan)
-      (removeGlobalLoan registry' (loan + offset)) := by
+    RegistryShifted offset frontier (removeStorageLoan registry loan)
+      (removeStorageLoan registry' (loan + offset)) := by
   obtain ⟨minted, junk, junk', rfl, rfl, minted_above, below, below'⟩ := shifted
-  refine ⟨removeGlobalLoan minted loan, junk, junk',
-    removeGlobalLoan_append_free minted junk (globalLoanKeyIn?_below below above), ?_,
-    fun entry member => minted_above entry (removeGlobalLoan_sublist minted loan entry member),
+  refine ⟨removeStorageLoan minted loan, junk, junk',
+    removeStorageLoan_append_free minted junk (storageLoanTargetIn?_below below above), ?_,
+    fun entry member => minted_above entry (removeStorageLoan_sublist minted loan entry member),
     below, below'⟩
-  rw [removeGlobalLoan_append_free _ junk' (globalLoanKeyIn?_below below' (by omega)),
-    removeGlobalLoan_map_shift]
+  rw [removeStorageLoan_append_free _ junk' (storageLoanTargetIn?_below below' (by omega)),
+    removeStorageLoan_map_shift]
 
-theorem RegistryShifted.cons {registry registry' : List (Nat × GlobalKey)}
+theorem RegistryShifted.cons {registry registry' : List (Nat × LoanTarget)}
     (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
-    (above : frontier ≤ loan) (key : GlobalKey) :
+    (above : frontier ≤ loan) (key : LoanTarget) :
     RegistryShifted offset frontier ((loan, key) :: registry) ((loan + offset, key) :: registry') := by
   obtain ⟨minted, junk, junk', rfl, rfl, minted_above, below, below'⟩ := shifted
   refine ⟨(loan, key) :: minted, junk, junk', rfl, rfl, ?_, below, below'⟩
@@ -791,13 +791,13 @@ theorem fillHole?_above {loan : Nat} {replacement value result : RuntimeValue}
   obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp filled
   exact RuntimeValue.above_shift_self frontier base
 
-theorem RegistryShifted.transfer {registry registry' : List (Nat × GlobalKey)}
+theorem RegistryShifted.transfer {registry registry' : List (Nat × LoanTarget)}
     (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
-    (above : frontier ≤ loan) (key : GlobalKey) {replacement : RuntimeValue}
+    (above : frontier ≤ loan) (key : LoanTarget) {replacement : RuntimeValue}
     (replacement_above : replacement.Above frontier) :
-    RegistryShifted offset frontier (transferGlobalLoan registry loan key replacement)
-      (transferGlobalLoan registry' (loan + offset) key (replacement.shift offset)) := by
-  unfold transferGlobalLoan
+    RegistryShifted offset frontier (transferStorageLoan registry loan key replacement)
+      (transferStorageLoan registry' (loan + offset) key (replacement.shift offset)) := by
+  unfold transferStorageLoan
   simp only [transferredLoan?_shift]
   cases found : transferredLoan? replacement with
   | none => exact shifted.remove above
@@ -868,10 +868,10 @@ theorem StateShifted.withGlobals (shifted : StateShifted offset frontier inert i
   { shifted with globals := rfl, globalsAbove := above }
 
 theorem StateShifted.withRegistry (shifted : StateShifted offset frontier inert inert' state state₂)
-    {registry registry' : List (Nat × GlobalKey)}
+    {registry registry' : List (Nat × LoanTarget)}
     (related : RegistryShifted offset frontier registry registry') :
-    StateShifted offset frontier inert inert' { state with globalLoans := registry }
-      { state₂ with globalLoans := registry' } :=
+    StateShifted offset frontier inert inert' { state with storageLoans := registry }
+      { state₂ with storageLoans := registry' } :=
   { shifted with registry := related }
 
 theorem StateShifted.push (shifted : StateShifted offset frontier inert inert' state state₂)
@@ -881,6 +881,7 @@ theorem StateShifted.push (shifted : StateShifted offset frontier inert inert' s
       { state with pending := state.pending.push (loan, value) }
       { state₂ with pending := state₂.pending.push (loan + offset, value.shift offset) } where
   globals := shifted.globals
+  tables := shifted.tables
   nextLoan := shifted.nextLoan
   frontier_le := shifted.frontier_le
   inert_le := by simp only [Array.size_push]; exact Nat.le_succ_of_le shifted.inert_le
@@ -891,6 +892,7 @@ theorem StateShifted.push (shifted : StateShifted offset frontier inert inert' s
       shifted.pending, Array.map_push]
   registry := shifted.registry
   globalsAbove := shifted.globalsAbove
+  tablesAbove := shifted.tablesAbove
   pendingAbove := by
     simp only
     rw [Array.extract_push_size _ _ shifted.inert_le]
@@ -901,7 +903,7 @@ theorem StateShifted.push (shifted : StateShifted offset frontier inert inert' s
 
 theorem StateShifted.lookup (shifted : StateShifted offset frontier inert inert' state state₂)
     {loan : Nat} (above : frontier ≤ loan) :
-    globalLoanKey? state₂ (loan + offset) = globalLoanKey? state loan :=
+    storageLoanTarget? state₂ (loan + offset) = storageLoanTarget? state loan :=
   shifted.registry.lookup above
 
 theorem StateShifted.slot_above (shifted : StateShifted offset frontier inert inert' state state₂)
@@ -919,6 +921,42 @@ theorem GlobalMap.insert_above {globals : GlobalMap} {key : GlobalKey} {value : 
   rcases GlobalMap.mem_insert.mp member with ⟨member, -⟩ | rfl
   · exact above slot member
   · exact value_above
+
+theorem StateShifted.loanValue (shifted : StateShifted offset frontier inert inert' state state₂)
+    (target : LoanTarget) :
+    state₂.loanValue? target = (state.loanValue? target).map (·.shift offset) := by
+  cases target with
+  | global key => simp [shifted.globals, GlobalMap.lookup_shift]
+  | table key => simp [shifted.tables, NativeTableStorage.shift, GlobalMap.lookup_shift]
+
+theorem StateShifted.loanValue_above
+    (shifted : StateShifted offset frontier inert inert' state state₂)
+    {target : LoanTarget} {value : RuntimeValue}
+    (found : state.loanValue? target = some value) : value.Above frontier := by
+  cases target with
+  | global key => exact shifted.slot_above found
+  | table key =>
+      change state.tables.contents.lookup key = some value at found
+      unfold GlobalMap.lookup at found
+      obtain ⟨slot, located, rfl⟩ := Option.map_eq_some_iff.mp found
+      exact shifted.tablesAbove slot (Array.mem_of_find?_eq_some located)
+
+theorem StateShifted.writeLoanValue
+    (shifted : StateShifted offset frontier inert inert' state state₂)
+    (target : LoanTarget) {value : RuntimeValue} (value_above : value.Above frontier) :
+    StateShifted offset frontier inert inert' (state.writeLoanValue target value)
+      (state₂.writeLoanValue target (value.shift offset)) := by
+  cases target with
+  | global key =>
+      simp only [RuntimeState.writeLoanValue_global]
+      exact { shifted with
+        globals := by simp [shifted.globals, GlobalMap.insert_shift]
+        globalsAbove := GlobalMap.insert_above shifted.globalsAbove value_above }
+  | table key =>
+      simp only [RuntimeState.writeLoanValue_table]
+      exact { shifted with
+        tables := by simp [shifted.tables, NativeTableStorage.shift, GlobalMap.insert_shift]
+        tablesAbove := GlobalMap.insert_above shifted.tablesAbove value_above }
 
 theorem RuntimeFrame.Above.setLocal {frame : RuntimeFrame} (above : frame.Above frontier)
     (index : Nat) {value : RuntimeValue} (value_above : value.Above frontier) :
@@ -976,25 +1014,24 @@ theorem fillVisibleHole_shift {frame : RuntimeFrame}
                       (fillHole?_above above replacement_above (frame_above.slot slot_eq) fill_eq)⟩
                     simp [RuntimeFrame.shift, Array.map_setIfInBounds]
   · rw [shifted.lookup above]
-    cases globalLoanKey? state loan with
+    cases storageLoanTarget? state loan with
     | none => exact ⟨state₂, rfl, shifted, frame_above⟩
     | some key =>
-        simp only [shifted.globals, GlobalMap.lookup_shift]
-        cases lookup_eq : state.globals.lookup key with
+        simp only [shifted.loanValue key]
+        cases lookup_eq : state.loanValue? key with
         | none => exact ⟨state₂, rfl, shifted, frame_above⟩
         | some value =>
             simp only [Option.map_some, Option.bind_some, fillHole?_shift]
             cases fill_eq : fillHole? loan replacement value with
             | none => exact ⟨state₂, rfl, shifted, frame_above⟩
             | some filled =>
-                refine ⟨{ state₂ with
-                    globals := (state.globals.insert key filled).shift offset
-                    globalLoans := transferGlobalLoan state₂.globalLoans (loan + offset) key
-                      (replacement.shift offset) },
-                  by simp [GlobalMap.insert_shift], ?_, frame_above⟩
-                exact (shifted.withGlobals _ (GlobalMap.insert_above shifted.globalsAbove
-                  (fillHole?_above above replacement_above (shifted.slot_above lookup_eq) fill_eq))
-                  ).withRegistry (shifted.registry.transfer above key replacement_above)
+                refine ⟨{ state₂.writeLoanValue key (filled.shift offset) with
+                    storageLoans := transferStorageLoan state₂.storageLoans (loan + offset) key
+                      (replacement.shift offset) }, rfl, ?_, frame_above⟩
+                exact (shifted.writeLoanValue key
+                  (fillHole?_above above replacement_above
+                    (shifted.loanValue_above lookup_eq) fill_eq)).withRegistry
+                  (shifted.registry.transfer above key replacement_above)
 
 theorem applyWriteBack_shift {frame : RuntimeFrame}
     (shifted : StateShifted offset frontier inert inert' state state₂)
@@ -1360,6 +1397,7 @@ theorem StateShifted.restart {state state₂ arguments arguments₂ : RuntimeSta
     StateShifted offset frontier inert inert' { state with pending := arguments.pending }
       { state₂ with pending := arguments₂.pending } where
   globals := final.globals
+  tables := final.tables
   nextLoan := final.nextLoan
   frontier_le := final.frontier_le
   inert_le := calling.inert_le
@@ -1367,6 +1405,7 @@ theorem StateShifted.restart {state state₂ arguments arguments₂ : RuntimeSta
   pending := calling.pending
   registry := final.registry
   globalsAbove := final.globalsAbove
+  tablesAbove := final.tablesAbove
   pendingAbove := calling.pendingAbove
 
 theorem applyPendingWriteBack_mirror {first second : RuntimeFrame × RuntimeState}

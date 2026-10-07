@@ -1,7 +1,7 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
-import LeanerIR.Proofs.Denote.Resources
+import LeanerIR.Proofs.Denote.ReturnedStorage
 import LeanerIR.Semantics.Frames
 
 /-!
@@ -1014,8 +1014,8 @@ identifiers beyond the frontier. -/
 def Admissible (state : LeanerIR.RuntimeState) (loans : List Nat) : Prop :=
   loans.Nodup ∧
     (∀ loan ∈ loans, loan < state.nextLoan ∧
-      LeanerIR.SemanticOperations.globalLoanKeyIn? state.globalLoans loan = none) ∧
-    LeanerIR.SemanticOperations.FreshGlobalLoanIds state
+      LeanerIR.SemanticOperations.storageLoanTargetIn? state.storageLoans loan = none) ∧
+    LeanerIR.SemanticOperations.FreshStorageLoanIds state
 
 /-- What a call denotes, for every callee handle and signature. -/
 abbrev CalleeMeaning : Type :=
@@ -1027,9 +1027,9 @@ abbrev GenericMeaning [Θ : Skolems unit] : Type :=
   FunctionHandle → Array TypeUse → (θ : TypeArgs) → (σs : NRow) → (shape : ResultShape) →
     @HList (Skolems.instantiate θ Θ).toCarriers σs → Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
 
-/-- The big-step run of a callee: from any admissible start whose globals
-encode the caller's memory, with references as `(current, prophecy)`,
-ending in the memory its exit globals encode.  What invoking a function
+/-- The big-step run of a callee: from any admissible start whose globals and
+Table storage encode the caller's memory, with references as `(current, prophecy)`,
+ending in the memory its exit stores encode.  What invoking a function
 value denotes. -/
 def propheticRun {unit : LeanerIR.Validation.ValidatedUnit}
     (executable : LeanerIR.Validation.ExecutableUnit unit) [Skolems unit]
@@ -1037,21 +1037,21 @@ def propheticRun {unit : LeanerIR.Validation.ValidatedUnit}
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans arguments results exit returnedLoans prophecyRow,
-      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      Encodes unit final exit.globals ∧ AgreeUnnamed unit final initial
+      StorageEncodesReturned unit final exit prophecyRow ∧ AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans arguments,
-      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).aborts start error
   undefined := fun initial =>
     ∃ start loans arguments results exit,
-      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       ¬∃ result, ∃ returnedLoans, ∃ resolved : HList σs,
@@ -1197,7 +1197,7 @@ def closureMeaning {unit : LeanerIR.Validation.ValidatedUnit}
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans supplied arguments results exit returnedLoans prophecyRow,
-      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1206,10 +1206,10 @@ def closureMeaning {unit : LeanerIR.Validation.ValidatedUnit}
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      Encodes unit final exit.globals ∧ AgreeUnnamed unit final initial
+      StorageEncodesReturned unit final exit prophecyRow ∧ AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans supplied arguments,
-      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1217,7 +1217,7 @@ def closureMeaning {unit : LeanerIR.Validation.ValidatedUnit}
         start error
   undefined := fun initial =>
     ∃ start loans supplied arguments results exit,
-      Encodes unit initial start.globals ∧ Admissible start loans ∧
+      StorageEncodes unit initial start ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -2048,7 +2048,7 @@ theorem wp_call {Args Result : Type} {function : Args → Comp unit Result}
     (permitted : contract.requires args initial)
     (post : ∀ result final,
       (¬contract.mayAbort args initial → contract.ensures args initial result final) →
-      contract.frame args initial final → ¬contract.mustAbort args initial →
+      contract.frame args initial result final → ¬contract.mustAbort args initial →
       ensures result final)
     (failing : ∀ error, contract.aborts args initial error → aborts error) :
     wp (function args) ensures aborts initial :=

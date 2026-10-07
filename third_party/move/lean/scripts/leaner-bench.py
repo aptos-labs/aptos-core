@@ -493,11 +493,13 @@ def problem_names(points):
 
 
 def problem_groups(points):
-    """The problems by group, in the order of `problem_names`. A problem's
-    group is the one its latest result records; a result from before groups
-    were recorded is grouped by its kind."""
+    """Group the latest full suite and any subsequent subset measurements.
+    Retired problems stay in historical data, but not in the page's index or
+    sections. A problem's group comes from its latest recorded result."""
+    full_index = next((i for i in range(len(points) - 1, -1, -1)
+                       if not points[i].get("subset")), 0)
     groups = {}
-    for name in problem_names(points):
+    for name in problem_names(points[full_index:]):
         results = [result for result in (result_of(point, name) for point in reversed(points))
                    if result]
         group = next((result["group"] for result in results if result.get("group")),
@@ -923,6 +925,40 @@ def value_table(labels, rows):
     return f"<details><summary>Table</summary><table><tr>{head}</tr>{body}</table></details>"
 
 
+def target_status(problem, name):
+    outcomes = {outcome["target"]: outcome["status"]
+                for outcome in problem.get("outcomes", [])}
+    outcome = outcomes.get(name, "verified" if problem["status"] == "verified" else "–")
+    if name in problem.get("expected_rejections", []):
+        if outcome == "rejected":
+            return "expected rejection"
+        if outcome == "verified":
+            return "unexpected acceptance"
+    return outcome
+
+
+def expensive_targets_section(point):
+    targets = sorted(
+        ((problem, target) for problem in point["problems"]
+         for target in problem.get("targets", []) if target.get("heartbeats") is not None),
+        key=lambda item: (-item[1]["heartbeats"], item[0]["name"], item[1]["target"]))[:20]
+    if not targets:
+        return ""
+    rows = "".join(
+        f'<tr><td>{rank}</td><td><a href="#{anchor(problem["name"])}">'
+        f'{html.escape(problem["name"])}</a></td><td>{html.escape(target["target"])}</td>'
+        f'<td>{beat_count(target["heartbeats"])}</td>'
+        f'<td>{html.escape(target_status(problem, target["target"]))}</td></tr>'
+        for rank, (problem, target) in enumerate(targets, 1))
+    scope = "latest partial run" if point.get("subset") else "latest run"
+    return (
+        '<section id="expensive-targets"><h2>Most expensive targets</h2>'
+        f'<p class="meta">Top {len(targets)} by heartbeats across the {scope}, '
+        'including rejections and timeouts.</p>'
+        '<table><tr><th>Rank</th><th>Problem</th><th>Target</th>'
+        f'<th>Heartbeats</th><th>Status</th></tr>{rows}</table></section>')
+
+
 def problem_section(points, name):
     labels = [label_of(point) for point in points]
     results = [result_of(point, name) for point in points]
@@ -940,21 +976,10 @@ def problem_section(points, name):
     latest = results[-1]
     status = latest["status"] if latest else "absent"
     targets = sorted((latest or {}).get("targets", []), key=lambda t: -t["heartbeats"])[:8]
-    outcomes = {outcome["target"]: outcome["status"]
-                for outcome in (latest or {}).get("outcomes", [])}
-    expected = set((latest or {}).get("expected_rejections", []))
-    def target_status(name):
-        outcome = outcomes.get(name, "verified" if status == "verified" else "–")
-        if name in expected:
-            if outcome == "rejected":
-                return "expected rejection"
-            if outcome == "verified":
-                return "unexpected acceptance"
-        return outcome
     target_rows = "".join(
         f"<tr><td>{html.escape(target['target'])}</td><td>{beat_count(target['heartbeats'])}</td>"
         f"<td>{target['wall_ms'] / 1000:.1f}</td>"
-        f"<td>{html.escape(target_status(target['target']))}</td></tr>" for target in targets)
+        f"<td>{html.escape(target_status(latest, target['target']))}</td></tr>" for target in targets)
     errors = "".join(f"<li>{html.escape(message)}</li>"
                      for message in (latest or {}).get("error_messages", []))
     rows = [(f"{title} s", [seconds(value[key]) for value in walls]) for key, title in GROUPS]
@@ -1011,7 +1036,9 @@ def index(points, groups, local_table):
         status = latest["status"] if latest else "absent"
         mark = "" if status == "verified" else f' <span class="status">{html.escape(status)}</span>'
         return f'<li><a href="#{anchor(name)}">{html.escape(name)}</a>{mark}</li>'
-    top = '<li><a href="#suite">Suite</a></li>' + (
+    top = ('<li><a href="#expensive-targets">Most expensive targets</a></li>'
+           if expensive_targets_section(points[-1]) else "")
+    top += '<li><a href="#suite">Suite</a></li>' + (
         '<li><a href="#local">Local run</a></li>' if local_table else "")
     body = "".join(
         f'<li><a class="group" href="#{anchor(group, "group")}">{html.escape(group)}</a>'
@@ -1036,7 +1063,7 @@ def page(points, local_table):
         f'runner {html.escape(str(latest.get("runner")))}, {latest.get("threads")} threads, '
         f'{html.escape(latest.get("toolchain", ""))}</div>'
         f'<div class="layout">{index(points, groups, local_table)}<main>'
-        + local_table + sections
+        + expensive_targets_section(latest) + local_table + sections
         + f"</main></div></div><script>{SCRIPT}</script></body></html>\n")
 
 

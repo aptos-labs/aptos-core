@@ -1,5 +1,5 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/intrinsic_map_role_sig_err.move: LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_aborts_empty` target has an incompatible physical signature
+Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_role_sig_err.move:1:1: error: LIR-MOVE-INTRINSIC-SIGNATURE: Move map intrinsic role `map_spec_aborts_empty` target has an incompatible physical signature
 LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_del`
 LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_set`
 LIR-MOVE-INTRINSIC-ROLE-DEPENDENCY: Move map intrinsic role `map_borrow_front` requires `map_spec_key_at`

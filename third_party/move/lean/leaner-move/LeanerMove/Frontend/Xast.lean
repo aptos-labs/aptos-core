@@ -18,7 +18,7 @@ namespace LeanerMove.Frontend.Xast
 /-- Schema identifier of an XAST document. -/
 def schema : String := "move-xast-module"
 /-- The XAST version this consumer reads. -/
-def version : Nat := 9
+def version : Nat := 10
 
 /-- A source location: byte offsets into the module's file table. -/
 structure Loc where
@@ -239,7 +239,9 @@ mutual
     | mk (ty : Ty) (loc : Loc) (node : ExpNode)
 
   inductive ExpNode where
-    | value (value : Value) (constant : Option String)
+    /-- `defaultedNum` preserves the compiler's defaulted literal type, distinct
+    from an explicitly suffixed integer of the same value and width. -/
+    | value (value : Value) (constant : Option String) (defaultedNum : Bool := false)
     | «local» (name : String)
     | param (index : Nat)
     | call (op : Operation) (inst : List Ty) (args : List Exp) (surface : Option SurfaceSyntax)

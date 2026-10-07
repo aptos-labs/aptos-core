@@ -1,6 +1,6 @@
 {
   "schema": "move-xast-module",
-  "version": 9,
+  "version": 10,
   "address": "0x42",
   "address_alias": null,
   "name": "lemmas",
@@ -180,7 +180,8 @@
                       "value": {
                         "number": "0"
                       },
-                      "constant": null
+                      "constant": null,
+                      "defaulted_num": true
                     },
                     {
                       "ty": 4,
@@ -250,7 +251,8 @@
                     "value": {
                       "number": "0"
                     },
-                    "constant": null
+                    "constant": null,
+                    "defaulted_num": true
                   }
                 ],
                 "surface": null
@@ -685,7 +687,8 @@
               "value": {
                 "number": "0"
               },
-              "constant": null
+              "constant": null,
+              "defaulted_num": true
             }
           ],
           "surface": null
@@ -747,7 +750,8 @@
                       "value": {
                         "number": "1"
                       },
-                      "constant": null
+                      "constant": null,
+                      "defaulted_num": true
                     }
                   ],
                   "surface": null
@@ -993,7 +997,8 @@
                 "value": {
                   "number": "0"
                 },
-                "constant": null
+                "constant": null,
+                "defaulted_num": true
               },
               {
                 "ty": 4,
@@ -1190,7 +1195,8 @@
                                 "value": {
                                   "number": "1"
                                 },
-                                "constant": null
+                                "constant": null,
+                                "defaulted_num": true
                               }
                             ],
                             "surface": null
@@ -1259,7 +1265,8 @@
                             "value": {
                               "number": "1"
                             },
-                            "constant": null
+                            "constant": null,
+                            "defaulted_num": true
                           }
                         ],
                         "surface": null
@@ -1309,7 +1316,8 @@
                 "value": {
                   "number": "0"
                 },
-                "constant": null
+                "constant": null,
+                "defaulted_num": true
               }
             ],
             "surface": null
@@ -1362,7 +1370,8 @@
                 "value": {
                   "number": "0"
                 },
-                "constant": null
+                "constant": null,
+                "defaulted_num": true
               }
             ],
             "surface": null
@@ -1409,7 +1418,8 @@
                   "value": {
                     "number": "0"
                   },
-                  "constant": null
+                  "constant": null,
+                  "defaulted_num": true
                 }
               ],
               "surface": null
@@ -1445,7 +1455,8 @@
                             "value": {
                               "number": "1"
                             },
-                            "constant": null
+                            "constant": null,
+                            "defaulted_num": true
                           }
                         ],
                         "surface": null
@@ -1531,7 +1542,8 @@
                 "value": {
                   "number": "0"
                 },
-                "constant": null
+                "constant": null,
+                "defaulted_num": true
               }
             ],
             "surface": null

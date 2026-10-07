@@ -1,6 +1,6 @@
-LeanerE2ETests/Check/Closures/Frames.lean:26:0: error: the precondition of `apply` is not established
+LeanerE2ETests/Check/Closures/Frames.lean:132:7: error: the precondition of `apply` is not established
 LeanerE2ETests/Check/Closures/Frames.lean:132:7: error: leaner verification failed: the automatic verification of `apply_bump_incorrect` failed; provide a proof: `verify apply_bump_incorrect by …` in the module (`verify apply_bump_incorrect by skip` shows the obligations it leaves)
 LeanerE2ETests/Check/Closures/Frames.lean:150:4: error: the specification clause `ensures exists<Config>(x) == old(exists<Config>(x))` is not established
 LeanerE2ETests/Check/Closures/Frames.lean:147:7: error: leaner verification failed: the automatic verification of `apply_any` failed; provide a proof: `verify apply_any by …` in the module (`verify apply_any by skip` shows the obligations it leaves)
-LeanerE2ETests/Check/Closures/Frames.lean:26:0: error: the precondition of `apply_writes` is not established
+LeanerE2ETests/Check/Closures/Frames.lean:179:7: error: the precondition of `apply_writes` is not established
 LeanerE2ETests/Check/Closures/Frames.lean:179:7: error: leaner verification failed: the automatic verification of `writes_config_incorrect` failed; provide a proof: `verify writes_config_incorrect by …` in the module (`verify writes_config_incorrect by skip` shows the obligations it leaves)
