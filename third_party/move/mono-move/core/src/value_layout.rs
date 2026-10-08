@@ -17,7 +17,7 @@
 //! header.
 
 use crate::{
-    interner::InternedIdentifier,
+    interner::{InternedIdentifier, Interner},
     types::{
         intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type, ADDRESS_TY,
         BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY, SIGNER_TY, U128_TY, U16_TY,
@@ -566,6 +566,13 @@ pub trait LayoutProvider {
     /// Returns the layout id for `ty`, or [`None`] if no layout has been
     /// published for it yet (e.g. its module is not loaded).
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId>;
+
+    /// Returns the interner these layouts were built against, or [`None`] for a
+    /// provider that has none. Deserializing a function value interns the
+    /// target's identity, so a provider without an interner cannot decode one.
+    fn interner(&self) -> Option<&dyn Interner> {
+        None
+    }
 
     fn layout_by_ty(&self, ty: InternedType) -> Option<&ValueLayout> {
         let id = self.layout_id(ty)?;
