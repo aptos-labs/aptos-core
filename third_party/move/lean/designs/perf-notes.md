@@ -2337,3 +2337,20 @@ which `assertBounds` now shares, and it reduces bundle projections of the
 instance (`(a, b, ()).snd.fst` to `b`) when it creates it. `sum_direct` costs
 23.2M (the `Int` variant 20.8M with the projection reduction, 22.4M before),
 and the five targets and the lemma verify again at 25k.
+
+## Bitwise operand order (2026-10-08)
+
+`bitwise_features::contains` compares `v & m` from the code with `m & v`
+from its specification, which `omega` reads as two atoms; the pipeline closed
+the leaf only through `leaner_denote_bv`, about 20M heartbeats each for two
+leaves. `bitwiseAnd_comm` (with `Or`/`Xor` variants) as `lir_denote_norm`
+simp lemmas, which simp applies by its ordered rewriting, decides the leaf
+after the first saturation round but doubled
+`features::change_feature_flags_for_next_epoch` (76.4M to 147.1M) and cost
+`features::set` 21%: rejected. `assertBounds` instead states `a & b = b & a`
+for a conjunction a leaf mentions in both orders. The other leaf's cost was
+`Int.shiftLeft 1 k % 256` beside the specification's
+`(Int.shiftLeft 1 k).tmod 256`, which the normalizer could not equate before
+the shift's bounds were asserted; `shiftLeft_tmod_of_nonneg` rewrites a
+truncating remainder of a nonnegative shift to the runtime's. `contains`
+costs 18.3M (57.0M before), and `features` 769.7M (854.6M).

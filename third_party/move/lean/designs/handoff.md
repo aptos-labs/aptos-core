@@ -1,5 +1,50 @@
 # Handoff
 
+Registry follow-up: axioms, bitwise, module closure (2026-10-08):
+- Module axioms over values are assumed by every verification of the unit
+  (`Contract.invariantReached`: an axiom reading no memory needs no reach),
+  as the Prover states its axioms globally; one reading memory still needs
+  the function to reach it. The layout printer printed axioms as `invariant`
+  (`Print/Layout.lean`); it prints `axiom` now. `bv_internal` verifies.
+- Export: `select.rs` module closure walks module, function and struct
+  specifications and spec-function bodies, so a module only an abort code
+  names is exported (`bv_aborts` reaches verification and fails its clause,
+  as in the Prover; exchange test in `aptos-move/cli/src/tests/exchange.rs`).
+- An arbitrary value (`__leaner_arbitrary_…`) takes no type arguments
+  (`Contract.arbitraryValue`), so `abort_in_fun` verifies. Membership lowers
+  its element at the projected specification type (`Lower`).
+- `int2bv` of a literal, also through specification casts, is the wrapped
+  literal (`BitVectorConversion.constant?`), so `bitwise_operators`'
+  recursive spec function decreases its measure and verifies.
+- Equality's instantiation is its operands' type when they share one
+  (`Encode`, beside the `old` normalization): an included schema kept `num`
+  over substituted `u64` operands. `defines` verifies.
+- Closer: bitwise identities with zero (`IntegerArithmetic`), the truncating
+  remainder of a nonnegative shift is its remainder
+  (`Types.shiftLeft_tmod_of_nonneg`), and `assertBounds` states `a & b = b & a`
+  where a leaf mentions both orders. Commutativity as simp lemmas instead cost
+  `features::change_feature_flags_for_next_epoch` 2x (rejected).
+  `bitwise_features`: `contains`/`is_enabled` verify; `set` and
+  `disable_feature_flags` still exceed the budget (bit clearing through a
+  vector write needs bit-level reasoning).
+- Tests: `SourceVerify/module_axioms{,_false}.move`,
+  `SourceVerify/schema_equality.move`, leaner-move `Tests.BitVectorConversion`.
+  `Check/Scalars/BitVectors`' `contains_without_bv` now verifies without
+  `pragma bv` (valid; it was marked as needing bv); `toggled_without_bv`
+  takes its place as the leaf integer arithmetic does not decide.
+  Registry: `abort_in_fun`, `bitwise_operators`, `bv_internal`, `defines` now
+  verify; `bv_aborts`, `bitwise_features` improved; no other baseline changed.
+- Benchmark against the previous checkpoint's run (15,465,529,048 raw
+  heartbeats): same outcomes (30 verified, one expected AMM rejection),
+  15,375,903,448 (-0.58%). Moved: features -9.94% (contains -67.9%,
+  change_feature_flags_for_next_epoch -36.1%, set -12.7%), option -0.88%,
+  fixed_point64 -1.10%, fixed_point32 -0.53%, error +0.13%; every other
+  problem within 0.1%.
+- Open from this session: generic module axioms (next: instantiate
+  `axiom<T>` at the instantiations a verification applies, MVP's
+  monomorphization; surface `axiom {T} e`), `bv_signed_generic` (awaiting the
+  user's choice for `int2bv` at a type parameter).
+
 Partial specification functions by declared types (2026-10-08, option A):
 - User decisions: an `int2bv` the compiler types at `num` wraps at `u64`
   (`BitVectorConversion.conversionWidth?`); one at a type parameter is still

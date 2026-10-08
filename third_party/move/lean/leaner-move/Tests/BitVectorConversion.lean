@@ -81,3 +81,13 @@ private def agreesWithBitVec (type : Xast.Ty) (bits : Nat) (signed : Bool) : Boo
 #guard match int2bv .u8 (.mk .u8 ⟨0, 0, 0⟩ (.param 0)) with
   | .ok (.mk .u8 _ (.param 0)) => true
   | _ => false
+
+-- A literal, also behind specification casts, converts to the wrapped
+-- literal, with no range test left for a measure or a guard to decide.
+#guard [(1, 1), (2 ^ 64, 0), (-1, 2 ^ 64 - 1)].all fun (input, expected) =>
+  let literal : Xast.Exp := .mk .num ⟨0, 0, 0⟩ (.value (.number input) none false)
+  let cast : Xast.Exp := .mk .u64 ⟨0, 0, 0⟩ (.call .cast [] [literal] none)
+  match int2bv .u64 cast with
+  | .ok (.mk .u64 _ (.call .cast [] [.mk _ _ (.value (.number value) _ _)] _)) =>
+      value == expected
+  | _ => false

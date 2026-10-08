@@ -1366,7 +1366,9 @@ private def itemDocs : Item → Except String (Array Doc)
         else clauses.push (block (text "proof") steps)
       pure #[block (signature ++ text " where") entries]
   | .namespaceInvariants declarations => do
-      let entries ← declarations.mapM fun declaration =>
+      let entries ← declarations.mapM fun declaration => do
+        if declaration.isAxiom then
+          return Format.group <| text "axiom " ++ Format.nest 2 (← expressionDoc declaration.expression)
         clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
       pure #[block (text "spec module where") entries]
 

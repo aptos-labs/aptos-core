@@ -56,6 +56,14 @@ private def residue (modulus : Int) (value : Exp) : Exp :=
 private def booleanCall (loc : Loc) (operation : Operation) (arguments : List Exp) : Exp :=
   .mk .bool loc (.call operation [] arguments none)
 
+/-- The value of a numeric literal, also seen through specification casts,
+which keep the value. -/
+private partial def constant? (value : Exp) : Option Int :=
+  match value.node with
+  | .value (.number constant) _ _ => some constant
+  | .call .cast [] [operand] _ => constant? operand
+  | _ => none
+
 /-- `int2bv(value)` with result type `type`, as a mathematical expression (see
 `conversionWidth?`). A value already in range is kept as it is, so a proof
 meets the residue only where the conversion changes the value. -/
@@ -65,9 +73,9 @@ def int2bv (type : Ty) (value : Exp) : Except String Exp := do
   let loc := value.loc
   -- A parameter holds a value of its type.
   if value.ty == type && value.node matches .param _ then return value
-  let wrapped := match value.node with
-    | .value (.number constant) _ _ => number loc (wrap bits signed constant)
-    | _ =>
+  let wrapped := match constant? value with
+    | some constant => number loc (wrap bits signed constant)
+    | none =>
       let modulus : Int := 2 ^ bits
       let low : Int := if signed then -(2 ^ (bits - 1)) else 0
       let integer := asNumber value

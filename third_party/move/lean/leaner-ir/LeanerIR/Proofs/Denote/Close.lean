@@ -681,8 +681,19 @@ def assertBounds (skip : Array Lean.Expr := #[]) (includeMagnitudes : Bool := tr
       expressions := expressions.push (← instantiateMVars decl.type)
       if let some fact ← typedBound? decl.toExpr ty then facts := facts.push fact
     let reads := divisionReads expressions
-    for site in operationSites expressions do
+    let sites := operationSites expressions
+    for site in sites do
       if let some fact ← operationFact? goal reads site then facts := facts.push fact
+    -- A conjunction mentioned with its operands in both orders is one value,
+    -- which omega reads as two atoms otherwise.
+    for site in sites do
+      unless site.isAppOfArity ``LeanerIR.Proofs.IntegerArithmetic.bitwiseAnd 2 do continue
+      let left := site.getArg! 0
+      let right := site.getArg! 1
+      let swapped := mkApp2 site.appFn!.appFn! right left
+      if left != right && sites.contains swapped && Lean.Expr.lt left right then
+        facts := facts.push (← mkAppM ``LeanerIR.Proofs.IntegerArithmetic.bitwiseAnd_comm
+          #[left, right])
     -- The bounds of the unsigned elements the goal compares by order, as
     -- its linear reading reaches them.
     let comparisons := sitesWhere (fun e => e.isAppOfArity ``LE.le 4 || e.isAppOfArity ``LT.lt 4)
@@ -6315,9 +6326,13 @@ simproc [lir_denote_norm] expandLiteralRange (∀ _ : Int, _ ≤ _ → _ < _ →
 attribute [lir_denote, lir_denote_norm] LeanerIR.Proofs.Denote.Memory.set_same
   LeanerIR.Proofs.Denote.ite_some_some LeanerIR.Proofs.Denote.isSome_ite
   Bool.ite_eq_true_distrib if_false_left LeanerIR.Proofs.Denote.ite_true_or
--- A bitwise operation of a value with itself.
+-- A bitwise operation of a value with itself or with zero.
 attribute [lir_denote_norm] LeanerIR.Proofs.IntegerArithmetic.bitwiseAnd_self
   LeanerIR.Proofs.IntegerArithmetic.bitwiseOr_self Nat.and_self Nat.or_self Nat.xor_self
+  LeanerIR.Proofs.IntegerArithmetic.bitwiseAnd_zero LeanerIR.Proofs.IntegerArithmetic.zero_bitwiseAnd
+  LeanerIR.Proofs.IntegerArithmetic.bitwiseOr_zero LeanerIR.Proofs.IntegerArithmetic.zero_bitwiseOr
+  LeanerIR.Proofs.IntegerArithmetic.bitwiseXor_zero LeanerIR.Proofs.IntegerArithmetic.zero_bitwiseXor
+  Nat.and_zero Nat.zero_and Nat.or_zero Nat.zero_or Nat.xor_zero Nat.zero_xor
 -- A specification's bitwise operation on nonnegative operands, as the runtime computes it.
 attribute [lir_denote_norm] LeanerIR.Proofs.IntegerArithmetic.bitwiseOr_nonnegative
   LeanerIR.Proofs.IntegerArithmetic.bitwiseXor_nonnegative
@@ -6421,9 +6436,10 @@ attribute [lir_denote_norm] LeanerIR.Proofs.Denote.findIndex?_eq_none_iff
   LeanerIR.Proofs.Denote.findIndex?_succ LeanerIR.Proofs.Denote.NTy.eqb_int
   LeanerIR.Proofs.Denote.NTy.eqb_bool LeanerIR.Proofs.Denote.NTy.eqb_address
   LeanerIR.Proofs.Denote.NTy.eqb_unit LeanerIR.Proofs.Denote.NTy.eqb_param
--- A wrapping shift whose value cannot reach the modulus.
+-- A wrapping shift whose value cannot reach the modulus, and the truncating
+-- remainder of a nonnegative shift, the runtime's.
 attribute [lir_denote_norm] LeanerIR.Proofs.Denote.shiftLeft_emod_of_fits
-  LeanerIR.Proofs.Denote.shiftLeft_tmod_of_fits
+  LeanerIR.Proofs.Denote.shiftLeft_tmod_of_fits LeanerIR.Proofs.Denote.shiftLeft_tmod_of_nonneg
 -- A resolved prophecy brings an operation's result into a leaf.
 attribute [lir_denote_norm] LeanerIR.Proofs.Denote.wrapInt_unsigned
   LeanerIR.Proofs.Denote.wrapInt_signed LeanerIR.Proofs.Denote.ModularOp.run_val

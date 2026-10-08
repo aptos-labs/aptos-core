@@ -1,11 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bitwise_features.move:26:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/bitwise_features.move:26:5: error: leaner verification failed: the automatic verification of `contains` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify contains by …` in `tests/sources/functional/bitwise_features.proof.lean` (`verify contains by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/bitwise_features.move:38:5: error: `is_enabled` calls `contains`, which is not verified; verify the callee first
 tests/sources/functional/bitwise_features.move:76:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

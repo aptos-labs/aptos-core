@@ -49,6 +49,18 @@ relative to `tests/sources`.
 
 ## Summary
 
+Axioms and bitwise follow-up (2026-10-08): a module axiom over values is
+assumed by every verification, as the Prover assumes its axioms globally, and
+the rendering prints it as an axiom; the export includes the modules
+specifications read; an arbitrary value takes no type arguments; an `int2bv`
+of a literal through casts is folded; an equality compares at its operands'
+type when a schema's inclusion gave them another; the closer relates a
+conjunction's two operand orders and reads a nonnegative shift's truncating
+remainder as its remainder. `abort_in_fun`, `bitwise_operators`,
+`bv_internal` and `defines` now verify,
+`bv_aborts` fails its clause as the Prover does, and `bitwise_features` keeps
+two budget failures of four (G14, V2).
+
 The Prover's bit-vector representation is no longer modeled (G14, decided
 2026-10-07): the representation guard and the scalar wrapping lowering described
 in the older paragraphs below are retired, `int2bv`/`bv2int` are imported
@@ -569,6 +581,18 @@ concern its encoding only. An `int2bv` the compiler types at `num` (e.g.
 `MoveToLeanerLang/constants.move` translates again. Open: one at a type
 parameter has no width and is rejected (`functional/bv_signed_generic.move`).
 
+An `int2bv` of a literal, also seen through specification casts, is the
+wrapped literal, so `functional/bitwise_operators.move` decreases its measure
+and verifies. `functional/bv_internal.move` verifies now that its axiom over
+values is assumed (V2 below) and printed as an axiom. In
+`functional/bitwise_features.move`, `contains` and `is_enabled` verify: the
+closer states that a conjunction a leaf mentions with its operands in both
+orders is one value, and reads a specification's truncating remainder of a
+nonnegative shift as the runtime's remainder (`SourceVerify/module_axioms{,_false}.move`). `set` and
+`disable_feature_flags` still exceed the budget: clearing a bit of a vector
+element (`m & (v & (255 ^ m)) = 0`) needs bit-level reasoning through the
+write.
+
 Tests: `functional/bv_cast.move`, `functional/bv_internal_aggregate.move`, `functional/bv_internal_invalid.move`, `functional/bv_signed_generic.move`.
 
 ### G15. Specification functions are partial
@@ -851,15 +875,14 @@ Tests: `functional/axiom_generic.move`, `functional/axioms.move`, `functional/ch
 
 ### V2. Construct not supported in generated contracts
 
-9 tests, 12 messages (2026-10-05 refresh).
+6 tests, 9 messages (2026-10-05 refresh; `abort_in_fun`, `bv_aborts` and
+`defines` reach verification since 2026-10-08).
 
 Messages:
 
-- 3 × `` a type argument of the specification function `…` has no native type (LeanerIR.GenericArgument.typeArg …) ``
+- 2 × `` a type argument of the specification function `…` has no native type (LeanerIR.GenericArgument.typeArg …) ``
 - 2 × `a function value with type arguments is not carried in generated contracts`
-- 1 × `specification function call namespace is out of range`
 - 1 × `specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts`
-- 1 × `` primitive `…` has non-inferable generic operation arguments ``
 - 1 × `generated contracts currently expand specification functions with one result`
 - 2 × `a field update on an enum whose variants do not all carry the field is not supported yet`
 - 1 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
@@ -868,13 +891,21 @@ The state-change predicates `publish`, `remove`, and `update` now translate
 in contracts, including labels they define (S2b of
 [`state-labels.md`](state-labels.md), 2026-10-05).
 
-Example (`functional/abort_in_fun.move:1`):
+An arbitrary value (`__leaner_arbitrary_…`, the value of a specification
+function's aborting call) takes no type arguments, so `abort_in_fun` verifies.
+A module the specifications read (an abort code's constant function) is
+exported with the module closure, so `bv_aborts` reaches verification; its
+clause fails, as in the Prover. An equality the compiler keeps at a schema's
+declared type (`num`) after the inclusion substitutes `u64` values compares at
+the operands' type, so `defines` verifies (`SourceVerify/schema_equality.move`).
+
+Example (`regression/performance_200511.move:1`):
 
 ```text
-a type argument of the specification function `0x42::TestAbortInFunction::__leaner_arbitrary_4_62` has no native type (LeanerIR.GenericArgument.typeArg …)
+a type argument of the specification function `0x1::bcs::serialize` has no native type (LeanerIR.GenericArgument.typeArg …)
 ```
 
-Tests: `functional/abort_in_fun.move`, `functional/bv_aborts.move`, `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/defines.move`, `functional/spec_fun_tuple_errors.move`, `regression/performance_200511.move`, `regression/enum_update_out_of_variant.move`, `functional/closures/inline/discarded_mut_ref_result.move`.
+Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/spec_fun_tuple_errors.move`, `regression/performance_200511.move`, `regression/enum_update_out_of_variant.move`, `functional/closures/inline/discarded_mut_ref_result.move`.
 
 ### V6. Construct not carried by the denotation
 
@@ -1117,7 +1148,7 @@ with the same type or prophecy value would be unsound.
 | Test | Functions |
 |---|---|
 | `functional/address_serialization_constant_size.move` | `serialized_addresses_same_len` |
-| `functional/bitwise_features.move` | `contains` (budget), `is_enabled` (not attempted), `set` (budget), `disable_feature_flags` (budget) |
+| `functional/bitwise_features.move` | `set` (budget), `disable_feature_flags` (budget) |
 | `functional/bug-17117.move` | `get_s_error` (budget), `get_s_no_error` (budget), `test_input_param_as_mut_ref` |
 | `functional/bug_15044.move` | `compare_u8_vector` |
 | `functional/bug_15880.move` | `test2` |

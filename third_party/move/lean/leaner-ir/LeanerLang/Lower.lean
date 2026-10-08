@@ -2484,7 +2484,8 @@ private partial def lowerExpr (context : ExprContext) (expected : Option TypeId)
       let some (.vector elementType _) ← typeNode? collection.2
         | failAt "LEANER-MEMBERSHIP-TYPE" "membership requires a vector collection"
             (some span)
-      let element ← lowerExpr context (some elementType) element
+      -- The element is a specification value, as `containsVector`'s needle.
+      let element ← lowerExpr context (some (← projectSpecTypeId elementType)) element
       let boolType ← internType .bool
       if let some expected := expected then ensureType expected boolType span
       let instantiations := #[GenericArgument.typeArg { typeId := elementType, loc }]

@@ -2683,6 +2683,13 @@ theorem shiftLeft_tmod_of_fits {width : Nat} (value : SpecInt (.bits width) fals
   rw [Int.tmod_eq_emod_of_nonneg nonnegative]
   exact shiftLeft_emod_of_fits value distance modulus fits
 
+/-- The truncating remainder of a shifted nonnegative value is its
+remainder: a specification's remainder meets the runtime's. -/
+theorem shiftLeft_tmod_of_nonneg (value : Int) (distance : Nat) (modulus : Int)
+    (nonnegative : 0 ≤ value) :
+    (Int.shiftLeft value distance).tmod modulus = Int.shiftLeft value distance % modulus :=
+  Int.tmod_eq_emod_of_nonneg (shiftLeft_nonneg value distance nonnegative)
+
 /-- A shift left is a multiplication by a power of two, which `omega` reads. -/
 theorem shiftLeft_eq_mul (value : Int) (distance : Nat) :
     Int.shiftLeft value distance = value * 2 ^ distance := by

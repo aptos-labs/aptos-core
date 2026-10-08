@@ -1174,6 +1174,12 @@ private structure SpecReads where
   without a body (an unspecified value among them) or a Move function. -/
   types : Bool := false
 
+/-- Whether a specification function is the unspecified value LeanerLang
+declares for an aborting specification branch. It does not depend on its
+instantiation, which may be a mathematical integer no native type stands for. -/
+private def arbitraryValue (unit : ValidatedUnit) (reference : LeanerIR.QualifiedRef) : Bool :=
+  (unit.tables.names[reference.name.index]?).any (·.name.startsWith "__leaner_arbitrary_")
+
 /-- What the expressions `start` reach read, through the specification
 functions they call. -/
 private def readsFrom (unit : ValidatedUnit) (start : List (LeanerIR.NamespaceId × ExprId)) :
@@ -1208,7 +1214,7 @@ private def readsFrom (unit : ValidatedUnit) (start : List (LeanerIR.NamespaceId
         | .operation (.specification (.functionCall callee _)) instantiations .. =>
             if let some (_, { body := some root, .. }) := specFunctionOf? unit callee then
               work := work ++ [(callee.namespaceId, root)]
-            else if !instantiations.isEmpty then
+            else if !instantiations.isEmpty && !arbitraryValue unit callee then
               reads := { reads with types := true }
         | .operation (.specification (.lemma callee _)) .. =>
             if let some (_, declaration) := lemmaOf? unit callee then
@@ -2782,7 +2788,9 @@ where
             | _ => own
           -- The type arguments as native types under the contract's family,
           -- which an instantiation of the contract resolves to the caller's.
-          let typeArgumentTerms ← (instantiations.zip typeArgumentTypes).mapM
+          let typeArguments := if arbitraryValue context.unit reference then #[]
+            else instantiations.zip typeArgumentTypes
+          let typeArgumentTerms ← typeArguments.mapM
             fun (instantiation, nty?) => do
               let some nty := nty?
                 | throwError m!"a type argument of the specification function `{name}` has no \
@@ -4398,11 +4406,15 @@ private def signerFacts (context : Context) (slots : Array Slot) (bound : Array 
 
 /-- Whether a namespace invariant reads memory a function reaches
 (`memoryReach`): those it assumes at entry and owes where it writes, as the
-Move Prover evaluates the invariants of the memory a function uses. -/
+Move Prover evaluates the invariants of the memory a function uses. An axiom
+reading no memory holds in every state and is assumed everywhere, as the Move
+Prover states its axioms globally. -/
 private def invariantReached (reach : Option (Array LeanerIR.StructHandle))
     (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     (invariant : LeanerIR.NamespaceInvariant) : Bool :=
-  match reach, reachFrom unit [(namespaceId, invariant.condition.expression)] with
+  let read := reachFrom unit [(namespaceId, invariant.condition.expression)]
+  if invariant.condition.kind matches .axiom_ _ && read.all (·.isEmpty) then true else
+  match reach, read with
   | some reached, some read => read.any reached.contains
   | _, _ => false
 

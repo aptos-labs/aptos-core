@@ -682,6 +682,18 @@ mutual
                 | .old => do
                     let instantiationLoc ← addGeneratedLocation loc
                     pure #[.typeArg { typeId, loc := instantiationLoc }]
+                -- Likewise an equality keeps the type a schema declared its
+                -- operands at (`num`) after inclusion substitutes values of
+                -- another type; LIR compares at the operands' type.
+                | .eq | .neq =>
+                    let inst := match inst, arguments with
+                      | [_], first :: rest =>
+                          if !(first.ty matches .reference ..) && rest.all (·.ty == first.ty) then
+                            [first.ty]
+                          else inst
+                      | _, _ => inst
+                    inst.toArray.mapM fun ty =>
+                      return LeanerIR.GenericArgument.typeArg (← generatedTypeUse loc ty)
                 | _ => inst.toArray.mapM fun ty =>
                     return LeanerIR.GenericArgument.typeArg (← generatedTypeUse loc ty)
               let sourceArguments := arguments

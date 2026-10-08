@@ -15,6 +15,15 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Registry follow-up (2026-10-08): module axioms over values are assumed by
+every verification and printed as axioms; the export follows specifications'
+module references; arbitrary values, `int2bv` of literals and schema
+equalities import exactly; the closer relates a conjunction's operand orders
+and a nonnegative shift's two remainders. `abort_in_fun`, `bitwise_operators`,
+`bv_internal` and `defines` verify; the benchmark keeps every outcome at
+-0.58% heartbeats. New fixtures: `SourceVerify/module_axioms{,_false}.move`,
+`SourceVerify/schema_equality.move`.
+
 Partial specification functions (2026-10-08, user decisions): an `int2bv` the
 compiler types at `num` wraps at `u64`, so `MoveToLeanerLang/constants.move`
 translates again; one at a type parameter is still rejected. A specification
@@ -711,7 +720,7 @@ files without `verify` targets.
 
 | Folder | Files | Notes |
 |---|---|---|
-| Scalars | `Addresses`, `Arithmetic`, `BitVectors`, `Division`, `Integers`, `Literals`, `Order`, `Signed`, `SpecLogicalArithmetic` | `BitVectors`: `pragma bv`; a wrong postcondition and the same leaf without the pragma fail (intended). `Division`: the division algorithm, the remainder's range, and cancellation at a divisor that is not a literal; a strict bound fails (intended). `Order`: an authored proof of transitivity. |
+| Scalars | `Addresses`, `Arithmetic`, `BitVectors`, `Division`, `Integers`, `Literals`, `Order`, `Signed`, `SpecLogicalArithmetic` | `BitVectors`: `pragma bv`; a one-bit membership test verifies without the pragma, while a wrong postcondition and a fact about toggled bits without the pragma fail (intended). `Division`: the division algorithm, the remainder's range, and cancellation at a divisor that is not a literal; a strict bound fails (intended). `Order`: an authored proof of transitivity. |
 | Structs | `Abilities`, `Invariants`, `PositionalStructs`, `Tuples` | `Abilities` has no `verify` targets. |
 | Enums | `EnumPatterns`, `EnumPayloads`, `EnumRefContracts`, `EnumRefs`, `EnumResources`, `Enums`, `MatchPatterns`, `VariantFields` | `EnumRefs` is execution only. `MatchPatterns` and `VariantFields`: a value no pattern or field fits aborts with Move's incomplete-match code, in the denotation and at run time. |
 | Vectors | `CertifiedReads`, `ElementQuantifiers`, `VectorBounds`, `VectorOperations`, `Vectors`, `GenericSwapRemove` | `CertifiedReads`: signed/unsigned bounds through total integer reads, zero for missing entries, and rejection of a false signed nonnegativity claim at 25k. `ElementQuantifiers`: element-wise preconditions establish indexed-read properties for value/reference vectors, signed integers, Booleans and generic equality predicates; stronger bounds and a missing-entry claim remain rejected at 25k. A target whose guards stay undecided exhausts heartbeats rather than failing fast. |
