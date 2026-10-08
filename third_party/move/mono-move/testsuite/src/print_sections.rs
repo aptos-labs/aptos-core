@@ -20,8 +20,8 @@ use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
     types::{InternedType, EMPTY_TYPE_LIST},
-    CaptureLayoutsId, DescriptorId, FrameOffset, FrameworkSymbols, LayoutId, LayoutProvider,
-    NominalFields, VMResult, ValueLayout,
+    CaptureLayoutsId, DescriptorId, FrameOffset, FrameworkSymbols, Interner, LayoutId,
+    LayoutProvider, NominalFields, VMResult, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -210,6 +210,10 @@ impl LayoutProvider for SnapshotLoaderContext<'_, '_, '_> {
 
     fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]> {
         self.guard.capture_layouts(id)
+    }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.guard.interner()
     }
 }
 

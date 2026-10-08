@@ -652,7 +652,10 @@ pub fn intern_sig_token(
 /// resource's struct tag).
 //
 // TODO(metering): decide if this construction requires metering.
-pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Result<InternedType> {
+pub fn intern_type_tag(
+    tag: &TypeTag,
+    interner: &(impl Interner + ?Sized),
+) -> anyhow::Result<InternedType> {
     use crate::types as ty;
     Ok(match tag {
         TypeTag::Bool => ty::BOOL_TY,
@@ -694,7 +697,7 @@ pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Resul
 /// reference kind.
 fn intern_function_param_tags(
     tags: &[FunctionParamOrReturnTag],
-    interner: &impl Interner,
+    interner: &(impl Interner + ?Sized),
 ) -> anyhow::Result<Vec<InternedType>> {
     tags.iter()
         .map(|tag| {
@@ -714,7 +717,7 @@ fn intern_function_param_tags(
 /// Interns a struct tag into its nominal type.
 pub fn intern_struct_tag(
     struct_tag: &StructTag,
-    interner: &impl Interner,
+    interner: &(impl Interner + ?Sized),
 ) -> anyhow::Result<InternedType> {
     let module_id = interner.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
     let name = interner.identifier_of(struct_tag.name.as_ident_str());
