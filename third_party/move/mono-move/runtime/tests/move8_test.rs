@@ -17,6 +17,7 @@ fn function(code: Vec<MicroOp>, frame_size: usize, pointer_slots: Vec<FO>) -> Fu
     Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
+        func_ref: crate::program_func_ref!("test", "test"),
         def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(code),
         entry_gas: 0,
