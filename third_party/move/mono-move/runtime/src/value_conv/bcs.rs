@@ -234,32 +234,30 @@ fn bad_closure(what: String) -> VMInternalError {
     ))
 }
 
-/// BCS-serializes the closure whose heap pointer sits at `base` into V1's
-/// function-value wire format: a `5 + 2n` sequence holding the
-/// `(format_version, module_id, fun_id, ty_args, mask)` header followed by one
-/// `(layout, value)` pair per captured value.
+/// The parts of a closure object that serialization and comparison both read.
+pub(crate) struct ClosureParts<'a> {
+    pub(crate) func_ref: &'a FunctionRef,
+    pub(crate) mask: u64,
+    /// The captured-data object, null when the mask captures nothing.
+    pub(crate) captured_data: *const u8,
+}
+
+impl ClosureParts<'_> {
+    pub(crate) fn captured_count(&self) -> usize {
+        self.mask.count_ones() as usize
+    }
+}
+
+/// Reads the closure whose heap pointer sits at `base`.
 ///
-/// The capture layouts come from the captured-data object, so no part of this
-/// needs the closure's target resolved or even loadable.
-//
-// TODO(correctness): V1 serializes only closures over persistent functions
-// (`#[persistent]` or `public`), using the absence of pre-computed captured
-// layouts as the signal. Monomorphization always builds those layouts, so
-// MonoMove has no equivalent signal and writes private, friend and
-// lambda-lifted closures where V1 aborts with `VALUE_SERIALIZATION_ERROR`.
-// That check guards the storage write path, so MonoMove commits resources V1
-// would never produce. `Function::def_idx` keeps the visibility recoverable
-// without a new field on `Function`.
+/// The func-ref is returned whether the target is resolved or not, so nothing
+/// here needs the target loadable.
 ///
 /// # Safety
 ///
-/// `base` must point to a fully initialized function value, and must remain
-/// valid (with all reachable heap objects live) throughout the call.
-unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
-    layouts: &T,
-    base: *const u8,
-    out: &mut Vec<u8>,
-) -> VMResult<()> {
+/// `base` must point to a fully initialized function value whose reachable
+/// heap objects stay live for the lifetime of the result.
+pub(crate) unsafe fn closure_parts<'a>(base: *const u8) -> VMResult<ClosureParts<'a>> {
     // SAFETY: a function value is a non-null closure pointer.
     let closure = unsafe { read_ptr(base, 0usize) };
     if closure.is_null() {
@@ -287,79 +285,173 @@ unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
         tag => return Err(bad_closure(format!("unknown func-ref tag {tag}"))),
     };
 
-    // SAFETY: a closure object carries its mask at a fixed offset.
+    // SAFETY: a closure object carries its mask at a fixed offset, and one with
+    // captures a non-null captured-data pointer.
     let mask = unsafe { read_u64(closure, CLOSURE_MASK_OFFSET) };
-    emit_closure_header(func_ref, mask, out)?;
+    let captured_data = if mask == 0 {
+        std::ptr::null()
+    } else {
+        let captured_data = unsafe { read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET) };
+        if captured_data.is_null() {
+            return Err(bad_closure("null captured data in closure".to_string()));
+        }
+        captured_data
+    };
+    Ok(ClosureParts {
+        func_ref,
+        mask,
+        captured_data,
+    })
+}
 
-    let captured_count = mask.count_ones() as usize;
-    if captured_count == 0 {
-        return Ok(());
-    }
-
-    // SAFETY: a closure with captures holds a non-null captured-data pointer.
-    let captured_data = unsafe { read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET) };
-    if captured_data.is_null() {
-        return Err(bad_closure("null captured data in closure".to_string()));
-    }
+/// The capture-layouts id of a `Materialized` captured-data object, or [`None`]
+/// when its captures are the wire blob they were read from.
+///
+/// # Safety
+///
+/// `captured_data` must point to a live captured-data object.
+pub(crate) unsafe fn materialized_capture_layouts(
+    captured_data: *const u8,
+) -> VMResult<Option<CaptureLayoutsId>> {
     // SAFETY: a captured-data object carries its tag and capture-layouts id at
     // fixed offsets.
-    let (tag, capture_layouts_id) = unsafe {
+    let (tag, id) = unsafe {
         (
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET),
             read_u32(captured_data, CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET),
         )
     };
     match tag {
-        CAPTURED_DATA_TAG_MATERIALIZED => {},
-        CAPTURED_DATA_TAG_RAW | CAPTURED_DATA_TAG_MATERIALIZED_RAW => {
-            // SAFETY: the blob follows the values region, and the two widths
-            // were written when the object was allocated.
-            unsafe {
-                let values_size = read_u32(captured_data, CAPTURED_DATA_VALUES_SIZE_OFFSET);
-                let blob_size = read_u32(captured_data, CAPTURED_DATA_BLOB_SIZE_OFFSET);
-                out.extend_from_slice(std::slice::from_raw_parts(
-                    captured_data.add(CAPTURED_DATA_VALUES_OFFSET + values_size as usize),
-                    blob_size as usize,
-                ));
-            }
-            return Ok(());
-        },
-        tag => return Err(bad_closure(format!("unknown captured-data tag {tag}"))),
+        CAPTURED_DATA_TAG_MATERIALIZED => Ok(Some(CaptureLayoutsId::from_u32(id))),
+        CAPTURED_DATA_TAG_RAW | CAPTURED_DATA_TAG_MATERIALIZED_RAW => Ok(None),
+        tag => Err(bad_closure(format!("unknown captured-data tag {tag}"))),
     }
+}
 
-    let capture_layouts = layouts
-        .capture_layouts(CaptureLayoutsId::from_u32(capture_layouts_id))
-        .ok_or(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::ValueLayoutNotFound,
-        ))?;
+/// The stored `(layout, value)*` wire bytes of a wire-backed captured-data
+/// object.
+///
+/// # Safety
+///
+/// `captured_data` must point to a live captured-data object whose tag is
+/// `Raw` or `MaterializedRaw`, and which stays live for the lifetime of the
+/// result.
+pub(crate) unsafe fn capture_blob<'a>(captured_data: *const u8) -> &'a [u8] {
+    // SAFETY: the blob follows the values region, and the two widths were
+    // written when the object was allocated.
+    unsafe {
+        let values_size = read_u32(captured_data, CAPTURED_DATA_VALUES_SIZE_OFFSET);
+        let blob_size = read_u32(captured_data, CAPTURED_DATA_BLOB_SIZE_OFFSET);
+        std::slice::from_raw_parts(
+            captured_data.add(CAPTURED_DATA_VALUES_OFFSET + values_size as usize),
+            blob_size as usize,
+        )
+    }
+}
+
+/// The published layouts of a `Materialized` closure's captures.
+pub(crate) fn capture_layouts_of<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    id: CaptureLayoutsId,
+    captured_count: usize,
+) -> VMResult<&[LayoutId]> {
+    let capture_layouts = layouts.capture_layouts(id).ok_or({
+        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+    })?;
     if capture_layouts.len() != captured_count {
         return Err(bad_closure(format!(
             "{} capture layouts for a mask capturing {captured_count}",
             capture_layouts.len()
         )));
     }
+    Ok(capture_layouts)
+}
 
-    // Captured values sit at their natural alignment within the values region,
-    // so walking the layouts in capture order reproduces the pack-time offsets.
+/// Yields each capture's layout and its offset within the captured-data
+/// object, in capture order.
+///
+/// Captured values sit at their natural alignment within the values region, so
+/// walking the layouts in capture order reproduces the pack-time offsets.
+pub(crate) fn capture_slots<'a, T: LayoutProvider + ?Sized>(
+    layouts: &'a T,
+    capture_layouts: &'a [LayoutId],
+) -> impl Iterator<Item = VMResult<(LayoutId, &'a ValueLayout, usize)>> + 'a {
     let mut cursor = 0usize;
-    for &id in capture_layouts {
-        let layout = layouts.layout(id).ok_or(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::ValueLayoutNotFound,
-        ))?;
+    capture_layouts.iter().map(move |&id| {
+        let layout = layouts.layout(id).ok_or({
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
+        })?;
         let (offset, next) =
             next_captured_value_offset(cursor, layout.size as usize, layout.align as usize);
+        cursor = next;
+        Ok((id, layout, CAPTURED_DATA_VALUES_OFFSET + offset))
+    })
+}
+
+/// BCS-serializes the closure whose heap pointer sits at `base` into V1's
+/// function-value wire format: a `5 + 2n` sequence holding the
+/// `(format_version, module_id, fun_id, ty_args, mask)` header followed by one
+/// `(layout, value)` pair per captured value.
+///
+/// The capture layouts come from the captured-data object, so no part of this
+/// needs the closure's target resolved or even loadable.
+//
+// TODO(correctness): V1 serializes only closures over persistent functions
+// (`#[persistent]` or `public`), using the absence of pre-computed captured
+// layouts as the signal. Monomorphization always builds those layouts, so
+// MonoMove has no equivalent signal and writes private, friend and
+// lambda-lifted closures where V1 aborts with `VALUE_SERIALIZATION_ERROR`.
+// That check guards the storage write path, so MonoMove commits resources V1
+// would never produce. `Function::def_idx` keeps the visibility recoverable
+// without a new field on `Function`.
+///
+/// # Safety
+///
+/// `base` must point to a fully initialized function value, and must remain
+/// valid (with all reachable heap objects live) throughout the call.
+unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    base: *const u8,
+    out: &mut Vec<u8>,
+) -> VMResult<()> {
+    // SAFETY: forwarded from this function's contract.
+    let parts = unsafe { closure_parts(base)? };
+    emit_closure_header(parts.func_ref, parts.mask, out)?;
+    if parts.captured_data.is_null() {
+        return Ok(());
+    }
+    // SAFETY: the captured-data object is live for as long as the closure is.
+    unsafe { emit_closure_captures(layouts, &parts, out) }
+}
+
+/// Writes a closure's `(layout, value)*` capture tail, the part that follows
+/// the header.
+///
+/// # Safety
+///
+/// `parts.captured_data` must be non-null and point to a live captured-data
+/// object matching `parts.mask`.
+pub(crate) unsafe fn emit_closure_captures<T: LayoutProvider + ?Sized>(
+    layouts: &T,
+    parts: &ClosureParts,
+    out: &mut Vec<u8>,
+) -> VMResult<()> {
+    let captured_data = parts.captured_data;
+    // SAFETY: forwarded from this function's contract.
+    let Some(id) = (unsafe { materialized_capture_layouts(captured_data)? }) else {
+        // A wire-backed closure reproduces the bytes it was read from, stale
+        // layouts included, which is what V1 does with its stored layouts.
+        out.extend_from_slice(unsafe { capture_blob(captured_data) });
+        return Ok(());
+    };
+
+    let capture_layouts = capture_layouts_of(layouts, id, parts.captured_count())?;
+    for slot in capture_slots(layouts, capture_layouts) {
+        let (id, layout, offset) = slot?;
         emit_move_type_layout(layouts, id, out)?;
         // SAFETY: the capture lies within the values region, and the layout it
         // was published under describes the bytes there.
-        unsafe {
-            serialize_impl(
-                layouts,
-                captured_data.add(CAPTURED_DATA_VALUES_OFFSET + offset),
-                layout,
-                out,
-            )?
-        };
-        cursor = next;
+        unsafe { serialize_impl(layouts, captured_data.add(offset), layout, out)? };
     }
     Ok(())
 }
@@ -1139,6 +1231,7 @@ mod tests {
     };
     use serde::Serialize;
     use std::{
+        cmp::Ordering,
         mem::{offset_of, size_of},
         ptr::NonNull,
         sync::Arc,
@@ -2961,6 +3054,285 @@ mod tests {
             serialize_closure_value(&layouts, copy.as_ptr())
         };
         assert_eq!(out, bytes);
+    }
+
+    /// Orders two closures, checking that equality agrees with the ordering.
+    ///
+    /// # Safety
+    ///
+    /// Both pointers must be live closure objects whose captures `layouts`
+    /// describes.
+    unsafe fn cmp_closures<T: LayoutProvider + ?Sized>(
+        layouts: &T,
+        a: *mut u8,
+        b: *mut u8,
+    ) -> VMResult<Ordering> {
+        let (slot_a, slot_b) = (a as u64, b as u64);
+        // SAFETY: a `u64` holding the closure pointer is exactly a function
+        // value's in-memory image.
+        let ord = unsafe { compare_impl(layouts, ptr(&slot_a), ptr(&slot_b), FUNCTION_LAYOUT_ID)? };
+        let eq = unsafe { equals_impl(layouts, ptr(&slot_a), ptr(&slot_b), FUNCTION_LAYOUT_ID)? };
+        assert_eq!(eq, ord.is_eq(), "equals and compare disagree");
+        Ok(ord)
+    }
+
+    /// Decodes `bytes` into a `Raw` closure on `heap`.
+    ///
+    /// # Safety
+    ///
+    /// `bytes` must encode a closure.
+    unsafe fn build_raw_closure<T: LayoutProvider + ?Sized>(
+        layouts: &T,
+        heap: &mut Heap,
+        bytes: &[u8],
+    ) -> *mut u8 {
+        let mut slot = 0u64;
+        let mut cursor = 0;
+        // SAFETY: a `u64` holding the closure pointer is exactly a function
+        // value's in-memory image.
+        unsafe {
+            deserialize_impl(
+                layouts,
+                heap,
+                &ValueLayout::function(),
+                bytes,
+                &mut cursor,
+                &mut slot as *mut u64 as *mut u8,
+                None,
+            )
+            .unwrap()
+        };
+        assert_eq!(cursor, bytes.len());
+        slot as *mut u8
+    }
+
+    #[test]
+    fn compare_closures_by_target() {
+        let layouts = ValueLayoutTable::new();
+        let plain = test_func_ref(EMPTY_TYPE_LIST);
+        let generic = test_func_ref(InternedTypeList::new(GlobalArenaPtr::from_static(
+            &CLOSURE_TY_ARGS,
+        )));
+        // A second reference with the same contents, so the structural path
+        // runs rather than the interned-pointer shortcut.
+        let same = test_func_ref(EMPTY_TYPE_LIST);
+
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let a = build_closure(&mut heap, &plain, 0, CaptureLayoutsId::NONE, &[]);
+            let b = build_closure(&mut heap, &generic, 0, CaptureLayoutsId::NONE, &[]);
+            let c = build_closure(&mut heap, &same, 0, CaptureLayoutsId::NONE, &[]);
+            assert_eq!(cmp_closures(&layouts, a, b).unwrap(), Ordering::Less);
+            assert_eq!(cmp_closures(&layouts, b, a).unwrap(), Ordering::Greater);
+            assert_eq!(cmp_closures(&layouts, a, c).unwrap(), Ordering::Equal);
+        }
+    }
+
+    #[test]
+    fn compare_closures_by_mask() {
+        let mut layouts = ValueLayoutTable::new();
+        let capture_layouts_id = layouts.push_capture_layouts(&[U64_LAYOUT_ID]);
+        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
+
+        let values = 7u64.to_le_bytes();
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let a = build_closure(&mut heap, &func_ref, 0b01, capture_layouts_id, &values);
+            let b = build_closure(&mut heap, &func_ref, 0b10, capture_layouts_id, &values);
+            // Same target and the same single capture, so only the mask
+            // separates them.
+            assert_eq!(cmp_closures(&layouts, a, b).unwrap(), Ordering::Less);
+        }
+    }
+
+    #[test]
+    fn compare_closures_on_the_flat_path() {
+        let mut layouts = ValueLayoutTable::new();
+        let capture_layouts_id = layouts.push_capture_layouts(&[U64_LAYOUT_ID, BOOL_LAYOUT_ID]);
+        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
+
+        // A `u64` then a `bool`, at their natural offsets in the values region.
+        let values = |n: u64, flag: bool| {
+            let mut values = [0u8; 16];
+            values[..8].copy_from_slice(&n.to_le_bytes());
+            values[8] = flag as u8;
+            values
+        };
+
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let a = build_closure(
+                &mut heap,
+                &func_ref,
+                0b11,
+                capture_layouts_id,
+                &values(7, true),
+            );
+            let b = build_closure(
+                &mut heap,
+                &func_ref,
+                0b11,
+                capture_layouts_id,
+                &values(7, true),
+            );
+            let c = build_closure(
+                &mut heap,
+                &func_ref,
+                0b11,
+                capture_layouts_id,
+                &values(7, false),
+            );
+            let d = build_closure(
+                &mut heap,
+                &func_ref,
+                0b11,
+                capture_layouts_id,
+                &values(8, false),
+            );
+            assert_eq!(cmp_closures(&layouts, a, b).unwrap(), Ordering::Equal);
+            assert_eq!(cmp_closures(&layouts, a, c).unwrap(), Ordering::Greater);
+            assert_eq!(cmp_closures(&layouts, c, d).unwrap(), Ordering::Less);
+
+            // Nothing resolved the target: comparison never reaches the loader.
+            for closure in [a, b, c, d] {
+                assert_eq!(
+                    *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET),
+                    FUNC_REF_TAG_UNRESOLVED
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn compare_closures_on_the_wire_path() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let table = ValueLayoutTable::new();
+        let layouts = InternedLayouts {
+            table: &table,
+            guard: &guard,
+        };
+
+        let wire = |n: u64| {
+            closure_wire(0b1, &[], &[(
+                MoveTypeLayout::U64,
+                bcs::to_bytes(&n).unwrap(),
+            )])
+        };
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let a = build_raw_closure(&layouts, &mut heap, &wire(7));
+            let b = build_raw_closure(&layouts, &mut heap, &wire(7));
+            let c = build_raw_closure(&layouts, &mut heap, &wire(8));
+            assert_eq!(cmp_closures(&layouts, a, b).unwrap(), Ordering::Equal);
+            assert_eq!(cmp_closures(&layouts, a, c).unwrap(), Ordering::Less);
+        }
+    }
+
+    #[test]
+    fn compare_a_wire_closure_against_a_packed_one() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let mut table = ValueLayoutTable::new();
+        let capture_layouts_id = table.push_capture_layouts(&[U64_LAYOUT_ID]);
+        let layouts = InternedLayouts {
+            table: &table,
+            guard: &guard,
+        };
+        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
+
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let packed = build_closure(
+                &mut heap,
+                &func_ref,
+                0b1,
+                capture_layouts_id,
+                &7u64.to_le_bytes(),
+            );
+            let raw = build_raw_closure(
+                &layouts,
+                &mut heap,
+                &closure_wire(0b1, &[], &[(
+                    MoveTypeLayout::U64,
+                    bcs::to_bytes(&7u64).unwrap(),
+                )]),
+            );
+            let bigger = build_raw_closure(
+                &layouts,
+                &mut heap,
+                &closure_wire(0b1, &[], &[(
+                    MoveTypeLayout::U64,
+                    bcs::to_bytes(&8u64).unwrap(),
+                )]),
+            );
+            // The packed side is demoted to wire bytes, in both operand orders.
+            assert_eq!(
+                cmp_closures(&layouts, packed, raw).unwrap(),
+                Ordering::Equal
+            );
+            assert_eq!(
+                cmp_closures(&layouts, raw, packed).unwrap(),
+                Ordering::Equal
+            );
+            assert_eq!(
+                cmp_closures(&layouts, packed, bigger).unwrap(),
+                Ordering::Less
+            );
+        }
+    }
+
+    #[test]
+    fn compare_closures_under_different_capture_layouts() {
+        // Two packed closures whose capture layouts were published separately:
+        // neither the flat path nor a byte comparison applies, so both demote.
+        let mut layouts = ValueLayoutTable::new();
+        let narrow = layouts.push_capture_layouts(&[U8_LAYOUT_ID]);
+        let wide = layouts.push_capture_layouts(&[U64_LAYOUT_ID]);
+        assert_ne!(narrow, wide);
+        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
+
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let a = build_closure(&mut heap, &func_ref, 0b1, narrow, &[7u8]);
+            let b = build_closure(&mut heap, &func_ref, 0b1, wide, &7u64.to_le_bytes());
+            // V1 holds a `u8` and a `u64` in different value variants, so this
+            // is a type error there rather than an ordering.
+            let err = cmp_closures(&layouts, a, b).unwrap_err();
+            assert!(matches!(
+                err.downcast_ref::<RuntimeError>(),
+                Some(RuntimeError::Unsupported(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn compare_nested_closures_through_captures() {
+        let mut layouts = ValueLayoutTable::new();
+        let capture_layouts_id = layouts.push_capture_layouts(&[FUNCTION_LAYOUT_ID]);
+        let plain = test_func_ref(EMPTY_TYPE_LIST);
+        let generic = test_func_ref(InternedTypeList::new(GlobalArenaPtr::from_static(
+            &CLOSURE_TY_ARGS,
+        )));
+
+        let mut heap = Heap::new(4096);
+        unsafe {
+            let wrap = |heap: &mut Heap, inner: *mut u8| {
+                build_closure(
+                    heap,
+                    &plain,
+                    0b1,
+                    capture_layouts_id,
+                    &(inner as u64).to_ne_bytes(),
+                )
+            };
+            let inner_a = build_closure(&mut heap, &plain, 0, CaptureLayoutsId::NONE, &[]);
+            let inner_b = build_closure(&mut heap, &generic, 0, CaptureLayoutsId::NONE, &[]);
+            let a = wrap(&mut heap, inner_a);
+            let b = wrap(&mut heap, inner_b);
+            assert_eq!(cmp_closures(&layouts, a, b).unwrap(), Ordering::Less);
+            assert_eq!(cmp_closures(&layouts, a, a).unwrap(), Ordering::Equal);
+        }
     }
 }
 
