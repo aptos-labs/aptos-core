@@ -22,7 +22,7 @@ use move_model::{
     },
     pragmas::{
         ABORTS_IF_IS_PARTIAL_PRAGMA, BV_INTERNAL_PRAGMA, CONDITION_ABSTRACT_PROP,
-        CONDITION_CONCRETE_PROP, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA,
+        CONDITION_CONCRETE_PROP, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA, VERIFY_PRAGMA,
     },
     spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
     symbol::Symbol,
@@ -3142,6 +3142,13 @@ fn closure_footprints(
     usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
     code: &[Bytecode],
 ) -> BTreeMap<TempIndex, ClosureFootprint> {
+    // A loop head havocs every temporary the body assigns, a closure among them, so a
+    // closure built inside a loop has two definitions and no footprint here. That is
+    // deliberate: the call-site havoc derived from a footprint covers the path through the
+    // loop body, but a claim made after the loop is checked against the loop-exit path,
+    // whose memory havoc comes from the callee's usage summary -- empty for a callee that
+    // declares no frame. Treating the footprint as known there would let a false post-loop
+    // claim through, so the loop case is left without one and rejected instead.
     let mut def_counts: BTreeMap<TempIndex, usize> = BTreeMap::new();
     for bc in code {
         for dest in bc.dests() {
@@ -3174,9 +3181,16 @@ fn closure_footprints(
 }
 
 /// The `modifies_of`/`reads_of` frame a function declares for a function-typed parameter,
-/// instantiated at a call site. Without a declaration the parameter may access no memory.
+/// instantiated at a call site.
+///
+/// Without a declaration the parameter may access no memory, except for the narrow case
+/// described on `leaves_frame_to_call_site`.
 #[derive(Default)]
 struct DeclaredFrame {
+    /// Whether the callee declared a frame for this parameter at all. Absent differs from
+    /// empty: empty says the closure touches nothing, absent says the callee did not speak
+    /// to the question.
+    declared: bool,
     writes: BTreeSet<QualifiedInstId<StructId>>,
     accessed: BTreeSet<QualifiedInstId<StructId>>,
     modifies_all: bool,
@@ -3195,6 +3209,7 @@ impl DeclaredFrame {
                 .collect::<BTreeSet<_>>()
         };
         Self {
+            declared: true,
             writes: inst(&access.old_memory),
             accessed: inst(&access.used_memory),
             modifies_all: access.frame_spec.modifies_all,
@@ -3203,10 +3218,42 @@ impl DeclaredFrame {
     }
 }
 
+/// Whether an opaque callee that declares no frame for a function-typed parameter leaves
+/// that frame to its call sites, where the closure's own footprint takes over.
+///
+/// An absent declaration normally means the parameter may touch no memory. Two things
+/// consume that meaning, and the relaxation requires both to be vacuous:
+///
+/// - The callee's body is never proven, so no proof of the callee rests on memory being
+///   untouched across the invoke.
+/// - The callee's conditions name no global memory, so after a caller havocs what the
+///   closure writes, nothing in the callee's summary can re-establish a claim about it.
+///
+/// Either one alone is not enough. A proven body consumes the frame even when the
+/// conditions are memory-free, and conditions that constrain memory are assumed by every
+/// caller even when the body is unproven.
+///
+/// Deliberately a property of the written specification rather than of what this run
+/// happens to verify. `is_explicitly_not_verified` answers false for every function once
+/// the scope is `Only`, which would both reopen the hole the footprint requirement closes
+/// and reject calls that are accepted at package scope, so the verification scope has no
+/// business here.
+fn leaves_frame_to_call_site(fun_env: &FunctionEnv) -> bool {
+    fun_env.is_pragma_false(VERIFY_PRAGMA)
+        && fun_env.get_spec_used_memory().is_empty()
+        && fun_env.get_spec_generic_used_memory().is_empty()
+        && fun_env.get_spec_old_memory().is_empty()
+        && fun_env.get_spec_generic_old_memory().is_empty()
+}
+
 /// Checks that a closure passed to an opaque function stays within the frame the callee
 /// declares for the parameter. The callee is verified under that frame, and its callers
 /// assume the result. The closure is judged by what its code accesses; frames of function
 /// values it invokes are not included.
+///
+/// A callee that declares no frame and satisfies `leaves_frame_to_call_site` is the
+/// exception: neither of those two consumers exists for it, so the call site supplies the
+/// frame instead, provided it has a closure footprint to supply.
 fn check_fun_arg_frames(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
@@ -3223,9 +3270,6 @@ fn check_fun_arg_frames(
             }
             let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
             let footprints = closure_footprints(usage, target.get_bytecode());
-            if footprints.is_empty() {
-                continue;
-            }
             for bc in target.get_bytecode() {
                 let Bytecode::Call(id, _, Operation::Function(mid, fid, targs), srcs, _) = bc
                 else {
@@ -3236,15 +3280,37 @@ fn check_fun_arg_frames(
                     continue;
                 }
                 for (param, src) in callee_env.get_parameters().iter().zip(srcs) {
-                    let Some(footprint) = footprints.get(src) else {
-                        continue;
-                    };
                     let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
                     if frame.modifies_all {
                         continue;
                     }
+                    let defers = !frame.declared && leaves_frame_to_call_site(&callee_env);
                     let loc = target.get_bytecode_loc(*id);
                     let param_name = param.0.display(env.symbol_pool());
+                    let Some(footprint) = footprints.get(src) else {
+                        // Deferring only works when this call site can answer the question
+                        // the callee left open. It can for a closure built here, whose
+                        // footprint is known and havoced across the call. A function value
+                        // of any other origin -- a forwarded parameter, a stored callback --
+                        // has no footprint to havoc, so the callee's empty frame stands and
+                        // the argument has to be rejected rather than waved through.
+                        if defers && param.1.skip_reference().is_function() {
+                            env.error(
+                                &loc,
+                                &format!(
+                                    "cannot establish what function argument `{}` may \
+                                     modify: `{}` declares no `modifies_of` for it, and the \
+                                     argument is not a closure built at this call site",
+                                    param_name,
+                                    callee_env.get_full_name_str()
+                                ),
+                            );
+                        }
+                        continue;
+                    };
+                    if defers {
+                        continue;
+                    }
                     for mem in footprint.code_writes.difference(&frame.writes) {
                         env.error(
                             &loc,
