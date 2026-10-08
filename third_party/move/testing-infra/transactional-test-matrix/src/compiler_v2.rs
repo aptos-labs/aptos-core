@@ -307,24 +307,8 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality.move",
-        "function values in resources, function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
-        "function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality_widened.move",
-        "function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/misc_1.move",
         "function value serialization",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/registry.move",
-        "function values in resources",
     ),
 ];
 
