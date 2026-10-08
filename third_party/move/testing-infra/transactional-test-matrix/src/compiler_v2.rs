@@ -323,16 +323,8 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "function value equality",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/funs_as_storage_key.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/misc_1.move",
         "function value serialization",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/persistent.move",
-        "function values in resources",
     ),
     MonoMoveDivergence::semantic(
         "tests/no-v1-comparison/closures/reentrancy.move",
@@ -356,14 +348,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/resolve_from_storage.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/storage_examples.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/fv_as_keys.move",
         "function values in resources",
     ),
     MonoMoveDivergence::semantic(
