@@ -54,9 +54,10 @@ use anyhow::Result;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryRegion};
 use mono_move_core::{
-    reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
-    FrameworkSymbols, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    reserved_layout_id, reserved_layouts, CaptureLayoutsId, DescriptorId, DescriptorProvider,
+    FrameOffset, FrameworkSymbols, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId,
+    ObjectDescriptor, TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
@@ -248,6 +249,11 @@ struct Layouts {
     /// are never moved, so [`LayoutId`] indices stay stable and concurrent
     /// reads need no lock.
     table: boxcar::Vec<ValueLayout>,
+    /// Closure capture-layout lists in [`CaptureLayoutsId`] order.
+    capture_layouts: boxcar::Vec<Box<[LayoutId]>>,
+    /// Capture-layout list to its ID. Keyed on the list itself, so closures
+    /// over different targets with the same capture shape share one entry.
+    capture_layouts_by_ids: DashMap<Box<[LayoutId]>, CaptureLayoutsId, ahash::RandomState>,
 }
 
 impl Default for Layouts {
@@ -264,6 +270,8 @@ impl Layouts {
             by_ty: DashMap::default(),
             enum_variants_by_type: DashMap::default(),
             table: initial_layouts(),
+            capture_layouts: boxcar::Vec::new(),
+            capture_layouts_by_ids: DashMap::default(),
         }
     }
 
@@ -274,10 +282,14 @@ impl Layouts {
             by_ty,
             enum_variants_by_type,
             table,
+            capture_layouts,
+            capture_layouts_by_ids,
         } = self;
         by_ty.clear();
         enum_variants_by_type.clear();
         *table = initial_layouts();
+        *capture_layouts = boxcar::Vec::new();
+        capture_layouts_by_ids.clear();
     }
 }
 
@@ -829,6 +841,25 @@ impl<'ctx> ExecutionGuard<'ctx> {
             .clone()
     }
 
+    /// Publishes the layouts of one closure's captures, in capture order, and
+    /// returns their [`CaptureLayoutsId`]. Idempotent on the list.
+    pub fn publish_capture_layouts(&self, ids: &[LayoutId]) -> CaptureLayoutsId {
+        if ids.is_empty() {
+            return CaptureLayoutsId::NONE;
+        }
+        if let Some(id) = self.ctx.layouts.capture_layouts_by_ids.get(ids) {
+            return *id;
+        }
+        *self
+            .ctx
+            .layouts
+            .capture_layouts_by_ids
+            .entry(ids.into())
+            .or_insert_with(|| {
+                CaptureLayoutsId::from_usize(self.ctx.layouts.capture_layouts.push(ids.into()))
+            })
+    }
+
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
@@ -854,6 +885,14 @@ impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
 
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.layout_id_for(ty)
+    }
+
+    fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]> {
+        self.ctx
+            .layouts
+            .capture_layouts
+            .get(id.as_usize())
+            .map(|ids| &**ids)
     }
 }
 
