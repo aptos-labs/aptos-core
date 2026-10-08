@@ -1937,6 +1937,10 @@ private def itemOf (stx : Syntax) : Except String ParsedItem := do
         expression := ← expressionOf expression
         properties := ← conditionPropertiesOf member
         isAxiom := member.isOfKind ``LeanerLang.leanerNamespaceAxiomMemberSyntax
+        -- The binders stand before the expression, whose own are not the axiom's.
+        generics := ← if member.isOfKind ``LeanerLang.leanerNamespaceAxiomMemberSyntax then
+            (childrenWhere isGenericBinderSyntax (member.getArg 1)).mapM binderOf
+          else pure #[]
         span := spanOf member } : NamespaceInvariantDecl)
     pure (.item (.namespaceInvariants declarations))
   else if stx.isOfKind ``leanerContractItem || stx.isOfKind ``leanerContractWhereItem then

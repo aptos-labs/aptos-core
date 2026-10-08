@@ -1,5 +1,37 @@
 # Handoff
 
+Generic module axioms (2026-10-08):
+- `axiom<T>` is assumed at each instantiation a verification applies, as the
+  Prover monomorphizes it (`Contract.specInstantiations`, `axiomInstances`):
+  the specification functions applied in the function's body and contract, in
+  its callees' contracts and in the expansions of these, a callee's or an
+  expansion's type parameter read as the application's argument; an axiom's
+  own application `f<T>` binds `T`. Each instance is translated with the
+  expansion fields `typeArguments`/`typeArgumentTypes`, so its binders range
+  over the instance's values (`boundedMembership?` for a bounded integer);
+  axioms go through the general quantifier translation, not the
+  single-binder invariant path, which read binder types from the raw table.
+- Surface: `axiom {T} e` (`Syntax`, `Ast.NamespaceInvariantDecl.generics`,
+  `Elab`, `Lower`, both printers). Generic invariants stay rejected.
+- `num` as a type argument: `opaqueSpec` takes `SpecTypeArgument`
+  (`native τ | integer`), so `spec_id<num>` has a key (`performance_200511`
+  reaches verification; two budget timeouts).
+- A module's `aborts_if_is_strict`/`_partial` holds for its functions
+  (`Contract`, the function's pragmas in effect); `opaque_native`'s negatives
+  needed the callee not to abort. `TRACE(e)` encodes as `e` (`Encode`).
+- Registry: `axiom_generic`, `axioms`, `mono_on_axiom_spec_type`,
+  `opaque_native` verify; `performance_200511` changes from the type-argument
+  rejection to two budget timeouts; no other baseline changed.
+- Tests: `SourceVerify/generic_axioms{,_false}.move`,
+  `SourceVerify/inherited_strictness{,_false}.move`.
+- Benchmark against the previous checkpoint (15,375,903,448): same outcomes,
+  15,376,387,648 (+0.003%); no problem moves by more than 0.03%.
+- Open: generic module invariants (`invariant<T>`: instances from the
+  resources a function reaches, and obligations at writes); `bitwise_table`
+  and `verify_table` reach the natives behind `extensions::table`'s map roles
+  (its role contracts are not used); mutable-reference behavioral predicates
+  (V20); `bv_signed_generic` (awaiting the user's choice).
+
 Registry follow-up: axioms, bitwise, module closure (2026-10-08):
 - Module axioms over values are assumed by every verification of the unit
   (`Contract.invariantReached`: an axiom reading no memory needs no reach),
@@ -40,10 +72,8 @@ Registry follow-up: axioms, bitwise, module closure (2026-10-08):
   change_feature_flags_for_next_epoch -36.1%, set -12.7%), option -0.88%,
   fixed_point64 -1.10%, fixed_point32 -0.53%, error +0.13%; every other
   problem within 0.1%.
-- Open from this session: generic module axioms (next: instantiate
-  `axiom<T>` at the instantiations a verification applies, MVP's
-  monomorphization; surface `axiom {T} e`), `bv_signed_generic` (awaiting the
-  user's choice for `int2bv` at a type parameter).
+- Open from this session: `bv_signed_generic` (awaiting the user's choice for
+  `int2bv` at a type parameter); generic module axioms followed (above).
 
 Partial specification functions by declared types (2026-10-08, option A):
 - User decisions: an `int2bv` the compiler types at `num` wraps at `u64`

@@ -1293,8 +1293,11 @@ The implemented surface states module invariants and axioms as members of
 one `spec module where` block; an axiom is never an obligation and is
 assumed at entry by every verification of the unit, as the Move Prover states
 its axioms globally (one reading memory, by those that reach it), and an
-invariant is assumed at entry and established at exit. Generic axioms and invariants (the
-`{T}` of the design) and proof-local labels are not yet parsed. A Move
+invariant is assumed at entry and established at exit. A generic axiom,
+`axiom {T} proposition`, is assumed at each instantiation of its type
+parameters at which the verification applies a specification function the
+axiom applies, as the Move Prover monomorphizes axioms. Generic invariants and
+proof-local labels are not yet parsed. A Move
 spec variable `x` arrives as the ghost resource `Ghost$x` the model backs
 it with, a struct with one field `v` at address 0, whose existence is an
 axiom of the module; `update x = e` is a write of that resource.

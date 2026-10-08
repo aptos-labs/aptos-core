@@ -15,6 +15,14 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Generic module axioms (2026-10-08): `axiom<T>` (LeanerLang `axiom {T} e`) is
+assumed at the instantiations a verification applies, as the Prover
+monomorphizes it; `num` is a specification function's type argument of its
+own; a module's abort strictness holds for its functions. Four more registry
+files verify; benchmark unchanged. New fixtures:
+`SourceVerify/generic_axioms{,_false}.move`,
+`SourceVerify/inherited_strictness{,_false}.move`.
+
 Registry follow-up (2026-10-08): module axioms over values are assumed by
 every verification and printed as axioms; the export follows specifications'
 module references; arbitrary values, `int2bv` of literals and schema

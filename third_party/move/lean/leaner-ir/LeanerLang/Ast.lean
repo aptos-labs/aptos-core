@@ -635,6 +635,8 @@ structure NamespaceInvariantDecl where
   properties : Array Pragma := #[]
   /-- An axiom: assumed, never an obligation. -/
   isAxiom : Bool := false
+  /-- The type parameters of a generic axiom. -/
+  generics : Array GenericBinder := #[]
   span : Span := {}
   deriving Repr, BEq, Inhabited
 

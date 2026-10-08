@@ -414,6 +414,13 @@ private def signatureDomain (unit : ValidatedUnit) (typeId : TypeId) (role : Str
     | throwError "{role} has an unknown type"
   pure (domainOf ty)
 
+/-- The values of a bounded integer type, as a binder's membership. -/
+private def boundedMembership? : IrTy → Option (Lean.Expr → MetaM Lean.Expr)
+  | .integer (.bits width) signed => some fun value => pure (mkApp3
+      (mkConst ``LeanerIR.IntegerValueFits)
+      (mkApp (mkConst ``LeanerIR.IntWidth.bits) (toExpr width)) (toExpr signed) value)
+  | _ => none
+
 /-- The Lean type of a binder in this domain. -/
 private def Domain.leanType : Domain → Lean.Expr
   | .integer => mkConst ``Int
@@ -552,10 +559,16 @@ instance [LeanerIR.Proofs.Denote.Carriers] (τ : LeanerIR.Proofs.Denote.NTy) :
     DecidableEq τ.carrier :=
   τ.decEq
 
+/-- A type argument of a specification function: a native type, or the
+mathematical integers (`num`), which no native type is. -/
+inductive SpecTypeArgument where
+  | native (type : LeanerIR.Proofs.Denote.NTy)
+  | integer
+
 /-- The meaning of a specification function without a body: a fixed
 function about which nothing is known, named by the declaration's qualified
 spelling and applied to its encoded arguments. -/
-opaque opaqueSpec (name : String) (typeArguments : List LeanerIR.Proofs.Denote.NTy)
+opaque opaqueSpec (name : String) (typeArguments : List SpecTypeArgument)
     (result : Type) [Inhabited result] (arguments : List RuntimeValue) : result
 
 /-- Logical membership corresponding to the value-level `containsVector`. -/
@@ -1705,7 +1718,10 @@ private partial def translate (context : Context) (id : ExprId) : MetaM Lean.Exp
                         (mkConst ``LeanerIR.Proofs.Denote.NTy.encode) carriers ntyExpr value) :
                           MetaM Lean.Expr))
                 | _, _, _ =>
-                let membership? ← if patternType == declared then pure none else
+                -- A bounded integer type an instantiation gives the pattern
+                -- ranges over its values.
+                let membership? ← if patternType == declared then pure (boundedMembership? declared)
+                  else
                   match patternType, declared with
                   | .integer .unbounded _, .integer (.bits width) signed =>
                       pure (some fun (value : Lean.Expr) => pure (mkApp3
@@ -2787,21 +2803,31 @@ where
             | some (.uninterpreted _ (some function) _) => function
             | _ => own
           -- The type arguments as native types under the contract's family,
-          -- which an instantiation of the contract resolves to the caller's.
+          -- which an instantiation of the contract resolves to the caller's,
+          -- or `num`.
           let typeArguments := if arbitraryValue context.unit reference then #[]
             else instantiations.zip typeArgumentTypes
           let typeArgumentTerms ← typeArguments.mapM
             fun (instantiation, nty?) => do
               let some nty := nty?
-                | throwError m!"a type argument of the specification function `{name}` has no \
-                    native type ({repr instantiation})"
+                | match instantiation with
+                  | .typeArg argument =>
+                      match context.typeOf? argument.typeId with
+                      | some (.integer .unbounded _) =>
+                          return mkConst ``LeanerLang.Contract.SpecTypeArgument.integer
+                      | _ => throwError m!"a type argument of the specification function \
+                          `{name}` has no native type ({repr instantiation})"
+                  | _ => throwError m!"a type argument of the specification function \
+                      `{name}` has no native type ({repr instantiation})"
               let some types := context.types
                 | throwError "the specification function `{name}` is applied outside a family"
-              return mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types (← quoteNTy nty)
+              return mkApp (mkConst ``LeanerLang.Contract.SpecTypeArgument.native)
+                (mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types (← quoteNTy nty))
           let encoded ← arguments.mapM runtimeOperand
           let domain := domainOf ty
           let value ← mkAppOptM ``LeanerLang.Contract.opaqueSpec
-            #[toExpr name, ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) typeArgumentTerms.toList,
+            #[toExpr name,
+              ← mkListLit (mkConst ``LeanerLang.Contract.SpecTypeArgument) typeArgumentTerms.toList,
               domain.leanType, none, ← mkListLit (mkConst ``RuntimeValue) encoded.toList]
           domain.ofBinder value
         let some functionId := context.unit.resolution.specFunction? reference.name
@@ -3590,6 +3616,125 @@ private def reachFold {α : Type} (unit : ValidatedUnit) (roots : List (LeanerIR
           (owner, ·) ++ work
   return (folded, work.isEmpty)
 
+/-- Whether a type mentions no type parameter. -/
+private def closedType (unit : ValidatedUnit) (typeId : TypeId) : Bool :=
+  go typeId 32
+where
+  go (typeId : TypeId) : Nat → Bool
+    | 0 => false
+    | fuel + 1 => match unit.tables.types[typeId.index]? with
+      | some (.typeParameter _) | none => false
+      | some (.vector element _) | some (.typeDomain element) => go element fuel
+      | some (.reference reference) => go reference.referent fuel
+      | some (.tuple elements) => elements.all (go · fuel)
+      | some (.function arguments result _) => arguments.all (go · fuel) && go result fuel
+      | some (.nominal _ arguments) => arguments.all fun
+          | .typeArg typeUse => go typeUse.typeId fuel
+          | _ => true
+      | some _ => true
+
+/-- The specification functions a function's verification applies, each at
+its type arguments in the function's frame: in the function's body and
+contract, in the contracts of the functions it calls, and in the
+specification functions these expand. A callee's or an expansion's type
+parameter is the argument its application gives it; an application at a type
+that mentions another parameter is left out. -/
+def specInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Array (LeanerIR.QualifiedRef × Array TypeId) := Id.run do
+  -- Each expression with the arguments of its owner's type parameters, none
+  -- in the function itself, whose parameters are its own.
+  let mut work : List (LeanerIR.NamespaceId × ExprId × Option (Array (Option TypeId))) :=
+    (functionRoots declaration).toList.map (namespaceId, ·, none)
+  let mut visited : Std.HashSet (Nat × Nat × List (Option Nat)) := {}
+  let mut applied : Array (LeanerIR.QualifiedRef × Array TypeId) := #[]
+  let bound := unit.namespaces.foldl (fun total ns => total + ns.expressions.size) 1
+  for _ in [0:bound] do
+    match work with
+    | [] => break
+    | (owner, id, arguments?) :: rest =>
+        work := rest
+        let key := (owner.index, id.index,
+          (arguments?.getD #[]).toList.map (·.map (·.index)))
+        if visited.contains key then continue
+        visited := visited.insert key
+        let some ownerNs := unit.namespaces[owner.index]? | continue
+        let some expression := ownerNs.expressions[id.index]? | continue
+        let inFrame (typeId : TypeId) : Option TypeId := match arguments? with
+          | none => some typeId
+          | some arguments => match unit.tables.types[typeId.index]? with
+            | some (.typeParameter index) => arguments[index]?.join
+            | _ => if closedType unit typeId then some typeId else none
+        if let .operation operation instantiations _ _ := expression.kind then
+          let inner := instantiations.map fun
+            | .typeArg typeUse => inFrame typeUse.typeId
+            | _ => none
+          match operation with
+          | .specification (.functionCall reference _) =>
+              if let some typeArguments := inner.mapM (fun argument => argument) then
+                unless applied.contains (reference, typeArguments) do
+                  applied := applied.push (reference, typeArguments)
+              let body? := do
+                let targetNs ← unit.namespaces[reference.namespaceId.index]?
+                let functionId ← unit.resolution.specFunction? reference.name
+                (← targetNs.specFunctions[functionId.index]?).body
+              if let some body := body? then
+                work := (reference.namespaceId, body, some inner) :: work
+          | .call (.function reference) =>
+              -- A callee's contract, not its body, which its own verification reads.
+              if arguments?.isNone then
+                if let some calleeNs := unit.namespaces[reference.namespaceId.index]? then
+                  if let some functionId := unit.resolution.function? reference.name then
+                    if let some callee := calleeNs.functions[functionId.index]? then
+                      let conditions := callee.contract.conditions.flatMap fun condition =>
+                        #[condition.expression] ++ condition.auxiliary.map (·.2)
+                      work := conditions.toList.map (reference.namespaceId, ·, some inner) ++ work
+          | _ => pure ()
+        work := (LeanerIR.Validation.expressionChildren expression.kind).toList.map
+          (owner, ·, arguments?) ++ work
+  return applied
+
+/-- The instantiations a generic axiom is assumed at: those that apply a
+specification function the axiom applies at a type argument list
+`applied` holds, as the Move Prover instantiates an axiom at the
+instantiations a verification uses. -/
+private def axiomInstances (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.NamespaceInvariant) (parameters : Nat)
+    (applied : Array (LeanerIR.QualifiedRef × Array TypeId)) : Array (Array TypeId) := Id.run do
+  let mut own : Array (LeanerIR.QualifiedRef × Array TypeId) := #[]
+  let mut work := [declaration.condition.expression]
+  for _ in [0:ns.expressions.size + 1] do
+    match work with
+    | [] => break
+    | id :: rest =>
+        work := rest
+        let some expression := ns.expressions[id.index]? | continue
+        if let .operation (.specification (.functionCall reference _)) instantiations _ _ :=
+            expression.kind then
+          if let some arguments := instantiations.mapM (fun
+              | .typeArg typeUse => some typeUse.typeId
+              | _ => none) then
+            own := own.push (reference, arguments)
+        work := (LeanerIR.Validation.expressionChildren expression.kind).toList ++ work
+  let mut instances : Array (Array TypeId) := #[]
+  for (reference, pattern) in own do
+    for (target, arguments) in applied do
+      unless target == reference && arguments.size == pattern.size do continue
+      let mut binding : Array (Option TypeId) := Array.replicate parameters none
+      let mut matched := true
+      for (formal, actual) in pattern.zip arguments do
+        match unit.tables.types[formal.index]? with
+        | some (.typeParameter index) =>
+            match binding[index]? with
+            | some none => binding := binding.set! index (some actual)
+            | some (some bound) => if bound != actual then matched := false
+            | none => matched := false
+        | _ => if formal != actual then matched := false
+      if matched then
+        if let some found := binding.mapM (fun argument => argument) then
+          unless instances.contains found do instances := instances.push found
+  return instances
+
 /-- The resource declarations what the expressions `roots` reach reaches in
 global memory, or with `writes` writes, `none` when it reaches none. Past the
 walk's bound, memory is conservatively reachable. -/
@@ -3712,16 +3857,26 @@ private inductive InvariantPhase where
 Invariant locals are declaration-owned, so their quantifier binders start
 unbound even when the surrounding function has locals with the same IDs.
 Update invariants are obligations only at exit; regular invariants are also
-assumptions at entry; axioms are assumptions at entry and never obligations. -/
+assumptions at entry; axioms are assumptions at entry and never obligations,
+a generic one at each instantiation of `applied` it applies
+(`axiomInstances`). -/
 private def namespaceInvariantTerms (context : Context)
     (modifiedResources : Option (Array ModifiedResource)) (phase : InvariantPhase)
-    (relevant : LeanerIR.NamespaceId → LeanerIR.NamespaceInvariant → Bool := fun _ _ => true) :
+    (relevant : LeanerIR.NamespaceId → LeanerIR.NamespaceInvariant → Bool := fun _ _ => true)
+    (applied : Array (LeanerIR.QualifiedRef × Array TypeId) := #[]) :
     MetaM (Array (Lean.Expr × ObligationRange)) := do
   let mut terms := #[]
   -- The invariants of every namespace of the unit, each read in its own.
   let invariants := (context.unit.namespaces.toList.zipIdx).flatMap fun (ns, index) =>
     ns.invariants.toList.map fun invariant => ((⟨index⟩ : LeanerIR.NamespaceId), ns, invariant)
-  for (invariantNamespaceId, invariantNs, declaration) in invariants do
+  let invariants := invariants.flatMap fun (namespaceId, ns, invariant) =>
+    match invariant.condition.kind with
+    | .axiom_ typeParameters =>
+        if typeParameters.isEmpty then [(namespaceId, ns, invariant, #[])] else
+          (axiomInstances context.unit ns invariant typeParameters.size applied).toList.map
+            fun arguments => (namespaceId, ns, invariant, arguments)
+    | _ => [(namespaceId, ns, invariant, #[])]
+  for (invariantNamespaceId, invariantNs, declaration, axiomArguments) in invariants do
     unless relevant invariantNamespaceId declaration do continue
     let (typeParameters, isUpdate, isAxiom) ← match declaration.condition.kind with
       | .globalInvariant typeParameters => pure (typeParameters, false, false)
@@ -3730,7 +3885,7 @@ private def namespaceInvariantTerms (context : Context)
       | kind => throwError "namespace condition {repr kind} is not a global invariant"
     if phase == .entry && isUpdate then continue
     if phase == .exit && isAxiom then continue
-    unless typeParameters.isEmpty do
+    unless typeParameters.isEmpty || isAxiom do
       throwError "generic namespace invariants are not supported in generated contracts"
     unless declaration.condition.auxiliary.isEmpty do
       throwError "namespace invariants cannot carry auxiliary expressions"
@@ -3739,6 +3894,12 @@ private def namespaceInvariantTerms (context : Context)
         | throwError "namespace invariant local type {localDecl.type.typeId.index} is out of range"
       pure ty
     let emptyLocals := Array.replicate declaration.locals.size none
+    -- A generic axiom's type parameters read as its instance's types, in the
+    -- function's frame.
+    let typeArguments ← axiomArguments.mapM fun typeId => do
+      let some ty := context.typeOf? typeId
+        | throwError "a type argument of a generic axiom has an unknown type"
+      pure (ty, context.valueRep? typeId)
     let invariantContext := { context with
       namespaceId := invariantNamespaceId
       ns := invariantNs
@@ -3746,7 +3907,10 @@ private def namespaceInvariantTerms (context : Context)
       localTypes
       oldLocals := emptyLocals
       results := #[]
-      resultTypes := #[] }
+      resultTypes := #[]
+      typeArguments := if axiomArguments.isEmpty then context.typeArguments else typeArguments
+      typeArgumentTypes := if axiomArguments.isEmpty then context.typeArgumentTypes
+        else axiomArguments.map context.ntyOf? }
     let range := conditionRange context.unit declaration.condition
     -- The declarations the invariant reads, against those a write modifies.
     let handleOf (typeIndex : Nat) : Option LeanerIR.StructHandle := do
@@ -3765,6 +3929,13 @@ private def namespaceInvariantTerms (context : Context)
     | none =>
         let some root := invariantNs.expressions[declaration.condition.expression.index]?
           | throwError "namespace invariant expression is out of range"
+        -- An axiom quantifies as any specification does, over its binders'
+        -- domains at its instance's types.
+        if isAxiom then
+          let proposition ← guardedInvariantBody invariantContext
+            declaration.condition.expression declaration.condition.expression none
+          terms := terms.push (proposition, range)
+          continue
         match root.kind with
         | .quantifier .forall #[binder] triggers condition body =>
             unless triggers.isEmpty do
@@ -4372,7 +4543,7 @@ private def hashFacts (context : Context)
   for hash in hashes do
     let application := fun (value : Lean.Expr) => do
       mkAppOptM ``LeanerLang.Contract.opaqueSpec
-        #[toExpr hash, ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) [],
+        #[toExpr hash, ← mkListLit (mkConst ``LeanerLang.Contract.SpecTypeArgument) [],
           mkConst ``RuntimeValue, none, ← mkListLit (mkConst ``RuntimeValue) [value]]
     for i in [0:values.size] do
       for j in [i + 1:values.size] do
@@ -4398,7 +4569,7 @@ private def signerFacts (context : Context) (slots : Array Slot) (bound : Array 
     let some value := binderOf binders | continue
     for (name, encoder) in predicates do
       let call ← mkAppOptM ``LeanerLang.Contract.opaqueSpec
-        #[toExpr name, ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) [],
+        #[toExpr name, ← mkListLit (mkConst ``LeanerLang.Contract.SpecTypeArgument) [],
           mkConst ``Bool, none,
           ← mkListLit (mkConst ``RuntimeValue) [← mkAppM encoder #[value]]]
       facts := facts.push (← mkEq call (mkConst ``Bool.true))
@@ -5218,12 +5389,13 @@ private def modelApplication (context : Context)
     | throwError "the native model `{name}` is applied outside a family"
   let typeParameters := declaration.signature.generics.filter (·.kind == .typeArg) |>.size
   let typeArguments ← (List.range typeParameters).mapM fun index =>
-    return mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types
-      (mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.param) (toExpr index))
+    return mkApp (mkConst ``LeanerLang.Contract.SpecTypeArgument.native)
+      (mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types
+        (mkApp (mkConst ``LeanerIR.Proofs.Denote.NTy.param) (toExpr index)))
   let encoded ← (parameterSlots.zip values).mapM fun (slot, value) =>
     (domainOf slot.physical).encode value
   mkAppOptM ``LeanerLang.Contract.opaqueSpec
-    #[toExpr name, ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) typeArguments,
+    #[toExpr name, ← mkListLit (mkConst ``LeanerLang.Contract.SpecTypeArgument) typeArguments,
       domain.leanType, none, ← mkListLit (mkConst ``RuntimeValue) encoded.toList]
 
 /-- A native's path-qualified name. -/
@@ -5683,13 +5855,20 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
   let groups ← if mapRole.isSome || tableRole.isSome then pure {}
     else groupConditions unit declaration.contract.conditions
   let invariantResources ← invariantModifiedResources ns declaration.contract
-  let isPartial := pragmaEnabled declaration.contract "aborts_if_is_partial"
+  -- A function's pragmas: its contract's, and those its module sets and its
+  -- contract does not.
+  let inEffect (name : String) : Bool := declaration.pragmas.any fun
+    | .assign pragmaName (.constant (.bool true)) _ => pragmaName == name
+    | _ => false
+  let isPartial := pragmaEnabled declaration.contract "aborts_if_is_partial" ||
+    inEffect "aborts_if_is_partial"
   -- A native without a specification is read by its Prover model
   -- (`NativeModel`): it aborts only as the model says, and its result is the
   -- value of the model's uninterpreted function at its arguments, so two
   -- calls at equal arguments agree and a clause naming the function speaks
   -- about the same value.
-  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict" || nativeModel.isSome ||
+  let isStrict := pragmaEnabled declaration.contract "aborts_if_is_strict" ||
+    inEffect "aborts_if_is_strict" || nativeModel.isSome ||
     mapRole.isSome || tableRole.isSome
   let parameterSlots ← declaration.signature.parameters.mapIdxM fun index parameter =>
     slotOf { unit := unit, namespaceId := namespaceId, ns := ns,
@@ -5754,7 +5933,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
       -- everywhere, as the Move Prover assumes them; only what a write
       -- owes is specialized to the keys it modifies.
       let invariants ← namespaceInvariantTerms context none .entry
-        (invariantApplies reach unit delegated)
+        (invariantApplies reach unit delegated) (specInstantiations unit namespaceId declaration)
       let storedAssumed ← if assumesStored && storedInvariant.isSome then
           pure #[← memoryInvariants state] else pure #[]
       let signers ← signerFacts context parameterSlots bound (some ·.entry)

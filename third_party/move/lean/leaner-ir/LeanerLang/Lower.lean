@@ -6592,7 +6592,7 @@ private def lowerNamespaceInvariants
   let boolType ← internType .bool
   for declaration in declarations do
     let loc ← addLoc declaration.span
-    let typeContext ← liftM <| typeContext #[]
+    let typeContext ← liftM <| typeContext declaration.generics
     let mut locals := #[]
     let mut localTypes := #[]
     let mut scopedDeclarations := #[]
@@ -6625,7 +6625,7 @@ private def lowerNamespaceInvariants
       loc
       condition := {
         loc
-        kind := if declaration.isAxiom then .axiom_ #[]
+        kind := if declaration.isAxiom then .axiom_ (declaration.generics.map (·.name))
           else if isUpdate then .globalInvariantUpdate else .globalInvariant
         properties
         expression := expression.1 }

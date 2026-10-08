@@ -894,9 +894,10 @@ syntax (name := leanerNamespaceInvariantMemberSyntax)
   kwInvariant (leanerConditionProperties)? leanerExpr (";")? :
     leanerNamespaceInvariantMember
 /-- An axiom of the module: a proposition assumed by every verification of
-its functions and never an obligation. -/
+its functions and never an obligation; a generic one at the instantiations a
+verification uses. -/
 syntax (name := leanerNamespaceAxiomMemberSyntax)
-  "axiom" leanerExpr (";")? : leanerNamespaceInvariantMember
+  "axiom" leanerGenericBinder* leanerExpr (";")? : leanerNamespaceInvariantMember
 syntax (name := leanerNamespaceInvariantItem) (priority := high)
   kwSpec kwModule kwWhere ppLine ppIndent(leanerNamespaceInvariantMember*) : leanerItem
 /-- A theorem among a module's items: a lemma about the module's

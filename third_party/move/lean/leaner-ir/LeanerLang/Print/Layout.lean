@@ -1368,7 +1368,8 @@ private def itemDocs : Item → Except String (Array Doc)
   | .namespaceInvariants declarations => do
       let entries ← declarations.mapM fun declaration => do
         if declaration.isAxiom then
-          return Format.group <| text "axiom " ++ Format.nest 2 (← expressionDoc declaration.expression)
+          return Format.group <| text ("axiom" ++ bindersText declaration.generics ++ " ") ++
+            Format.nest 2 (← expressionDoc declaration.expression)
         clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
       pure #[block (text "spec module where") entries]
 

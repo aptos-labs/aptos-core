@@ -4138,10 +4138,9 @@ private def conditionText (context : Context) (condition : Condition) : Except S
         unless typeParameters.isEmpty do
           throw "generic update module invariants are outside the current LeanerLang parser"
         pure ("invariant", none)
-    | .axiom_ typeParameters => do
-        unless typeParameters.isEmpty do
-          throw "generic module axioms are outside the current LeanerLang parser"
-        pure ("axiom", none)
+    | .axiom_ typeParameters =>
+        pure (" ".intercalate ("axiom" :: typeParameters.toList.map
+          fun name => "{" ++ sourceIdentifier name ++ "}"), none)
     | kind => throw s!"condition kind `{repr kind}` is outside the current LeanerLang parser"
   let properties ← condition.properties.mapM pragmaText
   -- An update invariant is one with the property `update`.
@@ -4787,8 +4786,13 @@ where
       fallback := fallback + 1
     for declaration in ns.invariants do
       let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      -- A generic axiom's type parameters, by name.
+      let binders := match declaration.condition.kind with
+        | .axiom_ typeParameters => typeParameters.map fun name =>
+            ({ name, kind := .typeArg, loc := declaration.loc } : LeanerIR.GenericBinder)
+        | _ => #[]
       let context : Context := {
-        unit, ns, locals := declaration.locals
+        unit, ns, locals := declaration.locals, binders
         localNames := declarationLocalNames ns declaration.locals 0
           (some declaration.condition.expression)
         specification := true

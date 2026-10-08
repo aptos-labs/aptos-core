@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/generic_axioms_false.move:18:9: error: the specification clause `ensures result == (a != b)` is not established
+LeanerE2ETests/SourceVerify/generic_axioms_false.move:17:5: error: leaner verification failed: the automatic verification of `distinct` failed; provide a proof: `verify distinct by …` in `LeanerE2ETests/SourceVerify/generic_axioms_false.proof.lean` (`verify distinct by skip` shows the obligations it leaves)

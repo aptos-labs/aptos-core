@@ -1,5 +1,13 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/performance_200511.move:3:1: error: a type argument of the specification function `0x1::bcs::serialize` has no native type (LeanerIR.GenericArgument.typeArg
-  { typeId := { index := 2 }, loc := { index := 123 } })
-tests/sources/regression/performance_200511.move:3:1: error: a type argument of the specification function `0x1::bcs::serialize` has no native type (LeanerIR.GenericArgument.typeArg
-  { typeId := { index := 2 }, loc := { index := 203 } })
+tests/sources/regression/performance_200511.move:45:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/performance_200511.move:45:5: error: leaner verification failed: the automatic verification of `fresh_guid` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify fresh_guid by …` in `tests/sources/regression/performance_200511.proof.lean` (`verify fresh_guid by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/performance_200511.move:53:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/performance_200511.move:53:5: error: leaner verification failed: the automatic verification of `new_event_handle_impl` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify new_event_handle_impl by …` in `tests/sources/regression/performance_200511.proof.lean` (`verify new_event_handle_impl by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

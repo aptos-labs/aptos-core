@@ -645,6 +645,9 @@ mutual
               if declared != ty && freezesResult declared ty then
                 let value ← addExpr (.mk declared sourceLoc node)
                 return ← freezeResult loc declared ty value
+        -- `TRACE(e)` asks the Prover to report `e`'s value; it is `e`.
+        if let .call (.trace .user) _ [value] _ := node then
+          return ← addExpr value
         -- A `&mut` parameter's value before is a parameter of its own.
         if let .call .old _ [.mk _ _ (.«local» name)] _ := node then
           if let some (_, before) := (← get).oldParameters.find? (·.1 == name) then

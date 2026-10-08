@@ -49,6 +49,12 @@ relative to `tests/sources`.
 
 ## Summary
 
+Generic axioms (2026-10-08): `axiom<T>` is assumed at the instantiations a
+verification applies (V1), `num` is a type argument of specification
+functions (V2), a module's abort strictness holds for its functions, and
+`TRACE(e)` reads as `e`. `axiom_generic`, `axioms`, `mono_on_axiom_spec_type`
+and `opaque_native` verify; `performance_200511` reaches verification.
+
 Axioms and bitwise follow-up (2026-10-08): a module axiom over values is
 assumed by every verification, as the Prover assumes its axioms globally, and
 the rendering prints it as an axiom; the export includes the modules
@@ -843,12 +849,12 @@ Tests: `functional/state_labels/nonlinear_cfg_error.move`.
 
 ### V1. Rendering outside the LeanerLang parser
 
-16 tests, 16 messages (2026-10-05 refresh).
+12 tests, 12 messages (2026-10-05 refresh; generic axioms parse since
+2026-10-08).
 
 Messages:
 
 - 6 × `generic module invariants are outside the current LeanerLang parser`
-- 4 × `generic module axioms are outside the current LeanerLang parser`
 - 2 × `` condition kind `…` is outside the current LeanerLang parser ``
 - 2 × `this quantifier kind is outside the current LeanerLang parser`
 - 1 × `` in-body specification condition `…` with N properties and N auxiliary expressions is outside the current LeanerLang parser ``
@@ -871,16 +877,29 @@ traps are distinguished from explicit aborts and map to `EXECUTION_FAILURE`.
 Partial-variant enum updates and mutable-reference behavioral predicates are
 listed under V2; `mono` now reaches its unsupported `emits` clause.
 
-Tests: `functional/axiom_generic.move`, `functional/axioms.move`, `functional/choice.move`, `functional/emits.move`, `functional/generic_invariants.move`, `functional/loop_unroll.move`, `functional/mono.move`, `functional/opaque_native.move`, `functional/uninst_global_invariant.move`, `regression/generic_aliasing_ghost_main.move`, `regression/generic_aliasing_ghost_pair.move`, `regression/generic_aliasing_ghost_params.move`, `regression/mono_after_global_invariant.move`, `regression/mono_on_axiom_spec_type.move`, `regression/type_param_bug_121721.move`, `regression/write_back_local_type_inst.move`.
+A generic axiom (`axiom<T>`, LeanerLang `axiom {T} e`) is assumed at each
+instantiation a verification applies a specification function of it at, as
+the Move Prover monomorphizes it: the applications in the function's body and
+contract, in its callees' contracts and in the specification functions these
+expand, a callee's type parameter read as the call's argument. The axiom's
+binders range over the instance types' values (a bounded integer's range
+included). A specification function applied at `num` takes it as a type
+argument of its own (`SpecTypeArgument.integer`). A module's
+`pragma aborts_if_is_strict` (and `_partial`) now holds for its functions. So
+`axiom_generic`, `axioms`, `mono_on_axiom_spec_type` and `opaque_native`
+verify (`SourceVerify/generic_axioms{,_false}.move`,
+`SourceVerify/inherited_strictness{,_false}.move`). Generic module invariants
+remain open.
+
+Tests: `functional/choice.move`, `functional/emits.move`, `functional/generic_invariants.move`, `functional/loop_unroll.move`, `functional/mono.move`, `functional/uninst_global_invariant.move`, `regression/generic_aliasing_ghost_main.move`, `regression/generic_aliasing_ghost_pair.move`, `regression/generic_aliasing_ghost_params.move`, `regression/mono_after_global_invariant.move`, `regression/type_param_bug_121721.move`, `regression/write_back_local_type_inst.move`.
 
 ### V2. Construct not supported in generated contracts
 
-6 tests, 9 messages (2026-10-05 refresh; `abort_in_fun`, `bv_aborts` and
-`defines` reach verification since 2026-10-08).
+5 tests, 7 messages (2026-10-05 refresh; `abort_in_fun`, `bv_aborts`,
+`defines` and `performance_200511` reach verification since 2026-10-08).
 
 Messages:
 
-- 2 × `` a type argument of the specification function `…` has no native type (LeanerIR.GenericArgument.typeArg …) ``
 - 2 × `a function value with type arguments is not carried in generated contracts`
 - 1 × `specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts`
 - 1 × `generated contracts currently expand specification functions with one result`
@@ -899,13 +918,17 @@ clause fails, as in the Prover. An equality the compiler keeps at a schema's
 declared type (`num`) after the inclusion substitutes `u64` values compares at
 the operands' type, so `defines` verifies (`SourceVerify/schema_equality.move`).
 
-Example (`regression/performance_200511.move:1`):
+A specification function applied at `num` takes it as a type argument
+(`SpecTypeArgument.integer`), so `performance_200511` reaches verification;
+two of its functions exceed the budget.
+
+Example (`functional/closures/closure_in_spec_expr.move`):
 
 ```text
-a type argument of the specification function `0x1::bcs::serialize` has no native type (LeanerIR.GenericArgument.typeArg …)
+specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts
 ```
 
-Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/spec_fun_tuple_errors.move`, `regression/performance_200511.move`, `regression/enum_update_out_of_variant.move`, `functional/closures/inline/discarded_mut_ref_result.move`.
+Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/spec_fun_tuple_errors.move`, `regression/enum_update_out_of_variant.move`, `functional/closures/inline/discarded_mut_ref_result.move`.
 
 ### V6. Construct not carried by the denotation
 
@@ -1180,6 +1203,7 @@ with the same type or prophecy value would be unsound.
 | `functional/verify_vector.move` | `verify_reverse` (budget), `verify_reverse_with_unroll` (budget), `verify_append` (budget), `verify_append_with_unroll`, `verify_index_of_with_unroll`, `verify_contains_with_unroll`, `verify_remove` (budget), `verify_remove_with_unroll` (budget) |
 | `regression/behavior_axiom_target_field.move` | `same_type_quantified`, `fun_inst` (unsupported quantified field-validity domain; V25) |
 | `regression/generic_aliasing_all_partitions.move` | `true_in_every_case` (budget), `never_alias` (budget) |
+| `regression/performance_200511.move` | `fresh_guid` (budget), `new_event_handle_impl` (budget) |
 | `regression/vector_theory_boogie_array_intern.move` | `f1` (budget) |
 | `regression/vector_theory_smt_seq.move` | `f1` (budget) |
 

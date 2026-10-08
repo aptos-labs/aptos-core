@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/inherited_strictness_false.move:17:9: error: the specification clause `aborts_if x == 0 with 1` is not established
+LeanerE2ETests/SourceVerify/inherited_strictness_false.move:15:5: error: leaner verification failed: the automatic verification of `caller` failed; provide a proof: `verify caller by …` in `LeanerE2ETests/SourceVerify/inherited_strictness_false.proof.lean` (`verify caller by skip` shows the obligations it leaves)
