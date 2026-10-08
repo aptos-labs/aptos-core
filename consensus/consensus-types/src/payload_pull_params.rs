@@ -61,6 +61,9 @@ pub struct PayloadPullParameters {
     pub max_txns_after_filtering: u64,
     pub soft_max_txns_after_filtering: u64,
     pub max_inline_txns: PayloadTxnsSize,
+    /// Maximum number of batch entries (proofs, inline batches and opt batches)
+    /// the pulled payload may contain, in total.
+    pub max_num_batch_entries: u64,
     pub user_txn_filter: PayloadFilter,
     pub pending_ordering: bool,
     pub pending_uncommitted_blocks: usize,
@@ -89,6 +92,7 @@ impl PayloadPullParameters {
         soft_max_txns_after_filtering: u64,
         max_inline_txns: u64,
         max_inline_txns_bytes: u64,
+        max_num_batch_entries: u64,
         user_txn_filter: PayloadFilter,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
@@ -101,6 +105,7 @@ impl PayloadPullParameters {
             max_txns_after_filtering,
             soft_max_txns_after_filtering,
             max_inline_txns: PayloadTxnsSize::new(max_inline_txns, max_inline_txns_bytes),
+            max_num_batch_entries,
             user_txn_filter,
             pending_ordering,
             pending_uncommitted_blocks,
@@ -122,6 +127,7 @@ impl std::fmt::Debug for PayloadPullParameters {
                 &self.soft_max_txns_after_filtering,
             )
             .field("max_inline_items", &self.max_inline_txns)
+            .field("max_num_batch_entries", &self.max_num_batch_entries)
             .field("pending_ordering", &self.pending_ordering)
             .field(
                 "pending_uncommitted_blocks",

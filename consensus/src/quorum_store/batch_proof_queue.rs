@@ -66,12 +66,16 @@ pub(crate) struct PullSession<'a> {
     pub(crate) excluded_batch_keys: HashSet<BatchKey>,
     pub(crate) filtered_txns: HashSet<&'a TxnSummaryWithExpiration>,
     pub(crate) cur_txns_per_kind: HashMap<BatchKind, u64>,
+    /// The number of batch entries (proofs, opt batches and inline batches) that
+    /// may still be pulled by this session, across all remaining pulls.
+    remaining_entries: u64,
 }
 
 impl<'a> PullSession<'a> {
     fn new(
         excluded_batches: &HashSet<BatchInfoExt>,
         items: &'a HashMap<BatchKey, QueueItem>,
+        max_num_batch_entries: u64,
     ) -> Self {
         let mut excluded_batch_keys = HashSet::with_capacity(excluded_batches.len());
         let mut filtered_txns = HashSet::new();
@@ -89,7 +93,18 @@ impl<'a> PullSession<'a> {
             excluded_batch_keys,
             filtered_txns,
             cur_txns_per_kind: HashMap::new(),
+            remaining_entries: max_num_batch_entries,
         }
+    }
+
+    /// Returns the number of batch entries that may still be pulled.
+    fn remaining_entries(&self) -> u64 {
+        self.remaining_entries
+    }
+
+    /// Consumes `num_entries` from the session's batch entry budget.
+    fn consume_entries(&mut self, num_entries: u64) {
+        self.remaining_entries = self.remaining_entries.saturating_sub(num_entries);
     }
 
     /// Add pulled batches to the session so subsequent pulls exclude them.
@@ -265,8 +280,9 @@ impl BatchProofQueue {
     pub(crate) fn create_pull_session(
         &self,
         excluded_batches: &HashSet<BatchInfoExt>,
+        max_num_batch_entries: u64,
     ) -> PullSession<'_> {
-        PullSession::new(excluded_batches, &self.items)
+        PullSession::new(excluded_batches, &self.items, max_num_batch_entries)
     }
 
     /// Add the ProofOfStore to proof queue.
@@ -799,6 +815,10 @@ impl BatchProofQueue {
         HashMap<BatchKind, u64>,
     ) {
         let mut result = Vec::new();
+        // The entry budget is shared across the proof, opt batch and inline batch
+        // pulls of a single session, so that the assembled payload never carries
+        // more batch entries than receiving validators will accept.
+        let max_entries = session.remaining_entries();
         let mut cur_unique_txns = 0;
         let mut cur_all_txns = PayloadTxnsSize::zero();
         let mut excluded_txns = 0;
@@ -821,6 +841,11 @@ impl BatchProofQueue {
 
         let items = &self.items;
         let batch_expiry_gap = self.batch_expiry_gap_when_init_usecs;
+
+        // Nothing left in the entry budget, so there's nothing to pull
+        if max_entries == 0 {
+            full = true;
+        }
 
         let mut iters = vec![];
         for (_, batches) in author_map
@@ -910,7 +935,8 @@ impl BatchProofQueue {
 
                         assert!(item.proof.is_none() == batches_without_proofs);
                         result.push(item);
-                        if cur_all_txns == max_txns
+                        if result.len() as u64 >= max_entries
+                            || cur_all_txns == max_txns
                             || cur_unique_txns == max_txns_after_filtering
                             || cur_unique_txns >= soft_max_txns_after_filtering
                         {
@@ -948,6 +974,8 @@ impl BatchProofQueue {
         if full || return_non_full {
             // Commit pending filtered txns into session only when the pull is accepted
             session.filtered_txns.extend(pending_filtered_txns);
+            // Charge the pulled entries against the session's entry budget
+            session.consume_entries(result.len() as u64);
 
             // Stable sort, so the order of proofs within an author will not change.
             result.sort_by_key(|item| Reverse(item.info.gas_bucket_start()));

@@ -182,6 +182,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PayloadTxnsSize::new(1, 1024),
         1,
         PayloadTxnsSize::new(1, 1024),
+        u64::MAX,
         10,
         1,
         Some(30_000),
