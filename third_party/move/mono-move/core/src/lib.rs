@@ -37,6 +37,7 @@ pub use instruction::{
     CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp,
     IntOperand, IntShiftOp, IntTy, JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, MicroOp,
     PackClosureOp, ShiftOperand, SizedSlot, ValueCmpOp, ValueRefCmpOp, VecPackOp, VecUnpackOp,
+    CAPTURED_DATA_BLOB_SIZE_OFFSET, CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET,
     CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
     CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_FUNC_REF_SIZE, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET,
@@ -67,8 +68,8 @@ pub use storage::{
 pub use types::{convert_mut_to_immut_ref, is_assignable, is_nominal, strip_ref};
 pub use value_format::FormatOptions;
 pub use value_layout::{
-    reserved_layout_id, reserved_layouts, FieldValueLayout, LayoutFlags, LayoutId, LayoutKind,
-    LayoutProvider, ValueLayout, ValueLayoutTable, VariantValueLayout,
+    reserved_layout_id, reserved_layouts, CaptureLayoutsId, FieldValueLayout, LayoutFlags,
+    LayoutId, LayoutKind, LayoutProvider, ValueLayout, ValueLayoutTable, VariantValueLayout,
 };
 pub use verifier::{assert_verified, verify_function, verify_program, VerificationError};
 pub use vm_error::{CallFrame, ErrorLocation, VMInternalError, VMResult};
