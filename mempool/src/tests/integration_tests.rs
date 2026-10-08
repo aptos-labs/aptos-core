@@ -19,7 +19,9 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_types::{
-    test_helpers::encrypted_transactions::{encrypted_transaction, non_valid_encrypted_transactions},
+    test_helpers::encrypted_transactions::{
+        encrypted_transaction, non_valid_encrypted_transactions,
+    },
     transaction::{ReplayProtector, SignedTransaction},
 };
 use once_cell::sync::Lazy;
