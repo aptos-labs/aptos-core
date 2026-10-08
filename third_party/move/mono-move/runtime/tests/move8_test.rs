@@ -6,7 +6,6 @@
 
 mod common;
 
-use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo, FrameOffset as FO,
     Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
@@ -15,8 +14,7 @@ use mono_move_core::{
 
 fn function(code: Vec<MicroOp>, frame_size: usize, pointer_slots: Vec<FO>) -> Function {
     Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
+        func_ref: crate::program_func_ref!("test", "test"),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
         code: Code::from_vec(code),

@@ -426,7 +426,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn caller_module(&self) -> Option<InternedModuleId> {
-        self.caller_frame().map(|(caller, _)| caller.module_id)
+        self.caller_frame().map(|(caller, _)| caller.module_id())
     }
 
     fn direct_caller_module(&self) -> Option<InternedModuleId> {
@@ -442,7 +442,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 | MicroOp::CallByPtr { .. }
                 | MicroOp::CallByPtrExempt { .. }
         ) {
-            Some(caller.module_id)
+            Some(caller.module_id())
         } else {
             None
         }
