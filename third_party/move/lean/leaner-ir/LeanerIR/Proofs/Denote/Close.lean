@@ -3420,10 +3420,10 @@ premise of an instance, the lookup at the position read, or the goal
 rewritten by the context. -/
 macro "leaner_denote_witness_premise" : tactic => `(tactic|
   first
-  | leaner_denote_instance_premise
-  | (simp (disch := omega) only [Int.toNat_natCast, Array.getElem?_push_size, LeanerIR.Proofs.Denote.getElem?_push_of_lt,
+  | leaner_denote_timed "wp-instance" leaner_denote_instance_premise
+  | leaner_denote_timed "wp-simp" (simp (disch := omega) only [Int.toNat_natCast, Array.getElem?_push_size, LeanerIR.Proofs.Denote.getElem?_push_of_lt,
       Array.getElem?_setIfInBounds_self_of_lt, Array.getElem?_setIfInBounds_ne]; done)
-  | leaner_denote_decide_by_context)
+  | leaner_denote_timed "wp-context" leaner_denote_decide_by_context)
 
 /-- A witness of a type along its pairs: a pair of witnesses, the unit, or
 an unknown. -/
@@ -3534,6 +3534,17 @@ witnesses. The conjuncts reading the binder are decided at the witness
 first, which rejects a candidate cheaply, a nested existential witnessed in
 turn; then the conjuncts not reading it. -/
 syntax "leaner_denote_witness" : tactic
+
+/-- The heartbeats the cheap decider spends searching an existential's
+witness. A candidate the search rejects pays every premise decider on its
+conjuncts, and a nested existential's whole search; a leaf whose witness needs
+the context rewritten is decided by the later steps, which rewrite it once. -/
+def cheapWitnessHeartbeats : Nat := 4000000
+
+/-- Run the witness search within `cheapWitnessHeartbeats`; exhausting it is
+an ordinary failure. -/
+elab "leaner_denote_cheap_witness" : tactic => do
+  evalBudgeted cheapWitnessHeartbeats (← `(tactic| leaner_denote_witness))
 
 
 /-- The body of an existential at a witness, proved: split into conjuncts,
@@ -3702,10 +3713,14 @@ elab_rules : tactic
       assignWitnessed goal others #[(domain, body, witness)] proof
       return true
     -- An integer the body bounds, such as a mutable parameter's value between
-    -- two increments.
-    if domain.isConstOf ``Int then
-      for value in ← boundWitnesses body do
-        if ← attempt value (← `(tactic| leaner_denote_witness_premise)) then return
+    -- two increments. A literal bound, such as a limit of the binder's type
+    -- every bounded binder states, is tried after the context's values: a
+    -- candidate that fails searches every nested binder in vain.
+    let (literalBounds, bounds) ← if domain.isConstOf ``Int then
+        pure ((← boundWitnesses body).partition fun bound => bound.int?.isSome)
+      else pure (#[], #[])
+    for value in bounds do
+      if ← attempt value (← `(tactic| leaner_denote_witness_premise)) then return
     -- A runtime value the body reads at one integer field: a nominal value
     -- holding an integer there, the integer witnessed in turn.
     if domain.isConstOf ``LeanerIR.RuntimeValue then
@@ -3765,6 +3780,8 @@ elab_rules : tactic
       unless read.contains position do read := read.push position
     for position in read do
       if ← attempt position (← `(tactic| leaner_denote_witness_premise)) then return
+    for value in literalBounds do
+      if ← attempt value (← `(tactic| leaner_denote_witness_premise)) then return
     -- Prefer witnesses from the predicate and context before enumerating
     -- execution points. A label is an existential, including in caller-side
     -- contracts with no callee points; arithmetic can construct its value
@@ -3778,17 +3795,17 @@ syntax "leaner_denote_decide_cheap" : tactic
 macro_rules
   | `(tactic| leaner_denote_decide_cheap) => `(tactic|
   first
-  | leaner_denote_assumption
-  | leaner_denote_witness
+  | leaner_denote_timed "c-assumption" leaner_denote_assumption
+  | leaner_denote_timed "c-witness" leaner_denote_cheap_witness
   | ((try simp only [LeanerIR.Proofs.Obligation_iff, Nat.reduceAdd, Int.reducePow,
       Int.reduceSub, Nat.reducePow, Nat.reduceSub])
      first
      | done
-     | leaner_denote_assumption
-     | leaner_denote_ground_arithmetic
-     | (leaner_denote_bounds; leaner_denote_omega)
-     | leaner_denote_decide
-     | leaner_denote_witness
+     | leaner_denote_timed "c-assumption" leaner_denote_assumption
+     | leaner_denote_timed "c-ground" leaner_denote_ground_arithmetic
+     | leaner_denote_timed "c-omega" (leaner_denote_bounds; leaner_denote_omega)
+     | leaner_denote_timed "c-decide" leaner_denote_decide
+     | leaner_denote_timed "c-witness" leaner_denote_cheap_witness
      -- A conjunction, such as a clause with an abort code, conjunct by
      -- conjunct.
      | (apply And.intro <;> leaner_denote_decide_cheap)))
@@ -8444,6 +8461,7 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       stageCost := stageCost.push ("call returned", (← IO.getNumHeartbeats) - stageStart)
       continue
     if let some (unfolded, branches, normal) ← bindRule? goal then
+      let ruled ← IO.getNumHeartbeats
       -- A straight-line action keeps its continuation in place: it reaches
       -- it on one path.
       if branches then
@@ -8454,9 +8472,23 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
         if let some continuation := continuation? then
           foldedNormal := foldedNormal.insert continuation (normal.extract 2 4)
       else setGoals [unfolded]
+      let folded ← IO.getNumHeartbeats
       let normalization ← normalization?.getDM normalization
       normalization? := some normalization
+      let beforeNormal ← getGoals
       normalizeAround normalization normal
+      let changed := (← getGoals) != beforeNormal
+      if debug then
+        let target ← instantiateMVars (← goal.getType)
+        let action := if target.isAppOfArity ``LeanerIR.Proofs.wp 7 then
+            match (target.getArg! 3).consumeMData.headBeta.getAppArgs.back?.map
+                (·.consumeMData.headBeta.getAppFn) with
+            | some (.const name _) => toString name
+            | _ => "?"
+          else "?"
+        logInfo m!"bind {action}{if branches then " (branching)" else ""}: rule \
+          {(ruled - stageStart) / 1000}k, fold {(folded - ruled) / 1000}k, normalize \
+          {((← IO.getNumHeartbeats) - folded) / 1000}k{if changed then "" else " (unchanged)"}"
       pending := pending ++ (← getGoals).toArray.map fun g => (g, provenance, clauses)
       stageCost := stageCost.push ("bind", (← IO.getNumHeartbeats) - stageStart)
       continue

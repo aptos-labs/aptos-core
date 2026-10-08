@@ -116,6 +116,11 @@ first waits for a certificate. Use all four instruments below.
    `pipe-saturate`, `pipe-split`, `pipe-bv`, `pipe-grind` and the like, so a
    leaf it closes is attributed to the stage that pays (2026-10-08: the
    `bitwise_features::contains` leaves were `pipe-saturate` and `pipe-bv`).
+   The cheap decider's steps are `c-assumption`, `c-witness`, `c-ground`,
+   `c-omega`, `c-decide`, and a witness candidate's premise deciders
+   `wp-instance`, `wp-simp`, `wp-context`. Under `leaner.denoteDebug` the
+   bind stage logs each action with the heartbeats of its rule, its fold,
+   and its normalization (`bind <action>: rule …k, fold …k, normalize …k`).
 7. **The benchmark problems.** `scripts/leaner-bench.py run [--only …]`
    builds `leaner-bench`, measures the standard problems natively, by
    phase, records the run in the local history, and prints each problem's
