@@ -21,14 +21,14 @@ return values: { 0, 000000000000000000000000000000000000000000000000000000000000
 task 10 lines 106-106:  run 0x42::print_values::return_struct
 Error: enum variants not yet supported by layouts
 task 11 lines 108-108:  run 0x42::print_values::return_anonymous
-Error: unsupported by MonoVM: function values are not yet supported
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::__lambda__1__return_anonymous(..)
 task 12 lines 110-110:  run 0x42::print_values::return_add
-Error: unsupported by MonoVM: function values are not yet supported
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(..)
 task 13 lines 112-112:  run 0x42::print_values::return_add_first --args 5
-Error: unsupported by MonoVM: function values are not yet supported
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(U64(5), ..)
 task 14 lines 114-114:  run 0x42::print_values::return_add_last --args 10
-Error: unsupported by MonoVM: function values are not yet supported
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(_, U64(10), ..)
 task 15 lines 116-116:  run 0x42::print_values::return_add_two_and_one
-Error: unsupported by MonoVM: function values are not yet supported
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(U64(2), U64(1), ..)
 task 16 lines 118-118:  run 0x42::print_values::return_closure_capture_struct
-Error: unsupported by MonoVM: function values are not yet supported
+return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::return_struct(..)

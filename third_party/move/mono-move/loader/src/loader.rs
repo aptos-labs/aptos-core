@@ -1098,6 +1098,10 @@ impl LayoutProvider for LoweringContext<'_, '_, '_> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.loader.guard.layout_id(ty)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.loader.guard.interner()
+    }
 }
 
 impl SpecializerContext for LoweringContext<'_, '_, '_> {
@@ -1170,6 +1174,16 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         self.loader
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets)
+    }
+
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId {
+        self.loader
+            .guard
+            .publish_captured_values_layout(captured, layout)
     }
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
