@@ -2212,6 +2212,12 @@ pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
 /// captures are still wire bytes and the values region is empty.
 pub const CAPTURED_DATA_TAG_RAW: u8 = 1;
 
+/// `ClosureCapturedData::MaterializedRaw` tag value. The object holds both the
+/// decoded values and the blob they were decoded from. The first `CallClosure`
+/// on a `Raw` closure produces it, so later calls read the values directly and
+/// serialization still reproduces the stored bytes.
+pub const CAPTURED_DATA_TAG_MATERIALIZED_RAW: u8 = 2;
+
 /// Places the next captured value of `(size, align)` after `cursor` bytes at its
 /// natural alignment, returning `(value_offset, next_cursor)`. The values region
 /// is 8-aligned and pointer-bearing types are ≥ 8-aligned, so natural alignment
@@ -2248,6 +2254,9 @@ impl MicroOp {
             | MicroOp::VecPack(_)
             | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
+            // Calling a closure whose captures are still wire bytes decodes
+            // them into a fresh captured-data object first.
+            | MicroOp::CallClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
             | MicroOp::DeepCopyHeapPtrs { .. }
@@ -2321,7 +2330,6 @@ impl MicroOp {
             | MicroOp::HeapMoveToImm8 { .. }
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::CallClosure(_)
             | MicroOp::IntAdd(_)
             | MicroOp::IntSub(_)
             | MicroOp::IntMul(_)

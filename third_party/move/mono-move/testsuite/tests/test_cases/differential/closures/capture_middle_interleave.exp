@@ -84,4 +84,5 @@ fun caller() {
     8: Return @7
   safe_point_layouts:
     1: []
+    6: []
 }

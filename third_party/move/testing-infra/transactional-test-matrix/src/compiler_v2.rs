@@ -307,10 +307,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "reference parameters, which no production path accepts",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/calculator.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/closure_equality.move",
         "function values in resources, function value equality",
     ),
@@ -344,10 +340,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/registry.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/resolve_from_storage.move",
         "function values in resources",
     ),
     MonoMoveDivergence::semantic(

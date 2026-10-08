@@ -105,6 +105,8 @@ fun call_double_twice() {
   safe_point_layouts:
     0: []
     2: []
+    3: []
+    5: []
 }
 
 fun call_identity() {
@@ -117,6 +119,7 @@ fun call_identity() {
     3: Return @5
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun double() {
