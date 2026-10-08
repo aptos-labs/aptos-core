@@ -7,19 +7,19 @@ The MonoMove runtime uses a long-living module cache that satisfies the followin
 - Stores executable IR and lowered code to avoid repeated deserialization, verification and translation.
   Note that executable IR already uses type pointers to the long-living interned type cache.
 
-- Supports upgrades: 1) within same block, 2) between speculative block trees (with Zaptos, blocks with published code may not be committed immediately).
-  Because of speculation and concurrent upgrades, newer or speculative code can co-exist with older versions at the same time.
+- Supports upgrades: they land at block end and are applied sequentially, with no execution in flight.
+  Within a block the cache holds at most one version of each module, and that version is immutable for the whole block.
 
 - Does not evict modules during execution of transactions (only at safe points when no execution happens).
 
 When a single transaction executes, it may "load" modules into its local read-set.
-The read-set is used to cache a consistent local view of the cache for transaction.
-This is needed to avoid cases where some transaction upgrades module `A`, and other transaction ends up seeing both old and new versions at the same time.
+The read-set is the set of modules the transaction has already paid for.
+Repeated access to a loaded module is free, so gas does not depend on how warm the long-living cache is.
 
 Loading a module can either be a hit in long-living module cache or a miss.
 On a miss, loader fetches the module from storage, deserializes it, verifies, translates to execution IR, and adds it to the long-living cache.
 To cover for the worst case, every module load has to be charged gas.
-Importantly, the charging must be **deterministic** irrespective of the cache state that may be different on different validators due to speculation.
+Importantly, the charging must be **deterministic** irrespective of the cache state, which differs across validators because each has loaded a different set of modules.
 
 Transaction may need to load modules for multiple reasons.
 
@@ -54,7 +54,8 @@ Note that (2) and (3) also cover cases like 1) deserializing data on global stor
 
 4. **Modules are upgradable.**
    On upgrade, modules may change their code and size, more structs may be added, enums may gain new variants.
-   Because the gas charge is proportional to module size in bytes, transactions that loaded upgraded module must be invalidated and re-executed by Block-STM.
+   A module's size, and therefore its cost, is fixed for the duration of a block.
+   The Block-STM invalidation that remains is for reads of modules published earlier in the same block, which the read-set handles.
    Again, semantics of gas charging may impact validation and upgrade logic.
 
 ## 3. Proposed Design
@@ -69,22 +70,8 @@ Derived cache entries can include struct layouts (constructed from multiple modu
 
 MonoMove runtime uses pull-based invalidation.
 It makes implementation simpler and more efficient.
-There are two main reasons why pull approach wins.
 
-Firstly, with Zaptos, push invalidation may result in adding many more entries to the cache.
-Consider an example below, where there is an already executed fork `B1-B2`, and currently executing fork `B2`.
-If `B2` republishes module `N`, with push-based approach any code that depend on `N` needs to be duplicated on both `B2` and `B1-B3` branch.
-
-```
-Speculative execution tree:
-
-    B0 (committed)
-    ├── B1 (speculative)
-    │   └── B3 (speculative, builds on B1)
-    └── B2 (speculative, publishes new version of module N)
-```
-
-Secondly, the existing gas metering model for structures like layouts requires filtering out modules that are already charged.
+The reason pull wins is that the existing gas metering model for structures like layouts requires filtering out modules that are already charged.
 For example, consider a transaction that has `A`, `B`, and `C` charged.
 Suppose that is accesses layout information from cache that depends on `A`, `B`, and `D`.
 Because of metering, it needs to only charge for non-visited subset of the modules.
@@ -236,32 +223,16 @@ Depending on the policy, module loading may be more or less expensive, making fu
 The best policy is workload dependent.
 Interpreter can also use inline caches to avoid repeated set intersection checks, if they are expensive.
 
-The important property of mandatory sets is that they cannot change size because of upgrade.
-That is, if `MS(a) = {a, b, c}`, it is not possible that it becomes `{a, b}` or `{a, b, c, d}` after some downstream upgrade.
-This makes them particularly attractive because they can be cached per each module instance.
+The important property of mandatory sets is that a cached one cannot go stale.
+A module instance is immutable for the whole block, so `MS(a) = {a, b, c}` computed for that instance stays `{a, b, c}` and can be cached on it.
 For example, if module `a` is cached in long-living cache, there is no need to re-traverse its dependencies in some complex way to simulate EL loading and metering.
 It is sufficient to check modules in `MS(a)`, which can be implemented lock-free.
 
 #### Implementation of Mandatory Sets
 
-For every module, long-living cache stores a pointer to the slot.
-Slot serves as a versioning primitive (for future Zaptos support).
-
-```rust
-pub struct Slot<T> {
-    /// Committed baseline value (storage).
-    base: AtomicPtr<T>,        
-    /// If true, need to resolve via overlay + pending.
-    stale: AtomicBool,
-    // Writes from all executed blocks in the speculative tree, compressed to at most 1 version per block.
-    overlay: Mutex<SmallVec<[(BlockId, *const T); 2]>>,
-    // Current block writes in-flight.
-    pending: Mutex<SmallVec<[(TxnIdx, *const T); 1]>>, 
-}
-```
-
-Mandatory sets are implemented as a slice of pointers to `Slot` instances in the cache.
-Slots are stable and never claimed by garbage collection unless the cache is flushed.
+The long-living cache maps an interned module id to a leaked pointer to the loaded module.
+A mandatory set is a slice of interned module ids, resolved through the cache on use.
+Entries are never claimed by garbage collection individually: the only eviction is a clear of the whole cache at a safe point.
 
 ### Handling Cache Misses for Loading Policies
 
@@ -281,3 +252,4 @@ In order to enforce correctness, loader splits "loading", "linking" and "inserti
 
 Steps (3) and (4) allow to safely store direct pointers between modules.
 Cache only needs to enforce GC does not evict modules before modules that point to them.
+The reverse-topological insertion, the canonical pointer and this GC constraint are all independent of versioning: they are required by the direct pointers alone.

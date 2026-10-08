@@ -86,10 +86,10 @@ fn load_eager_preloads_struct_closure() {
         "d must NOT be in read-set (unreached by a's functions)"
     );
 
-    // a's stored MS holds {a, b, c}: filled MS entries include self
-    // (ModuleMandatoryDependencies invariant 4, DESIGN.md §3).
+    // a's stored MS holds {a, b, c}: a filled MS always includes self
+    // (DESIGN.md §3).
     assert_eq!(
-        exec.mandatory_dependencies().slots().len(),
+        exec.mandatory_dependencies().len(),
         3,
         "expected MS(a) to be {{a, b, c}}"
     );
@@ -141,7 +141,7 @@ fn load_eager_primitive_only_module_includes_self() {
 
     assert_eq!(read_set.len(), 1);
     assert_eq!(
-        exec.mandatory_dependencies().slots().len(),
+        exec.mandatory_dependencies().len(),
         1,
         "MS must always include self even without struct refs"
     );
