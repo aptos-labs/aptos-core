@@ -74,11 +74,12 @@ pub enum ObjectDescriptorInner {
         variant_pointer_offsets: Vec<Vec<u32>>,
     },
 
-    /// `ClosureCapturedData` (Materialized) object.
+    /// `ClosureCapturedData` object holding decoded values.
     ///
-    /// Data-region layout: `[tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [values @ 8]`.
+    /// Data-region layout: `[tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4]
+    /// [blob_size: u32 @ 8] [layout_id: u32 @ 12] [values @ 16] [blob]`.
     /// `pointer_offsets` are relative to the values region (i.e., excluding
-    /// the 8-byte prefix), so an offset of `0` names the first byte of the
+    /// the 16-byte prefix), so an offset of `0` names the first byte of the
     /// first captured value. The prefix is added internally by the GC.
     /// Pointer-free captures carry no `CapturedData` descriptor: they share
     /// `Trivial`.

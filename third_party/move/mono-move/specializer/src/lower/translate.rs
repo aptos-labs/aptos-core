@@ -1802,8 +1802,10 @@ impl<'a> LoweringState<'a> {
                     dst: dst_off,
                     func_ref: ClosureFuncRef::Unresolved(info.func_ref),
                     mask: data.mask.bits(),
+                    persistent: info.persistent,
                     captured_data_descriptor_id: info.captured_data_descriptor_id,
                     values_size: info.values_size,
+                    captured_layout_id: info.captured_layout_id,
                     captured: captured_slots,
                 })))?;
             },
@@ -2618,9 +2620,10 @@ fn eq_kind(ty: &Type) -> VMResult<EqKind> {
         | Type::I64
         | Type::I128
         | Type::I256 => EqKind::Int,
-        Type::Vector { .. } | Type::Nominal { .. } => EqKind::NonIntValue,
+        // A function slot holds a closure pointer, compared through it.
+        Type::Vector { .. } | Type::Nominal { .. } | Type::Function { .. } => EqKind::NonIntValue,
         Type::ImmutRef { .. } | Type::MutRef { .. } => EqKind::Ref,
-        Type::Function { .. } | Type::TypeParam { .. } => {
+        Type::TypeParam { .. } => {
             return Err(VMInternalError::new(LoweringError::EqualityUnsupportedType))
         },
     })
