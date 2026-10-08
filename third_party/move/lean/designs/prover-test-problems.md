@@ -564,11 +564,30 @@ The former representation-guard files now reach verification; ten verify
 cleanly. Of those, `functional/bv_cast.move` differs by the narrowing-cast rule
 (the Prover rejects `(v as u8) == (v as u8)`), and the Prover's errors in
 `functional/bv_internal_invalid.move` and `functional/bv_internal_aggregate.move`
-concern its encoding only. Open: an `int2bv` whose width comes from context
-(XAST type `num`, e.g. a spec function's result) or from a type parameter is
-rejected (`functional/bv_signed_generic.move`, `MoveToLeanerLang/constants.move`).
+concern its encoding only. An `int2bv` the compiler types at `num` (e.g.
+`int2bv(value + 1)`) wraps at `u64` (decided 2026-10-08), so
+`MoveToLeanerLang/constants.move` translates again. Open: one at a type
+parameter has no width and is rejected (`functional/bv_signed_generic.move`).
 
 Tests: `functional/bv_cast.move`, `functional/bv_internal_aggregate.move`, `functional/bv_internal_invalid.move`, `functional/bv_signed_generic.move`.
+
+### G15. Specification functions are partial
+
+A Move specification function is defined where each parameter declared with a
+fixed-width integer type holds a value of that type; elsewhere its value is
+unspecified (decided 2026-10-08). Specification typing lets a caller pass any
+integer to such a parameter, and a specification function cannot abort. The
+importer guards the body by the parameters' ranges and reads the rest as an
+aborting branch, which a specification reads as an unspecified value
+(`Frontend/SpecDomains.lean`). A `num` parameter is unbounded. The
+specification version of a Move function is derived again from the function
+and is not guarded.
+
+The Prover's specification functions are total over the integers: for
+`spec fun successor(x: u8): num { x + 1 }`, `successor(300) == 301` verifies
+there and not in Leaner. Inside the domain the two agree.
+
+Tests: `SourceVerify/spec_fun_domain{,_false}.move`.
 
 ## Rejected before verification
 

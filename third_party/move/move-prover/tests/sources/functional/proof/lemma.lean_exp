@@ -12,23 +12,23 @@ warning: proof uses trusted assumption
    │             ^^^^^^^^^^^^^^^^^^^^^^
 
 warning: proof uses trusted assumption
-    ┌─ tests/sources/functional/proof/lemma.move:163:13
+    ┌─ tests/sources/functional/proof/lemma.move:164:13
     │
-163 │             assume [trusted] true;
+164 │             assume [trusted] true;
     │             ^^^^^^^^^^^^^^^^^^^^^^
 
 warning: proof uses trusted assumption
-    ┌─ tests/sources/functional/proof/lemma.move:202:13
+    ┌─ tests/sources/functional/proof/lemma.move:203:13
     │
-202 │             assume [trusted] true;
+203 │             assume [trusted] true;
     │             ^^^^^^^^^^^^^^^^^^^^^^
 
-tests/sources/functional/proof/lemma.move:151:13: error: the specification clause `ensures x + 1 == x` is not established
-tests/sources/functional/proof/lemma.move:150:9: error: leaner verification failed: the lemma `bad_claim` is not established
-tests/sources/functional/proof/lemma.move:184:13: error: the specification clause `ensures sum(n) <= n` is not established
-tests/sources/functional/proof/lemma.move:182:9: warning: unused termination hints, function is not recursive
-tests/sources/functional/proof/lemma.move:182:9: error: leaner verification failed: the lemma `sum_upper_bound` is not established
-tests/sources/functional/proof/lemma.move:207:13: error: the specification clause `ensures x >= 1` is not established
-tests/sources/functional/proof/lemma.move:205:9: error: leaner verification failed: the lemma `strong_claim` is not established
-tests/sources/functional/proof/lemma.move:173:9: error: the requirement of the lemma applied at `needs_positive(x)` does not hold
-tests/sources/functional/proof/lemma.move:170:5: error: leaner verification failed: the automatic verification of `might_be_zero` failed; provide a proof: `verify might_be_zero by …` in `tests/sources/functional/proof/lemma.proof.lean` (`verify might_be_zero by skip` shows the obligations it leaves)
+tests/sources/functional/proof/lemma.move:152:13: error: the specification clause `ensures x + 1 == x` is not established
+tests/sources/functional/proof/lemma.move:151:9: error: leaner verification failed: the lemma `bad_claim` is not established
+tests/sources/functional/proof/lemma.move:185:13: error: the specification clause `ensures sum(n) <= n` is not established
+tests/sources/functional/proof/lemma.move:183:9: warning: unused termination hints, function is not recursive
+tests/sources/functional/proof/lemma.move:183:9: error: leaner verification failed: the lemma `sum_upper_bound` is not established
+tests/sources/functional/proof/lemma.move:208:13: error: the specification clause `ensures x >= 1` is not established
+tests/sources/functional/proof/lemma.move:206:9: error: leaner verification failed: the lemma `strong_claim` is not established
+tests/sources/functional/proof/lemma.move:174:9: error: the requirement of the lemma applied at `needs_positive(x)` does not hold
+tests/sources/functional/proof/lemma.move:171:5: error: leaner verification failed: the automatic verification of `might_be_zero` failed; provide a proof: `verify might_be_zero by …` in `tests/sources/functional/proof/lemma.proof.lean` (`verify might_be_zero by skip` shows the obligations it leaves)

@@ -16,8 +16,10 @@ Leaner keeps one semantics instead:
 * Specification arithmetic is mathematical. Bitwise operations are exact on
   integers. Executable arithmetic is Move's checked arithmetic.
 * `int2bv(e)` wraps `e` into its fixed-width result type: modulo `2^w` for an
-  unsigned type, two's complement for a signed one. A generic or `num` result
-  type has no width and is rejected.
+  unsigned type, two's complement for a signed one. The compiler types the
+  conversion of an arithmetic operand at `num`, which has no width; that one
+  wraps at `u64`, the type Move gives an integer nothing else constrains
+  (decided 2026-10-08). A type-parameter result has no width and is rejected.
 * `bv2int(e)` reads the value back unchanged.
 * A specification cast keeps its value.
 

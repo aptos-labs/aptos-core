@@ -6,6 +6,7 @@ import LeanerMove.Frontend.Effects
 import LeanerMove.Frontend.Frames
 import LeanerMove.Frontend.Proofs
 import LeanerMove.Frontend.BitVectorConversion
+import LeanerMove.Frontend.SpecDomains
 import LeanerLang.AddressAlias
 import LeanerMove.Frontend.LIR.Codec
 
@@ -2152,7 +2153,12 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
         oldParameters := mutable.toArray.map fun parameter =>
           (parameter.name, oldParameterName parameter.name)
         parameterLocals := positions.toArray }
-      let body ← logically (function.body.mapM addExpr)
+      -- A specification function is defined where its parameters fit their
+      -- declared types. Compiler-v2's specification version of a Move
+      -- function is derived again from that function.
+      let body := if function.isMoveFun then function.body
+        else function.body.map (SpecDomains.partialBody function.params)
+      let body ← logically (body.mapM addExpr)
       modify fun state => { state with oldParameters := #[], parameterLocals := #[] }
       let parameters ← withMutablyBorrowedLocals expressionsBefore parameters
       let functionContract ← addContract function.spec functionLoc

@@ -1,3 +1,4 @@
+Move prover returns: exiting with verification errors
 warning: cannot derive `folds_of` exactly for this lambda argument: the enclosing function has no specification which requires the fold summary; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
    ┌─ tests/sources/functional/closures/inline/specialize_generic_caller.move:30:23
    │
@@ -9,3 +10,118 @@ warning: cannot derive `folds_of` exactly for this lambda argument: the enclosin
    │         │           │
    │         │           lambda argument
    │         from a call inlined at this callsite
+
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:10:11: error: Application type mismatch: The argument
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, n, ())
+has type
+  LeanerIR.RuntimeValue × ?m.918 × Int × Unit
+but is expected to have type
+  Nat → LeanerIR.Proofs.Denote.NTy
+in the application
+  «spec_fold$lambda$0».spec
+    (LeanerIR.RuntimeValue.vector
+        (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+      0, n, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:12:25: error: Type mismatch
+  n
+has type
+  Int
+but is expected to have type
+  LeanerIR.RuntimeValue × Int × Int × Unit → Int
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:28:31: error: Unknown identifier `i.val`
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:31:32: error: Unknown identifier `i.val`
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:32:11: error: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  b ≥ 1
+  0 ≤ a ≤ 999
+where
+ a := ↑v.values.size
+ b := «spec_fold$lambda$0».spec
+  (fun index => [LeanerIR.Proofs.Denote.NTy.int 64 false].getD index LeanerIR.Proofs.Denote.NTy.unit)
+  (LeanerIR.RuntimeValue.vector (Array.map (fun x => LeanerIR.RuntimeValue.integer x.val) v.values), 0, 0, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:10:11: error: Application type mismatch: The argument
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, n, ())
+has type
+  LeanerIR.RuntimeValue × ?m.918 × Int × Unit
+but is expected to have type
+  Nat → LeanerIR.Proofs.Denote.NTy
+in the application
+  «spec_fold$lambda$0».spec
+    (LeanerIR.RuntimeValue.vector
+        (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+      0, n, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:12:25: error: Type mismatch
+  n
+has type
+  Int
+but is expected to have type
+  LeanerIR.RuntimeValue × Int × Int × Unit → Int
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:31:58: error: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  0 ≤ b ≤ 18446744073709551615
+  0 ≤ a ≤ 999
+where
+ a := i.val
+ b := «spec_fold$lambda$0».spec
+  (fun index => [LeanerIR.Proofs.Denote.NTy.int 64 false].getD index LeanerIR.Proofs.Denote.NTy.unit)
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, i.val, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:32:11: error: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  0 ≤ b ≤ 18446744073709551615
+  0 ≤ a ≤ 999
+  a - b ≥ 1
+where
+ a := i.val
+ b := «spec_fold$lambda$0».spec
+  (fun index => [LeanerIR.Proofs.Denote.NTy.int 64 false].getD index LeanerIR.Proofs.Denote.NTy.unit)
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, i.val, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:10:11: error: Application type mismatch: The argument
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, n, ())
+has type
+  LeanerIR.RuntimeValue × ?m.918 × Int × Unit
+but is expected to have type
+  Nat → LeanerIR.Proofs.Denote.NTy
+in the application
+  «spec_fold$lambda$0».spec
+    (LeanerIR.RuntimeValue.vector
+        (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+      0, n, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:12:25: error: Type mismatch
+  n
+has type
+  Int
+but is expected to have type
+  LeanerIR.RuntimeValue × Int × Int × Unit → Int
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:32:11: error: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  0 ≤ d ≤ 18446744073709551615
+  0 ≤ c ≤ 18446744073709551614
+  c - e ≤ -2
+  0 ≤ b ≤ 18446744073709551614
+  0 ≤ a ≤ 999
+  a - b ≥ 1
+where
+ a := n.val
+ b := i.val
+ c := «spec_fold$lambda$0».spec
+  (fun index => [LeanerIR.Proofs.Denote.NTy.int 64 false].getD index LeanerIR.Proofs.Denote.NTy.unit)
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, i.val, ())
+ d := value✝.val
+ e := «spec_fold$lambda$0».spec
+  (fun index => [LeanerIR.Proofs.Denote.NTy.int 64 false].getD index LeanerIR.Proofs.Denote.NTy.unit)
+  (LeanerIR.RuntimeValue.vector
+      (Array.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values),
+    0, i.val + 1, ())
+tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean:6:8: error: leaner verification failed: the proof of `use_concrete` does not establish its specification

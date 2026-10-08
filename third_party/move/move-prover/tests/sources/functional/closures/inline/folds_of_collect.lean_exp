@@ -5,7 +5,6 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/inline/folds_of_collect.move:48:10: error: leaner verification failed: the lemma `fold_is_prefix` is not established
-tests/sources/functional/closures/inline/folds_of_collect.move:41:9: error: the specification clause `ensures result == v` is not established
 tests/sources/functional/closures/inline/folds_of_collect.move:39:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

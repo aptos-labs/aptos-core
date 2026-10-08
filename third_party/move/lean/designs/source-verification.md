@@ -196,6 +196,13 @@ The prelude's injectivity and length axioms and the concrete names the
 Prover computes for concrete types are not mirrored. A caller never fails
 on a modelled callee; it fails only on what its own clauses claim.
 
+A Move specification function is partial: it is defined where its
+parameters declared with fixed-width integer types hold values of those
+types, and its value elsewhere is unspecified, as for an aborting branch
+(G15 in [`prover-test-problems.md`](prover-test-problems.md)). The importer
+states the domain in the rendered body (`if 0 <= x && x <= MAX_U64 then …
+else abort()`), so the guard is part of the source the verifier reads.
+
 A recursive specification function unfolds where its measure descends,
 and a leaf holds it unfolded once at each of its applications whose guard
 the context decides. The

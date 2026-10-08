@@ -1,2 +1,2 @@
 Move prover returns: exiting with verification errors
-folds_of_idx.lean:296:15: error: LEANER-CALL-NAME: unknown function `spec_fold$gen$0`
+folds_of_idx.lean:311:15: error: LEANER-CALL-NAME: unknown function `spec_fold$gen$0`

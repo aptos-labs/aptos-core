@@ -1212,12 +1212,14 @@ leaner module std::features where
   -- TODO(tengzhang): add functional spec
   -- TODO(#12526): undo declaring opaque once fixed
   spec fun spec_contains(features : Vector<u8>, feature : Int) : Bool :=
-    (if 0 <= (1 << feature % 8) % 256 && (1 << feature % 8) % 256 < 256 then
-      (1 << feature % 8) % 256
-    else ((1 << feature % 8) % 256 % 256 + 256) % 256)
-      & features[feature / 8]
-      > 0
-      && features.length > feature / 8
+    if 0 <= feature && feature <= MAX_U64 then
+      (if 0 <= (1 << feature % 8) % 256 && (1 << feature % 8) % 256 < 256 then
+        (1 << feature % 8) % 256
+      else ((1 << feature % 8) % 256 % 256 + 256) % 256)
+        & features[feature / 8]
+        > 0
+        && features.length > feature / 8
+    else abort()
 
   opaque spec fun spec_is_enabled(feature : Int) : Bool
 

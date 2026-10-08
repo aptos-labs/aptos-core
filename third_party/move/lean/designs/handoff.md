@@ -1,5 +1,43 @@
 # Handoff
 
+Partial specification functions — WIP checkpoint (2026-10-08, decision pending):
+- User decisions: an `int2bv` the compiler types at `num` wraps at `u64`
+  (`BitVectorConversion.conversionWidth?`); a type parameter is still rejected
+  (`bv_signed_generic`). Specification functions are partial: defined where
+  parameters declared with fixed-width integer types fit them, unspecified
+  elsewhere (G15). The earlier contextual-width and literal-through-cast
+  attempts were rejected as hacks and are not in the tree.
+- Implemented: `Frontend/SpecDomains.lean` guards a spec function's body
+  (`if 0 <= x && x <= MAX_U64 then … else abort()`), not for compiler-v2's
+  specification versions of Move functions. `Contract.lean`: an uninterpreted
+  value needs a family only for type arguments, and a recursive definition
+  reading one at type arguments (and no storage) takes its instantiation
+  (`definitionTakesTypes`, `definitionTypes`), fixing "applied outside a family".
+- Validation in this container (4 cores): leaner-ir and leaner-move build,
+  leaner-move tests (new `Tests.SpecDomains`), E2E `move` suite with refreshed
+  baselines (constants translates again; seven stdlib renderings gain only the
+  guards), `SourceVerify/spec_fun_domain{,_false}.move` checked directly. NOT
+  run: leaner-ir/Rust/full E2E suites, cost gates, benchmark.
+- Registry (full refresh, 440 files): six previously verified functions regress
+  at 25k, all over recursive fold helpers: `behavioral_predicates_examples`
+  `reduce`/`reduce_opaque`, `bp_pure_callee::sum_checked`,
+  `folds_of::sum_direct` (verifies at 100k), `vector_hofs_fold::max_three`
+  (timeouts); the lemma `folds_of_ref::ref_fold_is_weighted`; and the authored
+  `specialize_generic_caller.proof.lean`. `folds_of_callee_ensures` loses its
+  family error. Three files new from main (`verify_only_list`,
+  `regression/behavioral_predicate_cycle`, `regression/recursion_inline_bound`)
+  get their first `.lean_exp`; their failures are not caused by this change.
+- Cause: the guard is an `if` in the body, split at every unfolding. Recursive
+  definitions already guard by parameter bounds (`parameterBounds`, decided by
+  the closer from context), but only for fixed-width LIR parameter types, and
+  the importer erases spec-function parameters to `num`.
+- Proposed next (awaiting the user): keep declared parameter types in LIR so the
+  verifier derives the domain from the type (also for non-recursive
+  expansions), with LeanerLang's value-preserving call-site coercions and a
+  canonical round trip; alternatives are tuning the closer for the body guard
+  or accepting the regressions. Do not treat this checkpoint's baselines as
+  accepted: the six regressions are recorded in them.
+
 Suspended 2026-10-07 at the user's request after committing this checkpoint.
 
 Bit-vector representation retired (2026-10-07, user decision, validated):

@@ -128,13 +128,13 @@ loopHypothesis✝ :
                     env.snd.snd.snd.fst.elim False fun result =>
                       env.snd.snd.snd.snd.fst.elim False fun i =>
                         env.snd.snd.snd.snd.snd.fst.elim False fun n =>
-                          LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5768 5774
+                          LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5824 5830
                               (i.val ≤ n.val) ∧
-                            LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5791 5804
+                            LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5847 5860
                                 (n.val = ↑v.values.size) ∧
-                              LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5821 5839
+                              LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5877 5895
                                   (↑result.values.size = i.val) ∧
-                                LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5856 5914
+                                LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5912 5970
                                   (∀ (j : Int),
                                     0 ≤ j →
                                       j < i.val →
@@ -305,14 +305,14 @@ loopHypothesis✝ :
                       env.snd.snd.snd.fst.elim False fun result =>
                         env.snd.snd.snd.snd.fst.elim False fun i =>
                           env.snd.snd.snd.snd.snd.fst.elim False fun n =>
-                            LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6641 6647
+                            LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6697 6703
                                 (i.val ≤ n.val) ∧
-                              LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6664 6677
+                              LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6720 6733
                                   (n.val = ↑v.values.size) ∧
-                                LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6694 6712
+                                LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6750 6768
                                     (↑result.values.size = i.val) ∧
-                                  LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6729
-                                    6782
+                                  LeanerIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6785
+                                    6838
                                     (∀ (j : Int),
                                       0 ≤ j →
                                         j < i.val →

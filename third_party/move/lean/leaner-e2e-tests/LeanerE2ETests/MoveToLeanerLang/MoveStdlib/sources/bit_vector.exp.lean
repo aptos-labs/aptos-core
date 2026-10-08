@@ -128,7 +128,9 @@ leaner module std::bit_vector where
     ensures result == self.bit_field[bit_index]
 
   spec fun spec_is_index_set(self : BitVector, bit_index : Int) : Bool :=
-    if bit_index >= self.length() then false else self.bit_field[bit_index]
+    if 0 <= bit_index && bit_index <= MAX_U64 then
+      if bit_index >= self.length() then false else self.bit_field[bit_index]
+    else abort()
 
   /--
   Return the length (number of usable bits) of this bitvector

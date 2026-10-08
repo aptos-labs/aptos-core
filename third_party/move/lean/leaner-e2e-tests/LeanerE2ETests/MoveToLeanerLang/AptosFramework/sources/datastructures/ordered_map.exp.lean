@@ -1774,7 +1774,7 @@ leaner module aptos_framework::ordered_map where
 
   @[map_spec_aborts_trim (OrderedMap)]
   spec fun spec_aborts_trim {K} {V}(m : OrderedMap<K, V>, at : Int) : Bool :=
-    at > spec_len(m)
+    if 0 <= at && at <= MAX_U64 then at > spec_len(m) else abort()
 
   @[map_spec_aborts_upsert_all (OrderedMap)]
   spec fun spec_aborts_upsert_all {K} {V}(
@@ -1860,8 +1860,10 @@ leaner module aptos_framework::ordered_map where
   spec fun «spec_map_ref$lambda$0» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Vector<T0> :=
-    if end == 0 then vec::<T0>()
-    else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
+    if 0 <= end && end <= MAX_U64 then
+      if end == 0 then vec::<T0>()
+      else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
+    else abort()
 
   /--
   The result of mapping `f` over the prefix `v[0..end]`.
@@ -1869,8 +1871,10 @@ leaner module aptos_framework::ordered_map where
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Vector<T1> :=
-    if end == 0 then vec::<T1>()
-    else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
+    if 0 <= end && end <= MAX_U64 then
+      if end == 0 then vec::<T1>()
+      else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
+    else abort()
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
@@ -1878,7 +1882,9 @@ leaner module aptos_framework::ordered_map where
   spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Bool :=
-    end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
+    if 0 <= end && end <= MAX_U64 then
+      end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
+    else abort()
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
@@ -1886,4 +1892,6 @@ leaner module aptos_framework::ordered_map where
   spec fun «spec_map_ref_aborts$lambda$3» {T0} {T1}(
     v : Vector<Entry<T0, T1> >, end : Int
   ) : Bool :=
-    end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)
+    if 0 <= end && end <= MAX_U64 then
+      end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)
+    else abort()

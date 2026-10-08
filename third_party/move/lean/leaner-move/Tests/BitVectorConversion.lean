@@ -68,8 +68,13 @@ private def agreesWithBitVec (type : Xast.Ty) (bits : Nat) (signed : Bool) : Boo
 
 #guard widths.all fun (type, bits, signed) => agreesWithBitVec type bits signed
 
--- A conversion has the width of its fixed-width result type.
-#guard (int2bv .num symbol).toOption.isNone
+-- A conversion has the width of its fixed-width result type; a `num` one wraps
+-- at `u64`, and a type parameter has no width.
+#guard [0, 1, -1, 2 ^ 64 - 1, 2 ^ 64, -(2 ^ 64), 5 * 2 ^ 64 + 3].all fun input =>
+  match int2bv .num symbol with
+  | .ok converted@(.mk .num _ _) =>
+      (evaluate input converted).toOption == some ((BitVec.ofInt 64 input).toNat : Int)
+  | _ => false
 #guard (int2bv (.typeParam 0) symbol).toOption.isNone
 
 -- A parameter of the result type is already in range.

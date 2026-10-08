@@ -570,8 +570,10 @@ leaner module std::vector where
   spec fun eq_remove_elem_at_index {Element}(
     i : Int, v1 : Vector<Element>, v2 : Vector<Element>
   ) : Bool :=
-    v1.length + 1 == v2.length && v1[0 .. i] == v2[0 .. i]
-      && v1[i .. v1.length] == v2[i + 1 .. v2.length]
+    if 0 <= i && i <= MAX_U64 then
+      v1.length + 1 == v2.length && v1[0 .. i] == v2[0 .. i]
+        && v1[i .. v1.length] == v2[i + 1 .. v2.length]
+    else abort()
 
   /--
   Check if `self` contains `e`.
@@ -587,8 +589,10 @@ leaner module std::vector where
   spec fun spec_fold {Element} {Acc}(
     f : Fn(Acc, &Element) -> Acc, v : Vector<Element>, init : Acc, end : Int
   ) : Acc :=
-    if end == 0 then init
-    else result_of<f>(spec_fold(f, v, init, end - 1), v[end - 1])
+    if 0 <= end && end <= MAX_U64 then
+      if end == 0 then init
+      else result_of<f>(spec_fold(f, v, init, end - 1), v[end - 1])
+    else abort()
 
   /--
   `t` folded over indices `0..end`, starting from `init`.
@@ -596,8 +600,10 @@ leaner module std::vector where
   spec fun spec_fold_idx {Acc}(
     t : Fn(Acc, u64) -> Acc, init : Acc, end : Int
   ) : Acc :=
-    if end == 0 then init
-    else result_of<t>(spec_fold_idx(t, init, end - 1), end - 1)
+    if 0 <= end && end <= MAX_U64 then
+      if end == 0 then init
+      else result_of<t>(spec_fold_idx(t, init, end - 1), end - 1)
+    else abort()
 
   /--
   The result of mapping `f` over the prefix `v[0..end]`.
@@ -605,8 +611,10 @@ leaner module std::vector where
   spec fun spec_map_ref {Element} {NewElement}(
     f : Fn(&Element) -> NewElement, v : Vector<Element>, end : Int
   ) : Vector<NewElement> :=
-    if end == 0 then vec::<NewElement>()
-    else concat(spec_map_ref(f, v, end - 1), vec(result_of<f>(v[end - 1])))
+    if 0 <= end && end <= MAX_U64 then
+      if end == 0 then vec::<NewElement>()
+      else concat(spec_map_ref(f, v, end - 1), vec(result_of<f>(v[end - 1])))
+    else abort()
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
@@ -614,4 +622,7 @@ leaner module std::vector where
   spec fun spec_map_ref_aborts {Element} {NewElement}(
     f : Fn(&Element) -> NewElement, v : Vector<Element>, end : Int
   ) : Bool :=
-    end > 0 && (spec_map_ref_aborts(f, v, end - 1) || aborts_of<f>(v[end - 1]))
+    if 0 <= end && end <= MAX_U64 then
+      end > 0
+        && (spec_map_ref_aborts(f, v, end - 1) || aborts_of<f>(v[end - 1]))
+    else abort()

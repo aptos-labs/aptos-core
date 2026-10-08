@@ -1,2 +1,2 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bv_signed_generic.move:1:1: error: `int2bv` needs a fixed-width integer result type; a generic or `num` one has no width
+tests/sources/functional/bv_signed_generic.move:1:1: error: `int2bv` at a type parameter has no width

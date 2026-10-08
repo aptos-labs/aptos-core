@@ -1,0 +1,7 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/verify_only_list.move:8:9: error: the specification clause `ensures result == 2` is not established
+tests/sources/functional/verify_only_list.move:7:5: error: leaner verification failed: the automatic verification of `first` failed; provide a proof: `verify first by …` in `tests/sources/functional/verify_only_list.proof.lean` (`verify first by skip` shows the obligations it leaves)
+tests/sources/functional/verify_only_list.move:13:9: error: the specification clause `ensures result == 3` is not established
+tests/sources/functional/verify_only_list.move:12:5: error: leaner verification failed: the automatic verification of `second` failed; provide a proof: `verify second by …` in `tests/sources/functional/verify_only_list.proof.lean` (`verify second by skip` shows the obligations it leaves)
+tests/sources/functional/verify_only_list.move:18:9: error: the specification clause `ensures result == 4` is not established
+tests/sources/functional/verify_only_list.move:17:5: error: leaner verification failed: the automatic verification of `third` failed; provide a proof: `verify third by …` in `tests/sources/functional/verify_only_list.proof.lean` (`verify third by skip` shows the obligations it leaves)

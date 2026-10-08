@@ -1,21 +1,23 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/bitwise_operators.move:4:3: error: no measure of the recursive specification function `spec_bv_and` decreases at every recursive call: the recursive call of `spec_bv_and` does not decrease its measure under the conditions on its path: omega could not prove the goal:
 a possible counterexample may satisfy the constraints
-  a ≤ 0
-where
- a := bundle.fst
-goal: bundle.fst.toNat < bundle.fst.toNat
-conditions: []
-the recursive call of `spec_bv_and` does not decrease its measure under the conditions on its path: omega could not prove the goal:
-a possible counterexample may satisfy the constraints
-  a ≤ 0
-  a - b ≤ 0
+  0 ≤ a ≤ 18446744073709551615
 where
  a := bundle.snd.fst
+goal: bundle.fst.toNat < bundle.fst.toNat
+conditions: [(0 ≤ bundle.fst ∧ bundle.fst ≤ 18446744073709551615) ∧
+   0 ≤ bundle.snd.fst ∧ bundle.snd.fst ≤ 18446744073709551615]
+the recursive call of `spec_bv_and` does not decrease its measure under the conditions on its path: omega could not prove the goal:
+a possible counterexample may satisfy the constraints
+  b ≥ 0
+  0 ≤ a ≤ 18446744073709551615
+where
+ a := bundle.fst
  b := if fact : 0 ≤ 1 ∧ 1 < 18446744073709551616 then 1
 else (Int.tmod 1 18446744073709551616 + 18446744073709551616).tmod 18446744073709551616
 goal: (bundle.snd.fst -
       if fact : 0 ≤ 1 ∧ 1 < 18446744073709551616 then 1
       else (Int.tmod 1 18446744073709551616 + 18446744073709551616).tmod 18446744073709551616).toNat <
   bundle.snd.fst.toNat
-conditions: []
+conditions: [(0 ≤ bundle.fst ∧ bundle.fst ≤ 18446744073709551615) ∧
+   0 ≤ bundle.snd.fst ∧ bundle.snd.fst ≤ 18446744073709551615]

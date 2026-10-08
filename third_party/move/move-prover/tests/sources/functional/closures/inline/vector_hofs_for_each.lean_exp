@@ -229,17 +229,17 @@ loopHypothesis✝ :
                   (env.snd.snd.fst.elim False fun v_1 =>
                       env.snd.snd.snd.fst.elim False fun i =>
                         env.snd.snd.snd.snd.fst.elim False fun n =>
-                          LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13622 13628
+                          LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13678 13684
                               (i.val ≤ n.val) ∧
-                            LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13645 13693
+                            LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13701 13749
                                 (↑v_1.fst.values.size = ↑v.values.size) ∧
-                              LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13710 13723
+                              LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13766 13779
                                   (n.val = ↑v_1.fst.values.size) ∧
-                                LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13740 13744
+                                LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13796 13800
                                     True ∧
-                                  LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13761 13765
+                                  LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13817 13821
                                       True ∧
-                                    LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13782 13841
+                                    LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13838 13897
                                       (∀ (j : Int),
                                         i.val ≤ j →
                                           j < n.val →
@@ -247,7 +247,7 @@ loopHypothesis✝ :
                                               (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
                     LeanerIR.Proofs.wp (recursive✝ env) leanerContinuation✝
                       (fun failure =>
-                        LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 13977 13992 False)
+                        LeanerIR.Proofs.Obligation "vector_hofs_for_each.lean" 14033 14048 False)
                       state
 leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
     (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.ref

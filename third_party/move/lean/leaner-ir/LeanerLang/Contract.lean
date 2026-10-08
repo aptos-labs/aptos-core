@@ -1170,6 +1170,9 @@ private structure SpecReads where
   result : Bool := false
   /-- A binder over the state domain: a state label. -/
   labels : Bool := false
+  /-- An uninterpreted value at type arguments: a specification function
+  without a body (an unspecified value among them) or a Move function. -/
+  types : Bool := false
 
 /-- What the expressions `start` reach read, through the specification
 functions they call. -/
@@ -1202,9 +1205,11 @@ private def readsFrom (unit : ValidatedUnit) (start : List (LeanerIR.NamespaceId
             .operation (.specification (.remove _)) .. |
             .operation (.specification (.update _)) .. =>
             reads := { reads with state := true }
-        | .operation (.specification (.functionCall callee _)) .. =>
+        | .operation (.specification (.functionCall callee _)) instantiations .. =>
             if let some (_, { body := some root, .. }) := specFunctionOf? unit callee then
               work := work ++ [(callee.namespaceId, root)]
+            else if !instantiations.isEmpty then
+              reads := { reads with types := true }
         | .operation (.specification (.lemma callee _)) .. =>
             if let some (_, declaration) := lemmaOf? unit callee then
               work := work ++ (declaration.contract.conditions.toList.map
@@ -1238,6 +1243,12 @@ private def specReads (unit : ValidatedUnit) (source : LeanerIR.QualifiedRef) : 
   match specFunctionOf? unit source with
   | some (_, { body := some root, .. }) => readsFrom unit [(source.namespaceId, root)]
   | _ => {}
+
+/-- Whether a recursive specification function's definition takes the types
+its type parameters stand for: it reads an uninterpreted value at type
+arguments, and no storage, whose family would supply them. -/
+private def definitionTakesTypes (reads : SpecReads) : Bool :=
+  reads.types && !reads.state
 
 /-- Whether a specification function reaches itself through the
 specification functions its body calls. -/
@@ -2039,6 +2050,24 @@ where
         | .integer | .text _ => translate context argument
       values := values.push value
     values.foldrM (fun value rest => mkAppM ``Prod.mk #[value, rest]) (mkConst ``Unit.unit)
+  /-- The types a recursive definition's type parameters stand for at a
+  call: the call's type arguments, under the caller's family. -/
+  definitionTypes (instantiations : Array LeanerIR.GenericArgument) : MetaM Lean.Expr := do
+    let arguments ← instantiations.mapM fun instantiation => do
+      let .typeArg argument := instantiation
+        | throwError "a specification function call takes only type arguments in \
+            generated contracts"
+      let some nty := context.ntyOf? argument.typeId
+        | throwError m!"a type argument of a recursive specification function has no \
+            native type ({repr instantiation})"
+      let quoted ← quoteNTy nty
+      pure <| match context.types with
+        | some types => mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types quoted
+        | none => quoted
+    let list ← mkListLit (mkConst ``LeanerIR.Proofs.Denote.NTy) arguments.toList
+    withLocalDeclD `index (mkConst ``Nat) fun index => do
+      mkLambdaFVars #[index] (← mkAppOptM ``List.getD
+        #[none, list, index, mkConst ``LeanerIR.Proofs.Denote.NTy.unit])
   /-- A recursive definition's result at a call, in the call's domain. -/
   callResult (reference : LeanerIR.QualifiedRef) (ty : IrTy) (value : Lean.Expr) :
       MetaM Lean.Expr := do
@@ -2159,6 +2188,7 @@ where
     if (← getEnv).contains name then return name
     let group := specGroup context.unit reference
     let reads := specReads context.unit reference
+    let typesType ← mkArrow (mkConst ``Nat) (mkConst ``LeanerIR.Proofs.Denote.NTy)
     let optionalLocal {α : Type} (present : Bool) (binder : Name) (type : Lean.Expr)
         (k : Option Lean.Expr → MetaM α) : MetaM α :=
       if present then withLocalDeclD binder type fun x => k (some x) else k none
@@ -2174,10 +2204,15 @@ where
     -- A definition reading storage takes the family its reads resolve
     -- resource types at, before the memory.
     optionalLocal reads.state `frame (atUnit ``LeanerIR.Proofs.Denote.Skolems) fun frame =>
-    optionalLocal reads.state `state (atUnit ``LeanerIR.Proofs.Denote.Memory) fun state => do
-    let parameters := #[unit?, executable, requiresTable, frame, state].filterMap
+    optionalLocal reads.state `state (atUnit ``LeanerIR.Proofs.Denote.Memory) fun state =>
+    -- One reading no storage, but an uninterpreted value at its type
+    -- parameters, takes the types they stand for (`definitionTypes`).
+    optionalLocal (definitionTakesTypes reads) `types typesType fun instantiation => do
+    let parameters := #[unit?, executable, requiresTable, frame, state, instantiation].filterMap
       fun parameter => parameter
-    let types ← frame.mapM frameTypes
+    let types ← match instantiation with
+      | some instantiation => pure (some instantiation)
+      | none => frame.mapM frameTypes
     let members ← group.mapM fun member => do
       let memberName ← specDefinitionName context.unit member
       let some (targetNs, declaration) := specFunctionOf? context.unit member
@@ -2653,6 +2688,8 @@ where
                   this contract does not take"
             applied := mkApp applied table
           if reads.state then applied := mkApp (mkApp applied (← context.frame)) (← currentState)
+          if definitionTakesTypes reads then
+            applied := mkApp applied (← definitionTypes instantiations)
           return ← callResult reference ty (mkApp applied bundle)
         if context.specCallStack.contains reference then
           throwError m!"the recursive specification function \
@@ -2700,13 +2737,13 @@ where
             | _ => own
           -- The type arguments as native types under the contract's family,
           -- which an instantiation of the contract resolves to the caller's.
-          let some types := context.types
-            | throwError "the specification function `{name}` is applied outside a family"
           let typeArgumentTerms ← (instantiations.zip typeArgumentTypes).mapM
             fun (instantiation, nty?) => do
               let some nty := nty?
                 | throwError m!"a type argument of the specification function `{name}` has no \
                     native type ({repr instantiation})"
+              let some types := context.types
+                | throwError "the specification function `{name}` is applied outside a family"
               return mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types (← quoteNTy nty)
           let encoded ← arguments.mapM runtimeOperand
           let domain := domainOf ty
