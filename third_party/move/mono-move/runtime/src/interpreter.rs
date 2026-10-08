@@ -633,7 +633,7 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     // execution guard keeps alive.
     let func = unsafe { regs.func.as_ref() };
     let offset = func.code.origins().get(regs.pc).copied();
-    let location = match (frame_module(func.module_id), offset) {
+    let location = match (frame_module(func.module_id()), offset) {
         (None, Some(offset)) => ErrorLocation::ScriptInstruction { offset },
         (None, None) => ErrorLocation::Script,
         (Some(module), Some(offset)) => ErrorLocation::Instruction {
@@ -2196,7 +2196,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: None,
-                            location: abort_location(func.module_id),
+                            location: abort_location(func.module_id()),
                             offset: bytecode_origin(func, regs.pc),
                         };
                     },
@@ -2229,7 +2229,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: Some(message),
-                            location: abort_location(func.module_id),
+                            location: abort_location(func.module_id()),
                             offset: bytecode_origin(func, regs.pc),
                         };
                     },
@@ -3056,7 +3056,7 @@ impl InterpreterContext<'_> {
         idx: ConstantPoolIndex,
     ) -> VMResult<()> {
         // SAFETY: `regs.func` points to the live, currently-executing function.
-        let module_id = unsafe { regs.func.as_ref() }.module_id;
+        let module_id = unsafe { regs.func.as_ref() }.module_id();
         let (ty, bytes) = self.load_constant(module_id, idx)?;
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer

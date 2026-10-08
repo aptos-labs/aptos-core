@@ -3,10 +3,10 @@
 
 use crate::{
     instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE},
-    interner::InternedModuleId,
+    interner::{view_function_ref, InternedFunctionRef, InternedModuleId},
     types::{InternedType, InternedTypeList},
 };
-use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
+use mono_move_alloc::LeakedBoxPtr;
 use move_binary_format::file_format::FunctionDefinitionIndex;
 use std::{fmt, ptr::NonNull};
 
@@ -167,8 +167,9 @@ impl SortedSafePointEntries {
 /// For leaf functions without return scratch, `extended_frame_size` equals
 /// `param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
 pub struct Function {
-    pub name: GlobalArenaPtr<str>,
-    pub module_id: InternedModuleId,
+    /// Symbolic identity of this function: its address, defining module, name
+    /// and type arguments.
+    pub func_ref: InternedFunctionRef,
     /// Definition index of this function in its defining module.
     pub def_idx: FunctionDefinitionIndex,
     /// Whether `#[module_lock]` requires this function to hold a module lock
@@ -276,8 +277,17 @@ impl Function {
     /// The function's interned name.
     pub fn name(&self) -> &str {
         // SAFETY: any safe `&Function` borrow carries an upstream guarantee
-        // that `name`'s pointee remains valid for the borrow's lifetime.
-        unsafe { self.name.as_ref_unchecked() }
+        // that `func_ref`'s pointees remain valid for the borrow's lifetime.
+        unsafe {
+            view_function_ref(self.func_ref)
+                .func_name
+                .as_ref_unchecked()
+        }
+    }
+
+    /// The function's defining module.
+    pub fn module_id(&self) -> InternedModuleId {
+        view_function_ref(self.func_ref).module_id
     }
 }
 

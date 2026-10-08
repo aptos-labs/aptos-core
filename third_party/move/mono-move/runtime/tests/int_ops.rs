@@ -36,7 +36,6 @@
 
 mod common;
 
-use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo, FrameOffset as FO,
     Function, FunctionDefinitionIndex, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp,
@@ -218,8 +217,7 @@ fn make_func(op: MicroOp, lhs_width: usize, rhs_width: usize) -> Function {
         }
     }
     Function {
-        name: GlobalArenaPtr::from_static("op"),
-        module_id: crate::program_module_id!("test"),
+        func_ref: crate::program_func_ref!("test", "op"),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
         code: Code::from_vec(vec![op, MicroOp::Return]),
