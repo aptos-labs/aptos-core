@@ -907,10 +907,10 @@ pub struct OverrideSizeCheckOption {
 pub struct LargePackagesModuleOption {
     /// Address of the `large_packages` move module for chunked publishing
     ///
-    /// By default, on the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
-    /// on Testnet and Mainnet, and `0x7` on localnest/devnet.
-    /// On any custom network where neither is used, you will need to first publish it from the framework
-    /// under move-examples/large_packages.
+    /// By default, the module is published at `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`
+    /// on Testnet and Mainnet, and `0x7` on localnet/devnet.
+    /// On a custom network where neither is available, publish your own copy of
+    /// `aptos-move/framework/aptos-experimental/sources/large_packages.move` and pass its address here.
     #[clap(long, value_parser = load_account_arg)]
     pub large_packages_module_address: Option<AccountAddress>,
 }

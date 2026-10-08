@@ -8,13 +8,10 @@
 /// In the final call, the caller can use `stage_code_chunk_and_publish_to_account`, `stage_code_chunk_and_publish_to_object`, or
 /// `stage_code_chunk_and_upgrade_object_code` to upload the final data chunk and publish or upgrade the package on-chain.
 ///
-/// The above logic is currently implemented in the Python
-/// SDK: [`aptos-python-sdk`](https://github.com/aptos-labs/aptos-python-sdk/blob/main/aptos_sdk/package_publisher.py).
-///
-/// Aptos CLI supports this as well with `--chunked-publish` flag:
+/// The Aptos CLI implements this flow with the `--chunked-publish` flag:
 /// - `aptos move publish [OPTIONS] --chunked-publish`
 /// - `aptos move create-object-and-publish-package [OPTIONS] --address-name <ADDRESS_NAME> --chunked-publish`
-/// - `aptos move upgrade-object-package [OPTIONS] --address-name <ADDRESS_NAME> --chunked-publish`
+/// - `aptos move upgrade-object-package [OPTIONS] --object-address <OBJECT_ADDRESS> --chunked-publish`
 ///
 /// # Usage
 ///
@@ -34,14 +31,12 @@
 ///
 /// # Notes
 ///
-/// * Make sure LargePackages is deployed to your network of choice, you can currently find it both on
-///   mainnet and testnet at `0xa29df848eebfe5d981f708c2a5b06d31af2be53bbd8ddc94c8523f4b903f7adb`, and
-///   in 0x7 (aptos-experimental) on devnet/localnet.
-/// * Ensure that `code_indices` have no gaps. For example, if code_indices are
-///   provided as [0, 1, 3] (skipping index 2), the inline function `assemble_module_code` will abort
-///   since `StagingArea.last_module_idx` is set as the max value of the provided index
-///   from `code_indices`, and `assemble_module_code` will lookup the `StagingArea.code` SmartTable from
-///   0 to `StagingArea.last_module_idx` in turn.
+/// * This module is deployed at `0x7` (aptos-experimental) on networks whose genesis includes it, such
+///   as testnet, devnet and localnet. On mainnet, use the deployment at
+///   `0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7`.
+/// * Ensure that `code_indices` have no gaps. Publishing assembles the modules at indices `0` through
+///   `StagingArea.last_module_idx` (the highest index staged), so if any index in that range was never
+///   staged, e.g. `[0, 1, 3]`, the final call aborts with `EMISSING_MODULE_CODE`.
 module aptos_experimental::large_packages {
     use std::error;
     use std::signer;
@@ -53,8 +48,8 @@ module aptos_experimental::large_packages {
 
     /// code_indices and code_chunks should be the same length.
     const ECODE_MISMATCH: u64 = 1;
-    /// Object reference should be provided when upgrading object code.
-    const EMISSING_OBJECT_REFERENCE: u64 = 2;
+    /// Code is missing for at least one module index between 0 and the highest staged index.
+    const EMISSING_MODULE_CODE: u64 = 3;
 
     struct StagingArea has key {
         metadata_serialized: vector<u8>,
@@ -209,6 +204,12 @@ module aptos_experimental::large_packages {
 
     inline fun assemble_module_code(staging_area: &mut StagingArea): vector<vector<u8>> {
         let last_module_idx = staging_area.last_module_idx;
+        // Staged indices are unique and never exceed `last_module_idx`, so a matching count means
+        // every index from 0 to `last_module_idx` is present.
+        assert!(
+            staging_area.code.length() == last_module_idx + 1,
+            error::invalid_state(EMISSING_MODULE_CODE)
+        );
         let code = vector[];
         let i = 0;
         while (i <= last_module_idx) {
@@ -222,5 +223,41 @@ module aptos_experimental::large_packages {
         let StagingArea { metadata_serialized: _, code, last_module_idx: _ } =
             move_from<StagingArea>(signer::address_of(owner));
         code.destroy();
+    }
+
+    #[test(owner = @0x123)]
+    fun test_stage_code_chunks_and_cleanup(owner: &signer) acquires StagingArea {
+        stage_code_chunk(
+            owner,
+            x"0102",
+            vector[0, 1],
+            vector[x"aa", x"bb"]
+        );
+        // A later chunk for an already staged module is appended to it.
+        stage_code_chunk(owner, x"03", vector[0], vector[x"cc"]);
+
+        let staging_area = borrow_global<StagingArea>(signer::address_of(owner));
+        assert!(staging_area.metadata_serialized == x"010203");
+        assert!(staging_area.last_module_idx == 1);
+        assert!(*staging_area.code.borrow(0) == x"aacc");
+        assert!(*staging_area.code.borrow(1) == x"bb");
+
+        cleanup_staging_area(owner);
+        assert!(
+            !exists<StagingArea>(signer::address_of(owner))
+        );
+    }
+
+    #[test(owner = @0x123)]
+    #[expected_failure(abort_code = 0x30003, location = Self)]
+    fun test_publish_with_gap_in_module_indices_fails(owner: &signer) acquires StagingArea {
+        stage_code_chunk(owner, x"01", vector[0, 2], vector[x"aa", x"bb"]);
+        stage_code_chunk_and_publish_to_account(owner, vector[], vector[], vector[]);
+    }
+
+    #[test(owner = @0x123)]
+    #[expected_failure(abort_code = 0x30003, location = Self)]
+    fun test_publish_without_staged_code_fails(owner: &signer) acquires StagingArea {
+        stage_code_chunk_and_publish_to_account(owner, x"01", vector[], vector[]);
     }
 }
