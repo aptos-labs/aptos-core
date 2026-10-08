@@ -4,4 +4,5 @@
 //! Conversions between VM values and the representations outside the VM.
 
 pub(crate) mod bcs;
+pub(crate) mod layout_wire;
 pub(crate) mod rust;

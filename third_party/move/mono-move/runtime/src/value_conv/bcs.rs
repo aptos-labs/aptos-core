@@ -631,7 +631,11 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
 
 /// Borrows the next `n` bytes, advancing the cursor. Returns an error if
 /// there is not enough bytes to read or the size of the slice overflows.
-fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> Result<&'b [u8], RuntimeError> {
+pub(crate) fn read_slice<'b>(
+    bytes: &'b [u8],
+    cursor: &mut usize,
+    n: usize,
+) -> Result<&'b [u8], RuntimeError> {
     let end = cursor.checked_add(n).ok_or(RuntimeError::BCSEof)?;
     if end > bytes.len() {
         return Err(RuntimeError::BCSEof);
@@ -645,7 +649,7 @@ fn read_slice<'b>(bytes: &'b [u8], cursor: &mut usize, n: usize) -> Result<&'b [
 // reimplementing the encode/decode here.
 
 /// Writes ULEB128-encoded length data.
-fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
+pub(crate) fn write_uleb128_len(out: &mut Vec<u8>, mut v: u64) {
     loop {
         let mut byte = (v & 0x7F) as u8;
         v >>= 7;

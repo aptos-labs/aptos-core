@@ -373,7 +373,9 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
         | E::BCSInvalidEnumTag { .. }
-        | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
+        | E::BCSSignerNotDeserializable
+        | E::BCSInvalidWireTag { .. }
+        | E::BCSInvalidClosure(_) => return V1Equivalent::V1StatusUnknown,
 
         E::MalformedStringArgument
         | E::ObjectArgumentDoesNotExist
