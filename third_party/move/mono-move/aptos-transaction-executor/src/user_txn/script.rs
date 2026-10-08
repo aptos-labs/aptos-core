@@ -34,7 +34,7 @@ pub(crate) fn run_script<'a>(
     let func = interp
         .load_script(code, ty_args)
         .map_err(MoveExecutionFailure::RuntimeError)?;
-    // Loading the script put its module into the read set.
+    // Loading the script charged for its module.
     let module = interp
         .load_module(func.module_id)
         .map_err(MoveExecutionFailure::RuntimeError)?;

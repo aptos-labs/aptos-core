@@ -61,7 +61,7 @@ fn call_indirect_triggers_lazy_module_load() {
     let main_fn = interp
         .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
         .expect("bar::main should resolve");
-    assert_eq!(interp.read_set().len(), 1, "only bar loaded so far");
+    assert_eq!(guard.charged_modules().len(), 1, "only bar loaded so far");
     let mut call = interp
         .build_call(main_fn)
         .expect("the root frame fits on the stack");
@@ -75,7 +75,7 @@ fn call_indirect_triggers_lazy_module_load() {
     );
 
     assert_eq!(
-        interp.read_set().len(),
+        guard.charged_modules().len(),
         2,
         "foo should have been lazily loaded during execution"
     );

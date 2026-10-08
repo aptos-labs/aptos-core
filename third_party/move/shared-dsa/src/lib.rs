@@ -4,9 +4,11 @@
 //! Collection of data structures and algorithms, for shared use across
 //! various crates.
 
+mod sparse_set;
 mod unordered_map;
 mod unordered_set;
 
+pub use sparse_set::SparseSet;
 pub use std::collections::hash_map::{Entry, OccupiedEntry, VacantEntry};
 pub use unordered_map::UnorderedMap;
 pub use unordered_set::UnorderedSet;
