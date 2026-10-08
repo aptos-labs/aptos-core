@@ -35,6 +35,7 @@ use move_model::{
         FunId, FunctionData, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, StructEnv, StructId,
     },
+    pragmas::VERIFY_PRAGMA,
     pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
@@ -1310,7 +1311,7 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
             }
             if let ExpData::Call(call_id, Operation::MoveFunction(mid, fid), args) = exp {
                 let callee_id = mid.qualified(*fid);
-                let (callee_param_access, callee_params) = {
+                let (callee_param_access, callee_params, callee_defers_frame) = {
                     let callee_env = env.get_function(callee_id);
                     let access = callee_env.get_fun_param_access_of().to_vec();
                     // Skip validation only for transparent callees with no declarations.
@@ -1319,7 +1320,11 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
                     if access.is_empty() && !callee_env.is_opaque() {
                         return true;
                     }
-                    (access, callee_env.get_parameters())
+                    (
+                        access,
+                        callee_env.get_parameters(),
+                        leaves_frame_to_call_site(&callee_env),
+                    )
                 };
 
                 // For each argument, check if it maps to a parameter with access_of
@@ -1341,6 +1346,11 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
                         .find(|a| a.fun_param == *param_name)
                     {
                         Some(a) => a,
+                        None if callee_defers_frame
+                            && !is_forwarded_param(arg, &caller_params) =>
+                        {
+                            continue
+                        },
                         None => {
                             empty_access = FunParamAccessOf {
                                 loc: Loc::default(),
@@ -1421,6 +1431,35 @@ fn validate_closure_access_of_compliance(env: &GlobalEnv) {
             true
         });
     }
+}
+
+/// Whether an opaque callee that declares no frame for a function-typed parameter leaves
+/// that frame to its call sites, where the closure's own footprint takes over.
+///
+/// An absent declaration normally means the parameter may touch no memory. Two things
+/// consume that meaning, and deferring requires both to be vacuous: the callee's body is
+/// never proven, so no proof of the callee rests on memory being untouched across the
+/// invoke, and the callee's conditions name no global memory, so after a caller havocs
+/// what the closure writes, nothing in the callee's summary can re-establish a claim about
+/// it. The prover's spec instrumentation re-decides this with the verification scope in
+/// hand, which this pass does not have, and is the backstop.
+fn leaves_frame_to_call_site(fun_env: &FunctionEnv) -> bool {
+    fun_env.is_pragma_false(VERIFY_PRAGMA)
+        && fun_env.get_spec_used_memory().is_empty()
+        && fun_env.get_spec_generic_used_memory().is_empty()
+        && fun_env.get_spec_old_memory().is_empty()
+        && fun_env.get_spec_generic_old_memory().is_empty()
+}
+
+/// Whether the argument is a function-typed parameter of the enclosing function, passed
+/// straight through to the callee.
+///
+/// A callee that defers its frame cannot bound such an argument, and neither can this call
+/// site: the closure was built somewhere else. What does bound it is the enclosing
+/// function's own `modifies_of`/`reads_of` for the parameter, which `compute_arg_memory`
+/// resolves exactly, so forwarding is checked rather than deferred.
+fn is_forwarded_param(arg: &Exp, caller_params: &[Parameter]) -> bool {
+    matches!(arg.as_ref(), ExpData::Temporary(_, idx) if *idx < caller_params.len())
 }
 
 /// Computes the memory footprint of a function-typed argument expression.

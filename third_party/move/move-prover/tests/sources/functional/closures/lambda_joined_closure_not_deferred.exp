@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `fv` may modify: `lambda_joined_closure_not_deferred::apply` declares no `modifies_of` for it, and the argument is not a closure built at this call site
+   ┌─ tests/sources/functional/closures/lambda_joined_closure_not_deferred.move:31:9
+   │
+31 │         apply(f, a)
+   │         ^^^^^^^^^^^

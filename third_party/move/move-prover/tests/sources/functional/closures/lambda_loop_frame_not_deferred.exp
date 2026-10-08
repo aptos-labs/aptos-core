@@ -1,0 +1,9 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: `lambda_loop_frame_not_deferred::apply` declares no `modifies_of` for it, and the argument is not a closure built at this call site
+   ┌─ tests/sources/functional/closures/lambda_loop_frame_not_deferred.move:40:13
+   │
+40 │ ╭             apply(b, |v| {
+41 │ │                 *v = *v + 1;
+42 │ │                 bump(a);
+43 │ │             });
+   │ ╰──────────────^
