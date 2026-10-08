@@ -72,10 +72,7 @@ use identifiers::IdentifierInternerKey;
 mod module_ids;
 use module_ids::ModuleIdInternerKey;
 mod loaded_module;
-pub use loaded_module::{
-    FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies,
-    ModuleSlot,
-};
+pub use loaded_module::{FunctionIrLookup, FunctionSlot, LoadedModule};
 mod module_cache;
 use module_cache::ModuleCache;
 mod script_cache;
@@ -503,19 +500,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// TODO(correctness): include deserializer and verifier configs in module
     /// and script cache keys, or clear both caches when on-chain configs
     /// change. Reusing cached code would bypass the updated rules.
-    ///
-    /// Returns an error only if the cache detects an invariant violation
-    /// during install. Under normal operation this method always returns
-    /// `Ok`.
-    pub fn insert_module(&self, module: Box<LoadedModule>) -> Result<&LoadedModule> {
-        let ptr = self.ctx.module_cache.insert(module)?;
+    pub fn insert_module(&self, module: Box<LoadedModule>) -> &LoadedModule {
+        let ptr = self.ctx.module_cache.insert(module);
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive). If the loaded module was
         // already in the cache, it is also alive (maintenance has not reset
         // caches).
-        Ok(unsafe { ptr.as_ref_unchecked() })
+        unsafe { ptr.as_ref_unchecked() }
     }
 
     /// Inserts a script loaded as a module into the cache, keyed by the hash
@@ -545,18 +538,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive).
         Some(unsafe { ptr.as_ref_unchecked() })
-    }
-
-    /// Returns the stable slot for `key`, creating an empty one if absent.
-    /// The returned pointer is valid for the cache's lifetime. Takes a
-    /// shard write lock on the create path.
-    pub fn get_or_create_module_slot<'guard>(
-        &'guard self,
-        key: ArenaRef<'guard, ModuleId>,
-    ) -> LoadedModuleSlot {
-        self.ctx
-            .module_cache
-            .get_or_create_slot(key.into_global_arena_ptr())
     }
 
     /// Wraps module ID pointer in a guard-scoped [`ArenaRef`], matching the
