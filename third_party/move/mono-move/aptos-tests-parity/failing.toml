@@ -589,10 +589,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::capture
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_under_cap_succeeds"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_fails_while_flag_on"
 note = "TODO"
 

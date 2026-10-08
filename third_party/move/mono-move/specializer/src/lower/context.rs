@@ -32,10 +32,10 @@ use mono_move_core::{
         EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
-    Code, DescriptorId, FieldDecl, FieldValueLayout, FrameLayoutInfo, FrameOffset,
-    FrameworkSymbols, Function, Interner, LayoutFlags, LayoutId, LayoutProvider, NominalFields,
-    PreparedModule, SizedSlot, SortedSafePointEntries, VMInternalError, VMResult, ValueLayout,
-    VariantValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    CaptureLayoutsId, Code, DescriptorId, FieldDecl, FieldValueLayout, FrameLayoutInfo,
+    FrameOffset, FrameworkSymbols, Function, Interner, LayoutFlags, LayoutId, LayoutProvider,
+    NominalFields, PreparedModule, SizedSlot, SortedSafePointEntries, VMInternalError, VMResult,
+    ValueLayout, VariantValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -210,15 +210,19 @@ pub struct ClosurePackInfo {
     pub captured_data_descriptor_id: Option<DescriptorId>,
     /// Byte width of the captured-data values region (`0` if non-capturing).
     pub values_size: u32,
+    /// Layouts of the captured values, in capture order.
+    pub capture_layouts_id: CaptureLayoutsId,
 }
 
 /// Captured-data layout for one capturing `PackClosure`: the GC trace
-/// descriptor (the reserved `Trivial` slot when pointer-free) and the byte
-/// width of the values region, which the allocation needs.
+/// descriptor (the reserved `Trivial` slot when pointer-free), the byte width
+/// of the values region, which the allocation needs, and the captures' value
+/// layouts, which serialization needs.
 #[derive(Clone, Copy)]
 pub struct ClosureCapturedInfo {
     pub descriptor_id: DescriptorId,
     pub values_size: u32,
+    pub capture_layouts_id: CaptureLayoutsId,
 }
 
 /// Per-`PackClosure` outcome of the discovery pass, in IR order. Distinguishes
@@ -705,11 +709,13 @@ pub fn try_build_context<'a>(
                     interner.function_ref_of(callee_module_id, callee_func_name, closure_ty_args);
                 let layout = descriptors.closure_captured[closure_pack_idx];
                 closure_pack_idx += 1;
-                let (captured_data_descriptor_id, values_size) = match layout {
-                    CapturedDataLayout::NonCapturing => (None, 0),
-                    CapturedDataLayout::Capturing(info) => {
-                        (Some(info.descriptor_id), info.values_size)
-                    },
+                let (captured_data_descriptor_id, values_size, capture_layouts_id) = match layout {
+                    CapturedDataLayout::NonCapturing => (None, 0, CaptureLayoutsId::NONE),
+                    CapturedDataLayout::Capturing(info) => (
+                        Some(info.descriptor_id),
+                        info.values_size,
+                        info.capture_layouts_id,
+                    ),
                     CapturedDataLayout::NotDerivable => {
                         return Ok(BuildContextOutcome::Skipped(
                             "captured-data layout not derivable",
@@ -720,6 +726,7 @@ pub fn try_build_context<'a>(
                     func_ref,
                     captured_data_descriptor_id,
                     values_size,
+                    capture_layouts_id,
                 });
                 continue;
             },
@@ -935,6 +942,10 @@ pub trait SpecializerContext: LayoutProvider {
         values_size: u32,
         pointer_offsets: &[FrameOffset],
     ) -> DescriptorId;
+
+    /// Publishes the layouts of one closure's captures, in capture order, and
+    /// returns their [`CaptureLayoutsId`]. Idempotent on the list.
+    fn publish_capture_layouts(&self, ids: &[LayoutId]) -> CaptureLayoutsId;
 
     /// Publishes `layout` for the type it was built for and returns its
     /// assigned id. Idempotent. [`None`] if the layout carries no type, which
@@ -1284,6 +1295,8 @@ fn try_discover_types_for_lowering_in_function_impl(
                 data.function_handle,
                 data.mask,
                 closure_ty_args,
+                visited,
+                descriptors,
             )?;
             descriptors.closure_captured.push(layout);
         }
@@ -1324,12 +1337,15 @@ fn discover_captured_data_descriptor(
     fhi: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
 ) -> VMResult<CapturedDataLayout> {
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
     let mut cursor = 0usize;
     let mut pointer_offsets = Vec::new();
+    let mut capture_layouts = Vec::new();
     for &ty in view_type_list(captured_list) {
         let Some((size, align)) = ctx.size_and_align(ty) else {
             return Ok(CapturedDataLayout::NotDerivable);
@@ -1337,6 +1353,15 @@ fn discover_captured_data_descriptor(
         if !gc_layout_supports(ctx, ty) {
             return Ok(CapturedDataLayout::NotDerivable);
         }
+        // The capture types are already substituted, so the walk needs no
+        // further type arguments. It publishes the layouts serialization
+        // reads; the loop above would otherwise leave them to chance.
+        let layout_id =
+            discover_type_metadata(ctx, interner, ty, EMPTY_TYPE_LIST, visited, descriptors)?;
+        let Some(layout_id) = layout_id else {
+            return Ok(CapturedDataLayout::NotDerivable);
+        };
+        capture_layouts.push(layout_id);
         let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
         for rel in type_pointer_offsets(ctx, ty)? {
             pointer_offsets.push(FrameOffset(offset as u32 + rel));
@@ -1345,9 +1370,11 @@ fn discover_captured_data_descriptor(
     }
     let values_size = cursor as u32;
     let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets);
+    let capture_layouts_id = ctx.publish_capture_layouts(&capture_layouts);
     Ok(CapturedDataLayout::Capturing(ClosureCapturedInfo {
         descriptor_id,
         values_size,
+        capture_layouts_id,
     }))
 }
 

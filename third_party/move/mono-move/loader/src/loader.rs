@@ -33,9 +33,10 @@ use mono_move_core::{
         infer_function_type_args, view_name, view_type, view_type_list, FunctionTypeMismatch,
         InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST,
     },
-    verify_function, DescriptorId, ErrorLocation, ExecutionErrorKind, FrameOffset,
-    FrameworkSymbols, Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider, ModuleId,
-    ModuleProvider, NominalFields, PreparedModule, VMInternalError, VMResult, ValueLayout,
+    verify_function, CaptureLayoutsId, DescriptorId, ErrorLocation, ExecutionErrorKind,
+    FrameOffset, FrameworkSymbols, Function, FunctionPtr, GasMeter, Interner, LayoutId,
+    LayoutProvider, ModuleId, ModuleProvider, NominalFields, PreparedModule, VMInternalError,
+    VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -1054,6 +1055,10 @@ impl LayoutProvider for LoweringContext<'_, '_, '_> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.loader.guard.layout_id(ty)
     }
+
+    fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]> {
+        self.loader.guard.capture_layouts(id)
+    }
 }
 
 impl SpecializerContext for LoweringContext<'_, '_, '_> {
@@ -1126,6 +1131,10 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         self.loader
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets)
+    }
+
+    fn publish_capture_layouts(&self, ids: &[LayoutId]) -> CaptureLayoutsId {
+        self.loader.guard.publish_capture_layouts(ids)
     }
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {

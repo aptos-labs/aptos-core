@@ -52,6 +52,48 @@ impl LayoutId {
     }
 }
 
+/// Typed index into the program's table of capture-layout lists. One entry is
+/// the [`LayoutId`] of every value a closure captures, in capture order.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CaptureLayoutsId(u32);
+
+impl CaptureLayoutsId {
+    /// Stands for a closure whose captures have no layouts: one that captures
+    /// nothing, or one whose captures are still wire bytes.
+    pub const NONE: Self = Self(u32::MAX);
+
+    /// Builds a capture-layouts ID from a table index.
+    ///
+    /// # Invariant
+    ///
+    /// - Index must always fit into `u32` and must not collide with
+    ///   [`Self::NONE`].
+    #[inline(always)]
+    pub const fn from_usize(idx: usize) -> Self {
+        debug_assert!(idx < u32::MAX as usize);
+        Self(idx as u32)
+    }
+
+    /// Returns the underlying index as `usize`.
+    #[inline(always)]
+    pub const fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+
+    /// Returns the underlying index, as stored in a captured-data object.
+    #[inline(always)]
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Rebuilds an ID from the `u32` read back out of a captured-data object.
+    #[inline(always)]
+    pub const fn from_u32(raw: u32) -> Self {
+        Self(raw)
+    }
+}
+
 bitflags! {
     /// Layout flags encoding information about value layouts.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -555,6 +597,10 @@ pub trait LayoutProvider {
     /// published for it yet (e.g. its module is not loaded).
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId>;
 
+    /// Returns the layouts of one closure's captures, in capture order, or
+    /// [`None`] for an unknown id (including [`CaptureLayoutsId::NONE`]).
+    fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]>;
+
     fn layout_by_ty(&self, ty: InternedType) -> Option<&ValueLayout> {
         let id = self.layout_id(ty)?;
         self.layout(id)
@@ -576,6 +622,7 @@ pub trait LayoutProvider {
 pub struct ValueLayoutTable {
     table: Vec<ValueLayout>,
     by_ty: HashMap<InternedType, LayoutId>,
+    capture_layouts: Vec<Box<[LayoutId]>>,
 }
 
 impl ValueLayoutTable {
@@ -583,7 +630,15 @@ impl ValueLayoutTable {
         Self {
             table: reserved_layouts(),
             by_ty: HashMap::new(),
+            capture_layouts: vec![],
         }
+    }
+
+    /// Publishes one closure's capture layouts, in capture order.
+    pub fn push_capture_layouts(&mut self, ids: &[LayoutId]) -> CaptureLayoutsId {
+        let id = CaptureLayoutsId::from_usize(self.capture_layouts.len());
+        self.capture_layouts.push(ids.into());
+        id
     }
 
     /// Publishes `layout` for the type it was built for.
@@ -619,6 +674,10 @@ impl LayoutProvider for ValueLayoutTable {
             return Some(id);
         }
         self.by_ty.get(&ty).copied()
+    }
+
+    fn capture_layouts(&self, id: CaptureLayoutsId) -> Option<&[LayoutId]> {
+        self.capture_layouts.get(id.as_usize()).map(|ids| &**ids)
     }
 }
 
