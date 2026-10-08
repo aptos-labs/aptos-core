@@ -11,16 +11,18 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc, evacuate_session_roots,
+        alloc_or_gc, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        evacuate_session_roots,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         FrozenHeap, Heap, TopFrame,
     },
     invariant_violation,
     memory::{
-        copy_8, read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
-        read_int, read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
-        write_bool, write_closure_func_ref_and_mask, write_enum_tag, write_fat_ptr, write_int,
-        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
+        copy_8, read_account_address, read_bool, read_closure_persistent, read_descriptor,
+        read_enum_tag, read_fat_ptr, read_int, read_obj_size, read_ptr, read_u32, read_u64,
+        read_u8, read_vec_len, vec_elem_ptr, write_bool, write_closure_func_ref_and_mask,
+        write_enum_tag, write_fat_ptr, write_int, write_ptr, write_u32, write_u64, write_u8,
+        MemoryRegion,
     },
     native_context::{LoaderAccess, ProductionNativeContext, ProductionNativeRegistry},
     reentrancy::ReentrancyState,
@@ -30,13 +32,15 @@ use crate::{
         VEC_PUSHBACK_INIT_CAPACITY,
     },
     value_cmp, value_conv,
-    value_conv::{bcs::DeserializeHooks, rust::write_value},
+    value_conv::{
+        bcs::{materialize_raw_captures, DeserializeHooks},
+        rust::write_value,
+    },
 };
 use mono_move_core::{
-    captured_values_size,
     interner::{
-        is_script_module_id, module_id_of, InternedFunctionRef, InternedIdentifier,
-        InternedModuleId,
+        identifier_of, is_script_module_id, module_id_of, view_function_ref, InternedFunctionRef,
+        InternedIdentifier, InternedModuleId,
     },
     native::{
         FunctionResolutionError, NativeABI, NativeExtension, NativeExtensions, NativeIdx,
@@ -51,9 +55,11 @@ use mono_move_core::{
     },
     BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
-    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
-    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, LayoutId, LayoutKind,
+    LayoutProvider, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
+    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_BLOB_SIZE_OFFSET,
+    CAPTURED_DATA_LAYOUT_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED,
+    CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -262,6 +268,13 @@ pub(crate) unsafe fn saved_return_pc(fp: *mut u8) -> (usize, FrameFlag) {
 //
 // TODO(security): prove at compile time that the block's `GlobalContext` guard
 // is held.
+//
+// TODO(correctness): a closure in these effects may be in the `Resolved` state,
+// holding a pointer to a leaked `Function`. That keeps the function's memory
+// pinned for as long as the effects are readable, and binds the value to the
+// module version it was resolved against. A later transaction reading it after
+// that module is upgraded must re-resolve the closure, as V1 does with the
+// module hash it records on resolution.
 pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
@@ -626,6 +639,17 @@ fn native_abort_location(name: &NativeName) -> VMResult<AbortLocation> {
     }
 }
 
+#[cold]
+#[inline(never)]
+fn stored_closure_target_not_persistent(callee: &Function) -> VMInternalError {
+    VMInternalError::new(RuntimeError::InvariantViolation(
+        RuntimeInvariantViolation::StoredClosureTargetNotPersistent {
+            module: Box::new(module_id_of(callee.module_id())),
+            function: identifier_of(view_function_ref(callee.func_ref).func_name),
+        },
+    ))
+}
+
 /// Attaches the faulting micro-op's originating instruction, or only the
 /// executing function's module when the program counter is past the end of the
 /// code.
@@ -635,7 +659,7 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
     // execution guard keeps alive.
     let func = unsafe { regs.func.as_ref() };
     let offset = func.code.origins().get(regs.pc).copied();
-    let location = match (frame_module(func.module_id), offset) {
+    let location = match (frame_module(func.module_id()), offset) {
         (None, Some(offset)) => ErrorLocation::ScriptInstruction { offset },
         (None, None) => ErrorLocation::Script,
         (Some(module), Some(offset)) => ErrorLocation::Instruction {
@@ -660,11 +684,9 @@ fn locate_bytecode_failure(err: VMInternalError, regs: VMRegisters) -> VMInterna
 unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalError {
     // SAFETY: guaranteed by the caller.
     match unsafe { saved_caller_ptr(fp).as_ref() } {
-        Some(caller) => {
-            err.at(
-                frame_module(caller.module_id).map_or(ErrorLocation::Script, ErrorLocation::Module)
-            )
-        },
+        Some(caller) => err
+            .at(frame_module(caller.module_id())
+                .map_or(ErrorLocation::Script, ErrorLocation::Module)),
         None => err,
     }
 }
@@ -682,7 +704,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
     Ok(callers
         .into_iter()
         .map(|(caller, offset)| CallFrame {
-            module: frame_module(caller.module_id),
+            module: frame_module(caller.module_id()),
             function: caller.def_idx,
             offset,
         })
@@ -1883,7 +1905,7 @@ impl InterpreterContext<'_> {
                         // dispatch errors should take precedence when call gas
                         // is calibrated.
                         self.reentrancy
-                            .enter(func.module_id, target, false)
+                            .enter(func.module_id(), target, false)
                             .map_err(|err| locate_rejected_call(err, fp))?;
                         self.push_call_frame(func, regs, target, FrameFlag::Checked)?;
                         continue;
@@ -1895,7 +1917,7 @@ impl InterpreterContext<'_> {
                     } => {
                         let target = self.load_function(module_id, func_name, ty_args)?;
                         debug_assert!(
-                            target.module_id == func.module_id && !target.has_module_lock,
+                            target.module_id() == func.module_id() && !target.has_module_lock,
                             "CallByNameExempt at a call site the reentrancy checker must observe"
                         );
                         self.push_call_frame(func, regs, target, FrameFlag::Unchecked)?;
@@ -1906,7 +1928,7 @@ impl InterpreterContext<'_> {
                         // Error precedence: reentrancy, stack overflow. The
                         // metering note at `CallByName` applies here too.
                         self.reentrancy
-                            .enter(func.module_id, callee, false)
+                            .enter(func.module_id(), callee, false)
                             .map_err(|err| locate_rejected_call(err, fp))?;
                         self.push_call_frame(func, regs, callee, FrameFlag::Checked)?;
                         continue;
@@ -1916,7 +1938,7 @@ impl InterpreterContext<'_> {
                         // Skips the reentrancy checker, so only a
                         // `CallByNameExempt` site may be patched to it.
                         debug_assert!(
-                            callee.module_id == func.module_id && !callee.has_module_lock,
+                            callee.module_id() == func.module_id() && !callee.has_module_lock,
                             "CallByPtrExempt at a call site the reentrancy checker must observe"
                         );
                         self.push_call_frame(func, regs, callee, FrameFlag::Unchecked)?;
@@ -2203,7 +2225,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: None,
-                            location: abort_location(func.module_id),
+                            location: abort_location(func.module_id()),
                             offset: bytecode_origin(func, regs.pc),
                         };
                     },
@@ -2236,7 +2258,7 @@ impl InterpreterContext<'_> {
                         break RuntimeStatus::Aborted {
                             code,
                             message: Some(message),
-                            location: abort_location(func.module_id),
+                            location: abort_location(func.module_id()),
                             offset: bytecode_origin(func, regs.pc),
                         };
                     },
@@ -3063,7 +3085,7 @@ impl InterpreterContext<'_> {
         idx: ConstantPoolIndex,
     ) -> VMResult<()> {
         // SAFETY: `regs.func` points to the live, currently-executing function.
-        let module_id = unsafe { regs.func.as_ref() }.module_id;
+        let module_id = unsafe { regs.func.as_ref() }.module_id();
         let (ty, bytes) = self.load_constant(module_id, idx)?;
 
         // SAFETY: `dst` is a verified 8-byte frame slot for a vector pointer
@@ -3263,7 +3285,7 @@ impl InterpreterContext<'_> {
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
                 let closure = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
-                write_closure_func_ref_and_mask(closure, &op.func_ref, op.mask);
+                write_closure_func_ref_and_mask(closure, &op.func_ref, op.persistent, op.mask);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
             }
@@ -3280,7 +3302,12 @@ impl InterpreterContext<'_> {
             // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
             let closure_root = self.root_pool.root_object(closure_ptr);
 
-            write_closure_func_ref_and_mask(closure_root.ptr(), &op.func_ref, op.mask);
+            write_closure_func_ref_and_mask(
+                closure_root.ptr(),
+                &op.func_ref,
+                op.persistent,
+                op.mask,
+            );
 
             // SAFETY: the verifier guarantees `captured_data_descriptor_id`
             // is `Some` whenever `captured` is non-empty. The values-region
@@ -3297,17 +3324,23 @@ impl InterpreterContext<'_> {
                 captured_desc_id
             )?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
-            // Persist the exact values-region size so `CallClosure` can validate
-            // a lazily-resolved callee's captured layout against it; the header
-            // records only the alignment-rounded allocation size.
-            //
-            // TODO(correctness): persisting only the total lets `CallClosure` check totals but
-            // not the per-capture `(size, align)` breakdown. Persist that layout
-            // here to enable element-wise validation of an `Unresolved` callee.
+            // Persist the exact values-region size; the object header records
+            // only the alignment-rounded allocation size.
             write_u32(
                 captured_data,
                 CAPTURED_DATA_VALUES_SIZE_OFFSET,
                 op.values_size,
+            );
+            write_u32(captured_data, CAPTURED_DATA_BLOB_SIZE_OFFSET, 0);
+            let Some(captured_layout_id) = op.captured_layout_id else {
+                invariant_violation!(Unreachable(
+                    "PackClosure: captured values have no layout".to_string()
+                ));
+            };
+            write_u32(
+                captured_data,
+                CAPTURED_DATA_LAYOUT_ID_OFFSET,
+                captured_layout_id.as_u32(),
             );
 
             // Captured values are laid out at their natural alignment within
@@ -3344,7 +3377,8 @@ impl InterpreterContext<'_> {
     /// Handles both `ClosureFuncRef::Resolved` and `Unresolved` targets — the
     /// latter resolved lazily via the loader on first call, then memoized into
     /// the closure object as `Resolved` so repeat calls take the fast path.
-    /// Captured data must be Materialized; other tags are errors.
+    /// Captures that are still wire bytes are decoded once, before the callee's
+    /// frame is written.
     ///
     /// # Safety
     ///
@@ -3410,12 +3444,13 @@ impl InterpreterContext<'_> {
             let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
 
             // Callee-dependent validation runs once, on the first resolution of
-            // an `Unresolved` closure; we then memoize the resolved pointer into
-            // the closure object (flipping it to `Resolved`) so later calls of
-            // the same closure value skip both the loader and these checks. An
-            // already-`Resolved` closure was validated earlier — by the verifier
-            // at pack time, or by this block on a prior call — and its captured
-            // data is immutable, so re-validation is unnecessary.
+            // an `Unresolved` closure. Once it and the captures' checks pass,
+            // the resolved pointer is memoized into the closure object
+            // (flipping it to `Resolved`), so later calls of the same closure
+            // value skip both the loader and these checks. An already-`Resolved`
+            // closure was validated earlier — by the verifier at pack time, or
+            // by this block on a prior call — and its captured data is
+            // immutable, so re-validation is unnecessary.
             if resolved_now {
                 let num_params = callee.param_slots.len();
                 if num_params > 64 {
@@ -3426,47 +3461,55 @@ impl InterpreterContext<'_> {
                 if num_params < 64 && (mask >> num_params) != 0 {
                     invariant_violation!(ClosureMaskExceedsParams { mask, num_params });
                 }
-                if mask != 0 {
-                    if captured_data.is_null() {
-                        invariant_violation!(NullCapturedData);
-                    }
-                    let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
-                    if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
-                        // TODO(completeness): handle `CAPTURED_DATA_TAG_RAW` here once
-                        // that tag has a writer. Until then only `Materialized` is ever
-                        // written, so any other tag is corruption.
-                        invariant_violation!(InvalidCapturedDataTag { tag: cap_tag });
-                    }
-                    // The resolved callee's captured `values_size` must equal the
-                    // one the object was packed with (persisted exactly, not the
-                    // alignment-rounded header), rejecting signature skew before
-                    // the copy loop reads the bytes at the callee's offsets.
-                    //
-                    // TODO(correctness): this compares only the *total* values_size, so a
-                    // same-total but different per-capture `(size, align)` layout
-                    // (a cross-module skew) still passes and is read at the wrong
-                    // per-value offsets. The `Resolved` path is fully covered by
-                    // the verifier's per-slot size+align check; closing it for
-                    // `Unresolved` targets needs the packed per-capture layout
-                    // persisted in the object to compare element-wise here.
-                    let expected = captured_values_size(
-                        callee
-                            .param_slots
-                            .iter()
-                            .enumerate()
-                            .filter(|(i, _)| (mask >> i) & 1 != 0)
-                            .map(|(_, pslot)| (pslot.size, pslot.align)),
-                    );
-                    let packed = read_u32(captured_data, CAPTURED_DATA_VALUES_SIZE_OFFSET);
-                    if expected != packed {
-                        invariant_violation!(ClosureCapturedLayoutMismatch { expected, packed });
-                    }
+                // A closure marked persistent, as every closure read from
+                // storage is, must call a persistent function. Only those have
+                // signatures frozen across upgrades, so any other target could
+                // disagree with the stored captures.
+                if read_closure_persistent(closure) && !callee.is_persistent {
+                    return Err(stored_closure_target_not_persistent(callee));
                 }
-                // Memoize: bake the resolved function pointer into the closure
-                // and flip the tag to `Resolved`. The func-ref payload is not
-                // GC-traced and `FunctionPtr` is a stable leaked address, so this
-                // survives heap relocation exactly like a closure packed as
-                // `Resolved`.
+            }
+
+            let captured_data = if mask == 0 {
+                captured_data
+            } else {
+                if captured_data.is_null() {
+                    invariant_violation!(NullCapturedData);
+                }
+                match *captured_data.add(CAPTURED_DATA_TAG_OFFSET) {
+                    CAPTURED_DATA_TAG_MATERIALIZED => {
+                        // A packed closure carries its captures' layouts, so a
+                        // lazily-resolved callee can be checked against them
+                        // element-wise. The `Resolved` path was checked by the
+                        // verifier at pack time, and captured data is
+                        // immutable, so the check runs once.
+                        if resolved_now {
+                            self.check_packed_captures(callee, mask, captured_data)?;
+                        }
+                        captured_data
+                    },
+                    // Decoded by an earlier call, from this same callee's
+                    // parameters.
+                    CAPTURED_DATA_TAG_MATERIALIZED_RAW => captured_data,
+                    // Still wire bytes. Decoding allocates, which is why
+                    // `CallClosure` is an allocating op, and it happens before
+                    // anything is written at `new_fp`.
+                    CAPTURED_DATA_TAG_RAW => {
+                        self.materialize_closure_captures(regs, callee, mask, op.closure_src)?
+                    },
+                    tag => invariant_violation!(InvalidCapturedDataTag { tag }),
+                }
+            };
+
+            if resolved_now {
+                // Memoize, now that every check has passed: bake the resolved
+                // function pointer into the closure and flip the tag to
+                // `Resolved`. The func-ref payload is not GC-traced and
+                // `FunctionPtr` is a stable leaked address, so this survives
+                // heap relocation exactly like a closure packed as `Resolved`.
+                // Decoding the captures may have collected, so the closure is
+                // re-read from its frame slot.
+                let closure = read_ptr(fp, op.closure_src);
                 write_ptr(
                     closure,
                     CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
@@ -3494,7 +3537,7 @@ impl InterpreterContext<'_> {
             // Every closure call is checked. Error precedence: reentrancy,
             // stack overflow.
             self.reentrancy
-                .enter(func.module_id, callee, true)
+                .enter(func.module_id(), callee, true)
                 .map_err(|err| locate_rejected_call(err, fp))?;
 
             // Stack-overflow check up front: `push_call_frame_at` skips the
@@ -3561,6 +3604,180 @@ impl InterpreterContext<'_> {
             self.push_call_frame_at(func, &mut regs, callee, new_fp, FrameFlag::Checked)?;
             Ok(regs)
         }
+    }
+
+    /// Checks a packed closure's captures against the callee just resolved for
+    /// it: each capture must have been packed under the layout of the callee's
+    /// corresponding parameter. Rejects cross-module signature skew before the
+    /// call's copy loop reads the values at the callee's offsets.
+    ///
+    /// # Safety
+    ///
+    /// `captured_data` points to a live `Materialized` captured-data object.
+    unsafe fn check_packed_captures(
+        &self,
+        callee: &Function,
+        mask: u64,
+        captured_data: *const u8,
+    ) -> VMResult<()> {
+        let guard = self.loader.guard();
+        // SAFETY: a `Materialized` captured-data object carries the layout id
+        // of its values at a fixed offset.
+        let id =
+            LayoutId::from_u32(unsafe { read_u32(captured_data, CAPTURED_DATA_LAYOUT_ID_OFFSET) });
+        let Some(LayoutKind::Struct { fields: packed }) = guard.layout(id).map(|l| &l.kind) else {
+            invariant_violation!(ClosureCapturedValuesLayoutMissing { id: id.as_u32() });
+        };
+        let captured = mask.count_ones() as usize;
+        if packed.len() != captured {
+            invariant_violation!(ClosureCapturedCountMismatch {
+                packed: packed.len(),
+                captured,
+            });
+        }
+        let mut capture_idx = 0usize;
+        for (param_idx, &param_ty) in callee.param_tys.iter().enumerate() {
+            if (mask >> param_idx) & 1 == 0 {
+                continue;
+            }
+            let Some(param_id) = guard.layout_id(param_ty) else {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
+            };
+            // Equal ids mean equal layouts, so equal sizes and alignments.
+            let packed_id = packed[capture_idx].id;
+            if packed_id != param_id {
+                invariant_violation!(ClosureCapturedLayoutMismatch {
+                    capture_idx,
+                    packed_id: packed_id.as_u32(),
+                    param_idx,
+                    param_id: param_id.as_u32(),
+                });
+            }
+            capture_idx += 1;
+        }
+        Ok(())
+    }
+
+    /// Decodes a closure's wire-backed captures into a `MaterializedRaw`
+    /// captured-data object, stores it on the closure, and returns it.
+    ///
+    /// Runs once per closure object: the decoded values are laid out from the
+    /// callee's parameters, so a later call on the same object reads them
+    /// exactly as it reads a packed closure's.
+    ///
+    /// # Safety
+    ///
+    /// - `regs` carries the caller's VM registers and `closure_src` is the
+    ///   caller frame slot holding the closure.
+    /// - That closure's captured data is a live `Raw` object.
+    /// - `callee` is the closure's resolved target.
+    #[inline(never)]
+    unsafe fn materialize_closure_captures(
+        &mut self,
+        regs: VMRegisters,
+        callee: &Function,
+        mask: u64,
+        closure_src: FrameOffset,
+    ) -> VMResult<*mut u8> {
+        let guard = self.loader.guard();
+
+        // Both the values region and its GC trace shape come from the callee's
+        // parameters: a capture's pointer offsets are the callee's own frame
+        // pointer offsets within that parameter's slot, so the GC traces the
+        // decoded copy exactly as it traces the parameter.
+        let mut capture_layouts = Vec::with_capacity(mask.count_ones() as usize);
+        let mut pointer_offsets = vec![];
+        let mut values_size = 0usize;
+        for (capture_idx, (param_idx, pslot)) in callee
+            .param_slots
+            .iter()
+            .enumerate()
+            .filter(|(param_idx, _)| (mask >> param_idx) & 1 != 0)
+            .enumerate()
+        {
+            let ty = callee.param_tys[param_idx];
+            let Some(layout_id) = guard.layout_id(ty) else {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
+            };
+            let Some(layout) = guard.layout(layout_id) else {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
+            };
+            if layout.size != pslot.size || layout.align != pslot.align {
+                invariant_violation!(ClosureParamLayoutMismatch {
+                    param_idx,
+                    layout_size: layout.size,
+                    layout_align: layout.align,
+                    param_size: pslot.size,
+                    param_align: pslot.align,
+                });
+            }
+            let (offset, next) =
+                next_captured_value_offset(values_size, pslot.size as usize, pslot.align as usize);
+            let param_slot = pslot.offset.0..pslot.offset.0 + pslot.size;
+            for ptr_offset in &callee.frame_layout.heap_ptr_offsets {
+                if param_slot.contains(&ptr_offset.0) {
+                    pointer_offsets.push(FrameOffset(
+                        offset as u32 + (ptr_offset.0 - param_slot.start),
+                    ));
+                }
+            }
+            capture_layouts.push(layout_id);
+            values_size = next;
+        }
+        let values_size = u32::try_from(values_size).map_err(|_| {
+            VMInternalError::new(RuntimeError::AllocationTooLarge {
+                requested: values_size,
+            })
+        })?;
+        // TODO(metering): each distinct trace shape is a permanent descriptor.
+        // Shapes are bounded by the callees that can be loaded and lowered, so
+        // this adds nothing beyond what `try_lower_function` already allows.
+        let descriptor_id = guard.publish_captured_data_descriptor(values_size, &pointer_offsets);
+
+        // SAFETY: `closure_src` is a GC-traced frame slot holding a live
+        // closure; rooting keeps it, and the captured data it points at, live
+        // and relocated across the decode's collection.
+        let closure_root = unsafe { self.root_pool.root_object(read_ptr(regs.fp, closure_src)) };
+        let captured_data = alloc_or_gc(
+            &mut self.heap,
+            self.loader.guard(),
+            &mut self.read_write_set,
+            &self.root_pool,
+            &self.extensions,
+            regs.fp,
+            TopFrame::Function {
+                func: regs.func,
+                pc: regs.pc,
+            },
+            |heap| {
+                // The whole decode re-runs after a collection, so the closure
+                // is re-read here rather than above.
+                // SAFETY: the root holds a live closure, and a `Raw` closure
+                // with captures holds a live captured-data object.
+                unsafe {
+                    let raw = read_ptr(closure_root.ptr(), CLOSURE_CAPTURED_DATA_PTR_OFFSET);
+                    materialize_raw_captures(
+                        guard,
+                        heap,
+                        raw,
+                        &capture_layouts,
+                        values_size,
+                        descriptor_id,
+                    )
+                }
+            },
+        )?;
+
+        // SAFETY: the root holds the closure, relocated if the decode
+        // collected, and the captured-data slot is at a fixed offset.
+        unsafe {
+            write_ptr(
+                closure_root.ptr(),
+                CLOSURE_CAPTURED_DATA_PTR_OFFSET,
+                captured_data,
+            )
+        };
+        Ok(captured_data)
     }
 
     /// Compute the callee's frame pointer and verify the callee's full

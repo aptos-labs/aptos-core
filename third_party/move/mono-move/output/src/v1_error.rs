@@ -465,7 +465,7 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
             V1ErrorInfo::with_no_message(StatusCode::MEMORY_LIMIT_EXCEEDED)
         },
 
-        E::StateKeyTypeTooDeep => {
+        E::StateKeyTypeTooDeep | E::ValueNotSerializable(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::VALUE_SERIALIZATION_ERROR, err)
         },
 
@@ -478,7 +478,8 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         | E::BCSRemainingInput { .. }
         | E::BCSInvalidBool { .. }
         | E::BCSInvalidEnumTag { .. }
-        | E::BCSSignerNotDeserializable => return V1Equivalent::V1StatusUnknown,
+        | E::BCSSignerNotDeserializable
+        | E::BCSInvalidClosure(_) => return V1Equivalent::V1StatusUnknown,
 
         E::MalformedStringArgument
         | E::ObjectArgumentDoesNotExist
@@ -487,6 +488,8 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,
+        // An agreed divergence: V1 orders function values, MonoMove refuses to.
+        E::FunctionValuesNotOrdered => return V1Equivalent::V1StatusUnknown,
 
         E::InvariantViolation(_) | E::ResourceProvider(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)
@@ -510,6 +513,11 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         // A stale function value can name a function that no longer resolves.
         L::FunctionNotFound { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::FUNCTION_RESOLUTION_FAILURE, err)
+        },
+        // Reachable from a function value decoded from storage or a script run
+        // with the wrong number of type arguments.
+        L::TypeArgumentCountMismatch { .. } => {
+            V1ErrorInfo::with_no_message(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
         },
         L::ScriptDeserializationFailed { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::CODE_DESERIALIZATION_ERROR, err)
@@ -977,6 +985,13 @@ mod tests {
                 module: "m".to_string(),
                 name: "f".to_string(),
             },
+            LoaderError::TypeArgumentCountMismatch {
+                address,
+                module: "m".to_string(),
+                name: "f".to_string(),
+                expected: 0,
+                got: 1,
+            },
             LoaderError::NativeFunctionNotLoadable {
                 address,
                 module: "m".to_string(),
@@ -1010,6 +1025,7 @@ mod tests {
             match err {
                 LoaderError::ModuleNotFound { .. }
                 | LoaderError::FunctionNotFound { .. }
+                | LoaderError::TypeArgumentCountMismatch { .. }
                 | LoaderError::NativeFunctionNotLoadable { .. }
                 | LoaderError::LoweringSkipped { .. }
                 | LoaderError::ResourceLayoutNotDerivable

@@ -8,7 +8,6 @@
 
 mod common;
 
-use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, FrameLayoutInfo, FrameOffset as FO,
     Function, FunctionDefinitionIndex, MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
@@ -38,10 +37,10 @@ fn ref_self_copy() {
         Return,
     ];
     let function = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: crate::program_module_id!("test"),
+        func_ref: crate::program_func_ref!("test", "test"),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
+        is_persistent: false,
         code: Code::from_vec(code),
         entry_gas: 0,
         param_slots: vec![],
