@@ -15,6 +15,13 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Test-driver parity (2026-10-08): `--verify-only` selects the verified
+functions under `--lean`; Move scripts, and any module whose rendered name is
+quoted (`std::string`), are verified again: the verifier had looked them up
+by their quoted spelling and silently verified nothing. The general
+pipeline's stages are timed (`pipe-…`). New fixture:
+`SourceVerify/script_false.move`.
+
 Generic module axioms (2026-10-08): `axiom<T>` (LeanerLang `axiom {T} e`) is
 assumed at the instantiations a verification applies, as the Prover
 monomorphizes it; `num` is a specification function's type argument of its

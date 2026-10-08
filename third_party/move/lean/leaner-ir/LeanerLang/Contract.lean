@@ -6162,7 +6162,9 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
 /-- Segments of a `leanerPath`, ignoring separators. -/
 private partial def pathSegments (stx : Syntax) : Array String :=
   match stx with
-  | .ident _ raw _ _ => #[raw.toString]
+  -- The identifier's name, as the elaborator registers it: a quoted segment
+  -- such as a script's `«<SELF>_0»` without its quotes.
+  | .ident _ _ name _ => #[name.toString (escape := false)]
   | .atom _ value => if value == "::" then #[] else #[value]
   | .node _ _ arguments => arguments.flatMap pathSegments
   | _ => #[]

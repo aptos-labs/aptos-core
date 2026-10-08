@@ -452,6 +452,29 @@ and intended negative specifications.
 
 ## General
 
+### G0. How the test driver runs a test
+
+A test file is verified alone, with the driver's dependencies: the Move
+standard library and its nursery, and `move-table-extension`
+(`std = 0x1`, `extensions = 0x2`), or the Aptos standard library under
+`// use-aptos-stdlib`; `// flag:` lines add options (`testsuite.rs`,
+`get_flags_and_baseline`). The Leaner path (`lib.rs`,
+`run_move_prover_lean`) builds the model with them and exports the target
+file's modules with what they read. Of the flags, it honors the extra
+`--dependency` files (`script`, `script_incorrect`, `exists_only_memory*`)
+and, since 2026-10-08, `--verify-only`: a target function the scope leaves out
+is exported with `pragma verify = false`, one it names with
+`pragma verify = true` (`leaner.rs`, `apply_scope`), as the Prover's
+`should_verify` selects them (`verify_only_list` now matches the Prover). The
+Boogie options (`--vector-theory`, `--split-vcs-by-assert`, `--timeout`,
+`--trace`) have no counterpart; `--check-inconsistency` is G11.
+
+Scripts were not verified at all until 2026-10-08: the verifier looked up a
+module by its path's raw spelling, which keeps the quotes of a script's
+`«<SELF>_0»`, found none, and verified nothing. `script_incorrect` now fails
+as in the Prover (`SourceVerify/script_false.move`). The same lookup skipped
+every module whose rendered name is quoted, `std::string` among them.
+
 ### G1. Import diagnostics — returned as reports; precise locations still open
 
 `SourceVerify.verifySource` now returns LIR import/validation errors as error
@@ -1017,6 +1040,15 @@ Tests: `functional/closures/behavioral_results.move`, `functional/closures/inlin
 ### V16. Native without specification or prelude model
 
 11 tests, 50 messages.
+
+In `bitwise_table`, `bitwise_table_mixed_instances` and `verify_table` the
+natives are those behind `extensions::table`, the test driver's
+`move-table-extension` dependency (`Table.spec.move` declares the map and its
+roles, and the export carries them). A handle-backed table carries only its
+read roles, `map_borrow` and `map_has_key` (`Contract.mapRoleOf?`); its
+allocating and mutating roles (`new`, `add`, `remove`, `length`) are disabled
+until stage 2 of [`intrinsic-maps.md`](intrinsic-maps.md), so a caller enters
+their bodies and meets the natives.
 
 Example (`functional/type_reflection.move:80`):
 

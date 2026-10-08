@@ -1,5 +1,39 @@
 # Handoff
 
+Test driver parity, scripts, pipeline stages (2026-10-08):
+- The registry driver (`move-prover/tests/testsuite.rs`) verifies each file
+  alone with the stdlib, nursery and `move-table-extension` dependencies
+  (`std = 0x1`, `extensions = 0x2`), `// use-aptos-stdlib`, and `// flag:`
+  lines; see G0 in `prover-test-problems.md`. To reproduce one outside the
+  driver, pass the same `--dependency`/`--named-addresses` flags to
+  `target/ci/move-prover --lean --heartbeats=25 -o <dir>/out.bpl <file>`;
+  the rendering lands at `<dir>/out.lean`.
+- `--verify-only` (and `aptos move prove --lean --only`) now select the
+  verified functions: `leaner::verify` takes the scope and exports a target
+  function with `pragma verify` as `should_verify` decides (`apply_scope`),
+  in the specification's and the resolved pragmas alike (the verifier checks
+  they agree). `verify_only_list` matches the Prover.
+- Scripts were never verified: `Verify.pathSegments` (and `Contract`'s) read
+  an identifier's raw spelling, so `«<SELF>_0»` kept its quotes, the module
+  lookup failed and `elaborateNamespaceWithVerification` returned silently.
+  They read the identifier's name now, as `Elab` registers it.
+  `script_incorrect` fails as in the Prover; `SourceVerify/script_false.move`.
+  The same skip hit every module whose name the renderer quotes: of the
+  framework, `std::string` (`«string»`). The `string` benchmark problem had
+  been "verified" with no target; `string::utf8` is verified now (3.8M
+  heartbeats), and the MoveStdlib source baseline stays clean.
+- `bitwise_table`/`verify_table`: the dependency and its intrinsic roles are
+  exported; the blocker is that handle-backed tables carry only the read roles
+  (`intrinsic-maps.md`, stage 2), not a missing dependency.
+- The general pipeline's stages are timed permanently (`pipe-simp`,
+  `pipe-omega`, `pipe-round`, `pipe-saturate`, `pipe-bv`, `pipe-grind`, …)
+  under `leaner.denoteDebug`/`leaner.denoteProfile`; see perf-notes.md.
+- Benchmark against the generic-axiom checkpoint (15,376,387,648): same
+  outcomes, 15,388,371,357 (+0.08%), all of it `string` (15.1M to 26.9M, its
+  first verified target); every other problem within 0.01%, so the timed
+  pipeline stages cost nothing measurable. Registry: `script_incorrect` and
+  `verify_only_list` change, as intended; no other baseline.
+
 Generic module axioms (2026-10-08):
 - `axiom<T>` is assumed at each instantiation a verification applies, as the
   Prover monomorphizes it (`Contract.specInstantiations`, `axiomInstances`):

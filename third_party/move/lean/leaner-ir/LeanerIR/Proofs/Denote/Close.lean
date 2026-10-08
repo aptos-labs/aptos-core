@@ -4652,42 +4652,49 @@ and decided as the prepared leaf is. -/
 syntax "leaner_denote_decide_ranges" : tactic
 
 /-- The general leaf: one pipeline, each stage over the previous stage's
-goals, so that a rewriting pass is never repeated for a later alternative. -/
+goals, so that a rewriting pass is never repeated for a later alternative.
+Its stages report under `pipe-` labels (`leaner_denote_timed`), so a leaf's
+cost is attributed past the pipeline as a whole. -/
 macro "leaner_denote_pipeline" : tactic => `(tactic| (
   leaner_denote_subst_vars
   try leaner_denote_split_search
   all_goals leaner_denote_reduce_projections
-  all_goals leaner_denote_bounded (try simp (disch := omega) only [LeanerIR.Proofs.Obligation_iff,
-    Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow, Nat.reduceSub,
-    Int.tmod_eq_emod_of_nonneg, Int.tdiv_eq_ediv_of_nonneg, lir_denote_norm] at *)
+  all_goals leaner_denote_timed "pipe-simp" (leaner_denote_bounded
+    (try simp (disch := omega) only [LeanerIR.Proofs.Obligation_iff,
+      Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow, Nat.reduceSub,
+      Int.tmod_eq_emod_of_nonneg, Int.tdiv_eq_ediv_of_nonneg, lir_denote_norm] at *))
   all_goals first
   | done
-  | leaner_denote_assumption
-  | omega
+  | leaner_denote_timed "pipe-assumption" leaner_denote_assumption
+  | leaner_denote_timed "pipe-omega" omega
   -- Positions that range over a few literal values, case by case.
-  | leaner_denote_decide_ranges
-  | (leaner_denote_saturate_round
+  | leaner_denote_timed "pipe-ranges" leaner_denote_decide_ranges
+  | (leaner_denote_timed "pipe-round" leaner_denote_saturate_round
      all_goals (first
        | done
-       | (leaner_denote_bounds; omega)
+       | leaner_denote_timed "pipe-bounds-omega" (leaner_denote_bounds; omega)
        -- An instance of a quantified hypothesis once the lookups after
        -- writes are read, before the context is saturated.
-       | leaner_denote_instance
-       | leaner_denote_range_instance
-       | leaner_denote_witness
+       | leaner_denote_timed "pipe-instance" leaner_denote_instance
+       | leaner_denote_timed "pipe-range-instance" leaner_denote_range_instance
+       | leaner_denote_timed "pipe-witness" leaner_denote_witness
        -- A lookup at a position the context does not tell apart from a
        -- written one, in each case.
-       | (leaner_denote_split_write
+       | (leaner_denote_timed "pipe-split-write" leaner_denote_split_write
           all_goals leaner_denote_decide_split)
-       | (leaner_denote_saturate
-          leaner_denote_inheriting
-            (all_goals (try (leaner_denote_split <;> (try leaner_simp_all [lir_denote_norm]))))
-          leaner_denote_inheriting
-            (all_goals (try (leaner_denote_split <;> (try leaner_simp_all [lir_denote_norm]))))
-          leaner_denote_inheriting (all_goals leaner_denote_split_goal)
-          leaner_denote_saturate_round
+       | (leaner_denote_timed "pipe-saturate" leaner_denote_saturate
+          leaner_denote_timed "pipe-split" (leaner_denote_inheriting
+            (all_goals (try (leaner_denote_split <;> (try leaner_simp_all [lir_denote_norm])))))
+          leaner_denote_timed "pipe-split" (leaner_denote_inheriting
+            (all_goals (try (leaner_denote_split <;> (try leaner_simp_all [lir_denote_norm])))))
+          leaner_denote_timed "pipe-split-goal"
+            (leaner_denote_inheriting (all_goals leaner_denote_split_goal))
+          leaner_denote_timed "pipe-round" leaner_denote_saturate_round
           -- Last, products and congruence, which `omega` reads as atoms.
-          all_goals (first | (leaner_denote_bounds; omega) | leaner_denote_bv | leaner_denote_grind))))))
+          all_goals (first
+            | leaner_denote_timed "pipe-bounds-omega" (leaner_denote_bounds; omega)
+            | leaner_denote_timed "pipe-bv" leaner_denote_bv
+            | leaner_denote_timed "pipe-grind" leaner_denote_grind))))))
 
 /-- A value the arithmetic rules named, with its definition, if a hypothesis
 defines one: `named.val = e` for a local of type `SpecInt` itself. -/

@@ -251,6 +251,7 @@ impl ProverOptions {
                 &model,
                 package_path,
                 filter.as_deref(),
+                &options.prover.verify_scope,
                 heartbeats,
                 &output,
                 writer,

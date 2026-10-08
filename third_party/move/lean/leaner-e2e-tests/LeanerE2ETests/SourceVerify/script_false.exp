@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/script_false.move:11:9: error: the specification clause `aborts_if false` is not established
+LeanerE2ETests/SourceVerify/script_false.move:10:5: error: leaner verification failed: the automatic verification of `main` failed; provide a proof: `verify main by …` in `LeanerE2ETests/SourceVerify/script_false.proof.lean` (`verify main by skip` shows the obligations it leaves)

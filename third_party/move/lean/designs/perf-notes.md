@@ -110,7 +110,12 @@ first waits for a certificate. Use all four instruments below.
    prints cost heartbeats themselves; `-Dleaner.denoteProfile=true` instead
    prints, per target, the closer's stages and, per step label, its runs and
    the heartbeats of its succeeding and of its failing runs, with no goal
-   printed.
+   printed. The general pipeline (`pipeline`, `range pipeline`) reports its
+   stages too, as `pipe-simp`, `pipe-omega`, `pipe-ranges`, `pipe-round`,
+   `pipe-bounds-omega`, `pipe-instance`, `pipe-split-write`,
+   `pipe-saturate`, `pipe-split`, `pipe-bv`, `pipe-grind` and the like, so a
+   leaf it closes is attributed to the stage that pays (2026-10-08: the
+   `bitwise_features::contains` leaves were `pipe-saturate` and `pipe-bv`).
 7. **The benchmark problems.** `scripts/leaner-bench.py run [--only …]`
    builds `leaner-bench`, measures the standard problems natively, by
    phase, records the run in the local history, and prints each problem's
