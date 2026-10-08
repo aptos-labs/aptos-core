@@ -593,26 +593,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restr
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::function_values::function_value_persistent"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::function_values::function_value_registry"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table_with_captured_vars"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::fv_as_table_keys::fv_in_table_with_refs"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::gas_profiling::test_gas_profiling_report"
 note = "TODO"
 
