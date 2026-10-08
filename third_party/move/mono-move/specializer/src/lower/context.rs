@@ -1068,8 +1068,7 @@ pub fn try_lower_function(
     let derived = derive_frame_layout(&ctx, func_ir, view_type_list(ctx.home_types))?;
 
     Ok(LoweringOutcome::Built(Function {
-        name,
-        module_id: module_ir.module.id(),
+        func_ref: interner.function_ref_of(module_ir.module.id(), name, ty_args),
         def_idx: func_ir.def_idx,
         has_module_lock: module_ir.module.definition_has_module_lock(func_ir.def_idx),
         code: Code::with_origins(code, origins),
