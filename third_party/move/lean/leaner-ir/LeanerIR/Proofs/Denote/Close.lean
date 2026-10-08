@@ -649,6 +649,19 @@ private def divisionReads (terms : Array Lean.Expr) : DivisionReads :=
     factors := products.flatMap fun product => #[product.getArg! 4, product.getArg! 5]
     equalities := equalities.map fun equality => (equality.getArg! 1, equality.getArg! 2) }
 
+/-- The bound a value carries by its type `type` (in weak head normal form):
+a fixed-width integer's range, a vector's length bound. -/
+private def typedBound? (value type : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  if type.isAppOfArity ``LeanerIR.SpecVector 1 then
+    return some (← mkAppM ``LeanerIR.SpecVector.bounded #[value])
+  if type.isAppOfArity ``LeanerIR.SpecInt 2 then
+    let width := type.getArg! 0
+    if width.isAppOfArity ``LeanerIR.IntWidth.bits 1 then
+      let lemma := if (type.getArg! 1).isConstOf ``Bool.true
+        then ``LeanerIR.SpecInt.signed_bounds else ``LeanerIR.SpecInt.unsigned_bounds
+      return some (mkApp2 (mkConst lemma) (width.getArg! 0) value)
+  return none
+
 /-- Assert the facts a leaf needs beside its hypotheses: the bounds of every
 certified integer in context, and the bounds of every bit operation on
 them that the goal or a hypothesis mentions. A fact whose statement is in
@@ -666,14 +679,7 @@ def assertBounds (skip : Array Lean.Expr := #[]) (includeMagnitudes : Bool := tr
       if decl.isImplementationDetail then continue
       let ty ← whnfR (← instantiateMVars decl.type)
       expressions := expressions.push (← instantiateMVars decl.type)
-      if ty.isAppOfArity ``LeanerIR.SpecVector 1 then
-        facts := facts.push (← mkAppM ``LeanerIR.SpecVector.bounded #[decl.toExpr])
-      if ty.isAppOfArity ``LeanerIR.SpecInt 2 then
-        let width := ty.getArg! 0
-        if width.isAppOfArity ``LeanerIR.IntWidth.bits 1 then
-          let lemma := if (ty.getArg! 1).isConstOf ``Bool.true
-            then ``LeanerIR.SpecInt.signed_bounds else ``LeanerIR.SpecInt.unsigned_bounds
-          facts := facts.push (mkApp2 (mkConst lemma) (width.getArg! 0) decl.toExpr)
+      if let some fact ← typedBound? decl.toExpr ty then facts := facts.push fact
     let reads := divisionReads expressions
     for site in operationSites expressions do
       if let some fact ← operationFact? goal reads site then facts := facts.push fact
@@ -2393,8 +2399,14 @@ private def unfoldSpecsOnce (goal : MVarId) (groundOnly := false) :
   for application in applications do
     let some unfold := unfolding? application | continue
     let proof := mkAppN (mkConst unfold) application.getAppArgs
+    -- The instance reads its arguments, not projections of their bundle:
+    -- a definitional reduction that keeps each argument once per use.
     let (fact, next) ← goal.withContext do
-      (← goal.assert `unfolded (← inferType proof) proof).intro1P
+      let type ← Meta.transform (← inferType proof) (post := fun e => do
+        match ← reduceProjection? e with
+        | some reduced => return .visit reduced
+        | none => return .continue)
+      (← goal.assert `unfolded type proof).intro1P
     goal := next
     facts := facts.push fact
   -- The guard of each instance, the condition its body branches on first,
@@ -2410,11 +2422,9 @@ private def unfoldSpecsOnce (goal : MVarId) (groundOnly := false) :
           let otherType ← instantiateMVars other.type
           return some (other.fvarId, (Lean.collectFVars {} otherType).fvarIds)
       | none => pure none
-    facts.mapM fun fact => do
-      let type ← instantiateMVars (← fact.getType)
-      let some (_, _, rhs) := type.eq? | return (fact, some none)
-      unless rhs.isAppOfArity ``ite 5 || rhs.isAppOfArity ``dite 5 do return (fact, some none)
-      let guard := rhs.getArg! 1
+    -- A proof of the guard or of its negation, over the facts connected to
+    -- it by shared variables and the bounds of the values they relate.
+    let decide (guard : Lean.Expr) : TacticM (Option (Lean.Expr × Bool)) := do
       let mut variables := (Lean.collectFVars {} guard).fvarIds
       let mut related : Array FVarId := #[]
       let mut changed := true
@@ -2432,32 +2442,64 @@ private def unfoldSpecsOnce (goal : MVarId) (groundOnly := false) :
       for (statement, holds) in #[(guard, true), (mkNot guard, false)] do
         let proof ← mkFreshExprMVar statement
         let some reduced ← observing? (proof.mvarId!.tryClearMany unrelated) | continue
+        -- The values the guard relates carry their types' bounds, which a
+        -- definition's domain guard states.
+        let reduced ← reduced.withContext do
+          let mut reduced := reduced
+          for decl in ← getLCtx do
+            if decl.isImplementationDetail then continue
+            let some fact ← typedBound? decl.toExpr (← whnfR (← instantiateMVars decl.type))
+              | continue
+            (_, reduced) ← (← reduced.assert `bounds (← inferType fact) fact).intro1P
+          pure reduced
         if ← closesBy reduced (← `(tactic|
             (try simp only [lir_denote_norm, beq_iff_eq, decide_eq_true_eq]) <;> omega)) then
-          return (fact, some (some (← instantiateMVars proof, holds)))
-      if debug then
-        IO.println s!"    unfolded (dropped): {((toString (← ppExpr type)).replace "\n" " ").take 300}"
-      return (fact, none)
+          return some (← instantiateMVars proof, holds)
+      return none
+    let branches (e : Lean.Expr) := e.isAppOfArity ``ite 5 || e.isAppOfArity ``dite 5
+    facts.mapM fun fact => do
+      let type ← instantiateMVars (← fact.getType)
+      let dropped : TacticM (FVarId × Option (Array (Lean.Expr × Bool))) := do
+        if debug then
+          IO.println s!"    unfolded (dropped): {((toString (← ppExpr type)).replace "\n" " ").take 300}"
+        return (fact, none)
+      let some (_, _, rhs) := type.eq? | return (fact, some #[])
+      unless branches rhs do return (fact, some #[])
+      let some first ← decide (rhs.getArg! 1) | return ← dropped
+      -- A definition's domain guard (`bounds`) does not tell whether its
+      -- instance is worth keeping; the condition its body branches on first
+      -- does, as it does for a function without a domain.
+      let domain := rhs.isAppOfArity ``dite 5 &&
+        (match rhs.getArg! 3 with | .lam name .. => name == `bounds | _ => false)
+      if domain && first.2 then
+        let body := (rhs.getArg! 3).bindingBody!.instantiate1 first.1
+        if branches body then
+          let some second ← decide (body.getArg! 1) | return ← dropped
+          return (fact, some #[first, second])
+      return (fact, some #[first])
   let mut kept := #[]
   for (fact, decision) in decisions do
     match decision with
     | none => goal ← goal.clear fact
-    | some none => kept := kept.push fact
-    | some (some (decided, holds)) =>
-        let (branched, next) ← goal.withContext do
-          let type ← instantiateMVars (← fact.getType)
-          let some (_, lhs, rhs) := type.eq? | throwError "an unfolding is an equation"
-          let arguments := rhs.getAppArgs
-          let rule := if rhs.isAppOf ``ite then (if holds then ``if_pos else ``if_neg)
-            else (if holds then ``dif_pos else ``dif_neg)
-          let branch ← mkAppOptM rule #[arguments[1]!, arguments[2]!, decided, arguments[0]!,
-            arguments[3]!, arguments[4]!]
-          let proof ← mkEqTrans (.fvar fact) branch
-          let some (_, _, taken) := (← instantiateMVars (← inferType proof)).eq?
-            | throwError "a branch is an equation"
-          (← goal.assert `unfolded (← mkEq lhs taken.headBeta) proof).intro1P
-        goal ← next.clear fact
-        kept := kept.push branched
+    | some decisions =>
+        -- Each decision rewrites the instance to the branch it takes.
+        let mut current := fact
+        for (decided, holds) in decisions do
+          let (branched, next) ← goal.withContext do
+            let type ← instantiateMVars (← current.getType)
+            let some (_, lhs, rhs) := type.eq? | throwError "an unfolding is an equation"
+            let arguments := rhs.getAppArgs
+            let rule := if rhs.isAppOf ``ite then (if holds then ``if_pos else ``if_neg)
+              else (if holds then ``dif_pos else ``dif_neg)
+            let branch ← mkAppOptM rule #[arguments[1]!, arguments[2]!, decided, arguments[0]!,
+              arguments[3]!, arguments[4]!]
+            let proof ← mkEqTrans (.fvar current) branch
+            let some (_, _, taken) := (← instantiateMVars (← inferType proof)).eq?
+              | throwError "a branch is an equation"
+            (← goal.assert `unfolded (← mkEq lhs taken.headBeta) proof).intro1P
+          goal ← next.clear current
+          current := branched
+        kept := kept.push current
   if kept.isEmpty then
     let bounded ← boundUnfoldings goal
     return some (some bounded, 0)

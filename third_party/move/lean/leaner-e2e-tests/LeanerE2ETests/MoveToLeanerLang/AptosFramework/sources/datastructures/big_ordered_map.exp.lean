@@ -3519,14 +3519,10 @@ leaner module aptos_framework::big_ordered_map where
 
   @[map_spec_aborts_new_with_config (BigOrderedMap)]
   spec fun spec_aborts_new_with_config {K} {V}(
-    inner_max_degree : Int, leaf_max_degree : Int, _reuse_slots : Bool
+    inner_max_degree : u16, leaf_max_degree : u16, _reuse_slots : Bool
   ) : Bool :=
-    if 0 <= inner_max_degree && inner_max_degree <= 65535
-      && (0 <= leaf_max_degree && leaf_max_degree <= 65535) then
-      inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)
-        || leaf_max_degree != 0
-          && (leaf_max_degree < 3 || leaf_max_degree > 4096)
-    else abort()
+    inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)
+      || leaf_max_degree != 0 && (leaf_max_degree < 3 || leaf_max_degree > 4096)
 
   -- Exhaustive over the hint-validation aborts (parameter ordering,
   -- division by zero, u64 overflow of the entry-size sums, and the

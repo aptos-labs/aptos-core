@@ -1,10 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_ref.move:75:10: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_ref.move:75:10: error: leaner verification failed: the lemma `ref_fold_is_weighted` is not established
 tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

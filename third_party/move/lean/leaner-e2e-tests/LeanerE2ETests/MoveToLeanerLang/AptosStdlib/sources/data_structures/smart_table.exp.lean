@@ -712,16 +712,14 @@ leaner module aptos_std::smart_table where
   @[weight = 50]
   spec fun «spec_fold$gen$0» {T0} {T1}(
     _v : Vector<Entry<T0, T1> >, «keys$init» : Vector<T0>,
-    «values$init» : Vector<T1>, _end : Int
+    «values$init» : Vector<T1>, _end : u64
   ) : (Vector<T0>, Vector<T1>) :=
-    if 0 <= _end && _end <= MAX_U64 then
-      if _end == 0 then («keys$init», «values$init»)
-      else
-        let («keys$acc», «values$acc») :=
-          «spec_fold$gen$0»(_v, «keys$init», «values$init», _end - 1)
-        (concat(«keys$acc», vec(_v[_end - 1].key)),
-          concat(«values$acc», vec(_v[_end - 1].value)))
-    else abort()
+    if _end == 0 then («keys$init», «values$init»)
+    else
+      let («keys$acc», «values$acc») :=
+        «spec_fold$gen$0»(_v, «keys$init», «values$init», _end - 1)
+      (concat(«keys$acc», vec(_v[_end - 1].key)),
+        concat(«values$acc», vec(_v[_end - 1].value)))
 
   -- We need to reverse the vectors to consume it efficiently
   -- We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it

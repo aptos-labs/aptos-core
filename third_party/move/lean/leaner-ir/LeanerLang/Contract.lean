@@ -2050,6 +2050,22 @@ where
         | .integer | .text _ => translate context argument
       values := values.push value
     values.foldrM (fun value rest => mkAppM ``Prod.mk #[value, rest]) (mkConst ``Unit.unit)
+  /-- A specification function's value outside its domain, where an
+  argument does not fit the fixed-width type of its parameter: an
+  uninterpreted function of the bundled arguments, declared once. -/
+  outsideValue (reference : LeanerIR.QualifiedRef) (bundle : Lean.Expr) : MetaM Lean.Expr := do
+    let name := Name.str (← specDefinitionName context.unit reference) "outside"
+    unless (← getEnv).contains name do
+      let (domains, result) ← definitionDomains reference
+      let bundleType ← domains.foldrM
+        (fun domain rest => mkAppM ``Prod #[domain.leanType, rest]) (mkConst ``Unit)
+      let resultType := definitionType result
+      let type ← mkArrow bundleType resultType
+      let value ← withLocalDeclD `bundle bundleType fun bundle => do
+        mkLambdaFVars #[bundle] (← mkAppOptM ``Inhabited.default #[resultType, none])
+      addDecl (.opaqueDecl
+        { name, levelParams := [], type, value, isUnsafe := false, all := [name] })
+    return mkApp (mkConst name) bundle
   /-- The types a recursive definition's type parameters stand for at a
   call: the call's type arguments, under the caller's family. -/
   definitionTypes (instantiations : Array LeanerIR.GenericArgument) : MetaM Lean.Expr := do
@@ -2156,14 +2172,44 @@ where
   `none` when no parameter is bounded. -/
   parameterBounds (bundle : Lean.Expr) (domains : Array Domain) (localTypes : Array IrTy) :
       MetaM (Option Lean.Expr) := do
-    let mut conjuncts : Array Lean.Expr := #[]
+    let mut values : Array Lean.Expr := #[]
     let mut rest := bundle
-    for index in [:domains.size] do
-      let value ← mkAppM ``Prod.fst #[rest]
+    for _ in [:domains.size] do
+      values := values.push (← mkAppM ``Prod.fst #[rest])
       rest ← mkAppM ``Prod.snd #[rest]
+    valueBounds values domains localTypes
+  /-- Whether `value` fits the integer type of `width` and `signed` by its
+  own form: a literal in range, the value of a certified integer of a type
+  that fits, or the length of a vector at a width of at least 64 bits. -/
+  fitsByType (value : Lean.Expr) (width : Nat) (signed : Bool) : MetaM Bool := do
+    let (low, high) : Int × Int := if signed
+      then (-(2 ^ (width - 1)), 2 ^ (width - 1) - 1) else (0, 2 ^ width - 1)
+    if let some literal := value.int? then return low ≤ literal && literal ≤ high
+    if value.isAppOfArity ``LeanerIR.SpecInt.val 3 then
+      let type ← whnfR (← inferType (value.getArg! 2))
+      unless type.isAppOfArity ``LeanerIR.SpecInt 2 do return false
+      let bits ← whnfR (type.getArg! 0)
+      unless bits.isAppOfArity ``LeanerIR.IntWidth.bits 1 do return false
+      let some width' := (bits.getArg! 0).rawNatLit? <|> (bits.getArg! 0).nat? | return false
+      let signed' := (type.getArg! 1).isConstOf ``Bool.true
+      return (signed' == signed && width' ≤ width) || (!signed' && signed && width' < width)
+    if value.isAppOfArity ``Nat.cast 3 then
+      let size := value.getArg! 2
+      return !signed && 64 ≤ width && size.isAppOfArity ``Array.size 2 &&
+        (size.getArg! 1).isAppOfArity ``LeanerIR.SpecVector.values 2
+    return false
+  /-- The bounds `values` carry by the fixed-width integer types of the
+  parameters they are bound to; `none` when no parameter is bounded. -/
+  valueBounds (values : Array Lean.Expr) (domains : Array Domain) (localTypes : Array IrTy) :
+      MetaM (Option Lean.Expr) := do
+    let mut conjuncts : Array Lean.Expr := #[]
+    for value in values, index in [:values.size] do
       match domains[index]?, localTypes[index]? with
       | some .integer, some (LeanerIR.Ty.integer (.bits width) signed) =>
           if width == 0 then continue
+          -- A value whose type already bounds it needs no guard: the
+          -- conjunct would be a theorem.
+          if ← fitsByType value width signed then continue
           let power (exponent : Nat) : MetaM Lean.Expr :=
             mkAppM ``HPow.hPow #[mkIntLit 2, mkNatLit exponent]
           let (low, high) ← if signed then
@@ -2312,10 +2358,10 @@ where
                 withLocalDeclD `nonNegative nonNegative[index] fun _ => assume (index + 1)
               else translateBody
             assume 0
-          -- The definition unfolds at well-typed arguments only, as the Move
-          -- Prover's axiom for the function does: the parameters' bounds
-          -- are what the recursion's descent may rely on, and the value
-          -- outside them is arbitrary.
+          -- The definition unfolds at well-typed arguments only: the
+          -- parameters' fixed-width types are the function's domain, which
+          -- the recursion's descent may rely on, and its value outside them
+          -- is unspecified (`outsideValue`).
           let body ← match ← parameterBounds bundle member.domains member.localTypes with
             | none => translateBody
             | some bounds =>
@@ -2323,8 +2369,7 @@ where
                 let inside ← withLocalDeclD `bounds bounds fun boundsHypothesis => do
                   mkLambdaFVars #[boundsHypothesis] (← translateBody)
                 let outside ← withLocalDeclD `outside (mkNot bounds) fun outsideHypothesis => do
-                  mkLambdaFVars #[outsideHypothesis]
-                    (← mkAppOptM ``Inhabited.default #[member.resultType, none])
+                  mkLambdaFVars #[outsideHypothesis] (← outsideValue member.reference bundle)
                 pure (mkApp5 (mkConst ``dite [1]) member.resultType bounds decision inside outside)
           mkLambdaFVars (#[bundle] ++ recurses) body
     -- Measures every recursive call provably descends on, a choice per
@@ -2777,6 +2822,8 @@ where
           let some localType := callee.valueTypeOf? localDecl.type.typeId
             | throwError "specification function local has an unknown type"
           targetTypes := targetTypes.push localType
+        let mut values : Array Lean.Expr := #[]
+        let mut parameterTypes : Array IrTy := #[]
         for (argument, index) in arguments.zipIdx do
           let some parameter := declaration.signature.parameters[index]?
             | throwError "specification function parameter is out of range"
@@ -2787,9 +2834,18 @@ where
             | .boolean => mkDecide value
             | _ => pure value
           targetLocals := targetLocals.set! index (some value)
-        translate { callee with
+          values := values.push value
+          parameterTypes := parameterTypes.push parameterType
+        let expanded ← translate { callee with
           locals := targetLocals, localTypes := targetTypes, oldLocals := targetLocals
           localNames := declaration.locals.map (·.name) } body
+        -- The function is defined where its arguments fit the fixed-width
+        -- types of its parameters, and unspecified elsewhere.
+        let some bounds ← valueBounds values (parameterTypes.map domainOf) parameterTypes
+          | return expanded
+        let outside ← callResult reference ty
+          (← outsideValue reference (← bundleArguments reference arguments))
+        mkAppM ``ite #[bounds, expanded, outside]
     | .specification (.result index) =>
         match context.ns.profile, context.resultTypes[0]?, context.results[0]? with
         | some .move, some (.tuple _), some packed =>

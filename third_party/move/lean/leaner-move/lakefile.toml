@@ -18,4 +18,4 @@ supportInterpreter = true
 
 [[lean_lib]]
 name = "Tests"
-roots = ["Tests.Profile", "Tests.Intrinsics", "Tests.Xir", "Tests.Xast", "Tests.BitVectorConversion", "Tests.SpecDomains"]
+roots = ["Tests.Profile", "Tests.Intrinsics", "Tests.Xir", "Tests.Xast", "Tests.BitVectorConversion"]

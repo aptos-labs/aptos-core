@@ -2316,3 +2316,24 @@ does not decide branches whose conditions an earlier hypothesis fixes; neither
 is installed. `math_fixed8::pow_raw` also needs `n & 1` as `n % 2`, pinning of
 `n` from omega-derived bounds, and many nonlinear overflow leaves, which is not
 feasible at 25k.
+
+## Domain guards of specification functions (2026-10-08)
+
+A specification function whose parameter has a fixed-width type is defined
+inside that domain only (G15): its recursive definition is
+`dite bounds body outside`. The closer decides only an unfolding's first
+guard, and keeps an instance it decides. With the domain on top, it decided
+the bounds and kept instances whose body's own first condition (`i.val = 0`)
+the context leaves open; a function without a domain drops those. Carried
+into normalization, preparation and grind, they made
+`folds_of::sum_direct` cost 33.5M closer heartbeats instead of 20.8M with
+`Int` parameters, and timed out five registry targets and a lemma at 25k.
+
+`unfoldSpecsOnce` now treats a domain guard (a `dite` binding `bounds`) as
+transparent: it decides the bounds, then the body's first condition, and drops
+the instance if that one is open. It decides guards with the bounds their
+values' types carry (`typedBound?`: `SpecInt` ranges, `SpecVector` lengths),
+which `assertBounds` now shares, and it reduces bundle projections of the
+instance (`(a, b, ()).snd.fst` to `b`) when it creates it. `sum_direct` costs
+23.2M (the `Int` variant 20.8M with the projection reduction, 22.4M before),
+and the five targets and the lemma verify again at 25k.

@@ -467,32 +467,30 @@ leaner module aptos_std::simple_map where
   -- We need to reverse the vector to consume it efficiently
   @[weight = 50]
   spec fun «spec_fold$gen$1» {T0} {T1}(
-    «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : Int,
+    «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : u64,
     _fold_anchor_ctx_0 : Vector<Element<T0, T1> >
   ) : (Vector<T0>, Vector<T1>) :=
-    if 0 <= _end && _end <= MAX_U64 then
-      if _end == 0 then («keys$init», «values$init»)
-      else
-        let («keys$acc», «values$acc») :=
-          «spec_fold$gen$1»(
-            «keys$init», «values$init», _end
-              - 1, _fold_anchor_ctx_0
+    if _end == 0 then («keys$init», «values$init»)
+    else
+      let («keys$acc», «values$acc») :=
+        «spec_fold$gen$1»(
+          «keys$init», «values$init», _end
+            - 1, _fold_anchor_ctx_0
+        )
+      (concat(
+          «keys$acc»,
+          vec(
+            _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
+              - (_end - 1)].key
           )
-        (concat(
-            «keys$acc»,
-            vec(
-              _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
-                - (_end - 1)].key
-            )
-          ),
-          concat(
-            «values$acc»,
-            vec(
-              _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
-                - (_end - 1)].value
-            )
-          ))
-    else abort()
+        ),
+        concat(
+          «values$acc»,
+          vec(
+            _fold_anchor_ctx_0[_fold_anchor_ctx_0.length - 1
+              - (_end - 1)].value
+          )
+        ))
 
   -- We need to reverse the vectors to consume it efficiently
   -- We can't use the constant EVECTORS_LENGTH_MISMATCH here as all calling code would then need to define it
@@ -513,40 +511,32 @@ leaner module aptos_std::simple_map where
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$0» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Vector<T0> :=
-    if 0 <= end && end <= MAX_U64 then
-      if end == 0 then vec::<T0>()
-      else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
-    else abort()
+    if end == 0 then vec::<T0>()
+    else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
 
   /--
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Vector<T1> :=
-    if 0 <= end && end <= MAX_U64 then
-      if end == 0 then vec::<T1>()
-      else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
-    else abort()
+    if end == 0 then vec::<T1>()
+    else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Bool :=
-    if 0 <= end && end <= MAX_U64 then
-      end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
-    else abort()
+    end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
 
   /--
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun «spec_map_ref_aborts$lambda$3» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Bool :=
-    if 0 <= end && end <= MAX_U64 then
-      end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)
-    else abort()
+    end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)

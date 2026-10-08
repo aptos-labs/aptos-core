@@ -359,13 +359,22 @@ private partial def matchesType (unit : RawUnit) (ownerName : NameId)
           | none => false
       | _, _ => false
 
+/-- A parameter matches its pattern; a fixed-width integer one matches `num`,
+since its type only bounds a specification function's domain (G15). -/
+private def matchesParameter (unit : RawUnit) (ownerName : NameId)
+    (pattern : TypePattern) (typeId : TypeId) : Bool :=
+  matchesType unit ownerName pattern typeId ||
+    (pattern == .num && unit.tables.types[typeId.index]?.any fun
+      | .integer (.bits _) _ => true
+      | _ => false)
+
 private def matchesSignature (unit : RawUnit) (ownerName : NameId)
     (pattern : SignaturePattern) (actual : Signature) : Bool :=
   actual.generics.size == 2 &&
     actual.generics.all (fun binder => binder.kind == .typeArg) &&
     pattern.parameters.size == actual.parameters.size &&
     (pattern.parameters.zip actual.parameters).all (fun (expected, parameter) =>
-      matchesType unit ownerName expected parameter.typeUse.typeId) &&
+      matchesParameter unit ownerName expected parameter.typeUse.typeId) &&
     actual.results.size == 1 &&
     matchesType unit ownerName pattern.result actual.results[0]!.typeId
 

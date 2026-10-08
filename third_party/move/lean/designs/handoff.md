@@ -1,42 +1,51 @@
 # Handoff
 
-Partial specification functions — WIP checkpoint (2026-10-08, decision pending):
+Partial specification functions by declared types (2026-10-08, option A):
 - User decisions: an `int2bv` the compiler types at `num` wraps at `u64`
-  (`BitVectorConversion.conversionWidth?`); a type parameter is still rejected
-  (`bv_signed_generic`). Specification functions are partial: defined where
-  parameters declared with fixed-width integer types fit them, unspecified
-  elsewhere (G15). The earlier contextual-width and literal-through-cast
-  attempts were rejected as hacks and are not in the tree.
-- Implemented: `Frontend/SpecDomains.lean` guards a spec function's body
-  (`if 0 <= x && x <= MAX_U64 then … else abort()`), not for compiler-v2's
-  specification versions of Move functions. `Contract.lean`: an uninterpreted
-  value needs a family only for type arguments, and a recursive definition
-  reading one at type arguments (and no storage) takes its instantiation
-  (`definitionTakesTypes`, `definitionTypes`), fixing "applied outside a family".
-- Validation in this container (4 cores): leaner-ir and leaner-move build,
-  leaner-move tests (new `Tests.SpecDomains`), E2E `move` suite with refreshed
-  baselines (constants translates again; seven stdlib renderings gain only the
-  guards), `SourceVerify/spec_fun_domain{,_false}.move` checked directly. NOT
-  run: leaner-ir/Rust/full E2E suites, cost gates, benchmark.
-- Registry (full refresh, 440 files): six previously verified functions regress
-  at 25k, all over recursive fold helpers: `behavioral_predicates_examples`
-  `reduce`/`reduce_opaque`, `bp_pure_callee::sum_checked`,
-  `folds_of::sum_direct` (verifies at 100k), `vector_hofs_fold::max_three`
-  (timeouts); the lemma `folds_of_ref::ref_fold_is_weighted`; and the authored
-  `specialize_generic_caller.proof.lean`. `folds_of_callee_ensures` loses its
-  family error. Three files new from main (`verify_only_list`,
+  (`BitVectorConversion.conversionWidth?`); one at a type parameter is still
+  rejected (`bv_signed_generic`). A specification function is partial: defined
+  where parameters declared with fixed-width integer types fit them,
+  unspecified elsewhere (G15). The user rejected syntactic patches
+  (contextual retyping, literals through casts) and chose deriving the domain
+  from the declared types (option A) over a guard in the body (the earlier
+  WIP commit e645c55f, superseded).
+- Importer: spec-function parameters keep fixed-width declared types
+  (`Encode.addSpecificationParameter`). LeanerLang reads such a parameter in
+  the body as `Int`, as contracts read function parameters (`Lower`), and the
+  printer treats parameters as logical locals, so `x + 18446744073709551616`
+  and `x < 2^64` re-elaborate canonically. Intrinsic map `num` role
+  parameters accept fixed-width ones (`Intrinsics.matchesParameter`).
+- Verifier (`Contract.lean`): recursive definitions unfold inside the domain
+  (existing `parameterBounds`); non-recursive expansions are guarded by
+  `valueBounds`, minus conjuncts the arguments' types imply (`fitsByType`:
+  literals, `SpecInt.val` of a fitting type, vector lengths); outside, both
+  read the uninterpreted `f.spec.outside` of the bundle. Recursive definitions
+  reading an uninterpreted value at type arguments take their instantiation
+  (`definitionTakesTypes`); a non-generic one needs no family.
+- Closer (`Close.lean`, `unfoldSpecsOnce`): a domain guard (`dite` binding
+  `bounds`) is transparent: decide it, then the body's first condition, and
+  drop the instance if that is open (as without a domain); guards are decided
+  with the typed-value bounds `typedBound?` (shared with `assertBounds`);
+  bundle projections of an instance are reduced. See perf-notes.md.
+- Tests: `SourceVerify/spec_fun_domain{,_false}.move`,
+  `Check/Specifications/SpecFunctionDomain{s,Errors}.lean`, leaner-move
+  `Tests.BitVectorConversion`. Full registry (440 files) against the pre-change
+  baselines (8c71365a): no function regresses; `folds_of_callee_ensures` loses
+  its family error; three files new from main (`verify_only_list`,
   `regression/behavioral_predicate_cycle`, `regression/recursion_inline_bound`)
-  get their first `.lean_exp`; their failures are not caused by this change.
-- Cause: the guard is an `if` in the body, split at every unfolding. Recursive
-  definitions already guard by parameter bounds (`parameterBounds`, decided by
-  the closer from context), but only for fixed-width LIR parameter types, and
-  the importer erases spec-function parameters to `num`.
-- Proposed next (awaiting the user): keep declared parameter types in LIR so the
-  verifier derives the domain from the type (also for non-recursive
-  expansions), with LeanerLang's value-preserving call-site coercions and a
-  canonical round trip; alternatives are tuning the closer for the body guard
-  or accepting the regressions. Do not treat this checkpoint's baselines as
-  accepted: the six regressions are recorded in them.
+  get first baselines, not caused by this change (checked with an `Int`
+  control for the one with typed spec parameters).
+- Benchmark, measured against the pre-change commit 8c71365a built in a
+  worktree on the same machine (15,084,073,019 raw heartbeats, reproducing the
+  handoff's 15,083,357,067): same outcomes (30 verified, one expected AMM
+  rejection), 15,465,529,048 (+2.53%). Moved: pool_u64 +10.93% (balance
+  97M to 292M, buy_in and redeem_shares +8%), math128 +4.48% (sqrt), features
+  +4.08% (change_feature_flags_for_next_epoch 42.9M to 76.4M), ordered_map
+  +0.54%; every other problem within 0.1%. The cost is expansion guards whose
+  arguments' range is not evident from their form (struct fields, vector
+  elements, other specification results), which the closer then proves.
+  Recovering it would mean bounding those forms statically (fields and
+  elements of typed values) or changing how leaves decide inline guards.
 
 Suspended 2026-10-07 at the user's request after committing this checkpoint.
 

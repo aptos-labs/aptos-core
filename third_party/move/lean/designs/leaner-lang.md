@@ -1212,16 +1212,21 @@ logical signature of `increment` above is:
 increment.spec : Int -> Int
 ```
 
-An authored specification function must use `Int` explicitly for direct
-integer parameters and results:
+An authored specification function normally uses `Int` for direct integer
+parameters and results:
 
 ```lean
 spec fun distance (left : Int) (right : Int) : Int := right - left
 ```
 
-Declaring a direct `UInt<n>`, `SInt<n>`, `UPtr`, or `IPtr` parameter/result on
-`spec fun` is an error. There is no implicit bounded re-packing on a
-specification-function call: an `Int` expression remains mathematical.
+A direct fixed-width parameter type is the function's domain: the function is
+defined where each argument fits its parameter's type, and its value elsewhere
+is unspecified (G15 in [`prover-test-problems.md`](prover-test-problems.md)).
+The body reads such a parameter as an `Int`, as a contract reads a function's
+parameters, so its arithmetic is mathematical. A call passes any integer; there
+is no implicit bounded re-packing, and an `Int` expression remains
+mathematical. A recursive definition unfolds inside the domain only, and an
+expansion of a non-recursive one is guarded the same way.
 
 Widening is applied at integer leaves, not by recursively replacing every
 integer nested in a data type. `Vector<UInt<64>>` remains that vector type, and

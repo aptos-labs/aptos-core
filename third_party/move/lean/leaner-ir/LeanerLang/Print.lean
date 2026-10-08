@@ -4608,12 +4608,15 @@ private def specFunctionText (unit : ValidatedUnit) (ns : PrintNamespace)
   match declaration.body with
   | none => pure signature
   | some root =>
+      -- The body reads its parameters as a specification does.
       let context : Context := {
         unit, ns, locals := declaration.locals
         localNames := declarationLocalNames ns declaration.locals
           declaration.signature.parameters.size (some root)
         binders := declaration.signature.generics
-        specification := true }
+        specification := true
+        logicalLocals := (declaration.locals.extract 0
+          declaration.signature.parameters.size).map (·.id) }
       let signature ← match decreases? with
         | some measure =>
             pure s!"{signature} decreases {← expressionText context measure (ns.expressions.size + 1) true}"

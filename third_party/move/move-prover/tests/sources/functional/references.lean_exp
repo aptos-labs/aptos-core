@@ -14,7 +14,7 @@ leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.Resul
   LeanerIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
     LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
-      (fun failure => LeanerIR.Proofs.Obligation "references.lean" 5843 5857 True) state
+      (fun failure => LeanerIR.Proofs.Obligation "references.lean" 5787 5801 True) state
 value✝ value : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
 a✝³ : { val := 10, fits := ⋯ } = value
 a✝² : value = value✝
@@ -29,7 +29,7 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultSh
       LeanerIR.Proofs.wp
         (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
           (LeanerIR.Proofs.Denote.Term.lit ()) env)
-        leanerContinuation✝ (fun failure => LeanerIR.Proofs.Obligation "references.lean" 5843 5857 True)
+        leanerContinuation✝ (fun failure => LeanerIR.Proofs.Obligation "references.lean" 5787 5801 True)
         state
     | LeanerIR.Proofs.Denote.Flow.return_ result env =>
       leanerContinuation✝ (LeanerIR.Proofs.Denote.Flow.return_ result env) state

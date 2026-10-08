@@ -5,9 +5,3 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/inline/vector_hofs_fold.move:99:5: error: leaner verification failed: the automatic verification of `count_even_concrete` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify count_even_concrete by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify count_even_concrete by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_fold.move:125:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_fold.move:125:5: error: leaner verification failed: the automatic verification of `max_three` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify max_three by …` in `tests/sources/functional/closures/inline/vector_hofs_fold.proof.lean` (`verify max_three by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

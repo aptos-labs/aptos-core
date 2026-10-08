@@ -6,7 +6,6 @@ import LeanerMove.Frontend.Effects
 import LeanerMove.Frontend.Frames
 import LeanerMove.Frontend.Proofs
 import LeanerMove.Frontend.BitVectorConversion
-import LeanerMove.Frontend.SpecDomains
 import LeanerLang.AddressAlias
 import LeanerMove.Frontend.LIR.Codec
 
@@ -362,9 +361,14 @@ private def addParameter (parameter : Param) (loc : LeanerIR.LocId) : BuildM Lea
     | throw s!"parameter `{parameter.name}` has no local declaration"
   return { name := parameter.name, typeUse := declaration.type }
 
+/-- A specification function's parameter, at its specification type. One
+declared with a fixed-width integer type keeps that type: the function is
+defined where its argument fits it (G15 in `designs/prover-test-problems.md`). -/
 private def addSpecificationParameter (parameter : Param)
     (loc : LeanerIR.LocId) : BuildM LeanerIR.Parameter := do
-  addParameter { parameter with ty := specificationType parameter.ty } loc
+  let ty := if (BitVectorConversion.fixedWidth? parameter.ty).isSome then parameter.ty
+    else specificationType parameter.ty
+  addParameter { parameter with ty } loc
 
 /-- Mark the locals a body borrows mutably as mutable declarations.
 
@@ -2153,12 +2157,7 @@ private def buildNamespace (unitIndex : Nat) (module : Xast.Module) :
         oldParameters := mutable.toArray.map fun parameter =>
           (parameter.name, oldParameterName parameter.name)
         parameterLocals := positions.toArray }
-      -- A specification function is defined where its parameters fit their
-      -- declared types. Compiler-v2's specification version of a Move
-      -- function is derived again from that function.
-      let body := if function.isMoveFun then function.body
-        else function.body.map (SpecDomains.partialBody function.params)
-      let body ← logically (body.mapM addExpr)
+      let body ← logically (function.body.mapM addExpr)
       modify fun state => { state with oldParameters := #[], parameterLocals := #[] }
       let parameters ← withMutablyBorrowedLocals expressionsBefore parameters
       let functionContract ← addContract function.spec functionLoc

@@ -49,18 +49,6 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/behavioral_predicates_examples.move:307:5: error: leaner verification failed: the automatic verification of `index_test_found` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify index_test_found by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify index_test_found by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/behavioral_predicates_examples.move:316:5: error: `index_opaque_test_found` calls `index_opaque`, which is not verified; verify the callee first
-tests/sources/functional/closures/behavioral_predicates_examples.move:340:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/behavioral_predicates_examples.move:340:5: error: leaner verification failed: the automatic verification of `reduce` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify reduce by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify reduce by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/behavioral_predicates_examples.move:360:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/behavioral_predicates_examples.move:360:5: error: leaner verification failed: the automatic verification of `reduce_opaque` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify reduce_opaque by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify reduce_opaque by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/behavioral_predicates_examples.move:379:9: error: the specification clause `ensures result == 8` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:378:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
@@ -68,7 +56,8 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/behavioral_predicates_examples.move:378:5: error: leaner verification failed: the automatic verification of `reduce_test_ok` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify reduce_test_ok by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify reduce_test_ok by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/behavioral_predicates_examples.move:386:5: error: `reduce_opaque_test_ok` calls `reduce_opaque`, which is not verified; verify the callee first
+tests/sources/functional/closures/behavioral_predicates_examples.move:387:9: error: the specification clause `ensures result == 8` is not established
+tests/sources/functional/closures/behavioral_predicates_examples.move:386:5: error: leaner verification failed: the automatic verification of `reduce_opaque_test_ok` failed; provide a proof: `verify reduce_opaque_test_ok by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify reduce_opaque_test_ok by skip` shows the obligations it leaves)
 tests/sources/functional/closures/behavioral_predicates_examples.move:395:9: error: the specification clause `ensures result == 7` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:394:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
@@ -76,4 +65,5 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/functional/closures/behavioral_predicates_examples.move:394:5: error: leaner verification failed: the automatic verification of `reduce_test_fail` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify reduce_test_fail by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify reduce_test_fail by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/behavioral_predicates_examples.move:402:5: error: `reduce_opaque_test_fail` calls `reduce_opaque`, which is not verified; verify the callee first
+tests/sources/functional/closures/behavioral_predicates_examples.move:403:9: error: the specification clause `ensures result == 7` is not established
+tests/sources/functional/closures/behavioral_predicates_examples.move:402:5: error: leaner verification failed: the automatic verification of `reduce_opaque_test_fail` failed; provide a proof: `verify reduce_opaque_test_fail by …` in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean` (`verify reduce_opaque_test_fail by skip` shows the obligations it leaves)

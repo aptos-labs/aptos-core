@@ -577,11 +577,16 @@ A Move specification function is defined where each parameter declared with a
 fixed-width integer type holds a value of that type; elsewhere its value is
 unspecified (decided 2026-10-08). Specification typing lets a caller pass any
 integer to such a parameter, and a specification function cannot abort. The
-importer guards the body by the parameters' ranges and reads the rest as an
-aborting branch, which a specification reads as an unspecified value
-(`Frontend/SpecDomains.lean`). A `num` parameter is unbounded. The
-specification version of a Move function is derived again from the function
-and is not guarded.
+importer keeps the declared parameter types, and the body reads such a
+parameter as an `Int`. The verifier derives the domain from the types: a
+recursive definition unfolds inside it, an expansion is guarded by it (an
+argument whose own form bounds it, such as a certified integer of a fitting
+type, a literal or a vector length, needs no guard), and outside it both read
+one uninterpreted value of the function at the arguments (`f.spec.outside`). The closer decides a domain guard from the bounds the
+arguments' types carry, and keeps an unfolding only where it also decides the
+body's own first condition, as for a function without a domain. A `num`
+parameter is unbounded. The specification version of a Move function is
+derived again from the function and is not guarded.
 
 The Prover's specification functions are total over the integers: for
 `spec fun successor(x: u8): num { x + 1 }`, `successor(300) == 301` verifies

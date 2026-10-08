@@ -198,10 +198,10 @@ on a modelled callee; it fails only on what its own clauses claim.
 
 A Move specification function is partial: it is defined where its
 parameters declared with fixed-width integer types hold values of those
-types, and its value elsewhere is unspecified, as for an aborting branch
-(G15 in [`prover-test-problems.md`](prover-test-problems.md)). The importer
-states the domain in the rendered body (`if 0 <= x && x <= MAX_U64 then …
-else abort()`), so the guard is part of the source the verifier reads.
+types, and its value elsewhere is unspecified (G15 in
+[`prover-test-problems.md`](prover-test-problems.md)). The rendering keeps the
+declared types (`spec fun f(x : u64) : Int`); the body reads `x` as an `Int`,
+and the verifier derives the domain from the type.
 
 A recursive specification function unfolds where its measure descends,
 and a leaf holds it unfolded once at each of its applications whose guard

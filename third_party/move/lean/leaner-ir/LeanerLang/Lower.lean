@@ -4346,11 +4346,13 @@ private partial def lowerSpecificationExpr (context : ExprContext) (expected : O
         failAt "LEANER-SPEC-ARITY"
           s!"spec.bitVectorToInt expects one argument, got {arguments.size}" (some span)
       let value ← lowerExpr context none arguments[0]!
+      -- An operand already read as an integer, such as a fixed-width
+      -- specification-function parameter, converts as the identity.
       unless (← typeNode? value.2).any fun
-          | .integer (.bits _) _ | .integer .pointer _ => true
+          | .integer (.bits _) _ | .integer .pointer _ | .integer .unbounded true => true
           | _ => false do
         failAt "LEANER-SPEC-BITVECTOR"
-          "spec.bitVectorToInt requires a fixed-width integer" (some span)
+          "spec.bitVectorToInt requires an integer" (some span)
       let resultType ← internType (.integer .unbounded true)
       if let some expected := expected then ensureType expected resultType span
       let id ← pushExpression loc resultType <|
@@ -6178,8 +6180,14 @@ private def lowerSpecFunction (declaration : SpecFunctionDecl) : LowerM Unit := 
     parameters := parameters.push { name := parameter.name, typeUse }
     locals := locals.push {
       id := ⟨index⟩, name := parameter.name, type := typeUse, loc := parameterLoc }
-    localTypes := localTypes.push
-      (parameter.name, ⟨index⟩, ← specReferentTypeId typeUse.typeId)
+    -- A fixed-width integer type is the parameter's domain: the function is
+    -- defined where its argument fits. The body reads the parameter as a
+    -- mathematical integer, as a contract reads a function's parameters.
+    let referent ← specReferentTypeId typeUse.typeId
+    let readType ← match ← typeNode? referent with
+      | some (.integer (.bits _) _) => internType (.integer .unbounded true)
+      | _ => pure referent
+    localTypes := localTypes.push (parameter.name, ⟨index⟩, readType)
   let parameterLocalTypes := localTypes
   let mut declarations := #[]
   let mut inferenceLocals := localTypes
