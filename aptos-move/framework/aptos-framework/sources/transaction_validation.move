@@ -919,6 +919,39 @@ module aptos_framework::transaction_validation {
         }
     }
 
+    /// Arguments for `versioned_metered_prologue`. Versioned like `PrologueArgs`:
+    /// a new field becomes a new enum variant, and old variants keep their layout.
+    enum MeteredPrologueArgs {
+        V1 {
+            replay_protector: ReplayProtector,
+        },
+    }
+
+    /// The metered half of the prologue. Runs after `versioned_prologue` has
+    /// validated the transaction and before the payload, charged against the
+    /// transaction's gas budget. Its effects survive a failed payload.
+    fun versioned_metered_prologue(sender: signer, _fee_payer: signer, args: MeteredPrologueArgs) {
+        match (args) {
+            V1 { replay_protector } => {
+                create_sender_account_if_needed(&sender, replay_protector);
+            },
+        }
+    }
+
+    /// The sender's first transaction may come from an address holding no
+    /// `Account` resource yet. Create it, so that the payload and the epilogue
+    /// find it in place.
+    fun create_sender_account_if_needed(sender: &signer, replay_protector: ReplayProtector) {
+        match (replay_protector) {
+            SequenceNumber(txn_sequence_number) => {
+                if (txn_sequence_number == 0) {
+                    account::create_account_if_does_not_exist(signer::address_of(sender));
+                };
+            },
+            Nonce(_) => {},
+        }
+    }
+
     /// Arguments for `versioned_epilogue`. A new field becomes a new enum variant.
     ///
     /// - Old variants are kept for compatibility; their on-chain layout must remain stable.

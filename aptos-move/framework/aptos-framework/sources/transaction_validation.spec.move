@@ -517,4 +517,12 @@ spec aptos_framework::transaction_validation {
         aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
         include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
     }
+
+    spec versioned_metered_prologue {
+        pragma verify = false;
+    }
+
+    spec create_sender_account_if_needed {
+        pragma verify = false;
+    }
 }

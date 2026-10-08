@@ -97,7 +97,7 @@ use std::{
     ops::Deref,
     sync::{atomic::AtomicU64, Arc},
 };
-pub use validation::{EpilogueArgs, PrologueArgs};
+pub use validation::{EpilogueArgs, MeteredPrologueArgs, PrologueArgs};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
