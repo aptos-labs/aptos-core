@@ -29,7 +29,6 @@ use std::sync::Arc;
 // only needed for serialization. Needed before production: building the
 // layout is a DoS vector.
 // TODO(metering): ensure the layout is bounded.
-#[allow(dead_code)]
 pub(crate) fn to_v1_type_layout<T: LayoutProvider + ?Sized>(
     layouts: &T,
     id: LayoutId,

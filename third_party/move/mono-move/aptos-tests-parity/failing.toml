@@ -451,10 +451,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2_runtime_checks::run_
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::any::test_any_with_function_values"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::attributes::test_bad_fun_attribute_in_compiled_module"
 note = "TODO"
 
@@ -586,10 +582,6 @@ note = "TODO"
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_over_cap_rejected"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_under_cap_succeeds"
 note = "TODO"
 
 [[test]]
