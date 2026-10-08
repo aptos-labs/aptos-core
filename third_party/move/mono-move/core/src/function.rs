@@ -3,7 +3,7 @@
 
 use crate::{
     instruction::{CodeOffset, FrameOffset, MicroOp, SizedSlot, FRAME_METADATA_SIZE},
-    interner::InternedModuleId,
+    interner::{InternedFunctionRef, InternedModuleId},
     types::{InternedType, InternedTypeList},
 };
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
@@ -169,6 +169,9 @@ impl SortedSafePointEntries {
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub module_id: InternedModuleId,
+    /// Symbolic identity `(module, name, type arguments)` of this function.
+    /// The type arguments are recorded nowhere else.
+    pub func_ref: InternedFunctionRef,
     /// Definition index of this function in its defining module.
     pub def_idx: FunctionDefinitionIndex,
     pub code: Code,

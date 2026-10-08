@@ -1066,9 +1066,11 @@ pub fn try_lower_function(
     // types — `gc_layout` rejects raw `TypeParam`s.
     let derived = derive_frame_layout(&ctx, func_ir, view_type_list(ctx.home_types))?;
 
+    let module_id = module_ir.module.id();
     Ok(LoweringOutcome::Built(Function {
         name,
-        module_id: module_ir.module.id(),
+        module_id,
+        func_ref: interner.function_ref_of(module_id, name, ty_args),
         def_idx: func_ir.def_idx,
         code: Code::with_origins(code, origins),
         entry_gas,
