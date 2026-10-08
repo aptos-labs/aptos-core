@@ -46,16 +46,22 @@ impl ScriptCache {
         module: Box<LoadedModule>,
     ) -> LeakedBoxPtr<LoadedModule> {
         let leaked = LeakedBoxPtr::from_box(module);
-        match self.inner.entry(hash) {
-            Entry::Occupied(existing) => {
-                // SAFETY: `leaked` is exclusive to this call and has no aliases.
-                unsafe { leaked.free_unchecked() };
-                *existing.get()
-            },
+        let winner = match self.inner.entry(hash) {
+            Entry::Occupied(existing) => Some(*existing.get()),
             Entry::Vacant(vacant) => {
                 vacant.insert(leaked);
-                leaked
+                None
             },
+        };
+        match winner {
+            // Freed once the shard guard is dropped: dropping a script
+            // deallocates its whole IR, which would block the shard.
+            Some(winner) => {
+                // SAFETY: `leaked` is exclusive to this call and has no aliases.
+                unsafe { leaked.free_unchecked() };
+                winner
+            },
+            None => leaked,
         }
     }
 
