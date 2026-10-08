@@ -1,20 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Per-transaction set of modules recorded by the loader, pinning one
-//! version per module for the duration of the transaction.
+//! Per-transaction set of modules the loader has read, holding the module each
+//! read resolved to and how far its loading has progressed.
 
 use crate::invariant_violation;
 use mono_move_core::{ModuleId, VMResult};
 use mono_move_global_context::{ArenaRef, LoadedModule};
 use shared_dsa::UnorderedMap;
 
-/// Represents different states of a loaded module in a read-set. Allowed
-/// state transitions:
-///   1. [`ModuleState::Unmetered`] can become [`ModuleState::Metered`] if gas has been
-///      charged for the module.
-///   2. [`ModuleState::Metered`] can become [`ModuleState::ReadyForLowering`] if
-///      the module became ready for lowering.
+/// Represents different states of a loaded module in a read-set. The only
+/// transition is [`ModuleState::Metered`] to
+/// [`ModuleState::ReadyForLowering`], once the module became ready for
+/// lowering.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum ModuleState {
     /// This module has been loaded, charged gas and its mandatory dependency
@@ -27,10 +25,6 @@ pub enum ModuleState {
     /// Note that this state is recorded before gas is charged to make sure
     /// that running out-of-gas still has a read in the read-set.
     Metered,
-    /// This module has not been metered yet and is only used for caching to
-    /// ensure that transactions always sees the same module version during
-    /// execution.
-    Unmetered,
 }
 
 /// Tracks how this read depends on a particular loaded module.
@@ -102,23 +96,6 @@ impl<'guard> ModuleReadSet<'guard> {
         Ok(())
     }
 
-    /// Records loaded module in the read-set as unmetered.
-    pub fn record_unmetered(
-        &mut self,
-        id: ArenaRef<'guard, ModuleId>,
-        module: &'guard LoadedModule,
-    ) -> VMResult<()> {
-        let read = ModuleRead::Loaded {
-            module,
-            state: ModuleState::Unmetered,
-        };
-        let prev = self.inner.insert(id, read);
-        match prev {
-            Some(ModuleRead::Pending) => Ok(()),
-            Some(ModuleRead::Loaded { .. }) | None => invariant_violation!(ModuleExpectedPending),
-        }
-    }
-
     /// Records loaded module in the read-set as metered.
     pub fn record_metered(
         &mut self,
@@ -156,28 +133,11 @@ impl<'guard> ModuleReadSet<'guard> {
         }
     }
 
-    /// Transitions an existing loaded module from unmetered to metered state.
-    pub fn mark_metered(&mut self, id: ArenaRef<'guard, ModuleId>) -> VMResult<()> {
-        match self.inner.get_mut(&id) {
-            Some(ModuleRead::Loaded { state, .. }) => match state {
-                ModuleState::Unmetered => {
-                    *state = ModuleState::Metered;
-                    Ok(())
-                },
-                ModuleState::Metered | ModuleState::ReadyForLowering => {
-                    invariant_violation!(ModuleAlreadyMetered);
-                },
-            },
-            Some(ModuleRead::Pending) | None => invariant_violation!(ModuleExpectedLoaded),
-        }
-    }
-
     /// Records that existing loaded module has satisfied the lowering
     /// requirements (i.e., its mandatory dependency set has been computed).
     pub fn mark_ready_for_lowering(&mut self, id: ArenaRef<'guard, ModuleId>) -> VMResult<()> {
         match self.inner.get_mut(&id) {
             Some(ModuleRead::Loaded { state, .. }) => match state {
-                ModuleState::Unmetered => invariant_violation!(ModuleExpectedMetered),
                 ModuleState::ReadyForLowering => invariant_violation!(ModuleAlreadyReady),
                 ModuleState::Metered => {
                     *state = ModuleState::ReadyForLowering;

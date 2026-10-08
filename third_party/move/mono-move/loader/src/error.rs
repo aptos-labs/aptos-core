@@ -104,25 +104,13 @@ pub enum LoaderInvariantViolation {
     #[error("Module is already loaded")]
     ModuleAlreadyLoaded,
 
-    #[error("Module must be loaded")]
-    ModuleExpectedLoaded,
-
     #[error("Module must be at least loaded")]
     ModuleExpectedAtLeastLoaded,
-
-    #[error("Module is already metered")]
-    ModuleAlreadyMetered,
-
-    #[error("Module must be metered")]
-    ModuleExpectedMetered,
 
     #[error("Module is already ready for lowering")]
     ModuleAlreadyReady,
 
     // ---- loader cross-checks against the read-set ----
-    #[error("All modules in the read-set must be metered")]
-    ReadSetEntryNotMetered,
-
     #[error("All modules in the read-set must be loaded")]
     ReadSetEntryNotLoaded,
 
@@ -138,13 +126,6 @@ pub enum LoaderInvariantViolation {
     // ---- function slot ----
     #[error("Function slot has just been set")]
     FunctionSlotEmptyAfterSet,
-
-    // ---- mandatory dependencies ----
-    #[error("Mandatory dependencies must be set")]
-    MandatoryDepsNotSet,
-
-    #[error("Mandatory dependencies must always be lazy")]
-    MandatoryDepsNotLazy,
 
     // ---- lowering ----
     /// The specializer produced a function the micro-op verifier rejects.
