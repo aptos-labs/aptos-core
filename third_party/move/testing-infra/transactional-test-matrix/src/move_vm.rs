@@ -218,10 +218,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/entry_points/struct_arguments.masm",
         "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported(
-        "tests/function_values_safety/closure_assign_return.masm",
-        "function value serialization",
-    ),
     MonoMoveDivergence::rendering(
         "tests/function_values_safety/dep_compatibility.masm",
         "invariant violation message, sub-status, location, and exec_state for a stale closure",

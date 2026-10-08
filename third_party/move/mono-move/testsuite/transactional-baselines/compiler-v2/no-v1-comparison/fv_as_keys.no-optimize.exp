@@ -1,15 +1,14 @@
 processed 23 tasks
 task 0 lines 2-89:  publish [module 0x99::test_struct {]
 task 1 lines 91-91:  run --verbose --signers 0x1 -- 0x99::test_struct::init
-Error: unsupported by MonoVM: function values are not yet supported
 task 2 lines 93-93:  run --verbose --signers 0x1 -- 0x99::test_struct::test_exist
 Error: Function execution failed with VMError: {
-    message: None,
-    major_status: ABORTED,
-    sub_status: Some(14566554180833181696),
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: None,
     location: 0x99::test_struct,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(7), 6)],
+    offsets: [(FunctionDefinitionIndex(7), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 3 lines 95-95:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_1
@@ -27,8 +26,8 @@ Error: Function execution failed with VMError: {
 }
 task 7 lines 104-106:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from [//expect to fail]
 Error: Function execution failed with VMError: {
-    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
-    major_status: MISSING_DATA,
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: 0x99::test_struct,
     indices: [],
@@ -47,8 +46,8 @@ Error: Function execution failed with VMError: {
 }
 task 9 lines 109-111:  run --verbose --signers 0x1 -- 0x99::test_struct::test_move_from [// expected to fail as the functon value has been removed above]
 Error: Function execution failed with VMError: {
-    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
-    major_status: MISSING_DATA,
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: 0x99::test_struct,
     indices: [],
@@ -57,8 +56,8 @@ Error: Function execution failed with VMError: {
 }
 task 10 lines 112-115:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from [/// Test cases for function values wrapped in enums as keys]
 Error: Function execution failed with VMError: {
-    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
-    major_status: MISSING_DATA,
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: 0x99::test_struct,
     indices: [],
@@ -67,17 +66,24 @@ Error: Function execution failed with VMError: {
 }
 task 11 lines 116-225:  publish [module 0x99::test_enum {]
 task 12 lines 227-229:  run --verbose --signers 0x1 -- 0x99::test_enum::init [//expect to fail]
-Error: unsupported by MonoVM: function values are not yet supported
 task 13 lines 230-230:  run --verbose --signers 0x1 -- 0x99::test_enum::bad_init
-Error: unsupported by MonoVM: function values are not yet supported
-task 14 lines 232-232:  run --verbose --signers 0x1 -- 0x99::test_enum::test_exist
 Error: Function execution failed with VMError: {
-    message: None,
-    major_status: ABORTED,
-    sub_status: Some(14566554180833181696),
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: None,
     location: 0x99::test_enum,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(8), 6)],
+    offsets: [(FunctionDefinitionIndex(1), 7)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 14 lines 232-232:  run --verbose --signers 0x1 -- 0x99::test_enum::test_exist
+Error: Function execution failed with VMError: {
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: None,
+    location: 0x99::test_enum,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(8), 2)],
     exec_state: Some(ExecutionState { stack_trace: [] }),
 }
 task 15 lines 234-234:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_1
@@ -95,8 +101,8 @@ Error: Function execution failed with VMError: {
 }
 task 19 lines 243-245:  run --verbose --signers 0x1 -- 0x99::test_enum::test_borrow_from [//expect to fail]
 Error: Function execution failed with VMError: {
-    message: Failed to borrow global resource from 0000000000000000000000000000000000000000000000000000000000000001,
-    major_status: MISSING_DATA,
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: 0x99::test_enum,
     indices: [],
@@ -115,8 +121,8 @@ Error: Function execution failed with VMError: {
 }
 task 21 lines 248-250:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from [// expected to fail as the functon value has been removed above]
 Error: Function execution failed with VMError: {
-    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
-    major_status: MISSING_DATA,
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: 0x99::test_enum,
     indices: [],
@@ -125,8 +131,8 @@ Error: Function execution failed with VMError: {
 }
 task 22 lines 251-251:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from
 Error: Function execution failed with VMError: {
-    message: Failed to move resource from 0000000000000000000000000000000000000000000000000000000000000001,
-    major_status: MISSING_DATA,
+    message: resource provider: resource provider invariant violation: a stored value does not decode: unsupported: function values are not yet supported,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: 0x99::test_enum,
     indices: [],

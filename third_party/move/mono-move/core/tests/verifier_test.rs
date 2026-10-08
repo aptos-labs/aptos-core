@@ -7,9 +7,9 @@ use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     interner::{FunctionRef, InternedFunctionRef, InternedModuleId, ModuleId},
     types::{InternedType, EMPTY_TYPE_LIST},
-    verify_function, CallClosureOp, Code, CodeOffset as CO, DescriptorId, DescriptorProvider,
-    FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId,
-    LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SizedSlot,
+    verify_function, CallClosureOp, CaptureLayoutsId, Code, CodeOffset as CO, DescriptorId,
+    DescriptorProvider, FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex,
+    LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SizedSlot,
     SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
@@ -30,6 +30,10 @@ impl LayoutProvider for VerifierProvider {
     }
 
     fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
+        None
+    }
+
+    fn capture_layouts(&self, _id: CaptureLayoutsId) -> Option<&[LayoutId]> {
         None
     }
 }
