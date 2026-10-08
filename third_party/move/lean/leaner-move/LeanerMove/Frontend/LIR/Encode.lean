@@ -1753,11 +1753,22 @@ private def functionKindProperty : FunctionKind → LeanerIR.ProfileValue
   | .inlineRetained => functionProperty "function.inlineRetained"
   | .native => functionProperty "function.native"
 
+/-- Whether an inline function's body is checked against a specification
+of its own, as the Move Prover checks it (`is_inline_verified`): one with a
+condition the source states, not only conditions a schema application
+injects. (The compiler rejects a specification of one taking a function.) -/
+private def isVerifiedInline (function : Xast.Function) : Bool :=
+  match function.spec with
+  | .mk _ _ conditions .. => conditions.any fun
+    | .mk _ _ properties .. => !properties.any (·.name == "$injected")
+
 /-- Non-opaque inline functions have already been expanded at their uses.
-Opaque inline functions still have calls and behavioral references: retain
-their declarations so their bodies can be checked against their contracts. -/
+Opaque inline functions still have calls and behavioral references, and a
+verified inline function's body is checked against its specification:
+retain their declarations. Nothing calls a non-opaque one's declaration. -/
 private def isExpandedInline (function : Xast.Function) : Bool :=
-  function.kind == .inlineRetained && !pragmaTrue function.pragmas "opaque"
+  function.kind == .inlineRetained && !pragmaTrue function.pragmas "opaque" &&
+    !isVerifiedInline function
 
 /-- A source declaration which can own ordinary comments. Expanded inline
 functions remain XAST anchors even though their LIR declarations are omitted. -/

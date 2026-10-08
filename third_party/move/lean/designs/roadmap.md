@@ -15,6 +15,10 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Inline specifications (2026-10-08): a non-opaque inline function with its
+own specification is verified against it, as in the Prover; its calls stay
+expanded. New fixture: `SourceVerify/inline_spec_false.move`.
+
 Loop invariant placement (2026-10-08): a loop invariant no loop header
 begins with is an error, as in the Prover (`loop_invariant_invalid`); a
 loop's annotations together form its specification, where a second one had

@@ -49,6 +49,12 @@ relative to `tests/sources`.
 
 ## Summary
 
+Inline specifications (2026-10-08): a non-opaque inline function with a
+specification of its own is verified against it, as the Prover verifies it;
+before, the importer dropped it with the calls it had expanded, and its
+specification was never checked. `inline_spec_no_opaque` fails `bad_inc` as
+the Prover does.
+
 Loop invariant placement (2026-10-08): a loop takes the leading run of
 `invariant`s of the specification blocks its header begins with, as the
 Prover's loop analysis does (`fat_loop.rs`); any other loop invariant is an

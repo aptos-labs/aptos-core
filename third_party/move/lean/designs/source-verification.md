@@ -123,7 +123,11 @@ usual; the Boogie backend's options have no effect.
 
 The adapter omits non-opaque inline declarations already expanded by compiler-v2.
 Opaque inline declarations remain: their callers and behavioral predicates still
-reference them, and their bodies must satisfy their contracts. An explicit
+reference them, and their bodies must satisfy their contracts. So does a
+non-opaque inline function with a specification of its own (a condition the
+source states, not one a schema application injects): the Move Prover verifies
+its body against it (`is_inline_verified`), while its calls stay expanded and a
+caller proves what the body does. An explicit
 `verify = false` retains the existing trusted-contract treatment. Their comments
 follow the same retention decision.
 
