@@ -23,8 +23,12 @@ const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
 // The maximum number of batch entries (proofs, inline batches and opt batches)
-// a single proposal payload may carry.
+// a single proposal payload may carry. The receiving limit is set higher than
+// the sending limit, so that config skew across validators cannot cause
+// payloads built by honest proposers to be rejected.
 const MAX_SENDING_NUM_BATCH_ENTRIES: u64 = 100;
+pub(crate) static MAX_RECEIVING_NUM_BATCH_ENTRIES: Lazy<u64> =
+    Lazy::new(|| 2 * MAX_SENDING_NUM_BATCH_ENTRIES);
 // stop reducing size at this point, so 1MB transactions can still go through
 const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 // We should reduce block size only until two QS batch sizes.
@@ -258,7 +262,7 @@ impl Default for ConsensusConfig {
             max_sending_inline_bytes: 200 * 1024, // 200 KB
             max_sending_num_batch_entries: MAX_SENDING_NUM_BATCH_ENTRIES,
             max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB
-            max_receiving_num_batch_entries: 100,
+            max_receiving_num_batch_entries: *MAX_RECEIVING_NUM_BATCH_ENTRIES,
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -471,6 +475,11 @@ impl ConsensusConfig {
                 config.max_sending_block_bytes,
                 config.max_receiving_block_bytes,
                 "send < recv for bytes",
+            ),
+            (
+                config.max_sending_num_batch_entries,
+                config.max_receiving_num_batch_entries,
+                "send < recv for num batch entries",
             ),
         ];
         for (send, recv, label) in &send_recv_pairs {
