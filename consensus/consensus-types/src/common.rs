@@ -723,7 +723,7 @@ mod tests {
 
     const MAX_BATCH_TXNS: u64 = 100;
     const MAX_BATCH_BYTES: u64 = 1024 * 1024;
-    const MAX_NUM_BATCH_ENTRIES: u64 = 1000;
+    const MAX_NUM_BATCH_ENTRIES: u64 = 100;
 
     fn make_batch_info(author: PeerId, num_txns: u64, num_bytes: u64) -> BatchInfo {
         BatchInfo::new(
