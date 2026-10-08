@@ -7,3 +7,5 @@ LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:39:16: error: the loop inv
 LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:41:7: error: leaner verification failed: the automatic verification of `bad_step` failed; provide a proof: `verify bad_step by …` in the module (`verify bad_step by skip` shows the obligations it leaves)
 LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:52:4: error: the specification clause `ensures result == 1` is not established
 LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:51:7: error: leaner verification failed: the automatic verification of `bad_default` failed; provide a proof: `verify bad_default by …` in the module (`verify bad_default by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:62:16: error: the loop invariant `i == 0` is not preserved by an iteration
+LeanerE2ETests/Check/Control/LoopInvariantErrors.lean:66:7: error: leaner verification failed: the automatic verification of `split_annotation` failed; provide a proof: `verify split_annotation by …` in the module (`verify split_annotation by skip` shows the obligations it leaves)

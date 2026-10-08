@@ -15,6 +15,13 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Loop invariant placement (2026-10-08): a loop invariant no loop header
+begins with is an error, as in the Prover (`loop_invariant_invalid`); a
+loop's annotations together form its specification, where a second one had
+silently replaced the first. New fixtures:
+`SourceVerify/loop_invariant_placement{,_false}.move`, and a case in
+`Check/Control/LoopInvariantErrors`.
+
 Test-driver parity (2026-10-08): `--verify-only` selects the verified
 functions under `--lean`; Move scripts, and any module whose rendered name is
 quoted (`std::string`), are verified again: the verifier had looked them up
@@ -739,7 +746,7 @@ files without `verify` targets.
 | Structs | `Abilities`, `Invariants`, `PositionalStructs`, `Tuples` | `Abilities` has no `verify` targets. |
 | Enums | `EnumPatterns`, `EnumPayloads`, `EnumRefContracts`, `EnumRefs`, `EnumResources`, `Enums`, `MatchPatterns`, `VariantFields` | `EnumRefs` is execution only. `MatchPatterns` and `VariantFields`: a value no pattern or field fits aborts with Move's incomplete-match code, in the denotation and at run time. |
 | Vectors | `CertifiedReads`, `ElementQuantifiers`, `VectorBounds`, `VectorOperations`, `Vectors`, `GenericSwapRemove` | `CertifiedReads`: signed/unsigned bounds through total integer reads, zero for missing entries, and rejection of a false signed nonnegativity claim at 25k. `ElementQuantifiers`: element-wise preconditions establish indexed-read properties for value/reference vectors, signed integers, Booleans and generic equality predicates; stronger bounds and a missing-entry claim remain rejected at 25k. A target whose guards stay undecided exhausts heartbeats rather than failing fast. |
-| Control | `Aborts`, `ControlForms`, `LiteralLoops`, `LoopControlErrors`, `LoopInvariantErrors`, `LoopInvariants`, `Loops`, `LoopVerification` | `Aborts`: a false contract (intended). `LiteralLoops`: loops over literal vectors with recursive specification functions in their invariants, and a nested loop with a nonlinear invariant; a wrong value fails (intended). `LoopInvariantErrors`: an invariant not established at entry and at an iteration. |
+| Control | `Aborts`, `ControlForms`, `LiteralLoops`, `LoopControlErrors`, `LoopInvariantErrors`, `LoopInvariants`, `Loops`, `LoopVerification` | `Aborts`: a false contract (intended). `LiteralLoops`: loops over literal vectors with recursive specification functions in their invariants, and a nested loop with a nonlinear invariant; a wrong value fails (intended). `LoopInvariantErrors`: an invariant not established at entry and at an iteration, and one of a loop's two annotations (a `where` region and a following `spec`), both of which form its specification. |
 | References | `BorrowCertificates`, `BorrowChecker`, `BorrowErrors`, `BorrowGlobalErrors`, `CorePrimitives`, `Freeze`, `Loans`, `OperandLoans`, `Prophecies`, `ReferencePatterns`, `References`, `ReturnedMutRefErrors`, `ReturnedMutRefs` | `BorrowCertificates` asserts certificates, no `verify`. `BorrowChecker`: twelve rejections at preparation, the accepted programs verified. |
 | Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GenericSpecResourceArguments`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors`, `TableReads`, `TableStorageKeys`, `TableStoredInvariants` | `TableStoredInvariants`: nine stored-entry proofs at 25k, including phantom arguments, computed keys and both handle layouts, plus two false-claim rejections. `TableReads`: membership, scalar/generic/nested lookup, opaque caller old-state contract and false-lookup rejection. `TableStorageKeys`: canonical Table slots across caller/callee namespaces, reference exclusion and distinct handles. `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
 | Calls | `AbstractClauses`, `Callees`, `Calls`, `Composition`, `InlinedCallees`, `Modules`, `OpaqueGeneric`, `PreludeNatives`, `Summaries` | Intended negatives: a caller does not see a `[concrete]` result (`AbstractClauses`), an opaque callee's body (`InlinedCallees`), a postcondition a callee of another module refutes (`Modules`). |

@@ -49,6 +49,18 @@ relative to `tests/sources`.
 
 ## Summary
 
+Loop invariant placement (2026-10-08): a loop takes the leading run of
+`invariant`s of the specification blocks its header begins with, as the
+Prover's loop analysis does (`fat_loop.rs`); any other loop invariant is an
+error at its location and nothing is verified (`Frontend.LoopInvariants`).
+`loop_invariant_invalid` reports the Prover's four errors. Consecutive
+specification blocks of a header are joined into one by the importer, and
+all annotations of one loop form its specification
+(`Contract.loopSpecifications`): before, a loop's second annotation
+silently replaced its first, whose invariants were neither checked nor
+assumed. The Prover's exemption of declarations in unreachable code is not
+modeled; no test has one.
+
 Generic axioms (2026-10-08): `axiom<T>` is assumed at the instantiations a
 verification applies (V1), `num` is a type argument of specification
 functions (V2), a module's abort strictness holds for its functions, and
@@ -518,7 +530,16 @@ Example (`functional/disable_inv.move`): the Prover rejects the module;
 Leaner reports `f1_incorrect`, a public function delegating its invariants,
 at its first write, and verifies the other functions.
 
-Tests: `functional/disable_inv.move`.
+The Prover also rejects a public function called, at any depth, from a
+function with `disable_invariants_in_body` (`functional/disable_inv_indirect`):
+the public function assumes the invariants at entry, which the disabled body
+need not keep. Leaner verifies the module; a call in such a body does not
+give the callee's postcondition where the invariants are broken (a function
+breaking an invariant, calling a public reader whose postcondition holds by
+the invariant, and restoring it before its exit, fails its own
+postcondition).
+
+Tests: `functional/disable_inv.move`, `functional/disable_inv_indirect.move`.
 
 ### G10. `pragma unroll` is bounded checking
 
@@ -646,6 +667,42 @@ The Prover's specification functions are total over the integers: for
 there and not in Leaner. Inside the domain the two agree.
 
 Tests: `SourceVerify/spec_fun_domain{,_false}.move`.
+
+### G16. Verified where the Prover's encoding or solver gives up
+
+Some tests pin a failure of the Prover that is not a property of the
+program: a limit of its encoding, of its specification inference, or of the
+solver. Leaner proves these functions, which is the intended outcome: its
+behavioral predicates are defined from a function's meaning, not from an
+inferred contract, and its theorems do not depend on solver heuristics.
+
+- `proof/weight_too_large`: a `[weight = 1000]` axiom is never instantiated
+  by Z3; `id_num(0) == 0` unfolds in Leaner.
+- `closures/lambda_spec_loop_anchor`, `closures/lambda_captured_fun_loop`:
+  the inferred contract of a looping lambda is not provable; Leaner reads
+  the lambda's behavior from its body.
+- `closures/behavioral_underivable_body`: `result_of<sum_to>` of a function
+  without a specification whose body loops.
+- `closures/lambda_funparam_memory_err`,
+  `closures/lambda_funparam_declared_memory_err`,
+  `closures/lambda_nested_hof_memory_err`: behavioral predicates of
+  function-typed parameters whose targets access global memory, which the
+  Prover's encoding does not thread yet.
+- `state_labels/labeled_state_arg_mismatch`: labeled states over two
+  different `&mut` arguments, which the Prover's witness keyed by label
+  cannot tell apart.
+- `regression/generic_aliasing_cap`: more than 256 type-aliasing cases; the
+  memory of a generic resource is one typed memory per instantiation.
+
+### G17. Diagnostics of the Prover not reported
+
+The Prover rejects some specifications Leaner reads without harm:
+`old(..)` of an expression that does not depend on state
+(`functional/old_param_err`; Leaner reads it as the expression), and a
+function accessing a resource its `reads` clause does not cover
+(`functional/reads_check`). A function's `reads` clause is not used by
+Leaner: a caller takes the callee to read all memory, so the unchecked
+clause cannot be relied on.
 
 ## Rejected before verification
 

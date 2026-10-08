@@ -1,0 +1,3 @@
+LeanerE2ETests/SourceVerify/loop_invariant_placement_false.move:11:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence
+LeanerE2ETests/SourceVerify/loop_invariant_placement_false.move:24:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence
+LeanerE2ETests/SourceVerify/loop_invariant_placement_false.move:38:17: error: Loop invariants must be declared at the beginning of the loop header in a consecutive sequence

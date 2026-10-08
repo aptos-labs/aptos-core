@@ -3459,10 +3459,18 @@ partial def loopSpecifications (ns : ValidatedNamespace)
   if let .loop .. := expression.kind then
     unless found.any (fun (site, _) => site == root) do
       found := found.push (root, { loc := expression.loc })
-  -- An annotation preceding a loop and the recursive visit name the same
-  -- site. Keep the authored entry, discovered before its default.
-  found := found.foldl (fun acc item =>
-    if acc.any (fun previous => previous.1 == item.1) then acc else acc.push item) #[]
+  -- Several annotations can name one site: one preceding the loop, found
+  -- here, and the blocks its header begins with, found by the recursive
+  -- visit. The site's specification is all of their conditions, in order;
+  -- the default, discovered after them, adds none.
+  found := found.foldl (fun acc (site, block) =>
+    match acc.findIdx? (·.1 == site) with
+    | some index => acc.modify index fun (site, previous) =>
+        (site, { previous with
+          pragmas := previous.pragmas ++ block.pragmas
+          conditions := previous.conditions ++ block.conditions
+          frame := previous.frame <|> block.frame })
+    | none => acc.push (site, block)) #[]
   return found
 
 /-- A condition's clause marked with the condition's range, so that a

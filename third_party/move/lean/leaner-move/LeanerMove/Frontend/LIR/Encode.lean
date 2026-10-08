@@ -6,6 +6,7 @@ import LeanerMove.Frontend.Effects
 import LeanerMove.Frontend.Frames
 import LeanerMove.Frontend.Proofs
 import LeanerMove.Frontend.BitVectorConversion
+import LeanerMove.Frontend.LoopInvariants
 import LeanerLang.AddressAlias
 import LeanerMove.Frontend.LIR.Codec
 
@@ -1373,7 +1374,9 @@ mutual
               match expressions.back? with
               | none => pure <| .block #[] none
               | some result => pure <| .block (expressions.pop) (some result)
-          | .loop body => pure <| .loop none (← addExpr body)
+          -- The specification blocks a loop's header begins with are its
+          -- specification, at one site.
+          | .loop body => pure <| .loop none (← addExpr (LoopInvariants.joinHeader body))
           | .loopCont nest isContinue =>
               pure <| if isContinue then .continue_ nest else .break_ nest none
           | .«return» value =>
