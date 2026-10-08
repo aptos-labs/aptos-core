@@ -124,7 +124,7 @@ use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format::CompiledScript,
-    file_format_common::VERSION_5,
+    file_format_common::{VERSION_5, VERSION_MIN},
     CompiledModule,
 };
 use move_core_types::{
@@ -1883,7 +1883,8 @@ impl AptosVM {
         gas_meter: &impl AptosGasMeter,
         modules: &[CompiledModule],
     ) -> VMResult<()> {
-        let mut min_version: u64 = 0;
+        // Nothing below `VERSION_MIN` deserializes, so start from there.
+        let mut min_version = u64::from(VERSION_MIN);
         if self
             .timed_features()
             .is_enabled(TimedFeatureFlag::RejectV5ModulePublishing)
