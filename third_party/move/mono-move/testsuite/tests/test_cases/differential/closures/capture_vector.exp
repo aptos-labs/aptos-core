@@ -203,6 +203,7 @@ fun capture_one() {
     6: []
     9: []
     10: []
+    11: []
 }
 
 fun capture_two() {
@@ -238,6 +239,7 @@ fun capture_two() {
     13: []
     16: []
     17: []
+    18: []
 }
 
 fun len_plus() {

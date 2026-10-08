@@ -7,10 +7,10 @@ use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     interner::{FunctionRef, InternedFunctionRef, InternedModuleId, ModuleId},
     types::{InternedType, EMPTY_TYPE_LIST},
-    verify_function, CaptureLayoutsId, Code, CodeOffset as CO, DescriptorId, DescriptorProvider,
-    FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId,
-    LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SortedSafePointEntries,
-    ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    verify_function, CallClosureOp, CaptureLayoutsId, Code, CodeOffset as CO, DescriptorId,
+    DescriptorProvider, FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex,
+    LayoutId, LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SafePointEntry,
+    SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// A descriptor table paired with an empty layout provider, to satisfy the
@@ -136,6 +136,31 @@ fn valid_with_vec_and_pointer_slots() {
         extended_frame_size: 56,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        ..minimal_func()
+    };
+    let errors = verify_function(&func, &trivial_descriptors());
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+#[test]
+fn valid_with_safe_point_at_call_closure() {
+    use MicroOp::*;
+
+    #[rustfmt::skip]
+    let code = vec![
+        CallClosure(Box::new(CallClosureOp { closure_src: FO(0), provided_args: vec![] })),
+        Return,
+    ];
+    let func = Function {
+        code: Code::from_vec(code),
+        param_and_local_sizes_sum: 16,
+        extended_frame_size: 40,
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        safe_point_layouts: SortedSafePointEntries::new(vec![SafePointEntry {
+            code_offset: CO(0),
+            layout: FrameLayoutInfo::new(vec![FO(8)]),
+        }]),
         ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());

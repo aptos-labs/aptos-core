@@ -342,7 +342,7 @@ fn read_struct_node(bytes: &[u8], cursor: &mut usize) -> Result<LayoutNode, Runt
 }
 
 /// Advances `layout` past one `MoveTypeLayout` without reading any value.
-fn skip_layout(bytes: &[u8], layout: &mut usize) -> Result<(), RuntimeError> {
+pub(crate) fn skip_layout(bytes: &[u8], layout: &mut usize) -> Result<(), RuntimeError> {
     match read_layout_node(bytes, layout)? {
         LayoutNode::Bool | LayoutNode::Int { .. } | LayoutNode::Address | LayoutNode::Function => {
             Ok(())
