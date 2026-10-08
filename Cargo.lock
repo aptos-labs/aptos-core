@@ -12951,6 +12951,7 @@ dependencies = [
  "bumpalo",
  "crossbeam-utils",
  "parking_lot 0.12.5",
+ "shared-dsa",
 ]
 
 [[package]]

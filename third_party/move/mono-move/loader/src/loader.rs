@@ -2,26 +2,22 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Implementation of loader to load modules from storage into the long-living
-//! cache and per-transaction read-set with deterministic gas charging.
+//! cache with deterministic gas charging.
 //!
 //! Loading modules includes multiple passes:
 //!
 //! 1. **Charge gas.**
 //! Whether the module is in the cache or not, gas is charged deterministically
 //! for target module and its mandatory dependencies (i.e., modules which are
-//! always preloaded with the target module). After this pass, all modules that
-//! were touched are added to the read-set.
+//! always preloaded with the target module). Each module is charged at most
+//! once per transaction: the execution guard records the ones already charged.
 //!
 //! 2. **Translate (on cache miss only).**
 //! For every cache miss, modules are fetched from storage, deserialized,
 //! verified and translated into stackless execution IR. Translated modules are
 //! then inserted into cache.
 
-use crate::{
-    error::LoaderError,
-    invariant_violation,
-    read_set::{ModuleRead, ModuleReadSet, ModuleState},
-};
+use crate::{error::LoaderError, invariant_violation};
 use mono_move_core::{
     abilities::{AbilityCalculator, AbilityError},
     interner::{
@@ -39,7 +35,8 @@ use mono_move_core::{
     ValueLayout,
 };
 use mono_move_global_context::{
-    ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, ScriptHash,
+    ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, ModuleIdx, ScriptHash,
+    SCRIPT_MODULE_IDX,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -105,8 +102,8 @@ pub enum LoadingPolicy {
 }
 
 /// Per-transaction code loader: loads code from the cache, charges gas on
-/// load, handles cache misses, and records each loaded executable in the
-/// transaction's read-set.
+/// load, handles cache misses, and records each module it charged on the
+/// execution guard.
 pub struct Loader<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
     module_provider: &'guard dyn ModuleProvider,
@@ -144,16 +141,18 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         self.guard
     }
 
-    /// Loads and returns the executable corresponding to the given ID,
-    /// records it (and any policy-dictated mandatory dependencies) in the
-    /// transaction's read-set, and charges gas for the load.
-    ///
-    /// # Precondition
-    ///
-    /// The code has not been resolved and added to the read-set yet.
+    /// The module with the specified ID, which this transaction has already
+    /// charged for and so must be loaded.
+    pub fn loaded_module(&self, module_id: InternedModuleId) -> VMResult<&'guard LoadedModule> {
+        self.loaded_module_at(self.module_idx(module_id)?)
+    }
+
+    /// Loads and returns the executable corresponding to the given ID, records
+    /// it (and any policy-dictated mandatory dependencies) as charged on the
+    /// guard, and charges gas for the load. A module this transaction has
+    /// already charged for is returned without charging again.
     pub fn load_module(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<&'guard LoadedModule> {
@@ -161,11 +160,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             LoadingPolicy::Lazy(lowering) => {
                 use LoweringPolicy::*;
                 match lowering {
-                    Lazy => self.load_lazy_with_lazy_lowering(read_set, gas_meter, id),
-                    Eager => self.load_lazy_with_eager_lowering(read_set, gas_meter, id),
+                    Lazy => self.load_lazy_with_lazy_lowering(gas_meter, id),
+                    Eager => self.load_lazy_with_eager_lowering(gas_meter, id),
                 }
             },
-            LoadingPolicy::Package => self.load_package(read_set, gas_meter, id),
+            LoadingPolicy::Package => self.load_package(gas_meter, id),
         }
     }
 
@@ -177,66 +176,70 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     //    during load time.
     pub fn load_function(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> VMResult<FunctionPtr> {
-        let id = self.guard.arena_ref_for_module_id(module_id);
+        let idx = self.module_idx(module_id)?;
+        self.load_function_at(gas_meter, idx, func_name, ty_args)
+    }
 
-        let module = match read_set.get(id) {
-            Some(ModuleRead::Loaded { module, state }) => match state {
-                ModuleState::ReadyForLowering => module,
-                ModuleState::Metered => {
-                    self.ensure_ready_for_lowering(read_set, gas_meter, id, module)?;
-                    module
-                },
-            },
-            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
-            None => self.load_module(read_set, gas_meter, id)?,
+    /// As [`Loader::load_function`], but names the callee's module by its table
+    /// index. Lowered call sites carry the index, so a call resolves without
+    /// hashing the module ID.
+    pub fn load_function_at(
+        &self,
+        gas_meter: &mut GasMeter,
+        idx: ModuleIdx,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> VMResult<FunctionPtr> {
+        let module = if self.guard.is_charged(idx) {
+            let module = self.loaded_module_at(idx)?;
+            // A script is loaded whole by `load_script` and has no module in
+            // storage to walk a lowering set from.
+            if idx != SCRIPT_MODULE_IDX {
+                self.ensure_ready_for_lowering(gas_meter, module)?;
+            }
+            module
+        } else {
+            self.load_module(gas_meter, self.module_id_at(idx)?)?
         };
 
         // Non-generic call.
         if ty_args.is_empty() {
-            // No lowered-code slot: either a native (present by name, no IR)
-            // or genuinely absent: report which.
-            let slot = module.get_function_slot(func_name).ok_or_else(|| {
-                match module.get_function_ir(func_name) {
-                    // TODO(completeness): a closure over a native is packable
-                    // but not callable, where the legacy VM calls it. A call
-                    // site has no `NativeABI`, so the fix is to synthesize one
-                    // per instantiation at load time.
-                    FunctionIrLookup::Native => LoaderError::NativeFunctionNotLoadable {
-                        address: *id.address(),
-                        module: id.name().to_string(),
-                        name: view_name(func_name).to_string(),
-                    },
-                    FunctionIrLookup::Ir(_) | FunctionIrLookup::NotDefined => {
-                        LoaderError::FunctionNotFound {
+            let Some(slot) = module.get_function_slot(func_name) else {
+                // No lowered-code slot: either a native (present by name, no IR)
+                // or genuinely absent: report which.
+                let id = self.module_id_at(idx)?;
+                return Err(VMInternalError::new(
+                    match module.get_function_ir(func_name) {
+                        // TODO(completeness): a closure over a native is packable
+                        // but not callable, where the legacy VM calls it. A call
+                        // site has no `NativeABI`, so the fix is to synthesize one
+                        // per instantiation at load time.
+                        FunctionIrLookup::Native => LoaderError::NativeFunctionNotLoadable {
                             address: *id.address(),
                             module: id.name().to_string(),
                             name: view_name(func_name).to_string(),
-                        }
+                        },
+                        FunctionIrLookup::Ir(_) | FunctionIrLookup::NotDefined => {
+                            LoaderError::FunctionNotFound {
+                                address: *id.address(),
+                                module: id.name().to_string(),
+                                name: view_name(func_name).to_string(),
+                            }
+                        },
                     },
-                }
-            })?;
+                ));
+            };
             if let Some(loaded) = slot.get() {
-                self.charge_mandatory_set(
-                    read_set,
-                    gas_meter,
-                    &loaded.mandatory_dependencies,
-                    |read_set, id| self.reserve_and_load(read_set, id),
-                )?;
+                self.charge_and_load(gas_meter, &loaded.mandatory_dependencies, None)?;
                 return Ok(loaded.function);
             }
-            let (function, function_ms) = self.lower_function_with_ty_args(
-                read_set,
-                gas_meter,
-                module,
-                func_name,
-                EMPTY_TYPE_LIST,
-            )?;
+            let (function, function_ms) =
+                self.lower_function_with_ty_args(gas_meter, module, func_name, EMPTY_TYPE_LIST)?;
             if let Err(loser) = slot.set(FunctionSlot::new(function, function_ms)) {
                 // SAFETY: There are no aliases and this is a unique pointer
                 // because it lost the race: safe to free.
@@ -266,15 +269,13 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         if let Some((function, function_ms)) =
             module.get_instantiated_function_ptr(func_name, ty_args)
         {
-            self.charge_mandatory_set(read_set, gas_meter, &function_ms, |read_set, id| {
-                self.reserve_and_load(read_set, id)
-            })?;
+            self.charge_and_load(gas_meter, &function_ms, None)?;
             return Ok(function);
         }
 
         // Cache miss: monomorphize & lower, charging gas.
         let (function, function_ms) =
-            self.lower_function_with_ty_args(read_set, gas_meter, module, func_name, ty_args)?;
+            self.lower_function_with_ty_args(gas_meter, module, func_name, ty_args)?;
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
     }
 
@@ -283,16 +284,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// for the modules its definition pulls in.
     pub fn publish_resource_type(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         ty: InternedType,
     ) -> VMResult<()> {
-        let mut ctx = LoweringContext::new(self, read_set);
+        let mut ctx = LoweringContext::new(self);
         let published = publish_resource_type(&mut ctx, self.guard, ty)?;
-        let discovered = Arc::<[InternedModuleId]>::from(ctx.discovered);
-        self.charge_mandatory_set(read_set, gas_meter, &discovered, |_, _| {
-            invariant_violation!(UnexpectedReadSetMiss);
-        })?;
+        self.charge_and_load(gas_meter, &ctx.discovered, None)?;
         if !published {
             return Err(VMInternalError::new(
                 LoaderError::ResourceLayoutNotDerivable,
@@ -305,7 +302,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// expected type. If the type turns out to be different, resolution fails.
     pub fn resolve_function(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: &IdentStr,
@@ -313,16 +309,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
         use FunctionResolutionError::*;
 
-        // Every load that succeeds leaves the entry loaded, so a pending entry
-        // means an earlier load of this module failed and left it behind.
+        // Charging happens before the load, so a module charged for but not
+        // loaded is one whose load failed earlier in this transaction.
         // Resolution is the one caller that survives a failed load, so it has
         // to fail the same way again instead of tripping over the leftover.
-        let id = self.guard.arena_ref_for_module_id(module_id);
-        if matches!(read_set.get(id), Some(ModuleRead::Pending)) {
+        let idx = self.module_idx(module_id)?;
+        if self.guard.is_charged(idx) && self.guard.module_at(idx).is_none() {
             return Ok(Err(FunctionNotFound));
         }
 
-        let module = match self.get_or_load_module(read_set, gas_meter, module_id) {
+        let module = match self.get_or_load_module(gas_meter, module_id) {
             Ok(module) => module,
             Err(err) if err.kind() == ExecutionErrorKind::LinkingError => {
                 return Ok(Err(FunctionNotFound))
@@ -366,7 +362,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             Err(FunctionTypeMismatch::NotInstantiated) => return Ok(Err(FunctionNotInstantiated)),
         };
 
-        if !self.ty_args_satisfy_constraints(read_set, gas_meter, constraints, &ty_args)? {
+        if !self.ty_args_satisfy_constraints(gas_meter, constraints, &ty_args)? {
             return Ok(Err(FunctionIncompatibleType));
         }
         let ty_args = self.guard.type_list_of(&ty_args);
@@ -381,7 +377,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// names has to be loaded to reach the declaration that does.
     fn ty_args_satisfy_constraints(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         constraints: &[AbilitySet],
         ty_args: &[InternedType],
@@ -396,7 +391,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
         let mut modules = UnorderedMap::with_capacity(nominal_modules.len());
         for nominal_module in nominal_modules {
-            let module = self.get_or_load_module(read_set, gas_meter, nominal_module)?;
+            let module = self.get_or_load_module(gas_meter, nominal_module)?;
             modules.insert(nominal_module, &module.ir().module);
         }
 
@@ -422,50 +417,48 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// On a cache miss, the module provider's configs govern deserialization
     /// and verification.
     ///
-    /// # Precondition
-    ///
-    /// No script has been loaded into this read-set yet.
+    /// The guard's script slot points at the script loaded last, so a caller
+    /// that runs several scripts under one guard sees the one it is running.
     pub fn load_script(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         script_code: &[u8],
         ty_args: InternedTypeList,
     ) -> VMResult<FunctionPtr> {
         let module_id = script_module_id(self.guard);
-        let id = self.guard.arena_ref_for_module_id(module_id);
-        read_set.record_pending_loading(id)?;
+        // Recorded before the load, so that a script that fails to load is
+        // still a read.
+        self.guard.mark_charged(SCRIPT_MODULE_IDX);
 
         let hash = ScriptHash::of(script_code);
         let module = match self.guard.get_script(&hash) {
             Some(module) => {
                 // A miss loads the dependencies to link the script. A hit loads
-                // them too, so that gas and the read-set do not depend on cache
-                // warmth.
+                // them too, so that gas and the recorded reads do not depend on
+                // cache warmth.
                 let script = &module.ir().module;
                 for &dependency in script.module_ids() {
                     if dependency != script.id() {
-                        self.get_or_load_module(read_set, gas_meter, dependency)?;
+                        self.get_or_load_module(gas_meter, dependency)?;
                     }
                 }
                 module
             },
             // TODO(perf): evaluate whether waiting for a concurrent insertion
             // beats every thread verifying the script itself.
-            None => self.build_and_insert_script(read_set, gas_meter, hash, script_code)?,
+            None => self.build_and_insert_script(gas_meter, hash, script_code)?,
         };
-        read_set.record_ready_for_lowering(id, module)?;
+        self.guard.set_script(module);
         gas_meter.charge(module.cost())?;
 
         let main = view_module_id(module_id).name();
-        self.load_function(read_set, gas_meter, module_id, main, ty_args)
+        self.load_function(gas_meter, module_id, main, ty_args)
     }
 
     /// Deserializes, verifies, and links `script_code` against its
     /// dependencies, then caches it as a module.
     fn build_and_insert_script(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         hash: ScriptHash,
         script_code: &[u8],
@@ -487,7 +480,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             .immediate_dependencies_iter()
             .map(|(address, name)| {
                 let module_id = self.guard.module_id_of(address, name);
-                self.get_or_load_module(read_set, gas_meter, module_id)
+                self.get_or_load_module(gas_meter, module_id)
             })
             .collect::<VMResult<Vec<_>>>()?;
         move_bytecode_verifier::dependencies::verify_script(
@@ -508,20 +501,18 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok(self.guard.insert_script(hash, module))
     }
 
-    /// Returns the module from the read-set, loading it first if this
+    /// Returns the module, loading and charging for it first if this
     /// transaction has not yet.
-    fn get_or_load_module(
+    pub fn get_or_load_module(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
     ) -> VMResult<&'guard LoadedModule> {
-        let id = self.guard.arena_ref_for_module_id(module_id);
-        match read_set.get(id) {
-            Some(ModuleRead::Loaded { module, .. }) => Ok(module),
-            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
-            None => self.load_module(read_set, gas_meter, id),
+        let idx = self.module_idx(module_id)?;
+        if self.guard.is_charged(idx) {
+            return self.loaded_module_at(idx);
         }
+        self.load_module(gas_meter, self.guard.arena_ref_for_module_id(module_id))
     }
 
     /// Runs the lowering pipeline for a single function with the given
@@ -529,7 +520,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// lowered code and its mandatory-dependency set.
     fn lower_function_with_ty_args(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         module: &LoadedModule,
         func_name: InternedIdentifier,
@@ -558,7 +548,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         };
         // TODO(metering): the lowering work, including micro-op verification
         // below, needs to be charged deterministically.
-        let mut loading_ctx = LoweringContext::new(self, read_set);
+        let mut loading_ctx = LoweringContext::new(self);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
             self.guard,
@@ -568,7 +558,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         )?;
 
         // Every filtered module is already loaded: lowering runs only once the
-        // parent is ready, which puts all of MS(parent) in the read-set.
+        // parent is ready, which charges all of MS(parent).
         let parent_ms = module
             .mandatory_dependencies()
             .iter()
@@ -577,9 +567,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         loading_ctx.discovered.retain(|id| !parent_ms.contains(id));
         let function_ms = Arc::<[InternedModuleId]>::from(loading_ctx.discovered);
 
-        self.charge_mandatory_set(read_set, gas_meter, &function_ms, |_, _| {
-            invariant_violation!(UnexpectedReadSetMiss);
-        })?;
+        self.charge_and_load(gas_meter, &function_ms, None)?;
 
         let function = match try_lower_function(
             module.ir(),
@@ -622,19 +610,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// gas for this code instance.
     fn load_lazy_with_lazy_lowering(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<&'guard LoadedModule> {
-        read_set.record_pending_loading(id)?;
-        let module = match self.guard.get_module(id) {
-            Some(module) => module,
-            None => self.build_and_insert_module_ir(id, None)?,
-        };
-
-        read_set.record_ready_for_lowering(id, module)?;
-        gas_meter.charge(module.cost())?;
-        Ok(module)
+        let module_id = id.into_global_arena_ptr();
+        self.charge_and_load(gas_meter, &[module_id], None)?;
+        self.loaded_module(module_id)
     }
 
     /// Loads the code corresponding to the specified ID and all other
@@ -642,7 +623,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// whether it was cache miss or hit.
     fn load_package(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<&'guard LoadedModule> {
@@ -656,42 +636,15 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             None => self.package_ids(id)?,
         };
 
-        // If cache hit, we need to go over package members, record them in the
-        // read-set, and charge gas. If cache miss, we do the same but also
-        // fetch modules from storage on read-set cache miss and insert them
-        // into the cache and read-set.
-        self.charge_mandatory_set(read_set, gas_meter, &package, |read_set, id| {
-            read_set.record_pending_loading(id)?;
-            let module = match self.guard.get_module(id) {
-                Some(module) => module,
-                None => self.build_and_insert_module_ir(id, Some(package.clone()))?,
-            };
-            read_set.record_ready_for_lowering(id, module)?;
-            Ok(module)
-        })?;
+        // The target is a member of its own package, so this charges for it
+        // too. Members already charged earlier in this transaction, by a
+        // layout-only side-load for instance, are charged once overall.
+        self.charge_and_load(gas_meter, &package, Some(&package))?;
 
-        // Promote any package member that was already in the read-set as
-        // metered (e.g., a layout-only side-load earlier in this transaction).
-        for &member_id in package.iter() {
-            let member_id = self.guard.arena_ref_for_module_id(member_id);
-            if matches!(
-                read_set.get(member_id),
-                Some(ModuleRead::Loaded {
-                    state: ModuleState::Metered,
-                    ..
-                })
-            ) {
-                read_set.mark_ready_for_lowering(member_id)?;
-            }
-        }
-
-        if let Some(ModuleRead::Loaded { module, state }) = read_set.get(id) {
-            if !matches!(state, ModuleState::ReadyForLowering) {
-                invariant_violation!(TargetModuleNotReady);
-            }
-            Ok(module)
-        } else {
-            invariant_violation!(TargetModuleNotLoaded)
+        let idx = self.module_idx(id.into_global_arena_ptr())?;
+        match self.guard.module_at(idx) {
+            Some(module) => Ok(module),
+            None => invariant_violation!(TargetModuleNotLoaded),
         }
     }
 
@@ -728,78 +681,63 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// module. Gas is charged for the whole set of these modules.
     fn load_lazy_with_eager_lowering(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         id: ArenaRef<'guard, ModuleId>,
     ) -> VMResult<&'guard LoadedModule> {
-        // Reserved before the walk, so that a walk that fails still leaves a
-        // read behind.
-        read_set.record_pending_loading(id)?;
-        let module = self.get_or_build(id)?;
-        self.charge_and_ready_for_eager_lowering(read_set, gas_meter, id, module)?;
+        let idx = self.module_idx(id.into_global_arena_ptr())?;
+        let module = self.get_or_build(idx, None)?;
+        self.charge_lowering_set(gas_meter, module)?;
         Ok(module)
     }
 
-    /// For metered module in the read-set, ensures the module is in ready for
-    /// lowering state.
+    /// Brings a module this transaction has already charged for up to the
+    /// state its policy requires before any of its functions can be lowered.
+    ///
+    /// Idempotent, so it can run on every call into an already-charged
+    /// module: each policy resolves a memoized set and charges only members
+    /// the transaction has not paid for, which on a repeat is none of them.
     fn ensure_ready_for_lowering(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
-        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> VMResult<()> {
         match &self.policy {
-            LoadingPolicy::Lazy(LoweringPolicy::Lazy) => {
-                // Nothing extra to charge, safe to mark ready for lowering.
-                read_set.mark_ready_for_lowering(id)?;
-            },
+            LoadingPolicy::Lazy(LoweringPolicy::Lazy) => Ok(()),
             LoadingPolicy::Lazy(LoweringPolicy::Eager) => {
-                self.charge_and_ready_for_eager_lowering(read_set, gas_meter, id, module)?;
+                self.charge_lowering_set(gas_meter, module)
             },
             LoadingPolicy::Package => {
-                // The metered state can arise from a layout-only side-load
-                // earlier in the transaction. Load the full package now to
-                // charge any missing siblings and promote them to ready.
-                self.load_package(read_set, gas_meter, id)?;
+                // The module can have been charged for by a layout-only
+                // side-load earlier in the transaction, which brings in no
+                // siblings. Load the full package now.
+                let id = self.guard.arena_ref_for_module_id(module.id());
+                self.load_package(gas_meter, id).map(drop)
             },
         }
-        Ok(())
     }
 
-    /// Charges gas for every member of MS(module) not yet metered, computing
-    /// the set first if it is not known, and marks the target ready for
-    /// lowering.
-    ///
-    /// # Precondition
-    ///
-    /// The target module is in the read-set, pending or metered.
-    fn charge_and_ready_for_eager_lowering(
+    /// Charges for every member of MS(module) this transaction has not paid
+    /// for yet, computing the set first if it is not known. The module is a
+    /// member of its own set, so this is also what charges for it.
+    fn charge_lowering_set(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
-        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> VMResult<()> {
         let ms = match module.mandatory_dependencies_if_known() {
             Some(ms) => ms.as_ref(),
-            None => self.compute_mandatory_set(read_set, module)?,
+            None => self.compute_mandatory_set(module)?,
         };
-        self.charge_mandatory_set(read_set, gas_meter, ms, |read_set, id| {
-            self.reserve_and_load(read_set, id)
-        })?;
-        read_set.mark_ready_for_lowering(id)?;
-        Ok(())
+        self.charge_and_load(gas_meter, ms, None)
     }
 
     /// Walks the module's lowering type closure and installs the resulting
     /// mandatory set, returning the set that won the race.
     fn compute_mandatory_set(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         module: &'guard LoadedModule,
     ) -> VMResult<&'guard [InternedModuleId]> {
-        let mut walker = LoweringContext::new(self, read_set);
+        let mut walker = LoweringContext::new(self);
         walker.discovered_seen.insert(module.id());
         walker.discovered.push(module.id());
 
@@ -852,81 +790,91 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
         let module = LoadedModule::new(module_ir, cost, deps, self.guard)
             .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
-        Ok(self.guard.insert_module(module))
+        self.guard
+            .insert_module(module)
+            .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))
     }
 
-    /// Records every module of a mandatory set in the read-set and charges
-    /// their costs as a single sum.
+    /// Loads every module in `ids` this transaction has not charged for yet,
+    /// records it as charged, and charges their costs as a single sum.
+    /// `package`, when set, is installed as the mandatory set of every module
+    /// built here.
     ///
     /// The sum must stay a single charge: a gas meter short of the total
     /// deducts nothing, so splitting it would leave a different balance on
     /// out-of-gas.
-    fn charge_mandatory_set<F>(
+    ///
+    /// A module is recorded before it is loaded, so a load that fails leaves
+    /// the module recorded but absent from the table. That pair is how a later
+    /// resolution tells a failed load apart from one never attempted.
+    fn charge_and_load(
         &self,
-        read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut GasMeter,
         ids: &[InternedModuleId],
-        mut on_read_set_miss: F,
-    ) -> VMResult<()>
-    where
-        F: FnMut(
-            &mut ModuleReadSet<'guard>,
-            ArenaRef<'guard, ModuleId>,
-        ) -> VMResult<&'guard LoadedModule>,
-    {
+        package: Option<&Arc<[InternedModuleId]>>,
+    ) -> VMResult<()> {
         let mut loading_cost = 0u64;
         for &module_id in ids {
-            let id = self.guard.arena_ref_for_module_id(module_id);
-            let module = match read_set.get(id) {
-                Some(ModuleRead::Loaded { .. }) => continue,
-                // A pending entry was reserved by the lowering walk or by this
-                // module's own in-flight load, so the lookup is a cache hit.
-                Some(ModuleRead::Pending) => self.load_pending(read_set, id)?,
-                None => on_read_set_miss(read_set, id)?,
-            };
+            let idx = self.module_idx(module_id)?;
+            if !self.guard.mark_charged(idx) {
+                continue;
+            }
+            let module = self.get_or_build(idx, package)?;
             loading_cost = loading_cost.saturating_add(module.cost());
         }
         gas_meter.charge(loading_cost)?;
         Ok(())
     }
 
-    /// Resolves a module reserved as pending in the read-set and promotes the
-    /// entry to metered.
-    fn load_pending(
-        &self,
-        read_set: &mut ModuleReadSet<'guard>,
-        id: ArenaRef<'guard, ModuleId>,
-    ) -> VMResult<&'guard LoadedModule> {
-        let module = self.get_or_build(id)?;
-        read_set.record_metered(id, module)?;
-        Ok(module)
-    }
-
-    /// Reserves `id` in the read-set and resolves it, leaving it metered.
-    fn reserve_and_load(
-        &self,
-        read_set: &mut ModuleReadSet<'guard>,
-        id: ArenaRef<'guard, ModuleId>,
-    ) -> VMResult<&'guard LoadedModule> {
-        read_set.record_pending_loading(id)?;
-        self.load_pending(read_set, id)
-    }
-
     /// Returns the cached module, building and installing it from storage on a
-    /// cache miss.
-    fn get_or_build(&self, id: ArenaRef<'guard, ModuleId>) -> VMResult<&'guard LoadedModule> {
-        match self.guard.get_module(id) {
+    /// cache miss. `package`, when set, is installed as the module's mandatory
+    /// set instead of deriving one from the policy.
+    fn get_or_build(
+        &self,
+        idx: ModuleIdx,
+        package: Option<&Arc<[InternedModuleId]>>,
+    ) -> VMResult<&'guard LoadedModule> {
+        if let Some(module) = self.guard.module_at(idx) {
+            return Ok(module);
+        }
+        let id = self.module_id_at(idx)?;
+        let deps = match package {
+            Some(package) => Some(package.clone()),
+            None => self.build_mandatory_dependencies_for_id(id)?,
+        };
+        self.build_and_insert_module_ir(id, deps)
+    }
+
+    /// The index of `module_id`, minting one if this transaction is the first
+    /// to name it.
+    fn module_idx(&self, module_id: InternedModuleId) -> VMResult<ModuleIdx> {
+        self.guard
+            .module_idx(module_id)
+            .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))
+    }
+
+    /// The ID the index was minted for. Every index the loader holds came from
+    /// the table, which creates the row and its ID together.
+    fn module_id_at(&self, idx: ModuleIdx) -> VMResult<ArenaRef<'guard, ModuleId>> {
+        match self.guard.module_id_at(idx) {
+            Some(module_id) => Ok(self.guard.arena_ref_for_module_id(module_id)),
+            None => invariant_violation!(ModuleIndexNotInTable),
+        }
+    }
+
+    /// The module at `idx`, which this transaction has already charged for and
+    /// so must be loaded.
+    fn loaded_module_at(&self, idx: ModuleIdx) -> VMResult<&'guard LoadedModule> {
+        match self.guard.module_at(idx) {
             Some(module) => Ok(module),
-            None => {
-                let deps = self.build_mandatory_dependencies_for_id(id)?;
-                self.build_and_insert_module_ir(id, deps)
-            },
+            None => invariant_violation!(ModuleNotLoaded),
         }
     }
 }
 
 /// Records the defining module of every nominal type occurring in `ty`. The
-/// result may repeat a module; loading one twice is a read-set hit.
+/// result may repeat a module; the second occurrence is already charged for and
+/// so costs nothing.
 ///
 /// TODO(metering): unbounded recursion, same family as the `TODO(metering)` on
 /// `mono_move_core::types::is_closed_type`.
@@ -966,11 +914,9 @@ fn collect_nominal_modules(ty: InternedType, out: &mut Vec<InternedModuleId>) {
     }
 }
 
-/// Records modules visited during lowering requirements calculation in the
-/// read-set.
+/// Collects the modules visited during a lowering requirements calculation.
 struct LoweringContext<'a, 'guard, 'ctx> {
     loader: &'a Loader<'guard, 'ctx>,
-    read_set: &'a mut ModuleReadSet<'guard>,
     /// All modules needed for lowering of this function, ordered based on the
     /// specializer DFS type traversal.
     discovered: Vec<InternedModuleId>,
@@ -978,10 +924,9 @@ struct LoweringContext<'a, 'guard, 'ctx> {
 }
 
 impl<'a, 'guard, 'ctx> LoweringContext<'a, 'guard, 'ctx> {
-    fn new(loader: &'a Loader<'guard, 'ctx>, read_set: &'a mut ModuleReadSet<'guard>) -> Self {
+    fn new(loader: &'a Loader<'guard, 'ctx>) -> Self {
         Self {
             loader,
-            read_set,
             discovered: vec![],
             discovered_seen: UnorderedSet::new(),
         }
@@ -1004,20 +949,11 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
     ) -> VMResult<Option<NominalFields>> {
-        let id = self.loader.guard.arena_ref_for_module_id(*module_id);
-
-        // Every module needs to be in the read-set. A pending entry is either
-        // reserved by this walk or left by a load that failed earlier in the
-        // transaction; resolving it again reports that failure as a linking
-        // error rather than an invariant violation.
-        let module = match self.read_set.get(id) {
-            Some(ModuleRead::Loaded { module, .. }) => module,
-            Some(ModuleRead::Pending) => self.loader.get_or_build(id)?,
-            None => {
-                self.read_set.record_pending_loading(id)?;
-                self.loader.get_or_build(id)?
-            },
-        };
+        // The walk does not record what it visits: the caller charges for
+        // everything handed back in `discovered`, and a record here would make
+        // that charge skip it.
+        let idx = self.loader.module_idx(*module_id)?;
+        let module = self.loader.get_or_build(idx, None)?;
 
         // Accumulate visited modules so that we can construct mandatory set
         // for the root module later.

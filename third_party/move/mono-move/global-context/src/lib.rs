@@ -6,6 +6,6 @@ mod context;
 pub use context::{
     struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, ArenaRef,
     ExecutionGuard, FunctionIrLookup, FunctionSlot, GlobalContext, InternedType, InternedTypeList,
-    LoadedModule, MaintenanceGuard, ScriptHash, Type,
+    LoadedModule, MaintenanceGuard, ModuleIdx, ScriptHash, Type, SCRIPT_MODULE_IDX,
 };
 pub mod maintenance_config;

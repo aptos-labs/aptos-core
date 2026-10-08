@@ -48,11 +48,6 @@ use std::{
 
 /// The loader access a native call needs, with the loader's own lifetimes
 /// erased.
-///
-/// [`ProductionNativeContext`] carries a single lifetime parameter, so it
-/// cannot name a `&mut ModuleReadSet<'guard>`: `&mut T` is invariant in `T`,
-/// and `'guard` strictly outlives any borrow taken at the dispatch site. A
-/// trait object hides `'guard` and restores the variance.
 pub trait LoaderAccess {
     /// The resource-group container `ty` belongs to, or [`None`] if it lives in
     /// its own storage slot.
@@ -110,8 +105,8 @@ pub struct ProductionNativeContext<'a> {
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
     /// Resource provider backing global-storage reads on a read-set cache miss.
     resource_provider: &'a dyn ResourceProvider,
-    /// Loader and module read-set access, for natives whose behaviour depends
-    /// on a module's declarations.
+    /// Loader access, for natives whose behaviour depends on a module's
+    /// declarations.
     loader: &'a dyn LoaderAccess,
     /// Per-transaction native extensions, shared across native calls. Only ever
     /// borrowed shared — each extension's own [`RefCell`](std::cell::RefCell)
@@ -892,7 +887,7 @@ impl NativeContext for ProductionNativeContext<'_> {
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
         // Resolved before the `rws` reborrow; the resolver reads the module
-        // read-set, disjoint from the read-write set.
+        // table, disjoint from the read-write set.
         let group = self.loader.resource_group_of(ty)?;
 
         // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
@@ -908,7 +903,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         mutable: bool,
     ) -> VMResult<Option<Ref<'_, Opaque>>> {
         // Resolved before the `rws` reborrow; the resolver reads the module
-        // read-set, disjoint from the read-write set.
+        // table, disjoint from the read-write set.
         let group = self.loader.resource_group_of(ty)?;
         self.borrow_entry(&InMemoryStorageKey::resource(address, ty), group, mutable)
     }
@@ -952,7 +947,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let module_id = self.guard.module_id_of(&address, module_name);
 
         // SAFETY: `gas` is reborrowed exclusively here; the callee borrows the
-        // loader and the module read-set, both disjoint from it.
+        // loader, disjoint from it.
         let gas = unsafe { &mut **self.gas.get() };
         let func_ref = match self
             .loader

@@ -34,8 +34,8 @@ use crate::{
 use mono_move_core::{
     captured_values_size,
     interner::{
-        is_script_module_id, module_id_of, InternedFunctionRef, InternedIdentifier,
-        InternedModuleId,
+        is_script_module_id, module_id_of, view_function_ref, InternedFunctionRef,
+        InternedIdentifier, InternedModuleId,
     },
     native::{
         FunctionResolutionError, NativeABI, NativeExtension, NativeExtensions, NativeIdx,
@@ -58,8 +58,8 @@ use mono_move_core::{
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
-use mono_move_global_context::LoadedModule;
-use mono_move_loader::{Loader, ModuleReadSet};
+use mono_move_global_context::{LoadedModule, ModuleIdx};
+use mono_move_loader::Loader;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -70,15 +70,15 @@ use move_core_types::{
 use move_value_view::MoveValueView;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
-    cell::{Ref, UnsafeCell},
+    cell::Ref,
     fmt,
     ptr::{null, NonNull},
 };
 
-/// Resolves the resource-group container a resource type belongs to from the
-/// read-set-pinned defining module, or [`None`] for an own storage slot.
+/// Resolves the resource-group container a resource type belongs to from its
+/// already-loaded defining module, or [`None`] for an own storage slot.
 macro_rules! resolve_resource_group {
-    ($loader:expr, $read_set:expr, $ty:expr) => {{
+    ($loader:expr, $ty:expr) => {{
         let Type::Nominal {
             module_id, name, ..
         } = view_type($ty)
@@ -88,9 +88,8 @@ macro_rules! resolve_resource_group {
                 "resource type must be a nominal type".to_string()
             ));
         };
-        let arena_ref = $loader.guard().arena_ref_for_module_id(*module_id);
         Ok::<Option<InternedType>, VMInternalError>(
-            $read_set.get_loaded(arena_ref)?.resource_group_of(name),
+            $loader.loaded_module(*module_id)?.resource_group_of(name),
         )
     }};
 }
@@ -132,18 +131,11 @@ pub(crate) unsafe fn write_closure_func_ref_and_mask(
 /// a trait object. See [`LoaderAccess`].
 struct LoaderAdapter<'a, 'guard> {
     loader: &'a Loader<'guard, 'guard>,
-    /// Held in an [`UnsafeCell`] because [`LoaderAccess`] takes `&self` but the
-    /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
-    /// at most one borrow is live at a time.
-    read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
 }
 
 impl LoaderAccess for LoaderAdapter<'_, '_> {
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
-        // SAFETY: this is the only borrow of the read-set, and it does not
-        // outlive the call.
-        let read_set = unsafe { &**self.read_set.get() };
-        resolve_resource_group!(self.loader, read_set, ty)
+        resolve_resource_group!(self.loader, ty)
     }
 
     fn resolve_function(
@@ -153,11 +145,8 @@ impl LoaderAccess for LoaderAdapter<'_, '_> {
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
-        // SAFETY: this is the only borrow of the read-set, and it does not
-        // outlive the call.
-        let read_set = unsafe { &mut **self.read_set.get() };
         self.loader
-            .resolve_function(read_set, gas_meter, module_id, func_name, expected_ty)
+            .resolve_function(gas_meter, module_id, func_name, expected_ty)
     }
 }
 
@@ -260,6 +249,13 @@ unsafe fn saved_caller_ptr(fp: *mut u8) -> *const Function {
 pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
+    /// Every module the transaction charged to load.
+    //
+    // TODO(correctness): an index is meaningful only against the module table
+    // generation that minted it. Maintenance resets the table and restarts the
+    // indices, so once a block-end barrier exists these must either carry a
+    // generation tag or be consumed before it runs.
+    module_reads: Vec<ModuleIdx>,
     /// Owns the allocations referenced by the read-write set and extensions.
     /// Those hold raw pointers into it, so the heap only needs to outlive them.
     /// Declared last because fields drop in declaration order.
@@ -270,6 +266,11 @@ impl SessionEffects {
     /// The transaction's global-storage read-write set.
     pub fn read_write_set(&self) -> &ResourceReadWriteSet {
         &self.read_write_set
+    }
+
+    /// Every module the transaction charged to load.
+    pub fn module_reads(&self) -> &[ModuleIdx] {
+        &self.module_reads
     }
 
     /// Returns the frozen heap allocation backing the written values.
@@ -420,7 +421,6 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
         // untrusted bytes.
         let mut hooks = Hooks {
             loader: &self.interp.loader,
-            read_set: &mut self.interp.read_set,
             resource_provider: self.interp.resource_provider,
             read_write_set: &mut self.interp.read_write_set,
             object_core,
@@ -428,7 +428,6 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
 
         struct Hooks<'a, 'guard> {
             loader: &'a Loader<'guard, 'guard>,
-            read_set: &'a mut ModuleReadSet<'guard>,
             resource_provider: &'guard dyn ResourceProvider,
             read_write_set: &'a mut ResourceReadWriteSet,
             object_core: InternedType,
@@ -436,13 +435,13 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
 
         impl DeserializeHooks for Hooks<'_, '_> {
             /// Relies on lowering to have published `ty`'s layout and
-            /// descriptor and recorded its module in the read set.
+            /// descriptor and charged for its defining module.
             fn resource_exists(
                 &mut self,
                 address: AccountAddress,
                 ty: InternedType,
             ) -> VMResult<bool> {
-                let group = resolve_resource_group!(self.loader, self.read_set, ty)?;
+                let group = resolve_resource_group!(self.loader, ty)?;
                 Ok(self.read_write_set.exists(
                     self.resource_provider,
                     &InMemoryStorageKey::resource(address, ty),
@@ -707,18 +706,16 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
 }
 
 /// Per-transaction interpreter context with a unified call stack and a
-/// GC-managed heap: owns the transaction state (code loader and read-set, gas
-/// meter, native extensions, resource read-write set) and the machine state
-/// (stack, heap, VM registers). Each `build_call` is one session; the heap and
-/// read-write set live across the sessions of a transaction.
+/// GC-managed heap: owns the transaction state (code loader, gas meter, native
+/// extensions, resource read-write set) and the machine state (stack, heap, VM
+/// registers). Each `build_call` is one session; the heap and read-write set
+/// live across the sessions of a transaction.
 pub struct InterpreterContext<'guard> {
     /// Per-transaction code loader; also the access point for the execution
     /// guard (descriptor/layout lookups). The loader's global-context
     /// lifetime is shrunk to `'guard` (covariance): nothing the interpreter
     /// exposes outlives the guard.
     pub(crate) loader: Loader<'guard, 'guard>,
-    /// Read-set of the modules loaded by this transaction.
-    read_set: ModuleReadSet<'guard>,
     pub(crate) gas_meter: GasMeter,
     /// A process-wide global native function table.
     natives: &'guard ProductionNativeRegistry,
@@ -815,7 +812,6 @@ impl<'guard> InterpreterContext<'guard> {
 
         Self {
             loader,
-            read_set: ModuleReadSet::new(),
             gas_meter,
             natives,
             extensions: NativeExtensions::new(),
@@ -836,23 +832,33 @@ impl<'guard> InterpreterContext<'guard> {
         self
     }
 
-    /// Resolve a runtime function call: look the target up in the read-set,
-    /// falling back to the [`Loader`] on cache miss. May trigger lazy module
-    /// loading, gas charge on a cache miss, and lowering of the function's
-    /// code.
+    /// Resolve a runtime function call through the [`Loader`]. May trigger lazy
+    /// module loading, gas charge on a cache miss, and lowering of the
+    /// function's code.
     pub fn load_function(
         &mut self,
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> VMResult<&'guard Function> {
-        let ptr = self.loader.load_function(
-            &mut self.read_set,
-            &mut self.gas_meter,
-            module_id,
-            name,
-            ty_args,
-        )?;
+        let ptr = self
+            .loader
+            .load_function(&mut self.gas_meter, module_id, name, ty_args)?;
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// As [`InterpreterContext::load_function`], but names the callee's module
+    /// by its table index.
+    pub fn load_function_at(
+        &mut self,
+        module_idx: ModuleIdx,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> VMResult<&'guard Function> {
+        let ptr = self
+            .loader
+            .load_function_at(&mut self.gas_meter, module_idx, name, ty_args)?;
         // SAFETY: the function lives in an arena the guard keeps alive.
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
@@ -864,9 +870,7 @@ impl<'guard> InterpreterContext<'guard> {
         code: &[u8],
         ty_args: InternedTypeList,
     ) -> VMResult<&'guard Function> {
-        let ptr =
-            self.loader
-                .load_script(&mut self.read_set, &mut self.gas_meter, code, ty_args)?;
+        let ptr = self.loader.load_script(&mut self.gas_meter, code, ty_args)?;
         // SAFETY: the function lives in an arena the guard keeps alive.
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
@@ -874,13 +878,8 @@ impl<'guard> InterpreterContext<'guard> {
     /// The module `module_id`, loaded and charged if this transaction has not
     /// loaded it yet.
     pub fn load_module(&mut self, module_id: InternedModuleId) -> VMResult<&'guard LoadedModule> {
-        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
-        match self.read_set.get(arena_ref) {
-            None => self
-                .loader
-                .load_module(&mut self.read_set, &mut self.gas_meter, arena_ref),
-            Some(_) => self.read_set.get_loaded(arena_ref),
-        }
+        self.loader
+            .get_or_load_module(&mut self.gas_meter, module_id)
     }
 
     /// The resource of type `ty` stored at `address`, or `None` if there is
@@ -891,8 +890,7 @@ impl<'guard> InterpreterContext<'guard> {
         address: AccountAddress,
         ty: InternedType,
     ) -> VMResult<Option<NonNull<u8>>> {
-        self.loader
-            .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
+        self.loader.publish_resource_type(&mut self.gas_meter, ty)?;
         let group = self.resource_group_of(ty)?;
         Ok(self.read_write_set.read(
             self.resource_provider,
@@ -902,10 +900,9 @@ impl<'guard> InterpreterContext<'guard> {
     }
 
     /// A module some loaded function came from. Loading the function loaded
-    /// its module into the read set, so a miss is an invariant violation.
+    /// its module, so a miss is an invariant violation.
     fn prepared_module(&self, module_id: InternedModuleId) -> VMResult<&'guard PreparedModule> {
-        let arena_ref = self.loader.guard().arena_ref_for_module_id(module_id);
-        Ok(&self.read_set.get_loaded(arena_ref)?.ir().module)
+        Ok(&self.loader.loaded_module(module_id)?.ir().module)
     }
 
     /// Resolve a constant from `module_id`'s constant pool, returning its
@@ -926,12 +923,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// [`None`] if it lives in its own storage slot. Membership is read from the
     /// resource's defining module, which must be available.
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
-        resolve_resource_group!(self.loader, self.read_set, ty)
-    }
-
-    /// Returns the transaction's read-set.
-    pub fn read_set(&self) -> &ModuleReadSet<'guard> {
-        &self.read_set
+        resolve_resource_group!(self.loader, ty)
     }
 
     pub fn set_rng_seed(&mut self, seed: u64) {
@@ -999,7 +991,6 @@ impl<'guard> InterpreterContext<'guard> {
     pub fn finish(self) -> VMResult<SessionEffects> {
         let Self {
             loader,
-            read_set: _,
             gas_meter: _,
             natives: _,
             extensions,
@@ -1021,6 +1012,10 @@ impl<'guard> InterpreterContext<'guard> {
         }
 
         let guard = loader.guard();
+        // Copied out here because the next acquire of the guard clears the set,
+        // and the same transaction re-acquires it to materialize its output.
+        let module_reads = guard.charged_modules();
+
         // Before the evacuation, so a demoted copy is no longer a root.
         //
         // SAFETY: every read-write-set entry holds initialized values of the
@@ -1039,6 +1034,7 @@ impl<'guard> InterpreterContext<'guard> {
         Ok(SessionEffects {
             read_write_set,
             extensions,
+            module_reads,
             #[allow(clippy::arc_with_non_send_sync)]
             heap: std::sync::Arc::new(FrozenHeap::new(evacuated)),
         })
@@ -1814,9 +1810,8 @@ impl InterpreterContext<'_> {
                 match *instr {
                     // ----- Control flow (set pc explicitly, return early) -----
                     MicroOp::CallIndirect {
-                        module_id,
-                        func_name,
-                        ty_args,
+                        module_idx,
+                        func_ref,
                     } => {
                         // TODO(perf): full flow should be like this:
                         //
@@ -1831,7 +1826,9 @@ impl InterpreterContext<'_> {
                         // to this call instruction like any other failure. This
                         // is deliberately unlike V1, which names the caller's
                         // module without an offset.
-                        let target = self.load_function(module_id, func_name, ty_args)?;
+                        let callee = view_function_ref(func_ref);
+                        let target =
+                            self.load_function_at(module_idx, callee.func_name, callee.ty_args)?;
                         self.call(func, regs, target)?;
                         continue;
                     },
@@ -3633,7 +3630,6 @@ impl InterpreterContext<'_> {
             let guard = self.loader.guard();
             let loader = LoaderAdapter {
                 loader: &self.loader,
-                read_set: UnsafeCell::new(&mut self.read_set),
             };
             let ctx = ProductionNativeContext::new(
                 new_fp,

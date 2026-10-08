@@ -2359,9 +2359,8 @@ impl<'a> LoweringState<'a> {
             },
             None => {
                 self.emit(MicroOp::CallIndirect {
-                    module_id: cs.callee_module_id,
-                    func_name: cs.callee_func_name,
-                    ty_args: cs.ty_args,
+                    module_idx: cs.callee_module_idx,
+                    func_ref: cs.callee_func_ref,
                 })?;
             },
         }

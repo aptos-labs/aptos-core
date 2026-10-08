@@ -18,7 +18,7 @@ use mono_move_core::{
     VMInternalError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::{
     serialize, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects,
     WriteClass,
@@ -297,11 +297,9 @@ impl TransactionalSession {
                 build_natives(),
             );
             modules.iter().try_for_each(|(id, _)| {
-                let mut read_set = ModuleReadSet::new();
                 let mut gas_meter = GasMeter::with_max_budget();
                 loader
                     .load_module(
-                        &mut read_set,
                         &mut gas_meter,
                         guard.intern_address_name(id.address(), id.name()),
                     )

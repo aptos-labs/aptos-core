@@ -5,7 +5,7 @@
 
 use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST, ExecutionErrorKind, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -23,38 +23,39 @@ fn load_lazy_cache_miss_and_hit() {
     module_provider.add_modules(&modules);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(
-        &guard,
-        &module_provider,
-        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &NoNatives,
-    );
-
     let id_module = ModuleId::new(AccountAddress::ONE, ident_str!("test").to_owned());
-    let id = guard.intern_module_id(&id_module);
+
+    // Each load runs under its own execution guard: the guard is what records
+    // charged modules, so sharing one would make the second load a free hit.
+    // The module cache lives on the context and survives both.
+    let load_once = || {
+        let guard = ctx.try_execution_context(0).unwrap();
+        let loader = Loader::new_with_policy(
+            &guard,
+            &module_provider,
+            LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+            &NoNatives,
+        );
+        let id = guard.intern_module_id(&id_module);
+
+        let mut gas = GasMeter::with_max_budget();
+        let before = gas.balance();
+        let module = loader.load_module(&mut gas, id).unwrap();
+        // Lazy policy: no dependency slots (self is handled separately).
+        assert!(module.mandatory_dependencies().is_empty());
+        assert_eq!(guard.charged_modules().len(), 1);
+        (before - gas.balance(), module.cost())
+    };
 
     // First call is a cache miss: fetches, deserializes, builds, installs.
-    let mut read_set = ModuleReadSet::new();
-    let mut gas = GasMeter::with_max_budget();
-    let gas_before = gas.balance();
-    let exec = loader.load_module(&mut read_set, &mut gas, id).unwrap();
-    let first_cost = exec.cost();
-    assert!(first_cost > 0, "cost should reflect bytecode size");
-    assert_eq!(gas_before - gas.balance(), first_cost);
-    assert_eq!(read_set.len(), 1);
-    // Lazy policy: no dependency slots (self is handled separately).
-    assert!(exec.mandatory_dependencies().is_empty());
+    let (charged, cost) = load_once();
+    assert!(cost > 0, "cost should reflect bytecode size");
+    assert_eq!(charged, cost);
 
-    // Second call on a fresh read-set is a cache hit: charges the same
-    // cost, records without fetching.
-    let mut read_set2 = ModuleReadSet::new();
-    let mut gas2 = GasMeter::with_max_budget();
-    let gas_before2 = gas2.balance();
-    let exec2 = loader.load_module(&mut read_set2, &mut gas2, id).unwrap();
-    assert_eq!(exec2.cost(), first_cost);
-    assert_eq!(gas_before2 - gas2.balance(), first_cost);
-    assert_eq!(read_set2.len(), 1);
+    // Second call is a cache hit: charges the same cost without fetching.
+    let (charged_again, cost_again) = load_once();
+    assert_eq!(cost_again, cost);
+    assert_eq!(charged_again, cost);
 }
 
 const GENERIC_SOURCE: &str = r#"
@@ -78,32 +79,32 @@ fn load_function_gas_is_cache_state_independent() {
     module_provider.add_modules(&modules);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(
-        &guard,
-        &module_provider,
-        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &NoNatives,
-    );
 
-    let module_id = guard
-        .intern_module_id(&ModuleId::new(
-            AccountAddress::ONE,
-            ident_str!("generic").to_owned(),
-        ))
-        .into_global_arena_ptr();
-    let name = guard
-        .intern_identifier(ident_str!("identity"))
-        .into_global_arena_ptr();
-    let at_u64 = guard.type_list_of(&[U64_TY]);
-    let at_bool = guard.type_list_of(&[BOOL_TY]);
+    // Each call runs under its own execution guard, so none of them sees a
+    // module the previous one already charged for.
+    let charge_for = |ty_args: &[_]| {
+        let guard = ctx.try_execution_context(0).unwrap();
+        let loader = Loader::new_with_policy(
+            &guard,
+            &module_provider,
+            LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+            &NoNatives,
+        );
+        let module_id = guard
+            .intern_module_id(&ModuleId::new(
+                AccountAddress::ONE,
+                ident_str!("generic").to_owned(),
+            ))
+            .into_global_arena_ptr();
+        let name = guard
+            .intern_identifier(ident_str!("identity"))
+            .into_global_arena_ptr();
+        let ty_args = guard.type_list_of(ty_args);
 
-    let charge_for = |ty_args| {
-        let mut read_set = ModuleReadSet::new();
         let mut gas = GasMeter::with_max_budget();
         let before = gas.balance();
         loader
-            .load_function(&mut read_set, &mut gas, module_id, name, ty_args)
+            .load_function(&mut gas, module_id, name, ty_args)
             .expect("instantiation must lower");
         before - gas.balance()
     };
@@ -111,11 +112,11 @@ fn load_function_gas_is_cache_state_independent() {
     // Cold (instantiation-cache miss, lowering runs) vs warm (hit):
     // identical charges, or replay would diverge across validators with
     // different cache states.
-    let cold = charge_for(at_u64);
-    let warm = charge_for(at_u64);
+    let cold = charge_for(&[U64_TY]);
+    let warm = charge_for(&[U64_TY]);
     assert_eq!(cold, warm, "cache state must not change gas charged");
-    let other_cold = charge_for(at_bool);
-    let other_warm = charge_for(at_bool);
+    let other_cold = charge_for(&[BOOL_TY]);
+    let other_warm = charge_for(&[BOOL_TY]);
     assert_eq!(
         other_cold, other_warm,
         "cache state must not change gas charged"
@@ -146,44 +147,41 @@ fn load_function_charges_type_closure_exactly_once() {
     module_provider.add_modules(&modules);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(
-        &guard,
-        &module_provider,
-        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-        &NoNatives,
-    );
 
-    let key_a = guard.intern_module_id(&ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("a").to_owned(),
-    ));
-    let key_b = guard.intern_module_id(&ModuleId::new(
-        AccountAddress::ONE,
-        ident_str!("b").to_owned(),
-    ));
-    let id_a = key_a.into_global_arena_ptr();
-    let name_f = guard
-        .intern_identifier(ident_str!("f"))
-        .into_global_arena_ptr();
-
-    // Returns what was charged and what the sum of the two module costs is.
+    // Returns what was charged and what the sum of the two module costs is,
+    // under a guard of its own so neither module starts out charged for.
     let charge_for = || {
-        let mut read_set = ModuleReadSet::new();
+        let guard = ctx.try_execution_context(0).unwrap();
+        let loader = Loader::new_with_policy(
+            &guard,
+            &module_provider,
+            LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+            &NoNatives,
+        );
+        let id_a = guard
+            .intern_module_id(&ModuleId::new(
+                AccountAddress::ONE,
+                ident_str!("a").to_owned(),
+            ))
+            .into_global_arena_ptr();
+        let id_b = guard
+            .intern_module_id(&ModuleId::new(
+                AccountAddress::ONE,
+                ident_str!("b").to_owned(),
+            ))
+            .into_global_arena_ptr();
+        let name_f = guard
+            .intern_identifier(ident_str!("f"))
+            .into_global_arena_ptr();
+
         let mut gas = GasMeter::with_max_budget();
         let before = gas.balance();
         loader
-            .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
+            .load_function(&mut gas, id_a, name_f, EMPTY_TYPE_LIST)
             .expect("load_function(a::f) must lower");
-        let cost_a = read_set
-            .get(key_a)
-            .expect("a must be in read-set")
-            .cost_for_test();
-        let cost_b = read_set
-            .get(key_b)
-            .expect("b must be in read-set")
-            .cost_for_test();
-        assert_eq!(read_set.len(), 2, "expected {{a, b}} in read-set");
+        let cost_a = loader.loaded_module(id_a).expect("a must be loaded").cost();
+        let cost_b = loader.loaded_module(id_b).expect("b must be loaded").cost();
+        assert_eq!(guard.charged_modules().len(), 2, "expected {{a, b}} charged");
         (before - gas.balance(), cost_a + cost_b)
     };
 
@@ -195,9 +193,9 @@ fn load_function_charges_type_closure_exactly_once() {
     assert_eq!(cold, warm, "cache state must not change gas charged");
 }
 
-// A module whose load failed stays in the read-set as a pending entry. A later
-// lowering walk that reaches it through a type must report the same linking
-// error, not an invariant violation.
+// A module whose load failed stays charged for, with no row in the module
+// table. A later lowering walk that reaches it through a type must report the
+// same linking error, not an invariant violation.
 #[test]
 fn lowering_after_failed_dependency_load_reports_linking_error() {
     let modules =
@@ -232,17 +230,15 @@ fn lowering_after_failed_dependency_load_reports_linking_error() {
         .intern_identifier(ident_str!("f"))
         .into_global_arena_ptr();
 
-    let mut read_set = ModuleReadSet::new();
     let mut gas = GasMeter::with_max_budget();
 
-    let Err(err) = loader.load_module(&mut read_set, &mut gas, key_b) else {
+    let Err(err) = loader.load_module(&mut gas, key_b) else {
         panic!("b is not in storage, so loading it must fail");
     };
     assert_eq!(err.kind(), ExecutionErrorKind::LinkingError);
 
-    // Lowering `a::f` walks `b::S` and reaches the pending entry left behind.
-    let Err(err) = loader.load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
-    else {
+    // Lowering `a::f` walks `b::S` and reaches the failed load left behind.
+    let Err(err) = loader.load_function(&mut gas, id_a, name_f, EMPTY_TYPE_LIST) else {
         panic!("b is still not in storage, so lowering `a::f` must fail");
     };
     assert_eq!(
