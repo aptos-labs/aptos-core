@@ -119,6 +119,7 @@ fun collision() {
     9: Return @7
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun non_monotonic() {
@@ -137,4 +138,5 @@ fun non_monotonic() {
     9: Return @8
   safe_point_layouts:
     0: []
+    1: []
 }
