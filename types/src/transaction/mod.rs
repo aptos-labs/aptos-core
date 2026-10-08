@@ -1593,9 +1593,6 @@ impl SignedTransaction {
     /// Check the encrypted payload representation allowed at mempool admission
     /// and batch creation. Internal Decrypted and FailedDecryption states are
     /// never valid submissions, even when their signatures verify.
-    ///
-    /// This is not a general VM validation check: execution may legitimately
-    /// receive a transaction transformed by the trusted decryption pipeline.
     pub fn verify_encrypted_payload_for_submission(&self) -> Result<()> {
         let Some(payload) = self.payload().as_encrypted_payload() else {
             return Ok(());

@@ -576,8 +576,7 @@ async fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     let results = par_map_blocking(transactions, num_cpus::get(), {
         let validator = Arc::clone(&smp.validator);
         move |t| {
-            // Admission has a stricter representation contract than generic VM
-            // validation, which also supports already-decrypted transactions.
+            // mempool should only ever accept an EncryptedPayload::Encrypted variant.
             let result = if t.0.verify_encrypted_payload_for_submission().is_err() {
                 Ok(aptos_types::transaction::VMValidatorResult::error(
                     StatusCode::MALFORMED,
