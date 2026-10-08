@@ -45,15 +45,21 @@ pub fn with_test_interpreter<R>(
     f(&mut interp, entry)
 }
 
-/// Builds an interned module id for hand-built test functions.
+/// Builds an interned function reference for hand-built test functions.
 #[macro_export]
-macro_rules! program_module_id {
-    ($name:literal) => {{
+macro_rules! program_func_ref {
+    ($module:literal, $name:literal) => {{
         static MODULE_ID: ::mono_move_core::interner::ModuleId =
             ::mono_move_core::interner::ModuleId::new(
                 ::move_core_types::account_address::AccountAddress::ONE,
-                ::mono_move_alloc::GlobalArenaPtr::from_static($name),
+                ::mono_move_alloc::GlobalArenaPtr::from_static($module),
             );
-        ::mono_move_alloc::GlobalArenaPtr::from_static(&MODULE_ID)
+        static FUNC_REF: ::mono_move_core::interner::FunctionRef =
+            ::mono_move_core::interner::FunctionRef {
+                module_id: ::mono_move_alloc::GlobalArenaPtr::from_static(&MODULE_ID),
+                func_name: ::mono_move_alloc::GlobalArenaPtr::from_static($name),
+                ty_args: ::mono_move_core::types::EMPTY_TYPE_LIST,
+            };
+        ::mono_move_alloc::GlobalArenaPtr::from_static(&FUNC_REF)
     }};
 }
