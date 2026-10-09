@@ -2947,7 +2947,8 @@ impl AptosVM {
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         // Taken from the payload rather than recomputed, so re-execution during state sync
-        // reproduces the promotions decided when the block was executed.
+        // reproduces the promotions decided when the block was executed. `AptosExecutorTask`
+        // adds the epilogue's own reads, which it records.
         output.set_hotness(to_make_hot);
         Ok((VMStatus::Executed, output))
     }

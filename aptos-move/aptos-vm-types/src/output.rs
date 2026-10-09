@@ -117,6 +117,30 @@ impl VMOutput {
         self.hotness = hotness;
     }
 
+    /// Adds the keys read by the block epilogue itself to its hotness. Keys it writes are skipped,
+    /// as the write makes them hot. Returns the number of keys newly added.
+    pub fn add_read_only_hotness<'a>(
+        &mut self,
+        reads: impl IntoIterator<Item = &'a StateKey>,
+    ) -> usize {
+        let Self {
+            change_set,
+            module_write_set,
+            hotness,
+            ..
+        } = self;
+        let num_before = hotness.len();
+        for key in reads {
+            if !change_set.resource_write_set().contains_key(key)
+                && !module_write_set.writes().contains_key(key)
+                && !hotness.contains(key)
+            {
+                hotness.insert(key.clone());
+            }
+        }
+        hotness.len() - num_before
+    }
+
     /// Sets the trace for this output. Should only be called once to replace the default empty
     /// trace with one recorded by the Move VM.
     ///
