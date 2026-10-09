@@ -456,7 +456,11 @@ impl ChunkyDKGManager {
         let spks: Vec<DealerPublicKey> = dkg_session_metadata
             .dealer_consensus_infos_cloned()
             .into_iter()
-            .map(|info| info.public_key)
+            .map(|info| {
+                info.public_key()
+                    .expect("on-chain dealer consensus keys must be valid")
+                    .clone()
+            })
             .collect();
 
         // Start aggregation producer
