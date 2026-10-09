@@ -13,7 +13,7 @@ use crate::{
 };
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use image::{
     imageops::{resize, FilterType},
     DynamicImage, GenericImageView, ImageBuffer, ImageFormat, ImageOutputFormat,
@@ -64,16 +64,29 @@ impl ImageOptimizer {
                     .await
                     .context("Failed to get image")?;
 
-                let img_bytes = response
-                    .bytes()
-                    .await
-                    .context("Failed to load image bytes")?;
+                // The size check above uses the HEAD Content-Length, which the
+                // origin controls and can omit or understate. Cap the body as it
+                // streams so the GET can't exceed max_file_size_bytes.
+                let mut img_bytes = Vec::new();
+                let mut stream = response.bytes_stream();
+                while let Some(chunk) = stream.next().await {
+                    let chunk = chunk.context("Failed to load image bytes")?;
+                    if img_bytes.len() + chunk.len() > max_file_size_bytes as usize {
+                        // The outer retry match arm records the failure metric, so
+                        // don't increment here or a single oversize body counts twice.
+                        return Err(backoff::Error::permanent(anyhow::anyhow!(
+                            "Image optimizer received file exceeding {} bytes, skipping",
+                            max_file_size_bytes
+                        )));
+                    }
+                    img_bytes.extend_from_slice(&chunk);
+                }
 
                 let format =
                     image::guess_format(&img_bytes).context("Failed to guess image format")?;
 
                 match format {
-                    ImageFormat::Gif | ImageFormat::Avif => Ok((img_bytes.to_vec(), format)),
+                    ImageFormat::Gif | ImageFormat::Avif => Ok((img_bytes, format)),
                     _ => {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;
