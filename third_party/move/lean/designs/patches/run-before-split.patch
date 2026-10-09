@@ -1,0 +1,17 @@
+--- a/third_party/move/lean/leaner-ir/LeanerIR/Proofs/Denote/Close.lean
++++ b/third_party/move/lean/leaner-ir/LeanerIR/Proofs/Denote/Close.lean
+@@ -9053,6 +9053,14 @@
+       pending := pending ++ (← getGoals).toArray.map fun g => (g, some .loopIteration, #[])
+       stageCost := stageCost.push ("recursive", (← IO.getNumHeartbeats) - stageStart)
+       continue
++    -- A literal closure's run is read once for every conjunct of a
++    -- conjunction, before it splits: each conjunct would read it again.
++    if (← goal.withContext (instantiateMVars (← goal.getType))).isAppOfArity ``And 2 then
++      if let some run ← denotedRun? goal callees then
++        pending := pending.push (run, provenance, clauses)
++        denoted := denoted.push run
++        stageCost := stageCost.push ("denoted run", (← IO.getNumHeartbeats) - stageStart)
++        continue
+     let splitTarget ← if debug then goal.withContext do
+         pure (some (← instantiateMVars (← goal.getType))) else pure none
+     if let some (subgoals, conditional) ← splitOnce goal then

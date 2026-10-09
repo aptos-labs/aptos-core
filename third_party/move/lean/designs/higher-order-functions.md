@@ -288,15 +288,28 @@ predicate's inputs are the arguments' values, a `&mut` one's its entry
 value; `ensures_of` takes after them the declared results and then the final
 value of each `&mut` argument, in order (`ensures_of<f>(old(x), x)` for
 `f: |&mut T|`); `result_of` names the declared results alone, and
-`requires_of` and `aborts_of` the inputs alone. The meaning (planned, H4d):
-the invocation runs with each `&mut` argument lent under a loan of its own,
-`.borrow loan entry`, from a start whose bookkeeping lends exactly those
-loans, and the final value is the one the run exports for the loan
+`requires_of` and `aborts_of` the inputs alone. The meaning (done
+2026-10-09, `AbortsOfMut`, `EnsuresOfMut`, `ResultOfMut` in
+`Proofs/Behavior.lean`): the invocation runs with each `&mut` argument lent
+under a loan of its own, `.borrow loan entry` (`lendMutable`, its positions
+marked by the function type), from a start whose bookkeeping lends exactly
+those loans, and the final value is the one the run exports for the loan
 (`RuntimeState.pending`), with the holes of returned references filled, as
-`argumentsResolve` reads a call; for a literal closure this is a run of the
-target's prophetic meaning at the reference `(entry, final)`, so the
-closure rules generalize from reference-free rows to rows whose references
-are the target's `&mut` parameters.
+`argumentsResolve` reads a call (`ResolvesAt`); a reference-free function
+value keeps `AbortsOf`/`EnsuresOf`/`ResultOf`. For a literal closure this is
+a run of the target's prophetic meaning at the reference `(entry, final)`
+(`ensuresOfMut_closureOf`, `abortsOfMut_closureOf` and their `_verified`
+forms in `Proofs/Invocation.lean`, over rows each element of which is a
+mutable reference or holds none, `NRow.lentFlat`), which the closer reads by
+the target's contract (`dispatchBehavior`) or body (`denotedRun`) as for
+reference-free rows. A contract reads a `&mut` input at the invocation's
+pre-state (its entry value, or its copy at a pre-state label), as the
+Prover reads `old` of it, and a final value of `ensures_of` at the
+post-state (`Contract.mutableAt`). Not carried yet: an invocation of a
+function value with `&mut` parameters the proof does not see (its `wp` needs
+the H4b typing of lent arguments), a state label defined by such an
+invocation, and `modifies_of` frames of such function values (`FramedAt` is
+vacuous at rows with references).
 
 **Frames.** Without `modifies_of`, Move treats a function parameter as not
 modifying global memory, and the compiler checks every closure passed for it.
@@ -484,9 +497,11 @@ traits are.
      Done (2026-10-03): parameter frames with and without `modifies_of`
      ("Frames" above), shared reference parameters, the Check fixture
      `Check/Closures/Frames.lean`, and generic higher-order functions over
-     rows of type parameters (`Check/Closures/GenericHofs.lean`). Open:
-     state labels, `&mut` arguments,
-     explicit `modifies_of` frames on stored closures, and `reads_of` (below).
+     rows of type parameters (`Check/Closures/GenericHofs.lean`); `&mut`
+     arguments of literal closures and of contracts (2026-10-09, above).
+     Open: state labels over `&mut` invocations, invocations of unseen
+     function values with `&mut` parameters, explicit `modifies_of` frames
+     on stored closures, and `reads_of` (below).
      Default frames of directly function-typed Move fields are implemented
      (2026-10-05, “Frames” above); explicit field write frames are diagnosed.
 5. **H5 — re-entrancy.** Call-stack modules and resource locks in the

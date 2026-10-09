@@ -1464,7 +1464,11 @@ private partial def Context.labelState (context : Context) (label : Nat) : MetaM
     context.bindLet pattern initializer
   let memory ← match operation with
     | .behavior .ensuresOf range | .behavior .resultOf range => do
-        let (executable, callable, inputs, pre) ← translateInvocation context range arguments
+        let (executable, callable, inputs, pre, mutable?) ←
+          translateInvocation context range arguments
+        if mutable?.isSome then
+          throwError "a state label defined by an invocation lending mutable references \
+            is not carried yet"
         mkAppM ``LeanerIR.Proofs.StateOf #[executable, callable, inputs, pre]
     | _ => (·.1) <$> translateStateChange context operation instantiations arguments
   return { memory, locals := context.oldLocals }
@@ -1540,9 +1544,28 @@ private partial def translateStateChange (context : Context)
     else mkAppM ``And #[condition, ← mkAppM ``And #[← slotPresent value, valueCondition]]
   return (memory, condition)
 
-/-- The semantic invocation a behavioral predicate and its defined label share. -/
+/-- The context reading each mutable reference parameter at a state label,
+or, without one, at its entry value (`entry`) or its current one: an
+invocation reads the references it lends at its pre-state, as the Prover
+reads `old` of them, and `ensures_of` their final values at its post-state. -/
+private partial def Context.mutableAt (context : Context) (label : Option Nat) (entry : Bool) :
+    MetaM Context := do
+  let values ← match label with
+    | some label => pure (← context.labelState label).locals
+    | none => pure (if entry then context.oldLocals else context.locals)
+  let locals := context.mutableParameters.foldl (init := context.locals) fun locals parameter =>
+    match values[parameter]? with
+    | some (some value) => locals.set! parameter (some value)
+    | _ => locals
+  return { context with locals }
+
+/-- The semantic invocation a behavioral predicate and its defined label
+share: the executable unit, the function value, its inputs, the pre-state,
+and, where it takes mutable references, which of its parameters are ones and
+how many (`LeanerIR.Proofs.EnsuresOfMut`). -/
 private partial def translateInvocation (context : Context) (range : LeanerIR.MemoryRange)
-    (arguments : Array ExprId) : MetaM (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) := do
+    (arguments : Array ExprId) :
+    MetaM (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr × Option (Lean.Expr × Nat)) := do
   let some executable := context.executable
     | throwError "a behavioral predicate reads the executable unit, which this contract \
         does not take"
@@ -1553,12 +1576,11 @@ private partial def translateInvocation (context : Context) (range : LeanerIR.Me
   let some (.function parameters _ _) := context.valueTypeOf? callableExpression.typeId
     | throwError "a behavioral predicate's operand is not a function value"
   -- A shared reference is the observed value itself, at runtime as in a
-  -- specification.
-  for parameter in parameters do
-    if let some (.reference reference) := context.typeOf? parameter then
-      if reference.kind == .mutable then
-        throwError "a behavioral predicate over a function with mutable reference parameters \
-          is not carried yet"
+  -- specification; a mutable one is lent under a loan of its own.
+  let mutable := parameters.map fun parameter =>
+    match context.typeOf? parameter with
+    | some (.reference reference) => reference.kind == .mutable
+    | _ => false
   let callableValue ← translateRuntimeOperand context callable
   -- Keep the native function row visible for projections of a literal call.
   let callableValue ← if callableValue.isAppOfArity ``LeanerIR.Proofs.Denote.ClosureValue.encode 1 then do
@@ -1569,15 +1591,22 @@ private partial def translateInvocation (context : Context) (range : LeanerIR.Me
         (← quoteNTy nativeType) callableValue.appArg!)
     else pure callableValue
   let inputs := (arguments.extract 1 (parameters.size + 1))
+  let lent := mutable.contains true
+  let entries ← if lent then context.mutableAt range.pre (entry := true) else pure context
   let inputValues ← mkListLit (mkConst ``LeanerIR.RuntimeValue)
-    (← inputs.toList.mapM (translateRuntimeOperand context))
+    (← (inputs.zip mutable).toList.mapM fun (input, isMutable) =>
+      translateRuntimeOperand (if isMutable then entries else context) input)
   let pre ← match range.pre, context.oldState with
     | some label, _ => (·.memory) <$> context.labelState label
     | none, some state => pure state
     | none, none => do
         let some state := context.state | throwError "an invocation needs a pre-state"
         pure state
-  return (executable, callableValue, inputValues, pre)
+  let mutable? ← if lent then
+      pure (some (← mkListLit (mkConst ``Bool) (mutable.toList.map toExpr),
+        (mutable.filter id).size))
+    else pure none
+  return (executable, callableValue, inputValues, pre, mutable?)
 
 /-- Encode scalar operands while retaining already-observed aggregate values. -/
 private partial def translateLogicalOperand (context : Context) (id : ExprId) : MetaM Lean.Expr := do
@@ -3171,25 +3200,51 @@ where
 state labels. -/
   translateBehavior (kind : LeanerIR.BehaviorKind) (range : LeanerIR.MemoryRange)
       (arguments : Array ExprId) (ty : IrTy) : MetaM Lean.Expr := do
-    let (executable, callableValue, inputValues, pre) ← translateInvocation context range arguments
+    let (executable, callableValue, inputValues, pre, mutable?) ←
+      translateInvocation context range arguments
     let post ← match range.post with
       | some label => (·.memory) <$> context.labelState label
       | none => currentState
     match kind with
     | .abortsOf =>
-        mkAppM ``LeanerIR.Proofs.AbortsOf #[executable, callableValue, inputValues, pre]
+        match mutable? with
+        | some (mutable, _) =>
+            mkAppM ``LeanerIR.Proofs.AbortsOfMut
+              #[executable, callableValue, mutable, inputValues, pre]
+        | none => mkAppM ``LeanerIR.Proofs.AbortsOf #[executable, callableValue, inputValues, pre]
     | .ensuresOf =>
         let some callableExpression := context.ns.expressions[arguments[0]!.index]?
           | throwError "a behavioral predicate's function value is out of range"
         let some (.function parameters _ _) := context.valueTypeOf? callableExpression.typeId
           | throwError "a behavioral predicate's operand is not a function value"
-        let results ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue)
-          (← (arguments.extract (parameters.size + 1) arguments.size).toList.mapM runtimeOperand)
-        mkAppM ``LeanerIR.Proofs.EnsuresOf
-          #[executable, callableValue, inputValues, results, pre, post]
+        let outputs := arguments.extract (parameters.size + 1) arguments.size
+        match mutable? with
+        | none =>
+            let results ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue)
+              (← outputs.toList.mapM runtimeOperand)
+            mkAppM ``LeanerIR.Proofs.EnsuresOf
+              #[executable, callableValue, inputValues, results, pre, post]
+        | some (mutable, count) =>
+            -- The declared results, then each mutable reference's final value,
+            -- read at the post-state.
+            unless count ≤ outputs.size do
+              throwError "`ensures_of` names a final value for each mutable reference argument"
+            let declared := outputs.extract 0 (outputs.size - count)
+            let finals := outputs.extract (outputs.size - count) outputs.size
+            let finalContext ← context.mutableAt range.post (entry := false)
+            let results ← mkArrayLit (mkConst ``LeanerIR.RuntimeValue)
+              (← declared.toList.mapM runtimeOperand)
+            let finalValues ← mkListLit (mkConst ``LeanerIR.RuntimeValue)
+              (← finals.toList.mapM (translateRuntimeOperand finalContext))
+            mkAppM ``LeanerIR.Proofs.EnsuresOfMut
+              #[executable, callableValue, mutable, inputValues, results, finalValues, pre, post]
     | .resultOf =>
-        let results ← mkAppM ``LeanerIR.Proofs.ResultOf
-          #[executable, callableValue, inputValues, pre]
+        let results ← match mutable? with
+          | some (mutable, _) =>
+              mkAppM ``LeanerIR.Proofs.ResultOfMut
+                #[executable, callableValue, mutable, inputValues, pre]
+          | none =>
+              mkAppM ``LeanerIR.Proofs.ResultOf #[executable, callableValue, inputValues, pre]
         (domainOf ty).ofRuntime (← mkAppM ``LeanerIR.SemanticOperations.packResults #[results])
     | .requiresOf =>
         let some table := context.requiresTable
@@ -5301,7 +5356,7 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : LeanerIR.Namespa
     MetaM Lean.Expr := do
   let groups ← groupConditions unit declaration.contract.conditions
   let localTypes ← declaration.locals.mapM fun localDecl => do
-    let some ty := unit.tables.types[localDecl.type.typeId.index]?
+    let some ty := unit.tables.types[(specTypeId unit localDecl.type.typeId).index]?
       | throwError "function local has an unknown type"
     pure ty
   let values := mkApp (mkConst ``Array [Level.zero]) (mkConst ``LeanerIR.RuntimeValue)
@@ -5309,8 +5364,9 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : LeanerIR.Namespa
   withLocalDeclD `arguments values fun arguments =>
     withLocalDeclD `state (mkApp (mkConst ``LeanerIR.Proofs.Denote.Memory) unitExpr) fun state => do
       let mut locals : Array (Option Lean.Expr) := Array.replicate declaration.locals.size none
+      -- A reference parameter is read as the value it passes.
       for parameter in declaration.signature.parameters, index in [0:declaration.signature.parameters.size] do
-        let some ty := unit.tables.types[parameter.typeUse.typeId.index]?
+        let some ty := unit.tables.types[(specTypeId unit parameter.typeUse.typeId).index]?
           | throwError "a parameter has an unknown type"
         let value ← mkAppM ``Array.getD #[arguments, toExpr index, mkConst ``LeanerIR.RuntimeValue.unit]
         locals := locals.set! index (some (← (domainOf ty).binderOfRuntime value))

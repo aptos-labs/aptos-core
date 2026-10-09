@@ -1198,6 +1198,107 @@ theorem ensuresOf_closureOf_verified_shape {unit : ValidatedUnit} {executable : 
     (ensuresOf_closureOf_shape weave capturedFree suppliedFree shapeFree typeInstantiation
       coherent captures args result ensures)
 
+/-- `ensures_of` of a closure whose target, weave, and captures a proof sees,
+at arguments lending mutable references and results of any reference-free
+shape, is a run of the target's prophetic meaning at the references' entry
+and final values. -/
+theorem ensuresOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) (result : shape.carrier)
+    {pre post : Memory unit}
+    (ensures : EnsuresOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) ((resultCodec shape).encode result) (HList.finals args)
+      pre post) :
+    (propheticMeaning executable typeInstantiation handle full shape
+      (weave.compose captures args)).ok pre result post := by
+  obtain ⟨start, loans, lent, exit, globals, admissible, lends, runs, resolves, encoded, agree⟩ :=
+    ensures
+  obtain ⟨lentArguments, invocation⟩ :=
+    invocationSpec_closureOf_lent weave capturedFree suppliedFlat typeInstantiation captures args
+      (executable := executable) (handle := handle) lends
+  rw [invocation] at runs
+  have resultLent := ResultShape.lend_encode shape shapeFree result
+  refine ⟨coherent, start, loans, _, _, exit, [], _, globals, admissible, lentArguments, runs,
+    resultLent, (ResultShape.lend_refFree shape shapeFree result).trans resultLent, ?_, encoded,
+    agree⟩
+  exact (weave.argumentsResolve_compose capturedFree captures args loans _ _).mpr
+    ((argumentsResolve_finals supplied args loans _ _).mpr resolves)
+
+/-- `aborts_of` of a closure whose target, weave, and captures a proof sees,
+at arguments lending mutable references, is an abort of the target's
+prophetic meaning at the references' entry values, whatever their final
+values. -/
+theorem abortsOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    (shape : ResultShape) (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) {state : Memory unit}
+    (aborts : AbortsOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) state) :
+    ∃ failure, (propheticMeaning executable typeInstantiation handle full shape
+      (weave.compose captures args)).aborts state failure := by
+  obtain ⟨start, loans, lent, failure, globals, admissible, lends, runs⟩ := aborts
+  obtain ⟨lentArguments, invocation⟩ :=
+    invocationSpec_closureOf_lent weave capturedFree suppliedFlat typeInstantiation captures args
+      (executable := executable) (handle := handle) lends
+  rw [invocation] at runs
+  exact ⟨failure, coherent, start, loans, _, globals, admissible, lentArguments, runs⟩
+
+/-- `ensures_of` of a closure taking mutable references whose target is
+verified: where what the target's theorem assumes and its precondition
+hold, what its contract ensures of the run, its frame, and that no
+condition under which it must abort held. -/
+theorem ensuresOfMut_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) (result : shape.carrier)
+    {pre post : Memory unit} {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (ensures : EnsuresOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) ((resultCodec shape).encode result) (HList.finals args)
+      pre post)
+    (assumed : contract.assumes (weave.compose captures args) pre)
+    (permitted : contract.requires (weave.compose captures args) pre) :
+    (¬contract.mayAbort (weave.compose captures args) pre →
+        contract.ensures (weave.compose captures args) pre result post) ∧
+      contract.frame (weave.compose captures args) pre result post ∧
+      ¬contract.mustAbort (weave.compose captures args) pre :=
+  (verified _ pre assumed permitted).1 result post
+    (ensuresOfMut_closureOf weave capturedFree suppliedFlat shapeFree typeInstantiation coherent
+      captures args result ensures)
+
+/-- `aborts_of` of a closure taking mutable references whose target is
+verified: where what the target's theorem assumes and its precondition
+hold, a failure its contract permits. -/
+theorem abortsOfMut_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) {state : Memory unit}
+    {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (aborts : AbortsOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) state)
+    (assumed : contract.assumes (weave.compose captures args) state)
+    (permitted : contract.requires (weave.compose captures args) state) :
+    ∃ failure, contract.aborts (weave.compose captures args) state failure := by
+  obtain ⟨failure, runs⟩ := abortsOfMut_closureOf weave capturedFree suppliedFlat shape
+    typeInstantiation coherent captures args aborts
+  exact ⟨failure, (verified _ state assumed permitted).2.1 failure runs⟩
+
 /-- A run of a closure whose target is verified, from where what the
 target's theorem assumes and its precondition hold, keeps the target's
 frame. -/

@@ -2364,3 +2364,19 @@ for a conjunction a leaf mentions in both orders. The other leaf's cost was
 the shift's bounds were asserted; `shiftLeft_tmod_of_nonneg` rewrites a
 truncating remainder of a nonnegative shift to the runtime's. `contains`
 costs 18.3M (57.0M before), and `features` 769.7M (854.6M).
+
+## A literal closure's run per conjunct (2026-10-09)
+
+`denotedRun` reads a literal closure's run (`EnsuresOf`/`EnsuresOfMut`
+of a target without a theorem) at each leaf that holds the hypothesis, after
+the goal's conjunction has split: every postcondition conjunct re-inlines the
+target. `lambda_spec_global_memory::settle` (four conjuncts after an opaque
+`apply` stating `ensures_of<f>(old(x), x)`) profiles at 32.4M heartbeats:
+`denoted run ×4`, `inline ×8` (the lambda and `debit` in it, 6.2M), `bind ×111`
+(13.2M), against a 25M budget. Reading the run once before a conjunction
+splits (`patches/run-before-split.patch`) takes it to 19.9M (`bind ×59`,
+`inline ×4`), but forces the run on conjuncts that would have closed without
+it: `vector_hofs_for_each::find_value` moves from a clause failure to the
+budget. Rejected as is; the refinement is to read the run once for exactly
+the conjuncts that read its outcome (result, final memory, lent finals) and
+split the rest off first.

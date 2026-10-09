@@ -656,7 +656,12 @@ verified through their targets' contracts, generic targets included).
 
 Done, 2026-10-01: H4a, the behavioral predicates in contracts; of H4c, the
 dispatch of a literal closure's predicates to its target's precondition and
-theorem.
+theorem. Done, 2026-10-09: of H4d, `&mut` arguments of behavioral predicates
+(`AbortsOfMut`, `EnsuresOfMut`, `ResultOfMut`), read of literal closures by
+their targets' contracts and bodies; open there: a state label witnessed by
+`&mut` predicates of an inlined target, invoking an unseen function value
+with `&mut` parameters, and labels defined by such invocations
+(`prover-test-problems.md`, V20).
 
 Open: the rest of H4 — typing of invocation outcomes (H4b, planned in
 [`static-typing.md`](static-typing.md), Phases 1–4 done: the checker at

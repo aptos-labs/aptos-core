@@ -49,6 +49,18 @@ relative to `tests/sources`.
 
 ## Summary
 
+Mutable-reference behavioral predicates (2026-10-09): `aborts_of`,
+`ensures_of` and `result_of` of a function value with `&mut` parameters are
+carried: the invocation lends each `&mut` argument under a loan of its own
+and `ensures_of<f>(inputs, results, finals)` names the final value the run
+exports for it, as the Prover lays the arguments out; a `&mut` input is read
+at the pre-state (the Prover's `old`), a final value at the post-state. Of a
+literal closure, these are runs of the target's prophetic meaning at the
+references' entry and final values, read by the target's contract or body.
+Three of the four `drive` tests verify; `lambda_spec_global_memory`
+verifies at a 200k budget and exceeds the native one (V20 keeps it and the
+rest).
+
 Generic module invariants (2026-10-09): `invariant<T>` holds at the
 instantiations unifying a resource type it reads (directly or through the
 specification functions it applies) with the memory a function uses, as the
@@ -72,7 +84,8 @@ precondition owed is the one callers see (an `[abstract]` clause, not a
 callee's precondition as the Prover does. A clause applying `requires_of`
 is not owed this way (it reads the module's table of declared
 preconditions), nor is the precondition of a closure's target, which its
-invocation owes through `requires_of`. Four `drive` functions now reach V20.
+invocation owes through `requires_of`. Four `drive` functions reached V20
+(three verify since the `&mut` predicates, above).
 
 Inline specifications (2026-10-08): a non-opaque inline function with a
 specification of its own is verified against it, as the Prover verifies it;
@@ -983,8 +996,9 @@ all 12 positive functions and reject all 15 deliberately invalid functions.
 Allowed codes remain constrained with partial abort conditions; arithmetic
 traps are distinguished from explicit aborts and map to `EXECUTION_FAILURE`.
 
-Partial-variant enum updates and mutable-reference behavioral predicates are
-listed under V2; `mono` now reaches its unsupported `emits` clause.
+Partial-variant enum updates are listed under V2, mutable-reference
+behavioral predicates under V20; `mono` now reaches its unsupported `emits`
+clause.
 
 A generic axiom (`axiom<T>`, LeanerLang `axiom {T} e`) is assumed at each
 instantiation a verification applies a specification function of it at, as
@@ -1004,8 +1018,9 @@ Tests: `functional/choice.move`, `functional/emits.move`, `functional/loop_unrol
 
 ### V2. Construct not supported in generated contracts
 
-5 tests, 7 messages (2026-10-05 refresh; `abort_in_fun`, `bv_aborts`,
-`defines` and `performance_200511` reach verification since 2026-10-08).
+4 tests, 6 messages (2026-10-05 refresh; `abort_in_fun`, `bv_aborts`,
+`defines` and `performance_200511` reach verification since 2026-10-08,
+`discarded_mut_ref_result` since 2026-10-09, V20).
 
 Messages:
 
@@ -1013,7 +1028,6 @@ Messages:
 - 1 × `specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts`
 - 1 × `generated contracts currently expand specification functions with one result`
 - 2 × `a field update on an enum whose variants do not all carry the field is not supported yet`
-- 1 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
 
 The state-change predicates `publish`, `remove`, and `update` now translate
 in contracts, including labels they define (S2b of
@@ -1037,7 +1051,7 @@ Example (`functional/closures/closure_in_spec_expr.move`):
 specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts
 ```
 
-Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/spec_fun_tuple_errors.move`, `regression/enum_update_out_of_variant.move`, `functional/closures/inline/discarded_mut_ref_result.move`.
+Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/spec_fun_tuple_errors.move`, `regression/enum_update_out_of_variant.move`.
 
 ### V6. Construct not carried by the denotation
 
@@ -1158,22 +1172,38 @@ Tests: `functional/recursive_move_funs_multi_hop.move`.
 
 ### V20. Behavioral predicates with mutable-reference parameters
 
-3 tests, 3 messages.
+5 tests, 5 messages (2026-10-09).
 
-Quantified labels and both state-change and invocation-defined labels are
-carried in contracts (S2 and S3 of [`state-labels.md`](state-labels.md)).
-Behavioral predicates over functions with `&mut` parameters remain open.
+`aborts_of`, `ensures_of` and `result_of` over function values with `&mut`
+parameters are carried (2026-10-09; `AbortsOfMut`, `EnsuresOfMut`,
+`ResultOfMut`, [`higher-order-functions.md`](higher-order-functions.md),
+"Behavioral predicates"): `lambda_spec_discarded_result`,
+`lambda_spec_loop_anchor` and `lambda_spec_two_state_specfun` verify (the
+Prover fails the inferred contract of the loop lambda in
+`lambda_spec_loop_anchor`; Leaner infers none). What remains:
 
-Message:
+- `lambda_spec_global_memory` and `discarded_mut_ref_result` exceed the
+  budget: `settle` verifies at 200k (35M heartbeats), each postcondition
+  conjunct reading the lambda's run again. Reading it once for the conjuncts
+  that read its outcome is the next step (`handoff.md`).
+- `lambda_captured_fun_loop`: the closer reads the lambda's run (a loop
+  without an invariant) at the continuation after `apply_mut`, which
+  fails; the Prover fails the file too, on the lambda's inferred contract.
+- `bp_requires_aborts_labeled_mut`: the state label's witness needs
+  `¬aborts_of` of an inlined target, which the witness search does not
+  derive (`handoff.md`, `patches/behavior-witness.patch`).
+- `closure_bp_post_sub_pre_only`: invoking an unseen function value with
+  `&mut` parameters leaves a residual obligation (its rule needs the H4b
+  typing of lent arguments); the Prover fails the clause too.
 
-- 7 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
+Messages:
 
-Tests: `functional/closures/lambda_spec_global_memory.move`, `functional/state_labels/bp_requires_aborts_labeled_mut.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`, `functional/closures/lambda_captured_fun_loop.move`, `functional/closures/lambda_spec_discarded_result.move`, `functional/closures/lambda_spec_loop_anchor.move`, `functional/closures/lambda_spec_two_state_specfun.move`.
+- 2 × `(deterministic) timeout at whnf, maximum number of heartbeats (25000) has been reached`
+- 1 × `the continuation after apply_mut is not established`
+- 1 × `the specification clause … is not established`
+- 1 × `verification failed with a residual obligation`
 
-The last four reach it since a function without a specification is verified
-for the preconditions of its calls (2026-10-09): their `drive` calls `apply`,
-whose precondition is a behavioral predicate over a `&mut` function. Before,
-`drive` was not verified at all.
+Tests: `functional/closures/lambda_spec_global_memory.move`, `functional/closures/inline/discarded_mut_ref_result.move`, `functional/closures/lambda_captured_fun_loop.move`, `functional/state_labels/bp_requires_aborts_labeled_mut.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`.
 
 The invocation-label increment moves `aborting_result_definition` to its
 intended no-abort clause failures. `aborts_if_at_state_label::caller` now

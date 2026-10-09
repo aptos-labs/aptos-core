@@ -3592,6 +3592,33 @@ private def assignWitnessed (goal : MVarId) (others : List MVarId)
   goal.assign proof
   setGoals others
 
+/-- A state label's binders witnessed at a program point: the point's state
+for a `Memory` binder, the values of its locals in the binder's domain for the
+others, each binder in turn; the witnesses and the body they instantiate. -/
+private partial def pointWitness? (value state target : Lean.Expr) :
+    TacticM (Option (Array (Lean.Expr × Lean.Expr × Lean.Expr) × Lean.Expr)) := do
+  let stateType ← inferType state
+  let locals ← pointLocals value
+  let rec choose (body : Lean.Expr) (used : Array Lean.Expr)
+      (chosen : Array (Lean.Expr × Lean.Expr × Lean.Expr)) :
+      TacticM (Option (Array (Lean.Expr × Lean.Expr × Lean.Expr) × Lean.Expr)) := do
+    let body ← whnfR body
+    let some (domain, predicate) := body.app2? ``Exists | return some (chosen, body)
+    let memory ← try isDefEq stateType domain catch _ => pure false
+    let candidates ← if memory then pure #[state] else
+      match locals with
+      | some (carriers, locals) =>
+          locals.filterMapM fun (τ, entry) => do
+            let some candidate ← localInDomain carriers τ entry domain | return none
+            return if used.contains candidate then none else some candidate
+      | none => pure #[]
+    for candidate in candidates do
+      if let some found ← choose (predicate.beta #[candidate]) (used.push candidate)
+          (chosen.push (domain, predicate, candidate)) then
+        return some found
+    return none
+  choose target #[] #[]
+
 /-- An existential goal over a state label — a memory and copies of the
 mutable parameters, as nested existentials — witnessed at one program point:
 the point's state for a `Memory` binder, the values of its locals in the
@@ -3604,28 +3631,7 @@ private partial def ledgerWitness (goal : MVarId) (others : List MVarId)
   unless domain.isAppOf ``LeanerIR.Proofs.Denote.Memory || (domainAccessor? domain).isSome do
     return false
   for (value, state) in ← programPoints do
-    let stateType ← inferType state
-    let locals ← pointLocals value
-    -- Each binder in turn, from this point.
-    let rec choose (body : Lean.Expr) (used : Array Lean.Expr)
-        (chosen : Array (Lean.Expr × Lean.Expr × Lean.Expr)) :
-        TacticM (Option (Array (Lean.Expr × Lean.Expr × Lean.Expr) × Lean.Expr)) := do
-      let body ← whnfR body
-      let some (domain, predicate) := body.app2? ``Exists | return some (chosen, body)
-      let memory ← try isDefEq stateType domain catch _ => pure false
-      let candidates ← if memory then pure #[state] else
-        match locals with
-        | some (carriers, locals) =>
-            locals.filterMapM fun (τ, entry) => do
-              let some candidate ← localInDomain carriers τ entry domain | return none
-              return if used.contains candidate then none else some candidate
-        | none => pure #[]
-      for candidate in candidates do
-        if let some found ← choose (predicate.beta #[candidate]) (used.push candidate)
-            (chosen.push (domain, predicate, candidate)) then
-          return some found
-      return none
-    let some (chosen, body) ← choose target #[] #[] | continue
+    let some (chosen, body) ← pointWitness? value state target | continue
     if chosen.isEmpty then continue
     let some proof ← decideInstance body (← `(tactic| leaner_denote_instance_premise))
       (normalize := true) | continue
@@ -6978,6 +6984,31 @@ private partial def nativeRow? (row : Lean.Expr) :
       let some tail ← nativeRow? (row.getArg! 1) values | return none
       return some (← mkAppM ``Prod.mk #[head, tail])
 
+/-- The native arguments of a row lending mutable references: each
+reference's entry and final value, the entry for both where no final is
+given (an abort does not read it); every other argument as `nativeRow?`
+reads it. -/
+private partial def nativeLentRow? (row : Lean.Expr) :
+    List Lean.Expr → Option (List Lean.Expr) → TacticM (Option Lean.Expr)
+  | [], finals =>
+      return if row.isConstOf ``NRow.nil && (finals.all (·.isEmpty)) then some (mkConst ``Unit.unit)
+        else none
+  | entry :: entries, finals => do
+      unless row.isAppOfArity ``NRow.cons 2 do return none
+      let τ := row.getArg! 0
+      if τ.isAppOfArity ``NTy.ref 1 then
+        let some current ← nativeOf? τ.appArg! entry | return none
+        let (final, rest) ← match finals with
+          | some (final :: rest) => pure (← nativeOf? τ.appArg! final, some rest)
+          | some [] => return none
+          | none => pure (some current, none)
+        let some final := final | return none
+        let some tail ← nativeLentRow? (row.getArg! 1) entries rest | return none
+        return some (← mkAppM ``Prod.mk #[← mkAppM ``Prod.mk #[current, final], tail])
+      let some head ← nativeOf? τ entry | return none
+      let some tail ← nativeLentRow? (row.getArg! 1) entries finals | return none
+      return some (← mkAppM ``Prod.mk #[head, tail])
+
 /-- The elements of a list or array literal. -/
 private def literalElements? (literal : Lean.Expr) : Option (List Lean.Expr) :=
   if literal.isAppOfArity ``List.toArray 2 then
@@ -6988,12 +7019,46 @@ private def literalElements? (literal : Lean.Expr) : Option (List Lean.Expr) :=
 private def unmarked (statement : Lean.Expr) : Lean.Expr :=
   if statement.isAppOfArity ``LeanerIR.Proofs.Obligation 4 then statement.appArg! else statement
 
+/-- An `ensures_of` or `aborts_of` statement's parts: whether it states a
+run, the function value, its arguments, and, of a run, its results and final
+memory; of an invocation lending mutable references, which arguments are
+(`lent`) and, of a run, their final values. -/
+private structure BehaviorView where
+  ensures : Bool
+  callable : Lean.Expr
+  arguments : Lean.Expr
+  results : Lean.Expr := default
+  post : Lean.Expr := default
+  lent : Option Lean.Expr := none
+  finals : Option Lean.Expr := none
+
+/-- The parts of an `ensures_of` or `aborts_of` statement. -/
+private def behaviorView? (statement : Lean.Expr) : Option BehaviorView :=
+  if statement.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7 then
+    some {
+      ensures := true, callable := statement.getArg! 2, arguments := statement.getArg! 3
+      results := statement.getArg! 4, post := statement.getArg! 6 }
+  else if statement.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5 then
+    some { ensures := false, callable := statement.getArg! 2, arguments := statement.getArg! 3 }
+  else if statement.isAppOfArity ``LeanerIR.Proofs.EnsuresOfMut 9 then
+    some {
+      ensures := true, callable := statement.getArg! 2, arguments := statement.getArg! 4
+      results := statement.getArg! 5, post := statement.getArg! 8
+      lent := some (statement.getArg! 3), finals := some (statement.getArg! 6) }
+  else if statement.isAppOfArity ``LeanerIR.Proofs.AbortsOfMut 6 then
+    some {
+      ensures := false, callable := statement.getArg! 2, arguments := statement.getArg! 4
+      lent := some (statement.getArg! 3) }
+  else none
+
 /-- Whether a statement is `ensures_of` or `aborts_of` under premises. -/
 private partial def states (statement : Lean.Expr) : Bool :=
   if statement.isArrow then states statement.bindingBody!
   else
     let statement := unmarked statement
-    statement.isAppOf ``LeanerIR.Proofs.EnsuresOf || statement.isAppOf ``LeanerIR.Proofs.AbortsOf
+    statement.isAppOf ``LeanerIR.Proofs.EnsuresOf || statement.isAppOf ``LeanerIR.Proofs.AbortsOf ||
+      statement.isAppOf ``LeanerIR.Proofs.EnsuresOfMut ||
+      statement.isAppOf ``LeanerIR.Proofs.AbortsOfMut
 
 /-- Behavioral contract derivation only handles literal closures. An abstract
 function value has no target theorem to re-derive, so trying to avoid that
@@ -7001,10 +7066,9 @@ work by preparing the whole context would add only speculative cost. -/
 private partial def statesLiteralBehavior (statement : Lean.Expr) : Bool :=
   if statement.isArrow then statesLiteralBehavior statement.bindingBody!
   else
-    let statement := unmarked statement
-    (statement.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7 ||
-      statement.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5) &&
-      ((statement.getArg! 2).find? (·.isAppOfArity ``closureOf 7)).isSome
+    match behaviorView? (unmarked statement) with
+    | some view => (view.callable.find? (·.isAppOfArity ``closureOf 7)).isSome
+    | none => false
 
 /-- Whether a premise of a goal's binders states `ensures_of` or `aborts_of`. -/
 private partial def spineStates : Lean.Expr → Bool
@@ -7031,7 +7095,8 @@ private partial def literalAbortAlternatives (statement : Lean.Expr) : Bool :=
   let statement := unmarked statement
   if statement.isAppOfArity ``Or 2 then
     literalAbortAlternatives (statement.getArg! 0) && literalAbortAlternatives (statement.getArg! 1)
-  else statement.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5 && statesLiteralBehavior statement
+  else (statement.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5 ||
+      statement.isAppOfArity ``LeanerIR.Proofs.AbortsOfMut 6) && statesLiteralBehavior statement
 
 /-- Expose the abort alternatives of a literal closure's contract before
 reading another invocation's result. A disjunction only states that one run
@@ -7050,6 +7115,28 @@ private def behaviorAlternatives? (goal : MVarId) : TacticM (Option (List MVarId
   -- opaque to ordinary unification so diagnostics retain the source clause.
   let goal ← goal.replaceLocalDeclDefEq hypothesis statement
   return some ((← goal.cases hypothesis).map (·.mvarId)).toList
+
+/-- The native arguments a behavioral statement's runtime arguments
+encode at the supplied row: of an invocation lending mutable references,
+with their final values where it states a run. -/
+private def lentNatives? (view : BehaviorView) (supplied : Lean.Expr) (arguments : List Lean.Expr) :
+    TacticM (Option Lean.Expr) := do
+  let some _ := view.lent | nativeRow? supplied arguments
+  match view.finals with
+  | some finals =>
+      let some finals := literalElements? finals | return none
+      nativeLentRow? supplied arguments (some finals)
+  | none => nativeLentRow? supplied arguments none
+
+/-- The native result a run's result literal encodes at a reference-free
+shape: nothing, or its one value. -/
+private def shapeResult? (shape results : Lean.Expr) : TacticM (Option Lean.Expr) := do
+  let some elements := literalElements? results | return none
+  if shape.isConstOf ``ResultShape.none then
+    return if elements.isEmpty then some (mkConst ``Unit.unit) else none
+  unless shape.isAppOfArity ``ResultShape.one 1 do return none
+  let [result] := elements | return none
+  nativeOf? shape.appArg! result
 
 /-- What a leaf learns from `ensures_of` and `aborts_of` of a closure whose
 target, weave, and captures it sees, and whose target is a verified
@@ -7087,9 +7174,9 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       stated := mkApp4 (mkConst ``Iff.mp) type type.appArg!
         (mkAppN (mkConst ``LeanerIR.Proofs.Obligation_iff) type.getAppArgs) stated
       type := type.appArg!
-    let ensures := type.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7
-    unless ensures || type.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5 do continue
-    let some closure := (type.getArg! 2).find? (·.isAppOfArity ``closureOf 7) | continue
+    let some view := behaviorView? type | continue
+    let ensures := view.ensures
+    let some closure := view.callable.find? (·.isAppOfArity ``closureOf 7) | continue
     let mask := closure.getArg! 3
     unless mask.isAppOfArity ``Weave.mask 4 do continue
     let weave := mask.appArg!
@@ -7112,8 +7199,8 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     -- Scalar argument carriers alone do not determine this implicit family.
     unless ← isDefEq (meaning.getArg! 2) (closure.getArg! 1) do continue
     let verified ← instantiateMVars (mkAppN theoremProof theoremArguments)
-    let some arguments := literalElements? (type.getArg! 3) | continue
-    let some natives ← nativeRow? supplied arguments | continue
+    let some arguments := literalElements? view.arguments | continue
+    let some natives ← lentNatives? view supplied arguments | continue
     -- Reference-freedom of a row or type, decided by the kernel.
     let free := fun (statement : Lean.Expr) => do
       mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq statement (mkConst ``Bool.true))
@@ -7121,7 +7208,24 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     -- instantiation, which the runtime frame is coherent with.
     let coherent ← mkAppM ``coherent_runtime #[meaning.getArg! 0, handle]
     let implication? ← try
-        if ensures && shape.isConstOf ``ResultShape.none then
+        if view.lent.isSome then
+          -- An invocation lending mutable references, at their entry and
+          -- final values.
+          let capturedFree ← free (mkApp (mkConst ``NRow.refFree) captured)
+          let flat ← free (mkApp (mkConst ``NRow.lentFlat) supplied)
+          if ensures then
+            let some result ← shapeResult? shape view.results | continue
+            some <$> mkAppAtFrame ``LeanerIR.Proofs.ensuresOfMut_closureOf_verified
+                (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
+              #[weave, capturedFree, flat,
+                ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape])),
+                closure.getArg! 4, coherent, closure.appArg!, natives, result, verified, stated]
+          else
+            some <$> mkAppAtFrame ``LeanerIR.Proofs.abortsOfMut_closureOf_verified
+                (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
+              #[weave, capturedFree, flat, closure.getArg! 4, coherent, closure.appArg!, natives,
+                verified, stated]
+        else if ensures && shape.isConstOf ``ResultShape.none then
           -- A run that returns nothing.
           let some [] := literalElements? (type.getArg! 4) | continue
           some <$> mkAppAtFrame ``LeanerIR.Proofs.ensuresOf_closureOf_verified_shape
@@ -7918,8 +8022,9 @@ abort (`forall_ok_of_wp`, `of_aborts_of_wp`), which the call rule inlines;
 the hypothesis stays, marked read (`Denoted`). -/
 private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr))
     (hypothesis : FVarId) (stated type : Lean.Expr) : TacticM (Option MVarId) := do
-  let ensures := type.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7
-  let some closure := (type.getArg! 2).find? (·.isAppOfArity ``closureOf 7) | return none
+  let some view := behaviorView? type | return none
+  let ensures := view.ensures
+  let some closure := view.callable.find? (·.isAppOfArity ``closureOf 7) | return none
   let mask := closure.getArg! 3
   unless mask.isAppOfArity ``Weave.mask 4 do throwError "no weave"
   let weave := mask.appArg!
@@ -7940,75 +8045,77 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
       compiled? := some (statement.getArg! 2).appArg!
   let some compiled := compiled? | throwError "not compiled"
   let shape ← whnfD (← mkAppM ``Function.result #[compiled])
-  let some arguments := literalElements? (type.getArg! 3) | throwError "arguments not literal"
-  let some natives ← nativeRow? supplied arguments | throwError "arguments not native"
+  let some arguments := literalElements? view.arguments | throwError "arguments not literal"
+  let some natives ← lentNatives? view supplied arguments | throwError "arguments not native"
   let free := fun (statement : Lean.Expr) => do
     mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq statement (mkConst ``Bool.true))
   let coherent ← mkAppM ``coherent_runtime
     #[type.getArg! 0, handle]
   let capturedFree ← free (mkApp (mkConst ``NRow.refFree) captured)
-  let suppliedFree ← free (mkApp (mkConst ``NRow.refFree) supplied)
-  if ensures && shape.isConstOf ``ResultShape.none then
-    -- A run that returns nothing.
-    let some [] := literalElements? (type.getArg! 4) | throwError m!"results not literal {type.getArg! 4}"
-    let .fvar finalVar := type.getArg! 6 | throwError "final not a variable"
-    let run ← mkAppAtFrame ``LeanerIR.Proofs.ensuresOf_closureOf_shape
-        (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
-      #[weave, capturedFree, suppliedFree,
-        ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape])),
-        closure.getArg! 4, coherent, closure.appArg!, natives, mkConst ``Unit.unit, stated]
-    let runType ← inferType run
-    let goal ← goal.replaceLocalDeclDefEq hypothesis
-      (mkApp (mkConst ``LeanerIR.Proofs.Denoted) (← instantiateMVars (← hypothesis.getType)))
-    let (runVar, goal) ← goal.withContext do (← goal.assert `leanerRun runType run).intro1P
-    let dependents ← goal.withContext do
-      (← getLCtx).foldlM (init := #[]) fun found decl => do
-        if decl.isImplementationDetail || decl.fvarId == runVar || decl.fvarId == finalVar then
-          return found
-        if (← instantiateMVars decl.type).containsFVar finalVar then return found.push decl.fvarId
-        return found
-    let (_, goal) ← goal.revert dependents (preserveOrder := true)
-    let (_, goal) ← goal.revert #[runVar]
-    let (_, goal) ← goal.revert #[finalVar]
-    let [next] ← goal.apply (← mkConstWithFreshMVarLevels ``LeanerIR.Proofs.forall_ok_unit_of_wp)
-      | return none
-    return some next
-  else if ensures then
-    unless shape.isAppOfArity ``ResultShape.one 1 do throwError m!"not one result {shape}"
-    let τ := shape.appArg!
-    let some [result] := literalElements? (type.getArg! 4) | throwError m!"results not literal {type.getArg! 4}"
-    let some native ← nativeOf? τ result | throwError "result not native"
-    let .fvar resultVar := native | throwError m!"result not a variable {native}"
-    let .fvar finalVar := type.getArg! 6 | throwError "final not a variable"
-    let run ← mkAppAtFrame ``LeanerIR.Proofs.ensuresOf_closureOf
-        (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
-      #[weave, capturedFree, suppliedFree, ← free (mkApp (mkConst ``NTy.refFree) τ),
-        closure.getArg! 4, coherent, closure.appArg!, natives, native, stated]
+  -- The supplied row: free of references, or lending mutable ones.
+  let suppliedFree ← match view.lent with
+    | some _ => free (mkApp (mkConst ``NRow.lentFlat) supplied)
+    | none => free (mkApp (mkConst ``NRow.refFree) supplied)
+  if ensures then
+    let unitShape := shape.isConstOf ``ResultShape.none
+    unless unitShape || shape.isAppOfArity ``ResultShape.one 1 do
+      throwError m!"not one result {shape}"
+    let some result ← shapeResult? shape view.results
+      | throwError m!"results not native {view.results}"
+    let resultVar? ← if unitShape then pure none else
+      let .fvar resultVar := result | throwError m!"result not a variable {result}"
+      pure (some resultVar)
+    let .fvar finalVar := view.post | throwError "final not a variable"
+    let shapeFree ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape]))
+    let run ← if view.lent.isSome then
+        mkAppAtFrame ``LeanerIR.Proofs.ensuresOfMut_closureOf
+          (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
+          #[weave, capturedFree, suppliedFree, shapeFree, closure.getArg! 4, coherent,
+            closure.appArg!, natives, result, stated]
+      else if unitShape then
+        -- A run that returns nothing.
+        mkAppAtFrame ``LeanerIR.Proofs.ensuresOf_closureOf_shape
+          (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
+          #[weave, capturedFree, suppliedFree, shapeFree, closure.getArg! 4, coherent,
+            closure.appArg!, natives, mkConst ``Unit.unit, stated]
+      else
+        mkAppAtFrame ``LeanerIR.Proofs.ensuresOf_closureOf
+          (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
+          #[weave, capturedFree, suppliedFree, ← free (mkApp (mkConst ``NTy.refFree) shape.appArg!),
+            closure.getArg! 4, coherent, closure.appArg!, natives, result, stated]
     let runType ← inferType run
     let goal ← goal.replaceLocalDeclDefEq hypothesis
       (mkApp (mkConst ``LeanerIR.Proofs.Denoted) (← instantiateMVars (← hypothesis.getType)))
     let (runVar, goal) ← goal.withContext do (← goal.assert `leanerRun runType run).intro1P
     -- What depends on the run's result and final state goes into the goal,
     -- the run first, so that the leaf is a fact about every run.
+    let reverted := (resultVar?.map (#[·])).getD #[] |>.push finalVar
     let dependents ← goal.withContext do
       (← getLCtx).foldlM (init := #[]) fun found decl => do
-        if decl.isImplementationDetail || decl.fvarId == runVar || decl.fvarId == resultVar ||
-            decl.fvarId == finalVar then return found
+        if decl.isImplementationDetail || decl.fvarId == runVar || reverted.contains decl.fvarId then
+          return found
         let declType ← instantiateMVars decl.type
-        if declType.containsFVar resultVar || declType.containsFVar finalVar then
-          return found.push decl.fvarId
+        if reverted.any declType.containsFVar then return found.push decl.fvarId
         return found
     let (_, goal) ← goal.revert dependents (preserveOrder := true)
     let (_, goal) ← goal.revert #[runVar]
-    let (_, goal) ← goal.revert #[resultVar, finalVar] (preserveOrder := true)
-    let [next] ← goal.apply (← mkConstWithFreshMVarLevels ``LeanerIR.Proofs.forall_ok_of_wp)
-      | return none
+    let (_, goal) ← goal.revert reverted (preserveOrder := true)
+    let rule := if unitShape then ``LeanerIR.Proofs.forall_ok_unit_of_wp
+      else ``LeanerIR.Proofs.forall_ok_of_wp
+    let [next] ← goal.apply (← mkConstWithFreshMVarLevels rule) | return none
     return some next
   else
-    let run ← mkAppAtFrame ``LeanerIR.Proofs.abortsOf_closureOf (type.getArg! 0) (type.getArg! 1)
-        (closure.getArg! 1)
-      #[weave, capturedFree, suppliedFree, shape, closure.getArg! 4, coherent, closure.appArg!,
-        natives, stated]
+    let run ← match view.lent with
+      | some _ =>
+          mkAppAtFrame ``LeanerIR.Proofs.abortsOfMut_closureOf (type.getArg! 0) (type.getArg! 1)
+            (closure.getArg! 1)
+            #[weave, capturedFree, suppliedFree, shape, closure.getArg! 4, coherent,
+              closure.appArg!, natives, stated]
+      | none =>
+          mkAppAtFrame ``LeanerIR.Proofs.abortsOf_closureOf (type.getArg! 0) (type.getArg! 1)
+            (closure.getArg! 1)
+            #[weave, capturedFree, suppliedFree, shape, closure.getArg! 4, coherent,
+              closure.appArg!, natives, stated]
     let goal ← goal.replaceLocalDeclDefEq hypothesis
       (mkApp (mkConst ``LeanerIR.Proofs.Denoted) (← instantiateMVars (← hypothesis.getType)))
     goal.withContext do
@@ -8040,7 +8147,8 @@ private def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String ×
       let mut type ← instantiateMVars (← hypothesis.getType)
       if type.isAppOfArity ``LeanerIR.Proofs.Denoted 1 then continue
       unless (type.find? fun e => e.isAppOf ``LeanerIR.Proofs.EnsuresOf ||
-          e.isAppOf ``LeanerIR.Proofs.AbortsOf).isSome do continue
+          e.isAppOf ``LeanerIR.Proofs.AbortsOf || e.isAppOf ``LeanerIR.Proofs.EnsuresOfMut ||
+          e.isAppOf ``LeanerIR.Proofs.AbortsOfMut).isSome do continue
       let mut stated := Lean.Expr.fvar hypothesis
       let mut held := true
       while type.isArrow do
@@ -8052,9 +8160,8 @@ private def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String ×
         stated := mkApp4 (mkConst ``Iff.mp) type type.appArg!
           (mkAppN (mkConst ``LeanerIR.Proofs.Obligation_iff) type.getAppArgs) stated
         type := type.appArg!
-      unless type.isAppOfArity ``LeanerIR.Proofs.EnsuresOf 7 ||
-          type.isAppOfArity ``LeanerIR.Proofs.AbortsOf 5 do continue
-      if ((type.getArg! 2).find? (·.isAppOfArity ``closureOf 7)).isSome then
+      let some view := behaviorView? type | continue
+      if (view.callable.find? (·.isAppOfArity ``closureOf 7)).isSome then
         found := found.push (hypothesis, stated, type)
     pure found
   for (hypothesis, stated, type) in candidates do

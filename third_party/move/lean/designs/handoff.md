@@ -1,5 +1,107 @@
 # Handoff
 
+Resume here (2026-10-09, suspended at the user's request):
+- Committed this session (newest last): loop invariant placement
+  (75885f6f), a bounded cheap witness search (5fe957a2), verified inline
+  specifications (44f4d360), callers owing callee preconditions (15eb18f6,
+  f58f44f7, 1e012c57 and the registry baselines), generic module invariants
+  (120b3b48, 2e27368f, 52ffe7a2), and `&mut` behavioral predicates (below).
+  Each has its registry summary in `prover-test-problems.md`.
+- Parked work, as patches against the commit that adds this note (the
+  container's scratch files do not survive; apply with
+  `git apply third_party/move/lean/designs/patches/<name>.patch`):
+  - `behavior-witness.patch` (closer, unvalidated): an existential over a
+    state label whose body states behavioral predicates is tried at each
+    program point (`pointWitness?`, shared with `ledgerWitness`), each
+    conjunct derived by `dispatchBehavior` and decided by
+    `leaner_denote_leaf_cheap`. For `bp_requires_aborts_labeled_mut` the
+    `requires_of` conjunct is decided at every point but `¬aborts_of` is
+    not: `checked_inc` is inlined (no `Satisfies` theorem among the
+    callees), so `dispatchBehavior` learns nothing from the introduced
+    `AbortsOfMut`. Next: read the abort by the target's body as
+    `denotedRun` does (`abortsOfMut_closureOf` and `of_aborts_of_wp`); the
+    resulting `wp` goal needs the closer's main loop, not the cheap
+    deciders, so the witness step should push the instantiated goal back
+    into the pipeline per candidate point (bounded), or prefer the entry
+    point. Failed attempts must restore the whole state: an earlier version
+    left `replaceTargetDefEq` behind and the proof had an unassigned
+    placeholder.
+  - `run-before-split.patch` (closer, measured, rejected as is): read a
+    literal closure's run once at a conjunction, before it splits; see the
+    `&mut` entry below and perf-notes.md.
+  - `bcs-serialize-facts.patch` (contracts, never built): task "BCS
+    serialize facts over parameters" for `address_serialization` and
+    `serialize_model`: the Prover's prelude facts of `bcs::serialize`
+    (injective, nonempty, one length for addresses) stated of a function's
+    parameters, as `hashFacts` states collision freedom. Build, run those two
+    registry tests, the suites, and the benchmark before committing.
+- Remaining registry work, by priority (user's order): finish behavioral
+  predicates (V20 remainder above; explicit `modifies_of` on stored closures
+  and `reads_of`, H4d), then the BCS facts, then the rest of the registry.
+- Tools: reproduce a registry file with
+  `target/ci/move-prover --dependency=../move-stdlib/sources
+  --dependency=../move-stdlib/nursery/sources
+  --dependency=../extensions/move-table-extension/sources
+  --named-addresses std=0x1 extensions=0x2 --lean --heartbeats=25
+  --language-version 2.4 -o <dir>/out.bpl <file>` from
+  `third_party/move/move-prover`; isolate one target of the rendered
+  `out.lean` with `scripts/isolate-target.py` (options
+  `leaner.stageLog="<file>"`, `leaner.denoteProfile=true`,
+  `leaner.denoteDebug=true`, `leaner.verifyHeartbeats=N`) and run it with
+  `lake env lean` from `leaner-move`. Debug output inside a closer step that
+  restores its state on failure must use `IO.println`: `logInfo` is rolled
+  back with the state.
+
+Behavioral predicates over `&mut` parameters (2026-10-09):
+- Semantics (`Proofs/Behavior.lean`): `lendMutable` lends the arguments at
+  the positions the function type marks mutable, each under its own loan as
+  `.borrow loan entry`; `ResolvesAt` reads each loan's final value as
+  `argumentsResolve` does; `AbortsOfMut`, `EnsuresOfMut` (inputs, declared
+  results, then the finals, the Prover's layout) and `ResultOfMut`. The
+  bridge to typed rows: `NRow.mutable`, `NRow.lentFlat` (every element a
+  mutable reference or reference-free), `HList.entries`/`HList.finals`,
+  `NRow.lend_lentFlat`, `argumentsResolve_finals`,
+  `invocationSpec_closureOf_lent`. `Proofs/Invocation.lean`:
+  `ensuresOfMut_closureOf`, `abortsOfMut_closureOf` (any final values), and
+  the `_verified` forms.
+- Translation (`Contract.lean`): `translateInvocation` returns the mutable
+  mask and count; inputs at mutable positions are read at the pre-state
+  (`Context.mutableAt`: a pre label's copy, else the entry value), finals at
+  the post-state; `requires_of`'s table reads a reference parameter as its
+  referent (`buildDeclaredRequires`). A label defined by such an invocation
+  is rejected ("not carried yet").
+- Closer (`Close.lean`): `BehaviorView` reads the four predicates;
+  `nativeLentRow?` builds `(entry, final)` pairs; `dispatchBehavior` and
+  `denotedRun` apply the `Mut` theorems (`denotedRun` now shares one path
+  for reference-free and lending runs).
+- `lambda_spec_global_memory::settle` verifies at 200k but needs 35M
+  heartbeats (25M budget): each of its four postcondition conjuncts reads
+  the lambda's run again, re-inlining the lambda and `debit`
+  (`denoted run ×4`, `inline ×8`, `bind ×111` of 32.4M profiled). Reading
+  the run once at the conjunction, before it splits
+  (`patches/run-before-split.patch`), brings it to 19.9M, but forces the
+  run on conjuncts that never needed it: `vector_hofs_for_each::find_value`
+  goes from a clause failure to the budget. Reverted. The same eagerness
+  already fails `lambda_captured_fun_loop::wrap2` (it verified while the
+  closer could not read `EnsuresOfMut`): the continuation leaf reads the
+  lambda's run, a loop without an invariant. Next: read a run only for the
+  conjuncts that read its outcome (its result, final memory, or the lent
+  finals), once for all of them, and leave the others to the split.
+- Registry (filters `functional/closures`, `functional/state_labels`,
+  `behavioral`): `lambda_spec_discarded_result`, `lambda_spec_loop_anchor`,
+  `lambda_spec_two_state_specfun` verify; `lambda_spec_global_memory` and
+  `discarded_mut_ref_result` reach verification and exceed the budget;
+  `lambda_captured_fun_loop`, `bp_requires_aborts_labeled_mut`,
+  `closure_bp_post_sub_pre_only` fail as the Prover does, for the reasons in
+  V20; no other baseline changed. Suites (leaner-ir, leaner-move,
+  leaner-e2e-tests) pass with no baseline change.
+- Benchmark against the generic-invariant checkpoint (15,407,968,920): same
+  outcomes (30 verified, one expected AMM rejection), 15,455,143,337
+  (+0.31%), spread thinly (calculator +0.67%, ordered_map +0.51%, Quicksort
+  +0.42%, every other problem within 0.35%); no problem states a `&mut`
+  predicate, so the drift is the larger closer and contract code paths, not
+  a changed proof. Not attributed further.
+
 Test driver parity, scripts, pipeline stages (2026-10-08):
 - The registry driver (`move-prover/tests/testsuite.rs`) verifies each file
   alone with the stdlib, nursery and `move-table-extension` dependencies
