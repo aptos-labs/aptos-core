@@ -616,6 +616,11 @@ impl NativeStateView<'_> {
             })
     }
 
+    /// The version the base is folded to.
+    pub fn base_version(&self) -> Option<Version> {
+        self.base.version()
+    }
+
     /// Overlay first, then the base. `None` for a tombstone or a miss.
     pub fn get(&self, key: &PositionKey) -> Option<NativePosition> {
         match self.overlay_write(&key.account(), &key.market) {

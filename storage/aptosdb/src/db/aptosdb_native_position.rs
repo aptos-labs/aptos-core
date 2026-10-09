@@ -95,7 +95,7 @@ impl AptosDB {
     }
 
     /// Called automatically from `open_internal` when
-    /// `ENABLE_TRADING_NATIVE` is `true`. Shares `env` and
+    /// `rocksdb_configs.enable_trading_native` is set. Shares `env` and
     /// `block_cache` with the main AptosDB so RocksDB background
     /// threads and the block cache stay singleton.
     pub fn init_native_position(

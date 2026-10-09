@@ -7,6 +7,8 @@ use crate::{
     ledger_update_stage::{CommitProcessing, LedgerUpdateStage},
     measurements::{EventMeasurements, OverallMeasuring},
     metrics::NUM_TXNS,
+    position_verifier::PositionIndexVerifier,
+    transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     OverallMeasurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
@@ -19,7 +21,7 @@ use aptos_logger::info;
 use aptos_metrics_core::IntCounterVecHelper;
 use aptos_transaction_generator_lib::TransactionFeedback;
 use aptos_types::{
-    block_executor::partitioner::ExecutableBlock,
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     transaction::{Transaction, TransactionPayload, Version},
 };
 use aptos_vm::VMBlockExecutor;
@@ -56,6 +58,18 @@ pub struct PipelineConfig {
 
     pub print_transactions: bool,
     pub wait_for_indexer_grpc: bool,
+    /// Derive the executor's on-chain config from the DB's `Features` at
+    /// start, as a node does, instead of the fixed benchmark config. Needed
+    /// for anything feature-gated at the executor (TransactionInfoV1, the
+    /// position root). Off by default so existing runs don't shift.
+    pub onchain_config_from_features: bool,
+    #[derivative(Default(value = "BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG"))]
+    pub onchain_config: BlockExecutorConfigFromOnchain,
+    /// After each block commits, check the published in-memory position
+    /// index against a replay of the committed write sets. Needs
+    /// `--enable-trading-native`.
+    pub verify_positions_each_block: bool,
+    pub position_verifier: Option<Arc<PositionIndexVerifier>>,
 }
 
 pub struct Pipeline<V> {
@@ -138,7 +152,12 @@ where
             start_version,
         );
 
-        let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
+        let mut exe = TransactionExecutor::new(
+            executor_1,
+            parent_block_id,
+            ledger_update_sender,
+            config.onchain_config,
+        );
 
         let commit_processing = if config.skip_commit {
             CommitProcessing::Skip
@@ -297,14 +316,19 @@ where
         let target_version = Arc::new(Mutex::new(None));
         let target_version_clone = target_version.clone();
 
+        let position_verifier = config.position_verifier.clone();
         if !config.skip_commit {
             let commit_thread = std::thread::Builder::new()
                 .name("txn_committer".to_string())
                 .spawn(move || {
                     start_commit_rx.map(|rx| rx.recv());
                     info!("Starting commit thread");
-                    let mut committer =
-                        TransactionCommitter::new(executor_3, start_version, commit_receiver);
+                    let mut committer = TransactionCommitter::new(
+                        executor_3,
+                        start_version,
+                        commit_receiver,
+                        position_verifier,
+                    );
                     let final_version = committer.run();
 
                     // Store the final version for indexer_grpc waiter

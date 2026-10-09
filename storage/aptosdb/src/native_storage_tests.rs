@@ -749,3 +749,274 @@ mod integration {
         assert_eq!(reader.count_positions_for_exchange(exch_a), 1);
     }
 }
+
+/// Checks a benchmark checkpoint against the ledger it committed: the
+/// positions implied by the committed write sets must match the JMT
+/// leaves and KV rows on disk, the resident index, and the reader API.
+/// Run with `POSITION_VERIFY_DB_DIR=<checkpoint dir>`.
+#[cfg(test)]
+mod verify {
+    use crate::{
+        native_state_reader::{InMemoryNativeStateReader, NativeStateReader},
+        native_state_store::{position_key_of, PositionKey},
+        AptosDB,
+    };
+    use aptos_config::config::{
+        HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    };
+    use aptos_types::{state_store::native_position::NativePosition, transaction::Version};
+    use move_core_types::account_address::AccountAddress;
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        sync::Arc,
+    };
+
+    fn canon(p: &NativePosition) -> Vec<u8> {
+        bcs::to_bytes(p).expect("serializable")
+    }
+
+    #[test]
+    #[ignore]
+    fn verify_position_store_against_ledger() {
+        let Ok(dir) = std::env::var("POSITION_VERIFY_DB_DIR") else {
+            eprintln!("set POSITION_VERIFY_DB_DIR to a benchmark checkpoint directory");
+            return;
+        };
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(&dir),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("open");
+        let bundle = db.position().expect("native-position storage attached");
+        let tip = db
+            .ledger_db
+            .metadata_db()
+            .get_synced_version()
+            .unwrap()
+            .expect("synced version");
+        let snapshot = bundle
+            .merkle_db
+            .latest_snapshot_version_at_or_before(tip)
+            .unwrap()
+            .expect("a position JMT snapshot");
+
+        // When the root feature is on, the committed TransactionInfo at the
+        // snapshot carries the position root; it must be the JMT's.
+        let txn_info = db
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info(snapshot)
+            .unwrap();
+        match txn_info.position_state_checkpoint_hash() {
+            Some(committed_root) => {
+                let jmt_root = bundle.merkle_db.get_root_hash(snapshot).unwrap();
+                assert_eq!(
+                    committed_root, jmt_root,
+                    "position root in TransactionInfo@{snapshot} disagrees with the JMT"
+                );
+                eprintln!("TransactionInfo@{snapshot} commits position root {committed_root:x}, equal to the JMT root");
+            },
+            None => eprintln!(
+                "TransactionInfo@{snapshot} carries no position root (root feature off); V1={}",
+                matches!(txn_info, aptos_types::transaction::TransactionInfo::V1(_))
+            ),
+        }
+        if std::env::var("POSITION_VERIFY_ROOT_ONLY").is_ok() {
+            return;
+        }
+
+        // Expected: replay every committed native-position op in order.
+        let mut expected: BTreeMap<PositionKey, NativePosition> = BTreeMap::new();
+        let mut expected_at_snapshot = None;
+        let mut num_ops = 0usize;
+        let mut begin: Version = 0;
+        while begin <= tip {
+            let end = (begin + 10_000).min(tip + 1);
+            let write_sets = db
+                .ledger_db
+                .write_set_db()
+                .get_write_sets(begin, end)
+                .unwrap();
+            for (i, ws) in write_sets.iter().enumerate() {
+                for (key, op) in ws.native_position_iter() {
+                    num_ops += 1;
+                    let pk = position_key_of(key).unwrap();
+                    match op.as_write_op().as_state_value_opt() {
+                        Some(sv) => {
+                            expected.insert(pk, NativePosition::deserialize(sv.bytes()).unwrap());
+                        },
+                        None => {
+                            expected.remove(&pk);
+                        },
+                    }
+                }
+                if begin + i as Version == snapshot {
+                    expected_at_snapshot = Some(expected.clone());
+                }
+            }
+            begin = end;
+        }
+        assert!(
+            num_ops > 0,
+            "no native-position ops in the ledger: the write path is not wired"
+        );
+        let expected_at_snapshot = expected_at_snapshot.expect("snapshot within ledger");
+        eprintln!(
+            "ledger: {num_ops} position ops over {} versions; {} live at tip {tip}, {} at snapshot {snapshot}",
+            tip + 1,
+            expected.len(),
+            expected_at_snapshot.len()
+        );
+
+        // The Move side wrote fixed constants; they must survive the BCS
+        // boundary into the Rust type field by field.
+        for (pk, p) in &expected {
+            let NativePosition::PerpV1 {
+                size,
+                is_long,
+                entry_px_times_size_sum,
+                avg_acquire_entry_px,
+                user_leverage,
+                is_isolated,
+                funding_index_at_last_update,
+                unrealized_funding_amount_before_last_update,
+                timestamp,
+            } = p;
+            assert!((1..1_000_000).contains(size), "{pk:?}: size {size}");
+            assert_eq!(*entry_px_times_size_sum, u128::from(*size) * 1000, "{pk:?}");
+            assert!(
+                *is_long
+                    && !*is_isolated
+                    && *avg_acquire_entry_px == 1000
+                    && *user_leverage == 10
+                    && *funding_index_at_last_update == 0
+                    && *unrealized_funding_amount_before_last_update == 0
+                    && *timestamp == 0,
+                "{pk:?}: Move/Rust field layout mismatch: {p:?}"
+            );
+        }
+
+        // Durable: JMT leaves at the snapshot, each agreeing with its KV row.
+        let mut on_disk: BTreeMap<PositionKey, Vec<u8>> = BTreeMap::new();
+        let leaves = bundle
+            .merkle_db
+            .iter_active_leaves_with_values(Arc::clone(&bundle.kv_db), snapshot, 0)
+            .unwrap();
+        for row in leaves {
+            let (key, value) = row.unwrap();
+            let pk = position_key_of(&key).unwrap();
+            let kv = bundle
+                .kv_db
+                .expect_value_by_version(&key, snapshot)
+                .unwrap();
+            assert_eq!(
+                kv.bytes(),
+                value.bytes(),
+                "{pk:?}: KV row disagrees with JMT leaf"
+            );
+            let pos = NativePosition::deserialize(value.bytes()).unwrap();
+            assert!(
+                on_disk.insert(pk, canon(&pos)).is_none(),
+                "{pk:?}: duplicate leaf"
+            );
+        }
+        let want_disk: BTreeMap<_, _> = expected_at_snapshot
+            .iter()
+            .map(|(k, p)| (*k, canon(p)))
+            .collect();
+        assert_eq!(
+            on_disk, want_disk,
+            "JMT+KV at snapshot {snapshot} disagree with the ledger"
+        );
+
+        // Resident: base + overlay through the view, enumeration and point reads.
+        let exchanges: BTreeSet<AccountAddress> = expected.keys().map(|k| k.exchange).collect();
+        let want_tip: BTreeMap<_, _> = expected.iter().map(|(k, p)| (*k, canon(p))).collect();
+        let overlay = bundle.positions.lock().clone();
+        let mut in_memory: BTreeMap<PositionKey, Vec<u8>> = BTreeMap::new();
+        bundle.position_base.with_view(&overlay, |view| {
+            for exchange in &exchanges {
+                let accounts =
+                    view.for_each_account_in_exchange(*exchange, |a, ps| Some((*a, ps.to_vec())));
+                for (account, positions) in accounts {
+                    for (market, pos) in positions {
+                        let pk = PositionKey {
+                            exchange: account.exchange,
+                            account: account.account,
+                            market,
+                        };
+                        assert!(
+                            in_memory.insert(pk, canon(&pos)).is_none(),
+                            "{pk:?}: duplicate"
+                        );
+                    }
+                }
+            }
+            for (pk, p) in &expected {
+                let got = view.get(pk).map(|g| canon(&g));
+                assert_eq!(
+                    got.as_deref(),
+                    Some(canon(p).as_slice()),
+                    "{pk:?}: view.get"
+                );
+            }
+        });
+        assert_eq!(
+            in_memory, want_tip,
+            "resident index disagrees with the ledger at tip {tip}"
+        );
+
+        // Public reader API.
+        let reader = InMemoryNativeStateReader::new(
+            Arc::clone(&bundle.position_base),
+            Arc::clone(&bundle.positions),
+        );
+        let mut num_accounts = 0;
+        for exchange in &exchanges {
+            let want_accounts: BTreeSet<_> = expected
+                .keys()
+                .filter(|k| k.exchange == *exchange)
+                .map(|k| k.account)
+                .collect();
+            num_accounts += want_accounts.len();
+            let got: BTreeSet<_> = reader
+                .iter_position_accounts_for_exchange(*exchange)
+                .into_iter()
+                .collect();
+            assert_eq!(got, want_accounts, "reader: accounts for {exchange}");
+            assert_eq!(
+                reader.count_positions_for_exchange(*exchange),
+                expected.keys().filter(|k| k.exchange == *exchange).count(),
+                "reader: count for {exchange}"
+            );
+            for account in &want_accounts {
+                let want: Vec<_> = expected
+                    .iter()
+                    .filter(|(k, _)| k.exchange == *exchange && k.account == *account)
+                    .map(|(k, p)| (k.market, canon(p)))
+                    .collect();
+                let got: Vec<_> = reader
+                    .get_account_positions(*exchange, *account)
+                    .into_iter()
+                    .map(|(m, p)| (m, canon(&p)))
+                    .collect();
+                assert_eq!(got, want, "reader: positions for {account}");
+            }
+        }
+        eprintln!(
+            "OK: ledger == JMT/KV@{snapshot} == resident index@{tip} == reader; {} positions across {num_accounts} accounts, {} exchange(s)",
+            expected.len(),
+            exchanges.len()
+        );
+    }
+}

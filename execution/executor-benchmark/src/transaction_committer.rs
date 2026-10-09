@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{metrics::NUM_TXNS, pipeline::CommitBlockMessage};
+use crate::{
+    metrics::NUM_TXNS, pipeline::CommitBlockMessage, position_verifier::PositionIndexVerifier,
+};
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
@@ -51,6 +53,7 @@ pub struct TransactionCommitter<V> {
     executor: Arc<BlockExecutor<V>>,
     start_version: Version,
     block_receiver: mpsc::Receiver<CommitBlockMessage>,
+    position_verifier: Option<Arc<PositionIndexVerifier>>,
 }
 
 impl<V> TransactionCommitter<V>
@@ -61,11 +64,13 @@ where
         executor: Arc<BlockExecutor<V>>,
         start_version: Version,
         block_receiver: mpsc::Receiver<CommitBlockMessage>,
+        position_verifier: Option<Arc<PositionIndexVerifier>>,
     ) -> Self {
         Self {
             executor,
             start_version,
             block_receiver,
+            position_verifier,
         }
     }
 
@@ -95,6 +100,9 @@ where
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, version);
             self.executor.pre_commit_block(block_id).unwrap();
             self.executor.commit_ledger(ledger_info_with_sigs).unwrap();
+            if let Some(verifier) = &self.position_verifier {
+                verifier.check_block(&output.execution_output);
+            }
 
             report_block(
                 self.start_version,

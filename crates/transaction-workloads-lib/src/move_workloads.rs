@@ -304,6 +304,18 @@ pub enum EntryPoints {
 
     /// Roll a dice using on-chain randomness (#[randomness] entry function)
     DiceRoll,
+    /// Native position, root-signed setup: enroll the publisher as an exchange.
+    NativePositionRegisterExchange,
+    /// Native position, publisher-signed setup: mint and store the capability.
+    NativePositionInitCap,
+    /// Native position: each user writes its own position on a random market.
+    NativePositionSet {
+        num_markets: u64,
+    },
+    /// Native position: each user deletes its position on a random market.
+    NativePositionDelete {
+        num_markets: u64,
+    },
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -313,6 +325,10 @@ impl EntryPointTrait for EntryPoints {
 
     fn package_name(&self) -> &'static str {
         match self {
+            EntryPoints::NativePositionRegisterExchange
+            | EntryPoints::NativePositionInitCap
+            | EntryPoints::NativePositionSet { .. }
+            | EntryPoints::NativePositionDelete { .. } => "trading_native",
             EntryPoints::Republish
             | EntryPoints::Nop
             | EntryPoints::NopOrderless
@@ -383,6 +399,10 @@ impl EntryPointTrait for EntryPoints {
 
     fn module_name(&self) -> &'static str {
         match self {
+            EntryPoints::NativePositionRegisterExchange
+            | EntryPoints::NativePositionInitCap
+            | EntryPoints::NativePositionSet { .. }
+            | EntryPoints::NativePositionDelete { .. } => "native_position_bench",
             EntryPoints::Republish
             | EntryPoints::Nop
             | EntryPoints::NopOrderless
@@ -463,6 +483,35 @@ impl EntryPointTrait for EntryPoints {
     ) -> TransactionPayload {
         let module_id = package.get_module_id(module_name);
         match self {
+            EntryPoints::NativePositionRegisterExchange => {
+                let exchange = *module_id.address();
+                get_payload(module_id, ident_str!("register_exchange").to_owned(), vec![
+                    bcs::to_bytes(&exchange).unwrap(),
+                ])
+            },
+            EntryPoints::NativePositionInitCap => {
+                get_payload_void(module_id, ident_str!("init_cap").to_owned())
+            },
+            EntryPoints::NativePositionSet { num_markets } => {
+                let rng = rng.expect("Must provide RNG");
+                let exchange = *module_id.address();
+                let market = native_position_market(rng.gen_range(0u64, *num_markets));
+                let size: u64 = rng.gen_range(1u64, 1_000_000u64);
+                get_payload(module_id, ident_str!("set_position").to_owned(), vec![
+                    bcs::to_bytes(&exchange).unwrap(),
+                    bcs::to_bytes(&market).unwrap(),
+                    bcs::to_bytes(&size).unwrap(),
+                ])
+            },
+            EntryPoints::NativePositionDelete { num_markets } => {
+                let rng = rng.expect("Must provide RNG");
+                let exchange = *module_id.address();
+                let market = native_position_market(rng.gen_range(0u64, *num_markets));
+                get_payload(module_id, ident_str!("delete_position").to_owned(), vec![
+                    bcs::to_bytes(&exchange).unwrap(),
+                    bcs::to_bytes(&market).unwrap(),
+                ])
+            },
             EntryPoints::Republish => {
                 let (metadata_serialized, code) = package.get_publish_args();
                 get_payload(module_id, ident_str!("publish_p").to_owned(), vec![
@@ -941,6 +990,9 @@ impl EntryPointTrait for EntryPoints {
 
     fn initialize_entry_point(&self) -> Option<Box<dyn EntryPointTrait>> {
         match self {
+            EntryPoints::NativePositionSet { .. } | EntryPoints::NativePositionDelete { .. } => {
+                Some(Box::new(EntryPoints::NativePositionInitCap))
+            },
             EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
             | EntryPoints::TokenV1MintAndTransferNFTParallel
@@ -971,6 +1023,15 @@ impl EntryPointTrait for EntryPoints {
         }
     }
 
+    fn root_initialize_entry_point(&self) -> Option<Box<dyn EntryPointTrait>> {
+        match self {
+            EntryPoints::NativePositionSet { .. } | EntryPoints::NativePositionDelete { .. } => {
+                Some(Box::new(EntryPoints::NativePositionRegisterExchange))
+            },
+            _ => None,
+        }
+    }
+
     fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
             EntryPoints::Republish => MultiSigConfig::Publisher,
@@ -993,6 +1054,10 @@ impl EntryPointTrait for EntryPoints {
 
     fn automatic_args(&self) -> AutomaticArgs {
         match self {
+            EntryPoints::NativePositionRegisterExchange
+            | EntryPoints::NativePositionInitCap
+            | EntryPoints::NativePositionSet { .. }
+            | EntryPoints::NativePositionDelete { .. } => AutomaticArgs::Signer,
             EntryPoints::Republish => AutomaticArgs::Signer,
             EntryPoints::Nop
             | EntryPoints::NopOrderless
@@ -1145,4 +1210,12 @@ fn bytes_make_or_change(
 
 fn get_payload_void(module_id: ModuleId, func: Identifier) -> TransactionPayload {
     get_payload(module_id, func, vec![])
+}
+
+/// Deterministic market address for index `idx`, disjoint from account space.
+fn native_position_market(idx: u64) -> AccountAddress {
+    let mut bytes = [0u8; AccountAddress::LENGTH];
+    bytes[0] = 0xAB;
+    bytes[AccountAddress::LENGTH - 8..].copy_from_slice(&idx.to_be_bytes());
+    AccountAddress::new(bytes)
 }

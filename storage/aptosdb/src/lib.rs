@@ -47,7 +47,6 @@ pub mod position_state_sync;
 mod pruner;
 mod sharded_jmt_merkle_db;
 mod sharded_kv_db;
-mod trading_native;
 
 #[cfg(test)]
 mod native_storage_tests;
