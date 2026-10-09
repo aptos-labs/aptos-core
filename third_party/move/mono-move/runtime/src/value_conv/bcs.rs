@@ -12,10 +12,14 @@
 //!   serialization fast-path via memcpy or integer comparison are broken for
 //!   big endian hosts.
 //!
+//! Serialization is a visitor over the shared iterative walk in
+//! `value_walk.rs`; deserialization builds values and so walks the layout on
+//! its own.
+//!
 //! TODO(cleanup):
-//!   Unify the value walks (serialize, deserialize, equals, compare, and the
-//!   Rust value writer in `rust.rs`) under a shared visitor/fold abstraction
-//!   instead of parallel recursive implementations.
+//!   Move deserialization and the Rust value writer in `rust.rs` onto a
+//!   shared layout walk as well, instead of parallel recursive
+//!   implementations.
 //!
 //! TODO(testing):
 //!   Add differential tests for these walks against the existing Move VM.
@@ -23,8 +27,9 @@
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
     heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationError, AllocationResult, Heap},
-    memory::{read_enum_tag, read_ptr, read_vec_len, write_ptr},
+    memory::write_ptr,
     types::VEC_DATA_OFFSET,
+    value_walk::{walk, Event, Step, ValueVisitor},
 };
 use mono_move_core::{
     interner::view_module_id,
@@ -32,6 +37,7 @@ use mono_move_core::{
     LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout, ENUM_DATA_OFFSET,
 };
 use move_core_types::account_address::AccountAddress;
+use std::convert::Infallible;
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values) or the type
@@ -100,115 +106,102 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     layout: &ValueLayout,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
-    if layout.has_no_pointers_no_padding() {
-        // SAFETY: for values with no padding and pointers, value's in-memory
-        // bytes are its BCS encoding.
-        // TODO(correctness): breaks on big-endian hosts. The in-memory
-        // representation is native-endian, so this raw copy only equals the
-        // little-endian BCS encoding on little-endian hosts.
-        unsafe { out.extend_from_slice(std::slice::from_raw_parts(base, layout.size as usize)) };
-        return Ok(());
-    }
+    // SAFETY: forwarded from this function's contract.
+    unsafe { walk(layouts, [base], layout, &mut Serializer { out })? };
+    Ok(())
+}
 
-    match &layout.kind {
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Signer => Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable(
-                "Scalars serialize on the no-pointers-no-padding fast path and never reach this arm"
-                    .to_string(),
-            ),
-        ))),
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                let field_layout = layouts.layout(field.id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
-                // SAFETY: the field lies within `base`'s region at `offset`
-                // which holds for well-typed values, as guaranteed by the
-                // safety precondition of this function.
+/// Appends the BCS encoding of each node the walk reports. Anything without
+/// pointers or padding is copied raw and skipped: its in-memory bytes are its
+/// encoding.
+struct Serializer<'o> {
+    out: &'o mut Vec<u8>,
+}
+
+impl ValueVisitor<1> for Serializer<'_> {
+    type Break = Infallible;
+
+    fn visit(&mut self, event: Event<'_, 1>) -> VMResult<Step<Infallible>> {
+        match event {
+            Event::Scalar {
+                layout,
+                ptrs: [base],
+            }
+            | Event::EnterStruct {
+                layout,
+                ptrs: [base],
+                ..
+            } => {
+                if !layout.has_no_pointers_no_padding() {
+                    return match layout.kind {
+                        LayoutKind::Struct { .. } => Ok(Step::Descend),
+                        LayoutKind::Bool
+                        | LayoutKind::UnsignedInt
+                        | LayoutKind::SignedInt
+                        | LayoutKind::Address
+                        | LayoutKind::Signer
+                        | LayoutKind::Vector { .. }
+                        | LayoutKind::FrozenEnum { .. }
+                        | LayoutKind::Function
+                        | LayoutKind::Ref => {
+                            Err(VMInternalError::new(RuntimeError::InvariantViolation(
+                                RuntimeInvariantViolation::Unreachable(
+                                    "Scalars are flagged as having no pointers and no padding"
+                                        .to_string(),
+                                ),
+                            )))
+                        },
+                    };
+                }
+                // SAFETY: for values with no padding and pointers, value's
+                // in-memory bytes are its BCS encoding.
+                // TODO(correctness): breaks on big-endian hosts. The in-memory
+                // representation is native-endian, so this raw copy only equals
+                // the little-endian BCS encoding on little-endian hosts.
                 unsafe {
-                    serialize_impl(layouts, base.add(field.offset as usize), field_layout, out)?
+                    self.out
+                        .extend_from_slice(std::slice::from_raw_parts(base, layout.size as usize))
                 };
-            }
-            Ok(())
-        },
-        LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector value holds an 8-byte heap pointer pointing to
-            // its data for any well-typed value. The length is stored in the
-            // data pointed to.
-            let vec_ptr = unsafe { read_ptr(base, 0usize) };
-            let len = unsafe { read_vec_len(vec_ptr) };
-            if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
-                return Err(VMInternalError::new(RuntimeError::BCSSequenceTooLong {
-                    len,
-                }));
-            }
-            write_uleb128_len(out, len);
-            if len == 0 {
-                return Ok(());
-            }
-
-            let elem_layout = layouts.layout(*elem_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
-            let elem_size = elem_layout.size as usize;
-            if elem_layout.has_no_pointers_no_padding() {
+                Ok(Step::Skip)
+            },
+            Event::EnterVector {
+                elem,
+                lens: [len],
+                data: [data],
+                ..
+            } => {
+                if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
+                    return Err(VMInternalError::new(RuntimeError::BCSSequenceTooLong {
+                        len,
+                    }));
+                }
+                write_uleb128_len(self.out, len);
+                if len == 0 {
+                    return Ok(Step::Skip);
+                }
+                if !elem.has_no_pointers_no_padding() {
+                    return Ok(Step::Descend);
+                }
                 // TODO(correctness): breaks on big-endian hosts, for the same
                 // reason as the scalar fast path: native-endian in-memory bytes
                 // equal the little-endian BCS bytes only on little-endian hosts.
-                // SAFETY: vector data is a single allocation, pointer is not
-                // null and is within bounds.
-                let vec_data = unsafe {
-                    std::slice::from_raw_parts(
-                        vec_ptr.add(VEC_DATA_OFFSET),
-                        len as usize * elem_size,
-                    )
-                };
-                out.extend_from_slice(vec_data);
-            } else {
-                for i in 0..len as usize {
-                    // SAFETY: ith element lies within the vector data region,
-                    // so the pointer is non-null and new pointer points within
-                    // the data region.
-                    let elem_ptr = unsafe { vec_ptr.add(VEC_DATA_OFFSET + i * elem_size) };
-                    // SAFETY: element pointer is a valid value of the given
-                    // element layout, as guaranteed by the valid `base` value
-                    // pointer passed into this function.
-                    unsafe { serialize_impl(layouts, elem_ptr, elem_layout, out)? };
-                }
-            }
-            Ok(())
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            // SAFETY: an enum value holds a non-null heap pointer and data
-            // follows the offset.
-            let obj_ptr = unsafe { read_ptr(base, 0usize) };
-            let tag = unsafe { read_enum_tag(obj_ptr) };
-            let variant_id = variants
-                .get(tag as usize)
-                .map(|v| v.id)
-                .ok_or({
-                    RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag,
-                        variant_count: variants.len(),
-                    })
-                })?;
-            write_uleb128_len(out, tag);
-
-            let variant_layout = layouts.layout(variant_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
-            // SAFETY: the variant body lives at the specified offset within
-            // the object.
-            unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
-            Ok(())
-        },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values are not yet supported",
-        ))),
-        LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable("References cannot be serialized".to_string()),
-        ))),
+                // SAFETY: the vector is non-empty, so `data` is non-null and
+                // addresses `len * elem_size` bytes of a single allocation.
+                let vec_data =
+                    unsafe { std::slice::from_raw_parts(data, len as usize * elem.size as usize) };
+                self.out.extend_from_slice(vec_data);
+                Ok(Step::Skip)
+            },
+            Event::EnterEnum { tags: [tag], .. } => {
+                write_uleb128_len(self.out, tag);
+                Ok(Step::Descend)
+            },
+            Event::Field { .. }
+            | Event::Element { .. }
+            | Event::ExitStruct { .. }
+            | Event::ExitVector { .. }
+            | Event::ExitEnum { .. } => Ok(Step::Descend),
+        }
     }
 }
 
