@@ -1,0 +1,6 @@
+LeanerE2ETests/SourceVerify/generic_invariants_false.move:11:9: error: the module invariant `invariant {T} ∀ (a : Address),
+        exists<Box<T> >(a) ==> global<Box<T> >(a).count > 0` does not hold after a write of memory it reads
+LeanerE2ETests/SourceVerify/generic_invariants_false.move:18:5: error: leaner verification failed: the automatic verification of `publish_zero` failed; provide a proof: `verify publish_zero by …` in `LeanerE2ETests/SourceVerify/generic_invariants_false.proof.lean` (`verify publish_zero by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/generic_invariants_false.move:11:9: error: the module invariant `invariant {T} ∀ (a : Address),
+        exists<Box<T> >(a) ==> global<Box<T> >(a).count > 0` does not hold after a write of memory it reads
+LeanerE2ETests/SourceVerify/generic_invariants_false.move:26:5: error: leaner verification failed: the automatic verification of `reset_u64` failed; provide a proof: `verify reset_u64 by …` in `LeanerE2ETests/SourceVerify/generic_invariants_false.proof.lean` (`verify reset_u64 by skip` shows the obligations it leaves)
