@@ -30,14 +30,13 @@ regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = { workspace = true }
 sha2 = { workspace = true }
-tempfile = { workspace = true }
 toml = { workspace = true }
 walkdir = { workspace = true }
 whoami = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
-move-stdlib = { path = "../../move-stdlib" }
+tempfile = { workspace = true }
 
 [[test]]
 name = "test_runner"
