@@ -61,10 +61,25 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
         &mut self,
         package: &Package,
         publisher: &LocalAccount,
+        root_account: &dyn RootAccountHandle,
         txn_factory: &TransactionFactory,
         rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
         let mut result = vec![];
+
+        // Root-signed setup first: the publisher's own setup may depend on it.
+        let root = root_account.get_root_account();
+        for (entry_point, _) in self.entry_points.as_ref() {
+            if let Some(root_entry_point) = entry_point.root_initialize_entry_point() {
+                let payload = root_entry_point.create_payload(
+                    package,
+                    root_entry_point.module_name(),
+                    Some(rng),
+                    Some(&publisher.address()),
+                );
+                result.push(root.sign_with_transaction_builder(txn_factory.payload(payload)));
+            }
+        }
 
         for (entry_point, _) in self.entry_points.as_ref() {
             if let Some(initial_entry_point) = entry_point.initialize_entry_point() {
