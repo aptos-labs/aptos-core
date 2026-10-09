@@ -2200,7 +2200,7 @@ def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceI
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
     (params : NRow) (codecs types : Option Lean.Expr) (twins : Array SpecTypes.TwinInfo) :
     TermElabM (Option (Lean.Expr × Bool)) := do
-  let required := (ContractView.implementation.of declaration).contract.conditions.filter
+  let required := (ContractView.interface.of declaration).contract.conditions.filter
     fun condition => condition.kind == .requires &&
       !Contract.conditionReadsRequires unit namespaceId condition.expression
   if required.isEmpty then return none

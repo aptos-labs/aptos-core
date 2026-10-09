@@ -6087,8 +6087,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
           mkLambdaFVars #[arguments, state, failureBinder] permitted
   /- The frame is stated over global memory: a successful execution leaves
   the slots it does not declare as modified alone.  With no `modifies`
-  clause the whole memory is unchanged, but for a function without a
-  specification, which states no frame.  With clauses, every listed resource
+  clause the whole memory is unchanged.  With clauses, every listed resource
   type reads the same at every key other than its listed ones, and every
   other resource type reads the same everywhere; a loose frame leaves the
   unlisted resource types open.  The memory's update laws discharge the
@@ -6098,10 +6097,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
       withLocalDeclD `result resultType fun result =>
         withLocalDeclD `final runtimeState fun final => do
           let body ←
-            -- A function without a specification states no frame; its
-            -- callers read its body.
-            if declaration.contract.modifiesAll ||
-                (declaration.contract.loc.isNone && declaration.body != .absent) then
+            if declaration.contract.modifiesAll then
               pure (mkConst ``True)
             else if declaration.contract.modifies.isEmpty then
               mkEq final initial
@@ -6270,7 +6266,7 @@ def ContractView.of (view : ContractView)
       conditions := declaration.contract.conditions.filter (!markedAs excluded ·) } }
 
 /-- The precondition of a function where it starts, as its caller owes it
-at the call: its `requires` clauses in the view its body is proved against,
+at the call: its `requires` clauses in the view its callers see,
 over its parameters' values (`locals`, the other locals unbound) and the
 memory there (`state`), after the pre-state `let`s they read. Each clause is
 marked with its source range, so a precondition not established is
@@ -6282,7 +6278,7 @@ def startPrecondition (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId
     (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (codecs types : Option Lean.Expr)
     (state : Lean.Expr) (twins : Array SpecTypes.TwinInfo) (executable : Option Lean.Expr) :
     MetaM Lean.Expr := do
-  let conditions := (ContractView.implementation.of declaration).contract.conditions
+  let conditions := (ContractView.interface.of declaration).contract.conditions
   let groups ← groupConditions unit conditions
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals := locals, localTypes,

@@ -53,8 +53,9 @@ Callee preconditions (2026-10-09): a caller owes the `requires` of a callee
 whose body it inlines and which it calls directly, where the callee starts,
 as the Prover asserts a callee's preconditions at every call; before, only a
 callee used through its contract had them checked. A function without a
-specification is verified when it calls a function with a precondition, and
-states no frame. `schema_apply`, `is_txn_signer::f7_incorrect` and
+specification is verified when it calls a function with a precondition. The
+precondition owed is the one callers see (an `[abstract]` clause, not a
+`[concrete]` one, as in the Prover). `schema_apply`, `is_txn_signer::f7_incorrect` and
 `behavioral_predicates_examples::apply_no_abort_test_fail` fail at the
 callee's precondition as the Prover does. A clause applying `requires_of`
 is not owed this way (it reads the module's table of declared
