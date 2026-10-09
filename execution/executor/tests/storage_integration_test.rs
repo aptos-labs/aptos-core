@@ -3,18 +3,21 @@
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{hash::CryptoHash, PrivateKey};
+use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
     integration_test_impl::{
         create_db_and_executor, test_execution_with_storage_impl, verify_committed_txn_status,
     },
 };
-use aptos_executor_types::BlockExecutorTrait;
-use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
+use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
+use aptos_storage_interface::{
+    state_store::state_view::db_state_view::DbStateViewAtVersion, DbReaderWriter,
+};
 use aptos_types::{
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
-    on_chain_config::{AptosVersion, OnChainConfig, ValidatorSet},
+    on_chain_config::{AptosVersion, Features, OnChainConfig, ValidatorSet},
     state_store::{state_key::StateKey, MoveResourceExt},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
@@ -24,7 +27,8 @@ use aptos_types::{
     validator_config::ValidatorConfig,
     validator_signer::ValidatorSigner,
 };
-use std::sync::Arc;
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
+use std::{collections::BTreeSet, sync::Arc};
 
 #[test]
 fn test_genesis() {
@@ -189,4 +193,108 @@ fn test_reconfiguration() {
 #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
 fn test_execution_with_storage() {
     test_execution_with_storage_impl();
+}
+
+#[test]
+#[cfg_attr(feature = "consensus-only-perf-test", ignore)]
+fn test_epilogue_hotness_survives_state_sync() {
+    let (genesis, validators) = aptos_vm_genesis::test_genesis_change_set_and_validators(Some(1));
+    let genesis_key = &aptos_vm_genesis::GENESIS_KEYPAIR.0;
+    let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
+
+    let path = aptos_temppath::TempPath::new();
+    path.create_as_dir().unwrap();
+    let (_, db, executor, _waypoint) = create_db_and_executor(path.path(), &genesis_txn, false);
+    let signer = ValidatorSigner::new(
+        validators[0].data.owner_address,
+        Arc::new(validators[0].consensus_key.clone()),
+    );
+
+    // Same as consensus and the chunk executor, take the features from the chain.
+    let features = Features::fetch_config(&db.reader.state_view_at_version(Some(0)).unwrap())
+        .unwrap()
+        .unwrap();
+    assert!(features.is_hotness_in_epilogue_enabled());
+    let onchain_config = TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG.with_features(&features);
+
+    let block_id = gen_block_id(1);
+    let txns = into_signature_verified_block(vec![
+        Transaction::BlockMetadata(BlockMetadata::new(
+            block_id,
+            1,
+            0,
+            signer.author(),
+            vec![0],
+            vec![],
+            1,
+        )),
+        get_test_signed_transaction(
+            aptos_test_root_address(),
+            /* sequence_number = */ 0,
+            genesis_key.clone(),
+            genesis_key.public_key(),
+            Some(aptos_stdlib::aptos_coin_mint(signer.author(), 1_000_000)),
+        ),
+    ]);
+    let output = executor
+        .execute_block(
+            (block_id, txns).into(),
+            executor.committed_block_id(),
+            onchain_config,
+        )
+        .unwrap();
+    let li = gen_ledger_info_with_sigs(1, &output, block_id, &[signer]);
+    executor.commit_blocks(vec![block_id], li.clone()).unwrap();
+    let version = li.ledger_info().version();
+
+    let epilogue_hotness = |db: &DbReaderWriter| {
+        let txn = db
+            .reader
+            .get_transaction_iterator(version, 1)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap();
+        let Transaction::BlockEpilogue(payload) = txn else {
+            panic!("Expected block epilogue, got: {:?}", txn);
+        };
+        let write_set = db
+            .reader
+            .get_write_set_iterator(version, 1)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap();
+        let hotness: BTreeSet<_> = write_set.hotness_keys().cloned().collect();
+        assert_eq!(payload.try_get_keys_to_make_hot(), Some(&hotness));
+        hotness
+    };
+    let expected = epilogue_hotness(&db);
+    assert!(!expected.is_empty());
+
+    let txn_list = db
+        .reader
+        .get_transactions(1, version, version, false)
+        .unwrap();
+    let output_list = db
+        .reader
+        .get_transaction_outputs(1, version, version)
+        .unwrap();
+    for by_execution in [true, false] {
+        let path = aptos_temppath::TempPath::new();
+        path.create_as_dir().unwrap();
+        let (_, synced_db, _, _) = create_db_and_executor(path.path(), &genesis_txn, false);
+        let chunk_executor = ChunkExecutor::<AptosVMBlockExecutor>::new(synced_db.clone());
+        if by_execution {
+            chunk_executor
+                .execute_chunk(txn_list.clone(), &li, None)
+                .unwrap();
+        } else {
+            chunk_executor
+                .apply_chunk(output_list.clone(), &li, None)
+                .unwrap();
+        }
+        chunk_executor.commit_chunk().unwrap();
+        assert_eq!(epilogue_hotness(&synced_db), expected);
+    }
 }
