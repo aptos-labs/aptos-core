@@ -180,7 +180,12 @@ class NightlySummaryTest(unittest.TestCase):
         suites = re.search(r"needs: \[(.*?)\]", cancellation).group(1)
         self.assertIn(f"needs: [{suites}, {CANCELLATION_JOB}]", result)
         self.assertIn("gh workflow run nightly-full-suite-retry.yaml", retry)
-        self.assertIn("needs.retry.result != 'success'", notify)
+        self.assertIn(
+            "always() && !cancelled() && needs.retry.result != 'success' && "
+            "(needs.result.result == 'failure' || "
+            "(needs.result.result == 'success' && github.run_attempt != '1'))",
+            notify,
+        )
         self.assertIn("errors: true", notify)
         rerun = (root / ".github/workflows/nightly-full-suite-retry.yaml").read_text()
         self.assertIn(".github/workflows/nightly-full-suite.yaml", rerun)
