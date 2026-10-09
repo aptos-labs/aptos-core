@@ -311,10 +311,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "function values in resources",
     ),
     MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/capturing_generic_option.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/closure_equality.move",
         "function values in resources, function value equality",
     ),
@@ -328,10 +324,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
     ),
     MonoMoveDivergence::unsupported(
         "tests/no-v1-comparison/closures/funs_as_storage_key.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/fv_enum.move",
         "function values in resources",
     ),
     MonoMoveDivergence::unsupported(

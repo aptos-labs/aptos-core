@@ -7,10 +7,10 @@ use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     interner::{FunctionRef, InternedFunctionRef, InternedModuleId, ModuleId},
     types::{InternedType, EMPTY_TYPE_LIST},
-    verify_function, Code, CodeOffset as CO, DescriptorId, DescriptorProvider, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId, LayoutProvider, MicroOp,
-    ObjectDescriptor, ObjectDescriptorTable, SortedSafePointEntries, ValueLayout,
-    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    verify_function, CaptureLayoutsId, Code, CodeOffset as CO, DescriptorId, DescriptorProvider,
+    FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId,
+    LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SortedSafePointEntries,
+    ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 
 /// A descriptor table paired with an empty layout provider, to satisfy the
@@ -30,6 +30,10 @@ impl LayoutProvider for VerifierProvider {
     }
 
     fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
+        None
+    }
+
+    fn capture_layouts(&self, _id: CaptureLayoutsId) -> Option<&[LayoutId]> {
         None
     }
 }

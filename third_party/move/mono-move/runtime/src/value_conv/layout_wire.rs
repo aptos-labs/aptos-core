@@ -25,6 +25,8 @@ use crate::{
     value_conv::bcs::{read_slice, read_uleb128_len, write_uleb128_len},
 };
 use mono_move_core::{
+    interner::{type_tag_of, view_module_id, FunctionRef},
+    types::{view_name, view_type_list},
     LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout,
 };
 use move_core_types::{
@@ -205,6 +207,51 @@ fn signed_int_tag(layout: &ValueLayout) -> VMResult<u64> {
 
 fn bad_int_width(size: u32) -> VMInternalError {
     unreachable_layout(format!("{size} is not a Move integer width"))
+}
+
+/// Writes a closure's `5 + 2n` sequence prefix and its five header elements,
+/// `(format_version, module_id, fun_id, ty_args, mask)`. The `n` capture pairs
+/// follow and are written by the caller.
+pub(crate) fn emit_closure_header(
+    func_ref: &FunctionRef,
+    mask: u64,
+    out: &mut Vec<u8>,
+) -> VMResult<()> {
+    write_uleb128_len(out, 5 + 2 * mask.count_ones() as u64);
+    out.extend_from_slice(&FUNCTION_DATA_SERIALIZATION_FORMAT_V1.to_le_bytes());
+
+    let module_id = view_module_id(func_ref.module_id);
+    out.extend_from_slice(&module_id.address().into_bytes());
+    emit_identifier(out, view_name(module_id.name()));
+    emit_identifier(out, view_name(func_ref.func_name));
+
+    let ty_args = view_type_list(func_ref.ty_args);
+    write_uleb128_len(out, ty_args.len() as u64);
+    for &ty in ty_args {
+        // Type parameters and references have no `TypeTag`. Neither can be a
+        // closure's type argument once it is fully substituted, but bailing
+        // beats emitting a header V1 could not have written.
+        let tag = type_tag_of(ty).ok_or_else(|| {
+            VMInternalError::new(RuntimeError::Unsupported(
+                "function value over a type with no type tag",
+            ))
+        })?;
+        bcs::serialize_into(out, &tag).map_err(|err| {
+            unreachable_layout(format!(
+                "a substituted type argument has no BCS form: {err}"
+            ))
+        })?;
+    }
+
+    // A `ClosureMask` is a newtype over `u64`.
+    out.extend_from_slice(&mask.to_le_bytes());
+    Ok(())
+}
+
+/// Writes an `Identifier`, a length-prefixed string.
+fn emit_identifier(out: &mut Vec<u8>, name: &str) {
+    write_uleb128_len(out, name.len() as u64);
+    out.extend_from_slice(name.as_bytes());
 }
 
 // ---------------------------------------------------------------------------
