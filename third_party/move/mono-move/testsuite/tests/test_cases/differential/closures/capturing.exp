@@ -280,6 +280,7 @@ fun adder() {
     5: Return @6
   safe_point_layouts:
     0: []
+    2: []
 }
 
 fun all_captured() {
@@ -293,6 +294,7 @@ fun all_captured() {
     4: Return @4
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun capture_ends() {
@@ -307,6 +309,7 @@ fun capture_ends() {
     5: Return @7
   safe_point_layouts:
     0: []
+    2: []
 }
 
 fun capture_second() {
@@ -321,6 +324,7 @@ fun capture_second() {
     5: Return @6
   safe_point_layouts:
     0: []
+    2: []
 }
 
 fun capture_two() {
@@ -335,6 +339,7 @@ fun capture_two() {
     5: Return @7
   safe_point_layouts:
     0: []
+    2: []
 }
 
 fun make_adder() {
@@ -359,6 +364,8 @@ fun use_adder() {
     4: Move8 [24] <- [56] @5
     5: Move8 [0] <- [24] @6
     6: Return @6
+  safe_point_layouts:
+    3: []
 }
 
 fun __lambda__1__adder() {

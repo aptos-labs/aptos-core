@@ -81,6 +81,7 @@ fun call_identity() {
     4: Return @5
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun call_pick() {
@@ -105,6 +106,9 @@ fun call_pick() {
     15: AddU64 [40] <- [24] + [40] @20
     16: Move8 [0] <- [40] @21
     17: Return @21
+  safe_point_layouts:
+    8: []
+    13: []
 }
 
 fun identity(): skipped (generic function not instantiated)

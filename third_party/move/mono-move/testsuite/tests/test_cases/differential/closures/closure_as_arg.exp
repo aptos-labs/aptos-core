@@ -78,6 +78,8 @@ fun apply() {
     1: Move8 [16] <- [48] @2
     2: Move8 [0] <- [16] @3
     3: Return @3
+  safe_point_layouts:
+    0: []
 }
 
 fun run() {

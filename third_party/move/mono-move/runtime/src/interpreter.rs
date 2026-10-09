@@ -11,7 +11,8 @@ use crate::{
     },
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc, evacuate_session_roots,
+        alloc_or_gc, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        evacuate_session_roots,
         macros::{alloc_captured_data, alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         FrozenHeap, Heap, TopFrame,
     },
@@ -29,10 +30,12 @@ use crate::{
         VEC_PUSHBACK_INIT_CAPACITY,
     },
     value_cmp, value_conv,
-    value_conv::{bcs::DeserializeHooks, rust::write_value},
+    value_conv::{
+        bcs::{materialize_raw_captures, DeserializeHooks},
+        rust::write_value,
+    },
 };
 use mono_move_core::{
-    captured_values_size,
     interner::{
         is_script_module_id, module_id_of, InternedFunctionRef, InternedIdentifier,
         InternedModuleId,
@@ -48,17 +51,17 @@ use mono_move_core::{
         is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
         Type,
     },
-    BytecodeOffset, CallClosureOp, CallFrame, ClosureFuncRef, CmpKind, CodeOffset,
-    ConstantPoolIndex, ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef,
-    GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
-    PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult,
-    VecPackOp, VecUnpackOp, CAPTURED_DATA_BLOB_SIZE_OFFSET,
+    BytecodeOffset, CallClosureOp, CallFrame, CaptureLayoutsId, ClosureFuncRef, CmpKind,
+    CodeOffset, ConstantPoolIndex, ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex,
+    FunctionRef, GasMeter, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
+    LayoutProvider, MicroOp, PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand,
+    VMInternalError, VMResult, VecPackOp, VecUnpackOp, CAPTURED_DATA_BLOB_SIZE_OFFSET,
     CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW, CAPTURED_DATA_VALUES_OFFSET,
-    CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
+    CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
@@ -3207,13 +3210,8 @@ impl InterpreterContext<'_> {
                 captured_desc_id
             )?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
-            // Persist the exact values-region size so `CallClosure` can validate
-            // a lazily-resolved callee's captured layout against it; the header
-            // records only the alignment-rounded allocation size.
-            //
-            // TODO(correctness): persisting only the total lets `CallClosure` check totals but
-            // not the per-capture `(size, align)` breakdown. Persist that layout
-            // here to enable element-wise validation of an `Unresolved` callee.
+            // Persist the exact values-region size; the object header records
+            // only the alignment-rounded allocation size.
             write_u32(
                 captured_data,
                 CAPTURED_DATA_VALUES_SIZE_OFFSET,
@@ -3260,7 +3258,8 @@ impl InterpreterContext<'_> {
     /// Handles both `ClosureFuncRef::Resolved` and `Unresolved` targets — the
     /// latter resolved lazily via the loader on first call, then memoized into
     /// the closure object as `Resolved` so repeat calls take the fast path.
-    /// Captured data must be Materialized; other tags are errors.
+    /// Captures that are still wire bytes are decoded once, before the callee's
+    /// frame is written.
     ///
     /// # Safety
     ///
@@ -3342,48 +3341,6 @@ impl InterpreterContext<'_> {
                 if num_params < 64 && (mask >> num_params) != 0 {
                     invariant_violation!(ClosureMaskExceedsParams { mask, num_params });
                 }
-                if mask != 0 {
-                    if captured_data.is_null() {
-                        invariant_violation!(NullCapturedData);
-                    }
-                    match *captured_data.add(CAPTURED_DATA_TAG_OFFSET) {
-                        CAPTURED_DATA_TAG_MATERIALIZED => {},
-                        CAPTURED_DATA_TAG_RAW => {
-                            // TODO(completeness): decode the blob into the callee's
-                            // captured values here, so a deserialized closure can be
-                            // called instead of falling back to the legacy VM.
-                            return Err(RuntimeError::Unsupported(
-                                "calling a deserialized function value",
-                            )
-                            .into());
-                        },
-                        tag => invariant_violation!(InvalidCapturedDataTag { tag }),
-                    }
-                    // The resolved callee's captured `values_size` must equal the
-                    // one the object was packed with (persisted exactly, not the
-                    // alignment-rounded header), rejecting signature skew before
-                    // the copy loop reads the bytes at the callee's offsets.
-                    //
-                    // TODO(correctness): this compares only the *total* values_size, so a
-                    // same-total but different per-capture `(size, align)` layout
-                    // (a cross-module skew) still passes and is read at the wrong
-                    // per-value offsets. The `Resolved` path is fully covered by
-                    // the verifier's per-slot size+align check; closing it for
-                    // `Unresolved` targets needs the packed per-capture layout
-                    // persisted in the object to compare element-wise here.
-                    let expected = captured_values_size(
-                        callee
-                            .param_slots
-                            .iter()
-                            .enumerate()
-                            .filter(|(i, _)| (mask >> i) & 1 != 0)
-                            .map(|(_, pslot)| (pslot.size, pslot.align)),
-                    );
-                    let packed = read_u32(captured_data, CAPTURED_DATA_VALUES_SIZE_OFFSET);
-                    if expected != packed {
-                        invariant_violation!(ClosureCapturedLayoutMismatch { expected, packed });
-                    }
-                }
                 // Memoize: bake the resolved function pointer into the closure
                 // and flip the tag to `Resolved`. The func-ref payload is not
                 // GC-traced and `FunctionPtr` is a stable leaked address, so this
@@ -3396,6 +3353,37 @@ impl InterpreterContext<'_> {
                 );
                 *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = FUNC_REF_TAG_RESOLVED;
             }
+
+            let captured_data = if mask == 0 {
+                captured_data
+            } else {
+                if captured_data.is_null() {
+                    invariant_violation!(NullCapturedData);
+                }
+                match *captured_data.add(CAPTURED_DATA_TAG_OFFSET) {
+                    CAPTURED_DATA_TAG_MATERIALIZED => {
+                        // A packed closure carries its captures' layouts, so a
+                        // lazily-resolved callee can be checked against them
+                        // element-wise. The `Resolved` path was checked by the
+                        // verifier at pack time, and captured data is
+                        // immutable, so the check runs once.
+                        if resolved_now {
+                            self.check_packed_captures(callee, mask, captured_data)?;
+                        }
+                        captured_data
+                    },
+                    // Decoded by an earlier call, from this same callee's
+                    // parameters.
+                    CAPTURED_DATA_TAG_MATERIALIZED_RAW => captured_data,
+                    // Still wire bytes. Decoding allocates, which is why
+                    // `CallClosure` is an allocating op, and it happens before
+                    // anything is written at `new_fp`.
+                    CAPTURED_DATA_TAG_RAW => {
+                        self.materialize_closure_captures(regs, callee, mask, op.closure_src)?
+                    },
+                    tag => invariant_violation!(InvalidCapturedDataTag { tag }),
+                }
+            };
 
             // Walk the callee's parameters, interleaving captured values
             // (from the captured-data object, packed sequentially in
@@ -3480,6 +3468,182 @@ impl InterpreterContext<'_> {
             self.call_unchecked(func, &mut regs, callee, new_fp)?;
             Ok(regs)
         }
+    }
+
+    /// Checks a packed closure's captures against the callee just resolved for
+    /// it: each capture's layout must have the size and alignment the callee's
+    /// corresponding parameter has today. Rejects cross-module signature skew
+    /// before the call's copy loop reads the values at the callee's offsets.
+    ///
+    /// # Safety
+    ///
+    /// `captured_data` points to a live `Materialized` captured-data object.
+    unsafe fn check_packed_captures(
+        &self,
+        callee: &Function,
+        mask: u64,
+        captured_data: *const u8,
+    ) -> VMResult<()> {
+        let guard = self.loader.guard();
+        // SAFETY: a captured-data object carries its capture-layouts id at a
+        // fixed offset.
+        let id = CaptureLayoutsId::from_u32(unsafe {
+            read_u32(captured_data, CAPTURED_DATA_CAPTURE_LAYOUTS_ID_OFFSET)
+        });
+        let Some(packed) = guard.capture_layouts(id) else {
+            invariant_violation!(ClosureCaptureLayoutsMissing { id: id.as_u32() });
+        };
+        let captured = mask.count_ones() as usize;
+        if packed.len() != captured {
+            invariant_violation!(ClosureCapturedCountMismatch {
+                packed: packed.len(),
+                captured,
+            });
+        }
+        let mut capture_idx = 0usize;
+        for (param_idx, pslot) in callee.param_slots.iter().enumerate() {
+            if (mask >> param_idx) & 1 == 0 {
+                continue;
+            }
+            let Some(layout) = guard.layout(packed[capture_idx]) else {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
+            };
+            if layout.size != pslot.size || layout.align != pslot.align {
+                invariant_violation!(ClosureCapturedLayoutMismatch {
+                    capture_idx,
+                    packed_size: layout.size,
+                    packed_align: layout.align,
+                    param_idx,
+                    param_size: pslot.size,
+                    param_align: pslot.align,
+                });
+            }
+            capture_idx += 1;
+        }
+        Ok(())
+    }
+
+    /// Decodes a closure's wire-backed captures into a `MaterializedRaw`
+    /// captured-data object, stores it on the closure, and returns it.
+    ///
+    /// Runs once per closure object: the decoded values are laid out from the
+    /// callee's parameters, so a later call on the same object reads them
+    /// exactly as it reads a packed closure's.
+    ///
+    /// # Safety
+    ///
+    /// - `regs` carries the caller's VM registers and `closure_src` is the
+    ///   caller frame slot holding the closure.
+    /// - That closure's captured data is a live `Raw` object.
+    /// - `callee` is the closure's resolved target.
+    #[inline(never)]
+    unsafe fn materialize_closure_captures(
+        &mut self,
+        regs: VMRegisters,
+        callee: &Function,
+        mask: u64,
+        closure_src: FrameOffset,
+    ) -> VMResult<*mut u8> {
+        let guard = self.loader.guard();
+
+        // Both the values region and its GC trace shape come from the callee's
+        // parameters: a capture's pointer offsets are the callee's own frame
+        // pointer offsets within that parameter's slot, so the GC traces the
+        // decoded copy exactly as it traces the parameter.
+        let mut capture_layouts = Vec::with_capacity(mask.count_ones() as usize);
+        let mut pointer_offsets = vec![];
+        let mut values_size = 0usize;
+        for (capture_idx, (param_idx, pslot)) in callee
+            .param_slots
+            .iter()
+            .enumerate()
+            .filter(|(param_idx, _)| (mask >> param_idx) & 1 != 0)
+            .enumerate()
+        {
+            let ty = callee.param_tys[param_idx];
+            let Some(layout_id) = guard.layout_id(ty) else {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
+            };
+            let Some(layout) = guard.layout(layout_id) else {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
+            };
+            if layout.size != pslot.size || layout.align != pslot.align {
+                invariant_violation!(ClosureCapturedLayoutMismatch {
+                    capture_idx,
+                    packed_size: layout.size,
+                    packed_align: layout.align,
+                    param_idx,
+                    param_size: pslot.size,
+                    param_align: pslot.align,
+                });
+            }
+            let (offset, next) =
+                next_captured_value_offset(values_size, pslot.size as usize, pslot.align as usize);
+            let param_slot = pslot.offset.0..pslot.offset.0 + pslot.size;
+            for ptr_offset in &callee.frame_layout.heap_ptr_offsets {
+                if param_slot.contains(&ptr_offset.0) {
+                    pointer_offsets.push(FrameOffset(
+                        offset as u32 + (ptr_offset.0 - param_slot.start),
+                    ));
+                }
+            }
+            capture_layouts.push(layout_id);
+            values_size = next;
+        }
+        let values_size = u32::try_from(values_size).map_err(|_| {
+            VMInternalError::new(RuntimeError::AllocationTooLarge {
+                requested: values_size,
+            })
+        })?;
+        // TODO(metering): each distinct trace shape is a permanent descriptor.
+        // Shapes are bounded by the callees that can be loaded and lowered, so
+        // this adds nothing beyond what `try_lower_function` already allows.
+        let descriptor_id = guard.publish_captured_data_descriptor(values_size, &pointer_offsets);
+
+        // SAFETY: `closure_src` is a GC-traced frame slot holding a live
+        // closure; rooting keeps it, and the captured data it points at, live
+        // and relocated across the decode's collection.
+        let closure_root = unsafe { self.root_pool.root_object(read_ptr(regs.fp, closure_src)) };
+        let captured_data = alloc_or_gc(
+            &mut self.heap,
+            self.loader.guard(),
+            &mut self.read_write_set,
+            &self.root_pool,
+            &self.extensions,
+            regs.fp,
+            TopFrame::Function {
+                func: regs.func,
+                pc: regs.pc,
+            },
+            |heap| {
+                // The whole decode re-runs after a collection, so the closure
+                // is re-read here rather than above.
+                // SAFETY: the root holds a live closure, and a `Raw` closure
+                // with captures holds a live captured-data object.
+                unsafe {
+                    let raw = read_ptr(closure_root.ptr(), CLOSURE_CAPTURED_DATA_PTR_OFFSET);
+                    materialize_raw_captures(
+                        guard,
+                        heap,
+                        raw,
+                        &capture_layouts,
+                        values_size,
+                        descriptor_id,
+                    )
+                }
+            },
+        )?;
+
+        // SAFETY: the root holds the closure, relocated if the decode
+        // collected, and the captured-data slot is at a fixed offset.
+        unsafe {
+            write_ptr(
+                closure_root.ptr(),
+                CLOSURE_CAPTURED_DATA_PTR_OFFSET,
+                captured_data,
+            )
+        };
+        Ok(captured_data)
     }
 
     /// Compute the callee's frame pointer and verify the callee's full
