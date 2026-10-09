@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/lambda_spec_discarded_result.move:8:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet
