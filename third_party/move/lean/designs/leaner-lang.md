@@ -1296,8 +1296,17 @@ its axioms globally (one reading memory, by those that reach it), and an
 invariant is assumed at entry and established at exit. A generic axiom,
 `axiom {T} proposition`, is assumed at each instantiation of its type
 parameters at which the verification applies a specification function the
-axiom applies, as the Move Prover monomorphizes axioms. Generic invariants and
-proof-local labels are not yet parsed. A Move
+axiom applies, as the Move Prover monomorphizes axioms. A generic
+invariant, `invariant {T} [update] proposition`, holds at the instantiations
+that make a resource type it reads, itself or through the specification
+functions it applies, one of the resource types a function's verification
+reads or writes, as the Move Prover monomorphizes its global invariants: a
+function assumes those at entry and owes, after a write, those of the type
+written. A type parameter a written type leaves undetermined is a ghost type
+parameter of the function, as the Prover adds one, and such a function is
+proved over every frame, so the ghost ranges over every type; one that
+memory a function only reads leaves undetermined is not assumed, as in the
+Prover. Proof-local labels are not yet parsed. A Move
 spec variable `x` arrives as the ghost resource `Ghost$x` the model backs
 it with, a struct with one field `v` at address 0, whose existence is an
 axiom of the module; `update x = e` is a write of that resource.

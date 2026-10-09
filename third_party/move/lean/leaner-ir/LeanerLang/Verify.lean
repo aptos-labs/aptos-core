@@ -2444,7 +2444,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
       withLocalDeclD `state stateType fun state => do
         let before := mkApp3 (mkConst ``Prod.snd [.zero, .zero]) envType stateType anchor
         let owed ← Contract.memoryWriteInvariants unit namespaceId ns declaration codecs types
-          twins written state before executable
+          twins written state before executable (writtenType := some resource.typeId)
         mkLambdaFVars #[start, startState, anchor, env, state] owed
     conditions := conditions.push (site, condition, readsUnit)
   return conditions
@@ -3535,7 +3535,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   -- over every skolem family and type instantiation; any other at the
   -- runtime family, a closed term the normalizer's caches keep, and the
   -- empty instantiation.
-  let generic := isGeneric declaration || family
+  let generic := isGeneric declaration || family ||
+    -- A generic invariant's ghost type parameter ranges over every type.
+    Contract.hasGhostInvariantInstances unit handle.namespaceId declaration
   -- A generic function outside a cycle is proved for the frames it runs in
   -- (`FrameOf`); a call passing its own type parameters runs in its frame.
   let framed := isGeneric declaration && cycle.isEmpty

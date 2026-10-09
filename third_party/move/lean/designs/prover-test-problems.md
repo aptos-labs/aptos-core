@@ -49,6 +49,18 @@ relative to `tests/sources`.
 
 ## Summary
 
+Generic module invariants (2026-10-09): `invariant<T>` holds at the
+instantiations unifying a resource type it reads (directly or through the
+specification functions it applies) with the memory a function uses, as the
+Prover's global invariant analysis monomorphizes it; a write that leaves a
+type parameter undetermined owes it at a ghost type parameter, the function
+then proved over every frame. `uninst_global_invariant` and
+`mono_after_global_invariant` fail where the Prover does, and
+`write_back_local_type_inst` verifies. `generic_invariants`,
+`generic_aliasing_ghost_main` and `generic_aliasing_ghost_pair` fail as the
+Prover does, by exhausting the budget on the failing aliasing cases;
+`generic_aliasing_ghost_params` exceeds it on two positive functions.
+
 Callee preconditions (2026-10-09): a caller owes the `requires` of a callee
 whose body it inlines and which it calls directly, where the callee starts,
 as the Prover asserts a callee's preconditions at every call; before, only a
@@ -950,11 +962,12 @@ Tests: `functional/state_labels/nonlinear_cfg_error.move`.
 
 Messages:
 
-- 6 × `generic module invariants are outside the current LeanerLang parser`
 - 2 × `` condition kind `…` is outside the current LeanerLang parser ``
-- 2 × `this quantifier kind is outside the current LeanerLang parser`
+- 3 × `this quantifier kind is outside the current LeanerLang parser`
 - 1 × `` in-body specification condition `…` with N properties and N auxiliary expressions is outside the current LeanerLang parser ``
-- 1 × `generic update module invariants are outside the current LeanerLang parser`
+
+Generic module invariants are carried since 2026-10-09 (Summary);
+`type_param_bug_121721` now stops at a quantifier kind.
 
 Example (`functional/emits.move`):
 
@@ -987,7 +1000,7 @@ verify (`SourceVerify/generic_axioms{,_false}.move`,
 `SourceVerify/inherited_strictness{,_false}.move`). Generic module invariants
 remain open.
 
-Tests: `functional/choice.move`, `functional/emits.move`, `functional/generic_invariants.move`, `functional/loop_unroll.move`, `functional/mono.move`, `functional/uninst_global_invariant.move`, `regression/generic_aliasing_ghost_main.move`, `regression/generic_aliasing_ghost_pair.move`, `regression/generic_aliasing_ghost_params.move`, `regression/mono_after_global_invariant.move`, `regression/type_param_bug_121721.move`, `regression/write_back_local_type_inst.move`.
+Tests: `functional/choice.move`, `functional/emits.move`, `functional/loop_unroll.move`, `functional/mono.move`, `regression/type_param_bug_121721.move`.
 
 ### V2. Construct not supported in generated contracts
 
@@ -1313,6 +1326,7 @@ with the same type or prophecy value would be unsound.
 | `functional/verify_vector.move` | `verify_reverse` (budget), `verify_reverse_with_unroll` (budget), `verify_append` (budget), `verify_append_with_unroll`, `verify_index_of_with_unroll`, `verify_contains_with_unroll`, `verify_remove` (budget), `verify_remove_with_unroll` (budget) |
 | `regression/behavior_axiom_target_field.move` | `same_type_quantified`, `fun_inst` (unsupported quantified field-validity domain; V25) |
 | `regression/generic_aliasing_all_partitions.move` | `true_in_every_case` (budget), `never_alias` (budget) |
+| `regression/generic_aliasing_ghost_params.move` | `seven_writes` (budget), `nine_writes_generic` (budget) |
 | `regression/performance_200511.move` | `fresh_guid` (budget), `new_event_handle_impl` (budget) |
 | `regression/vector_theory_boogie_array_intern.move` | `f1` (budget) |
 | `regression/vector_theory_smt_seq.move` | `f1` (budget) |

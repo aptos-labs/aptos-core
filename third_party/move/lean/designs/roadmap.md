@@ -15,6 +15,13 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Generic module invariants (2026-10-09): `invariant<T>` (LeanerLang
+`invariant {T}`) is monomorphized as the Prover does, by unifying the memory
+it reads with a function's, with ghost type parameters for what a write
+leaves undetermined. New fixtures:
+`SourceVerify/generic_invariants_false.move`,
+`SourceVerify/generic_invariant_ghosts_false.move`.
+
 Callee preconditions (2026-10-09): an inlined callee's `requires` is owed
 where it starts (`Contract.startPrecondition`, the closer's `requiring`
 table), and a function without a specification calling one is verified.

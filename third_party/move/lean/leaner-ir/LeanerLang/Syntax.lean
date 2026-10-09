@@ -890,8 +890,10 @@ syntax (name := leanerContractItem)
 syntax (name := leanerContractWhereItem)
   kwSpec leanerIdentifier kwWhere ppLine ppIndent(leanerClause*) : leanerItem
 declare_syntax_cat leanerNamespaceInvariantMember
+/-- An invariant of the module; a generic one at the instantiations of the
+memory a verification uses. -/
 syntax (name := leanerNamespaceInvariantMemberSyntax)
-  kwInvariant (leanerConditionProperties)? leanerExpr (";")? :
+  kwInvariant leanerGenericBinder* (leanerConditionProperties)? leanerExpr (";")? :
     leanerNamespaceInvariantMember
 /-- An axiom of the module: a proposition assumed by every verification of
 its functions and never an obligation; a generic one at the instantiations a

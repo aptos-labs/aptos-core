@@ -6626,7 +6626,8 @@ private def lowerNamespaceInvariants
       condition := {
         loc
         kind := if declaration.isAxiom then .axiom_ (declaration.generics.map (·.name))
-          else if isUpdate then .globalInvariantUpdate else .globalInvariant
+          else if isUpdate then .globalInvariantUpdate (declaration.generics.map (·.name))
+          else .globalInvariant (declaration.generics.map (·.name))
         properties
         expression := expression.1 }
       locals }

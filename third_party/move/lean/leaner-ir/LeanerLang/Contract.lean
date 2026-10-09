@@ -3642,20 +3642,23 @@ where
       | some _ => true
 
 /-- The specification functions a function's verification applies, each at
-its type arguments in the function's frame: in the function's body and
-contract, in the contracts of the functions it calls, and in the
+its type arguments in the function's frame, and the resource types of the
+memory it reads or writes, and of the memory it writes: in the function's
+body and contract, in the contracts of the functions it calls, and in the
 specification functions these expand. A callee's or an expansion's type
-parameter is the argument its application gives it; an application at a type
-that mentions another parameter is left out. -/
-def specInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+parameter is the argument its application gives it; an application at a
+type that mentions another parameter is left out. -/
+private def frameUses (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
-    Array (LeanerIR.QualifiedRef × Array TypeId) := Id.run do
+    Array (LeanerIR.QualifiedRef × Array TypeId) × Array TypeId × Array TypeId := Id.run do
   -- Each expression with the arguments of its owner's type parameters, none
   -- in the function itself, whose parameters are its own.
   let mut work : List (LeanerIR.NamespaceId × ExprId × Option (Array (Option TypeId))) :=
     (functionRoots declaration).toList.map (namespaceId, ·, none)
   let mut visited : Std.HashSet (Nat × Nat × List (Option Nat)) := {}
   let mut applied : Array (LeanerIR.QualifiedRef × Array TypeId) := #[]
+  let mut memory : Array TypeId := #[]
+  let mut written : Array TypeId := #[]
   let bound := unit.namespaces.foldl (fun total ns => total + ns.expressions.size) 1
   for _ in [0:bound] do
     match work with
@@ -3678,6 +3681,14 @@ def specInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceI
             | .typeArg typeUse => inFrame typeUse.typeId
             | _ => none
           match operation with
+          | .global _ | .specification (.global _) | .specification (.publish _) |
+              .specification (.remove _) | .specification (.update _) =>
+              if let some (some resource) := inner[0]? then
+                unless memory.contains resource do memory := memory.push resource
+                if operation matches .global (.borrow .mutable) | .global .take |
+                    .global .publish | .specification (.publish _) |
+                    .specification (.remove _) | .specification (.update _) then
+                  unless written.contains resource do written := written.push resource
           | .specification (.functionCall reference _) =>
               if let some typeArguments := inner.mapM (fun argument => argument) then
                 unless applied.contains (reference, typeArguments) do
@@ -3696,11 +3707,43 @@ def specInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceI
                     if let some callee := calleeNs.functions[functionId.index]? then
                       let conditions := callee.contract.conditions.flatMap fun condition =>
                         #[condition.expression] ++ condition.auxiliary.map (·.2)
-                      work := conditions.toList.map (reference.namespaceId, ·, some inner) ++ work
+                      work := (conditions ++ callee.contract.modifies).toList.map
+                        (reference.namespaceId, ·, some inner) ++ work
+                      -- The memory a callee's frame names is written.
+                      for target in callee.contract.modifies do
+                        let some { kind := .operation _ targetInstantiations _ _, .. } :=
+                            calleeNs.expressions[target.index]? | continue
+                        let some (LeanerIR.GenericArgument.typeArg resource) :=
+                            targetInstantiations[0]? | continue
+                        let resource? := match unit.tables.types[resource.typeId.index]? with
+                          | some (.typeParameter index) => inner[index]?.join
+                          | _ => if closedType unit resource.typeId then some resource.typeId
+                              else none
+                        if let some resource := resource? then
+                          unless written.contains resource do written := written.push resource
           | _ => pure ()
         work := (LeanerIR.Validation.expressionChildren expression.kind).toList.map
           (owner, ·, arguments?) ++ work
-  return applied
+  return (applied, memory, written)
+
+/-- The specification functions a function's verification applies, each at
+its type arguments in the function's frame (`frameUses`). -/
+def specInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Array (LeanerIR.QualifiedRef × Array TypeId) :=
+  (frameUses unit namespaceId declaration).1
+
+/-- The resource types of the memory a function's verification reads or
+writes, in the function's frame (`frameUses`). -/
+def memoryInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Array TypeId :=
+  (frameUses unit namespaceId declaration).2.1
+
+/-- The resource types of the memory a function's verification writes, in
+the function's frame (`frameUses`). -/
+def writtenInstantiations (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Array TypeId :=
+  (frameUses unit namespaceId declaration).2.2
 
 /-- The instantiations a generic axiom is assumed at: those that apply a
 specification function the axiom applies at a type argument list
@@ -3742,6 +3785,136 @@ private def axiomInstances (unit : ValidatedUnit) (ns : ValidatedNamespace)
         if let some found := binding.mapM (fun argument => argument) then
           unless instances.contains found do instances := instances.push found
   return instances
+
+/-- A type read inside a generic invariant: of the invariant itself (`none`),
+or of a specification function it applies, whose type parameters are the
+types of the application (`some`), in the scope of the application. -/
+private inductive ScopedType where
+  | mk (typeId : TypeId) (scope : Option (Array ScopedType))
+  deriving Inhabited, BEq
+
+/-- Unify a type of a generic invariant, whose type parameters `binding`
+binds, with a type in a function's frame: an invariant's parameter binds to
+the type it meets, and a type parameter of the function may be any type, so
+it meets every type. `none` where the two cannot be one type. -/
+private partial def unifyInstance (unit : ValidatedUnit) (pattern : ScopedType) (actual : TypeId)
+    (binding : Array (Option TypeId)) (fuel : Nat := 32) : Option (Array (Option TypeId)) :=
+  match fuel with
+  | 0 => none
+  | fuel + 1 =>
+    let .mk patternId scope := pattern
+    let within (typeId : TypeId) : ScopedType := .mk typeId scope
+    match unit.tables.types[patternId.index]?, unit.tables.types[actual.index]? with
+    | some (.typeParameter index), _ => match scope with
+        -- A specification function's parameter is its application's type.
+        | some arguments => match arguments[index]? with
+            | some argument => unifyInstance unit argument actual binding fuel
+            | none => none
+        | none => match binding[index]? with
+            | some none => some (binding.set! index (some actual))
+            | some (some bound) => if bound == actual then some binding else none
+            | none => none
+    | _, some (.typeParameter _) => some binding
+    | some (.nominal handle arguments), some (.nominal handle' arguments') =>
+        if handle != handle' || arguments.size != arguments'.size then none else
+        (arguments.zip arguments').foldlM (init := binding) fun binding pair => match pair with
+          | (.typeArg left, .typeArg right) =>
+              unifyInstance unit (within left.typeId) right.typeId binding fuel
+          | _ => some binding
+    | some (.vector element _), some (.vector element' _) =>
+        unifyInstance unit (within element) element' binding fuel
+    | _, _ => if patternId == actual && scope.isNone then some binding else none
+
+/-- The instantiations a generic invariant holds at in a function: those
+that make a resource type it reads, itself or through the specification
+functions it applies, one of the resource types of the memory the function
+uses (`memory`), as the Move Prover instantiates its global invariants by
+unifying their memory with a function's. A type parameter the memory leaves
+undetermined is `none`. -/
+private def invariantInstances (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.NamespaceInvariant) (parameters : Nat)
+    (memory : Array TypeId) : Array (Array (Option TypeId)) := Id.run do
+  let mut patterns : Array ScopedType := #[]
+  -- Each expression with its namespace and the scope of its types.
+  let mut work : List (LeanerIR.NamespaceId × ExprId × Option (Array ScopedType)) :=
+    [(⟨0⟩, declaration.condition.expression, none)]
+  let ownNamespace := ns
+  -- The applications walked, by function and type arguments.
+  let mut applied : Array (LeanerIR.QualifiedRef × Array TypeId) := #[]
+  let bound := unit.namespaces.foldl (fun total ns => total + ns.expressions.size) 1
+  for _ in [0:bound] do
+    match work with
+    | [] => break
+    | (owner, id, scope) :: rest =>
+        work := rest
+        let ownerNs := if scope.isNone then ownNamespace
+          else (unit.namespaces[owner.index]?).getD ownNamespace
+        let some expression := ownerNs.expressions[id.index]? | continue
+        if let .operation operation instantiations _ _ := expression.kind then
+          if operation matches .global _ | .specification (.global _) |
+              .specification (.publish _) | .specification (.remove _) |
+              .specification (.update _) then
+            if let some (LeanerIR.GenericArgument.typeArg resource) := instantiations[0]? then
+              let pattern := ScopedType.mk resource.typeId scope
+              unless patterns.contains pattern do patterns := patterns.push pattern
+          -- A specification function's body reads at its application's types.
+          if let .specification (.functionCall reference _) := operation then
+            let body? := do
+              let targetNs ← unit.namespaces[reference.namespaceId.index]?
+              let functionId ← unit.resolution.specFunction? reference.name
+              (← targetNs.specFunctions[functionId.index]?).body
+            let key := (reference, instantiations.filterMap fun
+              | .typeArg typeUse => some typeUse.typeId
+              | _ => none)
+            if let some body := body? then
+              -- An application walked before, a recursive one among them,
+              -- adds no memory.
+              unless applied.contains key do
+                applied := applied.push key
+                let arguments := instantiations.filterMap fun
+                  | .typeArg typeUse => some (ScopedType.mk typeUse.typeId scope)
+                  | _ => none
+                work := (reference.namespaceId, body, some arguments) :: work
+        work := (LeanerIR.Validation.expressionChildren expression.kind).toList.map
+          (owner, ·, scope) ++ work
+  let mut instances : Array (Array (Option TypeId)) := #[]
+  for pattern in patterns do
+    for actual in memory do
+      let some binding := unifyInstance unit pattern actual (Array.replicate parameters none)
+        | continue
+      unless instances.contains binding do instances := instances.push binding
+  return instances
+
+/-- A type argument of an invariant's instance: a type of the function's
+frame, or a ghost type parameter of the function, which the Move Prover adds
+for a parameter the memory leaves undetermined. -/
+private inductive InstanceArgument where
+  | type (typeId : TypeId)
+  | ghost (index : Nat)
+  deriving BEq
+
+/-- The type parameters of a function, a generic invariant's ghost
+parameters following them. -/
+def typeArity (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Nat :=
+  (declaration.signature.generics.filter (·.kind == .typeArg)).size
+
+/-- The ghost type parameter of the generic invariant at `position` among
+the unit's, for its parameter `index`, past the function's own (`base`). -/
+private def ghostIndex (base position index : Nat) : Nat :=
+  base + position * 16 + index
+
+/-- Whether a function's verification meets a generic invariant at an
+instance its memory leaves partly undetermined: it is proved at a ghost type
+parameter, over every frame, so that the ghost ranges over every type. -/
+def hasGhostInvariantInstances (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) : Bool :=
+  let memory := writtenInstantiations unit namespaceId declaration
+  !memory.isEmpty && unit.namespaces.any fun ns => ns.invariants.any fun invariant =>
+    match invariant.condition.kind with
+    | .globalInvariant parameters | .globalInvariantUpdate parameters =>
+        !parameters.isEmpty &&
+          (invariantInstances unit ns invariant parameters.size memory).any (·.any Option.isNone)
+    | _ => false
 
 /-- The resource declarations what the expressions `roots` reach reaches in
 global memory, or with `writes` writes, `none` when it reaches none. Past the
@@ -3871,30 +4044,48 @@ a generic one at each instantiation of `applied` it applies
 private def namespaceInvariantTerms (context : Context)
     (modifiedResources : Option (Array ModifiedResource)) (phase : InvariantPhase)
     (relevant : LeanerIR.NamespaceId → LeanerIR.NamespaceInvariant → Bool := fun _ _ => true)
-    (applied : Array (LeanerIR.QualifiedRef × Array TypeId) := #[]) :
+    (applied : Array (LeanerIR.QualifiedRef × Array TypeId) := #[])
+    (memory : Array TypeId := #[]) (ghostBase : Option Nat := none)
+    (ghostMemory : Option (Array TypeId) := none) :
     MetaM (Array (Lean.Expr × ObligationRange)) := do
   let mut terms := #[]
   -- The invariants of every namespace of the unit, each read in its own.
   let invariants := (context.unit.namespaces.toList.zipIdx).flatMap fun (ns, index) =>
     ns.invariants.toList.map fun invariant => ((⟨index⟩ : LeanerIR.NamespaceId), ns, invariant)
-  let invariants := invariants.flatMap fun (namespaceId, ns, invariant) =>
+  let invariants := invariants.zipIdx.flatMap fun ((namespaceId, ns, invariant), position) =>
     match invariant.condition.kind with
     | .axiom_ typeParameters =>
         if typeParameters.isEmpty then [(namespaceId, ns, invariant, #[])] else
           (axiomInstances context.unit ns invariant typeParameters.size applied).toList.map
-            fun arguments => (namespaceId, ns, invariant, arguments)
+            fun arguments => (namespaceId, ns, invariant, arguments.map InstanceArgument.type)
+    | .globalInvariant typeParameters | .globalInvariantUpdate typeParameters =>
+        if typeParameters.isEmpty then [(namespaceId, ns, invariant, #[])] else
+          -- An instance the memory leaves undetermined is the written
+          -- memory's alone, as the Move Prover ignores one of memory a
+          -- function only reads.
+          let determined := (invariantInstances context.unit ns invariant typeParameters.size
+            memory).filter (·.all Option.isSome)
+          let undetermined := (invariantInstances context.unit ns invariant typeParameters.size
+            (ghostMemory.getD memory)).filter (·.any Option.isNone)
+          (determined ++ undetermined).toList.filterMap
+            fun binding =>
+              -- A parameter the memory leaves undetermined is a ghost type
+              -- parameter of the function, where it has room for one.
+              let arguments := binding.mapIdx fun index argument => match argument, ghostBase with
+                | some typeId, _ => some (InstanceArgument.type typeId)
+                | none, some base => some (.ghost (ghostIndex base position index))
+                | none, none => none
+              (arguments.mapM id).map fun arguments => (namespaceId, ns, invariant, arguments)
     | _ => [(namespaceId, ns, invariant, #[])]
   for (invariantNamespaceId, invariantNs, declaration, axiomArguments) in invariants do
     unless relevant invariantNamespaceId declaration do continue
-    let (typeParameters, isUpdate, isAxiom) ← match declaration.condition.kind with
-      | .globalInvariant typeParameters => pure (typeParameters, false, false)
-      | .globalInvariantUpdate typeParameters => pure (typeParameters, true, false)
-      | .axiom_ typeParameters => pure (typeParameters, false, true)
+    let (isUpdate, isAxiom) ← match declaration.condition.kind with
+      | .globalInvariant _ => pure (false, false)
+      | .globalInvariantUpdate _ => pure (true, false)
+      | .axiom_ _ => pure (false, true)
       | kind => throwError "namespace condition {repr kind} is not a global invariant"
     if phase == .entry && isUpdate then continue
     if phase == .exit && isAxiom then continue
-    unless typeParameters.isEmpty || isAxiom do
-      throwError "generic namespace invariants are not supported in generated contracts"
     unless declaration.condition.auxiliary.isEmpty do
       throwError "namespace invariants cannot carry auxiliary expressions"
     let localTypes ← declaration.locals.mapM fun localDecl => do
@@ -3902,12 +4093,14 @@ private def namespaceInvariantTerms (context : Context)
         | throwError "namespace invariant local type {localDecl.type.typeId.index} is out of range"
       pure ty
     let emptyLocals := Array.replicate declaration.locals.size none
-    -- A generic axiom's type parameters read as its instance's types, in the
-    -- function's frame.
-    let typeArguments ← axiomArguments.mapM fun typeId => do
-      let some ty := context.typeOf? typeId
-        | throwError "a type argument of a generic axiom has an unknown type"
-      pure (ty, context.valueRep? typeId)
+    -- A generic declaration's type parameters read as its instance's types,
+    -- in the function's frame.
+    let typeArguments ← axiomArguments.mapM fun
+      | .type typeId => do
+          let some ty := context.typeOf? typeId
+            | throwError "a type argument of a generic invariant has an unknown type"
+          pure (ty, context.valueRep? typeId)
+      | .ghost index => pure (.typeParameter index, some (.parameter index))
     let invariantContext := { context with
       namespaceId := invariantNamespaceId
       ns := invariantNs
@@ -3918,7 +4111,9 @@ private def namespaceInvariantTerms (context : Context)
       resultTypes := #[]
       typeArguments := if axiomArguments.isEmpty then context.typeArguments else typeArguments
       typeArgumentTypes := if axiomArguments.isEmpty then context.typeArgumentTypes
-        else axiomArguments.map context.ntyOf? }
+        else axiomArguments.map fun
+          | .type typeId => context.ntyOf? typeId
+          | .ghost index => some (.param index) }
     let range := conditionRange context.unit declaration.condition
     -- The declarations the invariant reads, against those a write modifies.
     let handleOf (typeIndex : Nat) : Option LeanerIR.StructHandle := do
@@ -4684,7 +4879,7 @@ def memoryWriteInvariants (unit : ValidatedUnit) (namespaceId : LeanerIR.Namespa
     (ns : ValidatedNamespace) (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
     (codecs types : Option Lean.Expr) (twins : Array SpecTypes.TwinInfo)
     (written : LeanerIR.StructHandle) (state oldState : Lean.Expr)
-    (executable : Option Lean.Expr) : MetaM Lean.Expr := do
+    (executable : Option Lean.Expr) (writtenType : Option TypeId := none) : MetaM Lean.Expr := do
   if pragmaEnabled declaration.contract "disable_invariants_in_body" then
     return mkConst ``True
   let reach := memoryReach unit namespaceId declaration
@@ -4696,9 +4891,11 @@ def memoryWriteInvariants (unit : ValidatedUnit) (namespaceId : LeanerIR.Namespa
   let reads (invariantNamespace : LeanerIR.NamespaceId) (invariant : LeanerIR.NamespaceInvariant) :=
     (reachFrom unit [(invariantNamespace, invariant.condition.expression)]).any
       (·.contains written)
-  let terms ← namespaceInvariantTerms context none .exit fun invariantNamespace invariant =>
+  -- A generic invariant is owed at the instances of the type written.
+  let terms ← namespaceInvariantTerms context none .exit (fun invariantNamespace invariant =>
     invariantApplies reach unit delegated invariantNamespace invariant &&
-      reads invariantNamespace invariant
+      reads invariantNamespace invariant)
+    (memory := writtenType.toArray) (ghostBase := some (typeArity declaration))
   conjunction (terms.map fun (clause, range) => markObligation range clause)
 
 /-- The callees a function calls that leave their `[suspendable]`
@@ -4736,9 +4933,12 @@ def callWriteInvariants (unit : ValidatedUnit) (namespaceId : LeanerIR.Namespace
   let reads (invariantNamespace : LeanerIR.NamespaceId) (invariant : LeanerIR.NamespaceInvariant) :=
     (reachFrom unit [(invariantNamespace, invariant.condition.expression)]).any
       fun read => read.any written.contains
-  let terms ← namespaceInvariantTerms context none .exit fun invariantNamespace invariant =>
+  let terms ← namespaceInvariantTerms context none .exit (fun invariantNamespace invariant =>
     isSuspendable invariant && invariantApplies reach unit false invariantNamespace invariant &&
-      reads invariantNamespace invariant
+      reads invariantNamespace invariant)
+    (memory := memoryInstantiations unit namespaceId declaration)
+    (ghostBase := some (typeArity declaration))
+    (ghostMemory := some (writtenInstantiations unit namespaceId declaration))
   conjunction (terms.map fun (clause, range) => markObligation range clause)
 
 /-- Whether a function owes invariants of memory: it writes, at any depth,
@@ -5948,6 +6148,8 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
       -- owes is specialized to the keys it modifies.
       let invariants ← namespaceInvariantTerms context none .entry
         (invariantApplies reach unit delegated) (specInstantiations unit namespaceId declaration)
+        (memoryInstantiations unit namespaceId declaration) (some (typeArity declaration))
+        (some (writtenInstantiations unit namespaceId declaration))
       let storedAssumed ← if assumesStored && storedInvariant.isSome then
           pure #[← memoryInvariants state] else pure #[]
       let signers ← signerFacts context parameterSlots bound (some ·.entry)
@@ -6007,6 +6209,9 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
             else pure #[← mkArrow (← memoryInvariants state) (← memoryInvariants final)]
           let invariants ← namespaceInvariantTerms context invariantResources .exit
             (invariantApplies reach unit delegated)
+            (memory := memoryInstantiations unit namespaceId declaration)
+            (ghostBase := some (typeArity declaration))
+            (ghostMemory := some (writtenInstantiations unit namespaceId declaration))
           let invariantObligations := invariants.map fun (clause, range) =>
             markObligation range clause
           let body ← conjunction (clauses ++ dataInvariantObligations ++ storedInvariants ++

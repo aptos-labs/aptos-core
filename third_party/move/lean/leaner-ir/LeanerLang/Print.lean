@@ -4130,14 +4130,9 @@ private def conditionText (context : Context) (condition : Condition) : Except S
     | .abortsIf => pure ("aborts_if", none)
     | .abortsWith => pure ("aborts_with", none)
     | .structInvariant => pure ("invariant", none)
-    | .globalInvariant typeParameters => do
-        unless typeParameters.isEmpty do
-          throw "generic module invariants are outside the current LeanerLang parser"
-        pure ("invariant", none)
-    | .globalInvariantUpdate typeParameters => do
-        unless typeParameters.isEmpty do
-          throw "generic update module invariants are outside the current LeanerLang parser"
-        pure ("invariant", none)
+    | .globalInvariant typeParameters | .globalInvariantUpdate typeParameters =>
+        pure (" ".intercalate ("invariant" :: typeParameters.toList.map
+          fun name => "{" ++ sourceIdentifier name ++ "}"), none)
     | .axiom_ typeParameters =>
         pure (" ".intercalate ("axiom" :: typeParameters.toList.map
           fun name => "{" ++ sourceIdentifier name ++ "}"), none)
@@ -4786,9 +4781,10 @@ where
       fallback := fallback + 1
     for declaration in ns.invariants do
       let (file, start, _) := sourceOrderKey unit declaration.loc fallback
-      -- A generic axiom's type parameters, by name.
+      -- A generic declaration's type parameters, by name.
       let binders := match declaration.condition.kind with
-        | .axiom_ typeParameters => typeParameters.map fun name =>
+        | .axiom_ typeParameters | .globalInvariant typeParameters
+        | .globalInvariantUpdate typeParameters => typeParameters.map fun name =>
             ({ name, kind := .typeArg, loc := declaration.loc } : LeanerIR.GenericBinder)
         | _ => #[]
       let context : Context := {

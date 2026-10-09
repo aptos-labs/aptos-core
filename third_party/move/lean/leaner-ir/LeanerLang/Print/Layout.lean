@@ -1370,6 +1370,10 @@ private def itemDocs : Item → Except String (Array Doc)
         if declaration.isAxiom then
           return Format.group <| text ("axiom" ++ bindersText declaration.generics ++ " ") ++
             Format.nest 2 (← expressionDoc declaration.expression)
+        if !declaration.generics.isEmpty then
+          return Format.group <| text ("invariant" ++ bindersText declaration.generics ++ " ") ++
+            (← clauseDoc.propertyPrefix declaration.properties) ++
+            Format.nest 2 (← expressionDoc declaration.expression)
         clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
       pure #[block (text "spec module where") entries]
 
