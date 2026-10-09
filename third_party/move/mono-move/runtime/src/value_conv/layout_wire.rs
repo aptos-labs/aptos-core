@@ -11,14 +11,12 @@
 //! - [`emit_move_type_layout`] writes the wire bytes from a [`LayoutId`].
 //! - [`walk_capture`] advances a layout cursor and a value cursor together
 //!   over one captured value.
+//! - [`compare_captures`] runs that walk over two closures at once, each under
+//!   its own layouts.
 //!
 //! The tags are decoded in exactly one place, [`read_layout_node`], because a
 //! desync between the two cursors is silent: the value cursor lands mid-value
 //! and every later capture decodes garbage.
-
-// The entry points here land ahead of their callers, which arrive with
-// serialization, deserialization and comparison of function values.
-#![allow(dead_code)]
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
@@ -31,8 +29,9 @@ use mono_move_core::{
 };
 use move_core_types::{
     account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-    identifier::IdentStr,
+    identifier::IdentStr, language_storage::TypeTag,
 };
+use std::cmp::Ordering;
 
 /// BCS tags of `MoveTypeLayout`, in declaration order. Serde numbers enum
 /// variants by position, so these mirror the declaration in
@@ -268,8 +267,8 @@ fn emit_identifier(out: &mut Vec<u8>, name: &str) {
 enum LayoutNode {
     /// One canonical `0`/`1` byte.
     Bool,
-    /// An integer of this many bytes.
-    Int { width: usize },
+    /// An integer of this many bytes, two's complement when signed.
+    Int { width: usize, signed: bool },
     /// Thirty-two bytes.
     Address,
     /// A ULEB length then that many elements. One child layout follows and is
@@ -292,12 +291,18 @@ fn read_layout_node(bytes: &[u8], cursor: &mut usize) -> Result<LayoutNode, Runt
     let tag = read_uleb128_len(bytes, cursor)?;
     Ok(match tag {
         layout_tag::BOOL => LayoutNode::Bool,
-        layout_tag::U8 | layout_tag::I8 => LayoutNode::Int { width: 1 },
-        layout_tag::U16 | layout_tag::I16 => LayoutNode::Int { width: 2 },
-        layout_tag::U32 | layout_tag::I32 => LayoutNode::Int { width: 4 },
-        layout_tag::U64 | layout_tag::I64 => LayoutNode::Int { width: 8 },
-        layout_tag::U128 | layout_tag::I128 => LayoutNode::Int { width: 16 },
-        layout_tag::U256 | layout_tag::I256 => LayoutNode::Int { width: 32 },
+        layout_tag::U8 => int_node(1, false),
+        layout_tag::U16 => int_node(2, false),
+        layout_tag::U32 => int_node(4, false),
+        layout_tag::U64 => int_node(8, false),
+        layout_tag::U128 => int_node(16, false),
+        layout_tag::U256 => int_node(32, false),
+        layout_tag::I8 => int_node(1, true),
+        layout_tag::I16 => int_node(2, true),
+        layout_tag::I32 => int_node(4, true),
+        layout_tag::I64 => int_node(8, true),
+        layout_tag::I128 => int_node(16, true),
+        layout_tag::I256 => int_node(32, true),
         layout_tag::ADDRESS => LayoutNode::Address,
         layout_tag::VECTOR => LayoutNode::Vector,
         layout_tag::STRUCT => read_struct_node(bytes, cursor)?,
@@ -314,6 +319,10 @@ fn read_layout_node(bytes: &[u8], cursor: &mut usize) -> Result<LayoutNode, Runt
             })
         },
     })
+}
+
+fn int_node(width: usize, signed: bool) -> LayoutNode {
+    LayoutNode::Int { width, signed }
 }
 
 /// Decodes a `MoveStructLayout`, whose own tag has already been consumed.
@@ -354,16 +363,20 @@ pub(crate) fn skip_layout(bytes: &[u8], layout: &mut usize) -> Result<(), Runtim
             }
             Ok(())
         },
-        LayoutNode::Enum { variants } => {
-            for _ in 0..variants {
-                let fields = read_uleb128_len(bytes, layout)?;
-                for _ in 0..fields {
-                    skip_layout(bytes, layout)?;
-                }
-            }
-            Ok(())
-        },
+        LayoutNode::Enum { variants } => skip_variants(bytes, layout, variants),
     }
+}
+
+/// Advances `layout` past `count` variants, each a field count then that many
+/// field layouts.
+fn skip_variants(bytes: &[u8], layout: &mut usize, count: u64) -> Result<(), RuntimeError> {
+    for _ in 0..count {
+        let fields = read_uleb128_len(bytes, layout)?;
+        for _ in 0..fields {
+            skip_layout(bytes, layout)?;
+        }
+    }
+    Ok(())
 }
 
 /// Advances `layout` over one `MoveTypeLayout` and `value` over one value of
@@ -384,7 +397,7 @@ pub(crate) fn walk_capture(
             }
             Ok(())
         },
-        LayoutNode::Int { width } => {
+        LayoutNode::Int { width, .. } => {
             read_slice(bytes, value, width)?;
             Ok(())
         },
@@ -605,6 +618,361 @@ fn skip_type_tag(bytes: &[u8], cursor: &mut usize) -> Result<(), RuntimeError> {
             tag,
         }),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Comparing
+// ---------------------------------------------------------------------------
+
+/// Two captures sit at the same position under layouts of different kinds.
+///
+/// V1 reports `INTERNAL_TYPE_ERROR` for a value-kind mismatch and defines no
+/// cross-kind order. MonoMove has no equivalent error, so it falls back rather
+/// than inventing one.
+//
+// TODO(correctness): `drop_unchanged_writes` compares at session close, where
+// `Unsupported` aborts the block instead of falling back. See its own
+// `TODO(correctness)` on auditing the `equals` error paths.
+fn kind_mismatch() -> RuntimeError {
+    RuntimeError::Unsupported("captures compared under layouts of different kinds")
+}
+
+/// One side of a two-sided walk over a serialized closure's captures.
+struct Cursors<'b> {
+    bytes: &'b [u8],
+    layout: usize,
+    value: usize,
+}
+
+impl<'b> Cursors<'b> {
+    fn new(bytes: &'b [u8]) -> Self {
+        Self {
+            bytes,
+            layout: 0,
+            value: 0,
+        }
+    }
+
+    /// Positions both cursors on the `(layout, value)` pair that starts where
+    /// `value` sits: `layout` at the layout, `value` just past it.
+    fn begin_pair(&mut self) -> Result<(), RuntimeError> {
+        self.layout = self.value;
+        skip_layout(self.bytes, &mut self.value)
+    }
+}
+
+/// Orders the `(layout, value)*` capture tails of two serialized closures over
+/// targets that already compared equal, so both captured `count` values.
+///
+/// Each side is read under its own embedded layouts. A closure loaded from
+/// storage keeps the layouts it was written with, which a later upgrade may
+/// have changed, so the two sides can disagree on field counts.
+pub(crate) fn compare_captures(a: &[u8], b: &[u8], count: u64) -> Result<Ordering, RuntimeError> {
+    let mut a = Cursors::new(a);
+    let mut b = Cursors::new(b);
+    for _ in 0..count {
+        a.begin_pair()?;
+        b.begin_pair()?;
+        let ord = compare_value(&mut a, &mut b)?;
+        if ord.is_ne() {
+            return Ok(ord);
+        }
+    }
+    Ok(Ordering::Equal)
+}
+
+/// Compares one value on each side, each under its own layout, advancing both
+/// pairs of cursors past it.
+//
+// TODO(metering): recursion depth here follows the value, so a deeply nested
+// value consumes proportional native stack. Make it iterative.
+fn compare_value(a: &mut Cursors, b: &mut Cursors) -> Result<Ordering, RuntimeError> {
+    let node_a = read_layout_node(a.bytes, &mut a.layout)?;
+    let node_b = read_layout_node(b.bytes, &mut b.layout)?;
+    match (node_a, node_b) {
+        (LayoutNode::Bool, LayoutNode::Bool) => Ok(read_bool(a)?.cmp(&read_bool(b)?)),
+        (
+            LayoutNode::Int {
+                width: width_a,
+                signed: signed_a,
+            },
+            LayoutNode::Int {
+                width: width_b,
+                signed: signed_b,
+            },
+        ) => {
+            // V1 holds each width in its own `ValueImpl` variant, so `u64`
+            // against `u8` is a type error there, not a numeric comparison.
+            if width_a != width_b || signed_a != signed_b {
+                return Err(kind_mismatch());
+            }
+            compare_int(a, b, width_a, signed_a)
+        },
+        (LayoutNode::Address, LayoutNode::Address) => {
+            let bytes_a = read_slice(a.bytes, &mut a.value, AccountAddress::LENGTH)?;
+            let bytes_b = read_slice(b.bytes, &mut b.value, AccountAddress::LENGTH)?;
+            Ok(bytes_a.cmp(bytes_b))
+        },
+        (LayoutNode::Vector, LayoutNode::Vector) => compare_vector(a, b),
+        (LayoutNode::Struct { fields: fields_a }, LayoutNode::Struct { fields: fields_b }) => {
+            compare_fields(a, b, fields_a, fields_b)
+        },
+        (
+            LayoutNode::Enum {
+                variants: variants_a,
+            },
+            LayoutNode::Enum {
+                variants: variants_b,
+            },
+        ) => compare_enum(a, b, variants_a, variants_b),
+        (LayoutNode::Function, LayoutNode::Function) => {
+            // A nested closure lives entirely on the value side, and the layout
+            // cursors are already past the unit `Function` tag. The nested walk
+            // reuses the layout cursors, so they are restored after it.
+            let (layout_a, layout_b) = (a.layout, b.layout);
+            let ord = compare_closure(a, b)?;
+            a.layout = layout_a;
+            b.layout = layout_b;
+            Ok(ord)
+        },
+        (LayoutNode::Bool, _)
+        | (LayoutNode::Int { .. }, _)
+        | (LayoutNode::Address, _)
+        | (LayoutNode::Vector, _)
+        | (LayoutNode::Struct { .. }, _)
+        | (LayoutNode::Enum { .. }, _)
+        | (LayoutNode::Function, _) => Err(kind_mismatch()),
+    }
+}
+
+fn read_bool(side: &mut Cursors) -> Result<u8, RuntimeError> {
+    let byte = read_slice(side.bytes, &mut side.value, 1)?[0];
+    if byte > 1 {
+        return Err(RuntimeError::BCSInvalidBool { byte });
+    }
+    Ok(byte)
+}
+
+/// Compares two integers of the same width and signedness.
+fn compare_int(
+    a: &mut Cursors,
+    b: &mut Cursors,
+    width: usize,
+    signed: bool,
+) -> Result<Ordering, RuntimeError> {
+    let bytes_a = read_slice(a.bytes, &mut a.value, width)?;
+    let bytes_b = read_slice(b.bytes, &mut b.value, width)?;
+
+    if signed {
+        // Two's complement puts the sign in the top bit, where it sorts the
+        // wrong way round, so it is compared first and inverted.
+        let sign_a = bytes_a[width - 1] & 0x80;
+        let sign_b = bytes_b[width - 1] & 0x80;
+        if sign_a != sign_b {
+            return Ok(sign_b.cmp(&sign_a));
+        }
+    }
+    // BCS is little-endian, so the most significant byte is last.
+    Ok(bytes_a.iter().rev().cmp(bytes_b.iter().rev()))
+}
+
+fn compare_vector(a: &mut Cursors, b: &mut Cursors) -> Result<Ordering, RuntimeError> {
+    // V1 stores a vector of primitives in a container variant picked by the
+    // element type and compares the variants before the elements, so two
+    // vectors whose element kinds disagree are a type error there even when
+    // both are empty or lengths already differ.
+    if vector_class(a.bytes, a.layout)? != vector_class(b.bytes, b.layout)? {
+        return Err(kind_mismatch());
+    }
+
+    let len_a = read_vector_len(a)?;
+    let len_b = read_vector_len(b)?;
+
+    // One element layout serves every element, so each element rewinds the
+    // layout cursors to where they started.
+    let (elem_a, elem_b) = (a.layout, b.layout);
+    for i in 0..len_a.min(len_b) {
+        if i > 0 {
+            a.layout = elem_a;
+            b.layout = elem_b;
+        }
+        let ord = compare_value(a, b)?;
+        if ord.is_ne() {
+            return Ok(ord);
+        }
+    }
+    if len_a != len_b {
+        return Ok(len_a.cmp(&len_b));
+    }
+    if len_a == 0 {
+        // No element advanced the layout cursors past the element layout.
+        skip_layout(a.bytes, &mut a.layout)?;
+        skip_layout(b.bytes, &mut b.layout)?;
+    }
+    Ok(Ordering::Equal)
+}
+
+fn read_vector_len(side: &mut Cursors) -> Result<u64, RuntimeError> {
+    let len = read_uleb128_len(side.bytes, &mut side.value)?;
+    if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
+        return Err(RuntimeError::BCSSequenceTooLong { len });
+    }
+    Ok(len)
+}
+
+/// The V1 container variant a vector of this element layout takes: a dedicated
+/// one per primitive element type, and one shared by everything else.
+fn vector_class(bytes: &[u8], layout: usize) -> Result<Option<u64>, RuntimeError> {
+    let mut cursor = layout;
+    let tag = read_uleb128_len(bytes, &mut cursor)?;
+    Ok(match tag {
+        layout_tag::BOOL
+        | layout_tag::U8
+        | layout_tag::U16
+        | layout_tag::U32
+        | layout_tag::U64
+        | layout_tag::U128
+        | layout_tag::U256
+        | layout_tag::I8
+        | layout_tag::I16
+        | layout_tag::I32
+        | layout_tag::I64
+        | layout_tag::I128
+        | layout_tag::I256
+        | layout_tag::ADDRESS => Some(tag),
+        _ => None,
+    })
+}
+
+/// Compares a run of field layouts and values on each side, then the counts.
+fn compare_fields(
+    a: &mut Cursors,
+    b: &mut Cursors,
+    fields_a: u64,
+    fields_b: u64,
+) -> Result<Ordering, RuntimeError> {
+    for _ in 0..fields_a.min(fields_b) {
+        let ord = compare_value(a, b)?;
+        if ord.is_ne() {
+            return Ok(ord);
+        }
+    }
+    Ok(fields_a.cmp(&fields_b))
+}
+
+fn compare_enum(
+    a: &mut Cursors,
+    b: &mut Cursors,
+    variants_a: u64,
+    variants_b: u64,
+) -> Result<Ordering, RuntimeError> {
+    let tag_a = read_variant_tag(a, variants_a)?;
+    let tag_b = read_variant_tag(b, variants_b)?;
+    // V1 decodes an enum into a struct whose first field is the variant tag, so
+    // the tag orders ahead of the fields and the field counts it compares are
+    // the selected variants' plus one.
+    if tag_a != tag_b {
+        return Ok(tag_a.cmp(&tag_b));
+    }
+
+    let fields_a = enter_variant(a, tag_a)?;
+    let fields_b = enter_variant(b, tag_b)?;
+    let ord = compare_fields(a, b, fields_a, fields_b)?;
+    if ord.is_ne() {
+        return Ok(ord);
+    }
+
+    skip_variants(a.bytes, &mut a.layout, variants_a - tag_a - 1)?;
+    skip_variants(b.bytes, &mut b.layout, variants_b - tag_b - 1)?;
+    Ok(Ordering::Equal)
+}
+
+fn read_variant_tag(side: &mut Cursors, variants: u64) -> Result<u64, RuntimeError> {
+    let tag = read_uleb128_len(side.bytes, &mut side.value)?;
+    if tag >= variants {
+        return Err(RuntimeError::BCSInvalidEnumTag {
+            tag,
+            variant_count: variants as usize,
+        });
+    }
+    Ok(tag)
+}
+
+/// Advances `layout` to the first field layout of variant `tag`, returning that
+/// variant's field count.
+fn enter_variant(side: &mut Cursors, tag: u64) -> Result<u64, RuntimeError> {
+    skip_variants(side.bytes, &mut side.layout, tag)?;
+    read_uleb128_len(side.bytes, &mut side.layout)
+}
+
+/// Compares two nested closures, advancing both value cursors past them.
+fn compare_closure(a: &mut Cursors, b: &mut Cursors) -> Result<Ordering, RuntimeError> {
+    let header_a = read_closure_header(a.bytes, &mut a.value)?;
+    let header_b = read_closure_header(b.bytes, &mut b.value)?;
+    let ord = compare_closure_headers(&header_a, &header_b)?;
+    if ord.is_ne() {
+        return Ok(ord);
+    }
+
+    // Equal masks mean equal capture counts.
+    for _ in 0..header_a.captured {
+        a.begin_pair()?;
+        b.begin_pair()?;
+        let ord = compare_value(a, b)?;
+        if ord.is_ne() {
+            return Ok(ord);
+        }
+    }
+    Ok(Ordering::Equal)
+}
+
+/// Orders two serialized closures by target then mask, the order V1's `cmp_dyn`
+/// defines.
+fn compare_closure_headers(a: &ClosureHeader, b: &ClosureHeader) -> Result<Ordering, RuntimeError> {
+    let ord = a
+        .address
+        .cmp(&b.address)
+        .then_with(|| a.module_name.cmp(b.module_name))
+        .then_with(|| a.func_name.cmp(b.func_name));
+    if ord.is_ne() {
+        return Ok(ord);
+    }
+    let ord = read_ty_args(a.ty_args)?.cmp(&read_ty_args(b.ty_args)?);
+    Ok(ord.then_with(|| a.mask.cmp(&b.mask)))
+}
+
+/// Decodes a closure header's type arguments. `TypeTag` orders by declaration,
+/// which its BCS bytes do not reproduce, so they have to be decoded.
+fn read_ty_args(bytes: &[u8]) -> Result<Vec<TypeTag>, RuntimeError> {
+    bcs::from_bytes(bytes).map_err(|_| RuntimeError::BCSInvalidClosure("type arguments"))
+}
+
+/// Orders two function references the way V1's `cmp_dyn` orders closure
+/// targets: module id, then function name, then type arguments.
+pub(crate) fn compare_func_refs(a: &FunctionRef, b: &FunctionRef) -> VMResult<Ordering> {
+    let (module_a, module_b) = (view_module_id(a.module_id), view_module_id(b.module_id));
+    let ord = module_a
+        .address()
+        .cmp(module_b.address())
+        .then_with(|| view_name(module_a.name()).cmp(view_name(module_b.name())))
+        .then_with(|| view_name(a.func_name).cmp(view_name(b.func_name)));
+    if ord.is_ne() {
+        return Ok(ord);
+    }
+    Ok(func_ref_ty_args(a)?.cmp(&func_ref_ty_args(b)?))
+}
+
+fn func_ref_ty_args(func_ref: &FunctionRef) -> VMResult<Vec<TypeTag>> {
+    view_type_list(func_ref.ty_args)
+        .iter()
+        .map(|&ty| {
+            type_tag_of(ty).ok_or_else(|| {
+                VMInternalError::new(RuntimeError::Unsupported(
+                    "function value over a type with no type tag",
+                ))
+            })
+        })
+        .collect::<VMResult<Vec<TypeTag>>>()
 }
 
 #[cfg(test)]
@@ -1054,6 +1422,329 @@ mod tests {
             let mut cursor = 0;
             assert!(
                 walk_closure(&bytes[..end], &mut cursor).is_err(),
+                "truncating to {end} bytes must fail"
+            );
+        }
+    }
+
+    /// One capture tail holding a single `(layout, value)` pair.
+    fn one_capture<V: Serialize>(layout: &MoveTypeLayout, value: &V) -> Vec<u8> {
+        let mut out = vec![];
+        capture(&mut out, layout, value);
+        out
+    }
+
+    fn cmp_one<V: Serialize, W: Serialize>(
+        layout_a: &MoveTypeLayout,
+        a: &V,
+        layout_b: &MoveTypeLayout,
+        b: &W,
+    ) -> Result<Ordering, RuntimeError> {
+        compare_captures(&one_capture(layout_a, a), &one_capture(layout_b, b), 1)
+    }
+
+    /// Compares `a` against `b` under one shared layout.
+    fn cmp_same<V: Serialize, W: Serialize>(
+        layout: &MoveTypeLayout,
+        a: &V,
+        b: &W,
+    ) -> Result<Ordering, RuntimeError> {
+        cmp_one(layout, a, layout, b)
+    }
+
+    #[test]
+    fn compare_unsigned_is_numeric_not_byte_order() {
+        // Little-endian bytes order these the other way round.
+        assert_eq!(
+            cmp_same(&MoveTypeLayout::U64, &1u64, &256u64).unwrap(),
+            Ordering::Less
+        );
+        assert_eq!(
+            cmp_same(&MoveTypeLayout::U128, &u128::MAX, &0u128).unwrap(),
+            Ordering::Greater
+        );
+        assert_eq!(
+            cmp_same(&MoveTypeLayout::U16, &7u16, &7u16).unwrap(),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn compare_signed_orders_by_sign_first() {
+        for (a, b, expected) in [
+            (-1i64, 0i64, Ordering::Less),
+            (0, -1, Ordering::Greater),
+            (-2, -1, Ordering::Less),
+            (i64::MIN, i64::MAX, Ordering::Less),
+            (-5, -5, Ordering::Equal),
+        ] {
+            assert_eq!(
+                cmp_same(&MoveTypeLayout::I64, &a, &b).unwrap(),
+                expected,
+                "{a} against {b}"
+            );
+        }
+    }
+
+    #[test]
+    fn compare_bools_and_addresses() {
+        assert_eq!(
+            cmp_same(&MoveTypeLayout::Bool, &false, &true).unwrap(),
+            Ordering::Less
+        );
+        assert_eq!(
+            cmp_same(
+                &MoveTypeLayout::Address,
+                &AccountAddress::ONE,
+                &AccountAddress::TWO
+            )
+            .unwrap(),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn compare_vectors_by_element_then_length() {
+        let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8));
+        // The longer vector loses on its first element, which the ULEB length
+        // prefix would hide from a byte comparison.
+        assert_eq!(
+            cmp_same(&layout, &vec![9u8], &vec![1u8, 1]).unwrap(),
+            Ordering::Greater
+        );
+        assert_eq!(
+            cmp_same(&layout, &vec![1u8], &vec![1u8, 1]).unwrap(),
+            Ordering::Less
+        );
+        assert_eq!(
+            cmp_same(&layout, &Vec::<u8>::new(), &Vec::<u8>::new()).unwrap(),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn compare_vectors_of_different_element_kinds_is_a_type_error() {
+        // V1 puts these in different container variants and compares the
+        // variants before it looks inside, so even two empty ones are an error.
+        let u8s = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8));
+        let u64s = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64));
+        for (a, b) in [(vec![], vec![]), (vec![1u8], vec![1u64])] {
+            assert!(matches!(
+                cmp_one(&u8s, &a, &u64s, &b).unwrap_err(),
+                RuntimeError::Unsupported(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn compare_struct_by_field_then_count() {
+        let one = MoveTypeLayout::Struct(Arc::new(MoveStructLayout::Runtime(vec![
+            MoveTypeLayout::U64,
+        ])));
+        let two = MoveTypeLayout::Struct(Arc::new(MoveStructLayout::Runtime(vec![
+            MoveTypeLayout::U64,
+            MoveTypeLayout::U64,
+        ])));
+        // A stored closure can carry a pre-upgrade layout, so differing field
+        // counts order by count rather than erroring.
+        assert_eq!(
+            cmp_one(&one, &(7u64,), &two, &(7u64, 0u64)).unwrap(),
+            Ordering::Less
+        );
+        assert_eq!(
+            cmp_one(&one, &(8u64,), &two, &(7u64, 0u64)).unwrap(),
+            Ordering::Greater
+        );
+        assert_eq!(
+            cmp_same(&two, &(7u64, 1u64), &(7u64, 1u64)).unwrap(),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn compare_struct_against_primitive_is_a_type_error() {
+        let s = MoveTypeLayout::Struct(Arc::new(MoveStructLayout::Runtime(vec![
+            MoveTypeLayout::U64,
+        ])));
+        assert!(matches!(
+            cmp_one(&s, &(7u64,), &MoveTypeLayout::U64, &7u64).unwrap_err(),
+            RuntimeError::Unsupported(_)
+        ));
+    }
+
+    #[test]
+    fn compare_ints_of_different_widths_is_a_type_error() {
+        for (a, b) in [
+            (MoveTypeLayout::U8, MoveTypeLayout::U64),
+            (MoveTypeLayout::U64, MoveTypeLayout::I64),
+        ] {
+            assert!(matches!(
+                cmp_one(&a, &0u8, &b, &0u8).unwrap_err(),
+                RuntimeError::Unsupported(_)
+            ));
+        }
+    }
+
+    /// Builds a capture tail holding one value of [`enum_layout`].
+    fn enum_capture(tag: u64, fields: &[u64]) -> Vec<u8> {
+        let mut out = bcs::to_bytes(&enum_layout()).unwrap();
+        write_uleb128_len(&mut out, tag);
+        for value in fields {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+        out
+    }
+
+    #[test]
+    fn compare_enum_by_tag_then_fields() {
+        let cases = [
+            ((0u64, vec![1u64, 2]), (1u64, vec![]), Ordering::Less),
+            ((2, vec![3]), (1, vec![]), Ordering::Greater),
+            ((0, vec![1, 2]), (0, vec![1, 3]), Ordering::Less),
+            ((2, vec![3]), (2, vec![3]), Ordering::Equal),
+        ];
+        for ((tag_a, fields_a), (tag_b, fields_b), expected) in cases {
+            let ord = compare_captures(
+                &enum_capture(tag_a, &fields_a),
+                &enum_capture(tag_b, &fields_b),
+                1,
+            )
+            .unwrap();
+            assert_eq!(ord, expected, "variant {tag_a} against {tag_b}");
+        }
+    }
+
+    #[test]
+    fn compare_enum_leaves_cursors_at_the_end() {
+        // Two captures in a row: the first has to land the cursors exactly at
+        // the start of the second, whichever variant it selects.
+        for tag in 0..3u64 {
+            let fields = match tag {
+                0 => vec![1u64, 2],
+                1 => vec![],
+                _ => vec![3],
+            };
+            let mut bytes = enum_capture(tag, &fields);
+            capture(&mut bytes, &MoveTypeLayout::U64, &9u64);
+            assert_eq!(
+                compare_captures(&bytes, &bytes, 2).unwrap(),
+                Ordering::Equal
+            );
+
+            let mut other = enum_capture(tag, &fields);
+            capture(&mut other, &MoveTypeLayout::U64, &10u64);
+            assert_eq!(compare_captures(&bytes, &other, 2).unwrap(), Ordering::Less);
+        }
+    }
+
+    #[test]
+    fn compare_vector_leaves_cursors_at_the_end() {
+        for elements in [vec![], vec![1u64], vec![1u64, 2]] {
+            let mut bytes = one_capture(
+                &MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U64)),
+                &elements,
+            );
+            capture(&mut bytes, &MoveTypeLayout::U64, &9u64);
+            let mut other = bytes.clone();
+            *other.last_mut().unwrap() = 1;
+            assert_eq!(
+                compare_captures(&bytes, &bytes, 2).unwrap(),
+                Ordering::Equal
+            );
+            assert_eq!(
+                compare_captures(&bytes, &other, 2).unwrap(),
+                Ordering::Less,
+                "{elements:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn compare_nested_closures() {
+        let inner = |value: u64| {
+            let mut captures = vec![];
+            capture(&mut captures, &MoveTypeLayout::U64, &value);
+            let mut out = bcs::to_bytes(&MoveTypeLayout::Function).unwrap();
+            out.extend_from_slice(&closure_bytes(&[], 0b1, &captures, 1));
+            out
+        };
+        assert_eq!(
+            compare_captures(&inner(1), &inner(1), 1).unwrap(),
+            Ordering::Equal
+        );
+        assert_eq!(
+            compare_captures(&inner(1), &inner(2), 1).unwrap(),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn compare_nested_closures_by_target() {
+        // Same shape, different type arguments: the header decides.
+        let closure = |ty_args: &[TypeTag]| {
+            let mut out = bcs::to_bytes(&MoveTypeLayout::Function).unwrap();
+            out.extend_from_slice(&closure_bytes(ty_args, 0, &[], 0));
+            out
+        };
+        assert_eq!(
+            compare_captures(&closure(&[TypeTag::U8]), &closure(&[TypeTag::U64]), 1).unwrap(),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_captures(&closure(&[]), &closure(&[TypeTag::U8]), 1).unwrap(),
+            Ordering::Less
+        );
+    }
+
+    #[test]
+    fn compare_is_a_total_order() {
+        // Sorting by the comparison must agree with it pairwise, which catches
+        // a cursor left mid-value on an inequality.
+        let layout = MoveTypeLayout::Struct(Arc::new(MoveStructLayout::Runtime(vec![
+            MoveTypeLayout::U64,
+            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
+        ])));
+        let values = [
+            (0u64, vec![]),
+            (0u64, vec![1u8]),
+            (1u64, vec![]),
+            (1u64, vec![0u8, 0]),
+            (u64::MAX, vec![255u8]),
+        ];
+        for (i, a) in values.iter().enumerate() {
+            for (j, b) in values.iter().enumerate() {
+                assert_eq!(
+                    cmp_same(&layout, a, b).unwrap(),
+                    i.cmp(&j),
+                    "{a:?} against {b:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn compare_rejects_signer_and_native() {
+        for layout in [
+            MoveTypeLayout::Signer,
+            MoveTypeLayout::Native(
+                IdentifierMappingKind::Aggregator,
+                Box::new(MoveTypeLayout::U64),
+            ),
+        ] {
+            let bytes = one_capture(&layout, &AccountAddress::ONE);
+            assert!(matches!(
+                compare_captures(&bytes, &bytes, 1).unwrap_err(),
+                RuntimeError::Unsupported(_)
+            ));
+        }
+    }
+
+    #[test]
+    fn compare_rejects_truncation() {
+        let bytes = one_capture(&MoveTypeLayout::U64, &7u64);
+        for end in 1..bytes.len() {
+            assert!(
+                compare_captures(&bytes[..end], &bytes, 1).is_err(),
                 "truncating to {end} bytes must fail"
             );
         }

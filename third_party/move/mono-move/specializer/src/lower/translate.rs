@@ -2597,9 +2597,10 @@ fn eq_kind(ty: &Type) -> VMResult<EqKind> {
         | Type::I64
         | Type::I128
         | Type::I256 => EqKind::Int,
-        Type::Vector { .. } | Type::Nominal { .. } => EqKind::NonIntValue,
+        // A function slot holds a closure pointer, compared through it.
+        Type::Vector { .. } | Type::Nominal { .. } | Type::Function { .. } => EqKind::NonIntValue,
         Type::ImmutRef { .. } | Type::MutRef { .. } => EqKind::Ref,
-        Type::Function { .. } | Type::TypeParam { .. } => {
+        Type::TypeParam { .. } => {
             return Err(VMInternalError::new(LoweringError::EqualityUnsupportedType))
         },
     })
