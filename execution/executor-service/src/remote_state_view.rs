@@ -27,14 +27,20 @@ use rayon::ThreadPool;
 pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
 
 pub struct RemoteStateView {
+    epoch: u64,
     state_values: DashMap<StateKey, RemoteStateValue>,
 }
 
 impl RemoteStateView {
-    pub fn new() -> Self {
+    pub fn new(epoch: u64) -> Self {
         Self {
+            epoch,
             state_values: DashMap::new(),
         }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 
     pub fn has_state_key(&self, state_key: &StateKey) -> bool {
@@ -42,10 +48,11 @@ impl RemoteStateView {
     }
 
     pub fn set_state_value(&self, state_key: &StateKey, state_value: Option<StateValue>) {
-        self.state_values
-            .get(state_key)
-            .unwrap()
-            .set_value(state_value);
+        // A straggler response from a previous block can reference a key that is no longer
+        // tracked; drop it instead of panicking.
+        if let Some(value) = self.state_values.get(state_key) {
+            value.set_value(state_value);
+        }
     }
 
     pub fn insert_state_key(&self, state_key: StateKey) {
@@ -93,7 +100,7 @@ impl RemoteStateViewClient {
         let result_rx = controller.create_inbound_channel(kv_response_type.to_string());
         let command_tx =
             controller.create_outbound_channel(coordinator_address, kv_request_type.to_string());
-        let state_view = Arc::new(RwLock::new(RemoteStateView::new()));
+        let state_view = Arc::new(RwLock::new(RemoteStateView::new(0)));
         let state_value_receiver = RemoteStateValueReceiver::new(
             shard_id,
             state_view.clone(),
@@ -116,7 +123,11 @@ impl RemoteStateViewClient {
     }
 
     pub fn init_for_block(&self, state_keys: Vec<StateKey>) {
-        *self.state_view.write().unwrap() = RemoteStateView::new();
+        {
+            let mut state_view = self.state_view.write().unwrap();
+            let next_epoch = state_view.epoch() + 1;
+            *state_view = RemoteStateView::new(next_epoch);
+        }
         REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&self.shard_id.to_string(), "prefetch_kv"])
             .inc_by(state_keys.len() as u64);
@@ -130,16 +141,20 @@ impl RemoteStateViewClient {
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
     ) {
-        state_keys.clone().into_iter().for_each(|state_key| {
-            state_view_clone.read().unwrap().insert_state_key(state_key);
-        });
+        let epoch = {
+            let state_view = state_view_clone.read().unwrap();
+            for state_key in state_keys.iter() {
+                state_view.insert_state_key(state_key.clone());
+            }
+            state_view.epoch()
+        };
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
                 thread_pool.spawn(move || {
-                    Self::send_state_value_request(shard_id, sender, state_keys);
+                    Self::send_state_value_request(shard_id, epoch, sender, state_keys);
                 });
             });
     }
@@ -171,10 +186,11 @@ impl RemoteStateViewClient {
 
     fn send_state_value_request(
         shard_id: ShardId,
+        epoch: u64,
         sender: Arc<Sender<Message>>,
         state_keys: Vec<StateKey>,
     ) {
-        let request = RemoteKVRequest::new(shard_id, state_keys);
+        let request = RemoteKVRequest::new(shard_id, epoch, state_keys);
         let request_message = bcs::to_bytes(&request).unwrap();
         sender.send(Message::new(request_message)).unwrap();
     }
@@ -258,6 +274,16 @@ impl RemoteStateValueReceiver {
             .with_label_values(&[&shard_id.to_string(), "kv_responses"])
             .inc();
         let state_view_lock = state_view.read().unwrap();
+        // A straggler response from a previous block must not be applied to the current
+        // state view: its values may be stale for the current block.
+        if response.epoch != state_view_lock.epoch() {
+            trace!(
+                "Dropping stale KV response for shard {} with size {}",
+                shard_id,
+                response.inner.len()
+            );
+            return;
+        }
         trace!(
             "Received state values for shard {} with size {}",
             shard_id,
@@ -269,5 +295,59 @@ impl RemoteStateValueReceiver {
             .for_each(|(state_key, state_value)| {
                 state_view_lock.set_state_value(&state_key, state_value);
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_state_value_for_missing_key_is_noop() {
+        let view = RemoteStateView::new(0);
+        let key = StateKey::raw(b"key1");
+        // A straggler response from a previous block can reference a key that is no
+        // longer part of the state view; setting it must be a no-op instead of a panic.
+        view.set_state_value(&key, None);
+    }
+
+    #[test]
+    fn test_stale_epoch_response_dropped() {
+        let state_key = StateKey::raw(b"key1");
+        let state_value = StateValue::from(b"value1".to_vec());
+        let state_view = Arc::new(RwLock::new(RemoteStateView::new(2)));
+        state_view
+            .read()
+            .unwrap()
+            .insert_state_key(state_key.clone());
+
+        // A straggler response from a previous epoch must be dropped...
+        let stale = RemoteKVResponse::new(vec![(state_key.clone(), Some(state_value.clone()))], 1);
+        RemoteStateValueReceiver::handle_message(
+            0,
+            Message::new(bcs::to_bytes(&stale).unwrap()),
+            state_view.clone(),
+        );
+        assert!(!state_view
+            .read()
+            .unwrap()
+            .state_values
+            .get(&state_key)
+            .unwrap()
+            .is_ready());
+
+        // ... while a response for the current epoch is applied.
+        let fresh = RemoteKVResponse::new(vec![(state_key.clone(), Some(state_value))], 2);
+        RemoteStateValueReceiver::handle_message(
+            0,
+            Message::new(bcs::to_bytes(&fresh).unwrap()),
+            state_view.clone(),
+        );
+        let got = state_view
+            .read()
+            .unwrap()
+            .get_state_value(&state_key)
+            .unwrap();
+        assert_eq!(got, Some(StateValue::from(b"value1".to_vec())));
     }
 }
