@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/fun_arg_frame_check.move:52:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:52:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:52:5: error: leaner verification failed: the automatic verification of `named_fun` failed; provide a proof: `verify named_fun by …` in `tests/sources/regression/fun_arg_frame_check.proof.lean` (`verify named_fun by skip` shows the obligations it leaves)
+tests/sources/regression/fun_arg_frame_check.move:57:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:57:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:57:5: error: leaner verification failed: the automatic verification of `lambda_call` failed; provide a proof: `verify lambda_call by …` in `tests/sources/regression/fun_arg_frame_check.proof.lean` (`verify lambda_call by skip` shows the obligations it leaves)
+tests/sources/regression/fun_arg_frame_check.move:62:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:62:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:62:5: error: leaner verification failed: the automatic verification of `lambda_write` failed; provide a proof: `verify lambda_write by …` in `tests/sources/regression/fun_arg_frame_check.proof.lean` (`verify lambda_write by skip` shows the obligations it leaves)
+tests/sources/regression/fun_arg_frame_check.move:67:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:67:5: error: the precondition of `apply_pure` is not established
+tests/sources/regression/fun_arg_frame_check.move:67:5: error: leaner verification failed: the automatic verification of `helper_with_spec` failed; provide a proof: `verify helper_with_spec by …` in `tests/sources/regression/fun_arg_frame_check.proof.lean` (`verify helper_with_spec by skip` shows the obligations it leaves)
