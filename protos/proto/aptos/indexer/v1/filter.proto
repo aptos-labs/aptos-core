@@ -45,6 +45,9 @@ message MoveStructTagFilter {
 message EventFilter {
   optional MoveStructTagFilter struct_type = 1;
   optional string data_substring_filter = 2;
+  // Filter events by client_order_id field. This is useful for querying
+  // trading events (like OrderEvent) by the client-specified order identifier.
+  optional string client_order_id = 3;
 }
 
 message APIFilter {
