@@ -282,9 +282,21 @@ and otherwise the run `result_of` reads applies. A parameter of a shared
 reference type is the value it observes: a closure over such a target is
 typed at the row of the referents (`ClosureTypedAt`, `observedType`).
 
-Mutable-reference arguments follow the prophetic model: `ensures_of` relates
-the argument's entry value and its resolved final value, as the Move Book's
-single-occurrence form (`ensures_of<f>(x_mut, r)`) states.
+Mutable-reference arguments follow the prophetic model, in the Prover's
+argument layout (`spec_translator.rs`, `bytecode_translator.rs`): a
+predicate's inputs are the arguments' values, a `&mut` one's its entry
+value; `ensures_of` takes after them the declared results and then the final
+value of each `&mut` argument, in order (`ensures_of<f>(old(x), x)` for
+`f: |&mut T|`); `result_of` names the declared results alone, and
+`requires_of` and `aborts_of` the inputs alone. The meaning (planned, H4d):
+the invocation runs with each `&mut` argument lent under a loan of its own,
+`.borrow loan entry`, from a start whose bookkeeping lends exactly those
+loans, and the final value is the one the run exports for the loan
+(`RuntimeState.pending`), with the holes of returned references filled, as
+`argumentsResolve` reads a call; for a literal closure this is a run of the
+target's prophetic meaning at the reference `(entry, final)`, so the
+closure rules generalize from reference-free rows to rows whose references
+are the target's `&mut` parameters.
 
 **Frames.** Without `modifies_of`, Move treats a function parameter as not
 modifying global memory, and the compiler checks every closure passed for it.
