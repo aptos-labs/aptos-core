@@ -214,6 +214,8 @@ members = [
     "third_party/move/mono-move/alloc",
     "third_party/move/mono-move/aptos-state-view-providers",
     "third_party/move/mono-move/aptos-transaction-executor",
+    "third_party/move/mono-move/spec",
+    "third_party/move/mono-move/spec-macro",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
     "third_party/move/mono-move/lean-link",
@@ -916,6 +918,8 @@ legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-c
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
 mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/aptos-state-view-providers" }
 mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
+mono-move-spec = { path = "third_party/move/mono-move/spec" }
+mono-move-spec-macro = { path = "third_party/move/mono-move/spec-macro" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
 mono-move-lean-link = { path = "third_party/move/mono-move/lean-link" }
