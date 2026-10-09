@@ -8833,11 +8833,13 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           let holds ← started.withContext (mkFreshExprSyntheticOpaqueMVar owed)
           let (_, continues) ← (← started.assert `calleeRequires owed holds).intro1P
           replaceMainGoal [continues]
-          let holdsGoal := holds.mvarId!
+          -- The clauses the precondition states, as the obligation's
+          -- locations; the leaves decide what they state.
+          let (holdsGoal, required) ← stripObligations holds.mvarId! #[]
           setGoals [holdsGoal]
           evalTactic (← `(tactic| try leaner_denote_normalize))
           pending := pending ++ (← getGoals).toArray.map fun g =>
-            (g, some (Provenance.precondition calleeName), #[])
+            (g, some (Provenance.precondition calleeName), required)
           setGoals [continues]
           evalTactic (← `(tactic| try simp only [LeanerIR.Proofs.Obligation_iff] at calleeRequires))
           -- A precondition that does not hold closes what follows.

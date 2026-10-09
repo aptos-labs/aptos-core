@@ -2201,7 +2201,8 @@ def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceI
     (params : NRow) (codecs types : Option Lean.Expr) (twins : Array SpecTypes.TwinInfo) :
     TermElabM (Option (Lean.Expr × Bool)) := do
   let required := (ContractView.implementation.of declaration).contract.conditions.filter
-    (·.kind == .requires)
+    fun condition => condition.kind == .requires &&
+      !Contract.conditionReadsRequires unit namespaceId condition.expression
   if required.isEmpty then return none
   let readsUnit := required.any fun condition =>
     Contract.conditionReadsBehavior unit namespaceId condition.expression
@@ -3880,6 +3881,12 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     -- proof meets: the function's own and those of its inlined callees, each
     -- keyed by its site and function.
     let owners := #[(handle, ns, declaration, compiled)] ++ inlined
+    -- The callees a body the proof meets calls: a closure's target, reached
+    -- through a function value, owes no precondition of its own there (its
+    -- invocation's is the value's, `requires_of`).
+    let called := owners.foldl (fun found (owner, _, _, _) =>
+      (bodyCallees unit owner).foldl (fun found callee =>
+        if found.contains callee then found else found.push callee) found) #[]
     let invariants ← liftTermElabM <| withExecutableSkolems fun executable skolems => do
       owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
         let codecs := mkApp (mkConst ``Carriers.codec) (← Contract.frameCarriers skolems)
@@ -3911,7 +3918,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
               types twins
           else pure #[]
         -- The precondition an inlined callee's caller owes where it starts.
-        let precondition ← if owner == handle then pure none
+        let precondition ← if owner == handle || !called.contains owner then pure none
           else
             preconditionCondition unit executable owner.namespaceId ownerNs ownerDeclaration
               ownerCompiled.params codecs types twins

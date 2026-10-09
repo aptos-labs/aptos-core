@@ -5241,6 +5241,12 @@ def conditionReadsBehavior (unit : ValidatedUnit) (namespaceId : LeanerIR.Namesp
   let reads := readsFrom unit [(namespaceId, root)]
   reads.unit || reads.requires
 
+/-- Whether a condition reads the table of declared preconditions
+(`requires_of`), itself or through the specification functions it calls. -/
+def conditionReadsRequires (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (root : ExprId) : Bool :=
+  (readsFrom unit [(namespaceId, root)]).requires
+
 /-- Whether a function's contract states a behavioral predicate or assumes
 typing: then it takes the executable unit. -/
 def contractReadsUnit (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
@@ -6081,7 +6087,8 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
           mkLambdaFVars #[arguments, state, failureBinder] permitted
   /- The frame is stated over global memory: a successful execution leaves
   the slots it does not declare as modified alone.  With no `modifies`
-  clause the whole memory is unchanged.  With clauses, every listed resource
+  clause the whole memory is unchanged, but for a function without a
+  specification, which states no frame.  With clauses, every listed resource
   type reads the same at every key other than its listed ones, and every
   other resource type reads the same everywhere; a loose frame leaves the
   unlisted resource types open.  The memory's update laws discharge the
@@ -6091,7 +6098,10 @@ def buildContract (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
       withLocalDeclD `result resultType fun result =>
         withLocalDeclD `final runtimeState fun final => do
           let body ←
-            if declaration.contract.modifiesAll then
+            -- A function without a specification states no frame; its
+            -- callers read its body.
+            if declaration.contract.modifiesAll ||
+                (declaration.contract.loc.isNone && declaration.body != .absent) then
               pure (mkConst ``True)
             else if declaration.contract.modifies.isEmpty then
               mkEq final initial
@@ -6264,7 +6274,9 @@ at the call: its `requires` clauses in the view its body is proved against,
 over its parameters' values (`locals`, the other locals unbound) and the
 memory there (`state`), after the pre-state `let`s they read. Each clause is
 marked with its source range, so a precondition not established is
-reported there. -/
+reported there. A clause applying `requires_of` reads the module's table of
+declared preconditions, which the start does not take: it is left out, as
+the caller's obligation it would be is not stated. -/
 def startPrecondition (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
     (ns : ValidatedNamespace) (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
     (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (codecs types : Option Lean.Expr)
@@ -6277,7 +6289,8 @@ def startPrecondition (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId
     localNames := declaration.locals.map (·.name), results := #[], codecs, types,
     state := some state, oldState := some state, twins, executable }
   let context ← bindLets context groups.lets false
-  conjunction (← (conditions.filter (·.kind == .requires)).mapM fun condition => do
+  conjunction (← (conditions.filter fun condition => condition.kind == .requires &&
+      !conditionReadsRequires unit namespaceId condition.expression).mapM fun condition => do
     pure (markCondition unit condition (← translate context condition.expression)))
 
 /-- Name of the generated contract definition. -/

@@ -50,12 +50,16 @@ relative to `tests/sources`.
 ## Summary
 
 Callee preconditions (2026-10-09): a caller owes the `requires` of a callee
-whose body it inlines, where the callee starts, as the Prover asserts a
-callee's preconditions at every call; before, only a callee used through its
-contract had them checked. A function without a specification is verified
-when it calls a function with a precondition. `schema_apply` fails as the
-Prover does: `the precondition `requires false` of `f` does not hold at this
-call`.
+whose body it inlines and which it calls directly, where the callee starts,
+as the Prover asserts a callee's preconditions at every call; before, only a
+callee used through its contract had them checked. A function without a
+specification is verified when it calls a function with a precondition, and
+states no frame. `schema_apply`, `is_txn_signer::f7_incorrect` and
+`behavioral_predicates_examples::apply_no_abort_test_fail` fail at the
+callee's precondition as the Prover does. A clause applying `requires_of`
+is not owed this way (it reads the module's table of declared
+preconditions), nor is the precondition of a closure's target, which its
+invocation owes through `requires_of`. Four `drive` functions now reach V20.
 
 Inline specifications (2026-10-08): a non-opaque inline function with a
 specification of its own is verified against it, as the Prover verifies it;
@@ -692,9 +696,6 @@ inferred contract, and its theorems do not depend on solver heuristics.
 
 - `proof/weight_too_large`: a `[weight = 1000]` axiom is never instantiated
   by Z3; `id_num(0) == 0` unfolds in Leaner.
-- `closures/lambda_spec_loop_anchor`, `closures/lambda_captured_fun_loop`:
-  the inferred contract of a looping lambda is not provable; Leaner reads
-  the lambda's behavior from its body.
 - `closures/behavioral_underivable_body`: `result_of<sum_to>` of a function
   without a specification whose body loops.
 - `closures/lambda_funparam_memory_err`,
@@ -1151,9 +1152,14 @@ Behavioral predicates over functions with `&mut` parameters remain open.
 
 Message:
 
-- 3 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
+- 7 × `a behavioral predicate over a function with mutable reference parameters is not carried yet`
 
-Tests: `functional/closures/lambda_spec_global_memory.move`, `functional/state_labels/bp_requires_aborts_labeled_mut.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`.
+Tests: `functional/closures/lambda_spec_global_memory.move`, `functional/state_labels/bp_requires_aborts_labeled_mut.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`, `functional/closures/lambda_captured_fun_loop.move`, `functional/closures/lambda_spec_discarded_result.move`, `functional/closures/lambda_spec_loop_anchor.move`, `functional/closures/lambda_spec_two_state_specfun.move`.
+
+The last four reach it since a function without a specification is verified
+for the preconditions of its calls (2026-10-09): their `drive` calls `apply`,
+whose precondition is a behavioral predicate over a `&mut` function. Before,
+`drive` was not verified at all.
 
 The invocation-label increment moves `aborting_result_definition` to its
 intended no-abort clause failures. `aborts_if_at_state_label::caller` now
