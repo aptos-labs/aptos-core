@@ -127,6 +127,8 @@ private def clauseFailure (origin : Option Provenance) (snippet : String) : Mess
   | some .callReturned =>
       m!"the module invariant `{snippet}` does not hold after a call that writes memory it reads"
   | some .lemmaRequirement => m!"the requirement of the lemma applied at `{snippet}` does not hold"
+  | some (.precondition callee) =>
+      m!"the precondition `{snippet}` of `{callee}` does not hold at this call"
   | _ => m!"the specification clause `{snippet}` is not established"
 
 /-- Report a verification condition that was not established, at every
@@ -8251,7 +8253,8 @@ splitting, and a leaf by decision. -/
 partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
     (callees : Array (Lean.Expr × String × Lean.Expr)) (equations : Array Lean.Expr := #[])
     (residual : Bool := false) (labeled : Bool := false)
-    (unrolls : Array (Nat × Nat) := #[]) :
+    (unrolls : Array (Nat × Nat) := #[])
+    (preconditions : Array (Lean.Expr × Lean.Expr) := #[]) :
     TacticM Unit := do
   assertedBounds.set {}
   normalHypotheses.set {}
@@ -8809,8 +8812,11 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           pure next.mvarId!
         setGoals [next]
         -- The inlined callee starts here: its loops' invariants read `old`
-        -- from its arguments at the call.
-        if ← invariants.anyM fun (_, function, _) => goal.withContext (isDefEq function handle) then
+        -- from its arguments at the call, and its precondition is read there.
+        let precondition? ← preconditions.findM? fun (function, _) =>
+          goal.withContext (isDefEq function handle)
+        if precondition?.isSome ||
+            (← invariants.anyM fun (_, function, _) => goal.withContext (isDefEq function handle)) then
           let inlined ← getMainGoal
           let started ← inlined.withContext do
             let proof ← mkAppM ``FunctionStart.intro
@@ -8818,6 +8824,26 @@ partial def closeGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
             let (_, started) ← (← inlined.assert `leanerStart (← inferType proof) proof).intro1P
             pure started
           replaceMainGoal [started]
+        -- The caller owes the callee's precondition where it starts, as the
+        -- Move Prover asserts it at the call; the body may assume it.
+        if let some (_, condition) := precondition? then
+          let started ← getMainGoal
+          let owed ← atStart started handle
+            (mkApp2 condition (action.getArg! 0) (action.getArg! 2)) 0 #[]
+          let holds ← started.withContext (mkFreshExprSyntheticOpaqueMVar owed)
+          let (_, continues) ← (← started.assert `calleeRequires owed holds).intro1P
+          replaceMainGoal [continues]
+          let holdsGoal := holds.mvarId!
+          setGoals [holdsGoal]
+          evalTactic (← `(tactic| try leaner_denote_normalize))
+          pending := pending ++ (← getGoals).toArray.map fun g =>
+            (g, some (Provenance.precondition calleeName), #[])
+          setGoals [continues]
+          evalTactic (← `(tactic| try simp only [LeanerIR.Proofs.Obligation_iff] at calleeRequires))
+          -- A precondition that does not hold closes what follows.
+          if (← getGoals).isEmpty then
+            stageCost := stageCost.push ("call", (← IO.getNumHeartbeats) - stageStart)
+            continue
         let sizeBefore ← if debug then do
             let goal ← getMainGoal
             pure (← goal.withContext do pure (treeSize (← instantiateMVars (← goal.getType)) 100000000))
@@ -9160,11 +9186,12 @@ syntax (name := residualFlag) &"residual" : closeFlag
 syntax (name := labeledFlag) &"labeled" : closeFlag
 syntax "leaner_denote_close" closeFlag* (" [" term,* "]")?
   (" with" " [" term,* "]")? (" using" " [" term,* "]")?
-  (" unrolling" " [" term,* "]")? : tactic
+  (" unrolling" " [" term,* "]")? (" requiring" " [" term,* "]")? : tactic
 
 elab_rules : tactic
   | `(tactic| leaner_denote_close $flags* $[[$loops:term,*]]? $[with [$calls:term,*]]?
-      $[using [$equations:term,*]]? $[unrolling [$bounds:term,*]]?) => do
+      $[using [$equations:term,*]]? $[unrolling [$bounds:term,*]]?
+      $[requiring [$required:term,*]]?) => do
       if leaner.denoteDebug.get (← getOptions) then
         logInfo m!"normalized verification condition:\n{← getMainGoal}"
       let mut invariants : Array (Nat × Lean.Expr × Lean.Expr) := #[]
@@ -9203,8 +9230,15 @@ elab_rules : tactic
         let some bound ← (evalNat (pair.getArg! 3)).run
           | throwError "unroll bound must be a numeral"
         pure (site, bound)
+      let mut preconditions : Array (Lean.Expr × Lean.Expr) := #[]
+      for entry in (required.map (·.getElems)).getD #[] do
+        let pair ← whnf (← instantiateMVars (← Lean.Elab.Tactic.elabTerm entry none))
+        unless pair.isAppOfArity ``Prod.mk 4 do
+          throwError m!"a precondition must be a `(function, predicate)` pair, not {pair}"
+        preconditions := preconditions.push (pair.getArg! 2, pair.getArg! 3)
       let flagged (kind : Name) := flags.any (·.raw.isOfKind kind)
       closeGoals invariants callees equations (flagged ``residualFlag) (flagged ``labeledFlag) unrolls
+        preconditions
 
 /-- Prove a step a lemma's proof owes: what its lemma applications require,
 its assertions, and its case splits. -/

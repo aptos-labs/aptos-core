@@ -1333,6 +1333,14 @@ private def bodyCallees (unit : ValidatedUnit) (handle : FunctionHandle) : Array
   | some { body := .structured root, .. } => expressionCallees unit handle.namespaceId root #[]
   | _ => #[]
 
+/-- Whether a function's body calls a function with a precondition, which
+it owes at the call. -/
+private def callsRequiring (unit : ValidatedUnit) (handle : FunctionHandle) : Bool :=
+  (bodyCallees unit handle).any fun callee =>
+    match unit.namespaces[callee.namespaceId.index]?.bind (·.functions[callee.functionId.index]?) with
+    | some declaration => declaration.contract.conditions.any (·.kind == .requires)
+    | none => false
+
 /-- Whether a function is on a cycle of calls: a call of it reaches it again. -/
 private def onCallCycle (unit : ValidatedUnit) (handle : FunctionHandle) : Bool := Id.run do
   let mut reached : Array FunctionHandle := #[]
@@ -2182,6 +2190,36 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
         mkLambdaFVars #[start, startState] (← withAnchors 0 #[])
     conditions := conditions.push (loopSite namespaceId.index site.index, condition, readsUnit)
   return conditions
+
+/-- The precondition an inlined callee's caller owes where the callee
+starts, as the Move Prover asserts it at the call: its `requires` clauses
+over its arguments and the memory at its start
+(`Contract.startPrecondition`), if it states any. -/
+def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
+    (params : NRow) (codecs types : Option Lean.Expr) (twins : Array SpecTypes.TwinInfo) :
+    TermElabM (Option (Lean.Expr × Bool)) := do
+  let required := (ContractView.implementation.of declaration).contract.conditions.filter
+    (·.kind == .requires)
+  if required.isEmpty then return none
+  let readsUnit := required.any fun condition =>
+    Contract.conditionReadsBehavior unit namespaceId condition.expression
+  let argumentsType ← mkAppM ``HList #[← quoteRow params]
+  let stateType ← memoryAt outer
+  let parameterTypes := params.toList
+  let localTypes ← clauseLocalTypes unit declaration
+  let condition ← overExecutable outer readsUnit fun executable =>
+    withLocalDeclD `start argumentsType fun start =>
+    withLocalDeclD `startState stateType fun startState => do
+      let startSlots ← slotProjections start parameterTypes.length
+      let locals ← (Array.range declaration.locals.size).mapM fun index =>
+        match parameterTypes[index]? with
+        | some τ => logicalValue τ startSlots[index]!
+        | none => pure none
+      mkLambdaFVars #[start, startState] (← Contract.startPrecondition unit namespaceId ns
+        declaration locals localTypes codecs types startState twins executable)
+  return some (condition, readsUnit)
 
 /-- Whether a condition of a specification block marks the state or a
 derivation instead of stating an assumption. -/
@@ -3872,6 +3910,11 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
             afterCallConditions unit executable owner ownerNs ownerDeclaration ownerCompiled.params codecs
               types twins
           else pure #[]
+        -- The precondition an inlined callee's caller owes where it starts.
+        let precondition ← if owner == handle then pure none
+          else
+            preconditionCondition unit executable owner.namespaceId ownerNs ownerDeclaration
+              ownerCompiled.params codecs types twins
         let invariants := invariants.map (fun (site, invariant, readsUnit) =>
           (site, invariant, readsUnit, "loopInvariant")) ++
           assertions.map (fun (site, condition, readsUnit) =>
@@ -3882,14 +3925,19 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
             (site, condition, readsUnit, "construction")) ++
           writes.map (fun (site, condition, readsUnit) =>
             (site, condition, readsUnit, "memoryWritten")) ++
-          calls.map fun (site, condition, readsUnit) =>
-            (site, condition, readsUnit, "afterCall")
+          calls.map (fun (site, condition, readsUnit) =>
+            (site, condition, readsUnit, "afterCall")) ++
+          (precondition.map fun (condition, readsUnit) =>
+            (0, condition, readsUnit, "precondition")).toArray
         invariants.mapM fun (site, invariant, readsUnit, kind) =>
           return (site, owner, ← mkLambdaFVars (← executableBinders executable skolems) invariant,
             readsUnit, kind)
     let mut loopPairs : Array Term := #[]
+    let mut preconditionPairs : Array Term := #[]
     for (site, owner, invariant, _, kind) in invariants do
-      let name := artifacts ++ Name.mkSimple s!"{kind}_{site}"
+      let name := if kind == "precondition" then
+          artifacts ++ Name.mkSimple s!"precondition_{functionKey unit owner}"
+        else artifacts ++ Name.mkSimple s!"{kind}_{site}"
       liftTermElabM (addAbbrev name invariant)
       -- The invariant's skolem instance is the loop's own: an inlined generic
       -- callee runs under its frame's, so the closer applies it, at the unit
@@ -3897,8 +3945,12 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
       -- constant would take. The executable unit is the theorem's.
       let applied ← `(term| fun (_ : LeanerIR.Validation.ValidatedUnit)
           (Θ : LeanerIR.Proofs.Denote.Skolems $unitTerm) => @$(rootIdent name) $unitTerm executable Θ)
-      loopPairs := loopPairs.push
-        (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner), $applied)))
+      if kind == "precondition" then
+        preconditionPairs := preconditionPairs.push
+          (← `(term| ($(← handleSyntax owner), $applied)))
+      else
+        loopPairs := loopPairs.push
+          (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner), $applied)))
     liftTermElabM (publishCompiled segments unit function handle compiled)
     let pattern ← argumentPattern unit declaration compiled.params
     let budgetValue := (heartbeatBudget? declaration).getD (leaner.verifyHeartbeats.get (← getOptions))
@@ -4064,7 +4116,8 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
       | _, _ => pure #[]
     -- An obligation no clause locates is reported at the function.
     let closeTactic ← withRef reference `(tactic| leaner_denote_close $flags* [$loopPairs,*]
-      with [$calleePairs,*] using [$instantiationCertificates,*] unrolling [$unrollPairs,*])
+      with [$calleePairs,*] using [$instantiationCertificates,*] unrolling [$unrollPairs,*]
+      requiring [$preconditionPairs,*])
     -- A loop invariant reading `old` needs the function's start: the
     -- arguments and state are recorded as a hypothesis the closer finds.
     let readsStart : Bool := match declaration.body with
@@ -4858,20 +4911,21 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
           automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration then none
       some ⟨function, identifier, none⟩
   -- A function without a specification is verified against its loop
-  -- invariants, its in-body assertions, the data invariants of the values
-  -- it takes, returns, constructs, and mutates, and the invariants of the
-  -- memory it writes.
+  -- invariants, its in-body assertions, the preconditions of the functions
+  -- it calls, the data invariants of the values it takes, returns,
+  -- constructs, and mutates, and the invariants of the memory it writes.
   let named := targets.map (·.function)
   let targets := targets ++ (functionItems stx).filterMap fun item => do
     let identifier ← firstIdentifier? item[4]
     let function := identifier.getId.toString (escape := false)
     if named.contains function then none
-    let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
+    let (namespaceIndex, ns, functionIndex, declaration) ← findFunction? unit function
     if declaration.body == .absent ||
         (declaration.contract.loc.isSome && !statesNothing declaration.contract) ||
         automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration ||
         !(handlesDataInvariants unit ns declaration ||
           bodyStates ns declaration (· matches .loopInvariant | .assertion | .apply) ||
+          callsRequiring unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ ||
           Contract.owesMemoryInvariants unit ⟨namespaceIndex⟩ declaration) then
       none
     some ⟨function, identifier, none⟩

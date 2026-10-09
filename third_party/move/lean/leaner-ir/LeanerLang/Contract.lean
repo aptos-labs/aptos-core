@@ -6259,6 +6259,27 @@ def ContractView.of (view : ContractView)
   { declaration with contract := { declaration.contract with
       conditions := declaration.contract.conditions.filter (!markedAs excluded ·) } }
 
+/-- The precondition of a function where it starts, as its caller owes it
+at the call: its `requires` clauses in the view its body is proved against,
+over its parameters' values (`locals`, the other locals unbound) and the
+memory there (`state`), after the pre-state `let`s they read. Each clause is
+marked with its source range, so a precondition not established is
+reported there. -/
+def startPrecondition (unit : ValidatedUnit) (namespaceId : LeanerIR.NamespaceId)
+    (ns : ValidatedNamespace) (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
+    (locals : Array (Option Lean.Expr)) (localTypes : Array IrTy) (codecs types : Option Lean.Expr)
+    (state : Lean.Expr) (twins : Array SpecTypes.TwinInfo) (executable : Option Lean.Expr) :
+    MetaM Lean.Expr := do
+  let conditions := (ContractView.implementation.of declaration).contract.conditions
+  let groups ← groupConditions unit conditions
+  let context : Context := {
+    unit, namespaceId, ns, locals, oldLocals := locals, localTypes,
+    localNames := declaration.locals.map (·.name), results := #[], codecs, types,
+    state := some state, oldState := some state, twins, executable }
+  let context ← bindLets context groups.lets false
+  conjunction (← (conditions.filter (·.kind == .requires)).mapM fun condition => do
+    pure (markCondition unit condition (← translate context condition.expression)))
+
 /-- Name of the generated contract definition. -/
 def contractName (namespaceSegments : Array String) (function : String) : Name :=
   Name.str (Name.str (pathName namespaceSegments) function) "contract"

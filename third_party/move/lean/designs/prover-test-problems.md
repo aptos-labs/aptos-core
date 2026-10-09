@@ -49,6 +49,14 @@ relative to `tests/sources`.
 
 ## Summary
 
+Callee preconditions (2026-10-09): a caller owes the `requires` of a callee
+whose body it inlines, where the callee starts, as the Prover asserts a
+callee's preconditions at every call; before, only a callee used through its
+contract had them checked. A function without a specification is verified
+when it calls a function with a precondition. `schema_apply` fails as the
+Prover does: `the precondition `requires false` of `f` does not hold at this
+call`.
+
 Inline specifications (2026-10-08): a non-opaque inline function with a
 specification of its own is verified against it, as the Prover verifies it;
 before, the importer dropped it with the calls it had expanded, and its

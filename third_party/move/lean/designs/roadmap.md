@@ -15,6 +15,11 @@ ledger below.
 
 ## 1. Verification of validated LIR
 
+Callee preconditions (2026-10-09): an inlined callee's `requires` is owed
+where it starts (`Contract.startPrecondition`, the closer's `requiring`
+table), and a function without a specification calling one is verified.
+Benchmark +0.15% (`ordered_map`, `GenericStorage`), same outcomes.
+
 Inline specifications (2026-10-08): a non-opaque inline function with its
 own specification is verified against it, as in the Prover; its calls stay
 expanded. New fixture: `SourceVerify/inline_spec_false.move`.
