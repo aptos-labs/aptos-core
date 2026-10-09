@@ -4,14 +4,15 @@
 use crate::{
     output::VMOutput,
     tests::utils::{
-        build_vm_output, mock_create_with_layout, mock_modify_with_layout, mock_module_modify,
+        as_state_key, build_vm_output, mock_create_with_layout, mock_modify_with_layout,
+        mock_module_modify,
     },
 };
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput, write_set::WriteOp,
 };
 use claims::assert_ok;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
@@ -56,4 +57,25 @@ fn test_ok_output_equality() {
 
     assert_eq_outputs(&vm_output, txn_output_1);
     assert_eq_outputs(&vm_output, txn_output_2);
+}
+
+#[test]
+fn test_read_only_hotness_skips_writes() {
+    let mut vm_output = build_vm_output(
+        vec![mock_modify_with_layout("0", 0, None)],
+        vec![mock_module_modify("1", 1)],
+        vec![],
+    );
+    vm_output.set_hotness(BTreeSet::from([as_state_key!("3")]));
+
+    let reads = ["0", "1", "2", "3"].map(|k| as_state_key!(k));
+    // "0" and "1" are written and "3" is already set, so only "2" is new.
+    assert_eq!(vm_output.add_read_only_hotness(reads.iter()), 1);
+
+    let txn_output = assert_ok!(vm_output.into_transaction_output());
+    let hotness: BTreeSet<_> = txn_output.write_set().hotness_keys().cloned().collect();
+    assert_eq!(
+        hotness,
+        BTreeSet::from([as_state_key!("2"), as_state_key!("3")])
+    );
 }
