@@ -13,6 +13,7 @@ mod types;
 mod value_cmp;
 mod value_conv;
 mod value_display;
+pub mod value_walk;
 
 pub use error::{ArithOp, GlobalStorageOp, ReportedIntValue, RuntimeError, RuntimeStatus, VecOp};
 pub use global_storage::{ResourceReadWriteSet, WriteClass};
@@ -34,3 +35,4 @@ pub use native_context::{
 };
 pub use types::{DEFAULT_HEAP_SIZE, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use value_conv::bcs::{deserialize_into, serialize};
+pub use value_walk::{walk, Event, Step, ValueVisitor, MAX_VALUE_DEPTH};

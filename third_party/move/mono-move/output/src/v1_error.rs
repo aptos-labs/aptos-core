@@ -356,6 +356,11 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
         ),
 
         E::StackOverflow => V1ErrorInfo::with_no_message(StatusCode::CALL_STACK_OVERFLOW),
+        // V1 bounds value depth through its type depth limit and reports the
+        // same status when a value walk exceeds it.
+        E::ValueTooDeep { .. } => {
+            V1ErrorInfo::with_mono_message(StatusCode::VM_MAX_VALUE_DEPTH_REACHED, err)
+        },
         E::OutOfHeapMemory { .. } | E::AllocationTooLarge { .. } | E::VecAllocSizeOverflow => {
             V1ErrorInfo::with_no_message(StatusCode::MEMORY_LIMIT_EXCEEDED)
         },

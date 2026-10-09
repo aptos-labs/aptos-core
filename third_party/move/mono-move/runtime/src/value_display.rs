@@ -5,27 +5,33 @@
 //!
 //! [`FormatOptions`] chooses the syntax; see its module docs for the presets
 //! and for the rendering that deliberately differs from the V1 formatter.
+//!
+//! The renderer is a visitor over the iterative walk in `value_walk.rs`: the
+//! walk hands it scalars and the entry into and exit from each aggregate, and
+//! it keeps one [`Frame`] per open aggregate for the brackets, separators and
+//! indentation.
 //
 // TODO(correctness): the integer reads assume a little-endian host, as the
 // comparison and BCS walks do.
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    memory::{read_enum_tag, read_ptr, read_vec_len},
+    memory::{read_ptr, read_vec_len},
     types::VEC_DATA_OFFSET,
+    value_walk::{walk, Event, Step, ValueVisitor},
 };
 use mono_move_core::{
     interner::InternedIdentifier,
     types::{is_nominal, type_to_string, view_name, view_type, InternedType, Type},
     value_layout::U8_LAYOUT_ID,
-    FieldValueLayout, FormatOptions, LayoutId, LayoutKind, LayoutProvider, VMInternalError,
-    VMResult, ValueLayout, ENUM_DATA_OFFSET,
+    FieldValueLayout, FormatOptions, LayoutKind, LayoutProvider, VMInternalError, VMResult,
+    ValueLayout,
 };
 use move_core_types::{
     account_address::AccountAddress,
     int256::{I256, U256},
 };
-use std::fmt::Write;
+use std::{convert::Infallible, fmt::Write};
 
 /// Renders the value at `base` of type `ty` into `out`.
 ///
@@ -44,336 +50,392 @@ pub unsafe fn display<L: LayoutProvider + ?Sized>(
     options: &FormatOptions,
     out: &mut String,
 ) -> VMResult<()> {
-    let id = layouts.layout_id(ty).ok_or({
+    let layout = layouts.layout_by_ty(ty).ok_or({
         RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
     })?;
+    let mut renderer = Renderer {
+        options,
+        out,
+        frames: Vec::new(),
+        pending: None,
+    };
     // SAFETY: caller must enforce the safety precondition.
-    unsafe { display_impl(layouts, base, id, options, 0, out) }
+    unsafe { walk(layouts, [base], layout, &mut renderer)? };
+    Ok(())
 }
 
-/// Renders the value at `base` with the given layout, nested `depth` levels
-/// deep.
-///
-/// # Safety
-///
-/// `base` must point to a fully initialized value with layout `id`.
-unsafe fn display_impl<L: LayoutProvider + ?Sized>(
-    layouts: &L,
-    base: *const u8,
-    id: LayoutId,
-    options: &FormatOptions,
-    depth: usize,
-    out: &mut String,
-) -> VMResult<()> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
-    let layout = layouts.layout(id).ok_or({
-        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-    })?;
-
-    match &layout.kind {
-        LayoutKind::Bool => {
-            // SAFETY: a bool occupies one readable byte at `base`.
-            out.push_str(
-                if unsafe { *base } != 0 {
-                    "true"
-                } else {
-                    "false"
-                },
-            );
-            Ok(())
-        },
-        LayoutKind::UnsignedInt => {
-            // SAFETY: `base` is readable for the layout's size.
-            let suffix = unsafe {
-                match layout.size {
-                    1 => write_int(out, *base, "u8")?,
-                    2 => write_int(out, u16::from_le_bytes(read_array(base)), "u16")?,
-                    4 => write_int(out, u32::from_le_bytes(read_array(base)), "u32")?,
-                    8 => write_int(out, u64::from_le_bytes(read_array(base)), "u64")?,
-                    16 => write_int(out, u128::from_le_bytes(read_array(base)), "u128")?,
-                    32 => write_int(out, U256::from_le_bytes(read_array(base)), "u256")?,
-                    _ => return Err(bad_int_width("unsigned")),
-                }
-            };
-            if options.int_suffixes {
-                out.push_str(suffix);
-            }
-            Ok(())
-        },
-        LayoutKind::SignedInt => {
-            // SAFETY: `base` is readable for the layout's size.
-            let suffix = unsafe {
-                match layout.size {
-                    1 => write_int(out, *(base as *const i8), "i8")?,
-                    2 => write_int(out, i16::from_le_bytes(read_array(base)), "i16")?,
-                    4 => write_int(out, i32::from_le_bytes(read_array(base)), "i32")?,
-                    8 => write_int(out, i64::from_le_bytes(read_array(base)), "i64")?,
-                    16 => write_int(out, i128::from_le_bytes(read_array(base)), "i128")?,
-                    32 => write_int(out, I256::from_le_bytes(read_array(base)), "i256")?,
-                    _ => return Err(bad_int_width("signed")),
-                }
-            };
-            if options.int_suffixes {
-                out.push_str(suffix);
-            }
-            Ok(())
-        },
-        LayoutKind::Address => {
-            // SAFETY: an address occupies `AccountAddress::LENGTH` readable
-            // bytes at `base`.
-            let addr = unsafe { read_address(base, layout)? };
-            write_address(out, &addr, options);
-            Ok(())
-        },
-        LayoutKind::Signer => {
-            // SAFETY: a signer is an address in memory.
-            let addr = unsafe { read_address(base, layout)? };
-            out.push_str("signer(");
-            write_address(out, &addr, options);
-            out.push(')');
-            Ok(())
-        },
-        LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector values hold an 8-byte heap pointer to their data,
-            // which stores the length.
-            let vec = unsafe { read_ptr(base, 0usize) };
-            let len = unsafe { read_vec_len(vec) } as usize;
-
-            let elem = layouts.layout(*elem_id).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-            })?;
-            if options.vec_u8_as_hex && *elem_id == U8_LAYOUT_ID {
-                out.push_str("0x");
-                for i in 0..len {
-                    // SAFETY: the `i`th byte lies within the data region.
-                    let byte = unsafe { *vec.add(VEC_DATA_OFFSET + i) };
-                    write!(out, "{:02x}", byte).map_err(write_failed)?;
-                }
-                return Ok(());
-            }
-
-            let elem_size = elem.size as usize;
-            let elems = (0..len).map(|i| Child {
-                // SAFETY: the `i`th element lies within the data region.
-                ptr: unsafe { vec.add(VEC_DATA_OFFSET + i * elem_size) },
-                id: *elem_id,
-                name: None,
-            });
-            out.push('[');
-            // SAFETY: every element pointer is a valid value of `elem_id`.
-            unsafe {
-                display_body(
-                    layouts,
-                    elems,
-                    options,
-                    depth,
-                    !options.single_line && is_aggregate(elem),
-                    out,
-                )?
-            };
-            out.push(']');
-            Ok(())
-        },
-        LayoutKind::Struct { fields } => {
-            let nominal = nominal_of(layout)?;
-            if options.string_literals
-                && is_nominal(nominal, &AccountAddress::ONE, "string", "String")
-            {
-                // SAFETY: `String` wraps a single `vector<u8>` field.
-                return unsafe { display_string(base, fields, out) };
-            }
-            write_nominal(out, nominal, options);
-            out.push_str(" {");
-            // SAFETY: every field lies at its offset within the struct.
-            unsafe { display_fields(layouts, base, fields, options, depth, out)? };
-            out.push('}');
-            Ok(())
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            let nominal = nominal_of(layout)?;
-            // SAFETY: enum values hold a heap pointer to an object storing the
-            // tag followed by the variant body.
-            let obj = unsafe { read_ptr(base, 0usize) };
-            let tag = unsafe { read_enum_tag(obj) };
-            let variant = variants.get(tag as usize).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
-                    tag,
-                    variant_count: variants.len(),
-                })
-            })?;
-            // SAFETY: the variant body lives at the data offset.
-            let body = unsafe { obj.add(ENUM_DATA_OFFSET) };
-
-            let body_layout = layouts.layout(variant.id).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-            })?;
-            let LayoutKind::Struct { fields } = &body_layout.kind else {
-                return Err(VMInternalError::new(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::Unreachable(
-                        "An enum variant body must be a struct layout".to_string(),
-                    ),
-                )));
-            };
-
-            if is_nominal(nominal, &AccountAddress::ONE, "option", "Option") {
-                // SAFETY: `None` has no fields and `Some` has exactly one.
-                return unsafe { display_option(layouts, body, fields, options, depth, out) };
-            }
-
-            write_nominal(out, nominal, options);
-            out.push_str("::");
-            out.push_str(view_name(variant.name));
-            out.push_str(" {");
-            // SAFETY: every field lies at its offset within the variant body.
-            unsafe { display_fields(layouts, body, fields, options, depth, out)? };
-            out.push('}');
-            Ok(())
-        },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values are not yet supported",
-        ))),
-        LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable(
-                "Display runs on pointee types only".to_string(),
-            ),
-        ))),
-    }
+/// Writes the text for each node the walk reports.
+struct Renderer<'o> {
+    options: &'o FormatOptions,
+    out: &'o mut String,
+    /// One entry per aggregate the walk has entered and not yet exited.
+    frames: Vec<Frame>,
+    /// Set on entering an enum; consumed by the variant body that follows.
+    pending: Option<Pending>,
 }
 
-/// One rendered child of an aggregate: where it lives, how it is laid out, and
-/// the field name printed ahead of it, if any.
-struct Child {
-    ptr: *const u8,
-    id: LayoutId,
-    name: Option<InternedIdentifier>,
-}
-
-/// Renders the fields of a struct or of an enum variant body, whose header the
-/// caller has already written.
-///
-/// # Safety
-///
-/// `base` must point to a fully initialized value holding exactly `fields`.
-unsafe fn display_fields<L: LayoutProvider + ?Sized>(
-    layouts: &L,
-    base: *const u8,
-    fields: &[FieldValueLayout],
-    options: &FormatOptions,
-    depth: usize,
-    out: &mut String,
-) -> VMResult<()> {
-    let children = fields.iter().map(|field| Child {
-        // SAFETY: every field lies at its offset within the value.
-        ptr: unsafe { base.add(field.offset as usize) },
-        id: field.id,
-        name: Some(field.name),
-    });
-    // SAFETY: every child pointer is a valid value of its field layout.
-    unsafe { display_body(layouts, children, options, depth, !options.single_line, out) }
-}
-
-/// Renders the children of an aggregate between the brackets the caller writes.
-/// Empty aggregates emit nothing at all, so they read as `[]` or `S {}`.
-///
-/// # Safety
-///
-/// Every child must point to a fully initialized value with its stated layout.
-unsafe fn display_body<L, I>(
-    layouts: &L,
-    children: I,
-    options: &FormatOptions,
-    depth: usize,
+/// An open aggregate: how its children and its closing bracket render.
+struct Frame {
+    /// Nesting level of the children. The aggregate itself sits one level up.
+    child_depth: usize,
+    /// Children break across lines rather than being space-separated.
     newline: bool,
-    out: &mut String,
-) -> VMResult<()>
-where
-    L: LayoutProvider + ?Sized,
-    I: ExactSizeIterator<Item = Child>,
-{
-    if children.len() == 0 {
-        return Ok(());
-    }
-    if depth >= options.max_depth {
-        out.push_str(" .. ");
-        return Ok(());
-    }
-    separator(out, newline, depth + 1);
-    for (i, child) in children.enumerate() {
-        if i > 0 {
-            out.push(',');
-            separator(out, newline, depth + 1);
-        }
-        if i >= options.max_len {
-            out.push_str("..");
-            break;
-        }
-        if let Some(name) = child.name {
-            out.push_str(view_name(name));
-            out.push_str(": ");
-        }
-        // SAFETY: caller must enforce the safety precondition.
-        unsafe { display_impl(layouts, child.ptr, child.id, options, depth + 1, out)? };
-    }
-    separator(out, newline, depth);
-    Ok(())
+    /// Children are preceded by `name: `.
+    named: bool,
+    /// Children render with no separator and no name at all: the payload of
+    /// `Some(..)`.
+    transparent: bool,
+    /// A separator precedes the closing text, because a child was started.
+    separate: bool,
+    /// Written on exit.
+    close: &'static str,
 }
 
-/// Renders `0x1::option::Option` as `None` or `Some(v)`. `body` points at the
-/// variant body, whose `fields` are empty for `None` and hold the payload for
-/// `Some`.
-///
-/// The payload nests one level deeper, like any other field. V1 keeps it at the
-/// caller's level, so a multi-line `Some(S { .. })` indents differently there.
+/// What the next struct body stands for.
+enum Pending {
+    /// The fields of a named enum variant; the header is already written.
+    Variant,
+    /// The single payload field of `Some(..)`.
+    Some,
+}
+
+impl ValueVisitor<1> for Renderer<'_> {
+    type Break = Infallible;
+
+    fn visit(&mut self, event: Event<'_, 1>) -> VMResult<Step<Infallible>> {
+        match event {
+            Event::Scalar {
+                layout,
+                ptrs: [base],
+            } => {
+                self.no_pending()?;
+                // SAFETY: the walk hands out pointers to live scalars of
+                // `layout.size` bytes.
+                unsafe { self.scalar(layout, base)? };
+                Ok(Step::Skip)
+            },
+            Event::EnterStruct {
+                layout,
+                fields,
+                ptrs: [base],
+            } => match self.pending.take() {
+                None => {
+                    let nominal = nominal_of(layout)?;
+                    if self.options.string_literals
+                        && is_nominal(nominal, &AccountAddress::ONE, "string", "String")
+                    {
+                        // SAFETY: `String` wraps a single `vector<u8>` field.
+                        unsafe { display_string(base, fields, self.out)? };
+                        self.frames.push(self.leaf_frame());
+                        return Ok(Step::Skip);
+                    }
+                    write_nominal(self.out, nominal, self.options);
+                    self.out.push_str(" {");
+                    let child_depth = self.depth() + 1;
+                    Ok(self.open(fields.len(), child_depth, true, "}"))
+                },
+                // The enum frame already holds the body's depth.
+                Some(Pending::Variant) => Ok(self.open(fields.len(), self.depth(), true, "}")),
+                Some(Pending::Some) => {
+                    self.frames.push(Frame {
+                        child_depth: self.depth(),
+                        newline: false,
+                        named: false,
+                        transparent: true,
+                        separate: false,
+                        close: "",
+                    });
+                    Ok(Step::Descend)
+                },
+            },
+            Event::Field { index, field, .. } => Ok(self.child(index as u64, Some(field.name))),
+            Event::EnterVector {
+                elem_id,
+                elem,
+                lens: [len],
+                data: [data],
+                ..
+            } => {
+                self.no_pending()?;
+                if self.options.vec_u8_as_hex && elem_id == U8_LAYOUT_ID {
+                    self.out.push_str("0x");
+                    for i in 0..len as usize {
+                        // SAFETY: `i < len`, so the byte lies within the data
+                        // region and `data` is non-null.
+                        let byte = unsafe { *data.add(i) };
+                        write!(self.out, "{:02x}", byte).map_err(write_failed)?;
+                    }
+                    self.frames.push(self.leaf_frame());
+                    return Ok(Step::Skip);
+                }
+                self.out.push('[');
+                let child_depth = self.depth() + 1;
+                let newline = !self.options.single_line && is_aggregate(elem);
+                Ok(self.open_with(len as usize, child_depth, newline, false, "]"))
+            },
+            Event::Element { index, .. } => Ok(self.child(index, None)),
+            Event::EnterEnum {
+                layout,
+                variants,
+                tags: [tag],
+                body,
+                ..
+            } => {
+                self.no_pending()?;
+                let nominal = nominal_of(layout)?;
+                let Some(body) = body else {
+                    return Err(unreachable(
+                        "A single-value walk always selects a variant body",
+                    ));
+                };
+                let LayoutKind::Struct { fields } = &body.kind else {
+                    return Err(unreachable("An enum variant body must be a struct layout"));
+                };
+                let child_depth = self.depth() + 1;
+                if is_nominal(nominal, &AccountAddress::ONE, "option", "Option") {
+                    // `None` has no fields and `Some` has exactly one.
+                    if fields.is_empty() {
+                        self.out.push_str("None");
+                        self.frames.push(self.leaf_frame());
+                        return Ok(Step::Skip);
+                    }
+                    self.out.push_str("Some(");
+                    // The payload nests one level deeper, like any other
+                    // field. V1 keeps it at the caller's level, so a
+                    // multi-line `Some(S { .. })` indents differently there.
+                    self.frames.push(Frame {
+                        child_depth,
+                        newline: false,
+                        named: false,
+                        transparent: false,
+                        separate: false,
+                        close: ")",
+                    });
+                    self.pending = Some(Pending::Some);
+                    return Ok(Step::Descend);
+                }
+                write_nominal(self.out, nominal, self.options);
+                self.out.push_str("::");
+                self.out.push_str(view_name(variants[tag as usize].name));
+                self.out.push_str(" {");
+                self.frames.push(Frame {
+                    child_depth,
+                    newline: false,
+                    named: false,
+                    transparent: false,
+                    separate: false,
+                    close: "",
+                });
+                self.pending = Some(Pending::Variant);
+                Ok(Step::Descend)
+            },
+            Event::ExitStruct { .. } | Event::ExitVector { .. } | Event::ExitEnum { .. } => {
+                self.close()?;
+                Ok(Step::Descend)
+            },
+        }
+    }
+}
+
+impl Renderer<'_> {
+    /// Nesting level at which a value opened now renders its children.
+    fn depth(&self) -> usize {
+        self.frames.last().map_or(0, |frame| frame.child_depth)
+    }
+
+    /// A frame for an aggregate rendered in one go, with nothing to close.
+    fn leaf_frame(&self) -> Frame {
+        Frame {
+            child_depth: self.depth(),
+            newline: false,
+            named: false,
+            transparent: false,
+            separate: false,
+            close: "",
+        }
+    }
+
+    fn open(
+        &mut self,
+        count: usize,
+        child_depth: usize,
+        named: bool,
+        close: &'static str,
+    ) -> Step<Infallible> {
+        let newline = !self.options.single_line;
+        self.open_with(count, child_depth, newline, named, close)
+    }
+
+    /// Opens an aggregate with `count` children whose opening bracket is
+    /// already written. Empty aggregates render as `[]` or `S {}`; aggregates
+    /// past `max_depth` as `[ .. ]`.
+    fn open_with(
+        &mut self,
+        count: usize,
+        child_depth: usize,
+        newline: bool,
+        named: bool,
+        close: &'static str,
+    ) -> Step<Infallible> {
+        let mut frame = Frame {
+            child_depth,
+            newline,
+            named,
+            transparent: false,
+            separate: false,
+            close,
+        };
+        if count == 0 {
+            self.frames.push(frame);
+            return Step::Skip;
+        }
+        // The aggregate itself sits one level above its children.
+        if child_depth > self.options.max_depth {
+            self.out.push_str(" .. ");
+            self.frames.push(frame);
+            return Step::Skip;
+        }
+        frame.separate = true;
+        self.frames.push(frame);
+        Step::Descend
+    }
+
+    /// Writes what precedes child `index` of the innermost aggregate, or
+    /// elides it and the rest past `max_len`.
+    fn child(&mut self, index: u64, name: Option<InternedIdentifier>) -> Step<Infallible> {
+        let Some(frame) = self.frames.last() else {
+            return Step::Descend;
+        };
+        if frame.transparent {
+            return Step::Descend;
+        }
+        let (newline, child_depth, named) = (frame.newline, frame.child_depth, frame.named);
+        if index > 0 {
+            self.out.push(',');
+        }
+        separator(self.out, newline, child_depth);
+        if index >= self.options.max_len as u64 {
+            self.out.push_str("..");
+            return Step::Skip;
+        }
+        if let (true, Some(name)) = (named, name) {
+            self.out.push_str(view_name(name));
+            self.out.push_str(": ");
+        }
+        Step::Descend
+    }
+
+    /// Closes the innermost aggregate.
+    fn close(&mut self) -> VMResult<()> {
+        let Some(frame) = self.frames.pop() else {
+            return Err(unreachable("Every exit matches an open frame"));
+        };
+        if frame.separate {
+            separator(self.out, frame.newline, frame.child_depth - 1);
+        }
+        self.out.push_str(frame.close);
+        Ok(())
+    }
+
+    fn no_pending(&self) -> VMResult<()> {
+        if self.pending.is_some() {
+            return Err(unreachable("An enum variant body must be a struct layout"));
+        }
+        Ok(())
+    }
+
+    /// Writes a bool, integer, address or signer.
+    ///
+    /// # Safety
+    ///
+    /// `base` must be readable for `layout.size` bytes.
+    unsafe fn scalar(&mut self, layout: &ValueLayout, base: *const u8) -> VMResult<()> {
+        let out = &mut *self.out;
+        match &layout.kind {
+            LayoutKind::Bool => {
+                // SAFETY: a bool occupies one readable byte at `base`.
+                out.push_str(
+                    if unsafe { *base } != 0 {
+                        "true"
+                    } else {
+                        "false"
+                    },
+                );
+            },
+            LayoutKind::UnsignedInt => {
+                // SAFETY: `base` is readable for the layout's size.
+                let suffix = unsafe {
+                    match layout.size {
+                        1 => write_int(out, *base, "u8")?,
+                        2 => write_int(out, u16::from_le_bytes(read_array(base)), "u16")?,
+                        4 => write_int(out, u32::from_le_bytes(read_array(base)), "u32")?,
+                        8 => write_int(out, u64::from_le_bytes(read_array(base)), "u64")?,
+                        16 => write_int(out, u128::from_le_bytes(read_array(base)), "u128")?,
+                        32 => write_int(out, U256::from_le_bytes(read_array(base)), "u256")?,
+                        _ => return Err(bad_int_width("unsigned")),
+                    }
+                };
+                if self.options.int_suffixes {
+                    out.push_str(suffix);
+                }
+            },
+            LayoutKind::SignedInt => {
+                // SAFETY: `base` is readable for the layout's size.
+                let suffix = unsafe {
+                    match layout.size {
+                        1 => write_int(out, *(base as *const i8), "i8")?,
+                        2 => write_int(out, i16::from_le_bytes(read_array(base)), "i16")?,
+                        4 => write_int(out, i32::from_le_bytes(read_array(base)), "i32")?,
+                        8 => write_int(out, i64::from_le_bytes(read_array(base)), "i64")?,
+                        16 => write_int(out, i128::from_le_bytes(read_array(base)), "i128")?,
+                        32 => write_int(out, I256::from_le_bytes(read_array(base)), "i256")?,
+                        _ => return Err(bad_int_width("signed")),
+                    }
+                };
+                if self.options.int_suffixes {
+                    out.push_str(suffix);
+                }
+            },
+            LayoutKind::Address => {
+                // SAFETY: an address occupies `AccountAddress::LENGTH` readable
+                // bytes at `base`.
+                let addr = unsafe { read_address(base, layout)? };
+                write_address(out, &addr, self.options);
+            },
+            LayoutKind::Signer => {
+                // SAFETY: a signer is an address in memory.
+                let addr = unsafe { read_address(base, layout)? };
+                out.push_str("signer(");
+                write_address(out, &addr, self.options);
+                out.push(')');
+            },
+            LayoutKind::Struct { .. }
+            | LayoutKind::Vector { .. }
+            | LayoutKind::FrozenEnum { .. }
+            | LayoutKind::Function
+            | LayoutKind::Ref => {
+                return Err(unreachable(
+                    "The walk reports only scalars as scalar events",
+                ))
+            },
+        }
+        Ok(())
+    }
+}
+
+/// Renders `0x1::string::String` as a quoted literal with `\` and `"` escaped.
 ///
 /// # Safety
 ///
-/// `body` must point to a fully initialized variant body holding `fields`.
-unsafe fn display_option<L: LayoutProvider + ?Sized>(
-    layouts: &L,
-    body: *const u8,
-    fields: &[FieldValueLayout],
-    options: &FormatOptions,
-    depth: usize,
-    out: &mut String,
-) -> VMResult<()> {
-    let Some(payload) = fields.first() else {
-        out.push_str("None");
-        return Ok(());
-    };
-    out.push_str("Some(");
-    // SAFETY: the payload lies at its offset within the variant body.
-    unsafe {
-        display_impl(
-            layouts,
-            body.add(payload.offset as usize),
-            payload.id,
-            options,
-            depth + 1,
-            out,
-        )?
-    };
-    out.push(')');
-    Ok(())
-}
-
-/// Renders `0x1::string::String` as a quoted literal, escaping `\` and `"`.
-///
-/// # Safety
-///
-/// `base` must point to a fully initialized `String` holding `fields`.
+/// `base` must point to a fully initialized `String` whose single field is
+/// described by `fields`.
 unsafe fn display_string(
     base: *const u8,
     fields: &[FieldValueLayout],
     out: &mut String,
 ) -> VMResult<()> {
     let [bytes] = fields else {
-        return Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable(
-                "`String` must wrap a single byte vector".to_string(),
-            ),
-        )));
+        return Err(unreachable("`String` must wrap a single byte vector"));
     };
     // SAFETY: the field holds an 8-byte heap pointer to the vector data, which
     // stores the length ahead of the bytes. An empty vector is a null pointer,
@@ -387,11 +449,8 @@ unsafe fn display_string(
             std::slice::from_raw_parts(vec.add(VEC_DATA_OFFSET), len)
         }
     };
-    let text = std::str::from_utf8(bytes).map_err(|_| {
-        RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(
-            "`String` must hold UTF-8 bytes".to_string(),
-        ))
-    })?;
+    let text =
+        std::str::from_utf8(bytes).map_err(|_| unreachable("`String` must hold UTF-8 bytes"))?;
     out.push('"');
     for c in text.chars() {
         if c == '\\' || c == '"' {
@@ -406,13 +465,9 @@ unsafe fn display_string(
 /// The type a struct or enum layout describes. Variant bodies are the only
 /// struct layouts without one, and they are rendered through their enum.
 fn nominal_of(layout: &ValueLayout) -> VMResult<InternedType> {
-    layout.ty.ok_or_else(|| {
-        VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable(
-                "A struct or enum layout must name its type".to_string(),
-            ),
-        ))
-    })
+    layout
+        .ty
+        .ok_or_else(|| unreachable("A struct or enum layout must name its type"))
 }
 
 /// Writes the name of a struct or enum: qualified as `0x1::m::S<u64>`, or bare
@@ -478,14 +533,16 @@ fn write_int(
 }
 
 fn write_failed(err: std::fmt::Error) -> VMInternalError {
-    VMInternalError::new(RuntimeError::InvariantViolation(
-        RuntimeInvariantViolation::Unreachable(format!("Writing to a string failed: {err}")),
-    ))
+    unreachable(&format!("Writing to a string failed: {err}"))
 }
 
 fn bad_int_width(signedness: &str) -> VMInternalError {
+    unreachable(&format!("Unexpected {signedness} integer width"))
+}
+
+fn unreachable(msg: &str) -> VMInternalError {
     VMInternalError::new(RuntimeError::InvariantViolation(
-        RuntimeInvariantViolation::Unreachable(format!("Unexpected {signedness} integer width")),
+        RuntimeInvariantViolation::Unreachable(msg.to_string()),
     ))
 }
 
@@ -496,9 +553,7 @@ fn bad_int_width(signedness: &str) -> VMInternalError {
 /// `base` must be readable for `layout.size` bytes.
 unsafe fn read_address(base: *const u8, layout: &ValueLayout) -> VMResult<AccountAddress> {
     if layout.size as usize != AccountAddress::LENGTH {
-        return Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable("Unexpected address width".to_string()),
-        )));
+        return Err(unreachable("Unexpected address width"));
     }
     // SAFETY: caller guarantees `AccountAddress::LENGTH` readable bytes.
     Ok(AccountAddress::new(unsafe { read_array(base) }))
@@ -524,7 +579,7 @@ mod tests {
         value_conv::{bcs::AlignedBuf, rust::write_value},
     };
     use mono_move_core::{
-        intern_type_tag, reserved_layout_id, DescriptorId, FieldValueLayout, LayoutFlags,
+        intern_type_tag, reserved_layout_id, DescriptorId, FieldValueLayout, LayoutFlags, LayoutId,
         VariantValueLayout,
     };
     use mono_move_global_context::{ExecutionGuard, GlobalContext};
@@ -615,7 +670,9 @@ mod tests {
         let ty = intern_type_tag(&tag("option", "Option", vec![elem_tag.clone()]), guard).unwrap();
         let variant_ids = guard.publish_variant_layouts(ty, vec![
             struct_layout(None, 0, 1, vec![]),
-            struct_layout(None, elem_size, elem_size.max(1), vec![field(0, elem_id, "e")]),
+            struct_layout(None, elem_size, elem_size.max(1), vec![field(
+                0, elem_id, "e",
+            )]),
         ]);
         guard.publish_layout(ptr_layout(ty, LayoutKind::FrozenEnum {
             descriptor_id: DescriptorId(0),
@@ -627,7 +684,9 @@ mod tests {
 
     fn publish_string(guard: &ExecutionGuard<'_>, vec_u8_id: LayoutId) -> InternedType {
         let ty = intern_type_tag(&tag("string", "String", vec![]), guard).unwrap();
-        guard.publish_layout(struct_layout(Some(ty), 8, 8, vec![field(0, vec_u8_id, "bytes")]));
+        guard.publish_layout(struct_layout(Some(ty), 8, 8, vec![field(
+            0, vec_u8_id, "bytes",
+        )]));
         ty
     }
 

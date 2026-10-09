@@ -74,6 +74,9 @@ pub enum RuntimeError {
     #[error("stack overflow")]
     StackOverflow,
 
+    #[error("value nests deeper than {max_depth} levels")]
+    ValueTooDeep { max_depth: usize },
+
     // TODO(cleanup): also report how many bytes were free after GC.
     #[error("out of heap memory after GC (requested {requested} bytes)")]
     OutOfHeapMemory { requested: usize },
@@ -185,6 +188,7 @@ impl RuntimeError {
             | InvalidAbortMessage { .. }
             | AbortMessageTooLong { .. }
             | StateKeyTypeTooDeep
+            | ValueTooDeep { .. }
             | InvariantViolation(_)
             | ResourceProvider(_)
             | Unsupported(_) => false,
@@ -217,7 +221,8 @@ impl IntoExecutionError for RuntimeError {
             | AllocationTooLarge { .. }
             | VecAllocSizeOverflow
             | AbortMessageTooLong { .. }
-            | StateKeyTypeTooDeep => ExecutionErrorKind::RuntimeLimitExceeded,
+            | StateKeyTypeTooDeep
+            | ValueTooDeep { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
 
             BCSEof
             | BCSInvalidUleb

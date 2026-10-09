@@ -2,17 +2,20 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Structural equality and ordering of two VM values, driven by their layout.
+//!
+//! Both are visitors over [`walk`] with `N = 2`: the walk pairs up fields,
+//! elements and variant bodies, and the visitors only compare what they are
+//! handed, breaking out at the first difference.
 //
 // TODO(correctness): the comparison fast paths assume a little-endian host.
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    memory::{read_enum_tag, read_ptr, read_vec_len},
-    types::VEC_DATA_OFFSET,
+    value_walk::{lookup, walk, Event, Step, ValueVisitor},
 };
 use mono_move_core::{
     types::InternedType, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
-    ENUM_DATA_OFFSET,
+    ValueLayout,
 };
 use move_core_types::int256::{I256, U256};
 use std::cmp::Ordering;
@@ -58,139 +61,75 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
     b: *const u8,
     id: LayoutId,
 ) -> VMResult<bool> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
-    let layout = layouts.layout(id).ok_or({
-        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-    })?;
+    let layout = lookup(layouts, id)?;
+    // SAFETY: caller must enforce the safety precondition.
+    let differ = unsafe { walk(layouts, [a, b], layout, &mut Equals)? };
+    Ok(differ.is_none())
+}
 
-    if layout.has_no_pointers_no_padding() {
-        // SAFETY: both pointers must have layout's size and have no pointers,
-        // no padding.
-        return Ok(unsafe { bytes_cmp(a, b, layout.size as usize).is_eq() });
-    }
+/// Breaks at the first byte that differs; a completed walk means equal.
+struct Equals;
 
-    match &layout.kind {
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Signer => Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable(
-                "Primitive layouts must be handled by fast-path".to_string(),
-            ),
-        ))),
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds.
-                let eq = unsafe {
-                    equals_impl(
-                        layouts,
-                        a.add(field.offset as usize),
-                        b.add(field.offset as usize),
-                        field.id,
-                    )?
-                };
-                if !eq {
-                    return Ok(false);
+impl ValueVisitor<2> for Equals {
+    type Break = ();
+
+    fn visit(&mut self, event: Event<'_, 2>) -> VMResult<Step<()>> {
+        let same = match event {
+            // SAFETY: every pointer handed out by the walk addresses a live
+            // value of `layout`, so both are readable for `layout.size` bytes.
+            Event::Scalar {
+                layout,
+                ptrs: [a, b],
+            } => unsafe { bytes_cmp(a, b, layout.size as usize).is_eq() },
+            Event::EnterStruct {
+                layout,
+                ptrs: [a, b],
+                ..
+            } => {
+                if !layout.has_no_pointers_no_padding() {
+                    return Ok(Step::Descend);
                 }
-            }
-            Ok(true)
-        },
-        LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector values hold 8-byte heap pointers pointing to
-            // their data for any well-typed value. The length is stored in
-            // the data pointed to.
-            let vec_a = unsafe { read_ptr(a, 0usize) };
-            let len_a = unsafe { read_vec_len(vec_a) };
-            let vec_b = unsafe { read_ptr(b, 0usize) };
-            let len_b = unsafe { read_vec_len(vec_b) };
-
-            if len_a != len_b {
-                return Ok(false);
-            }
-            if len_a == 0 {
-                return Ok(true);
-            }
-
-            let elem_layout = layouts.layout(*elem_id).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-            })?;
-            let elem_size = elem_layout.size as usize;
-            if elem_layout.has_no_pointers_no_padding() {
-                // SAFETY: both vectors have same size specified by the layout.
-                let data_a = unsafe { vec_a.add(VEC_DATA_OFFSET) };
-                let data_b = unsafe { vec_b.add(VEC_DATA_OFFSET) };
-                return Ok(unsafe {
-                    bytes_cmp(data_a, data_b, len_a as usize * elem_size).is_eq()
-                });
-            }
-
-            for i in 0..len_a as usize {
-                // SAFETY: ith element lies within the vector data region,
-                // so the pointer is non-null and new pointer points within
-                // the data region. Lengths of `a` and `b` are the same.
-                let elem_a = unsafe { vec_a.add(VEC_DATA_OFFSET + i * elem_size) };
-                let elem_b = unsafe { vec_b.add(VEC_DATA_OFFSET + i * elem_size) };
-
-                // SAFETY: element pointers point to valid vector element
-                // values.
-                let eq = unsafe { equals_impl(layouts, elem_a, elem_b, *elem_id)? };
-                if !eq {
-                    return Ok(false);
+                // SAFETY: a struct with no pointers and no padding is exactly
+                // its `layout.size` bytes.
+                unsafe { bytes_cmp(a, b, layout.size as usize).is_eq() }
+            },
+            Event::EnterVector {
+                elem,
+                lens: [len_a, len_b],
+                data: [data_a, data_b],
+                ..
+            } => {
+                if len_a != len_b {
+                    return Ok(Step::Break(()));
                 }
-            }
-            Ok(true)
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            // SAFETY: well-typed enum values hold non-null heap pointers and
-            // every enum object stores its data following the offset.
-            let obj_a = unsafe { read_ptr(a, 0usize) };
-            let obj_b = unsafe { read_ptr(b, 0usize) };
-            let tag_a = unsafe { read_enum_tag(obj_a) };
-            let tag_b = unsafe { read_enum_tag(obj_b) };
-
-            // Validate both tags before the equality check. An out-of-range tag
-            // is heap corruption and must fail closed even when the tags differ.
-            let variant_id = variants.get(tag_a as usize).map(|v| v.id).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
-                    tag: tag_a,
-                    variant_count: variants.len(),
+                if len_a == 0 {
+                    return Ok(Step::Skip);
+                }
+                if !elem.has_no_pointers_no_padding() {
+                    return Ok(Step::Descend);
+                }
+                // SAFETY: both vectors are non-empty, so `data` is non-null
+                // and addresses `len * elem_size` bytes of elements.
+                unsafe { bytes_cmp(data_a, data_b, len_a as usize * elem.size as usize).is_eq() }
+            },
+            // Equal tags select the same variant, whose body decides.
+            Event::EnterEnum {
+                tags: [tag_a, tag_b],
+                ..
+            } => {
+                return Ok(if tag_a == tag_b {
+                    Step::Descend
+                } else {
+                    Step::Break(())
                 })
-            })?;
-            if tag_b as usize >= variants.len() {
-                return Err(VMInternalError::new(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag: tag_b,
-                        variant_count: variants.len(),
-                    },
-                )));
-            }
-
-            if tag_a != tag_b {
-                return Ok(false);
-            }
-
-            // SAFETY: both variant bodies live at the specified offset.
-            unsafe {
-                equals_impl(
-                    layouts,
-                    obj_a.add(ENUM_DATA_OFFSET),
-                    obj_b.add(ENUM_DATA_OFFSET),
-                    variant_id,
-                )
-            }
-        },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values are not yet supported",
-        ))),
-        LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
-            RuntimeInvariantViolation::Unreachable(
-                "Equality runs on pointee types only".to_string(),
-            ),
-        ))),
+            },
+            Event::Field { .. }
+            | Event::Element { .. }
+            | Event::ExitStruct { .. }
+            | Event::ExitVector { .. }
+            | Event::ExitEnum { .. } => return Ok(Step::Descend),
+        };
+        Ok(if same { Step::Skip } else { Step::Break(()) })
     }
 }
 
@@ -246,11 +185,56 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
     b: *const u8,
     id: LayoutId,
 ) -> VMResult<Ordering> {
-    // TODO(metering): This walk recurses on struct fields and vector elements; convert it
-    // to a non-recursive form to bound stack depth on deeply nested values.
-    let layout = layouts.layout(id).ok_or({
-        RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-    })?;
+    let layout = lookup(layouts, id)?;
+    // SAFETY: caller must enforce the safety precondition.
+    let ord = unsafe { walk(layouts, [a, b], layout, &mut Compare)? };
+    Ok(ord.unwrap_or(Ordering::Equal))
+}
+
+/// Breaks at the first ordered difference; a completed walk means equal.
+struct Compare;
+
+impl ValueVisitor<2> for Compare {
+    type Break = Ordering;
+
+    fn visit(&mut self, event: Event<'_, 2>) -> VMResult<Step<Ordering>> {
+        let ord = match event {
+            // SAFETY: every pointer handed out by the walk addresses a live
+            // value of `layout`, so both are readable for `layout.size` bytes.
+            Event::Scalar {
+                layout,
+                ptrs: [a, b],
+            } => unsafe { scalar_cmp(layout, a, b)? },
+            // The walk visits the common prefix; the lengths decide after it.
+            Event::ExitVector {
+                lens: [len_a, len_b],
+                ..
+            } => len_a.cmp(&len_b),
+            Event::EnterEnum {
+                tags: [tag_a, tag_b],
+                ..
+            } => tag_a.cmp(&tag_b),
+            Event::EnterStruct { .. }
+            | Event::EnterVector { .. }
+            | Event::Field { .. }
+            | Event::Element { .. }
+            | Event::ExitStruct { .. }
+            | Event::ExitEnum { .. } => return Ok(Step::Descend),
+        };
+        Ok(if ord.is_eq() {
+            Step::Descend
+        } else {
+            Step::Break(ord)
+        })
+    }
+}
+
+/// Orders two scalars of the same layout.
+///
+/// # Safety
+///
+/// Both pointers must address `layout.size` readable, initialized bytes.
+unsafe fn scalar_cmp(layout: &ValueLayout, a: *const u8, b: *const u8) -> VMResult<Ordering> {
     match &layout.kind {
         // A `bool` is a 1-byte `0`/`1` value, so it compares like a `u8`.
         LayoutKind::Bool | LayoutKind::UnsignedInt => {
@@ -315,99 +299,13 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // the layout, as guaranteed by the precondition of this function.
             Ok(unsafe { bytes_cmp(a, b, layout.size as usize) })
         },
-        LayoutKind::Struct { fields } => {
-            for field in fields.iter() {
-                // SAFETY: value is a valid struct, so all fields lie at `offset`
-                // and are within bounds.
-                let ord = unsafe {
-                    compare_impl(
-                        layouts,
-                        a.add(field.offset as usize),
-                        b.add(field.offset as usize),
-                        field.id,
-                    )?
-                };
-                if ord.is_ne() {
-                    return Ok(ord);
-                }
-            }
-            Ok(Ordering::Equal)
-        },
-        LayoutKind::Vector { elem_id, .. } => {
-            // SAFETY: vector values hold 8-byte heap pointers pointing to
-            // their data for any well-typed value. The length is stored in
-            // the data pointed to.
-            let vec_a = unsafe { read_ptr(a, 0usize) };
-            let len_a = unsafe { read_vec_len(vec_a) };
-            let vec_b = unsafe { read_ptr(b, 0usize) };
-            let len_b = unsafe { read_vec_len(vec_b) };
-
-            let elem = layouts.layout(*elem_id).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound)
-            })?;
-            let elem_size = elem.size as usize;
-            for i in 0..len_a.min(len_b) as usize {
-                // SAFETY: ith element lies within the vector data region,
-                // so the pointer is non-null and new pointer points within
-                // the data region.
-                let elem_a = unsafe { vec_a.add(VEC_DATA_OFFSET + i * elem_size) };
-                let elem_b = unsafe { vec_b.add(VEC_DATA_OFFSET + i * elem_size) };
-
-                // SAFETY: element pointers point to valid values.
-                let ord = unsafe { compare_impl(layouts, elem_a, elem_b, *elem_id)? };
-                if ord.is_ne() {
-                    return Ok(ord);
-                }
-            }
-            Ok(len_a.cmp(&len_b))
-        },
-        LayoutKind::FrozenEnum { variants, .. } => {
-            // SAFETY: well-typed enum values hold non-null heap pointers and
-            // every enum object stores its tag followed by data payload.
-            let obj_a = unsafe { read_ptr(a, 0usize) };
-            let obj_b = unsafe { read_ptr(b, 0usize) };
-            let tag_a = unsafe { read_enum_tag(obj_a) };
-            let tag_b = unsafe { read_enum_tag(obj_b) };
-
-            // Validate both tags before ordering them. An out-of-range tag is
-            // heap corruption and must fail closed even when the tags differ.
-            let variant_id = variants.get(tag_a as usize).map(|v| v.id).ok_or({
-                RuntimeError::InvariantViolation(RuntimeInvariantViolation::EnumTagOutOfRange {
-                    tag: tag_a,
-                    variant_count: variants.len(),
-                })
-            })?;
-            if tag_b as usize >= variants.len() {
-                return Err(VMInternalError::new(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::EnumTagOutOfRange {
-                        tag: tag_b,
-                        variant_count: variants.len(),
-                    },
-                )));
-            }
-
-            let ord = tag_a.cmp(&tag_b);
-            if ord.is_ne() {
-                return Ok(ord);
-            }
-
-            // SAFETY: both variant bodies live at the specified offset.
-            unsafe {
-                compare_impl(
-                    layouts,
-                    obj_a.add(ENUM_DATA_OFFSET),
-                    obj_b.add(ENUM_DATA_OFFSET),
-                    variant_id,
-                )
-            }
-        },
-        // TODO(completeness): function values are not yet supported.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values are not yet supported",
-        ))),
-        LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
+        LayoutKind::Struct { .. }
+        | LayoutKind::Vector { .. }
+        | LayoutKind::FrozenEnum { .. }
+        | LayoutKind::Function
+        | LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::Unreachable(
-                "Comparison runs on pointee types only".to_string(),
+                "The walk reports only scalars as scalar events".to_string(),
             ),
         ))),
     }
