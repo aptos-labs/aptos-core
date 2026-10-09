@@ -894,6 +894,10 @@ impl<'ctx> LayoutProvider for ExecutionGuard<'ctx> {
             .get(id.as_usize())
             .map(|ids| &**ids)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        Some(self)
+    }
 }
 
 impl<'ctx> Interner for ExecutionGuard<'ctx> {

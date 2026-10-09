@@ -31,6 +31,7 @@ use mono_move_core::{
 };
 use move_core_types::{
     account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
+    identifier::IdentStr,
 };
 
 /// BCS tags of `MoveTypeLayout`, in declaration order. Serde numbers enum
@@ -444,27 +445,48 @@ pub(crate) fn walk_capture(
 /// of `(format_version, module_id, fun_id, ty_args, mask)` followed by `n`
 /// capture pairs.
 pub(crate) fn walk_closure(bytes: &[u8], cursor: &mut usize) -> Result<(), RuntimeError> {
-    let captured = skip_closure_header(bytes, cursor)?;
-    for _ in 0..captured {
-        // A value follows its layout, so the layout's end has to be found
-        // before the value can be walked. Both passes decode the same tags.
-        let mut value = *cursor;
-        skip_layout(bytes, &mut value)?;
-
-        let mut layout = *cursor;
-        walk_capture(bytes, &mut layout, &mut value)?;
-        *cursor = value;
+    let header = read_closure_header(bytes, cursor)?;
+    for _ in 0..header.captured {
+        walk_capture_pair(bytes, cursor)?;
     }
     Ok(())
 }
 
+/// Advances `cursor` past one `(layout, value)` capture pair.
+pub(crate) fn walk_capture_pair(bytes: &[u8], cursor: &mut usize) -> Result<(), RuntimeError> {
+    // A value follows its layout, so the layout's end has to be found before
+    // the value can be walked. Both passes decode the same tags.
+    let mut value = *cursor;
+    skip_layout(bytes, &mut value)?;
+
+    let mut layout = *cursor;
+    walk_capture(bytes, &mut layout, &mut value)?;
+    *cursor = value;
+    Ok(())
+}
+
+/// A serialized closure's five header elements, borrowed from the wire bytes.
+pub(crate) struct ClosureHeader<'b> {
+    pub(crate) address: AccountAddress,
+    pub(crate) module_name: &'b IdentStr,
+    pub(crate) func_name: &'b IdentStr,
+    /// The `Vec<TypeTag>` BCS bytes, length prefix included.
+    pub(crate) ty_args: &'b [u8],
+    pub(crate) mask: u64,
+    /// Number of captured values, `mask.count_ones()`.
+    pub(crate) captured: u64,
+}
+
 /// Advances `cursor` past a closure's `5 + 2n` sequence prefix and its five
-/// header elements, returning `n`, the number of captured values.
+/// header elements, returning them.
 ///
 /// The `n` the sequence declares and the `n` the mask implies must agree. That
 /// is V1's arity check and, because BCS sequences are length-prefixed, also its
 /// check for trailing elements.
-pub(crate) fn skip_closure_header(bytes: &[u8], cursor: &mut usize) -> Result<u64, RuntimeError> {
+pub(crate) fn read_closure_header<'b>(
+    bytes: &'b [u8],
+    cursor: &mut usize,
+) -> Result<ClosureHeader<'b>, RuntimeError> {
     let len = read_uleb128_len(bytes, cursor)?;
     if len < 5 || (len - 5) % 2 != 0 {
         return Err(RuntimeError::BCSInvalidClosure("sequence length"));
@@ -481,14 +503,17 @@ pub(crate) fn skip_closure_header(bytes: &[u8], cursor: &mut usize) -> Result<u6
 
     // A `ModuleId` is an address then an identifier, followed here by the
     // function identifier.
-    read_slice(bytes, cursor, AccountAddress::LENGTH)?;
-    skip_identifier(bytes, cursor)?;
-    skip_identifier(bytes, cursor)?;
+    let address = AccountAddress::from_bytes(read_slice(bytes, cursor, AccountAddress::LENGTH)?)
+        .map_err(|_| RuntimeError::BCSInvalidClosure("module address"))?;
+    let module_name = read_identifier(bytes, cursor)?;
+    let func_name = read_identifier(bytes, cursor)?;
 
+    let ty_args_start = *cursor;
     let ty_args = read_uleb128_len(bytes, cursor)?;
     for _ in 0..ty_args {
         skip_type_tag(bytes, cursor)?;
     }
+    let ty_args = &bytes[ty_args_start..*cursor];
 
     // A `ClosureMask` is a newtype over `u64`.
     let mask = u64::from_le_bytes(
@@ -500,10 +525,28 @@ pub(crate) fn skip_closure_header(bytes: &[u8], cursor: &mut usize) -> Result<u6
     if len - 5 != captured * 2 {
         return Err(RuntimeError::BCSInvalidClosure("capture count"));
     }
-    Ok(captured)
+    Ok(ClosureHeader {
+        address,
+        module_name,
+        func_name,
+        ty_args,
+        mask,
+        captured,
+    })
 }
 
-/// Advances `cursor` past an `Identifier`, a length-prefixed string.
+/// Reads an `Identifier`, a length-prefixed string.
+fn read_identifier<'b>(bytes: &'b [u8], cursor: &mut usize) -> Result<&'b IdentStr, RuntimeError> {
+    let len = read_uleb128_len(bytes, cursor)?;
+    let len = usize::try_from(len).map_err(|_| RuntimeError::BCSEof)?;
+    let text = read_slice(bytes, cursor, len)?;
+    std::str::from_utf8(text)
+        .ok()
+        .and_then(|text| IdentStr::new(text).ok())
+        .ok_or(RuntimeError::BCSInvalidClosure("identifier"))
+}
+
+/// Advances `cursor` past an `Identifier` without validating it.
 fn skip_identifier(bytes: &[u8], cursor: &mut usize) -> Result<(), RuntimeError> {
     let len = read_uleb128_len(bytes, cursor)?;
     let len = usize::try_from(len).map_err(|_| RuntimeError::BCSEof)?;
