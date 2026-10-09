@@ -28,6 +28,7 @@
 //! ```
 
 pub use super::victoria_metrics::AuthToken;
+use crate::constants::MAX_DECOMPRESSED_LENGTH;
 use anyhow::{anyhow, Result};
 use debug_ignore::DebugIgnore;
 use flate2::read::GzDecoder;
@@ -159,9 +160,11 @@ impl PrometheusRemoteWriteClient {
     ) -> Result<reqwest::Response, anyhow::Error> {
         // Decompress if gzip encoded
         let decompressed = if encoding == "gzip" {
-            let mut decoder = GzDecoder::new(&raw_metrics_body[..]);
+            let decoder = GzDecoder::new(&raw_metrics_body[..]);
+            // Limit decompressed size to prevent decompression bomb attacks
+            let mut limited_decoder = decoder.take(MAX_DECOMPRESSED_LENGTH as u64);
             let mut decompressed = Vec::new();
-            decoder
+            limited_decoder
                 .read_to_end(&mut decompressed)
                 .map_err(|e| anyhow!("gzip decompression failed: {}", e))?;
             decompressed
