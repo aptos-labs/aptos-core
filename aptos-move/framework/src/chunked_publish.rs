@@ -7,13 +7,13 @@ use aptos_types::{
 };
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
-/// The default address where the `large_packages.move` module is deployed.
-/// This address is used on both mainnet and testnet.
+/// Address of the `large_packages` module on mainnet, which doesn't have it at `0x7`
+/// (aptos-experimental is never released to mainnet).
 pub const LARGE_PACKAGES_PROD_MODULE_ADDRESS: &str =
     "0x0e1ca3011bdd07246d4d16d909dbb2d6953a86c4735d5acf5865d962c630cce7";
 
-/// Address where large packages module is deployed on dev network started from genesis
-/// (including devnet and localnet)
+/// Address of the `large_packages` module on networks whose genesis includes aptos-experimental:
+/// testnet, devnet and localnet.
 pub const LARGE_PACKAGES_DEV_MODULE_ADDRESS: &str = "0x7";
 
 /// The default chunk size for splitting code and metadata to fit within the transaction size limits.
@@ -25,8 +25,9 @@ pub enum PublishType {
     ObjectUpgrade,
 }
 
+/// Returns the address of the `large_packages` module that chunked publishing uses by default.
 pub fn default_large_packages_module_address(chain_id: &ChainId) -> &'static str {
-    if chain_id.is_mainnet() || chain_id.is_testnet() {
+    if chain_id.is_mainnet() {
         LARGE_PACKAGES_PROD_MODULE_ADDRESS
     } else {
         LARGE_PACKAGES_DEV_MODULE_ADDRESS
@@ -220,4 +221,29 @@ pub fn large_packages_cleanup_staging_area(
         vec![],
         vec![],
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::chain_id::NamedChain;
+
+    #[test]
+    fn default_large_packages_module_address_by_network() {
+        assert_eq!(
+            default_large_packages_module_address(&ChainId::mainnet()),
+            LARGE_PACKAGES_PROD_MODULE_ADDRESS
+        );
+        // Every other network gets the module at 0x7 from its genesis.
+        for chain_id in [
+            ChainId::testnet(),
+            ChainId::new(NamedChain::DEVNET.id()),
+            ChainId::test(),
+        ] {
+            assert_eq!(
+                default_large_packages_module_address(&chain_id),
+                LARGE_PACKAGES_DEV_MODULE_ADDRESS
+            );
+        }
+    }
 }

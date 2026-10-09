@@ -1523,6 +1523,14 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
+            // Clear leftovers from an earlier chunked publish before the sequence number is read:
+            // the cleanup is a transaction, so it would shift the derived object address.
+            clear_stale_staging_area(
+                &self.txn_options,
+                chunked_publish_large_packages_module_address.unwrap(),
+                &self.env,
+            )
+            .await?;
             get_sequence_number(&self.txn_options.rest_client()?, sender_address).await?
                 + staging_tx_count
                 + 1
@@ -1561,13 +1569,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", payloads.len());
             println!("{}", message.bold());
 
-            submit_chunked_publish_transactions(
-                payloads,
-                &self.txn_options,
-                chunked_publish_large_packages_module_address.unwrap(),
-                &self.env,
-            )
-            .await
+            // The StagingArea was already cleared, before the object address was derived.
+            submit_chunk_transactions(payloads, &self.txn_options, &self.env).await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1782,6 +1785,14 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
+            // Clear leftovers from an earlier chunked publish before the sequence number is read:
+            // the cleanup is a transaction, so it would shift the derived object address.
+            clear_stale_staging_area(
+                &self.txn_options,
+                chunked_publish_large_packages_module_address.unwrap(),
+                &self.env,
+            )
+            .await?;
             get_sequence_number(&self.txn_options.rest_client()?, sender_address).await?
                 + staging_tx_count
                 + 1
@@ -1820,13 +1831,8 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             let message = format!("Publishing package in chunked mode will submit {} transactions for staging and publishing code.\n", payloads.len());
             println!("{}", message.bold());
 
-            submit_chunked_publish_transactions(
-                payloads,
-                &self.txn_options,
-                chunked_publish_large_packages_module_address.unwrap(),
-                &self.env,
-            )
-            .await
+            // The StagingArea was already cleared, before the object address was derived.
+            submit_chunk_transactions(payloads, &self.txn_options, &self.env).await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -2034,10 +2040,62 @@ fn build_package_options(
     BuiltPackage::build_to(&w, move_options.get_package_path()?, options)
 }
 
+/// Clears any data left in the sender's `StagingArea`, then submits the chunked publish transactions.
 async fn submit_chunked_publish_transactions(
     payloads: Vec<TransactionPayload>,
     txn_options: &TransactionOptions,
     large_packages_module_address: AccountAddress,
+    env: &MoveEnv,
+) -> CliTypedResult<TransactionSummary> {
+    clear_stale_staging_area(txn_options, large_packages_module_address, env).await?;
+    submit_chunk_transactions(payloads, txn_options, env).await
+}
+
+/// Clears data left in the sender's `StagingArea` by an earlier chunked publish that did not
+/// complete. Staged chunks are appended to whatever is already there, so leftover data would make
+/// the new publish fail, but only after all of its staging transactions had been paid for.
+///
+/// The cleanup is a transaction of its own, so flows that derive an address from the sender's
+/// sequence number must call this before reading it.
+async fn clear_stale_staging_area(
+    txn_options: &TransactionOptions,
+    large_packages_module_address: AccountAddress,
+    env: &MoveEnv,
+) -> CliTypedResult<()> {
+    if is_staging_area_empty(txn_options, large_packages_module_address).await? {
+        return Ok(());
+    }
+
+    let (_, account_address) = txn_options.get_public_key_and_address()?;
+    let message = format!(
+        "The resource {}::large_packages::StagingArea under account {} holds data from a chunked publish that did not complete.\
+        \nIt has to be cleared first, otherwise the new chunks would be appended to it and the publish would fail.",
+        large_packages_module_address, account_address,
+    )
+    .bold();
+    println!("{}", message);
+    prompt_yes_with_override(
+        "Do you want to clear it and continue?",
+        txn_options.prompt_options,
+    )?;
+
+    let payload = large_packages_cleanup_staging_area(large_packages_module_address);
+    let tx_summary = dispatch_transaction(payload, txn_options, env).await?;
+    if tx_summary.success == Some(false) {
+        return Err(CliError::SimulationError(format!(
+            "{} (clearing the StagingArea, transaction {})",
+            tx_summary.vm_status.unwrap_or_default(),
+            tx_summary.transaction_hash,
+        )));
+    }
+    println!("StagingArea cleared ({})\n", tx_summary.transaction_hash);
+    Ok(())
+}
+
+/// Submits the chunked publish transactions in order, stopping at the first one that fails.
+async fn submit_chunk_transactions(
+    payloads: Vec<TransactionPayload>,
+    txn_options: &TransactionOptions,
     env: &MoveEnv,
 ) -> CliTypedResult<TransactionSummary> {
     let mut publishing_result = Err(CliError::UnexpectedError(
@@ -2046,47 +2104,41 @@ async fn submit_chunked_publish_transactions(
     let payloads_length = payloads.len() as u64;
     let mut tx_hashes = vec![];
 
-    let (_, account_address) = txn_options.get_public_key_and_address()?;
-
-    if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
-        let message = format!(
-            "The resource {}::large_packages::StagingArea under account {} is not empty.\
-        \nThis may cause package publishing to fail if the data is unexpected. \
-        \nUse the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under the account.",
-            large_packages_module_address, account_address,
-        )
-            .bold();
-        println!("{}", message);
-        prompt_yes_with_override("Do you want to proceed?", txn_options.prompt_options)?;
-    }
-
     for (idx, payload) in payloads.into_iter().enumerate() {
         println!("Transaction {} of {}", idx + 1, payloads_length);
-        let result = dispatch_transaction(payload, txn_options, env).await;
-
-        match result {
-            Ok(tx_summary) => {
-                let tx_hash = tx_summary.transaction_hash.to_string();
-                let status = tx_summary.success.map_or_else(String::new, |success| {
-                    if success {
-                        "Success".to_string()
-                    } else {
-                        "Failed".to_string()
-                    }
-                });
-                println!("Transaction executed: {} ({})\n", status, tx_hash);
-                tx_hashes.push(tx_hash);
-                publishing_result = Ok(tx_summary);
-            },
-
+        let tx_summary = match dispatch_transaction(payload, txn_options, env).await {
+            Ok(tx_summary) => tx_summary,
             Err(e) => {
-                println!("{}", "Caution: An error occurred while submitting chunked publish transactions. \
-                \nDue to this error, there may be incomplete data left in the `StagingArea` resource. \
-                \nThis could cause further errors if you attempt to run the chunked publish command again. \
-                \nTo avoid this, use the `aptos move clear-staging-area` command to clean up the `StagingArea` resource under your account before retrying.".bold());
+                print_incomplete_chunked_publish_caution();
                 return Err(e);
             },
+        };
+
+        let tx_hash = tx_summary.transaction_hash.to_string();
+        let status = tx_summary.success.map_or_else(String::new, |success| {
+            if success {
+                "Success".to_string()
+            } else {
+                "Failed".to_string()
+            }
+        });
+        println!("Transaction executed: {} ({})\n", status, tx_hash);
+
+        // Chain submission reports a failed transaction as an error, but simulation backends
+        // (e.g. `--session`) return it as a summary. Either way the remaining chunks can't succeed.
+        if tx_summary.success == Some(false) {
+            print_incomplete_chunked_publish_caution();
+            return Err(CliError::SimulationError(format!(
+                "{} (transaction {} of {}, {})",
+                tx_summary.vm_status.unwrap_or_default(),
+                idx + 1,
+                payloads_length,
+                tx_hash,
+            )));
         }
+
+        tx_hashes.push(tx_hash);
+        publishing_result = Ok(tx_summary);
     }
 
     println!(
@@ -2103,6 +2155,15 @@ async fn submit_chunked_publish_transactions(
     );
     println!("\n{}\n", tx_hash_formatted);
     publishing_result
+}
+
+fn print_incomplete_chunked_publish_caution() {
+    println!(
+        "{}",
+        "Caution: The chunked publish did not complete, so incomplete data may be left in the `StagingArea` resource under your account. \
+        \nThe next chunked publish will offer to clear it first, or you can clear it now with `aptos move clear-staging-area`."
+            .bold()
+    );
 }
 
 async fn is_staging_area_empty(
