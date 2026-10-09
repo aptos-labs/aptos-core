@@ -2601,7 +2601,9 @@ pub struct Simulate {
     #[clap(flatten)]
     entry_function_args: EntryFunctionArguments,
 
-    #[clap(long)]
+    /// Simulate against a remote fullnode debugger snapshot instead of the REST
+    /// simulate endpoint. Mutually exclusive with `--session`.
+    #[clap(long, conflicts_with = "session")]
     local: bool,
 
     /// Include simulated events and state changes in the output.
@@ -2626,7 +2628,11 @@ impl CliCommand<TransactionSummary> for Simulate {
 
         let payload = TransactionPayload::EntryFunction(entry_function);
 
-        if self.local {
+        if let Some(session_path) = &self.txn_options.session {
+            self.txn_options
+                .simulate_using_session(session_path, payload, self.show_details)
+                .await
+        } else if self.local {
             self.txn_options
                 .simulate_locally(payload, &self.env, self.show_details)
                 .await
@@ -2641,7 +2647,7 @@ impl CliCommand<TransactionSummary> for Simulate {
 
 #[cfg(test)]
 mod simulate_flag_tests {
-    use super::{MoveTool, Simulate};
+    use super::{MoveTool, RunFunction, Simulate};
     use clap::Parser;
 
     #[derive(Parser)]
@@ -2656,6 +2662,14 @@ mod simulate_flag_tests {
         match cli.tool {
             MoveTool::Simulate(simulate) => simulate,
             _ => panic!("expected MoveTool::Simulate"),
+        }
+    }
+
+    fn parse_run(args: &[&str]) -> Result<RunFunction, clap::Error> {
+        let cli = TestCli::try_parse_from(std::iter::once("test").chain(args.iter().copied()))?;
+        match cli.tool {
+            MoveTool::Run(run) => Ok(run),
+            _ => panic!("expected MoveTool::Run"),
         }
     }
 
@@ -2684,6 +2698,231 @@ mod simulate_flag_tests {
             "--show-details",
         ]);
         assert!(simulate.show_details);
+    }
+
+    #[test]
+    fn unauthenticated_without_session_fails_to_parse() {
+        let err = parse_run(&[
+            "run",
+            "--unauthenticated",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--unauthenticated without --session must fail");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("session") || msg.contains("unauthenticated"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn unauthenticated_without_sender_account_fails_to_parse() {
+        let err = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--unauthenticated without --sender-account must fail");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("sender-account") || msg.contains("sender_account"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn unauthenticated_with_session_and_sender_parses() {
+        let run = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .expect("valid unauthenticated session run should parse");
+        assert!(run.txn_options.unauthenticated);
+        assert!(run.txn_options.session.is_some());
+        assert_eq!(
+            run.txn_options.sender_account,
+            Some(aptos_types::account_address::AccountAddress::ONE)
+        );
+        assert!(!run.txn_options.sponsor_gas);
+    }
+
+    #[test]
+    fn sponsor_gas_with_unauthenticated_session_parses() {
+        let run = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sponsor-gas",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .expect("sponsor-gas with unauthenticated session should parse");
+        assert!(run.txn_options.unauthenticated);
+        assert!(run.txn_options.sponsor_gas);
+    }
+
+    #[test]
+    fn unauthenticated_fee_payer_and_secondary_signers_parse() {
+        let run = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sender-account",
+            "0x1",
+            "--fee-payer-account",
+            "0x3",
+            "--secondary-signer-accounts",
+            "0x4",
+            "0x5",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .expect("fee payer and secondary signers should parse");
+        assert_eq!(
+            run.txn_options.fee_payer_account,
+            Some(aptos_types::account_address::AccountAddress::THREE)
+        );
+        assert_eq!(run.txn_options.secondary_signer_accounts.len(), 2);
+    }
+
+    #[test]
+    fn sponsor_gas_conflicts_with_fee_payer_account() {
+        let err = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--unauthenticated",
+            "--sender-account",
+            "0x1",
+            "--sponsor-gas",
+            "--fee-payer-account",
+            "0x3",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--sponsor-gas and --fee-payer-account must conflict");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("sponsor-gas") || msg.contains("fee-payer-account"),
+            "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn fee_payer_account_requires_unauthenticated() {
+        let err = parse_run(&[
+            "run",
+            "--session",
+            "/tmp/session",
+            "--sender-account",
+            "0x1",
+            "--fee-payer-account",
+            "0x3",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--fee-payer-account without --unauthenticated must fail");
+        assert!(
+            err.to_string().contains("unauthenticated"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn simulate_session_parses_and_conflicts_with_local() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--session",
+            "/tmp/fork",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(simulate.txn_options.session.is_some());
+        assert!(!simulate.local);
+        assert!(!simulate.txn_options.sponsor_gas);
+
+        let with_sponsor = parse_simulate(&[
+            "simulate",
+            "--session",
+            "/tmp/fork",
+            "--sponsor-gas",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(with_sponsor.txn_options.sponsor_gas);
+
+        let err = TestCli::try_parse_from([
+            "test",
+            "simulate",
+            "--session",
+            "/tmp/fork",
+            "--local",
+            "--sender-account",
+            "0x1",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ])
+        .err()
+        .expect("--session and --local must conflict");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("session") || msg.contains("local"),
+            "unexpected error: {msg}"
+        );
     }
 }
 

@@ -7,9 +7,9 @@ use crate::{local_simulation, MoveDebugger, MoveEnv};
 // Re-export from aptos-cli-common to eliminate the duplicate definition.
 pub use aptos_cli_common::ReplayProtectionType;
 use aptos_cli_common::{
-    format_txn_status, get_account_with_state, CliError, CliTypedResult, EncodingOptions,
-    GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions,
-    TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
+    estimate_session_max_gas, format_txn_status, get_account_with_state, CliError, CliTypedResult,
+    EncodingOptions, GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions,
+    RestOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
@@ -22,12 +22,13 @@ use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
+    account_config::AccountResource,
     chain_id::ChainId,
     contract_event::ContractEvent,
     state_store::state_key::inner::StateKeyInner,
     transaction::{
-        PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        authenticator::AccountAuthenticator, PersistedAuxiliaryInfo, ReplayProtector,
+        SignedTransaction, TransactionOutput, TransactionPayload, TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -37,6 +38,7 @@ use move_core_types::vm_status::VMStatus;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
+    path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -213,6 +215,35 @@ pub(crate) struct TxnOptions {
     pub(crate) gas_options: GasOptions,
     #[clap(flatten)]
     pub prompt_options: PromptOptions,
+
+    /// Dry-run against a local simulation session instead of a remote fullnode.
+    ///
+    /// Uses the simulation VM (same path as `POST /transactions/simulate`) and
+    /// never writes back to the session. Mutually exclusive with `--local`.
+    #[clap(long)]
+    pub(crate) session: Option<PathBuf>,
+
+    /// When combined with `--session`, skip gas payment by using fee payer
+    /// `@0x0` (same rule as fullnode simulate). Default off: gas is still
+    /// charged from the sender when they are the gas payer.
+    #[clap(long, requires = "session", conflicts_with = "fee_payer_account")]
+    pub(crate) sponsor_gas: bool,
+
+    /// When combined with `--session`, charge gas to this account instead of
+    /// the sender. No key is needed for it.
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg, requires = "session")]
+    pub(crate) fee_payer_account: Option<AccountAddress>,
+
+    /// When combined with `--session`, extra signer accounts for multi-agent
+    /// entry functions. No keys are needed for them.
+    #[clap(
+        long,
+        value_parser = aptos_cli_common::load_account_arg,
+        num_args = 1..,
+        requires = "session"
+    )]
+    pub(crate) secondary_signer_accounts: Vec<AccountAddress>,
+
     /// Replay protection mechanism to use when generating the transaction.
     ///
     /// When "nonce" is chosen, the transaction will be an orderless transaction and contains a replay protection nonce.
@@ -220,6 +251,156 @@ pub(crate) struct TxnOptions {
     /// When "seqnum" is chosen, the transaction will contain a sequence number that matches with the sender's onchain sequence number.
     #[clap(long, default_value_t = ReplayProtectionType::Seqnum)]
     pub(crate) replay_protection_type: ReplayProtectionType,
+}
+
+/// A session transaction built with `NoAccountAuthenticator`.
+pub struct UnauthenticatedSessionTransaction {
+    pub signed: SignedTransaction,
+    pub sender: AccountAddress,
+    pub gas_unit_price: u64,
+    /// `None` when replay protection is a nonce (orderless).
+    pub sequence_number: Option<u64>,
+    pub replay_protector: ReplayProtector,
+}
+
+/// Who signs an unauthenticated session transaction. None of them need a key.
+#[derive(Clone, Debug)]
+pub struct UnauthenticatedSigners {
+    pub sender: AccountAddress,
+    /// Extra signers for multi-agent entry functions or scripts.
+    pub secondary_signers: Vec<AccountAddress>,
+    /// `Some(@0x0)` waives gas, `Some(addr)` charges `addr`, `None` charges the sender.
+    pub fee_payer: Option<AccountAddress>,
+}
+
+impl UnauthenticatedSigners {
+    /// Resolve the fee payer from `--sponsor-gas` / `--fee-payer-account`.
+    /// clap makes the two flags mutually exclusive.
+    pub fn from_flags(
+        sender: AccountAddress,
+        secondary_signers: Vec<AccountAddress>,
+        sponsor_gas: bool,
+        fee_payer_account: Option<AccountAddress>,
+    ) -> Self {
+        let fee_payer = if sponsor_gas {
+            Some(AccountAddress::ZERO)
+        } else {
+            fee_payer_account
+        };
+        Self {
+            sender,
+            secondary_signers,
+            fee_payer,
+        }
+    }
+}
+
+/// Build an unauthenticated session transaction from the session's current state.
+///
+/// Shared by `aptos move run --session --unauthenticated` and
+/// `aptos move simulate --session`.
+pub fn build_unauthenticated_session_transaction(
+    state_store: &impl aptos_transaction_simulation::SimulationStateStore,
+    payload: TransactionPayload,
+    signers: UnauthenticatedSigners,
+    gas_unit_price: Option<u64>,
+    max_gas: Option<u64>,
+    expiration_secs: u64,
+    replay_protection: ReplayProtectionType,
+) -> CliTypedResult<UnauthenticatedSessionTransaction> {
+    let UnauthenticatedSigners {
+        sender,
+        secondary_signers,
+        fee_payer,
+    } = signers;
+
+    let mut seen = std::collections::BTreeSet::from([sender]);
+    for signer in &secondary_signers {
+        if !seen.insert(*signer) {
+            return Err(CliError::CommandArgumentError(format!(
+                "signer {} appears more than once (sender and secondary signers must be distinct)",
+                signer
+            )));
+        }
+    }
+
+    match &payload {
+        TransactionPayload::EncryptedPayload(_) => {
+            return Err(CliError::CommandArgumentError(
+                "unauthenticated session execution does not support encrypted payloads".to_string(),
+            ));
+        },
+        TransactionPayload::Multisig(_) => {
+            return Err(CliError::CommandArgumentError(
+                "unauthenticated session execution does not support multisig executables"
+                    .to_string(),
+            ));
+        },
+        _ => {},
+    }
+
+    const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+
+    let account = state_store.get_resource::<AccountResource>(sender)?;
+    let account_sequence = account.map(|a| a.sequence_number).unwrap_or(0);
+    let gas_unit_price = gas_unit_price.unwrap_or(DEFAULT_GAS_UNIT_PRICE);
+    let gas_payer = fee_payer.unwrap_or(sender);
+    let gas_waived = gas_payer == AccountAddress::ZERO;
+    let balance = if gas_waived {
+        0
+    } else {
+        state_store.get_apt_balance(gas_payer)?
+    };
+    let max_gas = estimate_session_max_gas(max_gas, balance, gas_unit_price, gas_waived);
+
+    let mut builder = TransactionFactory::new(state_store.get_chain_id()?)
+        .with_gas_unit_price(gas_unit_price)
+        .with_max_gas_amount(max_gas)
+        .with_transaction_expiration_time(expiration_secs)
+        .payload(payload)
+        .sender(sender)
+        .sequence_number(account_sequence);
+    if replay_protection == ReplayProtectionType::Nonce {
+        let mut rng = rand::thread_rng();
+        builder = builder.upgrade_payload_with_rng(&mut rng, true, true);
+    }
+    let raw_transaction = builder.build();
+
+    let secondary_authenticators =
+        vec![AccountAuthenticator::NoAccountAuthenticator; secondary_signers.len()];
+    let signed = match fee_payer {
+        Some(fee_payer) => SignedTransaction::new_fee_payer(
+            raw_transaction,
+            AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signers,
+            secondary_authenticators,
+            fee_payer,
+            AccountAuthenticator::NoAccountAuthenticator,
+        ),
+        None if !secondary_signers.is_empty() => SignedTransaction::new_multi_agent(
+            raw_transaction,
+            AccountAuthenticator::NoAccountAuthenticator,
+            secondary_signers,
+            secondary_authenticators,
+        ),
+        None => SignedTransaction::new_single_sender(
+            raw_transaction,
+            AccountAuthenticator::NoAccountAuthenticator,
+        ),
+    };
+    let replay_protector = signed.replay_protector();
+    let sequence_number = match replay_protector {
+        ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
+        ReplayProtector::Nonce(_) => None,
+    };
+
+    Ok(UnauthenticatedSessionTransaction {
+        signed,
+        sender,
+        gas_unit_price,
+        sequence_number,
+        replay_protector,
+    })
 }
 
 impl TxnOptions {
@@ -465,21 +646,110 @@ impl TxnOptions {
         )
         .await
     }
+
+    /// Dry-runs a transaction against a local simulation session without mutating it.
+    pub async fn simulate_using_session(
+        &self,
+        session_path: &std::path::Path,
+        payload: TransactionPayload,
+        show_details: bool,
+    ) -> CliTypedResult<TransactionSummary> {
+        use aptos_transaction_simulation_session::Session;
+
+        let sender_address = self.sender_account.ok_or_else(|| {
+            CliError::CommandArgumentError(
+                "`aptos move simulate --session` requires `--sender-account`".to_string(),
+            )
+        })?;
+
+        eprintln!(
+            "Warning: session simulate is unauthenticated (NoAccountAuthenticator) and does not modify session state."
+        );
+
+        let sess = Session::load(session_path)?;
+        let built = build_unauthenticated_session_transaction(
+            sess.state_store(),
+            payload,
+            UnauthenticatedSigners::from_flags(
+                sender_address,
+                self.secondary_signer_accounts.clone(),
+                self.sponsor_gas,
+                self.fee_payer_account,
+            ),
+            self.gas_options.gas_unit_price,
+            self.gas_options.max_gas,
+            self.gas_options.expiration_secs,
+            self.replay_protection_type,
+        )?;
+        let hash = built.signed.committed_hash();
+        let gas_unit_price = built.gas_unit_price;
+        let seq_num = built.sequence_number;
+        let replay_protector = built.replay_protector;
+
+        let (vm_status, txn_output) = sess.simulate_transaction(built.signed)?;
+
+        let success = match txn_output.status() {
+            TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+            TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+        };
+
+        let mut summary = TransactionSummary {
+            transaction_hash: hash.into(),
+            gas_used: Some(txn_output.gas_used()),
+            gas_unit_price: Some(gas_unit_price),
+            pending: None,
+            sender: Some(sender_address),
+            sequence_number: seq_num,
+            replay_protector: Some(replay_protector),
+            success,
+            timestamp_us: None,
+            version: None,
+            vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
+            deployed_object_address: None,
+            events: None,
+            changes: None,
+        };
+        if show_details {
+            let state_store = sess.state_store();
+            summary.events = Some(local_contract_events_to_json(
+                state_store,
+                txn_output.events(),
+            )?);
+            summary.changes = Some(local_write_set_to_json(
+                state_store,
+                txn_output.write_set(),
+            )?);
+        }
+
+        Ok(summary)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{local_contract_events_to_json, local_write_set_to_json, serialize_as_json};
-    use aptos_cli_common::TransactionSummary;
+    use super::{
+        build_unauthenticated_session_transaction, local_contract_events_to_json,
+        local_write_set_to_json, serialize_as_json, UnauthenticatedSigners,
+    };
+    use aptos_cli_common::{CliTypedResult, ReplayProtectionType, TransactionSummary};
     use aptos_crypto::HashValue;
     use aptos_transaction_simulation::EmptyStateView;
+    use aptos_transaction_simulation_session::Session;
     use aptos_types::{
         account_address::AccountAddress,
         event::EventKey,
         state_store::{state_key::StateKey, table::TableHandle},
+        transaction::{
+            authenticator::TransactionAuthenticator, EntryFunction, ReplayProtector,
+            TransactionPayload,
+        },
         write_set::{WriteOp, WriteSet},
     };
-    use move_core_types::{ident_str, language_storage::TypeTag};
+    use move_core_types::{
+        ident_str,
+        identifier::Identifier,
+        language_storage::{ModuleId, TypeTag},
+    };
 
     #[test]
     fn simulation_summary_omits_optional_fields_by_default() {
@@ -624,5 +894,135 @@ mod tests {
 
         let err = local_write_set_to_json(&state_view, &write_set).unwrap_err();
         assert!(err.to_string().contains("TradingNative"));
+    }
+
+    #[test]
+    fn unauthenticated_session_txn_honors_nonce_replay_protection() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let session = Session::init(temp_dir.path()).unwrap();
+
+        let built = build_unauthenticated_session_transaction(
+            session.state_store(),
+            transfer_payload(),
+            UnauthenticatedSigners::from_flags(AccountAddress::ONE, vec![], false, None),
+            None,
+            Some(2_000),
+            60,
+            ReplayProtectionType::Nonce,
+        )
+        .unwrap();
+
+        assert!(matches!(built.replay_protector, ReplayProtector::Nonce(_)));
+        assert!(built.sequence_number.is_none());
+    }
+
+    fn transfer_payload() -> TransactionPayload {
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new("aptos_account").unwrap(),
+            ),
+            Identifier::new("transfer").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(&AccountAddress::ONE).unwrap(),
+                bcs::to_bytes(&1u64).unwrap(),
+            ],
+        ))
+    }
+
+    fn build(signers: UnauthenticatedSigners) -> CliTypedResult<TransactionAuthenticator> {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let session = Session::init(temp_dir.path()).unwrap();
+        build_unauthenticated_session_transaction(
+            session.state_store(),
+            transfer_payload(),
+            signers,
+            None,
+            Some(2_000),
+            60,
+            ReplayProtectionType::Seqnum,
+        )
+        .map(|built| built.signed.authenticator())
+    }
+
+    #[test]
+    fn unauthenticated_signers_pick_the_matching_authenticator() {
+        let sender = AccountAddress::ONE;
+        let other = AccountAddress::TWO;
+
+        assert!(matches!(
+            build(UnauthenticatedSigners::from_flags(
+                sender,
+                vec![],
+                false,
+                None
+            ))
+            .unwrap(),
+            TransactionAuthenticator::SingleSender { .. }
+        ));
+        assert!(matches!(
+            build(UnauthenticatedSigners::from_flags(
+                sender,
+                vec![other],
+                false,
+                None
+            ))
+            .unwrap(),
+            TransactionAuthenticator::MultiAgent { .. }
+        ));
+        match build(UnauthenticatedSigners::from_flags(
+            sender,
+            vec![],
+            true,
+            None,
+        ))
+        .unwrap()
+        {
+            TransactionAuthenticator::FeePayer {
+                fee_payer_address, ..
+            } => assert_eq!(fee_payer_address, AccountAddress::ZERO),
+            other => panic!("expected FeePayer, got {other:?}"),
+        }
+        match build(UnauthenticatedSigners::from_flags(
+            sender,
+            vec![other],
+            false,
+            Some(AccountAddress::THREE),
+        ))
+        .unwrap()
+        {
+            TransactionAuthenticator::FeePayer {
+                fee_payer_address,
+                secondary_signer_addresses,
+                ..
+            } => {
+                assert_eq!(fee_payer_address, AccountAddress::THREE);
+                assert_eq!(secondary_signer_addresses, vec![other]);
+            },
+            other => panic!("expected FeePayer, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unauthenticated_signers_reject_duplicates() {
+        let sender = AccountAddress::ONE;
+        let err = build(UnauthenticatedSigners::from_flags(
+            sender,
+            vec![sender],
+            false,
+            None,
+        ))
+        .unwrap_err();
+        assert!(err.to_string().contains("more than once"), "{err}");
+
+        let err = build(UnauthenticatedSigners::from_flags(
+            sender,
+            vec![AccountAddress::TWO, AccountAddress::TWO],
+            false,
+            None,
+        ))
+        .unwrap_err();
+        assert!(err.to_string().contains("more than once"), "{err}");
     }
 }
