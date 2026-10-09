@@ -12,6 +12,7 @@ pub struct Claims {
     pub iss: String,
     pub sub: String,
     pub email: Option<String>,
+    pub email_verified: Option<serde_json::Value>,
     pub azp: Option<String>,
     pub aud: String,
     pub iat: u64,
