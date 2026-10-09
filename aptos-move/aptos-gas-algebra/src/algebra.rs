@@ -58,6 +58,11 @@ pub enum Module {}
 
 pub type NumModules = GasQuantity<Module>;
 
+/// Unit of bytecode (file format) version.
+pub enum BytecodeVersionUnit {}
+
+pub type BytecodeVersion = GasQuantity<BytecodeVersionUnit>;
+
 /***************************************************************************************************
  * Unit Conversion
  *

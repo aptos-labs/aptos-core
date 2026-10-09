@@ -125,14 +125,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LEANER_BENCH_CACHE: ${{ runner.temp }}/cache
           WINDOW: ${{ inputs.WINDOW || '30' }}
-          PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/leaner-bench/runs/${{ github.run_id }}/
+          PAGE_URL: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && format('https://{0}.github.io/{1}/leaner-bench/', github.repository_owner, github.event.repository.name) || '' }}
         run: |
           mkdir -p "$RUNNER_TEMP/report"
           python3 third_party/move/lean/scripts/leaner-bench.py report \
             --current "$RUNNER_TEMP/current/results.json" --window "$WINDOW" \
             --branch main --page-url "$PAGE_URL" \
             --html "$RUNNER_TEMP/report/index.html" \
-            --markdown "$RUNNER_TEMP/summary.md" --slack "$RUNNER_TEMP/report/slack.json"
+            --markdown "$RUNNER_TEMP/summary.md"
           cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
@@ -142,11 +142,10 @@ jobs:
           retention-days: 90
 
   publish:
-    # Publishes the report on the repository's Pages site (the gh-pages
-    # branch): every run at leaner-bench/runs/<run id>/, the latest nightly at
-    # leaner-bench/. The only job that writes, and it runs no code of the
-    # benchmarked commit.
+    # Publish only main's latest report at the stable Pages URL. The charts
+    # contain the run history, so no per-run HTML pages are kept.
     needs: report
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
       contents: write # the gh-pages branch
@@ -165,20 +164,14 @@ jobs:
 
       - name: Publish the report
         env:
-          NIGHTLY: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
-          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          COMMIT: ${{ github.sha }}
         run: |
           cd pages
-          mkdir -p "leaner-bench/runs/$GITHUB_RUN_ID"
-          cp "$RUNNER_TEMP/report/index.html" "leaner-bench/runs/$GITHUB_RUN_ID/index.html"
-          if [ "$NIGHTLY" = true ]; then
-            cp "$RUNNER_TEMP/report/index.html" leaner-bench/index.html
-          fi
-          # Keep the pages of the 90 most recent runs.
-          ls -1 leaner-bench/runs | sort -n | head -n -90 | while read -r old; do
-            git rm -rq "leaner-bench/runs/$old"
-          done
+          git rm -rq --ignore-unmatch leaner-bench/runs
+          mkdir -p leaner-bench
+          cp "$RUNNER_TEMP/report/index.html" leaner-bench/index.html
           git add leaner-bench
+          git diff --cached --quiet && exit 0
           git -c user.name="github-actions[bot]" \
             -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -qm "leaner-bench: run $GITHUB_RUN_ID of $COMMIT"
@@ -188,13 +181,3 @@ jobs:
             git pull -q --rebase origin gh-pages
           done
           exit 1
-
-      - name: Post to Slack
-        # Nightlies on main report; a delivery error does not fail the run.
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
-        with:
-          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload-file-path: ${{ runner.temp }}/report/slack.json
