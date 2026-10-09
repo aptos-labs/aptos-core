@@ -17,6 +17,7 @@
 //! header.
 
 use crate::{
+    interner::InternedIdentifier,
     types::{
         intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type, ADDRESS_TY,
         BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY, SIGNER_TY, U128_TY, U16_TY,
@@ -118,6 +119,16 @@ impl fmt::Display for ValueLayout {
 pub struct FieldValueLayout {
     pub offset: u32,
     pub id: LayoutId,
+    /// Declared field name.
+    pub name: InternedIdentifier,
+}
+
+/// Layout information for one variant of an enum.
+pub struct VariantValueLayout {
+    /// Declared variant name.
+    pub name: InternedIdentifier,
+    /// Layout of the variant's body, a [`LayoutKind::Struct`] over its fields.
+    pub id: LayoutId,
 }
 
 /// Shape-specific layout data.
@@ -136,7 +147,7 @@ pub enum LayoutKind {
     /// An inline struct: fields laid out flat in the parent's payload.
     /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
     Struct {
-        /// Byte offsets and IDs of each field within the struct payload.
+        /// Byte offsets, names and IDs of each field within the struct payload.
         fields: Box<[FieldValueLayout]>,
     },
     /// A vector: an 8-byte heap-pointer slot. `elem_id` is the element layout
@@ -153,8 +164,8 @@ pub enum LayoutKind {
     /// TODO(completeness): revisit with upgrade story, might not need to be frozen.
     FrozenEnum {
         descriptor_id: DescriptorId,
-        /// One layout per variant body, indexed by variant tag.
-        variants: Box<[LayoutId]>,
+        /// One entry per variant body, indexed by variant tag.
+        variants: Box<[VariantValueLayout]>,
         /// Size of the enum object's data region: the 8-byte tag plus the
         /// widest variant body, rounded up to 8-byte alignment. Sized to the
         /// largest variant so any variant fits.
@@ -381,7 +392,7 @@ impl ValueLayout {
     pub fn frozen_enum(
         ty: InternedType,
         descriptor_id: DescriptorId,
-        variants: Box<[LayoutId]>,
+        variants: Box<[VariantValueLayout]>,
         max_size_across_variants: u32,
     ) -> ValueLayout {
         Self {
