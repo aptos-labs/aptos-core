@@ -94,6 +94,36 @@ fn test_validate_transaction() {
 }
 
 #[test]
+fn test_validate_transaction_after_vm_panic() {
+    let mut vm_validator = TestValidator::new();
+
+    // Poison the (single) validator slot's mutex, as a VM panic inside
+    // validate_transaction would.
+    let slot = vm_validator.vm_validator.get_next_vm();
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _guard = slot.lock().unwrap();
+        panic!("simulated VM panic");
+    }));
+    assert!(slot.lock().is_err());
+
+    // The pool must keep validating transactions after a caught VM panic.
+    let address = account_config::aptos_test_root_address();
+    let program = aptos_stdlib::aptos_coin_mint(address, 100);
+    let transaction = transaction_test_helpers::get_test_signed_txn(
+        address,
+        1,
+        &aptos_vm_genesis::GENESIS_KEYPAIR.0,
+        aptos_vm_genesis::GENESIS_KEYPAIR.1.clone(),
+        Some(program),
+    );
+    let ret = vm_validator.validate_transaction(transaction).unwrap();
+    assert_eq!(ret.status(), None);
+
+    // Reconfiguration must not panic on the poisoned lock either.
+    vm_validator.vm_validator.restart().unwrap();
+}
+
+#[test]
 fn test_validate_invalid_signature() {
     let vm_validator = TestValidator::new();
 
