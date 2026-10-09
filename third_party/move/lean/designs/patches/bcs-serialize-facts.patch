@@ -1,0 +1,64 @@
+--- a/third_party/move/lean/leaner-ir/LeanerLang/Contract.lean
++++ b/third_party/move/lean/leaner-ir/LeanerLang/Contract.lean
+@@ -4809,6 +4809,50 @@
+         facts := facts.push (← mkArrow collide (← mkEq values[i]! values[j]!))
+   return facts
+ 
++/-- What a Move function assumes of `bcs::serialize` at the values it
++takes, where it applies the function at any depth (`bcs::to_bytes` reads it):
++the Move Prover's prelude (`native.bpl`) states of every value that the
++serialization is injective and not empty, and that addresses serialize to
++one length. They are stated of the function's parameters, as the hashes'
++collision freedom is (`hashFacts`). -/
++private def serializeFacts (context : Context)
++    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
++    (slots : Array Slot) (bound : Array SlotBinders) : MetaM (Array Lean.Expr) := do
++  unless context.ns.profile == some .move do return #[]
++  let serialize := "0x1::bcs::serialize"
++  if (reachedFunctions context.unit context.namespaceId declaration
++      [serialize, "0x1::bcs::to_bytes"]).isEmpty then return #[]
++  let some types := context.types | return #[]
++  -- Each parameter's value, with its type (a reference's referent).
++  let mut values : Array (TypeId × IrTy × Lean.Expr × Lean.Expr) := #[]
++  for ((slot, binders), parameter) in (slots.zip bound).zip declaration.signature.parameters do
++    let typeId := match context.unit.tables.types[parameter.typeUse.typeId.index]? with
++      | some (.reference reference) => reference.referent
++      | _ => parameter.typeUse.typeId
++    let some nty := context.ntyOf? typeId | continue
++    let typeArgument := mkApp (mkConst ``LeanerLang.Contract.SpecTypeArgument.native)
++      (mkApp2 (mkConst ``LeanerIR.Proofs.Denote.NTy.substWith) types (← quoteNTy nty))
++    let value ← slotValueRuntime context slot binders.entry
++    let serialized ← mkAppOptM ``LeanerLang.Contract.opaqueSpec
++      #[toExpr serialize,
++        ← mkListLit (mkConst ``LeanerLang.Contract.SpecTypeArgument) [typeArgument],
++        mkConst ``RuntimeValue, none, ← mkListLit (mkConst ``RuntimeValue) [value]]
++    values := values.push (typeId, slot.physical, value, serialized)
++  let length (serialized : Lean.Expr) := mkApp (mkConst ``LeanerLang.Contract.lengthVector) serialized
++  let mut facts := #[]
++  for (_, _, _, serialized) in values do
++    facts := facts.push (← mkAppM ``LT.lt #[toExpr (0 : Int), length serialized])
++  for i in [0:values.size] do
++    for j in [i + 1:values.size] do
++      let (left, leftType, leftValue, leftSerialized) := values[i]!
++      let (right, _, rightValue, rightSerialized) := values[j]!
++      unless left == right do continue
++      facts := facts.push (← mkArrow (← mkEq leftSerialized rightSerialized)
++        (← mkEq leftValue rightValue))
++      if leftType matches .address then
++        facts := facts.push (← mkEq (length leftSerialized) (length rightSerialized))
++  return facts
++
+ /-- What the Move Prover assumes of every signer value: that it signs the
+ transaction, as `std::signer` states it (`is_txn_signer` of the signer,
+ `is_txn_signer_addr` of its address), where the unit declares those
+@@ -6210,8 +6254,9 @@
+           pure #[← memoryInvariants state] else pure #[]
+       let signers ← signerFacts context parameterSlots bound (some ·.entry)
+       let hashes ← hashFacts context declaration parameterSlots bound
++      let serialized ← serializeFacts context declaration parameterSlots bound
+       let body ← conjunction (clauses ++ dataInvariants.map (·.1) ++ invariants.map (·.1) ++
+-        storedAssumed ++ signers ++ hashes)
++        storedAssumed ++ signers ++ hashes ++ serialized)
+       mkLambdaFVars #[arguments, state] body
+   let ensuresTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
+     withLocalDeclD `state runtimeState fun state =>

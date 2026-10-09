@@ -109,6 +109,10 @@ private def identifier (value : String) : String :=
 private def pragmaName (value : String) : String :=
   if value == "opaque" then value else identifier value
 
+/-- Frame targets require identifiers even for positional fields. -/
+private def frameIdentifier (value : String) : String :=
+  if !value.isEmpty && value.all Char.isDigit then s!"«{value}»" else identifier value
+
 private def isMoveAddress (value : String) : Bool :=
   let digits := value.toList.drop 2
   value.startsWith "0x" && !digits.isEmpty && digits.all fun character =>
@@ -214,6 +218,7 @@ private def throwText : ThrowKind → String
   | .abort => "abort"
   | .panic => "panic"
   | .moveVectorError => "moveVectorError"
+  | .moveArithmeticError => "moveArithmeticError"
 
 private def primitiveText : Primitive → String
   | .tuple => "tuple"
@@ -239,14 +244,17 @@ private def primitiveText : Primitive → String
   | .checkedAdd .abort => "checkedAddAbort"
   | .checkedAdd .panic => "checkedAddPanic"
   | .checkedAdd .moveVectorError => "checkedAdd[moveVectorError]"
+  | .checkedAdd .moveArithmeticError => "checkedAdd[moveArithmeticError]"
   | .subtract => "subtract"
   | .checkedSubtract .abort => "checkedSubtractAbort"
   | .checkedSubtract .panic => "checkedSubtractPanic"
   | .checkedSubtract .moveVectorError => "checkedSubtract[moveVectorError]"
+  | .checkedSubtract .moveArithmeticError => "checkedSubtract[moveArithmeticError]"
   | .multiply => "multiply"
   | .checkedMultiply .abort => "checkedMultiplyAbort"
   | .checkedMultiply .panic => "checkedMultiplyPanic"
   | .checkedMultiply .moveVectorError => "checkedMultiply[moveVectorError]"
+  | .checkedMultiply .moveArithmeticError => "checkedMultiply[moveArithmeticError]"
   | .overflowingAdd => "overflowingAdd"
   | .overflowingSubtract => "overflowingSubtract"
   | .overflowingMultiply => "overflowingMultiply"
@@ -254,10 +262,12 @@ private def primitiveText : Primitive → String
   | .checkedDivide .abort => "checkedDivideAbort"
   | .checkedDivide .panic => "checkedDividePanic"
   | .checkedDivide .moveVectorError => "checkedDivide[moveVectorError]"
+  | .checkedDivide .moveArithmeticError => "checkedDivide[moveArithmeticError]"
   | .modulo => "modulo"
   | .checkedModulo .abort => "checkedModuloAbort"
   | .checkedModulo .panic => "checkedModuloPanic"
   | .checkedModulo .moveVectorError => "checkedModulo[moveVectorError]"
+  | .checkedModulo .moveArithmeticError => "checkedModulo[moveArithmeticError]"
   | .bitwiseOr => "bitwiseOr"
   | .bitwiseAnd => "bitwiseAnd"
   | .bitwiseXor => "bitwiseXor"
@@ -266,10 +276,12 @@ private def primitiveText : Primitive → String
   | .checkedShiftLeft .abort => "checkedShiftLeftAbort"
   | .checkedShiftLeft .panic => "checkedShiftLeftPanic"
   | .checkedShiftLeft .moveVectorError => "checkedShiftLeft[moveVectorError]"
+  | .checkedShiftLeft .moveArithmeticError => "checkedShiftLeft[moveArithmeticError]"
   | .shiftRight => "shiftRight"
   | .checkedShiftRight .abort => "checkedShiftRightAbort"
   | .checkedShiftRight .panic => "checkedShiftRightPanic"
   | .checkedShiftRight .moveVectorError => "checkedShiftRight[moveVectorError]"
+  | .checkedShiftRight .moveArithmeticError => "checkedShiftRight[moveArithmeticError]"
   | .logicalAnd | .eagerLogicalAnd => "logicalAnd"
   | .logicalOr | .eagerLogicalOr => "logicalOr"
   | .logicalNot => "logicalNot"
@@ -283,6 +295,7 @@ private def primitiveText : Primitive → String
   | .checkedNegate .abort => "checkedNegateAbort"
   | .checkedNegate .panic => "checkedNegatePanic"
   | .checkedNegate .moveVectorError => "checkedNegate[moveVectorError]"
+  | .checkedNegate .moveArithmeticError => "checkedNegate[moveArithmeticError]"
   | .cast => "cast"
   | .checkedCast failure => s!"checkedCast[{throwText failure}]"
   | .implies => "implies"
@@ -640,6 +653,9 @@ mutual
         let variants := ", ".intercalate (variants.map identifier).toList
         call (text s!"core.data.testVariants[{typeText owner.value}, {variants}]")
           <$> #[value].mapM expressionDoc
+    | .updateField value field replacement _ =>
+        return call (text "core.data.updateField")
+          #[← expressionDoc value, text (identifier field), ← expressionDoc replacement]
     | .discriminant owner result value _ =>
         call (text s!"discriminant[{typeText owner.value}, {typeText result.value}]")
           <$> #[value].mapM expressionDoc
@@ -688,7 +704,11 @@ mutual
           | some pre, none => s!"{pre}.."
           | none, some post => s!"..{post}"
           | none, none => ""
-        pure <| text s!"{range} |~ " ++ (← expressionDocAt 1 body)
+        let labeled := text s!"{range} |~ " ++ (← expressionDocAt 1 body)
+        -- A leading `..` can continue the preceding let initializer as a
+        -- range across a line break. Preserve a delimiter in that spelling.
+        pure <| if pre.isNone && post.isSome then text "(" ++ labeled ++ text ")"
+          else labeled
     | .specification operation types arguments _ => do
         if let .behavior kind := operation then
           let some target := arguments[0]?
@@ -1091,6 +1111,10 @@ private def clauseDoc : ContractClause → Except String Doc
       let base ← condition "aborts_if" expression properties
       let code ← code.mapM expressionDoc
       pure <| base ++ (code.map fun value => text " with " ++ value).getD .nil
+  | .abortsWith expression additional properties _ => do
+      let base ← condition "aborts_with" expression properties
+      let codes ← additional.mapM expressionDoc
+      pure <| base ++ (if codes.isEmpty then .nil else text ", " ++ commaSep codes)
   | .invariant expression properties _ => condition "invariant" expression properties
   | .modifies expression _ loose => do
       pure <| text "modifies " ++ (← expressionDoc expression) ++
@@ -1100,21 +1124,26 @@ private def clauseDoc : ContractClause → Except String Doc
   | .readsAll _ => pure <| text "reads *"
   | .modifiesOf parameter formals targets _ => do
       let targets ← targets.mapM expressionDoc
-      pure <| text s!"modifies_of<{identifier parameter}>" ++
+      pure <| text s!"modifies_of<{frameIdentifier parameter}>" ++
         delimited "(" ")" (formals.map parameterDoc) ++ text " " ++ commaSep targets
-  | .modifiesOfAll parameter _ => pure <| text s!"modifies_of<{identifier parameter}> *"
+  | .modifiesOfAll parameter _ => pure <| text s!"modifies_of<{frameIdentifier parameter}> *"
 where
-  propertyText (properties : Array String) := if properties.isEmpty then "" else
-    "[" ++ ", ".intercalate (properties.map identifier).toList ++ "] "
-  condition (keyword : String) (expression : Expr) (properties : Array String) := do
-    let properties := if properties.isEmpty then "" else
-      "[" ++ ", ".intercalate (properties.map identifier).toList ++ "] "
-    let expression ← expressionDoc expression
-    pure <| Format.group <| text s!"{keyword} {properties}" ++
-      Format.nest 2 expression
-  binding (keyword name : String) (expression : Expr) (properties : Array String) := do
-    pure <| Format.group <| text s!"{keyword} {propertyText properties}{identifier name} := " ++
+  propertyDoc (property : Pragma) : Except String Doc := do
+    let name := text (identifier property.name)
+    if let some qualified := property.qualified then
+      return name ++ text s!" = {qualified}"
+    match property.value with
+    | .bool true _ => pure name
+    | value => return name ++ text " = " ++ (← expressionDoc value)
+  propertyPrefix (properties : Array Pragma) : Except String Doc := do
+    if properties.isEmpty then return .nil
+    return text "[" ++ commaSep (← properties.mapM propertyDoc) ++ text "] "
+  condition (keyword : String) (expression : Expr) (properties : Array Pragma) := do
+    pure <| Format.group <| text s!"{keyword} " ++ (← propertyPrefix properties) ++
       Format.nest 2 (← expressionDoc expression)
+  binding (keyword name : String) (expression : Expr) (properties : Array Pragma) := do
+    pure <| Format.group <| text s!"{keyword} " ++ (← propertyPrefix properties) ++
+      text s!"{identifier name} := " ++ Format.nest 2 (← expressionDoc expression)
 
 private def pragmaDoc (pragma : Pragma) : Except String Doc := do
   let value ← expressionDoc pragma.value
@@ -1337,7 +1366,14 @@ private def itemDocs : Item → Except String (Array Doc)
         else clauses.push (block (text "proof") steps)
       pure #[block (signature ++ text " where") entries]
   | .namespaceInvariants declarations => do
-      let entries ← declarations.mapM fun declaration =>
+      let entries ← declarations.mapM fun declaration => do
+        if declaration.isAxiom then
+          return Format.group <| text ("axiom" ++ bindersText declaration.generics ++ " ") ++
+            Format.nest 2 (← expressionDoc declaration.expression)
+        if !declaration.generics.isEmpty then
+          return Format.group <| text ("invariant" ++ bindersText declaration.generics ++ " ") ++
+            (← clauseDoc.propertyPrefix declaration.properties) ++
+            Format.nest 2 (← expressionDoc declaration.expression)
         clauseDoc (.invariant declaration.expression declaration.properties declaration.span)
       pure #[block (text "spec module where") entries]
 

@@ -1,2 +1,13 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/generic_aliasing_ghost_params.move:13:9: error: generic module invariants are outside the current LeanerLang parser
+tests/sources/regression/generic_aliasing_ghost_params.move:17:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_ghost_params.move:17:5: error: leaner verification failed: the automatic verification of `seven_writes` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify seven_writes by …` in `tests/sources/regression/generic_aliasing_ghost_params.proof.lean` (`verify seven_writes by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_ghost_params.move:28:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_ghost_params.move:28:5: error: leaner verification failed: the automatic verification of `nine_writes_generic` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify nine_writes_generic by …` in `tests/sources/regression/generic_aliasing_ghost_params.proof.lean` (`verify nine_writes_generic by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

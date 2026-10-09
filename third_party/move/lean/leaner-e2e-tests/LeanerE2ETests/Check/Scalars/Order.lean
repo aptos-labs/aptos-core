@@ -32,5 +32,5 @@ leaner module 0x42::order where
     ensures result ==> core.prim.compare(a, c) < 0
     aborts_if false
   verify ordered3 by
-    intro right
-    exact Std.TransCmp.lt_trans ‹_› right
+    intro left right
+    exact Std.TransCmp.lt_trans left right

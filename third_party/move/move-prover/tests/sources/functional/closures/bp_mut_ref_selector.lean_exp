@@ -1,3 +1,3 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/closures/bp_mut_ref_selector.move: LIR-SEMANTIC-TYPE: in fun apply_to_x: borrow result is not a reference type at [924, 932)
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/bp_mut_ref_selector.move:1:1: error: LIR-SEMANTIC-TYPE: in fun apply_to_x: borrow result is not a reference type at [924, 932)
 LIR-SEMANTIC-TYPE: in fun apply_to_x_returning: borrow result is not a reference type at [1201, 1209)

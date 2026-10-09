@@ -9,6 +9,29 @@ A Move or Rust file is verified by compiling it to LeanerLang and verifying
 that rendering; every message is reported in the coordinates of the file it
 came from.
 
+Move LIR import/validation failures return error reports before rendering,
+so callers can record the rejection and continue other files. These reports
+currently use the input path at line 1; any embedded byte ranges still need
+mapping to their precise source locations. Source numeric bitwise operators,
+`bv`/`bv_ret` pragmas and `int2bv`/`bv2int` wrappers are rejected before LIR
+encoding until their representation propagation is modeled. Conversion and
+subsequent arithmetic can wrap even when the exported expression has type
+`num`. Classification can also propagate from executable code into a contract,
+or from a signed wrapper into a later unsigned cast.
+
+Opaque `bv_internal` functions with scalar bodies are an exception: their
+ordinary contracts and callers stay in integer representation, while their
+executable operations retain Move semantics. Calls from the body, aggregate
+or generic values, inline specifications, concrete clauses and proof blocks
+still require representation analysis and are rejected. The scalar regression
+includes mutable-reference updates and callers. Specification casts implicitly
+read reference operands, including their distinct current and `old` values.
+
+The producer and consumer use XAST version 10, which preserves whether the
+compiler defaulted a specification numeric literal's type. Representation
+analysis needs that fact to adapt unsuffixed literals without silently changing
+explicit widths; see [`numeric-representation.md`](numeric-representation.md).
+
 ```text
 foo.move ─ compiler-v2 XAST ─┐
                              ├─ validated LIR ─ LeanerLang rendering ─ elaboration ─ messages
@@ -96,8 +119,19 @@ resource and its existence a `spec module where axiom` of the module. The
 verifier's messages are the command's diagnostics, and a verification error
 fails the command as a Prover error does. The Prover's timing line becomes
 `build, export, leaner-move, total`, beside the verifier's own. `--filter` narrows the targets as
-usual; the Boogie backend's options have no effect. The verifier is found
-through `LEANER_MOVE_EXE` (its executable, run as is, so the caller supplies
+usual; the Boogie backend's options have no effect.
+
+The adapter omits non-opaque inline declarations already expanded by compiler-v2.
+Opaque inline declarations remain: their callers and behavioral predicates still
+reference them, and their bodies must satisfy their contracts. So does a
+non-opaque inline function with a specification of its own (a condition the
+source states, not one a schema application injects): the Move Prover verifies
+its body against it (`is_inline_verified`), while its calls stay expanded and a
+caller proves what the body does. An explicit
+`verify = false` retains the existing trusted-contract treatment. Their comments
+follow the same retention decision.
+
+The verifier is found through `LEANER_MOVE_EXE` (its executable, run as is, so the caller supplies
 `LEAN_PATH`), `LEANER_MOVE_HOME` (its Lean package), or the enclosing Aptos
 Core checkout, where `leaner-move/.lake/build/bin/leaner-move` runs through
 `lake --dir <package> env` under the toolchain the package pins (`lake` from
@@ -165,6 +199,13 @@ unless `type_info::spec_is_struct` holds. None of them aborts otherwise.
 The prelude's injectivity and length axioms and the concrete names the
 Prover computes for concrete types are not mirrored. A caller never fails
 on a modelled callee; it fails only on what its own clauses claim.
+
+A Move specification function is partial: it is defined where its
+parameters declared with fixed-width integer types hold values of those
+types, and its value elsewhere is unspecified (G15 in
+[`prover-test-problems.md`](prover-test-problems.md)). The rendering keeps the
+declared types (`spec fun f(x : u64) : Int`); the body reads `x` as an `Int`,
+and the verifier derives the domain from the type.
 
 A recursive specification function unfolds where its measure descends,
 and a leaf holds it unfolded once at each of its applications whose guard

@@ -1,5 +1,35 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/closures/amm_example.move: LIR-SEMANTIC-TYPE: in fun swap: invoked operand is not a function type at [9270, 9358)
-LIR-SEMANTIC-TYPE: in fun create_compliant_fee_pool: closure construction result is not a function type at [12092, 12117)
-LIR-SEMANTIC-TYPE: in fun create_constant_product_pool: closure construction result is not a function type at [11280, 11296)
-LIR-SEMANTIC-TYPE: in fun create_noncompliant_fee_pool: closure construction result is not a function type at [11710, 11749)
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/amm_example.move:129:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/amm_example.move:129:5: error: leaner verification failed: the automatic verification of `constant_product_with_fee` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify constant_product_with_fee by …` in `tests/sources/functional/closures/amm_example.proof.lean` (`verify constant_product_with_fee by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/amm_example.move:173:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/amm_example.move:173:5: error: leaner verification failed: the automatic verification of `constant_product_with_fee_non_compliant` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify constant_product_with_fee_non_compliant by …` in `tests/sources/functional/closures/amm_example.proof.lean` (`verify constant_product_with_fee_non_compliant by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/amm_example.move:218:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/amm_example.move:218:5: error: leaner verification failed: the automatic verification of `swap` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify swap by …` in `tests/sources/functional/closures/amm_example.proof.lean` (`verify swap by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/amm_example.move:43:9: error: the data invariant `invariant ∀ (S : StateDomain;
+      client : Address;
+      r_in : u64;
+      r_out : u64;
+      amt : u64),
+        (r_in + amt)
+          * (r_out - (S.. |~ result_of<this.0>(client, r_in, r_out, amt)))
+          >= r_in * r_out` does not hold where a value is constructed
+tests/sources/functional/closures/amm_example.move:247:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/amm_example.move:247:5: error: leaner verification failed: the automatic verification of `create_constant_product_pool` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify create_constant_product_pool by …` in `tests/sources/functional/closures/amm_example.proof.lean` (`verify create_constant_product_pool by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/amm_example.move:255:5: error: `create_noncompliant_fee_pool` calls `constant_product_with_fee_non_compliant`, which is not verified; verify the callee first
+tests/sources/functional/closures/amm_example.move:264:5: error: `create_compliant_fee_pool` calls `constant_product_with_fee`, which is not verified; verify the callee first

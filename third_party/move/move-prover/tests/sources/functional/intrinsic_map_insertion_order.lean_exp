@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/intrinsic_map_insertion_order.move:56:5: error: `same_entries_not_equal` calls the native `add`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/intrinsic_map_insertion_order.move:11:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
+tests/sources/functional/intrinsic_map_insertion_order.move:84:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/intrinsic_map_insertion_order.move:83:5: error: leaner verification failed: the automatic verification of `canary` failed; provide a proof: `verify canary by …` in `tests/sources/functional/intrinsic_map_insertion_order.proof.lean` (`verify canary by skip` shows the obligations it leaves)

@@ -2710,16 +2710,11 @@ private def dataOperationTypeDiagnostics (mode : PreparationMode) (unit : Valida
               let resultErrors := if nominalTypeMatchesInstantiation ns resultType reference
                   instantiations then #[]
                 else typeMismatch loc "field update result is not its nominal target type"
-              -- In a specification the replacement is read at its projection.
+              -- Match after instantiating the field, including its logical
+              -- projection: a generic field instantiated with u64 reads as num.
               let replaces (replacementType field : TypeId) : Bool :=
-                typeMatchesInstantiation? ns replacementType targetNs field instantiations ||
-                  (context.logical &&
-                    ((match ns.tables.types[replacementType.index]? with
-                      | some (.reference reference) =>
-                          typeMatchesInstantiation? ns reference.referent targetNs field
-                            instantiations
-                      | _ => false) ||
-                     (specReadsInteger ns replacementType && isAnyIntegerType targetNs field)))
+                specMatchesInstantiation ns context.logical replacementType targetNs field
+                  instantiations
               let replacementErrors := match arguments[1]?.bind (exprType? ns) with
                 | some replacementType =>
                     if selected.all (fun typeUse => replaces replacementType typeUse.typeId) then #[]
@@ -4358,7 +4353,13 @@ private def scanContract (registry : SemanticsRegistry) (unit : ValidatedUnit)
       ds ++ scanExpr registry unit mode ns { context with logical := true } expression) ds
     match localType frame.parameter with
     | some (.function arguments _) =>
+        -- Shared arguments are passed by value to behavioral predicates;
+        -- their specification formals name the referent, as in `ensures_of`.
+        let logicalArguments := arguments.map fun
+          | .reference .shared referent => referent
+          | argument => argument
         if frame.formals.toList.map localType == arguments.map some ||
+            frame.formals.toList.map localType == logicalArguments.map some ||
             frame.modifiesAll && frame.formals.isEmpty then ds
         else ds.push <| .at "LIR-PARAMETER-FRAME"
           "a frame's formals differ from its parameter's argument types" frame.loc

@@ -690,12 +690,15 @@ private def failureText : LeanerIR.ThrowKind → Except String String
   | .profile value =>
       if value == { profile := .move, tag := "runtime.vector_error" } then
         pure "moveVectorError"
+      else if value == { profile := .move, tag := "runtime.arithmetic_error" } then
+        pure "moveArithmeticError"
       else throw s!"profile throw `{value.tag}` has no core LeanerLang spelling"
 
 private def checkedPrimitiveText (name : String) (failure : LeanerIR.ThrowKind) :
     Except String String := do
-  if failure == .profile { profile := .move, tag := "runtime.vector_error" } then
-    return s!"{name}[moveVectorError]"
+  if failure == .profile { profile := .move, tag := "runtime.vector_error" } ||
+      failure == LeanerIR.moveArithmeticError then
+    return s!"{name}[{← failureText failure}]"
   let suffix ← match failure with
     | .abort => pure "Abort"
     | .panic => pure "Panic"
@@ -1119,41 +1122,41 @@ private def operatorInfo? (context : Context) (primitive : PrimitiveOperation) :
   let operation : Option LeanerLang.CoreOperator := match primitive with
     | .add => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.add else none
-    | .checkedAdd .abort => if context.ns.profile == some .move then
+    | .checkedAdd LeanerIR.moveArithmeticError => if context.ns.profile == some .move then
         some LeanerLang.CoreOperator.add else none
     | .subtract => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.subtract else none
-    | .checkedSubtract .abort =>
+    | .checkedSubtract LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.subtract else none
     | .multiply => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.multiply else none
-    | .checkedMultiply .abort =>
+    | .checkedMultiply LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.multiply else none
     | .divide => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.divide else none
-    | .checkedDivide .abort =>
+    | .checkedDivide LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.divide else none
     | .modulo => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.modulo else none
-    | .checkedModulo .abort =>
+    | .checkedModulo LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.modulo else none
     | .shiftLeft => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.shiftLeft else none
-    | .checkedShiftLeft .abort =>
+    | .checkedShiftLeft LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.shiftLeft else none
     | .shiftRight => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.shiftRight else none
-    | .checkedShiftRight .abort =>
+    | .checkedShiftRight LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.shiftRight else none
     | .negate => if context.specification || context.ns.profile == some .rust then
         some LeanerLang.CoreOperator.negate else none
-    | .checkedNegate .abort =>
+    | .checkedNegate LeanerIR.moveArithmeticError =>
         if context.ns.profile == some .move then
           some LeanerLang.CoreOperator.negate else none
     | other => LeanerLang.Operators.ofPrimitiveOperation other
@@ -1795,7 +1798,7 @@ private def incrementsLocalByOne? (ns : ValidatedNamespace) (iterator : LocalId)
     let .operation (.primitive operation) _ #[incrementRead, oneId] _ :=
       incrementValueNode.kind | none
     guard (operation == PrimitiveOperation.add ||
-      operation == PrimitiveOperation.checkedAdd .abort)
+      operation == PrimitiveOperation.checkedAdd LeanerIR.moveArithmeticError)
     let incrementReadNode ← ns.expressions[incrementRead.index]?
     let incrementSource ← accessedLocal? ns incrementReadNode
     guard (incrementSource == iterator)
@@ -3008,7 +3011,7 @@ private partial def expressionText (context : Context) (id : ExprId)
               let result ← contextTypeText context expression.typeId
               if context.specification && result == "Int" then return argument
               pure s!"({argument} as {result})"
-          | .checkedCast .abort =>
+          | .checkedCast LeanerIR.moveArithmeticError =>
               let [argument] := arguments.toList
                 | throw "checked integer cast expects one operand"
               let result ← contextTypeText context expression.typeId
@@ -3016,7 +3019,7 @@ private partial def expressionText (context : Context) (id : ExprId)
               else if context.ns.profile == some .move then
                 pure s!"({argument} as {result})"
               else
-                pure s!"core.prim.checkedCast[abort, {result}]({argument})"
+                pure s!"core.prim.checkedCast[moveArithmeticError, {result}]({argument})"
           | .checkedCast failure =>
               let result ← contextTypeText context expression.typeId
               pure s!"core.prim.checkedCast[{← failureText failure}, {result}]({commaSep arguments})"
@@ -3257,6 +3260,10 @@ private partial def expressionText (context : Context) (id : ExprId)
               implicitDerefReceiverText value
             else value
           pure s!"({value} is {variants})"
+      | .data (.updateField _ field) =>
+          let [value, replacement] := arguments.toList
+            | throw "field update expects two operands"
+          pure s!"core.data.updateField({← expressionText context value (fuel - 1)}, {sourceIdentifier field}, {← expressionText context replacement (fuel - 1)})"
       | .data (.discriminant reference) =>
           let [valueId] := arguments.toList
             | throw "discriminant expects exactly one operand"
@@ -4102,11 +4109,6 @@ private partial def expressionText (context : Context) (id : ExprId)
       let kind ← failureText kind
       pure s!"{kind}({commaSep (← values.mapM (expressionText context · (fuel - 1)))})"
 
-private def flagAttributeName : Attribute → Except String String
-  | .assign name (.constant (.bool true)) _ => pure name
-  | .call name #[] _ => pure name
-  | attr => throw s!"attribute `{repr attr}` is not a boolean flag"
-
 private def pragmaText : Attribute → Except String String
   | .assign name (.constant (.bool true)) _ => pure name
   | .assign name (.constant (.bool false)) _ => pure s!"{name} = false"
@@ -4126,21 +4128,16 @@ private def conditionText (context : Context) (condition : Condition) : Except S
     | .requires => pure ("requires", none)
     | .ensures => pure ("ensures", none)
     | .abortsIf => pure ("aborts_if", none)
+    | .abortsWith => pure ("aborts_with", none)
     | .structInvariant => pure ("invariant", none)
-    | .globalInvariant typeParameters => do
-        unless typeParameters.isEmpty do
-          throw "generic module invariants are outside the current LeanerLang parser"
-        pure ("invariant", none)
-    | .globalInvariantUpdate typeParameters => do
-        unless typeParameters.isEmpty do
-          throw "generic update module invariants are outside the current LeanerLang parser"
-        pure ("invariant", none)
-    | .axiom_ typeParameters => do
-        unless typeParameters.isEmpty do
-          throw "generic module axioms are outside the current LeanerLang parser"
-        pure ("axiom", none)
+    | .globalInvariant typeParameters | .globalInvariantUpdate typeParameters =>
+        pure (" ".intercalate ("invariant" :: typeParameters.toList.map
+          fun name => "{" ++ sourceIdentifier name ++ "}"), none)
+    | .axiom_ typeParameters =>
+        pure (" ".intercalate ("axiom" :: typeParameters.toList.map
+          fun name => "{" ++ sourceIdentifier name ++ "}"), none)
     | kind => throw s!"condition kind `{repr kind}` is outside the current LeanerLang parser"
-  let properties ← condition.properties.mapM flagAttributeName
+  let properties ← condition.properties.mapM pragmaText
   -- An update invariant is one with the property `update`.
   let properties := match condition.kind with
     | .globalInvariantUpdate _ => #["update"] ++ properties
@@ -4152,6 +4149,11 @@ private def conditionText (context : Context) (condition : Condition) : Except S
     | .abortsIf, [] => pure ""
     | .abortsIf, [("abortCode", code)] =>
         pure s!" with {← expressionText context code (context.ns.expressions.size + 1)}"
+    | .abortsWith, codes => do
+        let codes ← codes.mapM fun (key, code) => do
+          unless key == "additionalCode" do throw "unexpected aborts_with auxiliary expression"
+          expressionText context code (context.ns.expressions.size + 1)
+        pure (if codes.isEmpty then "" else ", " ++ ", ".intercalate codes)
     | _, [] => pure ""
     | _, _ => throw "condition auxiliary expressions are outside the current LeanerLang parser"
   let bindingName := bindingName?.map (sourceIdentifier · ++ " := ") |>.getD ""
@@ -4209,7 +4211,11 @@ private def frameTexts (context : Context) (contract : FunctionContract) :
     | some name => name
     | none => (context.locals[id.index]?.map (·.name)).getD ""
   for frame in contract.parameterFrames do
-    let parameter := sourceIdentifier (nameOf frame.parameter)
+    let name := nameOf frame.parameter
+    -- A positional field is an identifier here, unlike a projection's
+    -- numeric suffix. Quote it so `modifies_of<«0»>` parses as a name.
+    let parameter := if !name.isEmpty && name.all Char.isDigit then s!"«{name}»"
+      else sourceIdentifier name
     if frame.modifiesAll then
       entries := entries.push s!"modifies_of<{parameter}> *;"
       continue
@@ -4237,13 +4243,15 @@ private def nominalContractText? (unit : ValidatedUnit) (ns : PrintNamespace)
     throw "nominal frames are outside the current LeanerLang printer"
   unless contract.conditions.all (·.kind == .structInvariant) do
     throw "non-invariant nominal conditions are outside the current LeanerLang printer"
-  if contract.conditions.isEmpty && contract.pragmas.isEmpty then return none
+  if contract.conditions.isEmpty && contract.pragmas.isEmpty &&
+      contract.parameterFrames.isEmpty then return none
   let context : Context := {
     unit, ns, locals := declaration.locals
     localNames := declarationLocalNames ns declaration.locals 0 none
     binders := declaration.generics
     nominalOwner := some declaration.name, specification := true }
   let entries ← conditionTexts context contract.conditions
+  let entries := entries ++ (← frameTexts context contract)
   let pragmas ← contract.pragmas.mapM pragmaText
   let entries := entries ++ pragmas.map fun pragma => s!"pragma {pragma};"
   pure <| some s!"spec {name} where\n{indent (lines entries)}"
@@ -4594,12 +4602,15 @@ private def specFunctionText (unit : ValidatedUnit) (ns : PrintNamespace)
   match declaration.body with
   | none => pure signature
   | some root =>
+      -- The body reads its parameters as a specification does.
       let context : Context := {
         unit, ns, locals := declaration.locals
         localNames := declarationLocalNames ns declaration.locals
           declaration.signature.parameters.size (some root)
         binders := declaration.signature.generics
-        specification := true }
+        specification := true
+        logicalLocals := (declaration.locals.extract 0
+          declaration.signature.parameters.size).map (·.id) }
       let signature ← match decreases? with
         | some measure =>
             pure s!"{signature} decreases {← expressionText context measure (ns.expressions.size + 1) true}"
@@ -4770,8 +4781,14 @@ where
       fallback := fallback + 1
     for declaration in ns.invariants do
       let (file, start, _) := sourceOrderKey unit declaration.loc fallback
+      -- A generic declaration's type parameters, by name.
+      let binders := match declaration.condition.kind with
+        | .axiom_ typeParameters | .globalInvariant typeParameters
+        | .globalInvariantUpdate typeParameters => typeParameters.map fun name =>
+            ({ name, kind := .typeArg, loc := declaration.loc } : LeanerIR.GenericBinder)
+        | _ => #[]
       let context : Context := {
-        unit, ns, locals := declaration.locals
+        unit, ns, locals := declaration.locals, binders
         localNames := declarationLocalNames ns declaration.locals 0
           (some declaration.condition.expression)
         specification := true

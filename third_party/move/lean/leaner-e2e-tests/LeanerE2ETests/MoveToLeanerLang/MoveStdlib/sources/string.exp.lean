@@ -152,10 +152,10 @@ leaner module std::«string» where
 
   opaque spec fun spec_internal_check_utf8(v : Vector<u8>) : Bool
 
-  opaque spec fun spec_internal_is_char_boundary(v : Vector<u8>, i : Int) : Bool
+  opaque spec fun spec_internal_is_char_boundary(v : Vector<u8>, i : u64) : Bool
 
   opaque spec fun spec_internal_sub_string(
-    v : Vector<u8>, i : Int, j : Int
+    v : Vector<u8>, i : u64, j : u64
   ) : Vector<u8>
 
   opaque spec fun spec_internal_index_of(v : Vector<u8>, r : Vector<u8>) : Int

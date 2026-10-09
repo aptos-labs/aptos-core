@@ -941,17 +941,25 @@ mutual
       let operands ← operands
       call oper #[← nth operands 1 "the comparison", ← nth operands 0 "the comparison"]
     match primitive with
-    | .checkedAdd .abort => arithmetic .add
-    | .checkedSubtract .abort => arithmetic .sub
-    | .checkedMultiply .abort => arithmetic .mul
-    | .checkedDivide .abort => arithmetic .div
-    | .checkedModulo .abort => arithmetic .mod
-    | .checkedShiftLeft .abort => arithmetic .shl
-    | .checkedShiftRight .abort => arithmetic .shr
+    | .checkedAdd .abort
+    | .checkedAdd LeanerIR.moveArithmeticError => arithmetic .add
+    | .checkedSubtract .abort
+    | .checkedSubtract LeanerIR.moveArithmeticError => arithmetic .sub
+    | .checkedMultiply .abort
+    | .checkedMultiply LeanerIR.moveArithmeticError => arithmetic .mul
+    | .checkedDivide .abort
+    | .checkedDivide LeanerIR.moveArithmeticError => arithmetic .div
+    | .checkedModulo .abort
+    | .checkedModulo LeanerIR.moveArithmeticError => arithmetic .mod
+    | .checkedShiftLeft .abort
+    | .checkedShiftLeft LeanerIR.moveArithmeticError => arithmetic .shl
+    | .checkedShiftRight .abort
+    | .checkedShiftRight LeanerIR.moveArithmeticError => arithmetic .shr
     | .bitwiseAnd => arithmetic .bitAnd
     | .bitwiseOr => arithmetic .bitOr
     | .bitwiseXor => arithmetic .bitXor
-    | .checkedCast .abort => do
+    | .checkedCast .abort
+    | .checkedCast LeanerIR.moveArithmeticError => do
         let target ← xirType (some expression.loc) expression.typeId
         let .int type := target | failHere "a cast targets an integer type"
         call (.cast type) (← operands)

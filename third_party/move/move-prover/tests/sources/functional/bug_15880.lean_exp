@@ -1,18 +1,10 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bug_15880.move:4:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/bug_15880.move:4:5: error: leaner verification failed: the automatic verification of `test1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test1 by …` in `tests/sources/functional/bug_15880.proof.lean` (`verify test1 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/bug_15880.move:11:17: error: the loop invariant `v == vector<u256>[1, 2, 3]` is not established at entry
+tests/sources/functional/bug_15880.move:4:5: error: leaner verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in `tests/sources/functional/bug_15880.proof.lean` (`verify test1 by skip` shows the obligations it leaves)
 tests/sources/functional/bug_15880.move:38:13: error: the assertion `global<R>(@0x1).v == 3` does not hold
 tests/sources/functional/bug_15880.move:37:13: error: the assertion `v == 4` does not hold
 tests/sources/functional/bug_15880.move:27:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in `tests/sources/functional/bug_15880.proof.lean` (`verify test2 by skip` shows the obligations it leaves)
 tests/sources/functional/bug_15880.move:54:18: error: the assertion `v == vector<u256>[1, 2, 3]` does not hold
 tests/sources/functional/bug_15880.move:46:4: error: leaner verification failed: the automatic verification of `test3` failed; provide a proof: `verify test3 by …` in `tests/sources/functional/bug_15880.proof.lean` (`verify test3 by skip` shows the obligations it leaves)
-tests/sources/functional/bug_15880.move:67:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/bug_15880.move:67:5: error: leaner verification failed: the automatic verification of `test4` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test4 by …` in `tests/sources/functional/bug_15880.proof.lean` (`verify test4 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/bug_15880.move:75:13: error: the assertion `v == vector<u256>[1, 2, 3]` does not hold
+tests/sources/functional/bug_15880.move:67:5: error: leaner verification failed: the automatic verification of `test4` failed; provide a proof: `verify test4 by …` in `tests/sources/functional/bug_15880.proof.lean` (`verify test4 by skip` shows the obligations it leaves)

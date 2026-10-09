@@ -5,5 +5,7 @@ warning: Unused parameter `a`. Consider removing or prefixing with an underscore
 13 │     inline fun bump_other_then_apply(f: |u64| u64, a: address, b: address, x: u64): u64 {
    │                                                    ^
 
-tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:25:5: error: operation `LeanerIR.Operation.data
-  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 2 } } "v")` is outside the current LeanerLang parser
+tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:17:13: error: the assertion `with_state_anchor!(
+      3, global<R>(a).v == old(global<R>(a).v) + 3 && res == x
+    )` does not hold
+tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:41:5: error: leaner verification failed: the automatic verification of `wrong_attached_claim` failed; provide a proof: `verify wrong_attached_claim by …` in `tests/sources/functional/closures/inline/anchor_mutation_pre_state.proof.lean` (`verify wrong_attached_claim by skip` shows the obligations it leaves)

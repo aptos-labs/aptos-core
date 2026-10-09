@@ -467,7 +467,7 @@ leaner module aptos_std::simple_map where
   -- We need to reverse the vector to consume it efficiently
   @[weight = 50]
   spec fun «spec_fold$gen$1» {T0} {T1}(
-    «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : Int,
+    «keys$init» : Vector<T0>, «values$init» : Vector<T1>, _end : u64,
     _fold_anchor_ctx_0 : Vector<Element<T0, T1> >
   ) : (Vector<T0>, Vector<T1>) :=
     if _end == 0 then («keys$init», «values$init»)
@@ -511,7 +511,7 @@ leaner module aptos_std::simple_map where
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$0» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Vector<T0> :=
     if end == 0 then vec::<T0>()
     else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
@@ -520,7 +520,7 @@ leaner module aptos_std::simple_map where
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Vector<T1> :=
     if end == 0 then vec::<T1>()
     else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
@@ -529,7 +529,7 @@ leaner module aptos_std::simple_map where
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
 
@@ -537,6 +537,6 @@ leaner module aptos_std::simple_map where
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun «spec_map_ref_aborts$lambda$3» {T0} {T1}(
-    v : Vector<Element<T0, T1> >, end : Int
+    v : Vector<Element<T0, T1> >, end : u64
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)

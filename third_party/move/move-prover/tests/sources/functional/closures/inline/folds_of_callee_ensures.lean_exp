@@ -1,3 +1,26 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_callee_ensures.move:24:10: error: operation `LeanerIR.Operation.data
-  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 1 } } "total")` is outside the current LeanerLang parser
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:68:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:68:5: error: leaner verification failed: the automatic verification of `sum_via_callee` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_via_callee by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_via_callee by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:90:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:90:5: error: leaner verification failed: the automatic verification of `sum_via_bare_callee` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_via_bare_callee by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_via_bare_callee by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:146:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:146:5: error: leaner verification failed: the automatic verification of `sum_field` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_field by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_field by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:189:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:187:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:187:5: error: leaner verification failed: the automatic verification of `sum_via_callee_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_via_callee_wrong by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_via_callee_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

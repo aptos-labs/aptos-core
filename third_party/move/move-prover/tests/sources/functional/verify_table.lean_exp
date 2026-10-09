@@ -1,11 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+tests/sources/functional/verify_table.move:15:5: error: `add` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:30:5: error: `add_fail` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
 tests/sources/functional/verify_table.move:40:5: error: `add_fail_exists` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
-tests/sources/functional/verify_table.move:62:5: error: `contains_and_length` calls the native `0x2::table::contains_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_has_key` belongs to a map whose representation is not carried
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
-tests/sources/functional/verify_table.move:2:1: error: the intrinsic map role `map_spec_len` belongs to a map whose representation is not carried
+tests/sources/functional/verify_table.move:49:5: error: `remove` calls the native `0x2::table::remove_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:62:5: error: `contains_and_length` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:74:5: error: `borrow` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:88:5: error: no denotation for the callee `0x2::table::borrow_mut`: reference operation is not carried by the denotation
+tests/sources/functional/verify_table.move:116:5: error: `add_R` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:128:5: error: `add_R_fail` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:143:5: error: no denotation for the callee `0x2::table::borrow_mut`: reference operation is not carried by the denotation

@@ -1,0 +1,4 @@
+LeanerE2ETests/SourceVerify/spec_fun_domain_false.move:11:9: error: the specification clause `ensures successor(300) == 301` is not established
+LeanerE2ETests/SourceVerify/spec_fun_domain_false.move:10:5: error: leaner verification failed: the automatic verification of `outside` failed; provide a proof: `verify outside by …` in `LeanerE2ETests/SourceVerify/spec_fun_domain_false.proof.lean` (`verify outside by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/spec_fun_domain_false.move:19:9: error: the specification clause `ensures wrapping_successor(x) == x + 1` is not established
+LeanerE2ETests/SourceVerify/spec_fun_domain_false.move:17:5: error: leaner verification failed: the automatic verification of `wraps` failed; provide a proof: `verify wraps by …` in `LeanerE2ETests/SourceVerify/spec_fun_domain_false.proof.lean` (`verify wraps by skip` shows the obligations it leaves)

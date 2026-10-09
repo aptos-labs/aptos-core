@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/inlined_requires_asserted.move:131:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/inlined_requires_asserted.move:130:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)
+tests/sources/regression/inlined_requires_asserted.move:14:9: error: the precondition `requires x < 10` of `g` does not hold at this call
+tests/sources/regression/inlined_requires_asserted.move:29:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)
+tests/sources/regression/inlined_requires_asserted.move:88:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/inlined_requires_asserted.move:87:5: error: the precondition of `g` is not established
+tests/sources/regression/inlined_requires_asserted.move:87:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)
+tests/sources/regression/inlined_requires_asserted.move:39:9: error: the precondition `requires x < 10` of `g` does not hold at this call
+tests/sources/regression/inlined_requires_asserted.move:54:5: error: leaner verification failed: the automatic verification of `pub_entry` failed; provide a proof: `verify pub_entry by …` in the module (`verify pub_entry by skip` shows the obligations it leaves)
+tests/sources/regression/inlined_requires_asserted.move:39:9: error: the precondition `requires x < 10` of `g` does not hold at this call
+tests/sources/regression/inlined_requires_asserted.move:61:5: error: leaner verification failed: the automatic verification of `direct` failed; provide a proof: `verify direct by …` in the module (`verify direct by skip` shows the obligations it leaves)

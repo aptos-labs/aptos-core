@@ -1134,36 +1134,47 @@ theorem GlobalMap.shift_of_plain {globals : GlobalMap} (offset : Nat)
   exact Array.map_congr_left fun slot member => by
     simp [RuntimeValue.shift_of_plain offset (plain slot member)]
 
-theorem SemanticOperations.FreshGlobalLoanIds.below {state : RuntimeState} (fresh : FreshGlobalLoanIds state) :
-    ∀ entry ∈ state.globalLoans, entry.1 < state.nextLoan := by
+theorem SemanticOperations.FreshStorageLoanIds.below {state : RuntimeState} (fresh : FreshStorageLoanIds state) :
+    ∀ entry ∈ state.storageLoans, entry.1 < state.nextLoan := by
   intro entry member
   refine Nat.lt_of_not_le fun beyond => ?_
   have absent := fresh entry.1 beyond
-  simp only [globalLoanKeyIn?, Option.map_eq_none_iff, List.find?_eq_none] at absent
+  simp only [storageLoanTargetIn?, Option.map_eq_none_iff, List.find?_eq_none] at absent
   exact absent entry member (by simp)
 
-/-- Starts with the same global memory, holding no loan, and fresh loan
+/-- Renaming loans leaves loan-free Table storage unchanged. -/
+theorem NativeTableStorage.shift_of_plain (offset : Nat) {storage : NativeTableStorage}
+    (plain : ∀ slot ∈ storage.contents.entries, Plain slot.value) :
+    storage.shift offset = storage := by
+  cases storage
+  simp only [NativeTableStorage.shift, GlobalMap.shift_of_plain offset plain]
+
+/-- Starts with the same global and Table storage, holding no loan, and fresh loan
 registries mirror each other: the second's frontier is raised by the
 difference. -/
 theorem StateShifted.ofStarts {start start₂ : RuntimeState}
     (globals_eq : start₂.globals = start.globals)
+    (tables_eq : start₂.tables = start.tables)
     (plain : ∀ slot ∈ start.globals.entries, Plain slot.value)
-    (fresh : FreshGlobalLoanIds start) (fresh₂ : FreshGlobalLoanIds start₂)
+    (tables_plain : ∀ slot ∈ start.tables.contents.entries, Plain slot.value)
+    (fresh : FreshStorageLoanIds start) (fresh₂ : FreshStorageLoanIds start₂)
     (le : start.nextLoan ≤ start₂.nextLoan) :
     StateShifted (start₂.nextLoan - start.nextLoan) start.nextLoan start.pending.size
       start₂.pending.size start start₂ where
   globals := by rw [globals_eq, GlobalMap.shift_of_plain _ plain]
+  tables := by rw [tables_eq, NativeTableStorage.shift_of_plain _ tables_plain]
   nextLoan := by omega
   frontier_le := Nat.le_refl _
   inert_le := Nat.le_refl _
   inert_le' := Nat.le_refl _
   pending := by simp
-  registry := ⟨[], start.globalLoans, start₂.globalLoans, rfl, rfl, by simp, fresh.below,
+  registry := ⟨[], start.storageLoans, start₂.storageLoans, rfl, rfl, by simp, fresh.below,
     fun entry member => by have := fresh₂.below entry member; omega⟩
   globalsAbove := fun slot member => RuntimeValue.above_of_plain _ (plain slot member)
+  tablesAbove := fun slot member => RuntimeValue.above_of_plain _ (tables_plain slot member)
   pendingAbove := by simp
 
-/-- Loan independence: a run from a start whose global memory holds no loan,
+/-- Loan independence: a run from a start whose global and Table storage hold no loan,
 on arguments holding none, is mirrored from every start with that memory and
 a fresh registry at a frontier no lower, with its loans raised by the
 frontiers' difference. -/
@@ -1173,17 +1184,20 @@ theorem runs_mirror {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     {start start₂ final : RuntimeState} {arguments : Array RuntimeValue} {outcome : Outcome}
     (run : EvalFunction executable handle instantiation start arguments final outcome)
     (globals_eq : start₂.globals = start.globals)
+    (tables_eq : start₂.tables = start.tables)
     (plain : ∀ slot ∈ start.globals.entries, Plain slot.value)
-    (fresh : FreshGlobalLoanIds start) (fresh₂ : FreshGlobalLoanIds start₂)
+    (tables_plain : ∀ slot ∈ start.tables.contents.entries, Plain slot.value)
+    (fresh : FreshStorageLoanIds start) (fresh₂ : FreshStorageLoanIds start₂)
     (le : start.nextLoan ≤ start₂.nextLoan)
     (arguments_plain : ∀ argument ∈ arguments, Plain argument) :
     ∃ final₂, EvalFunction executable handle instantiation start₂ arguments final₂
         (outcome.shift (start₂.nextLoan - start.nextLoan)) ∧
-      final₂.globals = final.globals.shift (start₂.nextLoan - start.nextLoan) := by
+      final₂.globals = final.globals.shift (start₂.nextLoan - start.nextLoan) ∧
+      final₂.tables = final.tables.shift (start₂.nextLoan - start.nextLoan) := by
   obtain ⟨final₂, finalShifted, -, run₂⟩ :=
-    shifts natives run _ _ _ _ start₂ (StateShifted.ofStarts globals_eq plain fresh fresh₂ le)
+    shifts natives run _ _ _ _ start₂ (StateShifted.ofStarts globals_eq tables_eq plain tables_plain fresh fresh₂ le)
       fun argument member => RuntimeValue.above_of_plain _ (arguments_plain argument member)
   rw [Array.map_shift_of_plain _ arguments_plain] at run₂
-  exact ⟨final₂, run₂, finalShifted.globals⟩
+  exact ⟨final₂, run₂, finalShifted.globals, finalShifted.tables⟩
 
 end LeanerIR

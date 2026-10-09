@@ -1,2 +1,43 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bv_aborts.move:1:1: error: specification function call namespace is out of range
+tests/sources/functional/bv_aborts.move:16:9: error: the specification clause `aborts_if x
+        > 815 with internal(0)
+      | (868234287550 << 24)
+        % 115792089237316195423570985008687907853269984665640564039457584007913129639936` is not established
+tests/sources/functional/bv_aborts.move:14:5: error: verification failed with a residual obligation:
+case left
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+x : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false) LeanerIR.Proofs.Denote.NRow.nil)
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value)
+      (fun result final => final = initialState✝ ∧ x.val ≤ 815)
+      (fun failure =>
+        LeanerIR.Proofs.Obligation "bv_aborts.lean" 1944 2104
+          (815 < x.val ∧
+            match failure with
+            | (LeanerIR.ThrowKind.abort, payload) =>
+              payload =
+                #[LeanerIR.RuntimeValue.integer
+                    (LeanerIR.Proofs.IntegerArithmetic.bitwiseOr (Int.shiftLeft 11 16 + 0)
+                      (Int.shiftLeft 868234287550 24 %
+                        115792089237316195423570985008687907853269984665640564039457584007913129639936))]
+            | (LeanerIR.ThrowKind.profile value, snd) =>
+              (value = { profile := LeanerIR.Profile.move, tag := "runtime.arithmetic_error" } ∨
+                  value = { profile := LeanerIR.Profile.move, tag := "runtime.vector_error" }) ∧
+                LeanerIR.Proofs.IntegerArithmetic.bitwiseOr (Int.shiftLeft 11 16 + 0)
+                    (Int.shiftLeft 868234287550 24 %
+                      115792089237316195423570985008687907853269984665640564039457584007913129639936) =
+                  -1
+            | x => False))
+      state
+a✝ : x.val > 815
+⊢ x.val ≤ 815
+tests/sources/functional/bv_aborts.move:14:5: error: leaner verification failed: the automatic verification of `assert_with_spec` failed; provide a proof: `verify assert_with_spec by …` in `tests/sources/functional/bv_aborts.proof.lean` (`verify assert_with_spec by skip` shows the obligations it leaves)

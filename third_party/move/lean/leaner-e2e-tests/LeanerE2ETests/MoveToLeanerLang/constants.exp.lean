@@ -14,11 +14,24 @@ leaner module 0x42::constants where
 
   const BIG : u128 := 1267650600228229401496703205376u128
 
-  spec fun int2bv_u64(value : Int) : Int := int_to_bit_vector(value + 1)
+  spec fun int2bv_u64(value : u64) : Int :=
+    if 0 <= value + 1 && value + 1 < 18446744073709551616 then value + 1
+    else
+      ((value + 1) % 18446744073709551616 + 18446744073709551616)
+        % 18446744073709551616
 
-  spec fun int2bv_u128(value : Int) : Int := int_to_bit_vector(value + 1)
+  spec fun int2bv_u128(value : u128) : Int :=
+    if 0 <= value + 1 && value + 1 < 18446744073709551616 then value + 1
+    else
+      ((value + 1) % 18446744073709551616 + 18446744073709551616)
+        % 18446744073709551616
 
-  spec fun int2bv_and_u64(left : Int, right : Int) : Int := left & right
+  spec fun int2bv_and_u64(left : u64, right : u64) : Int :=
+    (if 0 <= left && left < 18446744073709551616 then left
+    else
+      (left % 18446744073709551616 + 18446744073709551616)
+        % 18446744073709551616)
+      & right
 
   public fun owner() -> Address := OWNER
 

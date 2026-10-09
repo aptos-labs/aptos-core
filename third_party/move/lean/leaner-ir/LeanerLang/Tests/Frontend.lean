@@ -7,6 +7,25 @@ open Lean
 open Lean.Elab.Command
 open LeanerIR
 
+-- Positional field frame targets are identifiers, even though projections
+-- and field declarations use unquoted numeric names.
+run_cmd do
+  let env ← getEnv
+  for frame in ["*", "(owner : Address) global<R>(owner)"] do
+    let source := "leaner module 0x42::positional_frame where\n" ++
+      "  struct R has Key where\n    value : u64\n" ++
+      "  struct Wrapper has Drop where\n    0 : Fn(Address) -> Unit has Drop\n" ++
+      s!"  spec Wrapper where\n    modifies_of<«0»> {frame}\n"
+    let printed ← match LeanerLang.Print.formatSource env source with
+      | .ok printed => pure printed
+      | .error error => throwError "positional frame did not format: {error}"
+    unless printed.contains "modifies_of<«0»>" do
+      throwError "positional frame lost its quoted identifier: {printed}"
+    let .ok again := LeanerLang.Print.formatSource env printed
+      | throwError "positional frame did not re-import"
+    unless printed == again do
+      throwError "positional frame is not a formatting fixed point"
+
 -- Calls keep mathematical scalar results in derived specifications; their
 -- containing vectors keep physical elements. Only that boundary is injected.
 leaner module 0x42::scalar_call_elements where
@@ -807,7 +826,7 @@ elab "#guard_leaner_frontend" : command => do
       (mathNamespace.expressions[·.index]?)
     | throwError "the derived specification arithmetic body was not retained"
   unless (match executableBody.kind with
-      | .operation (.primitive (.checkedAdd .abort)) _ _ _ => true
+      | .operation (.primitive (.checkedAdd LeanerIR.moveArithmeticError)) _ _ _ => true
       | _ => false) && (match specificationBody.kind with
       | .operation (.primitive .add) _ _ _ => true
       | _ => false) do
@@ -1340,3 +1359,50 @@ elab "#guard_leaner_frontend" : command => do
 
 #guard_leaner_frontend
 #check_leaner 0x42::math
+
+-- Clause metadata carries values, not just Boolean flags. In particular the
+-- inferred specifications exported by Move may use `inferred = sathard`.
+leaner module 0x42::valued_condition_properties where
+  fun identity(x : u64) -> u64 := x
+  spec identity where
+    aborts_if false
+    ensures [inferred = sathard, enabled = false, weight = 2, note = "sample"] result == x
+
+run_cmd do
+  let env ← getEnv
+  let some unit := LeanerLang.registeredUnit? env `«0x42».valued_condition_properties
+    | throwError "missing valued-property fixture"
+  let properties := unit.namespaces[0]!.functions[0]!.contract.conditions[1]!.properties
+  unless properties.any (fun
+      | .assign "inferred" (.name none "sathard") _ => true
+      | _ => false) && properties.any (fun
+      | .assign "enabled" (.constant (.bool false)) _ => true
+      | _ => false) do
+    throwError "condition property values were lost"
+  let .ok printed := LeanerLang.Print.render env unit
+    | throwError "valued condition properties did not render"
+  unless printed.contains "inferred = sathard" && printed.contains "enabled = false" &&
+      printed.contains "weight = 2" && printed.contains "note = \"sample\"" do
+    throwError "condition property values changed when printed: {printed}"
+  let .ok formatted := LeanerLang.Print.formatSource env printed
+    | throwError "printed valued properties did not parse"
+  unless formatted == printed do
+    throwError "valued properties are not stable through formatting"
+
+-- A post-only label must not be reparsed as a range continuing the preceding
+-- let initializer. The calculator's inferred removal clause has this shape.
+run_cmd do
+  let source := "import LeanerLang\n\nleaner module 0x42::post_label_layout where\n" ++
+    "  struct R has Key where\n    value : u64\n" ++
+    "  fun remove_at(addr : Address) -> Unit := ()\n" ++
+    "  spec remove_at where\n    pragma verify = false\n" ++
+    "    ensures do\n      let a := addr\n      (..S |~ remove<R>(a))\n"
+  let printed ← match LeanerLang.Print.formatSource (← getEnv) source with
+    | .ok printed => pure printed
+    | .error error => throwError "post-only label did not format: {error}"
+  unless printed.contains "(..S |~ remove<R>(a))" do
+    throwError "post-only label lost its parentheses: {printed}"
+  let .ok again := LeanerLang.Print.formatSource (← getEnv) printed
+    | throwError "formatted post-only label did not parse"
+  unless printed == again do
+    throwError "post-only label formatting is not stable"

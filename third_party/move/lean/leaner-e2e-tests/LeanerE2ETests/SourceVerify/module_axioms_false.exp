@@ -1,0 +1,4 @@
+LeanerE2ETests/SourceVerify/module_axioms_false.move:19:9: error: the specification clause `ensures result` is not established
+LeanerE2ETests/SourceVerify/module_axioms_false.move:18:5: error: leaner verification failed: the automatic verification of `distinct` failed; provide a proof: `verify distinct by …` in `LeanerE2ETests/SourceVerify/module_axioms_false.proof.lean` (`verify distinct by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/module_axioms_false.move:29:9: error: the specification clause `ensures result == (spec_bit(byte, bit) > 1)` is not established
+LeanerE2ETests/SourceVerify/module_axioms_false.move:27:5: error: leaner verification failed: the automatic verification of `has_bit` failed; provide a proof: `verify has_bit by …` in `LeanerE2ETests/SourceVerify/module_axioms_false.proof.lean` (`verify has_bit by skip` shows the obligations it leaves)

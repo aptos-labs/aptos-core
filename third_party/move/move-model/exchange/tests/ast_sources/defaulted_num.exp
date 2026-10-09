@@ -1,0 +1,718 @@
+{
+  "schema": "move-xast-module",
+  "version": 10,
+  "address": "0x42",
+  "address_alias": null,
+  "name": "defaulted_num",
+  "doc": "",
+  "loc": 0,
+  "named_addresses": [
+    {
+      "name": "aptos_framework",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_std",
+      "address": "0x1"
+    },
+    {
+      "name": "aptos_token",
+      "address": "0x3"
+    },
+    {
+      "name": "aptos_token_objects",
+      "address": "0x4"
+    },
+    {
+      "name": "std",
+      "address": "0x1"
+    }
+  ],
+  "friends": [],
+  "pragmas": [],
+  "constants": [],
+  "structs": [],
+  "functions": [
+    {
+      "name": "caller",
+      "doc": "",
+      "loc": 9,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "x",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": 8,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "ensures",
+            "loc": 3,
+            "properties": [],
+            "exp": {
+              "ty": 3,
+              "loc": 7,
+              "kind": "call",
+              "op": "ge",
+              "inst": [],
+              "args": [
+                {
+                  "ty": 2,
+                  "loc": 6,
+                  "kind": "call",
+                  "op": "bit_or",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 4,
+                      "kind": "param",
+                      "index": 0
+                    },
+                    {
+                      "ty": 1,
+                      "loc": 5,
+                      "kind": "value",
+                      "value": {
+                        "number": "3"
+                      },
+                      "constant": null,
+                      "defaulted_num": true
+                    }
+                  ],
+                  "surface": null
+                },
+                {
+                  "ty": 0,
+                  "loc": 4,
+                  "kind": "param",
+                  "index": 0
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 2,
+        "kind": "call",
+        "op": {
+          "move_function": 0
+        },
+        "inst": [],
+        "args": [
+          {
+            "ty": 0,
+            "loc": 1,
+            "kind": "param",
+            "index": 0
+          }
+        ],
+        "surface": null
+      }
+    },
+    {
+      "name": "mask",
+      "doc": "",
+      "loc": 32,
+      "visibility": "private",
+      "is_entry": false,
+      "kind": "regular",
+      "is_receiver": false,
+      "attributes": [],
+      "type_params": [],
+      "params": [
+        {
+          "name": "x",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "pragmas": [],
+      "spec": {
+        "loc": 31,
+        "pragmas": [],
+        "conditions": [
+          {
+            "kind": "ensures",
+            "loc": 13,
+            "properties": [],
+            "exp": {
+              "ty": 3,
+              "loc": 18,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 14,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 17,
+                  "kind": "call",
+                  "op": "bit_or",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 15,
+                      "kind": "param",
+                      "index": 0
+                    },
+                    {
+                      "ty": 1,
+                      "loc": 16,
+                      "kind": "value",
+                      "value": {
+                        "number": "3"
+                      },
+                      "constant": null,
+                      "defaulted_num": true
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 19,
+            "properties": [],
+            "exp": {
+              "ty": 3,
+              "loc": 24,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 20,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 23,
+                  "kind": "call",
+                  "op": "bit_or",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 21,
+                      "kind": "param",
+                      "index": 0
+                    },
+                    {
+                      "ty": 1,
+                      "loc": 22,
+                      "kind": "value",
+                      "value": {
+                        "number": "3"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          },
+          {
+            "kind": "ensures",
+            "loc": 25,
+            "properties": [],
+            "exp": {
+              "ty": 3,
+              "loc": 30,
+              "kind": "call",
+              "op": "eq",
+              "inst": [
+                0
+              ],
+              "args": [
+                {
+                  "ty": 0,
+                  "loc": 26,
+                  "kind": "call",
+                  "op": {
+                    "result": 0
+                  },
+                  "inst": [],
+                  "args": [],
+                  "surface": null
+                },
+                {
+                  "ty": 2,
+                  "loc": 29,
+                  "kind": "call",
+                  "op": "bit_or",
+                  "inst": [],
+                  "args": [
+                    {
+                      "ty": 0,
+                      "loc": 27,
+                      "kind": "param",
+                      "index": 0
+                    },
+                    {
+                      "ty": 0,
+                      "loc": 28,
+                      "kind": "value",
+                      "value": {
+                        "number": "3"
+                      },
+                      "constant": null
+                    }
+                  ],
+                  "surface": null
+                }
+              ],
+              "surface": null
+            },
+            "abort_code": null,
+            "additional_codes": [],
+            "emits_handle": null,
+            "emits_condition": null,
+            "update_target": null
+          }
+        ],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      },
+      "body": {
+        "ty": 0,
+        "loc": 12,
+        "kind": "call",
+        "op": "bit_or",
+        "inst": [
+          0
+        ],
+        "args": [
+          {
+            "ty": 0,
+            "loc": 10,
+            "kind": "param",
+            "index": 0
+          },
+          {
+            "ty": 0,
+            "loc": 11,
+            "kind": "value",
+            "value": {
+              "number": "3"
+            },
+            "constant": null
+          }
+        ],
+        "surface": null
+      }
+    }
+  ],
+  "spec_funs": [
+    {
+      "name": "$caller",
+      "doc": "",
+      "loc": 9,
+      "type_params": [],
+      "params": [
+        {
+          "name": "x",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 0,
+        "loc": 2,
+        "kind": "call",
+        "op": {
+          "spec_function": {
+            "name": 1,
+            "range": {
+              "pre": null,
+              "post": null
+            }
+          }
+        },
+        "inst": [],
+        "args": [
+          {
+            "ty": 0,
+            "loc": 1,
+            "kind": "local",
+            "name": "x"
+          }
+        ],
+        "surface": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    },
+    {
+      "name": "$mask",
+      "doc": "",
+      "loc": 32,
+      "type_params": [],
+      "params": [
+        {
+          "name": "x",
+          "ty": 0
+        }
+      ],
+      "result": 0,
+      "uninterpreted": false,
+      "is_native": false,
+      "is_move_fun": true,
+      "uses_old": false,
+      "body": {
+        "ty": 0,
+        "loc": 12,
+        "kind": "call",
+        "op": "bit_or",
+        "inst": [
+          0
+        ],
+        "args": [
+          {
+            "ty": 0,
+            "loc": 10,
+            "kind": "local",
+            "name": "x"
+          },
+          {
+            "ty": 0,
+            "loc": 11,
+            "kind": "value",
+            "value": {
+              "number": "3"
+            },
+            "constant": null
+          }
+        ],
+        "surface": null
+      },
+      "spec": {
+        "loc": null,
+        "pragmas": [],
+        "conditions": [],
+        "frame": null,
+        "access_of": [],
+        "proof": null
+      }
+    }
+  ],
+  "spec_vars": [],
+  "invariants": [],
+  "lemmas": [],
+  "labels": [],
+  "skipped": [],
+  "comments": [
+    {
+      "loc": 33,
+      "text": "// Copyright © Aptos Foundation",
+      "own_line": true
+    },
+    {
+      "loc": 34,
+      "text": "// SPDX-License-Identifier: Apache-2.0",
+      "own_line": true
+    },
+    {
+      "loc": 35,
+      "text": "// Both literals below have type u256 before representation analysis.",
+      "own_line": true
+    },
+    {
+      "loc": 36,
+      "text": "// Only the first may adopt the other operand's narrower width.",
+      "own_line": true
+    },
+    {
+      "loc": 37,
+      "text": "// The marker must survive schema expansion as well.",
+      "own_line": true
+    }
+  ],
+  "sources": [
+    "defaulted_num.move"
+  ],
+  "locs": [
+    {
+      "file": 0,
+      "start": 73,
+      "end": 644
+    },
+    {
+      "file": 0,
+      "start": 529,
+      "end": 530
+    },
+    {
+      "file": 0,
+      "start": 524,
+      "end": 531
+    },
+    {
+      "file": 0,
+      "start": 468,
+      "end": 489
+    },
+    {
+      "file": 0,
+      "start": 629,
+      "end": 635
+    },
+    {
+      "file": 0,
+      "start": 481,
+      "end": 482
+    },
+    {
+      "file": 0,
+      "start": 476,
+      "end": 483
+    },
+    {
+      "file": 0,
+      "start": 476,
+      "end": 488
+    },
+    {
+      "file": 0,
+      "start": 538,
+      "end": 642
+    },
+    {
+      "file": 0,
+      "start": 500,
+      "end": 533
+    },
+    {
+      "file": 0,
+      "start": 128,
+      "end": 129
+    },
+    {
+      "file": 0,
+      "start": 132,
+      "end": 133
+    },
+    {
+      "file": 0,
+      "start": 128,
+      "end": 133
+    },
+    {
+      "file": 0,
+      "start": 310,
+      "end": 336
+    },
+    {
+      "file": 0,
+      "start": 318,
+      "end": 324
+    },
+    {
+      "file": 0,
+      "start": 329,
+      "end": 330
+    },
+    {
+      "file": 0,
+      "start": 333,
+      "end": 334
+    },
+    {
+      "file": 0,
+      "start": 328,
+      "end": 335
+    },
+    {
+      "file": 0,
+      "start": 318,
+      "end": 335
+    },
+    {
+      "file": 0,
+      "start": 345,
+      "end": 375
+    },
+    {
+      "file": 0,
+      "start": 353,
+      "end": 359
+    },
+    {
+      "file": 0,
+      "start": 364,
+      "end": 365
+    },
+    {
+      "file": 0,
+      "start": 368,
+      "end": 373
+    },
+    {
+      "file": 0,
+      "start": 363,
+      "end": 374
+    },
+    {
+      "file": 0,
+      "start": 353,
+      "end": 374
+    },
+    {
+      "file": 0,
+      "start": 384,
+      "end": 412
+    },
+    {
+      "file": 0,
+      "start": 392,
+      "end": 398
+    },
+    {
+      "file": 0,
+      "start": 403,
+      "end": 404
+    },
+    {
+      "file": 0,
+      "start": 407,
+      "end": 410
+    },
+    {
+      "file": 0,
+      "start": 402,
+      "end": 411
+    },
+    {
+      "file": 0,
+      "start": 392,
+      "end": 411
+    },
+    {
+      "file": 0,
+      "start": 140,
+      "end": 418
+    },
+    {
+      "file": 0,
+      "start": 106,
+      "end": 135
+    },
+    {
+      "file": 0,
+      "start": 0,
+      "end": 32
+    },
+    {
+      "file": 0,
+      "start": 33,
+      "end": 71
+    },
+    {
+      "file": 0,
+      "start": 160,
+      "end": 229
+    },
+    {
+      "file": 0,
+      "start": 238,
+      "end": 301
+    },
+    {
+      "file": 0,
+      "start": 560,
+      "end": 612
+    }
+  ],
+  "types": [
+    "u8",
+    "u256",
+    "num",
+    "bool"
+  ],
+  "modules": [
+    {
+      "address": "0x42",
+      "address_alias": null,
+      "name": "defaulted_num"
+    }
+  ],
+  "names": [
+    {
+      "module": 0,
+      "name": "mask"
+    },
+    {
+      "module": 0,
+      "name": "$mask"
+    }
+  ]
+}

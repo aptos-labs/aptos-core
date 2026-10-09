@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/closure_requires_guarded.move:99:5: error: the precondition of `reset` is not established
+tests/sources/regression/closure_requires_guarded.move:99:5: error: leaner verification failed: the automatic verification of `opaque_post_state_fails` failed; provide a proof: `verify opaque_post_state_fails by …` in the module (`verify opaque_post_state_fails by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:121:5: error: the precondition of `in_range` is not established
+tests/sources/regression/closure_requires_guarded.move:121:5: error: leaner verification failed: the automatic verification of `opaque_ensures_fails` failed; provide a proof: `verify opaque_ensures_fails by …` in the module (`verify opaque_ensures_fails by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:128:5: error: the precondition of `narrow` is not established
+tests/sources/regression/closure_requires_guarded.move:128:5: error: leaner verification failed: the automatic verification of `opaque_result_range_ok` failed; provide a proof: `verify opaque_result_range_ok by …` in the module (`verify opaque_result_range_ok by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:138:5: error: the precondition of `narrow` is not established
+tests/sources/regression/closure_requires_guarded.move:138:5: error: leaner verification failed: the automatic verification of `opaque_result_of_ok` failed; provide a proof: `verify opaque_result_of_ok by …` in the module (`verify opaque_result_of_ok by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:149:26: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/closure_requires_guarded.move:149:5: error: leaner verification failed: the automatic verification of `mut_ref_fails` failed; provide a proof: `verify mut_ref_fails by …` in the module (`verify mut_ref_fails by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:163:30: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/closure_requires_guarded.move:163:5: error: leaner verification failed: the automatic verification of `transparent_fails` failed; provide a proof: `verify transparent_fails by …` in the module (`verify transparent_fails by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:174:30: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/closure_requires_guarded.move:174:5: error: leaner verification failed: the automatic verification of `through_hof_fails` failed; provide a proof: `verify through_hof_fails by …` in the module (`verify through_hof_fails by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:185:5: error: the precondition of `g_opaque` is not established
+tests/sources/regression/closure_requires_guarded.move:185:5: error: leaner verification failed: the automatic verification of `opaque_abort_fails` failed; provide a proof: `verify opaque_abort_fails by …` in the module (`verify opaque_abort_fails by skip` shows the obligations it leaves)
+tests/sources/regression/closure_requires_guarded.move:200:5: error: the precondition of `bump` is not established
+tests/sources/regression/closure_requires_guarded.move:200:5: error: leaner verification failed: the automatic verification of `opaque_frame_fails` failed; provide a proof: `verify opaque_frame_fails by …` in the module (`verify opaque_frame_fails by skip` shows the obligations it leaves)

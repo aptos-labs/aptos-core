@@ -98,7 +98,7 @@ theorem Denote.Encodes.plain {unit : ValidatedUnit} {memory : Denote.Memory unit
   split at found
   · obtain ⟨value, -, encoded⟩ := Option.map_eq_some_iff.mp found.symm
     rw [← encoded]
-    exact @Denote.NTy.encode_plain (Denote.Carriers.runtime unit) _ value
+    exact Denote.ResourceType.encode_plain _ value
   · cases found
 
 /-- A function value that runs on arguments of `parameters` and returns
@@ -191,9 +191,12 @@ theorem closureMeaning_ok_ensuresOf {unit : ValidatedUnit} {executable : Executa
     ∃ values, shape.lend false result [] = some values ∧
       EnsuresOf executable closure.encode (HList.encode args) values initial final := by
   obtain ⟨start, loans, supplied, arguments, results, exit, returnedLoans, prophecyRow,
-    globals_eq, admissible, lend_eq, compose_eq, step, lend_false, -, -, encoded, agree⟩ := run
+    globals_eq, admissible, lend_eq, compose_eq, step, lend_false, lend_true, -, encoded, agree⟩ := run
   obtain ⟨rfl, rfl⟩ := lendArguments_refFree free lend_eq
   cases ResultShape.lend_refFree_loans shape shapeFree lend_false
+  rw [ResultShape.lend_refFree_view shape shapeFree, lend_false] at lend_true
+  have sameRow : prophecyRow = results := (Option.some.inj lend_true).symm
+  subst prophecyRow
   refine ⟨results, lend_false, start, exit, ⟨globals_eq, admissible⟩, ?_, encoded, agree⟩
   simp only [ClosureValue.encode, invocationSpec]
   simp only at compose_eq
@@ -249,7 +252,7 @@ theorem closureMeaning_defined {unit : ValidatedUnit} (executable : ExecutableUn
     (by rw [signatureTypes?_length signature_eq]; exact mask_bound) captures_typed
     (by simpa using argumentsTyped) compose_eq
   have startTyped : TypedState unit (fun _ => none) start.pending.size start :=
-    { globals := globals start globals_eq
+    { globals := globals start globals_eq.globals
       inert_le := Nat.le_refl _
       pending := fun _ member => by simp at member
       bounded := fun _ _ none_eq => by simp at none_eq }
@@ -290,7 +293,7 @@ section Agreement
 open SemanticOperations
 open BigStep
 
-/-- Two runs from starts with the same global memory holding no loan and
+/-- Two runs from starts with the same global and Table storage holding no loan and
 fresh registries, on arguments holding none: one is the other with its
 loans raised. -/
 theorem evalFunction_agree {unit : ValidatedUnit} {executable : ExecutableUnit unit}
@@ -299,18 +302,21 @@ theorem evalFunction_agree {unit : ValidatedUnit} {executable : ExecutableUnit u
     {start start₂ final final₂ : RuntimeState} {arguments : Array RuntimeValue}
     {outcome outcome₂ : Outcome}
     (globals_eq : start₂.globals = start.globals)
+    (tables_eq : start₂.tables = start.tables)
     (plain : ∀ slot ∈ start.globals.entries, Plain slot.value)
-    (fresh : FreshGlobalLoanIds start) (fresh₂ : FreshGlobalLoanIds start₂)
+    (tables_plain : ∀ slot ∈ start.tables.contents.entries, Plain slot.value)
+    (fresh : FreshStorageLoanIds start) (fresh₂ : FreshStorageLoanIds start₂)
     (arguments_plain : ∀ argument ∈ arguments, Plain argument)
     (run : EvalFunction executable handle instantiation start arguments final outcome)
     (run₂ : EvalFunction executable handle instantiation start₂ arguments final₂ outcome₂) :
     (∃ offset, outcome₂ = outcome.shift offset) ∨ ∃ offset, outcome = outcome₂.shift offset := by
   rcases Nat.le_total start.nextLoan start₂.nextLoan with le | le
   · obtain ⟨_, mirror, -⟩ :=
-      runs_mirror natives run globals_eq plain fresh fresh₂ le arguments_plain
+      runs_mirror natives run globals_eq tables_eq plain tables_plain fresh fresh₂ le arguments_plain
     exact .inl ⟨_, (Completeness.evalFunction_deterministic run₂ mirror).2⟩
-  · obtain ⟨_, mirror, -⟩ := runs_mirror natives run₂ globals_eq.symm
-      (by rw [globals_eq]; exact plain) fresh₂ fresh le arguments_plain
+  · obtain ⟨_, mirror, -⟩ := runs_mirror natives run₂ globals_eq.symm tables_eq.symm
+      (by rw [globals_eq]; exact plain) (by rw [tables_eq]; exact tables_plain)
+      fresh₂ fresh le arguments_plain
     exact .inr ⟨_, (Completeness.evalFunction_deterministic run mirror).2⟩
 
 /-- The arguments an invocation of a closure holding no loan runs its
@@ -354,7 +360,8 @@ theorem not_abortsOf_of_ok {unit : ValidatedUnit} {executable : ExecutableUnit u
   · rw [bottom] at ok; exact ok
   rw [spec_eq] at ok aborted
   obtain ⟨_, threw⟩ := aborted
-  rcases evalFunction_agree natives (starts₂.1.unique starts.1) starts.1.plain starts.2.2.2
+  rcases evalFunction_agree natives (starts₂.1.unique starts.1).1 (starts₂.1.unique starts.1).2
+      starts.1.globals.plain starts.1.tables.1.plain starts.2.2.2
       starts₂.2.2.2 composed_plain ok threw with ⟨_, shifted⟩ | ⟨_, shifted⟩ <;> cases shifted
 
 /-- `result_of` is the result of every run from a start at `state` that
@@ -366,7 +373,7 @@ theorem resultOf_eq_of_ok {unit : ValidatedUnit} {executable : ExecutableUnit un
     (callable_plain : Plain callable) (arguments_plain : ∀ argument ∈ arguments, Plain argument)
     (starts : StartsAt start state)
     (ok : (invocationSpec executable callable arguments).ok start results exit)
-    (encoded : Denote.Encodes unit post exit.globals)
+    (encoded : Denote.StorageEncodesReturned unit post exit results)
     (agree : Denote.AgreeUnnamed unit post state)
     (results_plain : ∀ result ∈ results, Plain result) :
     ResultOf executable callable arguments state = results := by
@@ -379,7 +386,8 @@ theorem resultOf_eq_of_ok {unit : ValidatedUnit} {executable : ExecutableUnit un
     bottom | ⟨function, typeInstantiation, composed, spec_eq, composed_plain⟩
   · rw [bottom] at ok; exact ok.elim
   rw [spec_eq] at ok ok₂
-  rcases evalFunction_agree natives (starts₂.1.unique starts.1) starts.1.plain starts.2.2.2
+  rcases evalFunction_agree natives (starts₂.1.unique starts.1).1 (starts₂.1.unique starts.1).2
+      starts.1.globals.plain starts.1.tables.1.plain starts.2.2.2
       starts₂.2.2.2 composed_plain ok ok₂ with ⟨offset, shifted⟩ | ⟨offset, shifted⟩
   · simp only [Outcome.shift_returned, Outcome.returned.injEq] at shifted
     rw [shifted, Array.map_shift_of_plain offset results_plain]
@@ -387,6 +395,99 @@ theorem resultOf_eq_of_ok {unit : ValidatedUnit} {executable : ExecutableUnit un
     have same := shifted.symm.trans (Array.map_shift_of_plain offset results_plain).symm
     have unshifted := congrArg (·.map (·.unshift offset)) same
     simpa [Array.map_map, Function.comp_def, RuntimeValue.unshift_shift] using unshifted
+
+/-- Equal runtime stores determine their named slots; agreement at unnamed
+resource types determines the rest of a semantic memory. -/
+private theorem memory_eq_of_encodes {unit : ValidatedUnit}
+    {left right pre : Denote.Memory unit} {leftState rightState : RuntimeState}
+    (leftEncoded : Denote.StorageEncodes unit left leftState)
+    (rightEncoded : Denote.StorageEncodes unit right rightState)
+    (same : leftState.globals = rightState.globals ∧ leftState.tables = rightState.tables)
+    (leftAgree : Denote.AgreeUnnamed unit left pre)
+    (rightAgree : Denote.AgreeUnnamed unit right pre) : left = right := by
+  classical
+  funext resource key
+  by_cases globalNamed : ∃ namespaceId typeId,
+      Denote.runtimeResourceOf unit namespaceId typeId = some resource
+  · obtain ⟨namespaceId, typeId, named⟩ := globalNamed
+    have encoded := leftEncoded.globals.2 namespaceId typeId key
+    rw [same.1, rightEncoded.globals.2, named] at encoded
+    exact Option.map_injective
+      (Denote.ResourceType.encode_injective resource) encoded.symm
+  by_cases tableNamed : ∃ namespaceId typeId,
+      Denote.TableMemory.runtimeResourceOf unit namespaceId typeId = some resource
+  · obtain ⟨namespaceId, typeId, named⟩ := tableNamed
+    have encoded := leftEncoded.tables.1.2 namespaceId typeId key
+    rw [same.2, rightEncoded.tables.1.2, named] at encoded
+    exact Option.map_injective
+      (Denote.ResourceType.encode_injective resource) encoded.symm
+  by_cases allocation : resource = Denote.TableMemory.allocationResource
+  · subst resource
+    rw [leftEncoded.tables.2, rightEncoded.tables.2, same.2]
+  have unnamed : Denote.Unnamed unit resource :=
+    ⟨fun ns ty named => globalNamed ⟨ns, ty, named⟩,
+     fun ns ty named => tableNamed ⟨ns, ty, named⟩, allocation⟩
+  exact congrFun ((leftAgree resource unnamed).trans (rightAgree resource unnamed).symm) key
+
+/-- Successful invocations determine their labeled post-state independently
+of the program points or loan identifiers of either execution. -/
+theorem stateOf_eq_of_ensuresOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    (natives : NativesShift executable)
+    {callable : RuntimeValue} {arguments : List RuntimeValue}
+    {results : Array RuntimeValue} {pre post : Denote.Memory unit}
+    (callable_plain : Plain callable) (arguments_plain : ∀ argument ∈ arguments, Plain argument)
+    (ensures : EnsuresOf executable callable arguments results pre post) :
+    StateOf executable callable arguments pre = post := by
+  classical
+  have returns : ∃ results post, EnsuresOf executable callable arguments results pre post :=
+    ⟨results, post, ensures⟩
+  unfold StateOf
+  rw [dif_pos returns]
+  obtain ⟨start, exit, starts, ok, encoded, agree⟩ := ensures
+  obtain ⟨start₂, exit₂, starts₂, ok₂, encoded₂, agree₂⟩ := returns.choose_spec.choose_spec
+  suffices same : (exit₂.resolveReturned returns.choose).globals =
+        (exit.resolveReturned results).globals ∧
+      (exit₂.resolveReturned returns.choose).tables = (exit.resolveReturned results).tables by
+    exact memory_eq_of_encodes encoded₂ encoded same agree₂ agree
+  rcases invocationSpec_plain (executable := executable) callable_plain arguments_plain with
+    bottom | ⟨function, typeInstantiation, composed, spec_eq, composed_plain⟩
+  · rw [bottom] at ok; exact ok.elim
+  rw [spec_eq] at ok ok₂
+  rcases Nat.le_total start.nextLoan start₂.nextLoan with le | le
+  · obtain ⟨_, mirror, shifted, tablesShifted⟩ := runs_mirror natives ok
+      (starts₂.1.unique starts.1).1 (starts₂.1.unique starts.1).2
+      starts.1.globals.plain starts.1.tables.1.plain
+      starts.2.2.2 starts₂.2.2.2 le composed_plain
+    have deterministic := Completeness.evalFunction_deterministic ok₂ mirror
+    have sameResults : returns.choose = results.map (·.shift (start₂.nextLoan - start.nextLoan)) := by
+      simpa only [Outcome.shift_returned, Outcome.returned.injEq] using deterministic.2
+    rw [← deterministic.1] at shifted tablesShifted
+    have globals : (exit₂.resolveReturned returns.choose).globals =
+        (exit.resolveReturned results).globals.shift (start₂.nextLoan - start.nextLoan) := by
+      simp only [RuntimeState.resolveReturned, shifted, sameResults, GlobalMap.resolveReturned_shift]
+    have tables : (exit₂.resolveReturned returns.choose).tables =
+        (exit.resolveReturned results).tables.shift (start₂.nextLoan - start.nextLoan) := by
+      simp only [RuntimeState.resolveReturned, tablesShifted, sameResults, NativeTableStorage.shift,
+        GlobalMap.resolveReturned_shift]
+    exact ⟨globals.trans (GlobalMap.shift_of_plain _ encoded.globals.plain),
+      tables.trans (NativeTableStorage.shift_of_plain _ encoded.tables.1.plain)⟩
+  · obtain ⟨_, mirror, shifted, tablesShifted⟩ := runs_mirror natives ok₂
+      (starts.1.unique starts₂.1).1 (starts.1.unique starts₂.1).2
+      starts₂.1.globals.plain starts₂.1.tables.1.plain
+      starts₂.2.2.2 starts.2.2.2 le composed_plain
+    have deterministic := Completeness.evalFunction_deterministic ok mirror
+    have sameResults : results = returns.choose.map (·.shift (start.nextLoan - start₂.nextLoan)) := by
+      simpa only [Outcome.shift_returned, Outcome.returned.injEq] using deterministic.2
+    rw [← deterministic.1] at shifted tablesShifted
+    have globals : (exit.resolveReturned results).globals =
+        (exit₂.resolveReturned returns.choose).globals.shift (start.nextLoan - start₂.nextLoan) := by
+      simp only [RuntimeState.resolveReturned, shifted, sameResults, GlobalMap.resolveReturned_shift]
+    have tables : (exit.resolveReturned results).tables =
+        (exit₂.resolveReturned returns.choose).tables.shift (start.nextLoan - start₂.nextLoan) := by
+      simp only [RuntimeState.resolveReturned, tablesShifted, sameResults, NativeTableStorage.shift,
+        GlobalMap.resolveReturned_shift]
+    exact ⟨(globals.trans (GlobalMap.shift_of_plain _ encoded₂.globals.plain)).symm,
+      (tables.trans (NativeTableStorage.shift_of_plain _ encoded₂.tables.1.plain)).symm⟩
 
 end Agreement
 
@@ -434,7 +535,8 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : Executable
     (returns : ∀ result final values, shape.lend false result [] = some values →
       EnsuresOf executable closure.encode (HList.encode args) values initial final →
       ¬AbortsOf executable closure.encode (HList.encode args) initial →
-      ResultOf executable closure.encode (HList.encode args) initial = values → ensures result final)
+      ResultOf executable closure.encode (HList.encode args) initial = values →
+      StateOf executable closure.encode (HList.encode args) initial = final → ensures result final)
     (fails : ∀ error, AbortsOf executable closure.encode (HList.encode args) initial → aborts error) :
     wp (closureMeaning executable closure σs shape args) ensures aborts initial := by
   have callable_plain : Plain closure.encode := .closure _ _ _ _ closure.plain
@@ -449,6 +551,7 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : Executable
     (not_abortsOf_of_ok shifts callable_plain arguments_plain starts ok)
     (resultOf_eq_of_ok shifts callable_plain arguments_plain starts ok encoded agree
       (ResultShape.lend_plain shape shapeFree lent))
+    (stateOf_eq_of_ensuresOf shifts callable_plain arguments_plain ensuresOf)
 
 end Rule
 
@@ -738,6 +841,9 @@ theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
         ResultOf executable (ClosureValue.encode (closureOf handle
           (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
           (HList.encode args) initial = (resultCodec shape).encode result →
+        StateOf executable (ClosureValue.encode (closureOf handle
+          (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
+          (HList.encode args) initial = final →
         ensures result final)
       (fun error =>
         AbortsOf executable (ClosureValue.encode (closureOf handle
@@ -759,7 +865,8 @@ theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       exact named.1 result final execution ensuresOf
         (not_abortsOf_of_ok shifts callablePlain argumentsPlain starts ok)
         (resultOf_eq_of_ok shifts callablePlain argumentsPlain starts ok encoded agree
-          resultsPlain),
+          resultsPlain)
+        (stateOf_eq_of_ensuresOf shifts callablePlain argumentsPlain ensuresOf),
     fun error execution => named.2.1 error execution (abortsOf_of_abort fullFree execution),
     named.2.2⟩
 
@@ -781,6 +888,7 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : Executa
       ¬AbortsOf executable (ClosureValue.encode closure) (HList.encode args) initial →
       ResultOf executable (ClosureValue.encode closure) (HList.encode args) initial =
         (resultCodec shape).encode result →
+      StateOf executable (ClosureValue.encode closure) (HList.encode args) initial = final →
       ensures result final)
     (fails : ∀ error,
       AbortsOf executable (ClosureValue.encode closure) (HList.encode args) initial →
@@ -790,10 +898,10 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : Executa
     typed invocable shapeInvocable
   refine wp_closureMeaning_unseen executable natives shifts closure args free shapeFree typed
     (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals
-    (fun result final values lent ensured unaborted resulted => ?_) fails
+    (fun result final values lent ensured unaborted resulted state => ?_) fails
   rw [ResultShape.lend_encode shape shapeFree result, Option.some.injEq] at lent
   subst lent
-  exact returns result final ensured unaborted resulted
+  exact returns result final ensured unaborted resulted state
 
 /-- Runs of the unit's functions end, at a family: an invocation of a typed
 closure on typed arguments from typed global memory returns or aborts. -/
@@ -831,7 +939,8 @@ theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUn
       EnsuresOf executable (ClosureValue.encode closure) (HList.encode args)
         ((resultCodec shape).encode result) initial final ∧
       ResultOf executable (ClosureValue.encode closure) (HList.encode args) initial =
-        (resultCodec shape).encode result := by
+        (resultCodec shape).encode result ∧
+      StateOf executable (ClosureValue.encode closure) (HList.encode args) initial = final := by
   have callable_plain : SemanticOperations.Plain closure.encode := .closure _ _ _ _ closure.plain
   have arguments_plain : ∀ argument ∈ HList.encode args, SemanticOperations.Plain argument :=
     rowCodec_plain σs args
@@ -847,7 +956,8 @@ theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUn
       agree (ResultShape.lend_plain shape shapeFree lent)
     rw [ResultShape.lend_encode shape shapeFree result, Option.some.injEq] at lent
     subst lent
-    exact ⟨result, final, ensuresOf, resulted⟩
+    exact ⟨result, final, ensuresOf, resulted,
+      stateOf_eq_of_ensuresOf shifts callable_plain arguments_plain ensuresOf⟩
 
 /-- The rows of semantic types a closure of a non-generic target is typed
 at: its target's parameters split by the mask into the captured and the
@@ -934,6 +1044,59 @@ abbrev KeepsMemoryAt {unit : ValidatedUnit} (executable : ExecutableUnit unit) [
     (parameters : NRow) (closure : ClosureValue) :
     Prop :=
   FramedAt executable parameters (fun _ pre post => post = pre) closure
+
+/-- The default frame of a Move function-valued field, expressed over its
+runtime encoding so data invariants can carry it through structs and enums. -/
+def EncodedKeepsMemory {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit] (parameters : NRow) (value : RuntimeValue) : Prop :=
+  ∀ closure : ClosureValue, closure.encode = value → KeepsMemoryAt executable parameters closure
+
+/-- A stored function's declared write frame, transported through its runtime
+encoding just as the default read-only frame is. -/
+def EncodedFramed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    [Skolems unit] (parameters : NRow)
+    (frame : HList parameters → Memory unit → Memory unit → Prop) (value : RuntimeValue) : Prop :=
+  ∀ closure : ClosureValue, closure.encode = value → FramedAt executable parameters frame closure
+
+@[simp] theorem encodedFramed_encode {unit : ValidatedUnit}
+    (executable : ExecutableUnit unit) [Skolems unit] (parameters : NRow)
+    (frame : HList parameters → Memory unit → Memory unit → Prop) (closure : ClosureValue) :
+    EncodedFramed executable parameters frame closure.encode ↔
+      FramedAt executable parameters frame closure := by
+  constructor
+  · intro held
+    exact held closure rfl
+  · intro held other equal
+    cases ClosureValue.encode_injective equal
+    exact held
+
+@[simp] theorem encodedFramed_function {unit : ValidatedUnit}
+    (executable : ExecutableUnit unit) [Skolems unit] (parameters results : NRow)
+    (mutable : List Bool) (frame : HList parameters → Memory unit → Memory unit → Prop)
+    (closure : (NTy.function parameters mutable results).carrier) :
+    EncodedFramed executable parameters frame
+        ((NTy.function parameters mutable results).encode closure) ↔
+      FramedAt executable parameters frame closure.val :=
+  encodedFramed_encode executable parameters frame closure.val
+
+@[simp] theorem encodedKeepsMemory_encode {unit : ValidatedUnit}
+    (executable : ExecutableUnit unit) [Skolems unit] (parameters : NRow)
+    (closure : ClosureValue) :
+    EncodedKeepsMemory executable parameters closure.encode ↔
+      KeepsMemoryAt executable parameters closure := by
+  constructor
+  · intro held
+    exact held closure rfl
+  · intro held other equal
+    cases ClosureValue.encode_injective equal
+    exact held
+
+@[simp] theorem encodedKeepsMemory_function {unit : ValidatedUnit}
+    (executable : ExecutableUnit unit) [Skolems unit] (parameters results : NRow)
+    (mutable : List Bool) (closure : (NTy.function parameters mutable results).carrier) :
+    EncodedKeepsMemory executable parameters ((NTy.function parameters mutable results).encode closure) ↔
+      KeepsMemoryAt executable parameters closure.val :=
+  encodedKeepsMemory_encode executable parameters closure.val
 
 /-- A frame holds of a function value wherever a narrower one does. -/
 theorem FramedAt.mono {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
@@ -1029,11 +1192,112 @@ theorem ensuresOf_closureOf_verified_shape {unit : ValidatedUnit} {executable : 
     (permitted : contract.requires (weave.compose captures args) pre) :
     (¬contract.mayAbort (weave.compose captures args) pre →
         contract.ensures (weave.compose captures args) pre result post) ∧
-      contract.frame (weave.compose captures args) pre post ∧
+      contract.frame (weave.compose captures args) pre result post ∧
       ¬contract.mustAbort (weave.compose captures args) pre :=
   (verified _ pre assumed permitted).1 result post
     (ensuresOf_closureOf_shape weave capturedFree suppliedFree shapeFree typeInstantiation
       coherent captures args result ensures)
+
+/-- `ensures_of` of a closure whose target, weave, and captures a proof sees,
+at arguments lending mutable references and results of any reference-free
+shape, is a run of the target's prophetic meaning at the references' entry
+and final values. -/
+theorem ensuresOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) (result : shape.carrier)
+    {pre post : Memory unit}
+    (ensures : EnsuresOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) ((resultCodec shape).encode result) (HList.finals args)
+      pre post) :
+    (propheticMeaning executable typeInstantiation handle full shape
+      (weave.compose captures args)).ok pre result post := by
+  obtain ⟨start, loans, lent, exit, globals, admissible, lends, runs, resolves, encoded, agree⟩ :=
+    ensures
+  obtain ⟨lentArguments, invocation⟩ :=
+    invocationSpec_closureOf_lent weave capturedFree suppliedFlat typeInstantiation captures args
+      (executable := executable) (handle := handle) lends
+  rw [invocation] at runs
+  have resultLent := ResultShape.lend_encode shape shapeFree result
+  refine ⟨coherent, start, loans, _, _, exit, [], _, globals, admissible, lentArguments, runs,
+    resultLent, (ResultShape.lend_refFree shape shapeFree result).trans resultLent, ?_, encoded,
+    agree⟩
+  exact (weave.argumentsResolve_compose capturedFree captures args loans _ _).mpr
+    ((argumentsResolve_finals supplied args loans _ _).mpr resolves)
+
+/-- `aborts_of` of a closure whose target, weave, and captures a proof sees,
+at arguments lending mutable references, is an abort of the target's
+prophetic meaning at the references' entry values, whatever their final
+values. -/
+theorem abortsOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    (shape : ResultShape) (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) {state : Memory unit}
+    (aborts : AbortsOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) state) :
+    ∃ failure, (propheticMeaning executable typeInstantiation handle full shape
+      (weave.compose captures args)).aborts state failure := by
+  obtain ⟨start, loans, lent, failure, globals, admissible, lends, runs⟩ := aborts
+  obtain ⟨lentArguments, invocation⟩ :=
+    invocationSpec_closureOf_lent weave capturedFree suppliedFlat typeInstantiation captures args
+      (executable := executable) (handle := handle) lends
+  rw [invocation] at runs
+  exact ⟨failure, coherent, start, loans, _, globals, admissible, lentArguments, runs⟩
+
+/-- `ensures_of` of a closure taking mutable references whose target is
+verified: where what the target's theorem assumes and its precondition
+hold, what its contract ensures of the run, its frame, and that no
+condition under which it must abort held. -/
+theorem ensuresOfMut_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (shapeFree : shape.row.refFree = true)
+    (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) (result : shape.carrier)
+    {pre post : Memory unit} {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (ensures : EnsuresOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) ((resultCodec shape).encode result) (HList.finals args)
+      pre post)
+    (assumed : contract.assumes (weave.compose captures args) pre)
+    (permitted : contract.requires (weave.compose captures args) pre) :
+    (¬contract.mayAbort (weave.compose captures args) pre →
+        contract.ensures (weave.compose captures args) pre result post) ∧
+      contract.frame (weave.compose captures args) pre result post ∧
+      ¬contract.mustAbort (weave.compose captures args) pre :=
+  (verified _ pre assumed permitted).1 result post
+    (ensuresOfMut_closureOf weave capturedFree suppliedFlat shapeFree typeInstantiation coherent
+      captures args result ensures)
+
+/-- `aborts_of` of a closure taking mutable references whose target is
+verified: where what the target's theorem assumes and its precondition
+hold, a failure its contract permits. -/
+theorem abortsOfMut_closureOf_verified {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    {shape : ResultShape} (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation)
+    (captures : HList captured) (args : HList supplied) {state : Memory unit}
+    {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (aborts : AbortsOfMut executable (closureOf handle weave.mask typeInstantiation captures).encode
+      supplied.mutable (HList.entries args) state)
+    (assumed : contract.assumes (weave.compose captures args) state)
+    (permitted : contract.requires (weave.compose captures args) state) :
+    ∃ failure, contract.aborts (weave.compose captures args) state failure := by
+  obtain ⟨failure, runs⟩ := abortsOfMut_closureOf weave capturedFree suppliedFlat shape
+    typeInstantiation coherent captures args aborts
+  exact ⟨failure, (verified _ state assumed permitted).2.1 failure runs⟩
 
 /-- A run of a closure whose target is verified, from where what the
 target's theorem assumes and its precondition hold, keeps the target's
@@ -1052,11 +1316,11 @@ theorem frame_of_ensuresOf_closureOf_verified {unit : ValidatedUnit}
       (HList.encode args) results pre post)
     (assumed : contract.assumes (weave.compose captures args) pre)
     (permitted : contract.requires (weave.compose captures args) pre) :
-    contract.frame (weave.compose captures args) pre post := by
+    ∃ result, contract.frame (weave.compose captures args) pre result post := by
   have verdict := verified _ pre assumed permitted
   rcases ok_or_undefined_of_ensuresOf_closureOf weave capturedFree suppliedFree shapeFree
       typeInstantiation coherent captures args ensures with ⟨result, ok⟩ | undefined
-  · exact (verdict.1 result post ok).2.1
+  · exact ⟨result, (verdict.1 result post ok).2.1⟩
   · exact absurd undefined verdict.2.2
 
 /-- A literal closure keeps a frame where every run of its target from
@@ -1096,14 +1360,14 @@ theorem FramedAt.ofVerified {unit : ValidatedUnit} {executable : ExecutableUnit 
     (held : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
       contract.assumes (weave.compose captures args) pre ∧
         contract.requires (weave.compose captures args) pre)
-    (framed : ∀ (args : HList supplied) (pre post : Memory unit),
-      contract.frame (weave.compose captures args) pre post → frame args pre post) :
+    (framed : ∀ (args : HList supplied) (pre post : Memory unit) (result : shape.carrier),
+      contract.frame (weave.compose captures args) pre result post → frame args pre post) :
     FramedAt executable supplied frame (closureOf handle weave.mask typeInstantiation captures) := by
   intro _ args results pre post typed ensures
   obtain ⟨assumed, permitted⟩ := held args pre typed
-  exact framed args pre post (frame_of_ensuresOf_closureOf_verified weave capturedFree
-    suppliedFree shapeFree typeInstantiation coherent captures args verified ensures assumed
-    permitted)
+  obtain ⟨result, frameKept⟩ := frame_of_ensuresOf_closureOf_verified weave capturedFree
+    suppliedFree shapeFree typeInstantiation coherent captures args verified ensures assumed permitted
+  exact framed args pre post result frameKept
 
 end Rows
 

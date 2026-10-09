@@ -7,5 +7,5 @@ tests/sources/functional/closures/behavioral_soundness.move:28:5: error: leaner 
 tests/sources/functional/closures/behavioral_soundness.move:44:9: error: the specification clause `ensures false` is not established
 tests/sources/functional/closures/behavioral_soundness.move:42:9: error: the specification clause `ensures result_of<function[Fn(u64) -> u64](requires_positive)>(0) >= 0` is not established
 tests/sources/functional/closures/behavioral_soundness.move:41:5: error: leaner verification failed: the automatic verification of `result_of_outside_precondition_is_consistent` failed; provide a proof: `verify result_of_outside_precondition_is_consistent by …` in `tests/sources/functional/closures/behavioral_soundness.proof.lean` (`verify result_of_outside_precondition_is_consistent by skip` shows the obligations it leaves)
-tests/sources/functional/closures/behavioral_soundness.move:1:1: error: a function value with captures or type arguments is not carried in generated contracts
-tests/sources/functional/closures/behavioral_soundness.move:1:1: error: a function value with captures or type arguments is not carried in generated contracts
+tests/sources/functional/closures/behavioral_soundness.move:1:1: error: a function value with type arguments is not carried in generated contracts
+tests/sources/functional/closures/behavioral_soundness.move:1:1: error: a function value with type arguments is not carried in generated contracts

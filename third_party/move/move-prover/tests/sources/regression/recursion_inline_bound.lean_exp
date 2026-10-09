@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/recursion_inline_bound.move:117:17: error: the specification clause `ensures result == x + 1` is not established
+tests/sources/regression/recursion_inline_bound.move:117:5: error: leaner verification failed: the automatic verification of `root` failed; provide a proof: `verify root by …` in the module (`verify root by skip` shows the obligations it leaves)
+tests/sources/regression/recursion_inline_bound.move:76:24: error: the specification clause `ensures result == 3` is not established
+tests/sources/regression/recursion_inline_bound.move:76:5: error: leaner verification failed: the automatic verification of `twice_fails` failed; provide a proof: `verify twice_fails by …` in the module (`verify twice_fails by skip` shows the obligations it leaves)
+tests/sources/regression/recursion_inline_bound.move:27:9: error: the specification clause `ensures result == 0` is not established
+tests/sources/regression/recursion_inline_bound.move:26:5: error: leaner verification failed: the automatic verification of `root` failed; provide a proof: `verify root by …` in the module (`verify root by skip` shows the obligations it leaves)
+tests/sources/regression/recursion_inline_bound.move:101:24: error: the specification clause `ensures result == 3` is not established
+tests/sources/regression/recursion_inline_bound.move:101:5: error: leaner verification failed: the automatic verification of `twice_fails` failed; provide a proof: `verify twice_fails by …` in the module (`verify twice_fails by skip` shows the obligations it leaves)

@@ -97,10 +97,24 @@ structure CompileNamespace where
   fuel : Nat
   placeFuel : Nat
 
+/-- Move function-valued fields carry a checked modification frame, empty
+unless explicitly declared. Only a function type at the field has one, not an
+arbitrary function nested in a vector or supplied as a type argument. -/
+def fieldKeepsMemory (ns : ValidatedNamespace) (field : FieldDecl) : Bool :=
+  ns.profile == some .move &&
+    (ns.tables.types[field.type.typeId.index]?).any fun ty => ty matches .function ..
+
+/-- A declaration whose fields have closure frames. The compiler's
+invariant checkpoints and contract generation use the same criterion. -/
+def declarationHasClosureFields (ns : ValidatedNamespace) (declaration : StructDecl) : Bool :=
+  declaration.fields.any (fieldKeepsMemory ns) ||
+    declaration.variants.any fun variant => variant.fields.any (fieldKeepsMemory ns)
+
 /-- Whether a declaration of a namespace carries a data invariant: a stated
-one, or the order of an intrinsic map's keys. -/
+one, a closure field's frame, or the order of an intrinsic map's keys. -/
 def declarationCarriesInvariant (ns : ValidatedNamespace) (declaration : StructDecl) : Bool :=
-  declaration.contract.conditions.any (·.kind == .structInvariant) ||
+  declarationHasClosureFields ns declaration ||
+    declaration.contract.conditions.any (·.kind == .structInvariant) ||
     ns.intrinsics.any fun intrinsic =>
       intrinsic.model == "map" && intrinsic.owner == declaration.name
 

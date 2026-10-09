@@ -993,10 +993,16 @@ operation. It must not silently replace a plain operation with a checked Move
 operation or vice versa.
 
 The profile selects operator semantics. For example, the same `+` token may
-lower to `checkedAdd[abort]` in Move and modular `add` behind a Rust overflow
+lower to `checkedAdd[moveArithmeticError]` in Move and modular `add` behind a Rust overflow
 assertion in Rust. When an operator alone would not determine the LIR
 constructor, canonical source uses a standard snake-case builtin rather than
 exposing `core.prim.*`.
+
+Move arithmetic traps use the `runtime.arithmetic_error` profile throw,
+which rolls back like other Move failures but is distinct from an explicit
+`abort(code)`. Its payload describes the failed operation; it is not a user
+abort code. Contract clauses recognize arithmetic and vector runtime errors
+as `EXECUTION_FAILURE` (`-1`). Explicit aborts retain their integer codes.
 
 ## References and nominal data operations
 
@@ -1042,7 +1048,7 @@ core.data.select[Type, field](value)
 core.data.selectVariants[Type, Variant₁.field₁, ...](value)
 core.data.testVariants[Type, Variant₁, ...](value)
 core.data.discriminant[Type](value)
-core.data.updateField[Type, field](value, replacement)
+core.data.updateField(value, field, replacement)
 ```
 
 The multi-variant operations express fields common to selected variants and
@@ -1051,6 +1057,13 @@ variant it reads with that variant's field; a value holding an unlisted
 variant is a mismatch. A field access `value.field` of an enum lists every
 variant that declares the field, so the core form is printed only for a
 selection of some of them, such as Move's specification `x.Variant.field`. `discriminant` returns the declared observable discriminant.
+
+Functional field updates are specification expressions. The receiver determines
+the nominal owner and its type arguments; the replacement uses the field's
+logical type. Updates preserve the variant and all other fields, including
+when a shared enum field occupies different positions in different variants.
+Updates on intrinsic maps and fields absent from some enum variants remain
+explicitly unsupported.
 
 ## Global storage
 
@@ -1199,16 +1212,21 @@ logical signature of `increment` above is:
 increment.spec : Int -> Int
 ```
 
-An authored specification function must use `Int` explicitly for direct
-integer parameters and results:
+An authored specification function normally uses `Int` for direct integer
+parameters and results:
 
 ```lean
 spec fun distance (left : Int) (right : Int) : Int := right - left
 ```
 
-Declaring a direct `UInt<n>`, `SInt<n>`, `UPtr`, or `IPtr` parameter/result on
-`spec fun` is an error. There is no implicit bounded re-packing on a
-specification-function call: an `Int` expression remains mathematical.
+A direct fixed-width parameter type is the function's domain: the function is
+defined where each argument fits its parameter's type, and its value elsewhere
+is unspecified (G15 in [`prover-test-problems.md`](prover-test-problems.md)).
+The body reads such a parameter as an `Int`, as a contract reads a function's
+parameters, so its arithmetic is mathematical. A call passes any integer; there
+is no implicit bounded re-packing, and an `Int` expression remains
+mathematical. A recursive definition unfolds inside the domain only, and an
+expansion of a non-recursive one is guarded the same way.
 
 Widening is applied at integer leaves, not by recursively replacing every
 integer nested in a data type. `Vector<UInt<64>>` remains that vector type, and
@@ -1272,10 +1290,23 @@ spec module where
 ```
 
 The implemented surface states module invariants and axioms as members of
-one `spec module where` block; an axiom is assumed by every verification of
-the module's functions and is never an obligation, an invariant is assumed
-at entry and established at exit. Generic axioms and invariants (the
-`{T}` of the design) and proof-local labels are not yet parsed. A Move
+one `spec module where` block; an axiom is never an obligation and is
+assumed at entry by every verification of the unit, as the Move Prover states
+its axioms globally (one reading memory, by those that reach it), and an
+invariant is assumed at entry and established at exit. A generic axiom,
+`axiom {T} proposition`, is assumed at each instantiation of its type
+parameters at which the verification applies a specification function the
+axiom applies, as the Move Prover monomorphizes axioms. A generic
+invariant, `invariant {T} [update] proposition`, holds at the instantiations
+that make a resource type it reads, itself or through the specification
+functions it applies, one of the resource types a function's verification
+reads or writes, as the Move Prover monomorphizes its global invariants: a
+function assumes those at entry and owes, after a write, those of the type
+written. A type parameter a written type leaves undetermined is a ghost type
+parameter of the function, as the Prover adds one, and such a function is
+proved over every frame, so the ghost ranges over every type; one that
+memory a function only reads leaves undetermined is not assumed, as in the
+Prover. Proof-local labels are not yet parsed. A Move
 spec variable `x` arrives as the ghost resource `Ghost$x` the model backs
 it with, a struct with one field `v` at address 0, whose existence is an
 axiom of the module; `update x = e` is a write of that resource.

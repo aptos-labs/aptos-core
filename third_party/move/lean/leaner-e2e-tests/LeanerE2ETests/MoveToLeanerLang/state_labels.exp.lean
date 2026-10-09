@@ -28,9 +28,9 @@ leaner module 0x42::state_labels where
     read_resource(addr)
 
   spec create_then_read where
-    ensures ..S |~ publish<Resource>(
+    ensures (..S |~ publish<Resource>(
         account.address, new Resource { value := 42 }
-      )
+      ))
     ensures result
         == (S.. |~ result_of<function[Fn(Address) -> u64](read_resource)>(addr))
     aborts_if S.. |~ aborts_of<function[Fn(Address) -> u64](read_resource)>(
@@ -50,5 +50,5 @@ leaner module 0x42::state_labels where
 
   spec inc_twice where
     ensures ∃ (S : StateDomain),
-        (..S |~ counter_increased(old(c), c))
+        ((..S |~ counter_increased(old(c), c)))
           && (S.. |~ counter_increased(old(c), c))

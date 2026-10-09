@@ -108,6 +108,17 @@ theorem NRow.lend_refFree : (row : NRow) → row.refFree = true → (prophecies 
         HList.encode_cons]
 end
 
+/-- A reference-free result has the same current and prophecy row. -/
+theorem ResultShape.lend_refFree_view (shape : ResultShape) (free : shape.row.refFree = true)
+    (value : shape.carrier) (loans : List Nat) :
+    shape.lend true value loans = shape.lend false value loans := by
+  cases shape with
+  | none => cases loans <;> rfl
+  | one τ =>
+      have plain : τ.refFree = true := by
+        simpa only [ResultShape.row, NRow.refFree, Bool.and_true] using free
+      simp only [ResultShape.lend, NTy.lend_refFree τ plain]
+
 /-- Lending a woven row lends the supplied arguments and places the captures'
 encodings among them. -/
 theorem Weave.lend_compose : {full captured supplied : NRow} →
@@ -755,7 +766,8 @@ def _root_.LeanerIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape
   aborts := fun args => contract.aborts (HList.toSkolem θ σs args)
   mayAbort := fun args => contract.mayAbort (HList.toSkolem θ σs args)
   mustAbort := fun args => contract.mustAbort (HList.toSkolem θ σs args)
-  frame := fun args => contract.frame (HList.toSkolem θ σs args)
+  frame := fun args initial result final =>
+    contract.frame (HList.toSkolem θ σs args) initial (ResultShape.toSkolem θ shape result) final
 
 /-- A contract the run satisfies at the frame type arguments induce holds,
 read in the caller's view, of the run at the caller's types. -/

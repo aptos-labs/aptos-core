@@ -282,9 +282,34 @@ and otherwise the run `result_of` reads applies. A parameter of a shared
 reference type is the value it observes: a closure over such a target is
 typed at the row of the referents (`ClosureTypedAt`, `observedType`).
 
-Mutable-reference arguments follow the prophetic model: `ensures_of` relates
-the argument's entry value and its resolved final value, as the Move Book's
-single-occurrence form (`ensures_of<f>(x_mut, r)`) states.
+Mutable-reference arguments follow the prophetic model, in the Prover's
+argument layout (`spec_translator.rs`, `bytecode_translator.rs`): a
+predicate's inputs are the arguments' values, a `&mut` one's its entry
+value; `ensures_of` takes after them the declared results and then the final
+value of each `&mut` argument, in order (`ensures_of<f>(old(x), x)` for
+`f: |&mut T|`); `result_of` names the declared results alone, and
+`requires_of` and `aborts_of` the inputs alone. The meaning (done
+2026-10-09, `AbortsOfMut`, `EnsuresOfMut`, `ResultOfMut` in
+`Proofs/Behavior.lean`): the invocation runs with each `&mut` argument lent
+under a loan of its own, `.borrow loan entry` (`lendMutable`, its positions
+marked by the function type), from a start whose bookkeeping lends exactly
+those loans, and the final value is the one the run exports for the loan
+(`RuntimeState.pending`), with the holes of returned references filled, as
+`argumentsResolve` reads a call (`ResolvesAt`); a reference-free function
+value keeps `AbortsOf`/`EnsuresOf`/`ResultOf`. For a literal closure this is
+a run of the target's prophetic meaning at the reference `(entry, final)`
+(`ensuresOfMut_closureOf`, `abortsOfMut_closureOf` and their `_verified`
+forms in `Proofs/Invocation.lean`, over rows each element of which is a
+mutable reference or holds none, `NRow.lentFlat`), which the closer reads by
+the target's contract (`dispatchBehavior`) or body (`denotedRun`) as for
+reference-free rows. A contract reads a `&mut` input at the invocation's
+pre-state (its entry value, or its copy at a pre-state label), as the
+Prover reads `old` of it, and a final value of `ensures_of` at the
+post-state (`Contract.mutableAt`). Not carried yet: an invocation of a
+function value with `&mut` parameters the proof does not see (its `wp` needs
+the H4b typing of lent arguments), a state label defined by such an
+invocation, and `modifies_of` frames of such function values (`FramedAt` is
+vacuous at rows with references).
 
 **Frames.** Without `modifies_of`, Move treats a function parameter as not
 modifying global memory, and the compiler checks every closure passed for it.
@@ -316,6 +341,31 @@ parameter's invocation keeps the frame as a hypothesis, a loop invoking such
 a parameter does not keep its state, and the frontend reads the invocation
 as a write. A frame a hypothesis states of a passed function value
 establishes any wider one (`FramedAt.mono`).
+
+Default frames of directly function-typed Move fields are now carried as
+implicit data invariants (2026-10-05). `EncodedKeepsMemory` states the frame
+over the field's runtime encoding. Construction, mutation, parameters,
+results, and stored resources check or carry it; an invocation of a closure
+read from storage recovers its frame from `MemoryInvariants.read`. The
+compiler and contract generator share the field predicate so packing and
+mutation cannot miss the obligation. `StoredFrames` checks construction,
+publication, removal, and invocation; `StoredFrameErrors` rejects both
+packing and assigning a memory-writing closure. This does not constrain
+arbitrary function values supplied as type arguments or nested in vectors.
+Explicit struct-field write frames (2026-10-06) use `EncodedFramed` instead:
+the frame's formals bind invocation arguments, its resource types are
+instantiated in the enclosing nominal's type scope, and its addresses are
+evaluated in the invocation's pre-state. Other fields of the same struct
+are available to address expressions. A wildcard frame imposes no memory
+restriction. The same construction and mutation checkpoints establish the
+frame, and opaque results carry it to callers. Source-clause markers are
+unwrapped when applying these guarantees. Shared-reference arguments admit
+referent-typed specification formals, matching behavioral predicates.
+Explicit enum-field write frames still receive an unsupported diagnostic.
+All four full suites passed with the focused frame checks. Dependency
+interfaces still omit nominal contracts, so an explicit write frame at that
+boundary is rejected; importing it as an empty frame would be unsound. The
+interface rejection and preservation of owned frames have frontend guards.
 
 **State labels.** A contract is a Lean proposition over states, so a label is
 a state variable: `..S |~ ensures_of<f>(x, y)` makes `S` the post-state of the
@@ -447,10 +497,13 @@ traits are.
      Done (2026-10-03): parameter frames with and without `modifies_of`
      ("Frames" above), shared reference parameters, the Check fixture
      `Check/Closures/Frames.lean`, and generic higher-order functions over
-     rows of type parameters (`Check/Closures/GenericHofs.lean`). Open:
-     state labels, `&mut` arguments,
-     frames and typing of closures stored in fields (the exchange carries
-     their `modifies_of`), and `reads_of` (below).
+     rows of type parameters (`Check/Closures/GenericHofs.lean`); `&mut`
+     arguments of literal closures and of contracts (2026-10-09, above).
+     Open: state labels over `&mut` invocations, invocations of unseen
+     function values with `&mut` parameters, explicit `modifies_of` frames
+     on stored closures, and `reads_of` (below).
+     Default frames of directly function-typed Move fields are implemented
+     (2026-10-05, “Frames” above); explicit field write frames are diagnosed.
 5. **H5 — re-entrancy.** Call-stack modules and resource locks in the
    semantics, with MonoVM.
 

@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/let.move:3:1: error: verification failed with a residual obligation:
+tests/sources/functional/let.move:74:5: error: verification failed with a residual obligation:
 case left.right.left.left.right.right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit

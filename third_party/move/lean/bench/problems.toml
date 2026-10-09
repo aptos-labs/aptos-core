@@ -115,13 +115,6 @@ modules = ["aptos_std::comparator"]
 inputs = ["aptos-move/framework/move-stdlib"]
 
 [[problem]]
-name = "type_info"
-kind = "move"
-package = "aptos-move/framework/aptos-stdlib"
-modules = ["aptos_std::type_info"]
-inputs = ["aptos-move/framework/move-stdlib"]
-
-[[problem]]
 name = "capability"
 kind = "move"
 package = "aptos-move/framework/aptos-stdlib"
@@ -196,6 +189,7 @@ repeat = 3
 
 [[problem]]
 name = "amm"
+expected_rejections = ["«0x42».amm::create_noncompliant_fee_pool"]
 kind = "move"
 package = "third_party/move/move-prover/doc/higher-order-paper-26/examples"
 modules = ["0x42::amm"]

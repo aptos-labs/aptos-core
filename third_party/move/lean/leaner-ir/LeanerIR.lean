@@ -30,6 +30,8 @@ import LeanerIR.Proofs.Fuel
 import LeanerIR.Proofs.Completeness
 import LeanerIR.Proofs.Order
 import LeanerIR.Proofs.Maps
+import LeanerIR.Proofs.Maps.Table
+import LeanerIR.Proofs.Denote.TableMemory
 import LeanerIR.Proofs.Spec
 import LeanerIR.Proofs.Representation
 import LeanerIR.Proofs.Contract

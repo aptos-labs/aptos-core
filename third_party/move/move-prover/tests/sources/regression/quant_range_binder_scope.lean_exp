@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+quant_range_binder_scope.lean:19:5: error: LEANER-CONTRACT-BINDING-DUPLICATE: contract binding `i` shadows an existing local

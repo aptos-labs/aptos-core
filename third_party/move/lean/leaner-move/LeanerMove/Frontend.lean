@@ -3,6 +3,7 @@
 
 import LeanerMove.Frontend.Cli
 import LeanerMove.Frontend.LIR.Backend
+import LeanerMove.Frontend.LoopInvariants
 
 /-!
 # The Move exchange frontend

@@ -1,2 +1,7 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:9:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet
+tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:30:9: error: the specification clause `ensures ∃ (S : StateDomain),
+        (S.. |~ requires_of<function[Fn(&mut Counter) -> u64](checked_inc)>(c))
+          && !(S.. |~ aborts_of<function[Fn(&mut Counter) -> u64](checked_inc)>(
+            c
+          ))` is not established
+tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.move:28:5: error: leaner verification failed: the automatic verification of `inc_twice_with_bp` failed; provide a proof: `verify inc_twice_with_bp by …` in `tests/sources/functional/state_labels/bp_requires_aborts_labeled_mut.proof.lean` (`verify inc_twice_with_bp by skip` shows the obligations it leaves)

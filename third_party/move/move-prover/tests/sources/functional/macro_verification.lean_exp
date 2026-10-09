@@ -1,5 +1,10 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/macro_verification.move:7:1: error: a quantifier range must be written as a range
+tests/sources/functional/macro_verification.move:29:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/macro_verification.move:29:5: error: leaner verification failed: the automatic verification of `foreach` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify foreach by …` in `tests/sources/functional/macro_verification.proof.lean` (`verify foreach by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/macro_verification.move:57:9: error: the specification clause `ensures v.length <= 4 ==> result == spec_sum(v, v.length) + 1` is not established
 tests/sources/functional/macro_verification.move:54:5: error: leaner verification failed: the automatic verification of `reduce` failed; provide a proof: `verify reduce by …` in `tests/sources/functional/macro_verification.proof.lean` (`verify reduce by skip` shows the obligations it leaves)
 tests/sources/functional/macro_verification.move:76:9: error: the specification clause `ensures result == x + y + y` is not established

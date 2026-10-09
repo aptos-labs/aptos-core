@@ -1471,64 +1471,64 @@ def holeWithin (loan : Nat) (value : RuntimeValue) : Bool :=
 /-- The key registered for `loan` in a global-loan registry.  Keeping the
 registry lookup separate from `RuntimeState` lets proof normalization expose
 the one state field that matters without unfolding the lookup itself. -/
-def globalLoanKeyIn? (loans : List (Nat × GlobalKey))
-    (loan : Nat) : Option GlobalKey :=
+def storageLoanTargetIn? (loans : List (Nat × LoanTarget))
+    (loan : Nat) : Option LoanTarget :=
   (loans.find? (·.1 == loan)).map (·.2)
 
 /-- A registry headed by the loan's own registration resolves to that key
 without scanning the symbolic tail. -/
-theorem globalLoanKeyIn?_head (loan : Nat) (key : GlobalKey)
-    (rest : List (Nat × GlobalKey)) :
-    globalLoanKeyIn? ((loan, key) :: rest) loan = some key := by
-  simp [globalLoanKeyIn?]
+theorem storageLoanTargetIn?_head (loan : Nat) (key : LoanTarget)
+    (rest : List (Nat × LoanTarget)) :
+    storageLoanTargetIn? ((loan, key) :: rest) loan = some key := by
+  simp [storageLoanTargetIn?]
 
 /-- A distinct registration cannot capture an unregistered identity. -/
-theorem globalLoanKeyIn?_cons_none {registered loan : Nat} {key : GlobalKey}
-    {rest : List (Nat × GlobalKey)} (different : registered ≠ loan)
-    (absent : globalLoanKeyIn? rest loan = none) :
-    globalLoanKeyIn? ((registered, key) :: rest) loan = none := by
-  simpa [globalLoanKeyIn?, different] using absent
+theorem storageLoanTargetIn?_cons_none {registered loan : Nat} {key : LoanTarget}
+    {rest : List (Nat × LoanTarget)} (different : registered ≠ loan)
+    (absent : storageLoanTargetIn? rest loan = none) :
+    storageLoanTargetIn? ((registered, key) :: rest) loan = none := by
+  simpa [storageLoanTargetIn?, different] using absent
 
 /-- The key whose global slot holds the hole of `loan`, per the state's
 loan registry.  Registration at the borrow is what keys the write-back:
 certified exclusivity keeps the recorded key the hole's location for the
 loan's whole life, so nothing ever searches global memory for a hole. -/
-def globalLoanKey? (state : RuntimeState) (loan : Nat) : Option GlobalKey :=
-  globalLoanKeyIn? state.globalLoans loan
+def storageLoanTarget? (state : RuntimeState) (loan : Nat) : Option LoanTarget :=
+  storageLoanTargetIn? state.storageLoans loan
 
 /-- A global-loan query depends only on the native registry, not on any of
 the other runtime-state fields.  Generated proofs use this equation to pull
 record updates out of routing decisions. -/
-theorem globalLoanKey?_registry (state : RuntimeState) (loan : Nat) :
-    globalLoanKey? state loan = globalLoanKeyIn? state.globalLoans loan :=
+theorem storageLoanTarget?_registry (state : RuntimeState) (loan : Nat) :
+    storageLoanTarget? state loan = storageLoanTargetIn? state.storageLoans loan :=
   rfl
 
 /-- Every identifier at or beyond `nextLoan` is absent from the global-loan
 registry.  This is the reachable-state invariant that makes a freshly minted
 local loan route to an ancestor frame rather than aliasing a global loan. -/
-def FreshGlobalLoanIds (state : RuntimeState) : Prop :=
+def FreshStorageLoanIds (state : RuntimeState) : Prop :=
   ∀ loan, state.nextLoan ≤ loan →
-    globalLoanKeyIn? state.globalLoans loan = none
+    storageLoanTargetIn? state.storageLoans loan = none
 
 /-- Any identifier at or beyond the allocation frontier is globally
 unregistered.  This named form lets generated closers consume the invariant
 without unfolding it or searching the whole local context. -/
-theorem FreshGlobalLoanIds.lookup_of_le {state : RuntimeState} {loan : Nat}
-    (fresh : FreshGlobalLoanIds state) (bound : state.nextLoan ≤ loan) :
-    globalLoanKeyIn? state.globalLoans loan = none :=
+theorem FreshStorageLoanIds.lookup_of_le {state : RuntimeState} {loan : Nat}
+    (fresh : FreshStorageLoanIds state) (bound : state.nextLoan ≤ loan) :
+    storageLoanTargetIn? state.storageLoans loan = none :=
   fresh loan bound
 
 /-- The next identifier itself is globally unregistered. -/
-theorem FreshGlobalLoanIds.lookup_next {state : RuntimeState}
-    (fresh : FreshGlobalLoanIds state) :
-    globalLoanKeyIn? state.globalLoans state.nextLoan = none :=
+theorem FreshStorageLoanIds.lookup_next {state : RuntimeState}
+    (fresh : FreshStorageLoanIds state) :
+    storageLoanTargetIn? state.storageLoans state.nextLoan = none :=
   fresh state.nextLoan (Nat.le_refl _)
 
 /-- Direct lookup form of freshness for an identifier minted at an offset
 from `nextLoan`. -/
-theorem FreshGlobalLoanIds.lookup_add {state : RuntimeState}
-    (fresh : FreshGlobalLoanIds state) (offset : Nat) :
-    globalLoanKeyIn? state.globalLoans (state.nextLoan + offset) = none := by
+theorem FreshStorageLoanIds.lookup_add {state : RuntimeState}
+    (fresh : FreshStorageLoanIds state) (offset : Nat) :
+    storageLoanTargetIn? state.storageLoans (state.nextLoan + offset) = none := by
   apply fresh
   omega
 
@@ -1539,15 +1539,15 @@ same after it, and ids only grow.  Registry equality would be wrong — a
 callee returning a global `&mut` legitimately exits with its returned loan
 registered. -/
 def LoanDiscipline (initial final : RuntimeState) : Prop :=
-  (FreshGlobalLoanIds initial → FreshGlobalLoanIds final) ∧
+  (FreshStorageLoanIds initial → FreshStorageLoanIds final) ∧
   (∀ loan, loan < initial.nextLoan →
-    globalLoanKeyIn? final.globalLoans loan =
-      globalLoanKeyIn? initial.globalLoans loan) ∧
+    storageLoanTargetIn? final.storageLoans loan =
+      storageLoanTargetIn? initial.storageLoans loan) ∧
   initial.nextLoan ≤ final.nextLoan
 
 /-- A body that leaves the registry untouched keeps the discipline. -/
 theorem LoanDiscipline.of_eq {initial final : RuntimeState}
-    (loans_eq : final.globalLoans = initial.globalLoans)
+    (loans_eq : final.storageLoans = initial.storageLoans)
     (monotone : initial.nextLoan ≤ final.nextLoan) :
     LoanDiscipline initial final := by
   refine ⟨fun fresh loan h => ?_, fun loan _ => by rw [loans_eq], monotone⟩
@@ -1576,7 +1576,7 @@ surrounding connective, where only a rewrite can reach it. -/
 @[simp] theorem LoanDiscipline.mk_self (state : RuntimeState)
     (globals : GlobalMap) (pending : Array (Nat × RuntimeValue)) :
     LoanDiscipline state
-      { globals, globalLoans := state.globalLoans,
+      { globals, storageLoans := state.storageLoans,
         nextLoan := state.nextLoan, pending } :=
   LoanDiscipline.of_eq rfl (Nat.le_refl _)
 
@@ -1586,7 +1586,7 @@ in simp form. -/
     (globals : GlobalMap) (pending : Array (Nat × RuntimeValue))
     (offset : Nat) :
     LoanDiscipline state
-      { globals, globalLoans := state.globalLoans,
+      { globals, storageLoans := state.storageLoans,
         nextLoan := state.nextLoan + offset, pending } :=
   LoanDiscipline.of_eq rfl (Nat.le_add_right _ _)
 
@@ -1594,9 +1594,9 @@ in simp form. -/
 discipline: the registration is invisible below the entry `nextLoan` and
 inside the final frontier. -/
 theorem LoanDiscipline.of_registered {initial final : RuntimeState}
-    {registered : Nat} {key : GlobalKey}
-    (loans_eq : final.globalLoans =
-      (registered, key) :: initial.globalLoans)
+    {registered : Nat} {key : LoanTarget}
+    (loans_eq : final.storageLoans =
+      (registered, key) :: initial.storageLoans)
     (minted : initial.nextLoan ≤ registered)
     (live : registered < final.nextLoan) :
     LoanDiscipline initial final := by
@@ -1605,13 +1605,13 @@ theorem LoanDiscipline.of_registered {initial final : RuntimeState}
     have different : (registered == loan) = false := by
       simp only [beq_eq_false_iff_ne]
       omega
-    simp only [globalLoanKeyIn?, List.find?_cons, different]
+    simp only [storageLoanTargetIn?, List.find?_cons, different]
     exact fresh loan (by omega)
   · rw [loans_eq]
     have different : (registered == loan) = false := by
       simp only [beq_eq_false_iff_ne]
       omega
-    simp only [globalLoanKeyIn?, List.find?_cons, different]
+    simp only [storageLoanTargetIn?, List.find?_cons, different]
 
 /-- Exact-next form of prior/future loan separation. -/
 theorem priorLoan_beq_next_false {loan nextLoan : Nat}
@@ -1665,61 +1665,61 @@ theorem futureLoan_ne_prior {loan nextLoan offset : Nat}
 /-- A newly registered global loan resolves to its recorded slot directly.
 This is the native routing certificate used when a whole-resource borrow is
 finalized; no search through either global memory or the registry survives. -/
-theorem globalLoanKey?_registered (globals : GlobalMap)
-    (rest : List (Nat × GlobalKey)) (nextLoan : Nat)
-    (pending : Array (Nat × RuntimeValue)) (loan : Nat) (key : GlobalKey) :
-    globalLoanKey?
+theorem storageLoanTarget?_registered (globals : GlobalMap)
+    (rest : List (Nat × LoanTarget)) (nextLoan : Nat)
+    (pending : Array (Nat × RuntimeValue)) (loan : Nat) (key : LoanTarget) :
+    storageLoanTarget?
       { globals
-        globalLoans := (loan, key) :: rest
+        storageLoans := (loan, key) :: rest
         nextLoan
         pending }
       loan = some key := by
-  simp [globalLoanKey?, globalLoanKeyIn?]
+  simp [storageLoanTarget?, storageLoanTargetIn?]
 
 /-- Drop one loan's registry entry. -/
-def removeGlobalLoan : List (Nat × GlobalKey) → Nat → List (Nat × GlobalKey)
+def removeStorageLoan : List (Nat × LoanTarget) → Nat → List (Nat × LoanTarget)
   | [], _ => []
   | entry :: rest, loan =>
       if entry.1 == loan then rest
-      else entry :: removeGlobalLoan rest loan
+      else entry :: removeStorageLoan rest loan
 
 /-- Removing a loan the registry does not hold leaves it unchanged. -/
-theorem removeGlobalLoan_of_free (loans : List (Nat × GlobalKey)) (loan : Nat)
-    (free : globalLoanKeyIn? loans loan = none) :
-    removeGlobalLoan loans loan = loans := by
+theorem removeStorageLoan_of_free (loans : List (Nat × LoanTarget)) (loan : Nat)
+    (free : storageLoanTargetIn? loans loan = none) :
+    removeStorageLoan loans loan = loans := by
   induction loans with
   | nil => rfl
   | cons entry rest ih =>
       by_cases h : (entry.1 == loan) = true
       · exfalso
-        simp [globalLoanKeyIn?, List.find?_cons, h] at free
+        simp [storageLoanTargetIn?, List.find?_cons, h] at free
       · simp only [Bool.not_eq_true] at h
-        have restFree : globalLoanKeyIn? rest loan = none := by
-          simpa only [globalLoanKeyIn?, List.find?_cons, h, Bool.false_eq_true,
+        have restFree : storageLoanTargetIn? rest loan = none := by
+          simpa only [storageLoanTargetIn?, List.find?_cons, h, Bool.false_eq_true,
             if_false] using free
-        simp only [removeGlobalLoan, h, Bool.false_eq_true, if_false, ih restFree]
+        simp only [removeStorageLoan, h, Bool.false_eq_true, if_false, ih restFree]
 
 /-- Retirement changes only the selected identity's lookup. No registry
 shape or resource payload is exposed to consumers of this law. -/
-theorem globalLoanKeyIn?_remove_other (loans : List (Nat × GlobalKey))
+theorem storageLoanTargetIn?_remove_other (loans : List (Nat × LoanTarget))
     (retired loan : Nat) (different : retired ≠ loan) :
-    globalLoanKeyIn? (removeGlobalLoan loans retired) loan =
-      globalLoanKeyIn? loans loan := by
+    storageLoanTargetIn? (removeStorageLoan loans retired) loan =
+      storageLoanTargetIn? loans loan := by
   induction loans with
   | nil => rfl
   | cons entry rest ih =>
       by_cases removed : entry.1 = retired
-      · simp [removeGlobalLoan, globalLoanKeyIn?, removed, different]
+      · simp [removeStorageLoan, storageLoanTargetIn?, removed, different]
       · by_cases matched : entry.1 = loan
-        · simp [removeGlobalLoan, globalLoanKeyIn?, matched, Ne.symm different]
-        · simpa [removeGlobalLoan, globalLoanKeyIn?, removed, matched] using ih
+        · simp [removeStorageLoan, storageLoanTargetIn?, matched, Ne.symm different]
+        · simpa [removeStorageLoan, storageLoanTargetIn?, removed, matched] using ih
 
 /-- Whether the hole of `loan` sits in a global slot. A contract over a
 borrow-taking function assumes this is false for its argument loans: the
 lender's hole lives in a caller frame, so the loan's death exports through
 the pending set rather than writing a global. -/
 def holeInGlobals (state : RuntimeState) (loan : Nat) : Bool :=
-  (globalLoanKey? state loan).isSome
+  (storageLoanTarget? state loan).isSome
 
 /-- Index of the first row a predicate accepts, counting from `index`.
 Structural recursion keeps searches over lowered literal rows transparent;
@@ -1779,10 +1779,10 @@ def transferredLoan? (replacement : RuntimeValue) : Option Nat :=
 new prophecy hole.  The registry retains only the owning storage key; the
 hole itself identifies the returned dynamic loan and its position inside the
 resource, so no projection path is transferred to the reference. -/
-def transferGlobalLoan (globalLoans : List (Nat × GlobalKey))
-    (completed : Nat) (key : GlobalKey) (replacement : RuntimeValue) :
-    List (Nat × GlobalKey) :=
-  let retained := removeGlobalLoan globalLoans completed
+def transferStorageLoan (storageLoans : List (Nat × LoanTarget))
+    (completed : Nat) (key : LoanTarget) (replacement : RuntimeValue) :
+    List (Nat × LoanTarget) :=
+  let retained := removeStorageLoan storageLoans completed
   match transferredLoan? replacement with
   | some transferred => (transferred, key) :: retained
   | none => retained
@@ -1791,16 +1791,16 @@ def transferGlobalLoan (globalLoans : List (Nat × GlobalKey))
 registration was invisible below the entry `nextLoan`, and removing it
 restores freshness of every id at or beyond the final frontier. -/
 theorem LoanDiscipline.of_retired {initial final : RuntimeState}
-    {retired : Nat} {key : GlobalKey} {rest : List (Nat × GlobalKey)}
+    {retired : Nat} {key : LoanTarget} {rest : List (Nat × LoanTarget)}
     (discipline : LoanDiscipline initial final)
-    (loans_eq : final.globalLoans = (retired, key) :: rest)
+    (loans_eq : final.storageLoans = (retired, key) :: rest)
     (minted : initial.nextLoan ≤ retired) :
-    LoanDiscipline initial { final with globalLoans := rest } := by
+    LoanDiscipline initial { final with storageLoans := rest } := by
   obtain ⟨fresh, stable, monotone⟩ := discipline
   refine ⟨fun freshInitial loan h => ?_, fun loan h => ?_, monotone⟩
   · have := fresh freshInitial loan h
     rw [loans_eq] at this
-    simp only [globalLoanKeyIn?, List.find?_cons] at this ⊢
+    simp only [storageLoanTargetIn?, List.find?_cons] at this ⊢
     split at this
     · simp at this
     · exact this
@@ -1809,8 +1809,8 @@ theorem LoanDiscipline.of_retired {initial final : RuntimeState}
     have different : (retired == loan) = false := by
       simp only [beq_eq_false_iff_ne]
       omega
-    simp only [globalLoanKeyIn?, List.find?_cons, different] at this
-    simpa only [globalLoanKeyIn?] using this
+    simp only [storageLoanTargetIn?, List.find?_cons, different] at this
+    simpa only [storageLoanTargetIn?] using this
 
 /-- A body that hands its one minted registry entry to a returned reborrow
 keeps the discipline.  This is the exit spelling of a returned global
@@ -1818,19 +1818,19 @@ keeps the discipline.  This is the exit spelling of a returned global
 hole re-registers under the same storage key — both identifiers minted
 inside the body. -/
 theorem LoanDiscipline.of_transfer {initial final : RuntimeState}
-    {completed transferred : Nat} {entry : GlobalKey} {key : GlobalKey}
+    {completed transferred : Nat} {entry : LoanTarget} {key : LoanTarget}
     {replacement : RuntimeValue}
-    (loans_eq : final.globalLoans =
-      transferGlobalLoan ((completed, entry) :: initial.globalLoans)
+    (loans_eq : final.storageLoans =
+      transferStorageLoan ((completed, entry) :: initial.storageLoans)
         completed key replacement)
     (transfer_eq : transferredLoan? replacement = some transferred)
     (transferred_minted : initial.nextLoan ≤ transferred)
     (live : transferred < final.nextLoan) :
     LoanDiscipline initial final := by
-  have spelled : final.globalLoans =
-      (transferred, key) :: initial.globalLoans := by
+  have spelled : final.storageLoans =
+      (transferred, key) :: initial.storageLoans := by
     rw [loans_eq]
-    simp only [transferGlobalLoan, removeGlobalLoan, beq_self_eq_true,
+    simp only [transferStorageLoan, removeStorageLoan, beq_self_eq_true,
       if_pos, transfer_eq]
   exact LoanDiscipline.of_registered spelled transferred_minted live
 
@@ -1873,9 +1873,8 @@ def fillLocalLoanHole? (frame : RuntimeFrame) (state : RuntimeState)
     loanLocations := transferLoanLocation frame.loanLocations loan replacement }, state)
 
 /-- Fill the hole of `loan` wherever it is visible from this frame: the
-locals first, then the global slots. Each scan sits behind its visibility
-predicate, so a contract hypothesis refuting `holeInFrame` or
-`holeInGlobals` decides the branch without the scan ever computing. -/
+locals first, then the registered slot in globals or native Table contents.
+A contract can rule out local or stored ownership before any value search. -/
 def fillVisibleHole (frame : RuntimeFrame) (state : RuntimeState)
     (loan : Nat) (replacement : RuntimeValue) :
     RuntimeFrame × RuntimeState × Bool :=
@@ -1890,21 +1889,19 @@ def fillVisibleHole (frame : RuntimeFrame) (state : RuntimeState)
         | none => (frame, state, false)
     | none => (frame, state, false)
   else
-    -- A global loan's hole is its whole slot, so the keyed write replaces
-    -- the slot and retires the registry entry.  A contract states the
-    -- absence of a global loan as this lookup being `none`, which rewrites
-    -- the scrutinee: the branch is decided without a case analysis.
-    match globalLoanKey? state loan with
+    -- The tagged target names the owning store and slot. A native entry
+    -- hole can sit within its Table's contents vector. Absence from the
+    -- registry still decides this branch without scanning either heap.
+    match storageLoanTarget? state loan with
     | some key =>
         -- A slot that no longer holds the loan's hole has nothing visible to
         -- fill; borrow discipline excludes it, and the value is exported as
         -- any invisible write-back is.
-        match (state.globals.lookup key).bind (fillHole? loan replacement) with
+        match (state.loanValue? key).bind (fillHole? loan replacement) with
         | some filled =>
             (frame,
-              { state with
-                globals := state.globals.insert key filled
-                globalLoans := transferGlobalLoan state.globalLoans loan key replacement },
+              { state.writeLoanValue key filled with
+                storageLoans := transferStorageLoan state.storageLoans loan key replacement },
               true)
         | none => (frame, state, false)
     | none => (frame, state, false)
@@ -1924,7 +1921,7 @@ reconciliation is the observable `pending.push`. -/
 theorem applyWriteBack_export {frame : RuntimeFrame} {state : RuntimeState}
     {loan : Nat} {value : RuntimeValue}
     (noLocalHole : holeInFrame frame loan = false)
-    (noGlobalHole : globalLoanKey? state loan = none) :
+    (noGlobalHole : storageLoanTarget? state loan = none) :
     applyWriteBack frame state loan value =
       (frame, { state with pending := state.pending.push (loan, value) }) := by
   unfold applyWriteBack fillVisibleHole
@@ -1936,7 +1933,7 @@ global-loan key lookup; when it is absent, the value is exported to the
 pending array directly. -/
 theorem applyWriteBack_empty_export {state : RuntimeState} {loan : Nat}
     {value : RuntimeValue}
-    (noGlobalHole : globalLoanKey? state loan = none) :
+    (noGlobalHole : storageLoanTarget? state loan = none) :
     applyWriteBack ({} : RuntimeFrame) state loan value =
       (({} : RuntimeFrame),
         { state with pending := state.pending.push (loan, value) }) := by
@@ -1946,29 +1943,28 @@ theorem applyWriteBack_empty_export {state : RuntimeState} {loan : Nat}
 
 /-- Closed routing equation for a write-back emitted by a dying function
 frame.  There is no local search at this boundary: the native loan registry
-either names the global slot directly or the value is exported to an
-ancestor frame. -/
+either names the owning slot in globals or Table contents, or the value is
+exported to an ancestor frame. -/
 theorem applyWriteBack_empty (state : RuntimeState) (loan : Nat)
     (value : RuntimeValue) :
     applyWriteBack ({} : RuntimeFrame) state loan value =
-      match globalLoanKey? state loan with
+      match storageLoanTarget? state loan with
       | some key =>
-          match (state.globals.lookup key).bind (fillHole? loan value) with
+          match (state.loanValue? key).bind (fillHole? loan value) with
           | some filled =>
               (({} : RuntimeFrame),
-                { state with
-                  globals := state.globals.insert key filled
-                  globalLoans := transferGlobalLoan state.globalLoans loan key value })
+                { state.writeLoanValue key filled with
+                  storageLoans := transferStorageLoan state.storageLoans loan key value })
           | none =>
               (({} : RuntimeFrame),
                 { state with pending := state.pending.push (loan, value) })
       | none =>
           (({} : RuntimeFrame),
             { state with pending := state.pending.push (loan, value) }) := by
-  cases lookup_eq : globalLoanKey? state loan with
+  cases lookup_eq : storageLoanTarget? state loan with
   | none => simp [applyWriteBack, fillVisibleHole, holeInFrame, lookup_eq]
   | some key =>
-      cases filled_eq : (state.globals.lookup key).bind (fillHole? loan value) <;>
+      cases filled_eq : (state.loanValue? key).bind (fillHole? loan value) <;>
         simp [applyWriteBack, fillVisibleHole, holeInFrame, lookup_eq, filled_eq]
 
 /-- Reconcile one write-back which has already crossed a function boundary.
@@ -2046,13 +2042,13 @@ write-back without asking proof normalization to reconstruct a record-field
 equality first. -/
 theorem applyPendingFrom_push (inherited : Array (Nat × RuntimeValue))
     (frame : RuntimeFrame) (globals : GlobalMap)
-    (globalLoans : List (Nat × GlobalKey)) (nextLoan : Nat)
+    (storageLoans : List (Nat × LoanTarget)) (nextLoan : Nat)
     (loan : Nat) (current : RuntimeValue) :
     applyPendingFrom inherited frame
-        { globals, globalLoans, nextLoan
+        { globals, storageLoans, nextLoan
           pending := inherited.push (loan, current) } =
       applyPendingWriteBack frame
-        { globals, globalLoans, nextLoan, pending := inherited }
+        { globals, storageLoans, nextLoan, pending := inherited }
         loan current := by
   apply applyPendingFrom_single
   rfl
@@ -2063,15 +2059,15 @@ small structural bridge before selecting native caller locations. -/
 theorem applyPendingFrom_two_push
     (inherited : Array (Nat × RuntimeValue))
     (frame : RuntimeFrame) (globals : GlobalMap)
-    (globalLoans : List (Nat × GlobalKey))
+    (storageLoans : List (Nat × LoanTarget))
     (nextLoan firstLoan secondLoan : Nat)
     (firstValue secondValue : RuntimeValue) :
     applyPendingFrom inherited frame
-        { globals, globalLoans, nextLoan
+        { globals, storageLoans, nextLoan
           pending := inherited.push (firstLoan, firstValue)
             |>.push (secondLoan, secondValue) } =
       let first := applyPendingWriteBack frame
-        { globals, globalLoans, nextLoan, pending := inherited }
+        { globals, storageLoans, nextLoan, pending := inherited }
         firstLoan firstValue
       applyPendingWriteBack first.1 first.2 secondLoan secondValue := by
   have tooLarge : ¬ inherited.size + 1 ≤ inherited.size := by omega
@@ -2084,7 +2080,7 @@ therefore updates that exact current value and retires only the fresh cache
 entry, without any search through locals or values. -/
 theorem applyPendingFrom_derefLocalZero
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan outerLoan loan : Nat) (replacement : RuntimeValue)
     (activeLoans : Array (ExprId × Nat))
     (separate : outerLoan ≠ loan) :
@@ -2096,7 +2092,7 @@ theorem applyPendingFrom_derefLocalZero
                 (⟨.local (⟨0⟩ : LocalId), #[], true⟩ : RuntimePlace)),
               (loan,
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (loan, replacement) } =
       ({ locals := #[some (.borrow outerLoan replacement)]
          activeLoans := transferActiveLoan activeLoans loan replacement
@@ -2106,7 +2102,7 @@ theorem applyPendingFrom_derefLocalZero
              (loan,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))]
            loan replacement },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
   rw [applyPendingFrom_push]
   simp [applyPendingWriteBack, fillLocalLoanHole?, localLoanPlace?,
@@ -2120,7 +2116,7 @@ version discharges by assumption and keeps the write-back constructor-shaped
 before its continuation is opened. -/
 theorem applyPendingFrom_derefLocalZero_of_lt
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan outerLoan loan : Nat) (replacement : RuntimeValue)
     (activeLoans : Array (ExprId × Nat))
     (fresh : outerLoan < loan) :
@@ -2132,7 +2128,7 @@ theorem applyPendingFrom_derefLocalZero_of_lt
                 (⟨.local (⟨0⟩ : LocalId), #[], true⟩ : RuntimePlace)),
               (loan,
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (loan, replacement) } =
       ({ locals := #[some (.borrow outerLoan replacement)]
          activeLoans := transferActiveLoan activeLoans loan replacement
@@ -2142,9 +2138,9 @@ theorem applyPendingFrom_derefLocalZero_of_lt
              (loan,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))]
            loan replacement },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
-  exact applyPendingFrom_derefLocalZero inherited globals globalLoans
+  exact applyPendingFrom_derefLocalZero inherited globals storageLoans
     runtimeNextLoan outerLoan loan replacement activeLoans
       (Nat.ne_of_lt fresh)
 
@@ -2217,11 +2213,11 @@ avoids a proof-time record projection without weakening the fail-closed
 boundary. -/
 theorem applyPendingFrom_samePending
     (inherited : Array (Nat × RuntimeValue)) (frame : RuntimeFrame)
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (nextLoan : Nat) :
     applyPendingFrom inherited frame
-        { globals, globalLoans, nextLoan, pending := inherited } =
-      (frame, { globals, globalLoans, nextLoan, pending := inherited }) := by
+        { globals, storageLoans, nextLoan, pending := inherited } =
+      (frame, { globals, storageLoans, nextLoan, pending := inherited }) := by
   simp [applyPendingFrom]
 
 theorem applyPending_globals (frame : RuntimeFrame) (state : RuntimeState) :
@@ -2600,20 +2596,20 @@ contains exactly one outer borrow.  Consequently finalization exports one
 pending write-back directly; neither a local scan nor a fold survives into
 the caller's proof. -/
 theorem exportFrameLoans_singleInteger
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (inherited : Array (Nat × RuntimeValue))
     (value : Int) (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKeyIn? globalLoans loan = none) :
+    (noGlobal : storageLoanTargetIn? storageLoans loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer value))]
           activeLoans
           loanLocations }
-        { globals, globalLoans, nextLoan, pending := inherited } =
-      { globals, globalLoans, nextLoan
+        { globals, storageLoans, nextLoan, pending := inherited } =
+      { globals, storageLoans, nextLoan
         pending := inherited.push (loan, .integer value) } := by
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned, holeInFrame,
-    holeWithin, findFirst, applyWriteBack_empty_export, globalLoanKey?,
+    holeWithin, findFirst, applyWriteBack_empty_export, storageLoanTarget?,
     noGlobal]
 
 /-- State-polymorphic form of the scalar finalization certificate.  Direct
@@ -2624,7 +2620,7 @@ theorem exportFrameLoans_singleInteger_state
     (state : RuntimeState) (loan : Nat) (value : Int)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? state loan = none) :
+    (noGlobal : storageLoanTarget? state loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer value))]
           activeLoans
@@ -2632,9 +2628,10 @@ theorem exportFrameLoans_singleInteger_state
         state =
       { state with
         pending := state.pending.push (loan, .integer value) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  exact exportFrameLoans_singleInteger globals globalLoans nextLoan loan
-    inherited value activeLoans loanLocations noGlobal
+  have noGlobalIn : storageLoanTargetIn? state.storageLoans loan = none := noGlobal
+  simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows,
+    borrowEntry?, collectPruned, holeInFrame, holeWithin, findFirst,
+    applyWriteBack_empty, storageLoanTarget?, noGlobalIn]
 
 /-- Finalize the scalar shape produced when a callee returns a reborrow.
 The returned reference itself is not stored in the dying frame; its dynamic
@@ -2646,7 +2643,7 @@ theorem exportFrameLoans_returnedReborrow_state
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
     (separate : outerLoan ≠ returnedLoan)
-    (noGlobal : globalLoanKey? state outerLoan = none) :
+    (noGlobal : storageLoanTarget? state outerLoan = none) :
     exportFrameLoans
         { locals := #[some (.borrow outerLoan (.loanHole returnedLoan))]
           activeLoans
@@ -2654,12 +2651,12 @@ theorem exportFrameLoans_returnedReborrow_state
         state =
       { state with
         pending := state.pending.push (outerLoan, .loanHole returnedLoan) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  have noGlobalIn : globalLoanKeyIn? globalLoans outerLoan = none := noGlobal
+  rcases state with ⟨globals, storageLoans, nextLoan, inherited⟩
+  have noGlobalIn : storageLoanTargetIn? storageLoans outerLoan = none := noGlobal
   have returnedSeparate : returnedLoan ≠ outerLoan := Ne.symm separate
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows,
     borrowEntry?, collectPruned, holeInFrame, holeWithin, findFirst,
-    applyWriteBack_empty, globalLoanKey?, noGlobalIn, returnedSeparate]
+    applyWriteBack_empty, storageLoanTarget?, noGlobalIn, returnedSeparate]
 
 /-- Finalize a returned reborrow projected from a nominal field.  The
 projected loan is represented solely by its prophetic hole in the enclosing
@@ -2670,7 +2667,7 @@ theorem exportFrameLoans_returnedProjectedReborrow_state
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
     (separate : outerLoan ≠ returnedLoan)
-    (noGlobal : globalLoanKey? state outerLoan = none) :
+    (noGlobal : storageLoanTarget? state outerLoan = none) :
     exportFrameLoans
         { locals := #[some (.borrow outerLoan
               (.nominal name none
@@ -2683,12 +2680,12 @@ theorem exportFrameLoans_returnedProjectedReborrow_state
           (outerLoan,
             .nominal name none
               #[.loanHole returnedLoan, .integer right]) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  have noGlobalIn : globalLoanKeyIn? globalLoans outerLoan = none := noGlobal
+  rcases state with ⟨globals, storageLoans, nextLoan, inherited⟩
+  have noGlobalIn : storageLoanTargetIn? storageLoans outerLoan = none := noGlobal
   have returnedSeparate : returnedLoan ≠ outerLoan := Ne.symm separate
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows,
     borrowEntry?, collectPruned, collectPrunedList, holeInFrame, holeWithin,
-    findFirst, findFirstList, applyWriteBack_empty, globalLoanKey?, noGlobalIn,
+    findFirst, findFirstList, applyWriteBack_empty, storageLoanTarget?, noGlobalIn,
     returnedSeparate]
 
 /-- Finalize the packed two-result analogue of a returned reborrow.  The
@@ -2698,7 +2695,7 @@ theorem exportFrameLoans_twoReturnedReborrows_state
     (initial : RuntimeState) (runtimeNextLoan : Nat)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (freshGlobal : FreshGlobalLoanIds initial) :
+    (freshGlobal : FreshStorageLoanIds initial) :
     exportFrameLoans
         { locals := #[some (.borrow initial.nextLoan
               (.loanHole (initial.nextLoan + 1 + 1))),
@@ -2707,20 +2704,20 @@ theorem exportFrameLoans_twoReturnedReborrows_state
           activeLoans
           loanLocations }
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := initial.pending } =
       { globals := initial.globals
-        globalLoans := initial.globalLoans
+        storageLoans := initial.storageLoans
         nextLoan := runtimeNextLoan
         pending := initial.pending.push
             (initial.nextLoan, .loanHole (initial.nextLoan + 1 + 1))
           |>.push (initial.nextLoan + 1,
             .loanHole (initial.nextLoan + 1 + 1 + 1)) } := by
-  have noFirst : globalLoanKeyIn? initial.globalLoans initial.nextLoan = none :=
+  have noFirst : storageLoanTargetIn? initial.storageLoans initial.nextLoan = none :=
     freshGlobal.lookup_next
   have noSecond :
-      globalLoanKeyIn? initial.globalLoans (initial.nextLoan + 1) = none :=
+      storageLoanTargetIn? initial.storageLoans (initial.nextLoan + 1) = none :=
     freshGlobal.lookup_add 1
   have returnedFirstOuterFirst :
       initial.nextLoan + 1 + 1 ≠ initial.nextLoan := by omega
@@ -2733,7 +2730,7 @@ theorem exportFrameLoans_twoReturnedReborrows_state
   simp [exportFrameLoans, exportSettledLoans, frameBorrows,
     outermostBorrows, borrowEntry?, collectPruned, collectPrunedList,
     holeInFrame, holeWithin, findFirst, findFirstList,
-    applyWriteBack_empty, globalLoanKey?, noFirst, noSecond,
+    applyWriteBack_empty, storageLoanTarget?, noFirst, noSecond,
     returnedFirstOuterFirst, returnedFirstOuterSecond,
     returnedSecondOuterFirst, returnedSecondOuterSecond]
 
@@ -2822,7 +2819,7 @@ theorem exportFrameLoans_addressNominalInteger_state
 both the local holder and keyed global hole; finalization writes the nested
 scalar resource directly to that key and retires its registry row. -/
 theorem exportFrameLoans_globalNominalThirdLocal
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount value : Int)
     (coinName amountName : StructHandle)
@@ -2837,25 +2834,25 @@ theorem exportFrameLoans_globalNominalThirdLocal
           loanLocations := loanLocations.push
             (loan, { root := .global key }) }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
       { globals := (globals.insert key (.loanHole loan)).insert key
           (.nominal coinName none
             #[.nominal amountName none #[.integer value]])
-        globalLoans := rest
+        storageLoans := rest
         nextLoan
         pending } := by
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned,
     holeInFrame, holeWithin, findFirst, findFirstList,
-    applyWriteBack_empty, globalLoanKey?, globalLoanKeyIn?,
-    removeGlobalLoan, transferGlobalLoan, transferredLoan?, fillHole?,
+    applyWriteBack_empty, storageLoanTarget?, storageLoanTargetIn?,
+    removeStorageLoan, transferStorageLoan, transferredLoan?, fillHole?,
     rewriteFirst, rewriteFirstList]
 
 /-- One-level form of the whole-resource finalization: the written value is
 a scalar-field nominal rather than a nested aggregate. -/
 theorem exportFrameLoans_globalScalarNominalSingletonLocation
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount value : Int)
     (coinName : StructHandle)
@@ -2866,25 +2863,25 @@ theorem exportFrameLoans_globalScalarNominalSingletonLocation
           activeLoans
           loanLocations := #[(loan, { root := .global key })] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
       { globals := (globals.insert key (.loanHole loan)).insert key
           (.nominal coinName none #[.integer value])
-        globalLoans := rest
+        storageLoans := rest
         nextLoan
         pending } := by
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned,
     holeInFrame, holeWithin, findFirst, findFirstList,
-    applyWriteBack_empty, globalLoanKey?, globalLoanKeyIn?,
-    removeGlobalLoan, transferGlobalLoan, transferredLoan?, fillHole?,
+    applyWriteBack_empty, storageLoanTarget?, storageLoanTargetIn?,
+    removeStorageLoan, transferStorageLoan, transferredLoan?, fillHole?,
     rewriteFirst, rewriteFirstList]
 
 /-- Literal-registry form of `exportFrameLoans_globalNominalThirdLocal`:
 push normalization turns the freshly registered global location into a
 singleton row before finalization is reconciled. -/
 theorem exportFrameLoans_globalNominalSingletonLocation
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount value : Int)
     (coinName amountName : StructHandle)
@@ -2897,13 +2894,13 @@ theorem exportFrameLoans_globalNominalSingletonLocation
           activeLoans
           loanLocations := #[(loan, { root := .global key })] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
       { globals := (globals.insert key (.loanHole loan)).insert key
           (.nominal coinName none
             #[.nominal amountName none #[.integer value]])
-        globalLoans := rest
+        storageLoans := rest
         nextLoan
         pending } := by
   simpa using exportFrameLoans_globalNominalThirdLocal globals rest nextLoan
@@ -2915,7 +2912,7 @@ whose value still carries the focused hole.  Settlement moves the written
 value into that hole, and the reconciled resource is then written back to
 the borrowed key. -/
 theorem exportFrameLoans_focusedGlobalNominal
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount value : Int)
     (outerName innerName : StructHandle)
@@ -2932,27 +2929,27 @@ theorem exportFrameLoans_focusedGlobalNominal
               (⟨.local (⟨3⟩ : LocalId), #[.deref, .field 0, .field 0], true⟩ :
                 RuntimePlace))] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
       { globals := (globals.insert key (.loanHole loan)).insert key
           (.nominal outerName none
             #[.nominal innerName none #[.integer value]])
-        globalLoans := rest
+        storageLoans := rest
         nextLoan
         pending } := by
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, settleFrameLoans, outermostBorrows,
     borrowEntry?, collectPruned, holeInFrame, holeWithin, findFirst,
     findFirstList, clearBorrowValue, fillVisibleHole, fillHole?, rewriteFirst,
-    rewriteFirstList, applyWriteBack_empty, globalLoanKey?, globalLoanKeyIn?,
-    removeGlobalLoan, transferGlobalLoan, transferredLoan?]
+    rewriteFirstList, applyWriteBack_empty, storageLoanTarget?, storageLoanTargetIn?,
+    removeStorageLoan, transferStorageLoan, transferredLoan?]
 
 /-- Finalize the enclosing keyed resource while a projected field reborrow
 escapes in the result.  The resource is written back with the returned
 loan's prophecy hole; neither the reference nor the call boundary carries a
 path to the key. -/
 theorem exportFrameLoans_returnedFocusedGlobalNominal
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (right : Int)
     (name : StructHandle) (activeLoans : Array (ExprId × Nat)) :
@@ -2967,25 +2964,25 @@ theorem exportFrameLoans_returnedFocusedGlobalNominal
               (⟨.local (⟨1⟩ : LocalId), #[.deref, .field 0], true⟩ :
                 RuntimePlace))] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
       { globals := (globals.insert key (.loanHole loan)).insert key
           (.nominal name none #[.loanHole (loan + 1), .integer right])
-        globalLoans := (loan + 1, key) :: rest
+        storageLoans := (loan + 1, .global key) :: rest
         nextLoan
         pending } := by
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows,
     borrowEntry?, collectPruned, collectPrunedList, holeInFrame, holeWithin,
-    findFirst, findFirstList, applyWriteBack_empty, globalLoanKey?,
-    globalLoanKeyIn?, removeGlobalLoan, transferGlobalLoan, transferredLoan?,
+    findFirst, findFirstList, applyWriteBack_empty, storageLoanTarget?,
+    storageLoanTargetIn?, removeStorageLoan, transferStorageLoan, transferredLoan?,
     fillHole?, rewriteFirst, rewriteFirstList]
 
 /-- Closed call-boundary reconciliation for a returned global projection.
 The callee has already transferred the owning key to the returned prophecy
 hole, and there are no newly exported pending writes to replay in the caller. -/
 theorem applyPendingFrom_returnedFocusedGlobalNominal
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (right : Int)
     (name : StructHandle) (activeLoans : Array (ExprId × Nat))
@@ -3002,13 +2999,13 @@ theorem applyPendingFrom_returnedFocusedGlobalNominal
                 (⟨.local (⟨1⟩ : LocalId), #[.deref, .field 0], true⟩ :
                   RuntimePlace))] }
           { globals := globals.insert key (.loanHole loan)
-            globalLoans := (loan, key) :: rest
+            storageLoans := (loan, .global key) :: rest
             nextLoan
             pending }) =
       (callerFrame,
         { globals := (globals.insert key (.loanHole loan)).insert key
             (.nominal name none #[.loanHole (loan + 1), .integer right])
-          globalLoans := (loan + 1, key) :: rest
+          storageLoans := (loan + 1, .global key) :: rest
           nextLoan
           pending }) := by
   rw [exportFrameLoans_returnedFocusedGlobalNominal]
@@ -3018,7 +3015,7 @@ theorem applyPendingFrom_returnedFocusedGlobalNominal
 before the mutation: the saved value sits between the focused reference and
 its holder. -/
 theorem exportFrameLoans_focusedGlobalNominalSaved
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount saved value : Int)
     (outerName innerName : StructHandle)
@@ -3035,20 +3032,20 @@ theorem exportFrameLoans_focusedGlobalNominalSaved
               (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0, .field 0], true⟩ :
                 RuntimePlace))] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
       { globals := (globals.insert key (.loanHole loan)).insert key
           (.nominal outerName none
             #[.nominal innerName none #[.integer value]])
-        globalLoans := rest
+        storageLoans := rest
         nextLoan
         pending } := by
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, settleFrameLoans, outermostBorrows,
     borrowEntry?, collectPruned, holeInFrame, holeWithin, findFirst,
     findFirstList, clearBorrowValue, fillVisibleHole, fillHole?, rewriteFirst,
-    rewriteFirstList, applyWriteBack_empty, globalLoanKey?, globalLoanKeyIn?,
-    removeGlobalLoan, transferGlobalLoan, transferredLoan?]
+    rewriteFirstList, applyWriteBack_empty, storageLoanTarget?, storageLoanTargetIn?,
+    removeStorageLoan, transferStorageLoan, transferredLoan?]
 
 /-- Finalize one scalar mutable parameter while preserving one scalar local.
 The single native parameter row determines the only export. -/
@@ -3056,7 +3053,7 @@ theorem exportFrameLoans_borrowInteger_state
     (state : RuntimeState) (loan : Nat) (current saved : Int)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? state loan = none) :
+    (noGlobal : storageLoanTarget? state loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer current)),
             some (.integer saved)]
@@ -3065,17 +3062,17 @@ theorem exportFrameLoans_borrowInteger_state
         state =
       { state with
         pending := state.pending.push (loan, .integer current) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  have noGlobalIn : globalLoanKeyIn? globalLoans loan = none := noGlobal
+  rcases state with ⟨globals, storageLoans, nextLoan, inherited⟩
+  have noGlobalIn : storageLoanTargetIn? storageLoans loan = none := noGlobal
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned, holeInFrame,
-    holeWithin, findFirst, applyWriteBack_empty, globalLoanKey?, noGlobalIn]
+    holeWithin, findFirst, applyWriteBack_empty, storageLoanTarget?, noGlobalIn]
 
 /-- The `Bool` twin of `exportFrameLoans_borrowInteger_state`. -/
 theorem exportFrameLoans_borrowBool_state
     (state : RuntimeState) (loan : Nat) (current : Int) (saved : Bool)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? state loan = none) :
+    (noGlobal : storageLoanTarget? state loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer current)),
             some (.bool saved)]
@@ -3084,17 +3081,17 @@ theorem exportFrameLoans_borrowBool_state
         state =
       { state with
         pending := state.pending.push (loan, .integer current) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  have noGlobalIn : globalLoanKeyIn? globalLoans loan = none := noGlobal
+  rcases state with ⟨globals, storageLoans, nextLoan, inherited⟩
+  have noGlobalIn : storageLoanTargetIn? storageLoans loan = none := noGlobal
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned, holeInFrame,
-    holeWithin, findFirst, applyWriteBack_empty, globalLoanKey?, noGlobalIn]
+    holeWithin, findFirst, applyWriteBack_empty, storageLoanTarget?, noGlobalIn]
 
 /-- Finalize the same mutable parameter shape with two scalar locals. -/
 theorem exportFrameLoans_borrowTwoIntegers_state
     (state : RuntimeState) (loan : Nat) (current first second : Int)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? state loan = none) :
+    (noGlobal : storageLoanTarget? state loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer current)),
             some (.integer first), some (.integer second)]
@@ -3103,10 +3100,10 @@ theorem exportFrameLoans_borrowTwoIntegers_state
         state =
       { state with
         pending := state.pending.push (loan, .integer current) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  have noGlobalIn : globalLoanKeyIn? globalLoans loan = none := noGlobal
+  rcases state with ⟨globals, storageLoans, nextLoan, inherited⟩
+  have noGlobalIn : storageLoanTargetIn? storageLoans loan = none := noGlobal
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned, holeInFrame,
-    holeWithin, findFirst, applyWriteBack_empty, globalLoanKey?, noGlobalIn]
+    holeWithin, findFirst, applyWriteBack_empty, storageLoanTarget?, noGlobalIn]
 
 /-- Finalize after local execution has advanced only the runtime loan
 counter and pending suffix.  The registry is still the incoming state's
@@ -3116,20 +3113,20 @@ theorem exportFrameLoans_singleInteger_fromState
     (inherited : Array (Nat × RuntimeValue)) (value : Int)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? initial loan = none) :
+    (noGlobal : storageLoanTarget? initial loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer value))]
           activeLoans
           loanLocations }
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := inherited } =
       { globals := initial.globals
-        globalLoans := initial.globalLoans
+        storageLoans := initial.storageLoans
         nextLoan := runtimeNextLoan
         pending := inherited.push (loan, .integer value) } := by
-  exact exportFrameLoans_singleInteger initial.globals initial.globalLoans
+  exact exportFrameLoans_singleInteger initial.globals initial.storageLoans
     runtimeNextLoan loan inherited value activeLoans loanLocations noGlobal
 
 /-- Finalize a two-local frame whose second local is a saved scalar.  The
@@ -3140,24 +3137,24 @@ theorem exportFrameLoans_borrowInteger_fromState
     (inherited : Array (Nat × RuntimeValue)) (current saved : Int)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? initial loan = none) :
+    (noGlobal : storageLoanTarget? initial loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer current)),
             some (.integer saved)]
           activeLoans
           loanLocations }
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := inherited } =
       { globals := initial.globals
-        globalLoans := initial.globalLoans
+        storageLoans := initial.storageLoans
         nextLoan := runtimeNextLoan
         pending := inherited.push (loan, .integer current) } := by
   have noGlobal' :
-      globalLoanKey?
+      storageLoanTarget?
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := inherited }
         loan = none := noGlobal
@@ -3171,24 +3168,24 @@ theorem exportFrameLoans_borrowBool_fromState
     (inherited : Array (Nat × RuntimeValue)) (current : Int) (saved : Bool)
     (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noGlobal : globalLoanKey? initial loan = none) :
+    (noGlobal : storageLoanTarget? initial loan = none) :
     exportFrameLoans
         { locals := #[some (.borrow loan (.integer current)),
             some (.bool saved)]
           activeLoans
           loanLocations }
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := inherited } =
       { globals := initial.globals
-        globalLoans := initial.globalLoans
+        storageLoans := initial.storageLoans
         nextLoan := runtimeNextLoan
         pending := inherited.push (loan, .integer current) } := by
   have noGlobal' :
-      globalLoanKey?
+      storageLoanTarget?
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := inherited }
         loan = none := noGlobal
@@ -3203,8 +3200,8 @@ theorem exportFrameLoans_twoIntegers_state
     (state : RuntimeState) (leftLoan rightLoan : Nat)
     (left right : Int) (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace))
-    (noLeftGlobal : globalLoanKey? state leftLoan = none)
-    (noRightGlobal : globalLoanKey? state rightLoan = none) :
+    (noLeftGlobal : storageLoanTarget? state leftLoan = none)
+    (noRightGlobal : storageLoanTarget? state rightLoan = none) :
     exportFrameLoans
         { locals := #[some (.borrow leftLoan (.integer left)),
             some (.borrow rightLoan (.integer right))]
@@ -3214,13 +3211,13 @@ theorem exportFrameLoans_twoIntegers_state
       { state with
         pending := state.pending.push (leftLoan, .integer left)
           |>.push (rightLoan, .integer right) } := by
-  rcases state with ⟨globals, globalLoans, nextLoan, inherited⟩
-  have noLeft : globalLoanKeyIn? globalLoans leftLoan = none :=
+  rcases state with ⟨globals, storageLoans, nextLoan, inherited⟩
+  have noLeft : storageLoanTargetIn? storageLoans leftLoan = none :=
     noLeftGlobal
-  have noRight : globalLoanKeyIn? globalLoans rightLoan = none :=
+  have noRight : storageLoanTargetIn? storageLoans rightLoan = none :=
     noRightGlobal
   simp [exportFrameLoans, exportSettledLoans, frameBorrows, outermostBorrows, borrowEntry?, collectPruned, holeInFrame,
-    holeWithin, findFirst, applyWriteBack_empty, globalLoanKey?,
+    holeWithin, findFirst, applyWriteBack_empty, storageLoanTarget?,
     noLeft, noRight]
 
 mutual
@@ -3932,7 +3929,7 @@ def borrowRuntimePlaceAt? (lexical : Nat) (referenceType : ReferenceType)
       -- writes back by key instead of searching global memory.
       let state := match place.root with
         | .global key =>
-            { state with globalLoans := (loanInstance, key) :: state.globalLoans }
+            { state with storageLoans := (loanInstance, .global key) :: state.storageLoans }
         | .local _ => state
       let activeLoans := frame.activeLoans.filter (·.1 != ⟨lexical⟩) |>.push (⟨lexical⟩, loanInstance)
       let loanLocations := frame.loanLocations.push (loanInstance, place)
@@ -3963,7 +3960,7 @@ def borrowRuntimePlace? (unit : ValidatedUnit) (ns : ValidatedNamespace)
         writeRuntimePlace? frame state place (.loanHole loanInstance)
       let state := match place.root with
         | .global key =>
-            { state with globalLoans := (loanInstance, key) :: state.globalLoans }
+            { state with storageLoans := (loanInstance, .global key) :: state.storageLoans }
         | .local _ => state
       let activeLoans :=
         (frame.activeLoans.filter (·.1 != ⟨lexical⟩)).push
@@ -4021,7 +4018,7 @@ theorem borrowRuntimePlaceAt?_global_mutable_of_lookup
             (state.nextLoan, { root := .global key }) },
          { state with
            globals := state.globals.insert key (.loanHole state.nextLoan)
-           globalLoans := (state.nextLoan, key) :: state.globalLoans
+           storageLoans := (state.nextLoan, .global key) :: state.storageLoans
            nextLoan := state.nextLoan + 1 },
          .borrow state.nextLoan value) := by
   simp [borrowRuntimePlaceAt?, readRuntimePlace?, readRoot?,
@@ -4355,7 +4352,7 @@ lexical-to-dynamic row emitted by borrow analysis.  Settlement discovers the
 prophecy hole in the global value itself; no path back to the owning key is
 stored on the reference. -/
 theorem settleLoans_returnedGlobalProjection_zero
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (name : StructHandle)
     (right current : Int) :
@@ -4364,7 +4361,7 @@ theorem settleLoans_returnedGlobalProjection_zero
           activeLoans := #[(⟨0⟩, loan)] }
         { globals := globals.insert key
               (.nominal name none #[.loanHole loan, .integer right])
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some .unit]
@@ -4372,7 +4369,7 @@ theorem settleLoans_returnedGlobalProjection_zero
          { globals := (globals.insert key
                (.nominal name none #[.loanHole loan, .integer right])).insert key
                (.nominal name none #[.integer current, .integer right])
-           globalLoans := rest
+           storageLoans := rest
            nextLoan
            pending }) := by
   have siteSelf : ((⟨0⟩ : ExprId) == (⟨0⟩ : ExprId)) = true := by
@@ -4382,8 +4379,8 @@ theorem settleLoans_returnedGlobalProjection_zero
   simp [settleLoans, findBorrowValue?, findFirst, findFirstList,
     clearBorrowValue, rewriteFirst, rewriteFirstList, indexOfFrom,
     applyWriteBack, fillVisibleHole, holeInFrame, holeInGlobals,
-    holeWithin, fillHole?, globalLoanKey?, globalLoanKeyIn?,
-    transferGlobalLoan, transferredLoan?, removeGlobalLoan, Array.filter,
+    holeWithin, fillHole?, storageLoanTarget?, storageLoanTargetIn?,
+    transferStorageLoan, transferredLoan?, removeStorageLoan, Array.filter,
     siteSelf, siteNotDifferent]
 
 /-- End both members of a packed pair of returned reborrows.  The validated
@@ -4453,7 +4450,7 @@ theorem settleLoans_twoReturnedReborrows
 third local. The global-loan registry supplies the write-back key directly;
 the reference contains only its dynamic loan and prophetic current value. -/
 theorem settleLoans_globalBorrowThirdLocal
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (argument : Int)
     (current : RuntimeValue) :
@@ -4463,7 +4460,7 @@ theorem settleLoans_globalBorrowThirdLocal
           activeLoans := #[(⟨0⟩, loan)]
           loanLocations := #[(loan, { root := .global key })] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some (.integer argument),
@@ -4472,7 +4469,7 @@ theorem settleLoans_globalBorrowThirdLocal
            loanLocations := #[(loan, { root := .global key })] },
          { globals := (globals.insert key (.loanHole loan)).insert key
                current
-           globalLoans := transferGlobalLoan ((loan, key) :: rest) loan key current
+           storageLoans := transferStorageLoan ((loan, .global key) :: rest) loan (.global key) current
            nextLoan
            pending }) := by
   have siteSelf :
@@ -4483,8 +4480,8 @@ theorem settleLoans_globalBorrowThirdLocal
     decide
   simp [settleLoans, findBorrowValue?, findFirst,
     clearBorrowValue, rewriteFirst, indexOfFrom, applyWriteBack,
-    fillVisibleHole, holeInFrame, holeWithin, globalLoanKey?, globalLoanKeyIn?,
-    removeGlobalLoan, transferGlobalLoan, transferredLoan?, fillHole?,
+    fillVisibleHole, holeInFrame, holeWithin, storageLoanTarget?, storageLoanTargetIn?,
+    removeStorageLoan, transferStorageLoan, transferredLoan?, fillHole?,
     rewriteFirstList, Array.filter, siteSelf, siteNotDifferent]
 
 /-- Execute the paired deaths of a field-focused global borrow.  The anchor
@@ -4492,7 +4489,7 @@ lists the enclosing resource loan before the projected field loan, so
 `settleLoans` settles the field first and then writes the reconstructed resource
 to the key recorded in the global-loan registry. -/
 theorem settleLoans_focusedGlobalNominal
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount value : Int)
     (outerName innerName : StructHandle) :
@@ -4508,7 +4505,7 @@ theorem settleLoans_focusedGlobalNominal
               (⟨.local (⟨3⟩ : LocalId), #[.deref, .field 0, .field 0], true⟩ :
                 RuntimePlace))] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some (.integer amount),
@@ -4521,7 +4518,7 @@ theorem settleLoans_focusedGlobalNominal
          { globals := (globals.insert key (.loanHole loan)).insert key
                (.nominal outerName none
                  #[.nominal innerName none #[.integer value]])
-           globalLoans := rest
+           storageLoans := rest
            nextLoan
            pending }) := by
   have outer_ne_inner : loan ≠ loan + 1 := by omega
@@ -4546,7 +4543,7 @@ theorem settleLoans_focusedGlobalNominal
     findFirstList,
     clearBorrowValue, rewriteFirst, indexOfFrom, applyWriteBack,
     fillVisibleHole, holeInFrame, holeWithin, fillHole?, rewriteFirstList,
-    globalLoanKey?, globalLoanKeyIn?, removeGlobalLoan, transferGlobalLoan,
+    storageLoanTarget?, storageLoanTargetIn?, removeStorageLoan, transferStorageLoan,
     transferredLoan?, fillHole?, rewriteFirstList, Array.filter,
     outer_ne_inner, inner_ne_outer, zero_eq_zero, one_eq_one, zero_eq_one,
     one_eq_zero, zero_ne_zero, one_ne_one, zero_ne_one, one_ne_zero]
@@ -4555,7 +4552,7 @@ theorem settleLoans_focusedGlobalNominal
 field before mutation leaves one scalar local between the focused reference
 and its enclosing global holder. -/
 theorem settleLoans_focusedGlobalNominalSaved
-    (globals : GlobalMap) (rest : List (Nat × GlobalKey))
+    (globals : GlobalMap) (rest : List (Nat × LoanTarget))
     (nextLoan loan : Nat) (pending : Array (Nat × RuntimeValue))
     (key : GlobalKey) (address : String) (amount saved value : Int)
     (outerName innerName : StructHandle) :
@@ -4571,7 +4568,7 @@ theorem settleLoans_focusedGlobalNominalSaved
               (⟨.local (⟨4⟩ : LocalId), #[.deref, .field 0, .field 0], true⟩ :
                 RuntimePlace))] }
         { globals := globals.insert key (.loanHole loan)
-          globalLoans := (loan, key) :: rest
+          storageLoans := (loan, .global key) :: rest
           nextLoan
           pending } =
         ({ locals := #[some (.address address), some (.integer amount),
@@ -4584,7 +4581,7 @@ theorem settleLoans_focusedGlobalNominalSaved
          { globals := (globals.insert key (.loanHole loan)).insert key
                (.nominal outerName none
                  #[.nominal innerName none #[.integer value]])
-           globalLoans := rest
+           storageLoans := rest
            nextLoan
            pending }) := by
   have outer_ne_inner : loan ≠ loan + 1 := by omega
@@ -4609,7 +4606,7 @@ theorem settleLoans_focusedGlobalNominalSaved
     findFirstList,
     clearBorrowValue, rewriteFirst, indexOfFrom, applyWriteBack,
     fillVisibleHole, holeInFrame, holeWithin, fillHole?, rewriteFirstList,
-    globalLoanKey?, globalLoanKeyIn?, removeGlobalLoan, transferGlobalLoan,
+    storageLoanTarget?, storageLoanTargetIn?, removeStorageLoan, transferStorageLoan,
     transferredLoan?, fillHole?, rewriteFirstList, Array.filter,
     outer_ne_inner, inner_ne_outer, zero_eq_zero, one_eq_one, zero_eq_one,
     one_eq_zero, zero_ne_zero, one_ne_one, zero_ne_one, one_ne_zero]
@@ -6042,7 +6039,7 @@ five separation facts are precisely the freshness invariants needed to
 retire the fresh rows while preserving the two enclosing parameter rows. -/
 theorem applyPendingFrom_twoDerefLocals
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan leftOuter rightOuter firstLoan secondLoan : Nat)
     (leftReplacement rightReplacement : RuntimeValue)
     (noLeftTransfer : transferredLoan? leftReplacement = none)
@@ -6065,7 +6062,7 @@ theorem applyPendingFrom_twoDerefLocals
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace)),
               (secondLoan,
                 (⟨.local (⟨1⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (firstLoan, leftReplacement)
             |>.push (secondLoan, rightReplacement) } =
       ({ locals := #[some (.borrow leftOuter leftReplacement),
@@ -6076,7 +6073,7 @@ theorem applyPendingFrom_twoDerefLocals
                (⟨.local (⟨0⟩ : LocalId), #[], true⟩ : RuntimePlace)),
              (rightOuter,
                (⟨.local (⟨1⟩ : LocalId), #[], true⟩ : RuntimePlace))] },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
   have secondFirst : secondLoan ≠ firstLoan := Ne.symm freshSeparate
   rw [applyPendingFrom_two_push]
@@ -6092,7 +6089,7 @@ the caller's native location cache; no owner root or projection path is
 exported by the callee. -/
 theorem applyPendingFrom_twoReturnedReborrows_derefLocals
     (initial : RuntimeState) (runtimeNextLoan leftOuter rightOuter : Nat)
-    (freshGlobal : FreshGlobalLoanIds initial)
+    (freshGlobal : FreshStorageLoanIds initial)
     (leftPrior : leftOuter < initial.nextLoan)
     (rightPrior : rightOuter < initial.nextLoan) :
     applyPendingFrom initial.pending
@@ -6127,7 +6124,7 @@ theorem applyPendingFrom_twoReturnedReborrows_derefLocals
                 (initial.nextLoan + 1 + 1 + 1,
                   (⟨.local (⟨1⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }) =
       ({ locals := #[some (.borrow leftOuter
@@ -6147,7 +6144,7 @@ theorem applyPendingFrom_twoReturnedReborrows_derefLocals
              (initial.nextLoan + 1 + 1 + 1,
                (⟨.local (⟨1⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] },
        { globals := initial.globals
-         globalLoans := initial.globalLoans
+         storageLoans := initial.storageLoans
          nextLoan := runtimeNextLoan
          pending := initial.pending }) := by
   rw [exportFrameLoans_twoReturnedReborrows_state initial runtimeNextLoan _ _
@@ -6169,7 +6166,7 @@ local.  The cached place still selects the first slot directly; no scan of
 either local is involved. -/
 theorem applyPendingFrom_derefLocalZero_pair
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan outerLoan loan : Nat)
     (replacement : RuntimeValue) (saved : Option RuntimeValue)
     (activeLoans : Array (ExprId × Nat))
@@ -6182,7 +6179,7 @@ theorem applyPendingFrom_derefLocalZero_pair
                 (⟨.local (⟨0⟩ : LocalId), #[], true⟩ : RuntimePlace)),
               (loan,
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (loan, replacement) } =
       ({ locals := #[some (.borrow outerLoan replacement), saved]
          activeLoans := transferActiveLoan activeLoans loan replacement
@@ -6192,7 +6189,7 @@ theorem applyPendingFrom_derefLocalZero_pair
              (loan,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))]
            loan replacement },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
   rw [applyPendingFrom_push]
   simp [applyPendingWriteBack, fillLocalLoanHole?, localLoanPlace?,
@@ -6207,7 +6204,7 @@ present in the two frames; no ownership path crosses the call boundary. -/
 theorem applyPendingFrom_returnedReborrow_derefLocalZero_pair
     (initial : RuntimeState) (runtimeNextLoan parameterLoan : Nat)
     (saved : Option RuntimeValue)
-    (freshGlobal : FreshGlobalLoanIds initial)
+    (freshGlobal : FreshStorageLoanIds initial)
     (parameterPrior : parameterLoan < initial.nextLoan) :
     applyPendingFrom initial.pending
         { locals := #[some (.borrow parameterLoan
@@ -6228,7 +6225,7 @@ theorem applyPendingFrom_returnedReborrow_derefLocalZero_pair
                 (initial.nextLoan + 1,
                   (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }) =
       ({ locals := #[some (.borrow parameterLoan
@@ -6240,26 +6237,26 @@ theorem applyPendingFrom_returnedReborrow_derefLocalZero_pair
              (initial.nextLoan + 1,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] },
        { globals := initial.globals
-         globalLoans := initial.globalLoans
+         storageLoans := initial.storageLoans
          nextLoan := runtimeNextLoan
          pending := initial.pending }) := by
   have returnedSeparate : initial.nextLoan ≠ initial.nextLoan + 1 := by omega
   have parameterSeparate : parameterLoan ≠ initial.nextLoan :=
     Nat.ne_of_lt parameterPrior
   have noGlobal :
-      globalLoanKey?
+      storageLoanTarget?
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }
           initial.nextLoan = none :=
-    FreshGlobalLoanIds.lookup_next freshGlobal
+    FreshStorageLoanIds.lookup_next freshGlobal
   rw [exportFrameLoans_returnedReborrow_state _ _ _ _ _
     returnedSeparate noGlobal]
   simpa [transferActiveLoan, transferLoanLocation, transferredLoan?, findFirst,
     Array.filter, parameterSeparate] using
     (applyPendingFrom_derefLocalZero_pair initial.pending initial.globals
-      initial.globalLoans runtimeNextLoan parameterLoan initial.nextLoan
+      initial.storageLoans runtimeNextLoan parameterLoan initial.nextLoan
       (.loanHole (initial.nextLoan + 1)) saved
       #[(⟨0⟩, initial.nextLoan)] parameterSeparate)
 
@@ -6270,7 +6267,7 @@ callee does not export an owning root or projection path. -/
 theorem applyPendingFrom_returnedProjectedReborrow_derefLocalZero_pair
     (initial : RuntimeState) (runtimeNextLoan parameterLoan : Nat)
     (saved : Option RuntimeValue) (name : StructHandle) (right : Int)
-    (freshGlobal : FreshGlobalLoanIds initial)
+    (freshGlobal : FreshStorageLoanIds initial)
     (parameterPrior : parameterLoan < initial.nextLoan) :
     applyPendingFrom initial.pending
         { locals := #[some (.borrow parameterLoan
@@ -6293,7 +6290,7 @@ theorem applyPendingFrom_returnedProjectedReborrow_derefLocalZero_pair
                   (⟨.local (⟨0⟩ : LocalId), #[.deref, .field 0], true⟩ :
                     RuntimePlace))] }
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }) =
       ({ locals := #[some (.borrow parameterLoan
@@ -6306,26 +6303,26 @@ theorem applyPendingFrom_returnedProjectedReborrow_derefLocalZero_pair
              (initial.nextLoan + 1,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] },
        { globals := initial.globals
-         globalLoans := initial.globalLoans
+         storageLoans := initial.storageLoans
          nextLoan := runtimeNextLoan
          pending := initial.pending }) := by
   have returnedSeparate : initial.nextLoan ≠ initial.nextLoan + 1 := by omega
   have parameterSeparate : parameterLoan ≠ initial.nextLoan :=
     Nat.ne_of_lt parameterPrior
   have noGlobal :
-      globalLoanKey?
+      storageLoanTarget?
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }
           initial.nextLoan = none :=
-    FreshGlobalLoanIds.lookup_next freshGlobal
+    FreshStorageLoanIds.lookup_next freshGlobal
   rw [exportFrameLoans_returnedProjectedReborrow_state _ _ _ _ _ _ _
     returnedSeparate noGlobal]
   simpa [transferActiveLoan, transferLoanLocation, transferredLoan?, findFirst,
     findFirstList, Array.filter, parameterSeparate] using
     (applyPendingFrom_derefLocalZero_pair initial.pending initial.globals
-      initial.globalLoans runtimeNextLoan parameterLoan initial.nextLoan
+      initial.storageLoans runtimeNextLoan parameterLoan initial.nextLoan
       (.nominal name none
         #[.loanHole (initial.nextLoan + 1), .integer right]) saved
       #[(⟨0⟩, initial.nextLoan)] parameterSeparate)
@@ -6335,7 +6332,7 @@ forwarding function has no saved result local after its return value moves
 out, so its caller reconciliation acts on just the mutable parameter slot. -/
 theorem applyPendingFrom_returnedReborrow_derefLocalZero
     (initial : RuntimeState) (runtimeNextLoan parameterLoan : Nat)
-    (freshGlobal : FreshGlobalLoanIds initial)
+    (freshGlobal : FreshStorageLoanIds initial)
     (parameterPrior : parameterLoan < initial.nextLoan) :
     applyPendingFrom initial.pending
         { locals := #[some (.borrow parameterLoan
@@ -6356,7 +6353,7 @@ theorem applyPendingFrom_returnedReborrow_derefLocalZero
                 (initial.nextLoan + 1,
                   (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }) =
       ({ locals := #[some (.borrow parameterLoan
@@ -6368,26 +6365,26 @@ theorem applyPendingFrom_returnedReborrow_derefLocalZero
              (initial.nextLoan + 1,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] },
        { globals := initial.globals
-         globalLoans := initial.globalLoans
+         storageLoans := initial.storageLoans
          nextLoan := runtimeNextLoan
          pending := initial.pending }) := by
   have returnedSeparate : initial.nextLoan ≠ initial.nextLoan + 1 := by omega
   have parameterSeparate : parameterLoan ≠ initial.nextLoan :=
     Nat.ne_of_lt parameterPrior
   have noGlobal :
-      globalLoanKey?
+      storageLoanTarget?
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }
           initial.nextLoan = none :=
-    FreshGlobalLoanIds.lookup_next freshGlobal
+    FreshStorageLoanIds.lookup_next freshGlobal
   rw [exportFrameLoans_returnedReborrow_state _ _ _ _ _
     returnedSeparate noGlobal]
   simpa [transferActiveLoan, transferLoanLocation, transferredLoan?, findFirst,
     Array.filter, parameterSeparate] using
     (applyPendingFrom_derefLocalZero initial.pending initial.globals
-      initial.globalLoans runtimeNextLoan parameterLoan initial.nextLoan
+      initial.storageLoans runtimeNextLoan parameterLoan initial.nextLoan
       (.loanHole (initial.nextLoan + 1)) #[(⟨0⟩, initial.nextLoan)]
       parameterSeparate)
 
@@ -6398,10 +6395,10 @@ identity comes entirely from the hole value, while `loanLocations` remains a
 validated local cache that never crosses the boundary. -/
 theorem exportFrameLoans_applyPendingFrom_returnedReborrow_derefLocalZero
     (initial : RuntimeState) (runtimeNextLoan parameterLoan : Nat)
-    (freshGlobal : FreshGlobalLoanIds initial)
+    (freshGlobal : FreshStorageLoanIds initial)
     (parameterPrior : parameterLoan < initial.nextLoan)
     (parameterNoGlobal :
-      globalLoanKeyIn? initial.globalLoans parameterLoan = none) :
+      storageLoanTargetIn? initial.storageLoans parameterLoan = none) :
     exportFrameLoans
         (applyPendingFrom initial.pending
           { locals := #[some (.borrow parameterLoan
@@ -6422,7 +6419,7 @@ theorem exportFrameLoans_applyPendingFrom_returnedReborrow_derefLocalZero
                   (initial.nextLoan + 1,
                     (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
             { globals := initial.globals
-              globalLoans := initial.globalLoans
+              storageLoans := initial.storageLoans
               nextLoan := runtimeNextLoan
               pending := initial.pending })).fst
         (applyPendingFrom initial.pending
@@ -6444,11 +6441,11 @@ theorem exportFrameLoans_applyPendingFrom_returnedReborrow_derefLocalZero
                   (initial.nextLoan + 1,
                     (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
             { globals := initial.globals
-              globalLoans := initial.globalLoans
+              storageLoans := initial.storageLoans
               nextLoan := runtimeNextLoan
               pending := initial.pending })).snd =
       { globals := initial.globals
-        globalLoans := initial.globalLoans
+        storageLoans := initial.storageLoans
         nextLoan := runtimeNextLoan
         pending := initial.pending.push
           (parameterLoan, .loanHole (initial.nextLoan + 1)) } := by
@@ -6456,9 +6453,9 @@ theorem exportFrameLoans_applyPendingFrom_returnedReborrow_derefLocalZero
     parameterLoan freshGlobal parameterPrior]
   have parameterSeparate : parameterLoan ≠ initial.nextLoan + 1 := by omega
   have noGlobal :
-      globalLoanKey?
+      storageLoanTarget?
           { globals := initial.globals
-            globalLoans := initial.globalLoans
+            storageLoans := initial.storageLoans
             nextLoan := runtimeNextLoan
             pending := initial.pending }
           parameterLoan = none := parameterNoGlobal
@@ -6473,7 +6470,7 @@ the reference or of this certificate. -/
 theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
     (initial : RuntimeState) (runtimeNextLoan parameterLoan : Nat)
     (saved : Option RuntimeValue)
-    (freshGlobal : FreshGlobalLoanIds initial)
+    (freshGlobal : FreshStorageLoanIds initial)
     (parameterPrior : parameterLoan < initial.nextLoan) :
     applyPendingFrom initial.pending
         { locals := #[some (.borrow parameterLoan
@@ -6504,7 +6501,7 @@ theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
                     (initial.nextLoan + 1 + 1,
                       (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
               { globals := initial.globals
-                globalLoans := initial.globalLoans
+                storageLoans := initial.storageLoans
                 nextLoan := runtimeNextLoan
                 pending := initial.pending })).fst
           (applyPendingFrom initial.pending
@@ -6526,7 +6523,7 @@ theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
                     (initial.nextLoan + 1 + 1,
                       (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
               { globals := initial.globals
-                globalLoans := initial.globalLoans
+                storageLoans := initial.storageLoans
                 nextLoan := runtimeNextLoan
                 pending := initial.pending })).snd) =
       ({ locals := #[some (.borrow parameterLoan
@@ -6538,15 +6535,15 @@ theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
              (initial.nextLoan + 1 + 1,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] },
        { globals := initial.globals
-         globalLoans := initial.globalLoans
+         storageLoans := initial.storageLoans
          nextLoan := runtimeNextLoan
          pending := initial.pending }) := by
   let shifted : RuntimeState :=
     { globals := initial.globals
-      globalLoans := initial.globalLoans
+      storageLoans := initial.storageLoans
       nextLoan := initial.nextLoan + 1
       pending := initial.pending }
-  have shiftedFresh : FreshGlobalLoanIds shifted := by
+  have shiftedFresh : FreshStorageLoanIds shifted := by
     intro candidate lower
     apply freshGlobal candidate
     change initial.nextLoan + 1 ≤ candidate at lower
@@ -6572,7 +6569,7 @@ theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
                     (initial.nextLoan + 1 + 1,
                       (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
               { globals := initial.globals
-                globalLoans := initial.globalLoans
+                storageLoans := initial.storageLoans
                 nextLoan := runtimeNextLoan
                 pending := initial.pending })).fst
           (applyPendingFrom initial.pending
@@ -6594,19 +6591,19 @@ theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
                     (initial.nextLoan + 1 + 1,
                       (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
               { globals := initial.globals
-                globalLoans := initial.globalLoans
+                storageLoans := initial.storageLoans
                 nextLoan := runtimeNextLoan
                 pending := initial.pending })).snd =
         { globals := initial.globals
-          globalLoans := initial.globalLoans
+          storageLoans := initial.storageLoans
           nextLoan := runtimeNextLoan
           pending := initial.pending.push
             (initial.nextLoan, .loanHole (initial.nextLoan + 1 + 1)) } := by
     have forwardedPrior : initial.nextLoan < shifted.nextLoan := by
       simp [shifted]
     have forwardedNoGlobal :
-        globalLoanKeyIn? shifted.globalLoans initial.nextLoan = none := by
-      exact FreshGlobalLoanIds.lookup_next freshGlobal
+        storageLoanTargetIn? shifted.storageLoans initial.nextLoan = none := by
+      exact FreshStorageLoanIds.lookup_next freshGlobal
     simpa [shifted] using
       (exportFrameLoans_applyPendingFrom_returnedReborrow_derefLocalZero
         shifted runtimeNextLoan initial.nextLoan shiftedFresh forwardedPrior
@@ -6617,7 +6614,7 @@ theorem applyPendingFrom_forwardedReborrow_derefLocalZero_pair
   simpa [transferActiveLoan, transferLoanLocation, transferredLoan?, findFirst,
     Array.filter, parameterSeparate] using
     (applyPendingFrom_derefLocalZero_pair initial.pending initial.globals
-      initial.globalLoans runtimeNextLoan parameterLoan initial.nextLoan
+      initial.storageLoans runtimeNextLoan parameterLoan initial.nextLoan
       (.loanHole (initial.nextLoan + 1 + 1)) saved
       #[(⟨0⟩, initial.nextLoan)] parameterSeparate)
 
@@ -6628,7 +6625,7 @@ the cached-location rewrite by assumption, without synthesizing a separate
 disequality proof inside a large expression. -/
 theorem applyPendingFrom_derefLocalZero_pair_of_lt
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan outerLoan loan : Nat)
     (replacement : RuntimeValue) (saved : Option RuntimeValue)
     (activeLoans : Array (ExprId × Nat))
@@ -6641,7 +6638,7 @@ theorem applyPendingFrom_derefLocalZero_pair_of_lt
                 (⟨.local (⟨0⟩ : LocalId), #[], true⟩ : RuntimePlace)),
               (loan,
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))] }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (loan, replacement) } =
       ({ locals := #[some (.borrow outerLoan replacement), saved]
          activeLoans := transferActiveLoan activeLoans loan replacement
@@ -6651,9 +6648,9 @@ theorem applyPendingFrom_derefLocalZero_pair_of_lt
              (loan,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))]
            loan replacement },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
-  exact applyPendingFrom_derefLocalZero_pair inherited globals globalLoans
+  exact applyPendingFrom_derefLocalZero_pair inherited globals storageLoans
     runtimeNextLoan outerLoan loan replacement saved activeLoans
       (Nat.ne_of_lt fresh)
 
@@ -6663,7 +6660,7 @@ followed by a saved scalar local.  `nativeInitialFrame?` may have reduced
 reached; this theorem keeps that residual array computation out of VCs. -/
 theorem applyPendingFrom_derefLocalZero_pair_parameterRow
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan outerLoan loan : Nat)
     (current replacement : RuntimeValue) (saved : Option RuntimeValue)
     (activeLoans : Array (ExprId × Nat))
@@ -6681,7 +6678,7 @@ theorem applyPendingFrom_derefLocalZero_pair_parameterRow
                 #[((.borrow outerLoan current), 0)]).push
               (loan,
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace)) }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (loan, replacement) } =
       ({ locals := #[some (.borrow outerLoan replacement), saved]
          activeLoans := transferActiveLoan activeLoans loan replacement
@@ -6691,10 +6688,10 @@ theorem applyPendingFrom_derefLocalZero_pair_parameterRow
              (loan,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))]
            loan replacement },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
   rw [parameterLoanLocations_filterMap_singleBorrow]
-  exact applyPendingFrom_derefLocalZero_pair inherited globals globalLoans
+  exact applyPendingFrom_derefLocalZero_pair inherited globals storageLoans
     runtimeNextLoan outerLoan loan replacement saved activeLoans separate
 
 /-- Reconcile the constructor form emitted immediately after reborrowing
@@ -6703,7 +6700,7 @@ the only local.  This is the lowering-facing companion to
 and cache push before either can become residual proof computation. -/
 theorem applyPendingFrom_derefLocalZero_afterBorrow
     (inherited : Array (Nat × RuntimeValue))
-    (globals : GlobalMap) (globalLoans : List (Nat × GlobalKey))
+    (globals : GlobalMap) (storageLoans : List (Nat × LoanTarget))
     (runtimeNextLoan outerLoan loan : Nat)
     (previous replacement : RuntimeValue)
     (activeLoans : Array (ExprId × Nat))
@@ -6718,7 +6715,7 @@ theorem applyPendingFrom_derefLocalZero_afterBorrow
                 (⟨.local (⟨0⟩ : LocalId), #[], true⟩ : RuntimePlace))].push
               (loan,
                 (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace)) }
-        { globals, globalLoans, nextLoan := runtimeNextLoan
+        { globals, storageLoans, nextLoan := runtimeNextLoan
           pending := inherited.push (loan, replacement) } =
       ({ locals := #[some (.borrow outerLoan replacement)]
          activeLoans := transferActiveLoan activeLoans loan replacement
@@ -6728,10 +6725,10 @@ theorem applyPendingFrom_derefLocalZero_afterBorrow
              (loan,
                (⟨.local (⟨0⟩ : LocalId), #[.deref], true⟩ : RuntimePlace))]
            loan replacement },
-       { globals, globalLoans, nextLoan := runtimeNextLoan
+       { globals, storageLoans, nextLoan := runtimeNextLoan
          pending := inherited }) := by
   rw [array_singleton_setIfInBounds_zero]
-  exact applyPendingFrom_derefLocalZero inherited globals globalLoans
+  exact applyPendingFrom_derefLocalZero inherited globals storageLoans
     runtimeNextLoan outerLoan loan replacement activeLoans separate
 
 /-- Materialize the local row of a fresh function frame. Parameters occupy

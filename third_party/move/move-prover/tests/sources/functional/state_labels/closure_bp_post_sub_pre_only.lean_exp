@@ -1,2 +1,116 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:9:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet
+tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verification failed with a residual obligation:
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+nativesTyped : LeanerIR.NativesTyped executable✝
+nativesShift : LeanerIR.NativesShift executable✝
+leanerAgree : LeanerIR.Proofs.TypesAgree unit
+leanerResources : LeanerIR.Proofs.ResourcesTyped unit
+f :
+  (LeanerIR.Proofs.Denote.NTy.function
+      (LeanerIR.Proofs.Denote.NRow.cons
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil)).ref
+        LeanerIR.Proofs.Denote.NRow.nil)
+      [false] LeanerIR.Proofs.Denote.NRow.nil).carrier
+snd✝² : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+x_value : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝¹ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed :
+  LeanerIR.Proofs.KeepsMemoryAt executable✝
+    (LeanerIR.Proofs.Denote.NRow.cons
+      (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          LeanerIR.Proofs.Denote.NRow.nil
+          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+            LeanerIR.Proofs.Denote.NRow.nil)).ref
+      LeanerIR.Proofs.Denote.NRow.nil)
+    f.val
+permitted : True
+fst✝ : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+left✝¹ : 0 ≤ x_value.val
+right✝¹ : x_value.val ≤ 18446744073709551615
+left✝ : 0 ≤ fst✝.val
+right✝ : fst✝.val ≤ 18446744073709551615
+⊢ LeanerIR.Proofs.wp
+    (LeanerIR.Proofs.Denote.closureMeaning executable✝ f.val
+      (LeanerIR.Proofs.Denote.NRow.cons
+        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            LeanerIR.Proofs.Denote.NRow.nil
+            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+              LeanerIR.Proofs.Denote.NRow.nil)).ref
+        LeanerIR.Proofs.Denote.NRow.nil)
+      LeanerIR.Proofs.Denote.ResultShape.none (((x_value, snd✝¹), fst✝, snd✝), ()))
+    (fun value state =>
+      LeanerIR.Proofs.wp
+        (LeanerIR.Proofs.Denote.Flow.bind
+          (LeanerIR.Proofs.Denote.Flow.bind
+            (LeanerIR.Proofs.Denote.Flow.bind LeanerIR.Proofs.Spec.bottom fun value env =>
+              LeanerIR.Proofs.Denote.Flow.bind
+                (LeanerIR.Proofs.Denote.Args.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+                  LeanerIR.Proofs.Denote.Args.nil env)
+                fun values env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value (value, values) env))
+            fun values env =>
+            LeanerIR.Proofs.Spec.bind
+              (LeanerIR.Proofs.Denote.closureMeaning executable✝ f.val
+                (LeanerIR.Proofs.Denote.NRow.cons
+                  (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                      LeanerIR.Proofs.Denote.NRow.nil
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                        LeanerIR.Proofs.Denote.NRow.nil)).ref
+                  LeanerIR.Proofs.Denote.NRow.nil)
+                LeanerIR.Proofs.Denote.ResultShape.none values)
+              fun result =>
+              LeanerIR.Proofs.Spec.pure
+                (LeanerIR.Proofs.Denote.Flow.value (LeanerIR.Proofs.Denote.ResultShape.none.toBody result) env))
+          fun x env =>
+          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ #[])
+            (LeanerIR.Proofs.Denote.Term.lit ()) env)
+        (fun value state =>
+          LeanerIR.Proofs.wp
+            (match value with
+            | LeanerIR.Proofs.Denote.Flow.value value env =>
+              match env.snd.fst with
+              | some reference =>
+                (LeanerIR.Proofs.Spec.assume (reference.fst = reference.snd)).bind fun x =>
+                  LeanerIR.Proofs.Denote.Mutables.nil.resolve env (LeanerIR.Proofs.Spec.pure ())
+              | none => LeanerIR.Proofs.Spec.pure ()
+            | LeanerIR.Proofs.Denote.Flow.return_ result env =>
+              match env.snd.fst with
+              | some reference =>
+                (LeanerIR.Proofs.Spec.assume (reference.fst = reference.snd)).bind fun x =>
+                  LeanerIR.Proofs.Denote.Mutables.nil.resolve env (LeanerIR.Proofs.Spec.pure result)
+              | none => LeanerIR.Proofs.Spec.pure result
+            | LeanerIR.Proofs.Denote.Flow.break_ nest env => LeanerIR.Proofs.Spec.bottom
+            | LeanerIR.Proofs.Denote.Flow.continue_ nest env => LeanerIR.Proofs.Spec.bottom)
+            (fun result final =>
+              (∃ S S_x,
+                  LeanerIR.Proofs.RequiresOf (requiresTable unit)
+                      ((LeanerIR.Proofs.Denote.NTy.function
+                            (LeanerIR.Proofs.Denote.NRow.cons
+                              (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                  LeanerIR.Proofs.Denote.NRow.nil
+                                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                                    LeanerIR.Proofs.Denote.NRow.nil)).ref
+                              LeanerIR.Proofs.Denote.NRow.nil)
+                            [false] LeanerIR.Proofs.Denote.NRow.nil).encode
+                        f)
+                      [S_x] S ∧
+                    ¬LeanerIR.Proofs.AbortsOfMut executable✝
+                        ((LeanerIR.Proofs.Denote.NTy.function
+                              (LeanerIR.Proofs.Denote.NRow.cons
+                                (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                    LeanerIR.Proofs.Denote.NRow.nil
+                                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+                                      LeanerIR.Proofs.Denote.NRow.nil)).ref
+                                LeanerIR.Proofs.Denote.NRow.nil)
+                              [false] LeanerIR.Proofs.Denote.NRow.nil).encode
+                          f)
+                        [true] [S_x] S) ∧
+                final = initialState✝)
+            (fun failure => True) state)
+        (fun failure => True) state)
+    (fun failure => True) initialState✝
+tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: leaner verification failed: the automatic verification of `apply_twice` failed; provide a proof: `verify apply_twice by …` in `tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.proof.lean` (`verify apply_twice by skip` shows the obligations it leaves)

@@ -1773,7 +1773,7 @@ leaner module aptos_framework::ordered_map where
     ∃ (k : K), spec_contains_key(m, k) && spec_contains_key(other, k)
 
   @[map_spec_aborts_trim (OrderedMap)]
-  spec fun spec_aborts_trim {K} {V}(m : OrderedMap<K, V>, at : Int) : Bool :=
+  spec fun spec_aborts_trim {K} {V}(m : OrderedMap<K, V>, at : u64) : Bool :=
     at > spec_len(m)
 
   @[map_spec_aborts_upsert_all (OrderedMap)]
@@ -1858,7 +1858,7 @@ leaner module aptos_framework::ordered_map where
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$0» {T0} {T1}(
-    v : Vector<Entry<T0, T1> >, end : Int
+    v : Vector<Entry<T0, T1> >, end : u64
   ) : Vector<T0> :=
     if end == 0 then vec::<T0>()
     else concat(«spec_map_ref$lambda$0»(v, end - 1), vec(v[end - 1].key))
@@ -1867,7 +1867,7 @@ leaner module aptos_framework::ordered_map where
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun «spec_map_ref$lambda$2» {T0} {T1}(
-    v : Vector<Entry<T0, T1> >, end : Int
+    v : Vector<Entry<T0, T1> >, end : u64
   ) : Vector<T1> :=
     if end == 0 then vec::<T1>()
     else concat(«spec_map_ref$lambda$2»(v, end - 1), vec(v[end - 1].value))
@@ -1876,7 +1876,7 @@ leaner module aptos_framework::ordered_map where
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun «spec_map_ref_aborts$lambda$1» {T0} {T1}(
-    v : Vector<Entry<T0, T1> >, end : Int
+    v : Vector<Entry<T0, T1> >, end : u64
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$1»(v, end - 1) || false)
 
@@ -1884,6 +1884,6 @@ leaner module aptos_framework::ordered_map where
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun «spec_map_ref_aborts$lambda$3» {T0} {T1}(
-    v : Vector<Entry<T0, T1> >, end : Int
+    v : Vector<Entry<T0, T1> >, end : u64
   ) : Bool :=
     end > 0 && («spec_map_ref_aborts$lambda$3»(v, end - 1) || false)

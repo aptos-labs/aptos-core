@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/returned_reference_freeze.move:62:35: error: the specification clause `ensures result == 9` is not established
+LeanerE2ETests/SourceVerify/returned_reference_freeze.move:62:5: error: leaner verification failed: the automatic verification of `wrong` failed; provide a proof: `verify wrong by …` in `LeanerE2ETests/SourceVerify/returned_reference_freeze.proof.lean` (`verify wrong by skip` shows the obligations it leaves)

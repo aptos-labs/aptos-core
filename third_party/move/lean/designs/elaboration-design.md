@@ -200,9 +200,14 @@ logical boundary.
 The shared checker also enforces result-slot bounds/types, type-domain
 instantiations/results, correlates resource-domain operations with their
 nominal type arguments/results, and enforces the fixed nullary/unary result
-shapes of `old`, `wellFormed`, and `abortFlag`. Trace, no-op, and source-level
-bit-vector/integer conversion nodes are unary and type-preserving, matching the
-existing source backend's representation-independent rendering.
+shapes of `old`, `wellFormed`, and `abortFlag`. Trace and no-op nodes are unary
+and type-preserving. Neutral fixed-width/logical-integer coercions are unary
+and check the corresponding numeric domains. They must not be conflated with
+Move's polymorphic `int2bv`/`bv2int` representation wrappers: unsigned
+conversion and subsequent arithmetic can wrap, while signed instances stay
+in the integer representation. The Move importer rejects those wrappers
+until representation flow is modeled (2026-10-07; registry C17). Erasing them
+previously allowed false overflow proofs.
 Specification vector construction, update, concatenation, containment,
 index-of, in-range, and range operations check their fixed arity and
 vector/element/index/result relationships before M4 interpretation. Their
@@ -970,7 +975,7 @@ tests pass solely through LIR semantics.
 > boolean fields, `spec.old`), `move_from` with post-state clauses and
 > frames, and whole-resource `&mut` update (`*coin := new Coin {...}`).
 > The write-back of a mutable global borrow is keyed by the state's loan
-> registry (`RuntimeState.globalLoans`) — certified exclusivity makes the
+> registry (`RuntimeState.storageLoans`) — certified exclusivity makes the
 > recorded key the hole's location, so nothing searches global memory.
 > Signers key storage by their address in `RuntimeValue.storageKey?`.
 >

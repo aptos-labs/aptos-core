@@ -24,12 +24,14 @@ namespace LeanerIR.Proofs.Denote
 open Lean Meta
 open Simp (Stats SimprocsArray)
 
-/-- Whether an equation's left side occurs in its right side: rewriting
-with it would not terminate, so it stays a fact but is no rewrite rule. -/
+/-- Whether an equation's left side occurs in its right side, including
+conditional and quantified equations: rewriting with it would not terminate,
+so it stays a fact but is no rewrite rule. -/
 def selfReferential (type : Expr) : MetaM Bool := do
-  let some (_, left, right) := type.eq? | return false
-  -- An instance as rewriting finds one, up to reducible unfolding.
-  return (← kabstract right left).hasLooseBVars
+  forallTelescope type fun _ body => do
+    let some (_, left, right) := body.eq? | return false
+    -- An instance as rewriting finds one, up to reducible unfolding.
+    return (← kabstract right left).hasLooseBVars
 
 /-- Whether rewriting `left` to `right` closes a cycle with the admitted
 equations (origin, left side, right side): `left` is reached from `right`

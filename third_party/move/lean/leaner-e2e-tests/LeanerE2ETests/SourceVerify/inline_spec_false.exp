@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/inline_spec_false.move:13:9: error: the specification clause `ensures result == x + 1` is not established
+LeanerE2ETests/SourceVerify/inline_spec_false.move:11:5: error: leaner verification failed: the automatic verification of `bad_inc` failed; provide a proof: `verify bad_inc by …` in `LeanerE2ETests/SourceVerify/inline_spec_false.proof.lean` (`verify bad_inc by skip` shows the obligations it leaves)

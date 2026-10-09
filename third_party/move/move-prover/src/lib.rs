@@ -144,6 +144,7 @@ fn run_move_prover_lean<W: WriteColor>(
         &env,
         source,
         None,
+        &options.prover.verify_scope,
         options.heartbeats,
         &output,
         error_writer,

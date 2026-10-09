@@ -568,7 +568,7 @@ leaner module std::vector where
   Check that `v1` is equal to the result of removing the element at index `i` from `v2`.
   -/
   spec fun eq_remove_elem_at_index {Element}(
-    i : Int, v1 : Vector<Element>, v2 : Vector<Element>
+    i : u64, v1 : Vector<Element>, v2 : Vector<Element>
   ) : Bool :=
     v1.length + 1 == v2.length && v1[0 .. i] == v2[0 .. i]
       && v1[i .. v1.length] == v2[i + 1 .. v2.length]
@@ -585,7 +585,7 @@ leaner module std::vector where
   `f` folded over `v[0..end]`, starting from `init`.
   -/
   spec fun spec_fold {Element} {Acc}(
-    f : Fn(Acc, &Element) -> Acc, v : Vector<Element>, init : Acc, end : Int
+    f : Fn(Acc, &Element) -> Acc, v : Vector<Element>, init : Acc, end : u64
   ) : Acc :=
     if end == 0 then init
     else result_of<f>(spec_fold(f, v, init, end - 1), v[end - 1])
@@ -594,7 +594,7 @@ leaner module std::vector where
   `t` folded over indices `0..end`, starting from `init`.
   -/
   spec fun spec_fold_idx {Acc}(
-    t : Fn(Acc, u64) -> Acc, init : Acc, end : Int
+    t : Fn(Acc, u64) -> Acc, init : Acc, end : u64
   ) : Acc :=
     if end == 0 then init
     else result_of<t>(spec_fold_idx(t, init, end - 1), end - 1)
@@ -603,7 +603,7 @@ leaner module std::vector where
   The result of mapping `f` over the prefix `v[0..end]`.
   -/
   spec fun spec_map_ref {Element} {NewElement}(
-    f : Fn(&Element) -> NewElement, v : Vector<Element>, end : Int
+    f : Fn(&Element) -> NewElement, v : Vector<Element>, end : u64
   ) : Vector<NewElement> :=
     if end == 0 then vec::<NewElement>()
     else concat(spec_map_ref(f, v, end - 1), vec(result_of<f>(v[end - 1])))
@@ -612,6 +612,6 @@ leaner module std::vector where
   Whether mapping `f` over the prefix `v[0..end]` aborts.
   -/
   spec fun spec_map_ref_aborts {Element} {NewElement}(
-    f : Fn(&Element) -> NewElement, v : Vector<Element>, end : Int
+    f : Fn(&Element) -> NewElement, v : Vector<Element>, end : u64
   ) : Bool :=
     end > 0 && (spec_map_ref_aborts(f, v, end - 1) || aborts_of<f>(v[end - 1]))

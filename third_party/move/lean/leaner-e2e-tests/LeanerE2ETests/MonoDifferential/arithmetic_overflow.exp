@@ -1,5 +1,4 @@
 step 0: 0x49::overflowing::add_beyond(100)
   mono:       failed InvalidOperation (Add: under/overflow)
-  LIR:        aborted 300
-  round trip: aborted 300
-  ERROR: mono and LIR diverge
+  LIR:        failed InvalidOperation (arithmetic error)
+  round trip: failed InvalidOperation (arithmetic error)

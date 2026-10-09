@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/quantifier_shadowing.move:23:16: error: the assertion `∀ (j in 0 .. v.length), v[j] == 0` does not hold
+LeanerE2ETests/SourceVerify/quantifier_shadowing.move:25:5: error: leaner verification failed: the automatic verification of `wrong` failed; provide a proof: `verify wrong by …` in `LeanerE2ETests/SourceVerify/quantifier_shadowing.proof.lean` (`verify wrong by skip` shows the obligations it leaves)

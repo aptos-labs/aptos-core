@@ -49,6 +49,7 @@ leaner module 0x42::reference_patterns where
   spec grow where
     pragma aborts_if_is_partial
     aborts_if !(s is Circle) with 14566554180833181697
+    aborts_if s is Circle && s.radius == MAX_U64 with -1
 
   fun reset_incorrect(s : Shape) -> Shape := do
     let mut t := s

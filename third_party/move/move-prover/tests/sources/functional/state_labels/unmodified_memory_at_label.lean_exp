@@ -1,0 +1,10 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/unmodified_memory_at_label.move:26:9: error: the specification clause `ensures S1.. |~ publish<Container>(
+        account.address,
+        new Container {
+          inner := old((..S1 |~ global<Resource>(addr))).value
+        }
+      )` is not established
+tests/sources/functional/state_labels/unmodified_memory_at_label.move:20:5: error: leaner verification failed: the automatic verification of `swap` failed; provide a proof: `verify swap by …` in `tests/sources/functional/state_labels/unmodified_memory_at_label.proof.lean` (`verify swap by skip` shows the obligations it leaves)
+tests/sources/functional/state_labels/unmodified_memory_at_label.move:43:9: error: the specification clause `ensures (..S1 |~ exists<Container>(account.address))` is not established
+tests/sources/functional/state_labels/unmodified_memory_at_label.move:38:5: error: leaner verification failed: the automatic verification of `swap_wrong` failed; provide a proof: `verify swap_wrong by …` in `tests/sources/functional/state_labels/unmodified_memory_at_label.proof.lean` (`verify swap_wrong by skip` shows the obligations it leaves)

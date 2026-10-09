@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/lambda_variant_field_access.move:31:9: error: the specification clause `ensures result` is not established
+tests/sources/regression/lambda_variant_field_access.move:28:5: error: leaner verification failed: the automatic verification of `two` failed; provide a proof: `verify two by …` in the module (`verify two by skip` shows the obligations it leaves)
+tests/sources/regression/lambda_variant_field_access.move:35:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet
+tests/sources/regression/lambda_variant_field_access.move:35:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet
+tests/sources/regression/lambda_variant_field_access.move:35:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet

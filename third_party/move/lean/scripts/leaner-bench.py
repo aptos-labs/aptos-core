@@ -14,7 +14,7 @@ the standard library and the `gh` CLI (for the history).
 
 A series of local runs on a branch: `run --only <names>` after each change,
 keeping the names. It builds `leaner-bench`, measures, records the run, and
-compares it with the previous one. `compare` only reads recorded runs:
+reports the latest run against main. `compare` only reads recorded runs:
 `history --local` lists them, `compare @-N @-1` the change since run @-N.
 """
 
@@ -42,6 +42,7 @@ PACKAGE = LEAN_DIR / "leaner-e2e-tests"
 # A local run's page, the history of local runs, and the problems' logs of
 # the latest local run, all git-ignored.
 LOCAL_PAGE = LEAN_DIR / "local_benchmark.html"
+LOCAL_RESULT = LEAN_DIR / "local_benchmark.json"
 LOCAL_HISTORY = LEAN_DIR / "local_benchmark_history.jsonl"
 LOCAL_LOGS = LEAN_DIR / "local_benchmark_logs"
 LOCAL_KEEP = 100
@@ -252,8 +253,35 @@ def measure(problem, executable, env, workdir):
                 "cpu_ms": [result["cpu_ms"] for result in finished],
                 "heartbeats": [result["heartbeats"]["total"] for result in finished],
             }
+    chosen = expected_outcome(problem, chosen)
     return {"name": problem["name"], "kind": problem["kind"], "group": group_of(problem),
             "input": input_id(problem), **chosen}
+
+
+def expected_outcome(problem, result):
+    """Accept only the declared target rejections, with all errors accounted for.
+    A timeout, unrelated error, missing target, or accepted negative stays visible.
+    """
+    expected = set(problem.get("expected_rejections", []))
+    if not expected:
+        return result
+    result = {**result, "expected_rejections": sorted(expected)}
+    if result.get("status") in ("timeout", "crashed"):
+        return result
+    outcomes = result.get("outcomes", [])
+    by_target = {outcome["target"]: outcome for outcome in outcomes}
+    if not expected <= by_target.keys():
+        return {**result, "status": "failed"}
+    if any(by_target[name]["status"] == "verified" for name in expected):
+        return {**result, "status": "unexpected acceptance"}
+    if any(outcome["status"] == "timeout" for outcome in outcomes):
+        return {**result, "status": "timeout"}
+    rejected = {outcome["target"] for outcome in outcomes if outcome["status"] == "rejected"}
+    accounted = sum(outcome["errors"] for outcome in outcomes)
+    if (rejected == expected and accounted > 0 and accounted == result.get("errors", 0)
+            and all(outcome["status"] in ("verified", "rejected") for outcome in outcomes)):
+        return {**result, "status": "expected rejection"}
+    return {**result, "status": "failed"}
 
 
 def cpu_model():
@@ -327,14 +355,12 @@ def run(args):
     if args.out:
         Path(args.out).write_text(json.dumps(results, indent=2) + "\n")
         print(f"leaner-bench: wrote {args.out}", file=sys.stderr)
-    # A local run joins the local history and renders the branch's local runs
-    # against the CI history; in CI the report job renders.
+    # Keep intermediate runs for explicit comparisons, but show only the
+    # latest local measurement against main in the default page.
     if not in_ci():
         record_local(results)
-        report(parser().parse_args(["report", "--local-runs"]))
-        if len(local_runs(results["branch"])) > 1:
-            print()
-            compare(parser().parse_args(["compare"]))
+        LOCAL_RESULT.write_text(json.dumps(results, indent=2) + "\n")
+        report(parser().parse_args(["report", "--local", str(LOCAL_RESULT)]))
 
 
 # --------------------------------------------------------------------------
@@ -467,11 +493,13 @@ def problem_names(points):
 
 
 def problem_groups(points):
-    """The problems by group, in the order of `problem_names`. A problem's
-    group is the one its latest result records; a result from before groups
-    were recorded is grouped by its kind."""
+    """Group the latest full suite and any subsequent subset measurements.
+    Retired problems stay in historical data, but not in the page's index or
+    sections. A problem's group comes from its latest recorded result."""
+    full_index = next((i for i in range(len(points) - 1, -1, -1)
+                       if not points[i].get("subset")), 0)
     groups = {}
-    for name in problem_names(points):
+    for name in problem_names(points[full_index:]):
         results = [result for result in (result_of(point, name) for point in reversed(points))
                    if result]
         group = next((result["group"] for result in results if result.get("group")),
@@ -485,12 +513,11 @@ def result_of(point, name):
 
 
 def suite_value(point, measure):
-    """The overall total of the problems a run verified completely; none for
+    """The total measured work, including verification rejections; none for
     a run of a subset, whose total compares with no other."""
     if point.get("subset"):
         return None
-    return sum(problem[measure]["total"] for problem in point["problems"]
-               if problem["status"] == "verified")
+    return sum(problem.get(measure, {}).get("total", 0) for problem in point["problems"])
 
 
 def median(values):
@@ -591,7 +618,7 @@ def latest_changes(points, name):
     overall heartbeats against the previous result."""
     results = [result_of(point, name) for point in points]
     latest = results[-1]
-    earlier = [result for result in results[:-1] if result and result["status"] == "verified"]
+    earlier = [result for result in results[:-1] if result and "wall_ms" in result]
     walls = [result["wall_ms"]["total"] for result in earlier]
     wall = latest["wall_ms"]["total"] if latest else None
     beats = latest.get("heartbeats", {}).get("total") if latest else None
@@ -600,9 +627,9 @@ def latest_changes(points, name):
         "latest": latest,
         "previous": change(wall, previous["wall_ms"]["total"] if previous else None),
         "median": change(wall, statistics.median(walls) if walls else None),
-        "heartbeats": change(beats, previous["heartbeats"]["total"] if previous else None),
-        "trend": sparkline([result["wall_ms"]["total"] if result and result["status"] == "verified"
-                            else None for result in results]),
+        "heartbeats": change(beats, previous.get("heartbeats", {}).get("total") if previous else None),
+        "trend": sparkline([result.get("wall_ms", {}).get("total") if result else None
+                            for result in results]),
     }
 
 
@@ -614,7 +641,7 @@ def markdown(points, threshold, page_url=None):
     if page_url:
         lines += [f"Charts: {page_url}", ""]
     counts = {status: sum(problem["status"] == status for problem in latest["problems"])
-              for status in ("verified", "failed", "timeout", "crashed")}
+              for status in ("verified", "expected rejection", "unexpected acceptance", "failed", "timeout", "crashed")}
     lines.append(
         f"Suite overall **{seconds(suite[-1])} s** ({percent(change(suite[-1], suite[-2] if len(suite) > 1 else None))} "
         f"vs previous, {percent(change(suite[-1], median(suite[:-1])))} "
@@ -642,7 +669,7 @@ def slack(points, threshold, heartbeat_threshold, page_url=None):
     latest = points[-1]
     suite = [suite_value(point, "wall_ms") for point in points]
     counts = {status: sum(problem["status"] == status for problem in latest["problems"])
-              for status in ("verified", "failed", "timeout", "crashed")}
+              for status in ("verified", "expected rejection", "unexpected acceptance", "failed", "timeout", "crashed")}
     lines = [
         f"*Leaner verification benchmark* · `{latest['commit'][:10]}` · {latest['date'][:10]}",
         f"Suite overall *{seconds(suite[-1])} s* "
@@ -898,6 +925,40 @@ def value_table(labels, rows):
     return f"<details><summary>Table</summary><table><tr>{head}</tr>{body}</table></details>"
 
 
+def target_status(problem, name):
+    outcomes = {outcome["target"]: outcome["status"]
+                for outcome in problem.get("outcomes", [])}
+    outcome = outcomes.get(name, "verified" if problem["status"] == "verified" else "–")
+    if name in problem.get("expected_rejections", []):
+        if outcome == "rejected":
+            return "expected rejection"
+        if outcome == "verified":
+            return "unexpected acceptance"
+    return outcome
+
+
+def expensive_targets_section(point):
+    targets = sorted(
+        ((problem, target) for problem in point["problems"]
+         for target in problem.get("targets", []) if target.get("heartbeats") is not None),
+        key=lambda item: (-item[1]["heartbeats"], item[0]["name"], item[1]["target"]))[:20]
+    if not targets:
+        return ""
+    rows = "".join(
+        f'<tr><td>{rank}</td><td><a href="#{anchor(problem["name"])}">'
+        f'{html.escape(problem["name"])}</a></td><td>{html.escape(target["target"])}</td>'
+        f'<td>{beat_count(target["heartbeats"])}</td>'
+        f'<td>{html.escape(target_status(problem, target["target"]))}</td></tr>'
+        for rank, (problem, target) in enumerate(targets, 1))
+    scope = "latest partial run" if point.get("subset") else "latest run"
+    return (
+        '<section id="expensive-targets"><h2>Most expensive targets</h2>'
+        f'<p class="meta">Top {len(targets)} by heartbeats across the {scope}, '
+        'including rejections and timeouts.</p>'
+        '<table><tr><th>Rank</th><th>Problem</th><th>Target</th>'
+        f'<th>Heartbeats</th><th>Status</th></tr>{rows}</table></section>')
+
+
 def problem_section(points, name):
     labels = [label_of(point) for point in points]
     results = [result_of(point, name) for point in points]
@@ -914,10 +975,11 @@ def problem_section(points, name):
             if result and result.get("repeats") else (None, None) for result in results]
     latest = results[-1]
     status = latest["status"] if latest else "absent"
-    targets = sorted((latest or {}).get("targets", []), key=lambda t: -t["wall_ms"])[:8]
+    targets = sorted((latest or {}).get("targets", []), key=lambda t: -t["heartbeats"])[:8]
     target_rows = "".join(
-        f"<tr><td>{html.escape(target['target'])}</td><td>{target['wall_ms'] / 1000:.1f}</td>"
-        f"<td>{beat_count(target['heartbeats'])}</td></tr>" for target in targets)
+        f"<tr><td>{html.escape(target['target'])}</td><td>{beat_count(target['heartbeats'])}</td>"
+        f"<td>{target['wall_ms'] / 1000:.1f}</td>"
+        f"<td>{html.escape(target_status(latest, target['target']))}</td></tr>" for target in targets)
     errors = "".join(f"<li>{html.escape(message)}</li>"
                      for message in (latest or {}).get("error_messages", []))
     rows = [(f"{title} s", [seconds(value[key]) for value in walls]) for key, title in GROUPS]
@@ -930,9 +992,9 @@ def problem_section(points, name):
         f'{chart(name, "Wall time (s)", " s", labels, wall_series, notes, band if any(b[1] for b in band) else None)}'
         f'{chart(name, f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, beat_series, notes)}</div>'
         + (f"<details open><summary>Most expensive targets, latest run</summary><table>"
-           f"<tr><th>Target</th><th>Seconds</th><th>Heartbeats</th></tr>{target_rows}"
+           f"<tr><th>Target</th><th>Heartbeats</th><th>Seconds</th><th>Status</th></tr>{target_rows}"
            f"</table></details>" if targets else "")
-        + (f"<details open><summary>Errors, latest run</summary><ul>{errors}</ul></details>"
+        + (f"<details open><summary>Diagnostics, latest run</summary><ul>{errors}</ul></details>"
            if errors else "")
         + value_table(labels, rows) + "</section>")
 
@@ -946,16 +1008,20 @@ def suite_section(points):
     divisor, suffix = beat_unit(max((value for value in scaled("heartbeats", 1)
                                      if value is not None), default=0))
     beats = scaled("heartbeats", divisor)
+    measurements = [f'{sum("heartbeats" in problem for problem in point["problems"])}'
+                    f'/{len(point["problems"])}' for point in points]
+    rows = [("Heartbeats", [beat_count(suite_value(point, "heartbeats")) for point in points]),
+            ("Heartbeat measurements", measurements)]
     if all(value is None for value in wall):
         return ('<section id="suite"><h2>Suite</h2><p class="meta">No full run in this '
                 "window: the suite total compares full runs only.</p></section>")
     return (
-        '<section id="suite"><h2>Suite<span class="status">problems verified completely, '
+        '<section id="suite"><h2>Suite<span class="status">all measured work, including rejections, '
         'full runs</span></h2>'
         '<div class="charts">'
         f'{chart("Suite", "Wall time (s)", " s", labels, [("Overall", wall)], {})}'
         f'{chart("Suite", f"Heartbeats ({suffix} = {BEAT_POWERS[suffix]})", suffix, labels, [("Overall", beats)], {})}'
-        "</div></section>")
+        "</div>" + value_table(labels, rows) + "</section>")
 
 
 def anchor(name, prefix="problem"):
@@ -970,7 +1036,9 @@ def index(points, groups, local_table):
         status = latest["status"] if latest else "absent"
         mark = "" if status == "verified" else f' <span class="status">{html.escape(status)}</span>'
         return f'<li><a href="#{anchor(name)}">{html.escape(name)}</a>{mark}</li>'
-    top = '<li><a href="#suite">Suite</a></li>' + (
+    top = ('<li><a href="#expensive-targets">Most expensive targets</a></li>'
+           if expensive_targets_section(points[-1]) else "")
+    top += '<li><a href="#suite">Suite</a></li>' + (
         '<li><a href="#local">Local run</a></li>' if local_table else "")
     body = "".join(
         f'<li><a class="group" href="#{anchor(group, "group")}">{html.escape(group)}</a>'
@@ -995,7 +1063,7 @@ def page(points, local_table):
         f'runner {html.escape(str(latest.get("runner")))}, {latest.get("threads")} threads, '
         f'{html.escape(latest.get("toolchain", ""))}</div>'
         f'<div class="layout">{index(points, groups, local_table)}<main>'
-        + local_table + sections
+        + expensive_targets_section(latest) + local_table + sections
         + f"</main></div></div><script>{SCRIPT}</script></body></html>\n")
 
 
@@ -1013,7 +1081,8 @@ def comparison_base(history, base_ref):
         return None
     for point in reversed(history):
         is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", point["commit"], merge_base], cwd=REPO)
+            ["git", "merge-base", "--is-ancestor", point["commit"], merge_base], cwd=REPO,
+            stderr=subprocess.DEVNULL)
         if is_ancestor.returncode == 0:
             return point
     return None
@@ -1023,8 +1092,8 @@ def local_comparison(base, local):
     """The local run against a CI run: heartbeats directly, wall time as each
     problem's share of the suite, since the machines differ."""
     names = [name for name in problem_names([local])
-             if (result_of(base, name) or {}).get("status") == "verified"
-             and (result_of(local, name) or {}).get("status") == "verified"]
+             if all(result and "heartbeats" in result and "wall_ms" in result
+                    for result in (result_of(base, name), result_of(local, name)))]
     base_total = sum(result_of(base, name)["wall_ms"]["total"] for name in names) or 1
     local_total = sum(result_of(local, name)["wall_ms"]["total"] for name in names) or 1
     rows = []
@@ -1033,7 +1102,7 @@ def local_comparison(base, local):
         share_before = before["wall_ms"]["total"] / base_total
         share_after = after["wall_ms"]["total"] / local_total
         rows.append((name, before["heartbeats"]["total"], after["heartbeats"]["total"],
-                     share_before, share_after))
+                     share_before, share_after, before["status"], after["status"]))
     return rows
 
 
@@ -1041,12 +1110,13 @@ def local_text(base, rows):
     title = (f"Local run against CI run {base['run']['id']} ({base['commit'][:10]}, "
              f"{base['date'][:10]})")
     header = (f"{'problem':<24} {'heartbeats CI':>14} {'local':>10} {'change':>9}"
-              f" {'time share CI':>14} {'local':>7}")
+              f" {'time share CI':>14} {'local':>7}  status CI → local")
     lines = [title, "", header]
-    for name, beats_before, beats_after, share_before, share_after in rows:
+    for name, beats_before, beats_after, share_before, share_after, status_before, status_after in rows:
         lines.append(f"{name:<24} {beat_count(beats_before):>14} {beat_count(beats_after):>10} "
                      f"{percent(change(beats_after, beats_before)):>9} "
-                     f"{share_before * 100:>13.1f}% {share_after * 100:>6.1f}%")
+                     f"{share_before * 100:>13.1f}% {share_after * 100:>6.1f}%  "
+                     f"{status_before} → {status_after}")
     return "\n".join(lines)
 
 
@@ -1056,12 +1126,13 @@ def local_html(base, rows):
     body = "".join(
         f"<tr><td>{html.escape(name)}</td><td>{beat_count(before)}</td><td>{beat_count(after)}</td>"
         f"<td>{percent(change(after, before))}</td><td>{share_before * 100:.1f} %</td>"
-        f"<td>{share_after * 100:.1f} %</td></tr>"
-        for name, before, after, share_before, share_after in rows)
+        f"<td>{share_after * 100:.1f} %</td><td>{html.escape(status_before)} → "
+        f"{html.escape(status_after)}</td></tr>"
+        for name, before, after, share_before, share_after, status_before, status_after in rows)
     return (f"<section id=\"local\"><h2>Local run against CI run {base['run']['id']}"
             f'<span class="status">{html.escape(base["commit"][:10])}, at or before the merge '
             "base</span></h2><table><tr><th>Problem</th><th>Heartbeats CI</th><th>Local</th>"
-            "<th>Change</th><th>Time share CI</th><th>Local</th></tr>"
+            "<th>Change</th><th>Time share CI</th><th>Local</th><th>Status CI → local</th></tr>"
             f"{body}</table></section>")
 
 
@@ -1113,15 +1184,15 @@ def compare(args):
         wall = [result["wall_ms"]["total"] if result else None for result in (old, new)]
         beats = [result.get("heartbeats", {}).get("total") if result else None
                  for result in (old, new)]
-        if old and new and old["status"] == new["status"] == "verified":
+        if all(value is not None for value in wall + beats):
             common.append((wall, beats))
         print(f"{name:<24} {status:>20} {seconds(wall[0]):>7} → {seconds(wall[1]):>6} "
               f"{percent(change(wall[1], wall[0])):>9} {beat_count(beats[0]):>7} → "
               f"{beat_count(beats[1]):>6} {percent(change(beats[1], beats[0])):>9}")
-    # The problems both runs verified completely, so subsets compare too.
+    # Common measurements, including rejections, so subsets compare too.
     wall = [sum(pair[0][side] for pair in common) for side in (0, 1)]
     beats = [sum(pair[1][side] for pair in common) for side in (0, 1)]
-    print(f"{f'verified in both ({len(common)})':<24} {'':>20} {seconds(wall[0]):>7} → "
+    print(f"{f'measured in both ({len(common)})':<24} {'':>20} {seconds(wall[0]):>7} → "
           f"{seconds(wall[1]):>6} {percent(change(wall[1], wall[0])):>9} "
           f"{beat_count(beats[0]):>7} → {beat_count(beats[1]):>6} "
           f"{percent(change(beats[1], beats[0])):>9}")

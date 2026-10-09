@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-enum_19575.lean:9:3: error: LEANER-ENUM-INVARIANT-GENERIC: generic enum invariants are not supported yet

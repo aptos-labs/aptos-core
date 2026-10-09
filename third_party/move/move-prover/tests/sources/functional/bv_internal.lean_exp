@@ -1,2 +1,0 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/bv_internal.move: LIR-SEMANTIC-TYPE: in fun bv2int_boundary: bit-vector-to-int result is not logical num at [5660, 5674)

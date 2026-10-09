@@ -93,13 +93,14 @@ private def atEntry (exp : Exp) : Exp :=
 private abbrev Bindings := List (String × Exp × Bool)
 
 private def lookup (bindings : Bindings) (post : Bool) (name : String) : Option Exp :=
-  (bindings.find? (·.1 == name)).map fun (_, value, atEntryState) =>
+  (bindings.find? (fun (bound, _, atEntryState) => bound == name && (post || atEntryState))).map fun (_, value, atEntryState) =>
     if post && atEntryState then atEntry value else value
 
 /-- The steps of a proof, at the entry and at each return. In a lemma's
 proof (`splitBranches`), an `if` is a case analysis: a split on its
 condition precedes the steps it guards. -/
-partial def steps (proof : Proof) (splitBranches : Bool := false) : Array Step × Array Step :=
+partial def steps (proof : Proof) (splitBranches : Bool := false)
+    (conditions : List Condition := []) : Array Step × Array Step :=
   let rec walk (bindings : Bindings) (guards : List Exp) (post : Bool)
       (acc : Array Step × Array Step) : Proof → Array Step × Array Step × Bindings
     | proof =>
@@ -115,7 +116,7 @@ partial def steps (proof : Proof) (splitBranches : Bool := false) : Array Step �
           (entry, exit, bindings)
       -- `assume [trusted] true` marks a lemma taken on trust and assumes
       -- nothing.
-      | .assume _ (.mk _ _ (.value (.bool true) _)) => (acc.1, acc.2, bindings)
+      | .assume _ (.mk _ _ (.value (.bool true) _ _)) => (acc.1, acc.2, bindings)
       | .assume loc exp =>
           let (entry, exit) := push acc { loc, guards, action := .assume (close exp) }
           (entry, exit, bindings)
@@ -157,7 +158,19 @@ partial def steps (proof : Proof) (splitBranches : Bool := false) : Array Step �
               let (entry, exit, _) :=
                 walk bindings (guards ++ [negated]) post (entry, exit) elseProof
               (entry, exit, bindings)
-  let (entry, exit, _) := walk [] [] false (#[], #[]) proof
+  -- Contract lets are in scope in a proof as well. Close them in declaration
+  -- order, retaining their state: pre-state bindings read through `old` in
+  -- post steps, while post-state bindings are unavailable at entry.
+  let bindings : Bindings := conditions.foldl (init := []) fun bindings condition =>
+    match condition with
+    | .mk kind _ _ expression .. =>
+        match kind with
+        | .letPre name | .letPost name =>
+            let post := kind matches .letPost _
+            let value := substitute (lookup bindings post) (fun _ => none) expression
+            (name, value, !post) :: bindings
+        | _ => bindings
+  let (entry, exit, _) := walk bindings [] false (#[], #[]) proof
   (entry, exit)
 
 /-- An expression under its path conditions: `g₁ ==> … ==> e`. -/

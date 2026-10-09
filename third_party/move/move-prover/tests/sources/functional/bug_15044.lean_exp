@@ -1,7 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bug_15044.move:18:9: error: the specification clause `ensures result.inner == EQUAL
-        ==> left_length == right_length
-          && (∀ (i : u64), i < left_length ==> left[i] == right[i])` is not established
 tests/sources/functional/bug_15044.move:12:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.

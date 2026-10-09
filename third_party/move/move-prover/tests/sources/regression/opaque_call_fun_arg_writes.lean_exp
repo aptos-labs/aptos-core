@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/opaque_call_fun_arg_writes.move:27:9: error: the specification clause `ensures global<R>(a).value == old(global<R>(a).value)` is not established
+tests/sources/regression/opaque_call_fun_arg_writes.move:24:5: error: leaner verification failed: the automatic verification of `forwarded_at` failed; provide a proof: `verify forwarded_at by …` in `tests/sources/regression/opaque_call_fun_arg_writes.proof.lean` (`verify forwarded_at by skip` shows the obligations it leaves)
+tests/sources/regression/opaque_call_fun_arg_writes.move:47:9: error: the specification clause `ensures global<R>(a).value == old(global<R>(a).value)` is not established
+tests/sources/regression/opaque_call_fun_arg_writes.move:44:5: error: leaner verification failed: the automatic verification of `addressed` failed; provide a proof: `verify addressed by …` in `tests/sources/regression/opaque_call_fun_arg_writes.proof.lean` (`verify addressed by skip` shows the obligations it leaves)

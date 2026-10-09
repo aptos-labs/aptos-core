@@ -5,7 +5,9 @@ import LeanerE2ETests.CheckSupport
 
 /-! Bit-vector decisions: under `pragma bv`, a leaf over bit operations
 on unsigned values is restated over bit vectors and decided there. Without
-the pragma the same leaf is left to integer arithmetic. -/
+the pragma the same leaf is left to integer arithmetic, which relates a
+conjunction's two operand orders and decides a membership test of one bit,
+but not a fact about the bits themselves. -/
 
 leaner module 0x48::flags where
   fun set(flags : &mut Vector<u8>, flag : u64, include : Bool) -> Unit := do
@@ -54,4 +56,9 @@ leaner module 0x48::flags where
 
   spec contains_without_bv where
     aborts_if false
-    ensures result == spec_contains(flags, flag) -- error: needs `pragma bv`
+    ensures result == spec_contains(flags, flag)
+
+  fun toggled_without_bv(byte : u8, bit : u8) -> u8 := byte ^ (1u8 << bit % 8u8)
+
+  spec toggled_without_bv where
+    ensures result & (1 << bit % 8) % 256 != byte & (1 << bit % 8) % 256 -- error: needs `pragma bv`

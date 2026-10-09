@@ -1,0 +1,10 @@
+LeanerE2ETests/SourceVerify/bv_conversion_false.move:9:9: error: the specification clause `ensures (if 0 <= x + 1 && x + 1 < 256 then x + 1
+      else ((x + 1) % 256 + 256) % 256)
+        > 255` is not established
+LeanerE2ETests/SourceVerify/bv_conversion_false.move:6:5: error: leaner verification failed: the automatic verification of `unsigned_bound` failed; provide a proof: `verify unsigned_bound by …` in `LeanerE2ETests/SourceVerify/bv_conversion_false.proof.lean` (`verify unsigned_bound by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/bv_conversion_false.move:15:9: error: the specification clause `ensures (if -128 <= x + 129 && x + 129 < 128 then x + 129
+      else ((x + 129 - -128) % 256 + 256) % 256 + -128)
+        > 255` is not established
+LeanerE2ETests/SourceVerify/bv_conversion_false.move:13:5: error: leaner verification failed: the automatic verification of `signed_bound` failed; provide a proof: `verify signed_bound by …` in `LeanerE2ETests/SourceVerify/bv_conversion_false.proof.lean` (`verify signed_bound by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/bv_conversion_false.move:22:9: error: the specification clause `ensures x == 0` is not established
+LeanerE2ETests/SourceVerify/bv_conversion_false.move:19:5: error: leaner verification failed: the automatic verification of `cast_not_modular` failed; provide a proof: `verify cast_not_modular by …` in `LeanerE2ETests/SourceVerify/bv_conversion_false.proof.lean` (`verify cast_not_modular by skip` shows the obligations it leaves)

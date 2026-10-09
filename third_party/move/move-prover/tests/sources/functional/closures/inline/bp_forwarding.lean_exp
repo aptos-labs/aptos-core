@@ -1,3 +1,19 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/closures/inline/bp_forwarding.move: LIR-SEMANTIC-TYPE: in fun set_values: function call result differs from the callee signature at [3981, 4001)
-LIR-SEMANTIC-TYPE: in fun set_values_wrong: function call result differs from the callee signature at [3981, 4001)
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/bp_forwarding.move:129:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/bp_forwarding.move:129:5: error: leaner verification failed: the automatic verification of `set_values` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify set_values by …` in `tests/sources/functional/closures/inline/bp_forwarding.proof.lean` (`verify set_values by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/bp_forwarding.move:150:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/bp_forwarding.move:150:5: error: leaner verification failed: the automatic verification of `all_values_bounded` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify all_values_bounded by …` in `tests/sources/functional/closures/inline/bp_forwarding.proof.lean` (`verify all_values_bounded by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/bp_forwarding.move:177:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/closures/inline/bp_forwarding.move:177:5: error: leaner verification failed: the automatic verification of `set_values_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify set_values_wrong by …` in `tests/sources/functional/closures/inline/bp_forwarding.proof.lean` (`verify set_values_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

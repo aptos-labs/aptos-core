@@ -1,2 +1,12 @@
 Move prover returns: exiting with verification errors
-consts.lean:44:29: error: LEANER-INTEGER-CONTEXT: an integer literal appears in a non-integer context
+tests/sources/functional/consts.move:32:9: error: the specification clause `ensures !result.b` is not established
+tests/sources/functional/consts.move:30:5: error: leaner verification failed: the automatic verification of `init_incorrect` failed; provide a proof: `verify init_incorrect by …` in `tests/sources/functional/consts.proof.lean` (`verify init_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/consts.move:45:13: error: the assertion `BYTE_ARRAY[0] == 22` does not hold
+tests/sources/functional/consts.move:43:5: error: leaner verification failed: the automatic verification of `array_1_incorrect` failed; provide a proof: `verify array_1_incorrect by …` in `tests/sources/functional/consts.proof.lean` (`verify array_1_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/consts.move:51:13: error: the assertion `ADDRESS_ARRAY[0]
+    == @0x222` does not hold
+tests/sources/functional/consts.move:49:5: error: leaner verification failed: the automatic verification of `array_2_incorrect` failed; provide a proof: `verify array_2_incorrect by …` in `tests/sources/functional/consts.proof.lean` (`verify array_2_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/consts.move:67:13: error: the assertion `v1[0] == @0x111 && v1[1] == @0x222 && v1[2] == @0x333` does not hold
+tests/sources/functional/consts.move:64:5: error: leaner verification failed: the automatic verification of `array_in_fun_incorrect` failed; provide a proof: `verify array_in_fun_incorrect by …` in `tests/sources/functional/consts.proof.lean` (`verify array_in_fun_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/consts.move:74:13: error: the assertion `v1[0] == false && v1[1] == false && v1[2] == false` does not hold
+tests/sources/functional/consts.move:71:5: error: leaner verification failed: the automatic verification of `array_in_fun_incorrect_bool` failed; provide a proof: `verify array_in_fun_incorrect_bool by …` in `tests/sources/functional/consts.proof.lean` (`verify array_in_fun_incorrect_bool by skip` shows the obligations it leaves)

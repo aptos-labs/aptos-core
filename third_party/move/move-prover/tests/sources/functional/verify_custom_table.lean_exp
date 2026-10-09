@@ -1,3 +1,3 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/verify_custom_table.move: LIR-SEMANTIC-TYPE: in fun create_and_insert_fail2: equality primitive operand types differ at [7698, 7734)
+Move prover returns: exiting with verification errors
+tests/sources/functional/verify_custom_table.move:1:1: error: LIR-SEMANTIC-TYPE: in fun create_and_insert_fail2: equality primitive operand types differ at [7698, 7734)
 LIR-SEMANTIC-TYPE: in fun create_and_insert_fail_due_to_typed_key_encoding: equality primitive operand types differ at [7240, 7276)

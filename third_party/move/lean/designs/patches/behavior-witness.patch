@@ -1,0 +1,66 @@
+--- a/third_party/move/lean/leaner-ir/LeanerIR/Proofs/Denote/Close.lean
++++ b/third_party/move/lean/leaner-ir/LeanerIR/Proofs/Denote/Close.lean
+@@ -7293,6 +7293,53 @@
+     catch _ => state.restore
+   return current
+ 
++/-- Whether a statement reads a behavioral predicate. -/
++private def readsBehavior (statement : Lean.Expr) : Bool :=
++  (statement.find? fun e => e.isAppOf ``LeanerIR.Proofs.RequiresOf ||
++    e.isAppOf ``LeanerIR.Proofs.AbortsOf || e.isAppOf ``LeanerIR.Proofs.AbortsOfMut ||
++    e.isAppOf ``LeanerIR.Proofs.EnsuresOf || e.isAppOf ``LeanerIR.Proofs.EnsuresOfMut).isSome
++
++/-- An existential over a state label whose body states behavioral
++predicates, witnessed at a program point: its body, instantiated there,
++derived through the literal closures' targets (`dispatchBehavior`: the table
++of declared preconditions, verified contracts) and decided by the cheap
++deciders, conjunct by conjunct; the points in turn. -/
++private def behaviorWitness (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr)) :
++    TacticM Bool := do
++  let target ← goal.withContext do instantiateMVars (← goal.getType)
++  let statement := unmarked target
++  let some (domain, _) := statement.app2? ``Exists | return false
++  unless domain.isAppOf ``LeanerIR.Proofs.Denote.Memory && readsBehavior statement do return false
++  let original ← saveState
++  let saved ← getGoals
++  let goal ← if target == statement then pure goal else goal.replaceTargetDefEq statement
++  goal.withContext do
++  let debug := leaner.denoteDebug.get (← getOptions)
++  let points ← programPoints
++  if debug then IO.println s!"behavior witness: {points.size} program points"
++  for (value, state) in points do
++    let some (chosen, body) ← pointWitness? value state statement
++      | if debug then IO.println s!"behavior witness: no witness at {← ppExpr value}"
++        continue
++    let attempt ← saveState
++    let instantiated ← mkFreshExprSyntheticOpaqueMVar body
++    setGoals [instantiated.mvarId!]
++    evalTactic (← `(tactic| repeat' apply And.intro))
++    let mut decided := true
++    for conjunct in ← getGoals do
++      let next ← dispatchBehavior conjunct callees
++      unless ← closesBy next (← `(tactic| leaner_denote_leaf_cheap)) do
++        if leaner.denoteDebug.get (← getOptions) then
++          IO.println s!"behavior witness: undecided at a point\n{← ppGoal next}"
++        decided := false
++        break
++    if decided then
++      assignWitnessed goal saved chosen (← instantiateMVars instantiated)
++      return true
++    attempt.restore
++  original.restore
++  return false
++
+ /-- The facts a proof states: its conjuncts, recursively. -/
+ private partial def conjuncts (proof : Lean.Expr) : MetaM (Array Lean.Expr) := do
+   let type ← whnfR (← instantiateMVars (← inferType proof))
+@@ -9167,6 +9214,9 @@
+       behaviorFailures := behaviorFailures + 1
+       stageCost := stageCost.push ("existing behavior attempt", spent)
+     let derivationStart ← IO.getNumHeartbeats
++    if ← behaviorWitness goal callees then
++      stageCost := stageCost.push ("behavior witness", (← IO.getNumHeartbeats) - derivationStart)
++      continue
+     let goal ← dispatchBehavior goal callees
+     stageCost := stageCost.push ("terminating facts", terminatingDone - behaviorStart)
+       |>.push ("result/state rewriting", rewritingDone - terminatingDone)

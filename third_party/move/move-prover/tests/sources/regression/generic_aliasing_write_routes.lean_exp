@@ -9,38 +9,14 @@ Hint: Additional diagnostic information may be available using the `set_option d
 tests/sources/regression/generic_aliasing_write_routes.move:30:5: error: leaner verification failed: the automatic verification of `two_reads_one_write` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify two_reads_one_write by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify two_reads_one_write by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/regression/generic_aliasing_write_routes.move:50:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:47:5: error: leaner verification failed: the automatic verification of `callee_writes` failed; provide a proof: `verify callee_writes by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify callee_writes by skip` shows the obligations it leaves)
-tests/sources/regression/generic_aliasing_write_routes.move:7:1: error: the continuation after `remove_r` is not established
+tests/sources/regression/generic_aliasing_write_routes.move:66:5: error: the continuation after `remove_r` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:68:9: error: the specification clause `ensures result` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:66:5: error: leaner verification failed: the automatic verification of `native_modifies` failed; provide a proof: `verify native_modifies by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify native_modifies by skip` shows the obligations it leaves)
 tests/sources/regression/generic_aliasing_write_routes.move:86:9: error: the specification clause `ensures result` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:84:5: error: leaner verification failed: the automatic verification of `opaque_modifies` failed; provide a proof: `verify opaque_modifies by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify opaque_modifies by skip` shows the obligations it leaves)
-tests/sources/regression/generic_aliasing_write_routes.move:7:1: error: Tactic `decide` failed for proposition
-  LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit = true
-because its `Decidable` instance
-  instDecidableEqBool (LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit) true
-did not reduce to `isTrue` or `isFalse`.
-
-Reduction got stuck at the `Decidable` instance
-  match LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit, true with
-  | false, false => isTrue ⋯
-  | false, true => isFalse ⋯
-  | true, false => isFalse ⋯
-  | true, true => isTrue ⋯
 tests/sources/regression/generic_aliasing_write_routes.move:99:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:96:5: error: leaner verification failed: the automatic verification of `frame_writes` failed; provide a proof: `verify frame_writes by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify frame_writes by skip` shows the obligations it leaves)
 tests/sources/regression/generic_aliasing_write_routes.move:116:9: error: the specification clause `ensures result` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:113:5: error: leaner verification failed: the automatic verification of `closure_writes` failed; provide a proof: `verify closure_writes by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify closure_writes by skip` shows the obligations it leaves)
-tests/sources/regression/generic_aliasing_write_routes.move:7:1: error: Tactic `decide` failed for proposition
-  LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit = true
-because its `Decidable` instance
-  instDecidableEqBool (LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit) true
-did not reduce to `isTrue` or `isFalse`.
-
-Reduction got stuck at the `Decidable` instance
-  match LeanerIR.Proofs.resourcesTypedCheck «0x42».generic_aliasing_write_routes.unit, true with
-  | false, false => isTrue ⋯
-  | false, true => isFalse ⋯
-  | true, false => isFalse ⋯
-  | true, true => isTrue ⋯
 tests/sources/regression/generic_aliasing_write_routes.move:128:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:125:5: error: leaner verification failed: the automatic verification of `frame_only` failed; provide a proof: `verify frame_only by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify frame_only by skip` shows the obligations it leaves)

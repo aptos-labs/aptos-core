@@ -88,6 +88,32 @@ def omissions (package : Package) : IO (Array Report) := do
         text := s!"unsupported Move declaration `{skipped.name}`: {skipped.reason}" }
   return reports
 
+/-- The loop invariants of the target modules' functions that no loop claims
+(`Frontend.LoopInvariants`), each an error at its location, in source order. -/
+def misplacedLoopInvariants (package : Package) : IO (Array Report) := do
+  let mut maps : Std.HashMap String (Option Lean.FileMap) := {}
+  let mut reports := #[]
+  for module in package.modules do
+    unless module.isTarget do continue
+    for function in module.functions do
+      let some body := function.body | continue
+      for loc in LeanerMove.Frontend.LoopInvariants.misplaced body do
+        let file := (module.sources[loc.file]?).getD "?"
+        let map ← match maps[file]? with
+          | some map => pure map
+          | none => do
+              let map ← try pure (some (Lean.FileMap.ofString (← IO.FS.readFile file)))
+                catch _ => pure none
+              maps := maps.insert file map
+              pure map
+        let position := map.map (·.toPosition ⟨loc.start⟩)
+        reports := reports.push {
+          file, line := position.map (·.line) |>.getD 1
+          column := position.map (·.column + 1) |>.getD 1, severity := .error
+          text := LeanerMove.Frontend.LoopInvariants.message }
+  return reports.qsort fun a b => a.file < b.file || a.file == b.file &&
+    (a.line < b.line || a.line == b.line && a.column < b.column)
+
 /-- Verify a Move file, or the modules of a Move package directory, writing
 the LeanerLang rendering to `output`. With `exported`, the source and its
 dependencies are read from that existing `move exchange --format ast` export
@@ -103,7 +129,7 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
     (renderOnly : Bool := false) (heartbeats : Option Nat := none)
     (modules : Array String := #[]) (dev : Bool := false) :
     IO (Array Report) := do
-  let (unit, companions, omitted) ← LeanerLang.Perf.withPhase .frontend do
+  let prepared ← LeanerLang.Perf.withPhase .frontend do
     let package ← match exported with
       | some exported =>
           LeanerMove.Frontend.Cli.readExportDir exported source filter
@@ -116,10 +142,20 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
             else LeanerMove.Frontend.Cli.exportModules source modules dev
           else LeanerMove.Frontend.Cli.exportMoveFiles [source]
     let package ← withProofFiles package
+    -- A misplaced loop invariant rejects the run, as in the Move Prover.
+    let misplaced ← misplacedLoopInvariants package
+    if !misplaced.isEmpty then return .error (Sum.inr misplaced)
     match LeanerMove.Frontend.LIR.Backend.fromXast package with
-    | .ok unit => pure (unit, ← companions package unit, ← omissions package)
-    | .error message => throw <| IO.userError s!"{source}: {message}"
-  let reports ← run environment { unit, companions, output, renderOnly, heartbeats }
-  return (if renderOnly then #[] else omitted) ++ reports
+    | .ok unit => pure (Except.ok (unit, ← companions package unit, ← omissions package))
+    | .error message => pure (Except.error (Sum.inl message))
+  match prepared with
+  | .error (Sum.inr reports) => return reports
+  | .error (Sum.inl message) =>
+      return #[{
+        file := source.toString, line := 1, column := 1
+        severity := .error, text := message }]
+  | .ok (unit, companions, omitted) =>
+      let reports ← run environment { unit, companions, output, renderOnly, heartbeats }
+      return (if renderOnly then #[] else omitted) ++ reports
 
 end LeanerMove.SourceVerify

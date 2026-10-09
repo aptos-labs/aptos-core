@@ -1,0 +1,2 @@
+LeanerE2ETests/SourceVerify/field_update_labels.move:34:9: error: the specification clause `ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + 2` is not established
+LeanerE2ETests/SourceVerify/field_update_labels.move:30:5: error: leaner verification failed: the automatic verification of `caller_wrong` failed; provide a proof: `verify caller_wrong by …` in `LeanerE2ETests/SourceVerify/field_update_labels.proof.lean` (`verify caller_wrong by skip` shows the obligations it leaves)

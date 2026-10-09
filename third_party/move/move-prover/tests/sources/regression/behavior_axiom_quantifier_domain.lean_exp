@@ -5,13 +5,5 @@ Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
 tests/sources/regression/behavior_axiom_quantifier_domain.move:21:5: error: leaner verification failed: the automatic verification of `out_of_range` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify out_of_range by …` in `tests/sources/regression/behavior_axiom_quantifier_domain.proof.lean` (`verify out_of_range by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/regression/behavior_axiom_quantifier_domain.move:29:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/behavior_axiom_quantifier_domain.move:29:5: error: leaner verification failed: the automatic verification of `in_range` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify in_range by …` in `tests/sources/regression/behavior_axiom_quantifier_domain.proof.lean` (`verify in_range by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/regression/behavior_axiom_quantifier_domain.move:45:9: error: the specification clause `ensures result >= 20` is not established
-tests/sources/regression/behavior_axiom_quantifier_domain.move:44:5: error: leaner verification failed: the automatic verification of `whole_type` failed; provide a proof: `verify whole_type by …` in `tests/sources/regression/behavior_axiom_quantifier_domain.proof.lean` (`verify whole_type by skip` shows the obligations it leaves)
 tests/sources/regression/behavior_axiom_quantifier_domain.move:60:9: error: the specification clause `ensures result == 0` is not established
 tests/sources/regression/behavior_axiom_quantifier_domain.move:59:5: error: leaner verification failed: the automatic verification of `out_of_where` failed; provide a proof: `verify out_of_where by …` in `tests/sources/regression/behavior_axiom_quantifier_domain.proof.lean` (`verify out_of_where by skip` shows the obligations it leaves)

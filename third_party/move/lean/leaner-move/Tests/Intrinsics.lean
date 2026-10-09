@@ -107,15 +107,23 @@ private def hasCode (unit : RawUnit) (code : String) : Bool :=
   (diagnostics unit).any (fun diagnostic => diagnostic.code == code)
 
 #guard registryComplete
-#guard roleSchemas.size == 62
+#guard roleSchemas.size == 64
 #guard roleSchemas.countP (fun role => role.kind == .executable) == 37
-#guard roleSchemas.countP (fun role => role.kind == .specification) == 25
+#guard roleSchemas.countP (fun role => role.kind == .specification) == 27
 #guard signaturePatterns .specAbortsNewWithConfig == #[{
   parameters := #[.num, .num, .bool]
   result := .bool }]
 #guard signaturePatterns .specAbortsTrim == #[{
   parameters := #[.owner, .num]
   result := .bool }]
+#guard (roleSchema? "map_spec_insertion_key_at").map (·.role) == some .specInsertionKeyAt
+#guard (roleSchema? "map_spec_insertion_rank").map (·.role) == some .specInsertionRank
+#guard signaturePatterns .specInsertionKeyAt == #[{
+  parameters := #[.owner, .num]
+  result := .key }]
+#guard signaturePatterns .specInsertionRank == #[{
+  parameters := #[.owner, .key]
+  result := .num }]
 #guard (validate fixture).isOk
 
 private def unknownModel : RawUnit :=

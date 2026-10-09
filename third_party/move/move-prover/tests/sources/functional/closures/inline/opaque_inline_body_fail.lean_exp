@@ -1,3 +1,4 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/closures/inline/opaque_inline_body_fail.move: LIR-SEMANTIC-TARGET: call target `inc` does not resolve to a declared function at [492, 498)
-LIR-SEMANTIC-TARGET: call target `inc_trusted` does not resolve to a declared function at [940, 954)
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/inline/opaque_inline_body_fail.move:12:9: error: the specification clause `ensures result == x + 1` is not established
+tests/sources/functional/closures/inline/opaque_inline_body_fail.move:9:5: error: leaner verification failed: the automatic verification of `inc` failed; provide a proof: `verify inc by …` in `tests/sources/functional/closures/inline/opaque_inline_body_fail.proof.lean` (`verify inc by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/opaque_inline_body_fail.move:18:5: error: `test_inc` calls `inc`, which is not verified; verify the callee first

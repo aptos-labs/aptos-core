@@ -20,6 +20,12 @@ namespace LeanerIR.Proofs
 
 open LeanerIR.Validation (ExecutableUnit ValidatedUnit)
 
+/-- A literal callable's encoding with its specification type retained as
+an elaboration hint. This asserts no typing property: invocation rules
+still establish the closure's typing independently. -/
+abbrev Denote.ClosureValue.encodeFor (_type : Denote.NTy) (closure : Denote.ClosureValue) : RuntimeValue :=
+  closure.encode
+
 /-- An invocation of a function value on supplied arguments, as the big-step
 semantics runs it: the closure's target under the instantiation the closure
 fixed, on the captures and the arguments composed by its mask. A value that
@@ -35,10 +41,10 @@ def invocationSpec {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       | none => Spec.bottom
   | _ => Spec.bottom
 
-/-- A start an invocation runs from, as a call's does: globals encoding
-the memory, with loan bookkeeping that lends nothing (`Denote.Admissible`). -/
+/-- A start an invocation runs from, as a call's does: globals and Table
+storage encoding the memory, with loan bookkeeping that lends nothing (`Denote.Admissible`). -/
 def StartsAt {unit : ValidatedUnit} (start : RuntimeState) (memory : Denote.Memory unit) : Prop :=
-  Denote.Encodes unit memory start.globals ∧ Denote.Admissible start []
+  Denote.StorageEncodes unit memory start ∧ Denote.Admissible start []
 
 /-- `aborts_of<f>(x)`: the invocation aborts from a start at `memory`. -/
 def AbortsOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
@@ -53,7 +59,7 @@ def EnsuresOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callabl
     (arguments : List RuntimeValue)
     (results : Array RuntimeValue) (pre post : Denote.Memory unit) : Prop :=
   ∃ start exit, StartsAt start pre ∧ (invocationSpec executable callable arguments).ok start results exit ∧
-    Denote.Encodes unit post exit.globals ∧ Denote.AgreeUnnamed unit post pre
+    Denote.StorageEncodesReturned unit post exit results ∧ Denote.AgreeUnnamed unit post pre
 
 open Classical in
 /-- `result_of<f>(x)`: results the invocation returns from a start at
@@ -63,6 +69,16 @@ noncomputable def ResultOf {unit : ValidatedUnit} (executable : ExecutableUnit u
     (arguments : List RuntimeValue) (state : Denote.Memory unit) : Array RuntimeValue :=
   if returns : ∃ results post, EnsuresOf executable callable arguments results state post
   then returns.choose else #[]
+
+open Classical in
+/-- The post-state of a successful invocation, sharing `ResultOf`'s choice.
+On an invocation with no successful execution this defaults to its pre-state;
+using the label does not assume that the invocation succeeds. -/
+noncomputable def StateOf {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (callable : RuntimeValue) (arguments : List RuntimeValue)
+    (state : Denote.Memory unit) : Denote.Memory unit :=
+  if returns : ∃ results post, EnsuresOf executable callable arguments results state post
+  then returns.choose_spec.choose else state
 
 /-- Where the invocation returns, `result_of` names results it returns. -/
 theorem ensuresOf_resultOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
@@ -94,6 +110,190 @@ def RequiresOf {unit : Validation.ValidatedUnit} (table : RequiresTable unit)
       | some composed => table function composed.toArray state
       | none => True
   | _ => True
+
+/-! ## Invocations lending mutable references
+
+A function value whose parameters include mutable references is invoked as a
+call invokes its target: each `&mut` argument is lent under a loan of its
+own and passes its entry value; its final value is the one the run exports
+for that loan, the holes of the references the run returns filled
+(`Denote.argumentsResolve`). `mutable` marks the supplied arguments that are
+mutable references; the predicates read their entry values among the
+arguments and their final values in order, as the Move Prover lays out
+`ensures_of<f>(inputs, results, finals)`. -/
+
+/-- The supplied arguments with each mutable one lent under the next loan,
+as a borrow of its entry value; and the loans left. -/
+def lendMutable : List Bool → List RuntimeValue → List Nat → Option (List RuntimeValue × List Nat)
+  | [], [], loans => some ([], loans)
+  | true :: mutable, entry :: arguments, loan :: loans =>
+      (lendMutable mutable arguments loans).map fun lent => (.borrow loan entry :: lent.1, lent.2)
+  | false :: mutable, argument :: arguments, loans =>
+      (lendMutable mutable arguments loans).map fun lent => (argument :: lent.1, lent.2)
+  | _, _, _ => none
+
+/-- Lent loans resolve at final values, in order, as lent arguments do
+(`Denote.argumentsResolve`): the run exported each loan with a value that,
+the returned references' holes filled, is its final value, or returned the
+loan carrying it. -/
+def ResolvesAt (returned : Array RuntimeValue) (exports : List (Nat × RuntimeValue)) :
+    List Nat → List RuntimeValue → Prop
+  | _, [] => True
+  | [], _ :: _ => False
+  | loan :: loans, final :: finals =>
+      (match Denote.exportedRaw? loan exports with
+        | some exported => SemanticOperations.resolveReturnedBorrows returned exported = final
+        | none => ∃ entry ∈ returned.toList,
+            (loan, final) ∈ (SemanticOperations.outermostBorrows entry).toList) ∧
+      ResolvesAt returned exports loans finals
+
+/-- `aborts_of<f>(x)` of a function value taking mutable references: the
+invocation lending them aborts from a start at `memory`. -/
+def AbortsOfMut {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
+    (mutable : List Bool) (arguments : List RuntimeValue) (memory : Denote.Memory unit) : Prop :=
+  ∃ start loans lent failure,
+    Denote.StorageEncodes unit memory start ∧ Denote.Admissible start loans ∧
+    lendMutable mutable arguments loans = some (lent, []) ∧
+    (invocationSpec executable callable lent).aborts start failure
+
+/-- `ensures_of<f>(x, r, y)` of a function value taking mutable references:
+the invocation lending them returns `results` from a start at `pre`, leaves
+the memory `post`, and the references at `finals`. -/
+def EnsuresOfMut {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
+    (mutable : List Bool) (arguments : List RuntimeValue) (results : Array RuntimeValue)
+    (finals : List RuntimeValue) (pre post : Denote.Memory unit) : Prop :=
+  ∃ start loans lent exit,
+    Denote.StorageEncodes unit pre start ∧ Denote.Admissible start loans ∧
+    lendMutable mutable arguments loans = some (lent, []) ∧
+    (invocationSpec executable callable lent).ok start results exit ∧
+    ResolvesAt results (Denote.exportsAfter start.pending exit.pending) loans finals ∧
+    Denote.StorageEncodesReturned unit post exit results ∧ Denote.AgreeUnnamed unit post pre
+
+open Classical in
+/-- `result_of<f>(x)` of a function value taking mutable references: results
+the invocation returns from a start at `memory`; unspecified when it
+returns none. -/
+noncomputable def ResultOfMut {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (callable : RuntimeValue) (mutable : List Bool) (arguments : List RuntimeValue)
+    (state : Denote.Memory unit) : Array RuntimeValue :=
+  if returns : ∃ results finals post,
+      EnsuresOfMut executable callable mutable arguments results finals state post
+  then returns.choose else #[]
+
+/-- Where the invocation returns, `result_of` names results it returns. -/
+theorem ensuresOfMut_resultOfMut {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    {callable : RuntimeValue} {mutable : List Bool} {arguments : List RuntimeValue}
+    {results : Array RuntimeValue} {finals : List RuntimeValue} {pre post : Denote.Memory unit}
+    (ensures : EnsuresOfMut executable callable mutable arguments results finals pre post) :
+    ∃ finals post, EnsuresOfMut executable callable mutable arguments
+      (ResultOfMut executable callable mutable arguments pre) finals pre post := by
+  have returns : ∃ results finals post,
+      EnsuresOfMut executable callable mutable arguments results finals pre post :=
+    ⟨results, finals, post, ensures⟩
+  unfold ResultOfMut
+  rw [dif_pos returns]
+  exact returns.choose_spec
+
+section
+open Denote
+
+/-- The positions of a parameter row that are mutable references. -/
+def Denote.NRow.mutable : NRow → List Bool
+  | .nil => []
+  | .cons (.ref _) rest => true :: rest.mutable
+  | .cons _ rest => false :: rest.mutable
+
+/-- A parameter row each element of which is a mutable reference or holds
+none, as a function's parameters are. -/
+def Denote.NRow.lentFlat : NRow → Bool
+  | .nil => true
+  | .cons (.ref _) rest => rest.lentFlat
+  | .cons τ rest => τ.refFree && rest.lentFlat
+
+variable [Carriers]
+
+/-- The values a row of arguments passes: a mutable reference's entry value,
+any other argument's encoding. -/
+def Denote.HList.entries : {row : NRow} → HList row → List RuntimeValue
+  | .nil, _ => []
+  | .cons (.ref σ) _, values => σ.encode values.1.1 :: HList.entries values.2
+  | .cons τ _, values => τ.encode values.1 :: HList.entries values.2
+
+/-- The final values of a row's mutable references, in order. -/
+def Denote.HList.finals : {row : NRow} → HList row → List RuntimeValue
+  | .nil, _ => []
+  | .cons (.ref σ) _, values => σ.encode values.1.2 :: HList.finals values.2
+  | .cons _ _, values => HList.finals values.2
+
+end
+
+section
+open Denote
+variable {unit : Validation.ValidatedUnit} [Skolems unit]
+
+/-- A flat row lends as its entries, each mutable one under the next loan. -/
+theorem Denote.NRow.lend_lentFlat : (row : NRow) → row.lentFlat = true → (values : HList row) →
+    (loans : List Nat) →
+    NRow.lend row false values loans = lendMutable row.mutable (HList.entries values) loans
+  | .nil, _, _, _ => rfl
+  | .cons τ rest, flat, values, loans => by
+      cases τ with
+      | ref σ =>
+          simp only [NRow.lentFlat] at flat
+          cases loans with
+          | nil => rfl
+          | cons loan loans =>
+              simp only [NRow.lend, NTy.lend, Option.bind_some, NRow.mutable, HList.entries,
+                lendMutable, NRow.lend_lentFlat rest flat values.2 loans, ite_false,
+                Bool.false_eq_true]
+      | _ =>
+          simp only [NRow.lentFlat, Bool.and_eq_true] at flat
+          simp only [NRow.lend, NTy.lend_refFree _ flat.1, Option.bind_some, NRow.mutable,
+            HList.entries, lendMutable, NRow.lend_lentFlat rest flat.2 values.2 loans]
+
+/-- A row's references resolve as its final values do. -/
+theorem argumentsResolve_finals : (row : NRow) → (values : HList row) → (loans : List Nat) →
+    (returned : Array RuntimeValue) → (exports : List (Nat × RuntimeValue)) →
+    (argumentsResolve row values loans returned exports ↔
+      ResolvesAt returned exports loans (HList.finals values))
+  | .nil, _, _, _, _ => by simp [argumentsResolve, HList.finals, ResolvesAt]
+  | .cons τ rest, values, loans, returned, exports => by
+      have later := argumentsResolve_finals rest values.2
+      cases τ <;> cases loans <;>
+        simp only [argumentsResolve, HList.finals, ResolvesAt, later]
+      -- The two sides' matches on the export are separate but equal auxiliaries.
+      all_goals exact Iff.rfl
+end
+
+section
+open Denote
+variable {unit : Validation.ValidatedUnit} [Skolems unit]
+
+/-- The invocation of a closure whose target, weave, and captures a proof
+sees, on lent supplied arguments, runs the target on the woven row, which
+lends as the woven arguments. -/
+theorem invocationSpec_closureOf_lent {unit : ValidatedUnit} {executable : ExecutableUnit unit}
+    [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) (suppliedFlat : supplied.lentFlat = true)
+    (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (args : HList supplied) {loans : List Nat} {lent : List RuntimeValue}
+    (lends : lendMutable supplied.mutable (HList.entries args) loans = some (lent, [])) :
+    lendArguments full (weave.compose captures args) loans =
+        some (weave.composeList (HList.encode captures) lent).toArray ∧
+      invocationSpec executable (closureOf handle weave.mask typeInstantiation captures).encode lent =
+        functionSpecAt executable handle typeInstantiation
+          (weave.composeList (HList.encode captures) lent).toArray := by
+  rw [← NRow.lend_lentFlat supplied suppliedFlat args loans] at lends
+  refine ⟨?_, ?_⟩
+  · unfold lendArguments
+    rw [weave.lend_compose capturedFree captures args loans, lends]
+    rfl
+  · simp only [invocationSpec, ClosureValue.encode, closureOf]
+    rw [weave.compose_mask _ _ (HList.encode_length captured captures)
+      (NRow.lend_length supplied false args loans _ lends)]
+
+end
 
 section
 open Denote
@@ -214,7 +414,7 @@ theorem ensuresOf_closureOf_verified {unit : ValidatedUnit} {executable : Execut
     (permitted : contract.requires (weave.compose captures args) pre) :
     (¬contract.mayAbort (weave.compose captures args) pre →
         contract.ensures (weave.compose captures args) pre result post) ∧
-      contract.frame (weave.compose captures args) pre post ∧
+      contract.frame (weave.compose captures args) pre result post ∧
       ¬contract.mustAbort (weave.compose captures args) pre :=
   (verified _ pre assumed permitted).1 result post
     (ensuresOf_closureOf weave capturedFree suppliedFree resultFree typeInstantiation coherent
@@ -264,9 +464,12 @@ theorem ensuresOf_of_run {unit : ValidatedUnit} {executable : ExecutableUnit uni
     (runs : (propheticMeaning executable typeInstantiation handle full shape args).ok pre result final) :
     EnsuresOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
       (σs := .nil) ()).encode (HList.encode args) ((resultCodec shape).encode result) pre final := by
-  obtain ⟨-, start, loans, arguments, results, exit, returnedLoans, _, globals, admissible,
-    lent, ran, resultsLent, -, -, encoded, agree⟩ := runs
+  obtain ⟨-, start, loans, arguments, results, exit, returnedLoans, prophecyRow, globals, admissible,
+    lent, ran, resultsLent, prophecyLent, -, encoded, agree⟩ := runs
   obtain ⟨rfl, rfl⟩ := lendArguments_refFree fullFree lent
+  rw [ResultShape.lend_refFree_view shape shapeFree, resultsLent] at prophecyLent
+  have sameRow : prophecyRow = results := (Option.some.inj prophecyLent).symm
+  subst prophecyRow
   have returned : results = (resultCodec shape).encode result := by
     cases shape with
     | none =>

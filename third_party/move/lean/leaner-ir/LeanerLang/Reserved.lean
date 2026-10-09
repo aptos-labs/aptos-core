@@ -16,7 +16,7 @@ namespace LeanerLang
 private def reservedWords : Std.HashSet String := Std.HashSet.ofList [
   "Address", "Bool", "Bytes", "Char", "Copy", "Drop", "Fn", "IPtr", "Int", "Key", "Nat",
   "Never", "Range", "SInt", "Signer", "Store", "UInt", "UPtr", "Unit", "Vector", "abort",
-  "aborts_if", "as", "assert", "assume", "break", "const", "continue", "copy",
+  "aborts_if", "aborts_with", "as", "assert", "assume", "break", "const", "continue", "copy",
   "deprecated", "discriminant", "do", "drop", "else", "ensures", "entry", "enum",
   "evidence", "exists", "false", "for", "forall", "friend", "fun", "function", "has",
   "i128", "i16", "i256", "i32", "i64", "i8", "if", "immutable", "in", "invariant",

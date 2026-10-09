@@ -1,0 +1,4 @@
+LeanerE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:18:4: error: the specification clause `ensures successor(300) == 301` is not established
+LeanerE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:17:7: error: leaner verification failed: the automatic verification of `outside` failed; provide a proof: `verify outside by …` in the module (`verify outside by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:24:4: error: the specification clause `ensures triangle(-1) == 0` is not established
+LeanerE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:23:7: error: leaner verification failed: the automatic verification of `negative` failed; provide a proof: `verify negative by …` in the module (`verify negative by skip` shows the obligations it leaves)

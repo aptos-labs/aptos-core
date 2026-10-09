@@ -1,0 +1,6 @@
+LeanerE2ETests/SourceVerify/bv_encoding_false.move:13:9: error: the specification clause `ensures x + 1 == 0` is not established
+LeanerE2ETests/SourceVerify/bv_encoding_false.move:11:5: error: leaner verification failed: the automatic verification of `sum` failed; provide a proof: `verify sum by …` in `LeanerE2ETests/SourceVerify/bv_encoding_false.proof.lean` (`verify sum by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/bv_encoding_false.move:19:9: error: the specification clause `ensures add_one(x) == 0` is not established
+LeanerE2ETests/SourceVerify/bv_encoding_false.move:17:5: error: leaner verification failed: the automatic verification of `spec_call` failed; provide a proof: `verify spec_call by …` in `LeanerE2ETests/SourceVerify/bv_encoding_false.proof.lean` (`verify spec_call by skip` shows the obligations it leaves)
+LeanerE2ETests/SourceVerify/bv_encoding_false.move:25:9: error: the specification clause `ensures x <= 255` is not established
+LeanerE2ETests/SourceVerify/bv_encoding_false.move:23:5: error: leaner verification failed: the automatic verification of `narrowing_bound` failed; provide a proof: `verify narrowing_bound by …` in `LeanerE2ETests/SourceVerify/bv_encoding_false.proof.lean` (`verify narrowing_bound by skip` shows the obligations it leaves)

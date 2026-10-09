@@ -884,20 +884,78 @@ structure RuntimeFrame where
   typeInstantiation : Array (TypeId × TypeId) := #[]
   deriving Repr, BEq, Inhabited
 
+/-- Native Table storage, separate from physical Table values and key-resource
+globals. The allocation history persists after destruction, so a later
+allocation must be fresh relative to every earlier handle. Contents slots are
+keyed by the closed Table type and handle, and contain encoded entry vectors.
+The Table native contracts and storage agreement determine their meaning. -/
+structure NativeTableStorage where
+  contents : GlobalMap := {}
+  allocated : Array String := #[]
+  deriving Repr, BEq, Inhabited
+
+/-- A loan's owning storage slot. Ordinary globals and native Table contents
+have distinct identities even when their family and key are identical. -/
+inductive LoanTarget where
+  | global (key : GlobalKey)
+  | table (key : GlobalKey)
+  deriving Repr, BEq, DecidableEq, Inhabited
+
 /-- Whole runtime state threaded through expressions and calls.  `nextLoan`
-mints dynamic loan instances.  `globalLoans` registers each live mutable
-borrow of a global slot with the key whose slot holds its hole, so the
-loan's death writes back by key instead of searching global memory — the
+mints dynamic loan instances.  `storageLoans` registers each live mutable
+loan into globals or native Table contents with its tagged owning slot, so
+the loan's death writes back directly without searching either store — the
 certified exclusivity of a live loan is what makes the recorded key the
 hole's location.  `pending` carries loan write-backs whose holes live in an
 ancestor frame: a callee's dying borrow exports its current value here, and
 every caller applies what becomes visible at its call site. -/
 structure RuntimeState where
   globals : GlobalMap := {}
-  globalLoans : List (Nat × GlobalKey) := []
+  storageLoans : List (Nat × LoanTarget) := []
   nextLoan : Nat := 0
   pending : Array (Nat × RuntimeValue) := #[]
+  tables : NativeTableStorage := {}
   deriving Repr, BEq, Inhabited
+
+/-- Read the storage slot to which a mutable loan must return. -/
+def RuntimeState.loanValue? (state : RuntimeState) : LoanTarget → Option RuntimeValue
+  | .global key => state.globals.lookup key
+  | .table key => state.tables.contents.lookup key
+
+/-- Replace one storage slot, retaining the other store and allocation history. -/
+def RuntimeState.writeLoanValue (state : RuntimeState) (target : LoanTarget)
+    (value : RuntimeValue) : RuntimeState :=
+  match target with
+  | .global key => { state with globals := state.globals.insert key value }
+  | .table key => { state with tables.contents := state.tables.contents.insert key value }
+
+@[simp] theorem RuntimeState.loanValue?_global (state : RuntimeState) (key : GlobalKey) :
+    state.loanValue? (.global key) = state.globals.lookup key := rfl
+@[simp] theorem RuntimeState.loanValue?_table (state : RuntimeState) (key : GlobalKey) :
+    state.loanValue? (.table key) = state.tables.contents.lookup key := rfl
+@[simp] theorem RuntimeState.writeLoanValue_global (state : RuntimeState) (key : GlobalKey)
+    (value : RuntimeValue) :
+    state.writeLoanValue (.global key) value =
+      { state with globals := state.globals.insert key value } := rfl
+@[simp] theorem RuntimeState.writeLoanValue_table (state : RuntimeState) (key : GlobalKey)
+    (value : RuntimeValue) :
+    state.writeLoanValue (.table key) value =
+      { state with tables.contents := state.tables.contents.insert key value } := rfl
+
+@[simp] theorem RuntimeState.loanValue?_write_self (state : RuntimeState)
+    (target : LoanTarget) (value : RuntimeValue) :
+    (state.writeLoanValue target value).loanValue? target = some value := by
+  cases target <;> simp
+
+theorem RuntimeState.loanValue?_write_other (state : RuntimeState)
+    (written query : LoanTarget) (value : RuntimeValue) (distinct : query ≠ written) :
+    (state.writeLoanValue written value).loanValue? query = state.loanValue? query := by
+  cases written <;> cases query <;> simp_all
+
+@[simp] theorem RuntimeState.writeLoanValue_allocated (state : RuntimeState)
+    (target : LoanTarget) (value : RuntimeValue) :
+    (state.writeLoanValue target value).tables.allocated = state.tables.allocated := by
+  cases target <;> rfl
 
 /-- Source location paired with the namespace whose location table owns it. -/
 structure RuntimeLocation where

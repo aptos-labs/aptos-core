@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/type_dependent_code.move:10:5: error: verification failed with a residual obligation:
 case h_2.continues
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -314,7 +314,7 @@ invariantHolds✝ : True
 tests/sources/functional/type_dependent_code.move:11:9: error: the specification clause `aborts_if exists<S<X> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:12:9: error: the specification clause `aborts_if exists<S<u8> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:10:5: error: leaner verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves)
-tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/type_dependent_code.move:26:5: error: verification failed with a residual obligation:
 case h_2.continues
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
