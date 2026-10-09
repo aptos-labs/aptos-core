@@ -221,9 +221,9 @@ schedules. Standalone scripts are not auto-discovered.
 at **09:00 UTC (01:00 PST / 02:00 PDT)**. Land the workflow before deploying that
 registration. Manual dispatch is supported. A failed first attempt re-runs its
 failed jobs once through the [retry workflow](../../.github/workflows/nightly-full-suite-retry.yaml),
-which absorbs lost runners and other infrastructure failures. The final attempt
-posts its result to
-`#cicd-testing` via `NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
+which absorbs lost runners and other infrastructure failures. A failed final
+attempt or one that passes after the retry posts to `#cicd-testing` via
+`NIGHTLY_SLACK_WEBHOOK_URL`, headed by a bar of
 one square per night for the last seven completed runs on the branch
 (green, yellow for passing only after the retry, red, a cross for a cancelled run
 that is not retried, or grey for skipped),
@@ -265,8 +265,8 @@ for GitHub's `queue: max` setting.
    Verify every required suite, tested SHA, artifacts, and aggregate result.
 4. On a temporary validation branch, replace expensive jobs with lightweight
    passing/failing jobs to check aggregation and Slack delivery, including a
-   failure outside Move. Do not merge those substitutions; green runs post the
-   bar without failure details.
+   failure outside Move. Do not merge those substitutions; green runs do not
+   post to Slack.
 5. Deploy PIES, trigger Cloud Scheduler's **Run now**, and verify daily dispatch.
    Enable `subsystem` after these checks; reset to `legacy` or unset the variable
    to roll back. Passing local tests do not establish live CI or alert delivery.
