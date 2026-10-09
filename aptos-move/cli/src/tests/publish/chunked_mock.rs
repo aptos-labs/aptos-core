@@ -128,13 +128,15 @@ fn chunked_publish_clears_stale_staging_area_first() {
     assert!(result.is_ok(), "{:?}", result);
     assert!(submitted.len() > 2, "{:?}", submitted);
     assert_eq!(submitted[0], "cleanup_staging_area");
+    // The session's genesis has the current `large_packages` module, so its positional entry
+    // functions are used.
     let (last, staging) = submitted[1..].split_last().unwrap();
     assert!(
-        staging.iter().all(|f| f == "stage_code_chunk"),
+        staging.iter().all(|f| f == "stage_chunks"),
         "{:?}",
         submitted
     );
-    assert_eq!(last, "stage_code_chunk_and_publish_to_account");
+    assert_eq!(last, "stage_chunks_and_publish_to_account");
 }
 
 #[test]
@@ -145,5 +147,58 @@ fn chunked_publish_stops_at_failed_transaction() {
     let error = result.expect_err("chunked publish should fail");
     assert!(error.contains("Out of gas"), "{}", error);
     assert!(error.contains("transaction 2 of"), "{}", error);
-    assert_eq!(submitted, vec!["stage_code_chunk", "stage_code_chunk"]);
+    assert_eq!(submitted, vec!["stage_chunks", "stage_chunks"]);
+}
+
+/// Runs `clear-staging-area` and returns the result together with the entry functions submitted.
+fn run_clear_staging_area(stale_staging_area: bool) -> (Result<String, String>, Vec<String>) {
+    let session_dir = TempDir::new().unwrap();
+    let session_path = session_dir.path().join("session");
+    init_session(&session_path, stale_staging_area);
+
+    let submitted = Arc::new(Mutex::new(vec![]));
+    let recorder = submitted.clone();
+    let (env, buffer) = common::env_with_mock(move |ctx| {
+        ctx.expect_submit_transaction()
+            .returning(move |_, payload| {
+                recorder.lock().unwrap().push(entry_function_name(&payload));
+                Ok(summary(true))
+            });
+    });
+
+    let output = common::run_cli_with_env(
+        &[
+            "clear-staging-area",
+            "--assume-yes",
+            "--large-packages-module-address",
+            "0x7",
+            "--session",
+            session_path.to_str().unwrap(),
+            "--private-key",
+            PRIVATE_KEY,
+            "--sender-account",
+            SENDER,
+        ],
+        env,
+        buffer,
+    );
+    let submitted = submitted.lock().unwrap().clone();
+    (output.result, submitted)
+}
+
+#[test]
+fn clear_staging_area_without_staging_area_submits_nothing() {
+    let (result, submitted) = run_clear_staging_area(false);
+
+    let output: serde_json::Value = serde_json::from_str(&result.expect("succeeds")).unwrap();
+    assert!(output["Result"].is_null(), "{}", output);
+    assert!(submitted.is_empty(), "{:?}", submitted);
+}
+
+#[test]
+fn clear_staging_area_removes_staging_area() {
+    let (result, submitted) = run_clear_staging_area(true);
+
+    assert!(result.is_ok(), "{:?}", result);
+    assert_eq!(submitted, vec!["cleanup_staging_area"]);
 }

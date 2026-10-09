@@ -911,6 +911,8 @@ pub struct LargePackagesModuleOption {
     /// on Mainnet, and at `0x7` on Testnet, devnet and localnet.
     /// On a custom network where neither is available, publish your own copy of
     /// `aptos-move/framework/aptos-experimental/sources/large_packages.move` and pass its address here.
+    /// Chunks are staged with their positions if the module supports it (`stage_chunks`), so that
+    /// repeated or conflicting chunks are detected; earlier versions only support staging in order.
     #[clap(long, value_parser = load_account_arg)]
     pub large_packages_module_address: Option<AccountAddress>,
 }
