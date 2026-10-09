@@ -4,7 +4,7 @@
 use crate::{
     common::native_coin,
     types::{
-        AccountIdentifier, Currency, CurrencyMetadata, OperationType, Transaction,
+        AccountIdentifier, Amount, Currency, CurrencyMetadata, OperationType, Transaction,
         FUNGIBLE_ASSET_MODULE, FUNGIBLE_STORE_RESOURCE, OBJECT_CORE_RESOURCE, OBJECT_MODULE,
         OBJECT_RESOURCE_GROUP,
     },
@@ -1046,4 +1046,16 @@ async fn test_storage_refund_exceeds_gas_fee() {
         storage_refund as i128 - gas_fee as i128,
         "Net should equal storage_refund - gas_fee"
     );
+}
+
+#[test]
+fn test_suggested_gas_fee_does_not_overflow() {
+    // `max_gas_amount` comes straight from the client's /construction/metadata
+    // request and is only lower-bounded (>= 1), so a near-u64::MAX value must not
+    // overflow the gas_unit_price * max_gas_amount product.
+    let fee = Amount::suggested_gas_fee(100, u64::MAX);
+    assert_eq!(fee.value, u64::MAX.to_string());
+
+    // Ordinary values are unchanged.
+    assert_eq!(Amount::suggested_gas_fee(100, 1_000).value, "100000");
 }
