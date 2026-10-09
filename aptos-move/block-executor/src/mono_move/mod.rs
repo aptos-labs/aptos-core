@@ -224,9 +224,10 @@ impl MonoTxnOutput {
         match self {
             MonoTxnOutput::Executed { outcome, .. } => match outcome {
                 TxnOutcome::Executed { effects, .. } => Some(effects),
-                // TODO(correctness): a discard writes nothing, but its reads are
-                //   what parallel validation needs; publish the read set here
-                //   once Block-STM validates MonoMove transactions.
+                // TODO(correctness): these two write nothing, but parallel
+                //   validation needs their module and resource reads. Both
+                //   outcomes have to carry them before MonoMove runs on
+                //   Block-STM.
                 TxnOutcome::Discarded { .. } => None,
                 TxnOutcome::ExecutedNoEffects(_) => None,
                 // TODO(correctness): Revisit this arm: unexpected system txn errors

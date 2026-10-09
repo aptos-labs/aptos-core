@@ -15,3 +15,4 @@ rust-version = { workspace = true }
 bumpalo = { workspace = true }
 crossbeam-utils = { workspace = true }
 parking_lot = { workspace = true }
+shared-dsa = { workspace = true }

@@ -88,40 +88,21 @@ fn format_verification_errors(errors: &[VerificationError]) -> String {
         .join("; ")
 }
 
-/// Read-set state-machine and cache-consistency assertions raised by the
-/// loader. Surfaced rather than panicked so callers can produce a clean
+/// Module-table and cache-consistency assertions raised by the loader.
+/// Surfaced rather than panicked so callers can produce a clean
 /// per-transaction outcome and alert operationally on
 /// [`ExecutionErrorKind::InvariantViolation`].
 #[derive(Debug, Error)]
 pub enum LoaderInvariantViolation {
-    // ---- read_set transitions ----
-    #[error("There should be no entry when marked as pending")]
-    EntryAlreadyExists,
+    // ---- module table ----
+    #[error("Module index has no row in the module table")]
+    ModuleIndexNotInTable,
 
-    #[error("Module must be recorded as pending")]
-    ModuleExpectedPending,
-
-    #[error("Module is already loaded")]
-    ModuleAlreadyLoaded,
-
-    #[error("Module must be at least loaded")]
-    ModuleExpectedAtLeastLoaded,
-
-    #[error("Module is already ready for lowering")]
-    ModuleAlreadyReady,
-
-    // ---- loader cross-checks against the read-set ----
-    #[error("All modules in the read-set must be loaded")]
-    ReadSetEntryNotLoaded,
+    #[error("Module was charged for but is not loaded")]
+    ModuleNotLoaded,
 
     #[error("Target module is not loaded")]
     TargetModuleNotLoaded,
-
-    #[error("Target module is not metered and ready")]
-    TargetModuleNotReady,
-
-    #[error("All modules must be present in the read-set")]
-    UnexpectedReadSetMiss,
 
     // ---- function slot ----
     #[error("Function slot has just been set")]
@@ -140,7 +121,7 @@ pub enum LoaderInvariantViolation {
 /// unit and struct variants:
 ///
 /// ```ignore
-/// invariant_violation!(PendingEntryAlreadyExists);
+/// invariant_violation!(ModuleNotLoaded);
 /// ```
 #[macro_export]
 macro_rules! invariant_violation {

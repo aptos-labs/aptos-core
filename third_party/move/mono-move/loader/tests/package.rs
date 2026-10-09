@@ -5,7 +5,7 @@
 
 use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, ModuleRead, ModuleReadSet, ModuleState};
+use mono_move_loader::{Loader, LoadingPolicy};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -36,21 +36,21 @@ fn load_package_cache_miss_loads_all_members() {
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);
 
-    let mut read_set = ModuleReadSet::new();
     let mut gas = GasMeter::with_max_budget();
-    let exec = loader.load_module(&mut read_set, &mut gas, id_a).unwrap();
+    let exec = loader.load_module(&mut gas, id_a).unwrap();
 
-    // Both package members must be in the read-set.
-    assert_eq!(read_set.len(), 2);
+    // Both package members must have been charged for.
+    assert_eq!(guard.charged_modules().len(), 2);
 
     // mandatory_dependencies covers every package member, including
     // self. For a 2-module package, that's both slots.
     assert_eq!(exec.mandatory_dependencies().len(), 2);
 
-    // The sibling must also be loadable from the read-set directly.
-    let id_b = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());
-    let key_b = guard.intern_module_id(&id_b);
-    assert!(read_set.get(key_b).is_some());
+    // The sibling must also be resolvable through the loader directly.
+    let id_b = guard
+        .intern_address_name(&AccountAddress::ONE, ident_str!("b"))
+        .into_global_arena_ptr();
+    assert!(loader.loaded_module(id_b).is_ok());
 }
 
 const CROSS_PACKAGE_SOURCE: &str = r#"
@@ -65,7 +65,7 @@ module 0x1::a {
 "#;
 
 #[test]
-fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
+fn package_policy_reuses_side_loaded_module_on_function_call() {
     let modules =
         mono_move_testsuite::compile_move_source(CROSS_PACKAGE_SOURCE).expect("compilation failed");
     let mut module_provider = InMemoryModuleProvider::new();
@@ -78,12 +78,12 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
     let loader =
         Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
-    let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
-    let id_b_module = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());
-    let id_a_key = guard.intern_module_id(&id_a_module);
-    let id_b_key = guard.intern_module_id(&id_b_module);
-    let id_a = id_a_key.into_global_arena_ptr();
-    let id_b = id_b_key.into_global_arena_ptr();
+    let id_a = guard
+        .intern_address_name(&AccountAddress::ONE, ident_str!("a"))
+        .into_global_arena_ptr();
+    let id_b = guard
+        .intern_address_name(&AccountAddress::ONE, ident_str!("b"))
+        .into_global_arena_ptr();
     let name_f = guard
         .intern_identifier(ident_str!("f"))
         .into_global_arena_ptr();
@@ -91,50 +91,33 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
         .intern_identifier(ident_str!("g"))
         .into_global_arena_ptr();
 
-    let mut read_set = ModuleReadSet::new();
     let mut gas = GasMeter::with_max_budget();
 
     // 1. `a::f` takes `b::S` by value, so lowering it walks `S` and side-loads
-    //    `b` as a metered read. `S` is a concrete inline struct, so the
-    //    specializer derives its GC layout and `a::f` lowers successfully. That
-    //    layout-only side-load leaves `b` recorded as a metered read: only its
-    //    layout was needed, so its mandatory-dependency set isn't computed yet.
+    //    `b`. `S` is a concrete inline struct, so the specializer derives its
+    //    GC layout and `a::f` lowers successfully. Only `b`'s layout was
+    //    needed, so its package was never pulled in.
     loader
-        .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
+        .load_function(&mut gas, id_a, name_f, EMPTY_TYPE_LIST)
         .expect("load_function(a::f) must lower now that inline structs are supported");
-    assert!(
-        matches!(
-            read_set.get(id_b_key),
-            Some(ModuleRead::Loaded {
-                state: ModuleState::Metered,
-                ..
-            })
-        ),
-        "expected `b` to be recorded as a metered side-load after lowering `a::f`"
+    assert_eq!(
+        guard.charged_modules().len(),
+        2,
+        "expected `a` and the side-loaded `b` to be charged for"
     );
 
     // 2. `b::g` is nominal-free, so dispatching to it succeeds. The package
-    //    policy must promote the already-metered `b` to ReadyForLowering
-    //    rather than re-loading or bailing.
+    //    policy must reuse the already-charged `b` rather than re-loading or
+    //    bailing, which is observable as a charge of zero.
+    let before = gas.balance();
     loader
-        .load_function(&mut read_set, &mut gas, id_b, name_g, EMPTY_TYPE_LIST)
-        .expect("load_function(b::g) must promote b, not bail");
-    assert!(matches!(
-        read_set.get(id_b_key),
-        Some(ModuleRead::Loaded {
-            state: ModuleState::ReadyForLowering,
-            ..
-        })
-    ));
-    // `a` is loaded via the package policy at the very start of step 1, so it
-    // should also be ready by now — confirms step 2 didn't regress its state.
-    assert!(matches!(
-        read_set.get(id_a_key),
-        Some(ModuleRead::Loaded {
-            state: ModuleState::ReadyForLowering,
-            ..
-        })
-    ));
+        .load_function(&mut gas, id_b, name_g, EMPTY_TYPE_LIST)
+        .expect("load_function(b::g) must reuse b, not bail");
+    assert_eq!(
+        before,
+        gas.balance(),
+        "a module charged for earlier in the transaction must not be charged again"
+    );
 }
 
 #[test]
@@ -148,25 +131,31 @@ fn load_package_cache_hit_walks_dependencies() {
     ]);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx.try_execution_context(0).unwrap();
-    let loader =
-        Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
 
-    let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
-    let id_a = guard.intern_module_id(&id_a_module);
+    // Each load runs under its own execution guard: the guard is what records
+    // charged modules, so sharing one would make the second load a free hit.
+    let load_once = || {
+        let guard = ctx.try_execution_context(0).unwrap();
+        let loader =
+            Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package, &NoNatives);
+        let id_a = guard.intern_module_id(&ModuleId::new(
+            AccountAddress::ONE,
+            ident_str!("a").to_owned(),
+        ));
 
-    // Prime the cache with a full package load.
-    let mut rs1 = ModuleReadSet::new();
-    let mut g1 = GasMeter::with_max_budget();
-    loader.load_module(&mut rs1, &mut g1, id_a).unwrap();
+        let mut gas = GasMeter::with_max_budget();
+        let before = gas.balance();
+        loader.load_module(&mut gas, id_a).unwrap();
+        (before - gas.balance(), guard.charged_modules().len())
+    };
 
-    // Second call with a fresh read-set must hit the cache and charge both
-    // members without fetching.
-    let mut rs2 = ModuleReadSet::new();
-    let mut g2 = GasMeter::with_max_budget();
-    let before = g2.balance();
-    loader.load_module(&mut rs2, &mut g2, id_a).unwrap();
-    let charged = before - g2.balance();
-    assert!(charged > 0);
-    assert_eq!(rs2.len(), 2);
+    // Prime the cache with a full package load, then hit it: the hit must
+    // charge both members without fetching.
+    let (charged_first, members_first) = load_once();
+    let (charged_second, members_second) = load_once();
+
+    assert!(charged_second > 0);
+    assert_eq!(charged_first, charged_second);
+    assert_eq!(members_first, members_second);
+    assert_eq!(members_second, 2);
 }

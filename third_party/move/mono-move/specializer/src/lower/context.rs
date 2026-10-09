@@ -24,7 +24,9 @@ use crate::{
 };
 use mono_move_core::{
     align_up_u32, checked_align_up_u32,
-    interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId, TypeSubstitutionError},
+    interner::{
+        InternedFunctionRef, InternedIdentifier, InternedModuleId, ModuleIdx, TypeSubstitutionError,
+    },
     native::{NativeIdx, NativeResolver},
     next_captured_value_offset,
     types::{
@@ -86,8 +88,12 @@ pub struct TypedSlot {
 /// Pre-computed layout for one call instruction. Arg and ret slots are
 /// caller-frame addresses laid out from `callee_base`.
 pub struct CallSiteInfo {
-    pub callee_module_id: InternedModuleId,
-    pub callee_func_name: InternedIdentifier,
+    /// Table index of the callee's module, minted here so the emitted call
+    /// carries it and the interpreter never looks the module up by ID.
+    pub callee_module_idx: ModuleIdx,
+    /// Interned identity of the callee, which the emitted call carries in
+    /// place of its three parts.
+    pub callee_func_ref: InternedFunctionRef,
     pub arg_slots: Vec<TypedSlot>,
     pub ret_slots: Vec<TypedSlot>,
     /// Empty for non-generic calls.
@@ -777,9 +783,17 @@ pub fn try_build_context<'a>(
             }
         })
         .collect::<Vec<_>>();
+        // TODO(security, metering): exhausting the index space is treated as
+        // unreachable. It is reachable by publishing enough modules, so this
+        // needs a bound and a decision about what a block does when it is hit.
+        let callee_module_idx = interner
+            .module_idx_of(callee_module_id)
+            .expect("module index space is not exhausted");
+        let callee_func_ref =
+            interner.function_ref_of(callee_module_id, callee_func_name, call_ty_args);
         call_sites.push(CallSiteInfo {
-            callee_module_id,
-            callee_func_name,
+            callee_module_idx,
+            callee_func_ref,
             arg_slots,
             ret_slots,
             ty_args: call_ty_args,

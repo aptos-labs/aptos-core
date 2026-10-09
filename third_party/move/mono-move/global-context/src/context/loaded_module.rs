@@ -4,8 +4,10 @@
 //! Loaded module — what the module cache stores. Stores the polymorphic IR
 //! with the lowered monomorphic functions and generic function instantiations.
 
+use crate::context::ExecutionGuard;
 use anyhow::Result;
 use aptos_types::vm::module_metadata::{get_metadata, get_randomness_annotation};
+use mono_move_alloc::LeakedBoxPtr;
 use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
@@ -20,7 +22,80 @@ use move_core_types::identifier::IdentStr;
 use parking_lot::Mutex;
 use shared_dsa::{Entry, UnorderedMap, UnorderedSet};
 use specializer::{FunctionIR, ModuleIR};
-use std::sync::{Arc, OnceLock};
+use std::{
+    ptr::{self, NonNull},
+    sync::{
+        atomic::{AtomicPtr, Ordering},
+        Arc, OnceLock,
+    },
+};
+
+/// A row of the module table. The identity is fixed when the row is created,
+/// while the content stays empty until the module is loaded: a mandatory set
+/// can name a module that is still a cache miss, so a row has to exist before
+/// its content does.
+pub struct ModuleEntry {
+    id: InternedModuleId,
+    module: AtomicPtr<LoadedModule>,
+}
+
+impl ModuleEntry {
+    /// Creates an empty entry for the specified module ID.
+    pub fn new(id: InternedModuleId) -> Self {
+        Self {
+            id,
+            module: AtomicPtr::new(ptr::null_mut()),
+        }
+    }
+
+    /// Returns the ID of the module this entry is keyed by.
+    pub fn id(&self) -> InternedModuleId {
+        self.id
+    }
+
+    /// Reads the loaded module in this entry, or [`None`] if it is empty.
+    pub fn get<'guard>(&self, _guard: &'guard ExecutionGuard<'_>) -> Option<&'guard LoadedModule> {
+        // SAFETY: while a guard is held, maintenance cannot run, so the
+        // pointer is alive.
+        unsafe { self.get_ptr().map(|p| p.as_ref_unchecked()) }
+    }
+
+    /// Returns the pointer to the module if set, and [`None`] otherwise.
+    pub fn get_ptr(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
+        let raw = self.module.load(Ordering::Acquire);
+        // SAFETY: only `init` writes a non-null pointer here, and it is handed
+        // one that came from a leaked box.
+        NonNull::new(raw).map(|p| unsafe { LeakedBoxPtr::from_raw_unchecked(p) })
+    }
+
+    /// Fills the entry if it was empty.
+    ///
+    /// On race, if the entry is already filled, returns the input pointer back
+    /// in `Err` so the caller can either free it or adopt the winner via
+    /// [`ModuleEntry::get_ptr`].
+    pub fn init(&self, ptr: LeakedBoxPtr<LoadedModule>) -> Result<(), LeakedBoxPtr<LoadedModule>> {
+        let raw = ptr.as_non_null().as_ptr();
+        // On success: Release publishes the pointee's initialization to
+        // subsequent `get_ptr` readers (Acquire).
+        // On failure: the caller only observes that some other initialization
+        // happened; any subsequent read performs its own Acquire, so Relaxed
+        // is sufficient for the failure ordering.
+        match self
+            .module
+            .compare_exchange(ptr::null_mut(), raw, Ordering::Release, Ordering::Relaxed)
+        {
+            Ok(_) => Ok(()),
+            Err(_) => Err(ptr),
+        }
+    }
+
+    /// Atomically empties the entry, returning the previous content if any.
+    pub fn clear(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
+        let raw = self.module.swap(ptr::null_mut(), Ordering::AcqRel);
+        // SAFETY: as for `get_ptr`.
+        NonNull::new(raw).map(|p| unsafe { LeakedBoxPtr::from_raw_unchecked(p) })
+    }
+}
 
 /// Lowered code for a single function instance, paired with the modules the
 /// lowering required.

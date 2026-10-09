@@ -7,7 +7,7 @@
 
 use mono_move_core::{native::NativeIdx, types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_runtime::ProductionNativeRegistry;
 use mono_move_testsuite::{engine::build_natives, InMemoryModuleProvider};
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::IdentStr};
@@ -50,11 +50,9 @@ fn def_idx_stamped_and_resolvable_by_name() {
     let main_name = guard
         .intern_identifier(ident_str!("main"))
         .into_global_arena_ptr();
-    let mut read_set = ModuleReadSet::new();
     let mut gas_meter = GasMeter::with_max_budget();
     let main_ptr = loader
         .load_function(
-            &mut read_set,
             &mut gas_meter,
             module_id.into_global_arena_ptr(),
             main_name,
