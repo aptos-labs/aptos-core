@@ -42,6 +42,7 @@ fn trivial_program() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         module_id: crate::program_module_id!("test"),
+        func_ref: crate::program_func_ref!("test", "test"),
         def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,

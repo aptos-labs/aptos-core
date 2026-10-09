@@ -220,6 +220,7 @@ fn make_func(op: MicroOp, lhs_width: usize, rhs_width: usize) -> Function {
     Function {
         name: GlobalArenaPtr::from_static("op"),
         module_id: crate::program_module_id!("test"),
+        func_ref: crate::program_func_ref!("test", "op"),
         def_idx: FunctionDefinitionIndex(0),
         code: Code::from_vec(vec![op, MicroOp::Return]),
         entry_gas: 0,

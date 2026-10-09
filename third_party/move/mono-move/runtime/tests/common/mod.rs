@@ -57,3 +57,17 @@ macro_rules! program_module_id {
         ::mono_move_alloc::GlobalArenaPtr::from_static(&MODULE_ID)
     }};
 }
+
+/// Builds an interned function reference for hand-built test functions.
+#[macro_export]
+macro_rules! program_func_ref {
+    ($module:literal, $name:literal) => {{
+        static FUNC_REF: ::mono_move_core::interner::FunctionRef =
+            ::mono_move_core::interner::FunctionRef {
+                module_id: $crate::program_module_id!($module),
+                func_name: ::mono_move_alloc::GlobalArenaPtr::from_static($name),
+                ty_args: ::mono_move_core::types::EMPTY_TYPE_LIST,
+            };
+        ::mono_move_alloc::GlobalArenaPtr::from_static(&FUNC_REF)
+    }};
+}
