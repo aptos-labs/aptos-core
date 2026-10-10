@@ -100,6 +100,10 @@ struct TypeInfo {
     /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
     /// avoid undeclared-function errors.
     cmp_available: bool,
+    /// True iff comparing values of this type walks a vector. The element-wise vector
+    /// comparison is costly for the solver, so facts that only help proofs, rather than
+    /// define a role, are not emitted for such keys.
+    cmp_reaches_vector: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -609,6 +613,7 @@ impl TypeInfo {
             is_bv: bv_flag && ty.is_number(),
             is_type_param: matches!(ty, Type::TypeParameter(_)),
             cmp_available: false,
+            cmp_reaches_vector: mono_analysis::compare_reaches_vector(env, ty),
         }
     }
 }

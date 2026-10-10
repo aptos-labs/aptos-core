@@ -447,6 +447,19 @@ fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
     None
 }
 
+/// Whether comparing values of `ty` reaches a vector, directly or through a field.
+pub fn compare_reaches_vector(env: &GlobalEnv, ty: &Type) -> bool {
+    match ty {
+        Type::Vector(_) => true,
+        Type::Reference(_, inner) => compare_reaches_vector(env, inner),
+        Type::Struct(mid, sid, targs) => env
+            .get_struct(mid.qualified(*sid))
+            .get_fields()
+            .any(|field| compare_reaches_vector(env, &field.get_type().instantiate(targs))),
+        _ => false,
+    }
+}
+
 /// How a data invariant can observe hidden validity slots: by (transitively)
 /// calling a bound validity predicate, or by lifting a function's spec
 /// conditions through a behavioral predicate.
@@ -538,12 +551,17 @@ impl Analyzer<'_> {
             // The key-ordered enumeration ascends under `cmp::compare<K>`, and that
             // axiom is stated through `compare`. A spec that reads positions needs it
             // even when no ordering role is called, so a use of the sorted `key_at`
-            // registers `compare<K>` like an ordering-role call does.
+            // registers `compare<K>` like an ordering-role call does. The map's own
+            // frame clauses read positions too, so this reaches most keyed maps; keys
+            // whose comparison walks a vector are skipped, since that model is costly
+            // for the solver and they keep the behaviour of an uncalled ordering role.
             if let Some(key_at) = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT) {
                 for (sf, actuals) in &self.native_spec_fun_insts {
                     if *sf == key_at {
                         if let Some(k) = actuals.first() {
-                            cmp_k_to_register.push(k.clone());
+                            if !compare_reaches_vector(self.env, k) {
+                                cmp_k_to_register.push(k.clone());
+                            }
                         }
                     }
                 }
