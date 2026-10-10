@@ -101,7 +101,7 @@ The resulting JSON can be submitted later with `aptos governance` or signed offl
 
 ## `aptos move clear-staging-area`
 
-Remove the staging-area resource left on-chain by an incomplete chunked publish. A new `--chunked-publish` run also offers to remove it before staging, so you only need this to clean up without publishing again.
+Remove the staging-area resource left on-chain by an incomplete chunked publish. A new `--chunked-publish` run does not need this: it continues with the chunks that are already staged if they belong to the same package, and offers to remove them otherwise. So you only need this to clean up without publishing again.
 
 ```shellscript filename="Terminal"
 aptos move clear-staging-area --profile devnet

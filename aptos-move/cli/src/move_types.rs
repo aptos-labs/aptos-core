@@ -949,6 +949,11 @@ pub struct ChunkedPublishOption {
     /// for publishing the Move package.
     ///
     /// Use this option for publishing large packages exceeding `MAX_PUBLISH_PACKAGE_SIZE`.
+    ///
+    /// If an earlier chunked publish of the same package did not complete, the chunks that it staged
+    /// are not staged again, provided that the `large_packages` module stages chunks by position
+    /// (it has `stage_chunks`). This doesn't apply to publishing to a new object, whose address
+    /// depends on the number of transactions, and chunks that belong to another package are cleared.
     #[clap(long)]
     pub chunked_publish: bool,
 

@@ -1,16 +1,17 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Chunked publish against a mocked chain. A local session stands in for the on-chain
-//! `StagingArea` check; transaction submission goes to the mock.
+//! Chunked publish against a mocked chain. A local session holds the state that the CLI reads, such
+//! as a `StagingArea` left by an earlier chunked publish; transaction submission goes to the mock.
 
 use crate::tests::common;
 use aptos_cli_common::TransactionSummary;
+use aptos_framework::chunked_publish::chunk_key;
 use aptos_transaction_simulation::SimulationStateStore;
 use aptos_transaction_simulation_session::Session;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::TransactionPayload,
+    state_store::{state_key::StateKey, state_value::StateValue, table::TableHandle},
+    transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use std::{
@@ -22,6 +23,9 @@ use tempfile::TempDir;
 
 const SENDER: &str = "0xcafe";
 const PRIVATE_KEY: &str = "0x1111111111111111111111111111111111111111111111111111111111111111";
+
+/// A chunk of a package: its part, its index in the part, and its bytes.
+type Chunk = (u16, u16, Vec<u8>);
 
 fn summary(success: bool) -> TransactionSummary {
     TransactionSummary {
@@ -42,47 +46,120 @@ fn summary(success: bool) -> TransactionSummary {
     }
 }
 
-fn entry_function_name(payload: &TransactionPayload) -> String {
+fn entry_function(payload: &TransactionPayload) -> &EntryFunction {
     let TransactionPayload::EntryFunction(entry_function) = payload else {
         panic!("expected an entry function payload, got {:?}", payload);
     };
-    entry_function.function().to_string()
+    entry_function
 }
 
-/// Creates a session; if `stale_staging_area` is set, the sender's `StagingArea` holds data
-/// left by an earlier chunked publish.
-fn init_session(path: &Path, stale_staging_area: bool) {
+fn entry_function_name(payload: &TransactionPayload) -> String {
+    entry_function(payload).function().to_string()
+}
+
+/// What the sender's `StagingArea` holds when a test starts.
+enum Staged {
+    /// There is no `StagingArea`.
+    Nothing,
+    /// There is a resource that isn't laid out like a `StagingArea`, e.g. one that an older version
+    /// of the module left.
+    Garbage,
+    /// There is a `StagingArea` with these chunks.
+    Chunks(Vec<Chunk>),
+}
+
+fn write_state(session: &mut Session, key: StateKey, bytes: Vec<u8>) {
+    session
+        .state_store()
+        .set_state_value(key, StateValue::new_legacy(bytes.into()))
+        .unwrap();
+}
+
+fn init_session(path: &Path, staged: Staged) {
     let mut session = Session::init(path).expect("session init");
-    if stale_staging_area {
-        let sender = AccountAddress::from_hex_literal(SENDER).unwrap();
-        let tag = StructTag::from_str("0x7::large_packages::StagingArea").unwrap();
-        session
-            .state_store()
-            .set_state_value(
-                StateKey::resource(&sender, &tag).unwrap(),
-                StateValue::new_legacy(vec![0u8].into()),
-            )
-            .unwrap();
-        // Funding is a session operation, which persists the state written above.
-        session.fund_account(sender, 1).unwrap();
+    let sender = AccountAddress::from_hex_literal(SENDER).unwrap();
+    let staging_area = StateKey::resource(
+        &sender,
+        &StructTag::from_str("0x7::large_packages::StagingArea").unwrap(),
+    )
+    .unwrap();
+    match staged {
+        Staged::Nothing => return,
+        Staged::Garbage => write_state(&mut session, staging_area, vec![0u8]),
+        Staged::Chunks(chunks) => {
+            // StagingArea { chunks: TableWithLength { inner: Table { handle }, length }, keys }
+            let handle = AccountAddress::from_hex_literal("0xabc").unwrap();
+            let keys: Vec<u64> = chunks
+                .iter()
+                .map(|(part, index, _)| chunk_key(*part, *index))
+                .collect();
+            let mut bytes = bcs::to_bytes(&handle).unwrap();
+            bytes.extend(bcs::to_bytes(&(chunks.len() as u64)).unwrap());
+            bytes.extend(bcs::to_bytes(&keys).unwrap());
+            write_state(&mut session, staging_area, bytes);
+            for ((_, _, chunk), key) in chunks.iter().zip(keys) {
+                write_state(
+                    &mut session,
+                    StateKey::table_item(&TableHandle(handle), &bcs::to_bytes(&key).unwrap()),
+                    bcs::to_bytes(chunk).unwrap(),
+                );
+            }
+        },
+    }
+    // Funding is a session operation, which persists the state written above.
+    session.fund_account(sender, 1).unwrap();
+}
+
+/// The outcome of a command run against the mocked chain.
+struct Run {
+    result: Result<String, String>,
+    /// The transactions that were submitted, in order.
+    submitted: Vec<TransactionPayload>,
+}
+
+impl Run {
+    fn names(&self) -> Vec<String> {
+        self.submitted.iter().map(entry_function_name).collect()
+    }
+
+    /// The chunks that the transactions stage, in the order in which they are submitted.
+    fn staged_chunks(&self) -> Vec<Chunk> {
+        let mut chunks = vec![];
+        for payload in &self.submitted {
+            let entry_function = entry_function(payload);
+            if !entry_function
+                .function()
+                .as_str()
+                .starts_with("stage_chunks")
+            {
+                continue;
+            }
+            let args = entry_function.args();
+            let parts: Vec<u16> = bcs::from_bytes(&args[0]).unwrap();
+            let indices: Vec<u16> = bcs::from_bytes(&args[1]).unwrap();
+            let bytes: Vec<Vec<u8>> = bcs::from_bytes(&args[2]).unwrap();
+            for ((part, index), bytes) in parts.into_iter().zip(indices).zip(bytes) {
+                chunks.push((part, index, bytes));
+            }
+        }
+        chunks
+    }
+
+    /// The number of chunks in each part of the package, which the publishing transaction carries.
+    fn chunk_counts(&self) -> Vec<u16> {
+        let last = entry_function(self.submitted.last().expect("a transaction was submitted"));
+        bcs::from_bytes(&last.args()[3]).unwrap()
     }
 }
 
-/// Runs a chunked publish of a small package, split into several chunks, and returns the
-/// result together with the entry functions submitted, in order.
-fn run_chunked_publish(
-    stale_staging_area: bool,
+fn run_command(
+    args: &[&str],
+    staged: Staged,
     mut submit_result: impl FnMut(usize) -> TransactionSummary + Send + 'static,
-) -> (Result<String, String>, Vec<String>) {
-    let pkg = common::make_package("chunked_mock", &[(
-        "chunked_mock",
-        "module 0xCAFE::chunked_mock {
-    public fun hello(): u64 { 42 }
-}",
-    )]);
+) -> Run {
     let session_dir = TempDir::new().unwrap();
     let session_path = session_dir.path().join("session");
-    init_session(&session_path, stale_staging_area);
+    init_session(&session_path, staged);
 
     let submitted = Arc::new(Mutex::new(vec![]));
     let recorder = submitted.clone();
@@ -90,115 +167,198 @@ fn run_chunked_publish(
         ctx.expect_submit_transaction()
             .returning(move |_, payload| {
                 let mut submitted = recorder.lock().unwrap();
-                submitted.push(entry_function_name(&payload));
+                submitted.push(payload);
                 Ok(submit_result(submitted.len()))
             });
     });
 
-    let output = common::run_cli_with_env(
+    let mut args = args.to_vec();
+    args.extend([
+        "--assume-yes",
+        "--large-packages-module-address",
+        "0x7",
+        "--session",
+        session_path.to_str().unwrap(),
+        "--private-key",
+        PRIVATE_KEY,
+        "--sender-account",
+        SENDER,
+    ]);
+    let output = common::run_cli_with_env(&args, env, buffer);
+    let submitted = submitted.lock().unwrap().clone();
+    Run {
+        result: output.result,
+        submitted,
+    }
+}
+
+/// A small package, which is split into several chunks.
+fn make_test_package() -> TempDir {
+    common::make_package("chunked_mock", &[(
+        "chunked_mock",
+        "module 0xCAFE::chunked_mock {
+    public fun hello(): u64 { 42 }
+}",
+    )])
+}
+
+/// Runs a chunked publish of `pkg` with a chunk size of 64 bytes.
+fn run_chunked_publish(
+    pkg: &TempDir,
+    staged: Staged,
+    submit_result: impl FnMut(usize) -> TransactionSummary + Send + 'static,
+) -> Run {
+    run_command(
         &[
             "publish",
             "--package-dir",
             pkg.path().to_str().unwrap(),
             "--skip-fetch-latest-git-deps",
-            "--assume-yes",
             "--chunked-publish",
             "--chunk-size",
-            "200",
-            "--large-packages-module-address",
-            "0x7",
-            "--session",
-            session_path.to_str().unwrap(),
-            "--private-key",
-            PRIVATE_KEY,
-            "--sender-account",
-            SENDER,
+            "64",
         ],
-        env,
-        buffer,
-    );
-    let submitted = submitted.lock().unwrap().clone();
-    (output.result, submitted)
+        staged,
+        submit_result,
+    )
+}
+
+/// The `stage_chunks` transactions followed by the one that publishes.
+fn staging_then_publishing(names: &[String]) -> bool {
+    match names.split_last() {
+        Some((last, staging)) => {
+            last == "stage_chunks_and_publish_to_account"
+                && staging.iter().all(|name| name == "stage_chunks")
+        },
+        None => false,
+    }
 }
 
 #[test]
 fn chunked_publish_clears_stale_staging_area_first() {
-    let (result, submitted) = run_chunked_publish(true, |_| summary(true));
-
-    assert!(result.is_ok(), "{:?}", result);
-    assert!(submitted.len() > 2, "{:?}", submitted);
-    assert_eq!(submitted[0], "cleanup_staging_area");
     // The session's genesis has the current `large_packages` module, so its positional entry
     // functions are used.
-    let (last, staging) = submitted[1..].split_last().unwrap();
-    assert!(
-        staging.iter().all(|f| f == "stage_chunks"),
-        "{:?}",
-        submitted
-    );
-    assert_eq!(last, "stage_chunks_and_publish_to_account");
+    let run = run_chunked_publish(&make_test_package(), Staged::Garbage, |_| summary(true));
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    let names = run.names();
+    assert!(names.len() > 2, "{:?}", names);
+    assert_eq!(names[0], "cleanup_staging_area");
+    assert!(staging_then_publishing(&names[1..]), "{:?}", names);
 }
 
 #[test]
 fn chunked_publish_stops_at_failed_transaction() {
     // The second chunk fails; nothing after it may be submitted.
-    let (result, submitted) = run_chunked_publish(false, |call| summary(call != 2));
-
-    let error = result.expect_err("chunked publish should fail");
-    assert!(error.contains("Out of gas"), "{}", error);
-    assert!(error.contains("transaction 2 of"), "{}", error);
-    assert_eq!(submitted, vec!["stage_chunks", "stage_chunks"]);
-}
-
-/// Runs `clear-staging-area` and returns the result together with the entry functions submitted.
-fn run_clear_staging_area(stale_staging_area: bool) -> (Result<String, String>, Vec<String>) {
-    let session_dir = TempDir::new().unwrap();
-    let session_path = session_dir.path().join("session");
-    init_session(&session_path, stale_staging_area);
-
-    let submitted = Arc::new(Mutex::new(vec![]));
-    let recorder = submitted.clone();
-    let (env, buffer) = common::env_with_mock(move |ctx| {
-        ctx.expect_submit_transaction()
-            .returning(move |_, payload| {
-                recorder.lock().unwrap().push(entry_function_name(&payload));
-                Ok(summary(true))
-            });
+    let run = run_chunked_publish(&make_test_package(), Staged::Nothing, |call| {
+        summary(call != 2)
     });
 
-    let output = common::run_cli_with_env(
-        &[
-            "clear-staging-area",
-            "--assume-yes",
-            "--large-packages-module-address",
-            "0x7",
-            "--session",
-            session_path.to_str().unwrap(),
-            "--private-key",
-            PRIVATE_KEY,
-            "--sender-account",
-            SENDER,
-        ],
-        env,
-        buffer,
-    );
-    let submitted = submitted.lock().unwrap().clone();
-    (output.result, submitted)
+    let names = run.names();
+    let error = run.result.expect_err("chunked publish should fail");
+    assert!(error.contains("Out of gas"), "{}", error);
+    assert!(error.contains("transaction 2 of"), "{}", error);
+    assert_eq!(names, vec!["stage_chunks", "stage_chunks"]);
+}
+
+#[test]
+fn chunked_publish_resumes_incomplete_publish() {
+    let pkg = make_test_package();
+    let full = run_chunked_publish(&pkg, Staged::Nothing, |_| summary(true));
+    assert!(full.result.is_ok(), "{:?}", full.result);
+    let all = full.staged_chunks();
+    assert!(all.len() >= 4, "the package needs several chunks");
+
+    // An earlier publish got as far as staging the first two chunks.
+    let resumed = run_chunked_publish(&pkg, Staged::Chunks(all[..2].to_vec()), |_| summary(true));
+
+    assert!(resumed.result.is_ok(), "{:?}", resumed.result);
+    let names = resumed.names();
+    assert!(staging_then_publishing(&names), "{:?}", names);
+    assert_eq!(resumed.staged_chunks(), all[2..].to_vec());
+    assert!(resumed.submitted.len() < full.submitted.len());
+    // The module is still told how many chunks make up the whole package.
+    assert_eq!(resumed.chunk_counts(), full.chunk_counts());
+}
+
+#[test]
+fn chunked_publish_resumes_with_only_the_publishing_transaction_left() {
+    let pkg = make_test_package();
+    let full = run_chunked_publish(&pkg, Staged::Nothing, |_| summary(true));
+    let all = full.staged_chunks();
+
+    // Every chunk was staged, but the transaction that publishes the package failed.
+    let resumed = run_chunked_publish(&pkg, Staged::Chunks(all), |_| summary(true));
+
+    assert!(resumed.result.is_ok(), "{:?}", resumed.result);
+    assert_eq!(resumed.names(), vec!["stage_chunks_and_publish_to_account"]);
+    assert!(resumed.staged_chunks().is_empty());
+    assert_eq!(resumed.chunk_counts(), full.chunk_counts());
+}
+
+#[test]
+fn chunked_publish_clears_staged_chunks_of_another_package() {
+    let pkg = make_test_package();
+    let full = run_chunked_publish(&pkg, Staged::Nothing, |_| summary(true));
+    let mut staged = full.staged_chunks();
+    // The package was changed after the chunks were staged: one chunk differs.
+    staged[1].2[0] ^= 0xFF;
+
+    let run = run_chunked_publish(&pkg, Staged::Chunks(staged), |_| summary(true));
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    let names = run.names();
+    assert_eq!(names[0], "cleanup_staging_area");
+    assert_eq!(names[1..], full.names()[..]);
+    assert_eq!(run.staged_chunks(), full.staged_chunks());
+}
+
+#[test]
+fn chunked_publish_clears_staged_chunk_the_package_does_not_have() {
+    let pkg = make_test_package();
+    let full = run_chunked_publish(&pkg, Staged::Nothing, |_| summary(true));
+    let mut staged = full.staged_chunks()[..2].to_vec();
+    // A chunk of a module that the package doesn't have.
+    staged.push((100, 0, vec![1, 2, 3]));
+
+    let run = run_chunked_publish(&pkg, Staged::Chunks(staged), |_| summary(true));
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    let names = run.names();
+    assert_eq!(names[0], "cleanup_staging_area");
+    assert_eq!(names[1..], full.names()[..]);
+}
+
+#[test]
+fn chunked_publish_with_empty_staging_area_stages_everything() {
+    let pkg = make_test_package();
+    let full = run_chunked_publish(&pkg, Staged::Nothing, |_| summary(true));
+
+    let run = run_chunked_publish(&pkg, Staged::Chunks(vec![]), |_| summary(true));
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    assert_eq!(run.names(), full.names());
+    assert_eq!(run.staged_chunks(), full.staged_chunks());
+}
+
+fn run_clear_staging_area(staged: Staged) -> Run {
+    run_command(&["clear-staging-area"], staged, |_| summary(true))
 }
 
 #[test]
 fn clear_staging_area_without_staging_area_submits_nothing() {
-    let (result, submitted) = run_clear_staging_area(false);
+    let run = run_clear_staging_area(Staged::Nothing);
 
-    let output: serde_json::Value = serde_json::from_str(&result.expect("succeeds")).unwrap();
+    let names = run.names();
+    let output: serde_json::Value = serde_json::from_str(&run.result.expect("succeeds")).unwrap();
     assert!(output["Result"].is_null(), "{}", output);
-    assert!(submitted.is_empty(), "{:?}", submitted);
+    assert!(names.is_empty(), "{:?}", names);
 }
 
 #[test]
 fn clear_staging_area_removes_staging_area() {
-    let (result, submitted) = run_clear_staging_area(true);
+    let run = run_clear_staging_area(Staged::Garbage);
 
-    assert!(result.is_ok(), "{:?}", result);
-    assert_eq!(submitted, vec!["cleanup_staging_area"]);
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    assert_eq!(run.names(), vec!["cleanup_staging_area"]);
 }

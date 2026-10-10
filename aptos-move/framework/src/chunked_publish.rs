@@ -8,6 +8,7 @@ use aptos_types::{
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
 };
+use std::collections::HashSet;
 
 /// Address of the `large_packages` module on mainnet, which doesn't have it at `0x7`
 /// (aptos-experimental is never released to mainnet).
@@ -21,6 +22,7 @@ pub const LARGE_PACKAGES_DEV_MODULE_ADDRESS: &str = "0x7";
 /// The default chunk size for splitting code and metadata to fit within the transaction size limits.
 pub const CHUNK_SIZE_IN_BYTES: usize = 55_000;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PublishType {
     AccountDeploy,
     ObjectDeploy,
@@ -192,8 +194,86 @@ impl ChunkBatch {
     }
 }
 
-// Creates payloads for the `stage_chunks*` functions. Part 0 of a package is its metadata and part
-// `i + 1` the code of module `i`; every chunk is staged with its part and its index in the part.
+/// A chunk of a package at its position, for [`LargePackagesAbi::Positional`]. Part 0 of a package is
+/// its metadata and part `i + 1` is the code of module `i`; `index` is the chunk's index in its part.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PositionedChunk {
+    pub part: u16,
+    pub index: u16,
+    pub bytes: Vec<u8>,
+}
+
+/// The key under which the `large_packages` module stores the chunk at `(part, index)`.
+pub fn chunk_key(part: u16, index: u16) -> u64 {
+    (u64::from(part) << 32) | u64::from(index)
+}
+
+/// The position `(part, index)` of the chunk stored under `key`, or `None` if `key` isn't the key of
+/// any chunk that the `stage_chunks*` functions can stage.
+pub fn chunk_position(key: u64) -> Option<(u16, u16)> {
+    Some((
+        u16::try_from(key >> 32).ok()?,
+        u16::try_from(key & 0xFFFF_FFFF).ok()?,
+    ))
+}
+
+/// All chunks of a package for [`LargePackagesAbi::Positional`].
+#[derive(Clone, Debug)]
+pub struct PositionalChunks {
+    /// Every chunk, sorted by position, which is also the order in which a full publish stages them.
+    pub chunks: Vec<PositionedChunk>,
+    /// The number of chunks in each part, which the final transaction passes to the module.
+    pub chunk_counts: Vec<u16>,
+}
+
+impl PositionalChunks {
+    /// Splits the metadata and the code of the modules of a package into chunks of at most
+    /// `chunk_size` bytes.
+    pub fn new(metadata: Vec<u8>, package_code: Vec<Vec<u8>>, chunk_size: usize) -> Self {
+        let parts: Vec<Vec<u8>> = std::iter::once(metadata).chain(package_code).collect();
+        let chunk_counts = parts
+            .iter()
+            .map(|part| to_u16(part.len().div_ceil(chunk_size)))
+            .collect();
+        let chunks = parts
+            .iter()
+            .enumerate()
+            .flat_map(|(part, bytes)| {
+                bytes
+                    .chunks(chunk_size)
+                    .enumerate()
+                    .map(move |(index, chunk)| PositionedChunk {
+                        part: to_u16(part),
+                        index: to_u16(index),
+                        bytes: chunk.to_vec(),
+                    })
+            })
+            .collect();
+        Self {
+            chunks,
+            chunk_counts,
+        }
+    }
+
+    /// The chunk at `(part, index)`, if the package has one.
+    pub fn get(&self, part: u16, index: u16) -> Option<&PositionedChunk> {
+        self.chunks
+            .binary_search_by_key(&(part, index), |chunk| (chunk.part, chunk.index))
+            .ok()
+            .map(|position| &self.chunks[position])
+    }
+
+    /// The chunks that aren't at one of the `staged` positions, in staging order.
+    pub fn missing(&self, staged: &HashSet<(u16, u16)>) -> Vec<PositionedChunk> {
+        self.chunks
+            .iter()
+            .filter(|chunk| !staged.contains(&(chunk.part, chunk.index)))
+            .cloned()
+            .collect()
+    }
+}
+
+// Creates payloads for the `stage_chunks*` functions that stage every chunk of a package.
 fn create_positional_payloads(
     metadata: Vec<u8>,
     package_code: Vec<Vec<u8>>,
@@ -202,30 +282,47 @@ fn create_positional_payloads(
     large_packages_module_address: AccountAddress,
     chunk_size: usize,
 ) -> Vec<TransactionPayload> {
-    let parts: Vec<Vec<u8>> = std::iter::once(metadata).chain(package_code).collect();
-    let chunk_counts: Vec<u16> = parts
-        .iter()
-        .map(|part| to_u16(part.len().div_ceil(chunk_size)))
-        .collect();
+    let package = PositionalChunks::new(metadata, package_code, chunk_size);
+    create_positional_payloads_for(
+        package.chunks,
+        &package.chunk_counts,
+        publish_type,
+        object_address,
+        large_packages_module_address,
+        chunk_size,
+    )
+}
 
+/// Creates the transactions that stage `chunks`, the last of which then publishes the package.
+/// `chunk_counts` is the number of chunks in each part of the whole package. Chunks are packed into
+/// transactions of at most `chunk_size` bytes.
+///
+/// `chunks` can be only some of the chunks of the package: to resume an earlier publish that did not
+/// complete, the chunks that are already staged are left out.
+pub fn create_positional_payloads_for(
+    chunks: Vec<PositionedChunk>,
+    chunk_counts: &[u16],
+    publish_type: PublishType,
+    object_address: Option<AccountAddress>,
+    large_packages_module_address: AccountAddress,
+    chunk_size: usize,
+) -> Vec<TransactionPayload> {
     let mut batches = vec![ChunkBatch::default()];
-    for (part_index, part) in parts.iter().enumerate() {
-        for (chunk_index, chunk) in part.chunks(chunk_size).enumerate() {
-            if batches
-                .last()
-                .is_some_and(|batch| batch.size + chunk.len() > chunk_size)
-            {
-                batches.push(ChunkBatch::default());
-            }
-            let batch = batches.last_mut().expect("there is always a batch");
-            batch.part_indices.push(to_u16(part_index));
-            batch.chunk_indices.push(to_u16(chunk_index));
-            batch.chunks.push(chunk.to_vec());
-            batch.size += chunk.len();
+    for chunk in chunks {
+        if batches
+            .last()
+            .is_some_and(|batch| batch.size + chunk.bytes.len() > chunk_size)
+        {
+            batches.push(ChunkBatch::default());
         }
+        let batch = batches.last_mut().expect("there is always a batch");
+        batch.part_indices.push(chunk.part);
+        batch.chunk_indices.push(chunk.index);
+        batch.size += chunk.bytes.len();
+        batch.chunks.push(chunk.bytes);
     }
     // The final transaction also carries the chunk counts, two bytes per part.
-    let chunk_counts_size = std::mem::size_of::<u16>() * chunk_counts.len();
+    let chunk_counts_size = std::mem::size_of_val(chunk_counts);
     if batches
         .last()
         .is_some_and(|batch| batch.size + chunk_counts_size > chunk_size)
@@ -540,5 +637,133 @@ mod tests {
 
         assert_eq!(payloads.len(), 3);
         assert!(staged_chunks(entry_function(&payloads[2])).is_empty());
+    }
+
+    #[test]
+    fn chunk_keys_round_trip() {
+        for (part, index) in [(0, 0), (1, 0), (0, 1), (7, 300), (u16::MAX, u16::MAX)] {
+            assert_eq!(chunk_position(chunk_key(part, index)), Some((part, index)));
+        }
+        // The part is in the upper 32 bits and the index in the lower ones, as in the Move module.
+        assert_eq!(chunk_key(1, 0), 1 << 32);
+        assert_eq!(chunk_key(0, 5), 5);
+        // Keys that no `stage_chunks*` call can produce.
+        assert_eq!(chunk_position(1 << 48), None);
+        assert_eq!(chunk_position((1 << 32) | (1 << 16)), None);
+    }
+
+    #[test]
+    fn positional_chunks_are_sorted_and_counted() {
+        let package = PositionalChunks::new(
+            (0..25).collect(),
+            vec![(100..130).collect(), vec![7; 5]],
+            10,
+        );
+
+        assert_eq!(package.chunk_counts, vec![3, 3, 1]);
+        let positions: Vec<(u16, u16)> = package
+            .chunks
+            .iter()
+            .map(|chunk| (chunk.part, chunk.index))
+            .collect();
+        assert_eq!(positions, vec![
+            (0, 0),
+            (0, 1),
+            (0, 2),
+            (1, 0),
+            (1, 1),
+            (1, 2),
+            (2, 0)
+        ]);
+        assert_eq!(
+            package.get(0, 2).unwrap().bytes,
+            (20..25).collect::<Vec<u8>>()
+        );
+        assert_eq!(package.get(2, 0).unwrap().bytes, vec![7; 5]);
+        assert!(package.get(2, 1).is_none());
+        assert!(package.get(3, 0).is_none());
+    }
+
+    #[test]
+    fn missing_chunks_leave_out_staged_ones() {
+        let package = PositionalChunks::new(vec![1; 25], vec![vec![2; 25]], 10);
+        let staged: HashSet<(u16, u16)> = [(0, 0), (0, 2), (1, 1)].into_iter().collect();
+
+        let positions: Vec<(u16, u16)> = package
+            .missing(&staged)
+            .iter()
+            .map(|chunk| (chunk.part, chunk.index))
+            .collect();
+        assert_eq!(positions, vec![(0, 1), (1, 0), (1, 2)]);
+
+        let everything: HashSet<(u16, u16)> = package
+            .chunks
+            .iter()
+            .map(|chunk| (chunk.part, chunk.index))
+            .collect();
+        assert!(package.missing(&everything).is_empty());
+    }
+
+    #[test]
+    fn resumed_payloads_stage_only_the_given_chunks() {
+        let package = PositionalChunks::new(vec![1; 25], vec![vec![2; 25]], 10);
+        let staged: HashSet<(u16, u16)> = [(0, 0), (0, 1), (1, 0)].into_iter().collect();
+
+        let payloads = create_positional_payloads_for(
+            package.missing(&staged),
+            &package.chunk_counts,
+            PublishType::AccountDeploy,
+            None,
+            AccountAddress::ONE,
+            10,
+        );
+
+        // The missing chunks take 5, 10 and 5 bytes: one transaction each, and the last publishes.
+        assert_eq!(payloads.len(), 3);
+        let positions: Vec<(u16, u16)> = payloads
+            .iter()
+            .flat_map(|payload| staged_chunks(entry_function(payload)))
+            .map(|(part, index, _)| (part, index))
+            .collect();
+        assert_eq!(positions, vec![(0, 2), (1, 1), (1, 2)]);
+        let last = entry_function(payloads.last().unwrap());
+        assert_eq!(
+            last.function().as_str(),
+            "stage_chunks_and_publish_to_account"
+        );
+        // The counts are those of the whole package, not of what is staged now.
+        assert_eq!(bcs::from_bytes::<Vec<u16>>(&last.args()[3]).unwrap(), vec![
+            3, 3
+        ]);
+    }
+
+    #[test]
+    fn resumed_payloads_with_everything_staged_only_publish() {
+        let package = PositionalChunks::new(vec![1; 25], vec![vec![2; 25]], 10);
+        let object = AccountAddress::from_hex_literal("0xcafe").unwrap();
+
+        let payloads = create_positional_payloads_for(
+            vec![],
+            &package.chunk_counts,
+            PublishType::ObjectUpgrade,
+            Some(object),
+            AccountAddress::ONE,
+            10,
+        );
+
+        assert_eq!(payloads.len(), 1);
+        let last = entry_function(&payloads[0]);
+        assert_eq!(
+            last.function().as_str(),
+            "stage_chunks_and_upgrade_object_code"
+        );
+        assert!(staged_chunks(last).is_empty());
+        assert_eq!(bcs::from_bytes::<Vec<u16>>(&last.args()[3]).unwrap(), vec![
+            3, 3
+        ]);
+        assert_eq!(
+            bcs::from_bytes::<AccountAddress>(&last.args()[4]).unwrap(),
+            object
+        );
     }
 }
