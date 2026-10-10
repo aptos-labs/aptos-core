@@ -51,6 +51,7 @@ use aptos_transaction_simulation::SimulationStateStore;
 use aptos_transaction_simulation_session::Session;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
+    account_config::AccountResource,
     object_address::create_object_code_deployment_address,
     on_chain_config::aptos_test_feature_flags_genesis,
     state_store::{state_key::StateKey, table::TableHandle, TStateView},
@@ -1571,11 +1572,9 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 &self.env,
             )
             .await?;
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await?
-                + staging_tx_count
-                + 1
+            account_sequence_number(&self.txn_options, sender_address).await? + staging_tx_count + 1
         } else {
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await? + 1
+            account_sequence_number(&self.txn_options, sender_address).await? + 1
         };
 
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
@@ -1674,19 +1673,16 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let built_package =
             build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
-        let client = self
-            .txn_options
-            .rest_options
-            .client(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given object address.
-        let registry = CachedPackageRegistry::create(client, self.object_address, false).await?;
-        let package = registry
-            .get_package(built_package.name())
-            .await
-            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        let upgrade_policy = object_package_upgrade_policy(
+            &self.txn_options,
+            self.object_address,
+            built_package.name(),
+        )
+        .await?;
 
-        if package.upgrade_policy() == UpgradePolicy::immutable() {
+        if upgrade_policy == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
                 "A package with upgrade policy `immutable` cannot be upgraded".to_owned(),
             ));
@@ -1694,7 +1690,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
         let message = format!(
             "Do you want to upgrade the package '{}' at object address {}",
-            package.name(),
+            built_package.name(),
             self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
@@ -1827,11 +1823,9 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 &self.env,
             )
             .await?;
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await?
-                + staging_tx_count
-                + 1
+            account_sequence_number(&self.txn_options, sender_address).await? + staging_tx_count + 1
         } else {
-            get_sequence_number(&self.txn_options.rest_client()?, sender_address).await? + 1
+            account_sequence_number(&self.txn_options, sender_address).await? + 1
         };
 
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
@@ -1943,49 +1937,9 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
             build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
 
         // Get the `PackageRegistry` at the given code object address.
-        let upgrade_policy = match &self.txn_options.session {
-            None => {
-                let client = self
-                    .txn_options
-                    .rest_options
-                    .client(&self.txn_options.profile_options)?;
-
-                let registry =
-                    CachedPackageRegistry::create(client, self.object_address, false).await?;
-                let package_info = registry
-                    .get_package(package.name())
-                    .await
-                    .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
-                package_info.upgrade_policy()
-            },
-            Some(session_path) => {
-                let sess = Session::load(session_path)?;
-
-                let package_registry = sess
-                    .state_store()
-                    .get_resource::<PackageRegistry>(self.object_address)?
-                    .ok_or_else(|| {
-                        CliError::CommandArgumentError(format!(
-                            "Package registry not found at object address {}",
-                            self.object_address
-                        ))
-                    })?;
-
-                let metadata = package_registry
-                    .packages
-                    .iter()
-                    .find(|p| p.name == package.name())
-                    .ok_or_else(|| {
-                        CliError::CommandArgumentError(format!(
-                            "Package {} not found at object address {}",
-                            package.name(),
-                            self.object_address
-                        ))
-                    })?;
-
-                metadata.upgrade_policy
-            },
-        };
+        let upgrade_policy =
+            object_package_upgrade_policy(&self.txn_options, self.object_address, package.name())
+                .await?;
 
         if upgrade_policy == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
@@ -2255,6 +2209,74 @@ fn print_incomplete_chunked_publish_caution() {
         \nThe next chunked publish will offer to clear it first, or you can clear it now with `aptos move clear-staging-area`."
             .bold()
     );
+}
+
+/// The sequence number of `address`, read from the session when simulating with `--session` and
+/// from the chain otherwise. Object addresses are derived from it, so it has to come from where the
+/// transactions are executed.
+async fn account_sequence_number(
+    txn_options: &TransactionOptions,
+    address: AccountAddress,
+) -> CliTypedResult<u64> {
+    match &txn_options.session {
+        None => get_sequence_number(&txn_options.rest_client()?, address).await,
+        Some(session_path) => {
+            let session = Session::load(session_path)?;
+            Ok(session
+                .state_store()
+                .get_resource::<AccountResource>(address)?
+                .map_or(0, |account| account.sequence_number))
+        },
+    }
+}
+
+/// The upgrade policy of the package `package_name` that is published at `object_address`, read from
+/// the session when simulating with `--session` and from the chain otherwise.
+async fn object_package_upgrade_policy(
+    txn_options: &TransactionOptions,
+    object_address: AccountAddress,
+    package_name: &str,
+) -> CliTypedResult<UpgradePolicy> {
+    match &txn_options.session {
+        None => {
+            let client = txn_options
+                .rest_options
+                .client(&txn_options.profile_options)?;
+
+            let registry = CachedPackageRegistry::create(client, object_address, false).await?;
+            let package_info = registry
+                .get_package(package_name)
+                .await
+                .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+            Ok(package_info.upgrade_policy())
+        },
+        Some(session_path) => {
+            let session = Session::load(session_path)?;
+
+            let package_registry = session
+                .state_store()
+                .get_resource::<PackageRegistry>(object_address)?
+                .ok_or_else(|| {
+                    CliError::CommandArgumentError(format!(
+                        "Package registry not found at object address {}",
+                        object_address
+                    ))
+                })?;
+
+            let metadata = package_registry
+                .packages
+                .iter()
+                .find(|p| p.name == package_name)
+                .ok_or_else(|| {
+                    CliError::CommandArgumentError(format!(
+                        "Package {} not found at object address {}",
+                        package_name, object_address
+                    ))
+                })?;
+
+            Ok(metadata.upgrade_policy)
+        },
+    }
 }
 
 /// The `large_packages` module that a chunked publish stages through.

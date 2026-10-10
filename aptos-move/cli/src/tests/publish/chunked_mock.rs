@@ -6,13 +6,21 @@
 
 use crate::tests::common;
 use aptos_cli_common::TransactionSummary;
-use aptos_framework::chunked_publish::chunk_key;
+use aptos_framework::{
+    chunked_publish::chunk_key,
+    natives::code::{PackageMetadata, PackageRegistry, UpgradePolicy},
+};
+use aptos_package_builder::PackageBuilder;
 use aptos_transaction_simulation::SimulationStateStore;
 use aptos_transaction_simulation_session::Session;
 use aptos_types::{
+    account_config::AccountResource,
+    event::{EventHandle, EventKey},
+    object_address::create_object_code_deployment_address,
     state_store::{state_key::StateKey, state_value::StateValue, table::TableHandle},
     transaction::{EntryFunction, TransactionPayload},
 };
+use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use std::{
     path::Path,
@@ -155,11 +163,28 @@ impl Run {
 fn run_command(
     args: &[&str],
     staged: Staged,
+    submit_result: impl FnMut(usize) -> TransactionSummary + Send + 'static,
+) -> Run {
+    run_command_with_setup(args, staged, |_| {}, submit_result)
+}
+
+/// Like [`run_command`], and `setup` can put anything else that a test needs into the session.
+fn run_command_with_setup(
+    args: &[&str],
+    staged: Staged,
+    setup: impl FnOnce(&mut Session),
     mut submit_result: impl FnMut(usize) -> TransactionSummary + Send + 'static,
 ) -> Run {
     let session_dir = TempDir::new().unwrap();
     let session_path = session_dir.path().join("session");
     init_session(&session_path, staged);
+    let mut session = Session::load(&session_path).expect("session load");
+    setup(&mut session);
+    // Funding is a session operation, which persists the state written above.
+    session
+        .fund_account(AccountAddress::from_hex_literal(SENDER).unwrap(), 1)
+        .unwrap();
+    drop(session);
 
     let submitted = Arc::new(Mutex::new(vec![]));
     let recorder = submitted.clone();
@@ -361,4 +386,165 @@ fn clear_staging_area_removes_staging_area() {
 
     assert!(run.result.is_ok(), "{:?}", run.result);
     assert_eq!(run.names(), vec!["cleanup_staging_area"]);
+}
+
+/// A small package whose address is assigned on the command line, as it is for an object.
+fn make_object_test_package() -> TempDir {
+    let mut builder = PackageBuilder::new("chunked_mock");
+    builder.add_alias("chunked_mock", "_");
+    builder.add_source(
+        "chunked_mock",
+        "module chunked_mock::chunked_mock {
+    public fun hello(): u64 { 42 }
+}",
+    );
+    builder
+        .write_to_temp()
+        .expect("failed to create temp package")
+}
+
+/// Gives the sender's account in the session this sequence number.
+fn set_sender_sequence_number(session: &mut Session, sequence_number: u64) {
+    let sender = AccountAddress::from_hex_literal(SENDER).unwrap();
+    let account = AccountResource::new(
+        sequence_number,
+        vec![0; 32],
+        EventHandle::new(EventKey::new(0, sender), 0),
+        EventHandle::new(EventKey::new(1, sender), 0),
+    );
+    session
+        .state_store()
+        .set_resource(sender, &account)
+        .unwrap();
+}
+
+/// Publishes a package named `chunked_mock` at `object` in the session, with this upgrade policy.
+fn set_package_registry(session: &mut Session, object: AccountAddress, policy: UpgradePolicy) {
+    let registry = PackageRegistry {
+        packages: vec![PackageMetadata {
+            name: "chunked_mock".to_string(),
+            upgrade_policy: policy,
+            upgrade_number: 0,
+            source_digest: String::new(),
+            manifest: vec![],
+            modules: vec![],
+            deps: vec![],
+            extension: None,
+        }],
+    };
+    session
+        .state_store()
+        .set_resource(object, &registry)
+        .unwrap();
+}
+
+/// The address that the first module of the package was compiled for, from the chunks that the
+/// transactions stage.
+fn staged_module_address(run: &Run) -> AccountAddress {
+    // Part 0 is the package metadata, and part 1 the code of the first module.
+    let module: Vec<u8> = run
+        .staged_chunks()
+        .into_iter()
+        .filter(|(part, ..)| *part == 1)
+        .flat_map(|(_, _, bytes)| bytes)
+        .collect();
+    *CompiledModule::deserialize(&module)
+        .expect("the staged chunks are a module")
+        .self_addr()
+}
+
+fn run_create_object(chunked: bool, sequence_number: u64) -> Run {
+    let pkg = make_object_test_package();
+    let mut args = vec![
+        "create-object-and-publish-package",
+        "--address-name",
+        "chunked_mock",
+        "--package-dir",
+        pkg.path().to_str().unwrap(),
+        "--skip-fetch-latest-git-deps",
+    ];
+    if chunked {
+        args.extend(["--chunked-publish", "--chunk-size", "64"]);
+    }
+    run_command_with_setup(
+        &args,
+        Staged::Nothing,
+        move |session| set_sender_sequence_number(session, sequence_number),
+        |_| summary(true),
+    )
+}
+
+#[test]
+fn chunked_object_publish_derives_address_from_session_sequence_number() {
+    let sender = AccountAddress::from_hex_literal(SENDER).unwrap();
+
+    let run = run_create_object(true, 5);
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    let names = run.names();
+    assert_eq!(names.last().unwrap(), "stage_chunks_and_publish_to_object");
+    // The sender has sent 5 transactions in the session, and the object is created by the last of
+    // the transactions of this publish, so it is derived from the sequence number after that one.
+    let expected = create_object_code_deployment_address(sender, 5 + run.submitted.len() as u64);
+    assert_eq!(staged_module_address(&run), expected);
+}
+
+#[test]
+fn object_publish_derives_address_from_session_sequence_number() {
+    let sender = AccountAddress::from_hex_literal(SENDER).unwrap();
+
+    let run = run_create_object(false, 5);
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    assert_eq!(run.submitted.len(), 1);
+    let args = entry_function(&run.submitted[0]).args();
+    let code: Vec<Vec<u8>> = bcs::from_bytes(&args[1]).unwrap();
+    let address = *CompiledModule::deserialize(&code[0]).unwrap().self_addr();
+    assert_eq!(address, create_object_code_deployment_address(sender, 6));
+}
+
+fn run_upgrade_object_package(policy: UpgradePolicy) -> Run {
+    let pkg = make_object_test_package();
+    let object = AccountAddress::from_hex_literal("0xabc123").unwrap();
+    run_command_with_setup(
+        &[
+            "upgrade-object-package",
+            "--object-address",
+            "0xabc123",
+            "--named-addresses",
+            "chunked_mock=0xabc123",
+            "--package-dir",
+            pkg.path().to_str().unwrap(),
+            "--skip-fetch-latest-git-deps",
+            "--chunked-publish",
+            "--chunk-size",
+            "64",
+        ],
+        Staged::Nothing,
+        move |session| set_package_registry(session, object, policy),
+        |_| summary(true),
+    )
+}
+
+#[test]
+fn upgrade_object_package_reads_the_package_from_the_session() {
+    let run = run_upgrade_object_package(UpgradePolicy::compat());
+
+    assert!(run.result.is_ok(), "{:?}", run.result);
+    assert_eq!(
+        run.names().last().unwrap(),
+        "stage_chunks_and_upgrade_object_code"
+    );
+}
+
+#[test]
+fn upgrade_object_package_with_immutable_package_in_session_fails() {
+    let run = run_upgrade_object_package(UpgradePolicy::immutable());
+
+    let names = run.names();
+    let error = run
+        .result
+        .expect_err("an immutable package can't be upgraded");
+    assert!(error.contains("immutable"), "{}", error);
+    assert!(names.is_empty(), "{:?}", names);
 }
