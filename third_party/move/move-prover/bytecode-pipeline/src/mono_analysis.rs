@@ -261,6 +261,7 @@ impl MonoAnalysisProcessor {
             node_deps: BTreeMap::new(),
             node_types: BTreeMap::new(),
             selected_root: root,
+            native_spec_fun_insts: BTreeSet::new(),
         };
         // Analyze axioms found in modules.
         for module_env in env.get_modules() {
@@ -404,6 +405,9 @@ struct Analyzer<'a> {
     node_deps: BTreeMap<MonoNode, BTreeSet<MonoNode>>,
     node_types: BTreeMap<MonoNode, BTreeSet<Type>>,
     selected_root: Option<VerificationRoot>,
+    /// Instantiations of native spec functions reached from this analysis, by function.
+    /// `info.native_inst` keeps them only per module.
+    native_spec_fun_insts: BTreeSet<(QualifiedId<SpecFunId>, Vec<Type>)>,
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -529,6 +533,19 @@ impl Analyzer<'_> {
             if needs_option_v {
                 for (_k, v) in ty_args.iter() {
                     option_v_to_register.push(v.clone());
+                }
+            }
+            // The key-ordered enumeration ascends under `cmp::compare<K>`, and that
+            // axiom is stated through `compare`. A spec that reads positions needs it
+            // even when no ordering role is called, so a use of the sorted `key_at`
+            // registers `compare<K>` like an ordering-role call does.
+            if let Some(key_at) = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT) {
+                for (sf, actuals) in &self.native_spec_fun_insts {
+                    if *sf == key_at {
+                        if let Some(k) = actuals.first() {
+                            cmp_k_to_register.push(k.clone());
+                        }
+                    }
                 }
             }
             let needs_vec_k = vec_k_roles_eager
@@ -2086,6 +2103,8 @@ impl Analyzer<'_> {
                 }
 
                 if spec_fun.is_native && !actuals.is_empty() {
+                    self.native_spec_fun_insts
+                        .insert((mid.qualified(*fid), actuals.clone()));
                     // Add module to native modules
                     self.info
                         .native_inst

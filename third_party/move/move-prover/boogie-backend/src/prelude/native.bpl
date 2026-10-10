@@ -1444,6 +1444,17 @@ axiom (forall t: {{Table}}, i: int :: {{"{"}}{{EKA}}(t, i)}
 axiom (forall t: {{Table}}, i: int, j: int :: {{"{"}}{{EKA}}(t, i), {{EKA}}(t, j)}
     {{EWF}}(t) && 0 <= i && i < j && j < LenTable(t) ==>
         $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, i), {{EKA}}(t, j)) == $1.cmp.Ordering.Less());
+// The first and last positions bound every contained key. Both follow from the
+// ascending axiom with the rank axioms, but only through a key's rank, which a
+// key known merely to be contained has no term for; the solver then misses the
+// chain depending on how the table term is written (measured). Stated directly,
+// they need only the containment and the end position.
+axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, 0)}
+    {{EWF}}(t) && 0 < LenTable(t) && ContainsTable(t, {{ENC}}(k)) ==>
+        $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, 0), k) != $1.cmp.Ordering.Greater());
+axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, LenTable(t) - 1)}
+    {{EWF}}(t) && 0 < LenTable(t) && ContainsTable(t, {{ENC}}(k)) ==>
+        $1.cmp.$compare'{{instance.0.suffix}}'(k, {{EKA}}(t, LenTable(t) - 1)) != $1.cmp.Ordering.Greater());
 {%- endif %}
 // A contained key's rank is in range and key_at inverts it (up to $IsEqual).
 axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}{{ERK}}(t, {{ENC}}(k))}
