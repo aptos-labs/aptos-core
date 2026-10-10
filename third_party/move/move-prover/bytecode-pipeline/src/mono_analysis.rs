@@ -447,15 +447,21 @@ fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
     None
 }
 
-/// Whether comparing values of `ty` reaches a vector, directly or through a field.
+/// Whether comparing values of `ty` reaches a vector or an intrinsic map, directly or
+/// through a field. Intrinsic structs are judged as maps, not by their declared Move
+/// fields: their comparison has no model.
 pub fn compare_reaches_vector(env: &GlobalEnv, ty: &Type) -> bool {
     match ty {
         Type::Vector(_) => true,
         Type::Reference(_, inner) => compare_reaches_vector(env, inner),
-        Type::Struct(mid, sid, targs) => env
-            .get_struct(mid.qualified(*sid))
-            .get_fields()
-            .any(|field| compare_reaches_vector(env, &field.get_type().instantiate(targs))),
+        Type::Struct(mid, sid, targs) => {
+            let qid = mid.qualified(*sid);
+            env.get_intrinsics().get_decl_for_struct(&qid).is_some()
+                || env
+                    .get_struct(qid)
+                    .get_fields()
+                    .any(|field| compare_reaches_vector(env, &field.get_type().instantiate(targs)))
+        },
         _ => false,
     }
 }

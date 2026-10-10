@@ -6,7 +6,7 @@
 // Inserting a key then bounds the largest key from below by both the new key
 // and the previous largest key.
 module 0x42::intrinsic_map_key_order {
-    struct Map<phantom K: copy + drop, phantom V> has store, drop {}
+    struct Map<phantom K: copy + drop, phantom V> has copy, store, drop {}
 
     spec Map {
         pragma intrinsic = map,
@@ -69,6 +69,20 @@ module 0x42::intrinsic_map_key_order {
     spec add_smallest_unchanged_wrong {
         requires spec_len(m) > 0;
         ensures spec_key_at(m, 0) == spec_key_at(old(m), 0);
+    }
+
+    // A key holding a map has no comparison model, so reading its positions must not
+    // ask for one.
+    struct MapKey has copy, drop, store {
+        a: u64,
+        inner: Map<u64, u64>,
+    }
+
+    fun add_map_keyed(m: &mut Map<MapKey, u64>, k: MapKey) {
+        add(m, k, 0);
+    }
+    spec add_map_keyed {
+        ensures spec_len(m) > 0 ==> spec_contains(m, spec_key_at(m, 0));
     }
 
     // Brings `cmp` into the program as a real package's map module does, while
