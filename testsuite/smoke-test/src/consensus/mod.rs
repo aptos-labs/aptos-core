@@ -9,3 +9,4 @@ mod dag;
 mod helpers;
 mod optqs_fault_tolerance;
 mod quorum_store_fault_tolerance;
+mod restart_with_commit_backlog;

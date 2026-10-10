@@ -55,6 +55,7 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     vm::module_metadata::get_randomness_annotation_for_entry_function,
 };
+use fail::fail_point;
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::ModuleStorage;
@@ -1311,6 +1312,13 @@ impl PipelineBuilder {
         Ok(compute_result)
     }
 
+    /// Returns true while the `consensus::commit_ledger::stall` failpoint is set to `return`.
+    /// Always false when failpoints are compiled out.
+    fn commit_ledger_stalled() -> bool {
+        fail_point!("consensus::commit_ledger::stall", |_| true);
+        false
+    }
+
     /// Precondition: 1. pre-commit finishes, 2. parent block's phase finishes 3. commit proof is available
     /// What it does: Commit the ledger info to storage, this makes the data visible for clients
     async fn commit_ledger(
@@ -1328,6 +1336,13 @@ impl PipelineBuilder {
         // it's committed as prefix
         if ledger_info_with_sigs.commit_info().id() != block.id() {
             return Ok(None);
+        }
+
+        // Test-only hook: while this failpoint is active, hold the ledger commit without blocking
+        // the runtime. The node keeps ordering, executing and pre-committing blocks, but its
+        // committed ledger (and therefore its commit root) falls behind the rest of the network.
+        while Self::commit_ledger_stalled() {
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
         tracker.start_working();
