@@ -134,6 +134,10 @@ pub struct MonoInfo {
     /// callee. `info.funs` isn't populated for these callees, so post-passes use this
     /// map to ask which intrinsic roles were called and with which type args.
     pub intrinsic_calls: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
+    /// Key types of key-ordered maps whose positions a spec reads. Their order facts
+    /// need `cmp::compare<K>`, which only the backend can tell is declared, so they are
+    /// kept apart from `native_inst` and added there by the backend.
+    pub position_read_keys: BTreeSet<Type>,
     pub all_types: BTreeSet<Type>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
     /// A map from function types used in the program to the closures appearing in
@@ -538,6 +542,7 @@ impl Analyzer<'_> {
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
+        let mut position_read_keys: Vec<Type> = vec![];
         let mut vec_k_to_register: Vec<Type> = vec![];
         let mut iter_ptr_to_register: Vec<Type> = vec![];
         let mut spec_fun_to_register: Vec<(QualifiedId<SpecFunId>, Vec<Type>)> = vec![];
@@ -557,16 +562,17 @@ impl Analyzer<'_> {
             // The key-ordered enumeration ascends under `cmp::compare<K>`, and that
             // axiom is stated through `compare`. A spec that reads positions needs it
             // even when no ordering role is called, so a use of the sorted `key_at`
-            // registers `compare<K>` like an ordering-role call does. The map's own
-            // frame clauses read positions too, so this reaches most keyed maps; keys
-            // whose comparison walks a vector are skipped, since that model is costly
-            // for the solver and they keep the behaviour of an uncalled ordering role.
+            // records K for the backend, which registers `compare<K>` when `compare`
+            // is declared. The map's own frame clauses read positions too, so this
+            // reaches most keyed maps; keys whose comparison walks a vector are
+            // skipped, since that model is costly for the solver and they keep the
+            // behaviour of an uncalled ordering role.
             if let Some(key_at) = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT) {
                 for (sf, actuals) in &self.native_spec_fun_insts {
                     if *sf == key_at {
                         if let Some(k) = actuals.first() {
                             if !compare_reaches_vector(self.env, k) {
-                                cmp_k_to_register.push(k.clone());
+                                position_read_keys.push(k.clone());
                             }
                         }
                     }
@@ -1202,7 +1208,11 @@ impl Analyzer<'_> {
                 .flatten()
                 .filter_map(|inst| inst.first().cloned())
                 .collect::<Vec<_>>();
-            for ty in existing_cmp_ks.iter().chain(cmp_k_to_register.iter()) {
+            for ty in existing_cmp_ks
+                .iter()
+                .chain(cmp_k_to_register.iter())
+                .chain(position_read_keys.iter())
+            {
                 cmp_closure.extend(ty.get_all_contained_types_with_skip_reference(self.env));
             }
             for (struct_qid, ty_args) in self.info.table_inst.iter() {
@@ -1241,6 +1251,7 @@ impl Analyzer<'_> {
                     .insert(vec![ty]);
             }
         }
+        self.info.position_read_keys.extend(position_read_keys);
         for (spec_fun_qid, ty_args) in spec_fun_to_register {
             self.info
                 .spec_funs

@@ -515,6 +515,23 @@ pub fn add_prelude(
         filtered.into_iter().flatten().collect_vec()
     };
     let mut cmp_instances = filter_native_with_contained_types(CMP_MODULE);
+    // `compare` and `Ordering` are declared by the Aptos natives template; without it,
+    // adding the position-read keys would only reference undeclared functions.
+    if options.custom_natives.is_some() {
+        for ty in &mono_info.position_read_keys {
+            for bv_flag in [false, true] {
+                cmp_instances.extend(
+                    ty.get_all_contained_types_with_skip_reference(env)
+                        .into_iter()
+                        .filter(|i| !bv_flag || !never_renders_bv(i))
+                        .map(|i| {
+                            let info = TypeInfo::new(env, options, &i, bv_flag);
+                            (i, info)
+                        }),
+                );
+            }
+        }
+    }
     cmp_instances.sort();
     cmp_instances.dedup();
     // Mark each MapImpl's K as `cmp_available` when its suffix is in `cmp_instances`,
