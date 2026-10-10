@@ -1112,6 +1112,13 @@ procedure {:inline 2} {{impl.fun_add_no_override}}{{S}}(m: $Mutation ({{Self}}),
         // `AddTable` cannot fire: the function is `{:inline}` and its
         // expansion is a constructor term with two array stores.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1135,6 +1142,13 @@ procedure {:inline 2} {{impl.fun_add_override_if_exists}}{{S}}(m: $Mutation ({{S
         // `AddTable` cannot fire: the function is `{:inline}` and its
         // expansion is a constructor term with two array stores.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1163,6 +1177,13 @@ returns (prev_v: $1.option.Option{{SV}}, m': $Mutation ({{Self}})) {
         // `AddTable` cannot fire: the function is `{:inline}` and its
         // expansion is a constructor term with two array stores.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, v));
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, v), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, v){{W2}});
     }
@@ -1263,6 +1284,13 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
         // `AddTable` cannot fire, so well-formedness has to be carried by an
         // assume or the enumeration axioms stay gated off past this call.
         assume {{EWF}}(t{{U}}) ==> {{EWF}}(AddTable(t{{U}}, enc_k, default));
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+        // The previous first and last keys survive the insertion; this names them in
+        // the new table so the end-position bound axioms can relate the two tables.
+        assume {{EWF}}(t{{U}}) && 0 < LenTable(t{{U}}) ==>
+            ContainsTable(AddTable(t{{U}}, enc_k, default), {{ENC}}({{EKA}}(t{{U}}, 0)))
+            && ContainsTable(AddTable(t{{U}}, enc_k, default), {{ENC}}({{EKA}}(t{{U}}, LenTable(t{{U}}) - 1)));
+{%- endif %}
 {%- endif %}
         {{GH}}m' := $UpdateMutation(m, {{W1}}AddTable(t{{U}}, enc_k, default){{W2}});
         t' := $Dereference(m');
@@ -1452,9 +1480,9 @@ axiom (forall t: {{Table}}, i: int, j: int :: {{"{"}}{{EKA}}(t, i), {{EKA}}(t, j
 axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, 0)}
     {{EWF}}(t) && 0 < LenTable(t) && ContainsTable(t, {{ENC}}(k)) ==>
         $1.cmp.$compare'{{instance.0.suffix}}'({{EKA}}(t, 0), k) != $1.cmp.Ordering.Greater());
-axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, LenTable(t) - 1)}
-    {{EWF}}(t) && 0 < LenTable(t) && ContainsTable(t, {{ENC}}(k)) ==>
-        $1.cmp.$compare'{{instance.0.suffix}}'(k, {{EKA}}(t, LenTable(t) - 1)) != $1.cmp.Ordering.Greater());
+axiom (forall t: {{Table}}, k: {{K}}, i: int :: {{"{"}}ContainsTable(t, {{ENC}}(k)), {{EKA}}(t, i)}
+    {{EWF}}(t) && i == LenTable(t) - 1 && 0 <= i && ContainsTable(t, {{ENC}}(k)) ==>
+        $1.cmp.$compare'{{instance.0.suffix}}'(k, {{EKA}}(t, i)) != $1.cmp.Ordering.Greater());
 {%- endif %}
 // A contained key's rank is in range and key_at inverts it (up to $IsEqual).
 axiom (forall t: {{Table}}, k: {{K}} :: {{"{"}}{{ERK}}(t, {{ENC}}(k))}

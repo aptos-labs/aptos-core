@@ -1,0 +1,30 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_map_key_order.move:71:9
+   │
+71 │         ensures spec_key_at(m, 0) == spec_key_at(old(m), 0);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_map_key_order.move:66: add_smallest_unchanged_wrong
+   =     at tests/sources/functional/intrinsic_map_key_order.move:70: add_smallest_unchanged_wrong (spec)
+   =     at tests/sources/functional/intrinsic_map_key_order.move:66: add_smallest_unchanged_wrong
+   =         m = <redacted>
+   =         k = <redacted>
+   =     at tests/sources/functional/intrinsic_map_key_order.move:67: add_smallest_unchanged_wrong
+   =     at tests/sources/functional/intrinsic_map_key_order.move:66: add_smallest_unchanged_wrong
+   =         m = <redacted>
+   =     at tests/sources/functional/intrinsic_map_key_order.move:71: add_smallest_unchanged_wrong (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_map_key_order.move:85:9
+   │
+85 │         ensures spec_key_at(m, spec_len(m) - 1).price == k.price;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_map_key_order.move:81: add_new_key_largest_wrong
+   =         m = <redacted>
+   =         k = <redacted>
+   =     at tests/sources/functional/intrinsic_map_key_order.move:82: add_new_key_largest_wrong
+   =     at tests/sources/functional/intrinsic_map_key_order.move:81: add_new_key_largest_wrong
+   =         m = <redacted>
+   =     at tests/sources/functional/intrinsic_map_key_order.move:85: add_new_key_largest_wrong (spec)
