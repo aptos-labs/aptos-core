@@ -1,0 +1,60 @@
+[package]
+name = "mono-move-replay"
+description = "Compares the MonoMove-backed transaction executor (V2) against the legacy AptosVM (V1) on real chain transactions: captures them into a corpus, replays both VMs on the same state, and reports a verdict per transaction."
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[[bin]]
+name = "mono-move-replay"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-comparison-testing-dump-format = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-meter = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-memory-usage-tracker = { workspace = true }
+aptos-move-debugger = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-transaction-simulation = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
+aptos-vm = { workspace = true }
+aptos-vm-environment = { workspace = true }
+aptos-vm-logging = { workspace = true }
+aptos-vm-types = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+libc = { workspace = true }
+mono-move-aptos-state-view-providers = { workspace = true }
+mono-move-aptos-transaction-executor = { workspace = true }
+mono-move-core = { workspace = true }
+mono-move-global-context = { workspace = true }
+mono-move-loader = { workspace = true }
+mono-move-output = { workspace = true }
+mono-move-replay-common = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sysinfo = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+mono-move-testsuite = { workspace = true }
+tempfile = { workspace = true }

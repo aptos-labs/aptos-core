@@ -4,9 +4,10 @@
 use aptos_keyless_validation::KeylessValidationError;
 use aptos_types::{
     error::{split_canonical, OUT_OF_RANGE},
-    transaction::validation::ECANT_PAY_GAS_DEPOSIT,
+    transaction::{validation::ECANT_PAY_GAS_DEPOSIT, TransactionStatus},
 };
 use mono_move_core::VMInternalError;
+use mono_move_output::gap::Gap;
 use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
     RuntimeStatus,
@@ -15,21 +16,84 @@ use move_core_types::vm_status::AbortLocation;
 use thiserror::Error;
 
 /// Every reason a transaction's effects could not be rendered into a
-/// `TransactionOutput`. Always an executor bug; the reasons are diagnostics.
+/// `TransactionOutput`. An executor bug, unless a value hit a MonoMove gap; the
+/// reasons are diagnostics.
 #[derive(Debug, Error)]
-#[error("failed to materialize the transaction output: {}", .0.join("; "))]
-pub struct MaterializationError(Vec<String>);
+#[error("failed to materialize the transaction output: {}", .reasons.join("; "))]
+pub struct MaterializationError {
+    reasons: Vec<String>,
+    gaps: Vec<Gap>,
+    status: Option<TransactionStatus>,
+}
 
 impl MaterializationError {
     /// Sorts the reasons, so that what is reported does not depend on the order
     /// the failures were hit in.
     pub fn new(mut reasons: Vec<String>) -> Self {
         reasons.sort();
-        Self(reasons)
+        Self {
+            reasons,
+            gaps: vec![],
+            status: None,
+        }
+    }
+
+    /// The failures of an executed transaction's output, which would have
+    /// committed with `status`. Its gaps are kept only if every failure is one:
+    /// any other failure is an executor bug, which a gap must not hide.
+    pub(crate) fn of_executed(
+        failures: Vec<MaterializationFailure>,
+        status: TransactionStatus,
+    ) -> Self {
+        let only_gaps = failures.iter().all(|failure| failure.gap.is_some());
+        let (reasons, gaps): (Vec<_>, Vec<_>) = failures
+            .into_iter()
+            .map(|failure| (failure.reason, failure.gap))
+            .unzip();
+        let mut gaps: Vec<Gap> = if only_gaps {
+            gaps.into_iter().flatten().collect()
+        } else {
+            vec![]
+        };
+        // By message, then kind, so that the order (and which gap comes first) does not depend on
+        // the order the failures were found in, and duplicates are adjacent for `dedup`.
+        gaps.sort_by_cached_key(|gap| (gap.message.clone(), format!("{:?}", gap.kind)));
+        gaps.dedup();
+        Self {
+            gaps,
+            status: Some(status),
+            ..Self::new(reasons)
+        }
     }
 
     pub fn reasons(&self) -> &[String] {
-        &self.0
+        &self.reasons
+    }
+
+    /// The MonoMove gaps the values hit, e.g. a written function value, when
+    /// they are the only failures. Empty when any failure is an executor bug.
+    pub fn gaps(&self) -> &[Gap] {
+        &self.gaps
+    }
+
+    /// The status the transaction executed with, final before its output was
+    /// materialized; `None` if it did not execute.
+    pub fn status(&self) -> Option<&TransactionStatus> {
+        self.status.as_ref()
+    }
+}
+
+/// One way an executed transaction's output failed to materialize.
+pub(crate) struct MaterializationFailure {
+    pub(crate) reason: String,
+    /// Set when the failure is a MonoMove gap, e.g. a value it cannot serialize
+    /// yet, rather than an executor bug.
+    pub(crate) gap: Option<Gap>,
+}
+
+impl From<String> for MaterializationFailure {
+    fn from(reason: String) -> Self {
+        Self { reason, gap: None }
     }
 }
 
@@ -215,4 +279,42 @@ pub(crate) fn call_result(status: RuntimeStatus) -> Result<(), MoveExecutionFail
 /// Whether an epilogue abort is the fee payer failing to cover the fee.
 pub(crate) fn is_cant_pay_fee_abort(code: u64) -> bool {
     split_canonical(code) == (OUT_OF_RANGE, ECANT_PAY_GAS_DEPOSIT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mono_move_output::gap::GapKind;
+
+    fn gap(message: &str) -> Gap {
+        Gap {
+            kind: GapKind::Other,
+            message: message.to_string(),
+        }
+    }
+
+    fn failure(reason: &str, gap: Option<Gap>) -> MaterializationFailure {
+        MaterializationFailure {
+            reason: reason.to_string(),
+            gap,
+        }
+    }
+
+    #[test]
+    fn gaps_are_kept_only_when_every_failure_is_one() {
+        let status = TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success);
+        let all = MaterializationError::of_executed(
+            vec![failure("a", Some(gap("f"))), failure("b", Some(gap("f")))],
+            status.clone(),
+        );
+        assert_eq!(all.gaps(), &[gap("f")]);
+        assert_eq!(all.status(), Some(&status));
+        // A failure that is not a gap is an executor bug, which the gap must not hide.
+        let mixed = MaterializationError::of_executed(
+            vec![failure("a", Some(gap("f"))), failure("b", None)],
+            status,
+        );
+        assert!(mixed.gaps().is_empty());
+        assert_eq!(mixed.reasons(), &["a".to_string(), "b".to_string()]);
+    }
 }

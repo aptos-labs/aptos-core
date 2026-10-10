@@ -4,7 +4,7 @@
 //! Creates a `TransactionOutput` from a transaction's side effects.
 
 use crate::{
-    errors::MaterializationError,
+    errors::{MaterializationError, MaterializationFailure},
     providers::{AptosDataProvider, GroupMembers, MaterializedGroups},
 };
 use aptos_types::{
@@ -19,7 +19,7 @@ use mono_move_core::{
     nominal_tag, storage::resource_provider::InMemoryStorageKey, types::InternedType,
     value_layout::LayoutProvider,
 };
-use mono_move_output::to_contract_events;
+use mono_move_output::{gap::gap, to_contract_events};
 use mono_move_runtime::{serialize, SessionEffects, WriteClass};
 use move_core_types::{language_storage::StructTag, vm_status::StatusCode};
 use std::{collections::HashMap, ptr::NonNull};
@@ -39,12 +39,34 @@ pub(crate) fn executed_output(
     status: TransactionStatus,
     auxiliary_data: TransactionAuxiliaryData,
 ) -> Result<(TransactionOutput, MaterializedGroups), MaterializationError> {
-    let (write_set, groups) =
-        drain_write_set(effects, layouts, provider).map_err(MaterializationError::new)?;
-    let events = to_contract_events(effects, layouts)
-        .map_err(|e| MaterializationError::new(vec![format!("event finalization failed: {e}")]))?;
-    let output = TransactionOutput::new(write_set, events, gas_used, status, auxiliary_data);
-    Ok((output, groups))
+    // Every write and event is attempted, so that all failures are reported:
+    // one that is a gap must not hide another that is a bug.
+    let writes = drain_write_set(effects, layouts, provider);
+    let events = to_contract_events(effects, layouts).map_err(|errors| {
+        errors
+            .iter()
+            .map(|e| MaterializationFailure {
+                reason: format!("event finalization failed: {e}"),
+                gap: gap(e),
+            })
+            .collect::<Vec<_>>()
+    });
+    match (writes, events) {
+        (Ok((write_set, groups)), Ok(events)) => {
+            let output =
+                TransactionOutput::new(write_set, events, gas_used, status, auxiliary_data);
+            Ok((output, groups))
+        },
+        (writes, events) => {
+            let failures = writes
+                .err()
+                .into_iter()
+                .chain(events.err())
+                .flatten()
+                .collect();
+            Err(MaterializationError::of_executed(failures, status))
+        },
+    }
 }
 
 /// Creates the output of a discarded transaction: empty, carrying the reason.
@@ -92,25 +114,30 @@ fn drain_write_set(
     effects: &SessionEffects,
     layouts: &impl LayoutProvider,
     provider: &dyn AptosDataProvider,
-) -> Result<(WriteSet, MaterializedGroups), Vec<String>> {
+) -> Result<(WriteSet, MaterializedGroups), Vec<MaterializationFailure>> {
     let mut writes: Vec<(StateKey, WriteOp)> = vec![];
     let mut group_ops: HashMap<StateKey, HashMap<StructTag, MemberOp>> = HashMap::new();
     let mut materialized_groups = MaterializedGroups::new();
-    let mut failures: Vec<String> = vec![];
+    let mut failures: Vec<MaterializationFailure> = vec![];
 
     // SAFETY: written pointers refer to live values in the effects' frozen
     // heap, `layouts` describes their interned types, and no GC runs during the
     // drain.
-    let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
-        // SAFETY: forwarded from this function's contract.
-        let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
-            .map_err(|e| format!("failed to serialize written value: {e}"))?;
-        Ok(Bytes::from(blob))
-    };
+    let written_bytes =
+        |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, MaterializationFailure> {
+            // SAFETY: forwarded from this function's contract.
+            let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }.map_err(|e| {
+                MaterializationFailure {
+                    reason: format!("failed to serialize written value: {e}"),
+                    gap: gap(&e),
+                }
+            })?;
+            Ok(Bytes::from(blob))
+        };
     let mut convert = |key: &InMemoryStorageKey,
                        class: WriteClass,
                        group: Option<InternedType>|
-     -> Result<(), String> {
+     -> Result<(), MaterializationFailure> {
         match group {
             None => {
                 let state_key = key.as_state_key().map_err(|e| format!("{e:#}"))?;
@@ -173,18 +200,20 @@ fn drain_write_set(
                 materialized_groups.insert(group_key.clone(), members);
                 writes.push((group_key, op));
             },
-            Err(e) => failures.push(e),
+            Err(e) => failures.push(e.into()),
         }
     }
 
-    if !failures.is_empty() {
-        return Err(failures);
-    }
     // `WriteSet::new` collects into a `BTreeMap`, so we do not need to sort the
     // `writes` vector here.
-    let write_set =
-        WriteSet::new(writes).map_err(|e| vec![format!("failed to build the write set: {e:?}")])?;
-    Ok((write_set, materialized_groups))
+    match WriteSet::new(writes) {
+        Ok(write_set) if failures.is_empty() => Ok((write_set, materialized_groups)),
+        Ok(_) => Err(failures),
+        Err(e) => {
+            failures.push(format!("failed to build the write set: {e:?}").into());
+            Err(failures)
+        },
+    }
 }
 
 /// Merges a group's member ops into a single write for the group's slot, and

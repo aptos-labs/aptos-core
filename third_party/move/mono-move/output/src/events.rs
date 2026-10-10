@@ -10,7 +10,7 @@ use aptos_types::{
     event::EventKey,
 };
 use mono_move_core::{type_tag_of, value_layout::LayoutProvider, VMInternalError, VMResult};
-use mono_move_natives::{EventKind, EventStore};
+use mono_move_natives::{EventEntry, EventKind, EventStore};
 use mono_move_runtime::{serialize, SessionEffects};
 
 /// Whether the effects emitted a reconfiguration (new-epoch) event. Only each
@@ -25,21 +25,33 @@ pub fn has_new_epoch_event(effects: &SessionEffects) -> VMResult<bool> {
     }))
 }
 
-/// Materializes the emitted events into [`ContractEvent`]s, in emission order.
-/// The effects retain every backing allocation reachable from the event values;
-/// `layouts` must describe those values' interned types.
+/// Materializes the emitted events into [`ContractEvent`]s, in emission order,
+/// reporting every event that fails rather than the first, so that one failure
+/// cannot hide another. The effects retain every backing allocation reachable
+/// from the event values; `layouts` must describe those values' interned types.
 //
 // TODO(security): prove at compile time that the execution guard backing
 // `layouts` is held.
 pub fn to_contract_events<L: LayoutProvider + ?Sized>(
     effects: &SessionEffects,
     layouts: &L,
-) -> VMResult<Vec<ContractEvent>> {
-    let store = effects.extension::<EventStore>()?;
-
-    // SAFETY: the effects retain their frozen local heap and `layouts` describes
-    // the event values' types; no GC can run after execution.
-    unsafe { to_contract_events_from_store(&store, layouts) }
+) -> Result<Vec<ContractEvent>, Vec<VMInternalError>> {
+    let store = effects.extension::<EventStore>().map_err(|e| vec![e])?;
+    let mut events = vec![];
+    let mut errors = vec![];
+    for entry in store.entries() {
+        // SAFETY: the effects retain their frozen local heap and `layouts`
+        // describes the event values' types; no GC can run after execution.
+        match unsafe { to_contract_event(entry, layouts) } {
+            Ok(event) => events.push(event),
+            Err(err) => errors.push(err),
+        }
+    }
+    if errors.is_empty() {
+        Ok(events)
+    } else {
+        Err(errors)
+    }
 }
 
 /// Materializes an [`EventStore`] into [`ContractEvent`]s, in emission order.
@@ -56,22 +68,38 @@ pub unsafe fn to_contract_events_from_store<L: LayoutProvider + ?Sized>(
     store
         .entries()
         .iter()
-        .map(|entry| {
-            let type_tag = type_tag_of(entry.msg_ty).ok_or(OutputError::InvalidEventType)?;
-            // SAFETY: forwarded from this function's contract.
-            let data = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }?;
-            let event = match &entry.kind {
-                EventKind::V2 => ContractEvent::new_v2(type_tag, data),
-                EventKind::V1 {
-                    guid,
-                    sequence_number,
-                } => {
-                    let key: EventKey =
-                        bcs::from_bytes(guid).map_err(OutputError::InvalidEventGuid)?;
-                    ContractEvent::new_v1(key, *sequence_number, type_tag, data)
-                },
-            };
-            event.map_err(|e| VMInternalError::new(OutputError::InvalidEvent(e.to_string())))
-        })
+        // SAFETY: forwarded from this function's contract.
+        .map(|entry| unsafe { to_contract_event(entry, layouts) })
         .collect()
+}
+
+/// Materializes one emitted event. The event's key and type are checked before
+/// its payload is serialized, so a payload MonoMove cannot serialize yet does
+/// not hide a malformed key or type.
+///
+/// # Safety
+///
+/// As for [`to_contract_events_from_store`].
+unsafe fn to_contract_event<L: LayoutProvider + ?Sized>(
+    entry: &EventEntry,
+    layouts: &L,
+) -> VMResult<ContractEvent> {
+    let type_tag = type_tag_of(entry.msg_ty).ok_or(OutputError::InvalidEventType)?;
+    let key = match &entry.kind {
+        EventKind::V2 => None,
+        EventKind::V1 {
+            guid,
+            sequence_number,
+        } => Some((
+            bcs::from_bytes::<EventKey>(guid).map_err(OutputError::InvalidEventGuid)?,
+            *sequence_number,
+        )),
+    };
+    // SAFETY: forwarded from this function's contract.
+    let data = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }?;
+    let event = match key {
+        None => ContractEvent::new_v2(type_tag, data),
+        Some((key, sequence_number)) => ContractEvent::new_v1(key, sequence_number, type_tag, data),
+    };
+    event.map_err(|e| VMInternalError::new(OutputError::InvalidEvent(e.to_string())))
 }

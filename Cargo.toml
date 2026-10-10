@@ -10,6 +10,7 @@ members = [
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-e2e-comparison-testing",
+    "aptos-move/aptos-e2e-comparison-testing/dump-format",
     "aptos-move/aptos-gas-algebra",
     "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-meter",
@@ -221,7 +222,9 @@ members = [
     "third_party/move/mono-move/natives",
     "third_party/move/mono-move/orchestrator",
     "third_party/move/mono-move/output",
+    "third_party/move/mono-move/replay",
     "third_party/move/mono-move/replay-benchmark",
+    "third_party/move/mono-move/replay-common",
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
     "third_party/move/mono-move/testsuite",
@@ -339,6 +342,7 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
 aptos-collections = { path = "crates/aptos-collections" }
+aptos-comparison-testing-dump-format = { path = "aptos-move/aptos-e2e-comparison-testing/dump-format" }
 aptos-compression = { path = "crates/aptos-compression" }
 aptos-config = { path = "config" }
 aptos-consensus = { path = "consensus" }
@@ -923,6 +927,7 @@ mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }
 mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
 mono-move-output = { path = "third_party/move/mono-move/output" }
+mono-move-replay-common = { path = "third_party/move/mono-move/replay-common" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }
 move-abigen = { path = "third_party/move/tools/move-abigen" }

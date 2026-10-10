@@ -11,7 +11,7 @@
 pub mod capture;
 pub mod compare;
 pub mod data;
-pub mod gas;
+pub use mono_move_replay_common::gas;
 pub mod report;
 pub mod timing;
 pub mod v1;

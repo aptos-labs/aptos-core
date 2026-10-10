@@ -18,7 +18,8 @@ use mono_move_core::{
     VMInternalError,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoaderError, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_output::gap::gap;
 use mono_move_runtime::{
     serialize, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects,
     WriteClass,
@@ -135,26 +136,9 @@ impl From<VMInternalError> for RunError {
     // value equality) surface as `LoweringError` invariant violations, not as
     // skips, so they still render as VM statuses here.
     fn from(err: VMInternalError) -> Self {
-        if let Some(RuntimeError::Unsupported(what)) = err.downcast_ref::<RuntimeError>() {
-            return RunError::VmUnsupported(what.to_string());
-        }
-        match err.downcast_ref::<LoaderError>() {
-            Some(LoaderError::LoweringSkipped { reason }) => {
-                RunError::VmUnsupported(reason.to_string())
-            },
-            Some(
-                gap @ (LoaderError::NativeFunctionNotLoadable { .. }
-                | LoaderError::ResourceLayoutNotDerivable),
-            ) => RunError::VmUnsupported(gap.to_string()),
-            Some(
-                LoaderError::ModuleNotFound { .. }
-                | LoaderError::FunctionNotFound { .. }
-                | LoaderError::ScriptDeserializationFailed { .. }
-                | LoaderError::ScriptVerificationFailed { .. }
-                | LoaderError::GlobalContext(_)
-                | LoaderError::InvariantViolation(_),
-            )
-            | None => RunError::Vm(err),
+        match gap(&err) {
+            Some(gap) => RunError::VmUnsupported(gap.message),
+            None => RunError::Vm(err),
         }
     }
 }

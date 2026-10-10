@@ -894,6 +894,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-block-executor",
+ "aptos-comparison-testing-dump-format",
  "aptos-framework",
  "aptos-language-e2e-tests",
  "aptos-replay-benchmark",
@@ -911,11 +912,21 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-package",
- "rocksdb",
- "serde",
  "tempfile",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "aptos-comparison-testing-dump-format"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-types",
+ "bcs 0.1.4",
+ "rocksdb",
+ "serde",
+ "tempfile",
 ]
 
 [[package]]
@@ -13140,11 +13151,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-replay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-comparison-testing-dump-format",
+ "aptos-crypto",
+ "aptos-gas-algebra",
+ "aptos-gas-meter",
+ "aptos-gas-schedule",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-memory-usage-tracker",
+ "aptos-move-debugger",
+ "aptos-rest-client",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-vm-environment",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "clap 4.5.60",
+ "futures",
+ "hex",
+ "libc",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-output",
+ "mono-move-replay-common",
+ "mono-move-testsuite",
+ "move-binary-format",
+ "move-core-types",
+ "reqwest 0.11.23",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "mono-move-replay-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-cached-packages",
  "aptos-logger",
  "aptos-move-debugger",
  "aptos-rest-client",
@@ -13159,10 +13214,26 @@ dependencies = [
  "mono-move-aptos-state-view-providers",
  "mono-move-aptos-transaction-executor",
  "mono-move-global-context",
- "mono-move-testsuite",
+ "mono-move-replay-common",
  "move-binary-format",
  "move-core-types",
  "tokio",
+]
+
+[[package]]
+name = "mono-move-replay-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-infallible",
+ "aptos-rest-client",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "clap 4.5.60",
+ "mono-move-testsuite",
+ "move-binary-format",
+ "move-core-types",
  "url",
 ]
 

@@ -28,6 +28,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::view_module_id,
+    storage::resource_provider::ResourceProviderError,
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
     LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout, ENUM_DATA_OFFSET,
 };
@@ -406,6 +407,50 @@ pub unsafe fn deserialize_into<T: LayoutProvider + ?Sized>(
 fn blittable(layout: &ValueLayout, untrusted: bool) -> bool {
     layout.all_byte_patterns_valid()
         && !(untrusted && matches!(layout.kind, LayoutKind::Struct { .. }))
+}
+
+/// The provider error for a stored value [`deserialize_into`] rejected because it uses a feature
+/// MonoMove does not support yet, so it is reported as that rather than as an invariant violation.
+pub fn unsupported_stored_value(err: &VMInternalError) -> Option<ResourceProviderError> {
+    use RuntimeError as E;
+    match err.downcast_ref::<RuntimeError>()? {
+        E::Unsupported(what) => Some(ResourceProviderError::Unsupported(what)),
+        // Exhaustive, so a new variant for an unsupported feature is classified here too.
+        E::ArithmeticOverflow { .. }
+        | E::ArithmeticUnderflow { .. }
+        | E::DivisionByZero { .. }
+        | E::DivisionOverflow { .. }
+        | E::ShiftAmountOutOfRange { .. }
+        | E::ArithmeticUnderOverflow { .. }
+        | E::NegateMinOverflow { .. }
+        | E::CastOutOfRange { .. }
+        | E::PopFromEmptyVector
+        | E::VecUnpackLengthMismatch { .. }
+        | E::VectorIndexOutOfBounds { .. }
+        | E::ResourceDoesNotExist { .. }
+        | E::ResourceAlreadyExists { .. }
+        | E::EnumVariantMismatch { .. }
+        | E::StackOverflow
+        | E::OutOfHeapMemory { .. }
+        | E::AllocationTooLarge { .. }
+        | E::VecAllocSizeOverflow
+        | E::InvalidAbortMessage { .. }
+        | E::AbortMessageTooLong { .. }
+        | E::StateKeyTypeTooDeep
+        | E::InvariantViolation(_)
+        | E::ResourceProvider(_)
+        | E::BCSEof
+        | E::BCSInvalidUleb
+        | E::BCSSequenceTooLong { .. }
+        | E::BCSRemainingInput { .. }
+        | E::BCSInvalidBool { .. }
+        | E::BCSInvalidEnumTag { .. }
+        | E::BCSSignerNotDeserializable
+        | E::MalformedStringArgument
+        | E::ObjectArgumentDoesNotExist
+        | E::ObjectArgumentLacksResource
+        | E::ArgumentStorageRead(_) => None,
+    }
 }
 
 /// # Safety
