@@ -151,9 +151,20 @@ spec aptos_framework::transaction_context {
         aborts_if [abstract] false;
     }
 
+    spec module {
+        /// The value the counter returned last. Callers use it to state that a value
+        /// they hold was issued earlier, and hence differs from any value issued later.
+        global spec_counter_last: num;
+    }
+
     spec monotonically_increasing_counter(): u128 {
         pragma opaque;
         // Assume that the monotonically increasing counter is always increasing.
         aborts_if [abstract] false;
+        // The value is timestamp, transaction index, session counter and local counter,
+        // most significant first, so each value exceeds every earlier one. Stated only
+        // below the top of the range, where a larger value exists.
+        ensures [abstract] old(spec_counter_last) < MAX_U128 ==> result > old(spec_counter_last);
+        ensures [abstract] spec_counter_last == result;
     }
 }
