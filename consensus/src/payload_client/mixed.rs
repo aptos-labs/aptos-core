@@ -146,7 +146,8 @@ mod tests {
                     99,                     // max_unique_items
                     99,
                     50,
-                    500000, // inline limit: 500KB
+                    500000,   // inline limit: 500KB
+                    u64::MAX, // max_num_batch_entries
                     PayloadFilter::Empty,
                     false,
                     0,
@@ -173,7 +174,8 @@ mod tests {
                     99,                         // max_unique_items
                     99,
                     50,
-                    500000, // inline limit: 500KB
+                    500000,   // inline limit: 500KB
+                    u64::MAX, // max_num_batch_entries
                     PayloadFilter::Empty,
                     false,
                     0,
@@ -200,7 +202,8 @@ mod tests {
                     2,                      // max_unique_items
                     2,
                     0,
-                    0, // inline limit: 0
+                    0,        // inline limit: 0
+                    u64::MAX, // max_num_batch_entries
                     PayloadFilter::Empty,
                     false,
                     0,
@@ -228,6 +231,7 @@ mod tests {
                     30,
                     10,
                     all_validator_txns[0].size_in_bytes() as u64,
+                    u64::MAX, // max_num_batch_entries
                     PayloadFilter::Empty,
                     false,
                     0,
@@ -272,7 +276,8 @@ mod tests {
                     99,                        // max_unique_items
                     99,
                     50,
-                    500000, // inline limit: 500KB
+                    500000,   // inline limit: 500KB
+                    u64::MAX, // max_num_batch_entries
                     PayloadFilter::Empty,
                     false,
                     0,

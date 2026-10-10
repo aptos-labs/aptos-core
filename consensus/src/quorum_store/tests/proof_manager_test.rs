@@ -58,6 +58,15 @@ async fn get_proposal(
     max_txns: u64,
     filter: &[BatchInfoExt],
 ) -> Payload {
+    get_proposal_with_entry_limit(proof_manager, max_txns, filter, u64::MAX).await
+}
+
+async fn get_proposal_with_entry_limit(
+    proof_manager: &mut ProofManager,
+    max_txns: u64,
+    filter: &[BatchInfoExt],
+    max_num_batch_entries: u64,
+) -> Payload {
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
     let req = GetPayloadCommand::GetPayloadRequest(GetPayloadRequest {
@@ -65,6 +74,7 @@ async fn get_proposal(
         max_txns_after_filtering: max_txns,
         soft_max_txns_after_filtering: max_txns,
         max_inline_txns: PayloadTxnsSize::new(max(max_txns / 2, 1), 100000),
+        max_num_batch_entries,
         filter: PayloadFilter::InQuorumStore(filter_set),
         callback: callback_tx,
         block_timestamp: aptos_infallible::duration_since_epoch(),
@@ -120,6 +130,34 @@ async fn get_proposal_and_assert(
         None,
         None,
     );
+}
+
+#[tokio::test]
+async fn test_proposal_respects_batch_entry_limit() {
+    let mut proof_manager = create_proof_manager();
+
+    // Add more proofs than the batch entry limit allows
+    let max_num_batch_entries = 4;
+    let num_proofs = 10;
+    let proofs: Vec<_> = (0..num_proofs)
+        .map(|i| create_proof(PeerId::random(), 10, i))
+        .collect();
+    proof_manager.receive_proofs(proofs);
+
+    // Pull a proposal with a transaction budget large enough for all the proofs
+    let payload =
+        get_proposal_with_entry_limit(&mut proof_manager, 100, &[], max_num_batch_entries).await;
+
+    // Verify that the payload only contains as many entries as the limit allows
+    match payload {
+        Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+            let num_entries = p.proof_with_data().batch_summary.len()
+                + p.inline_batches().len()
+                + p.opt_batches().batch_summary.len();
+            assert_eq!(num_entries as u64, max_num_batch_entries);
+        },
+        payload => panic!("Unexpected payload variant: {:?}", payload),
+    }
 }
 
 #[tokio::test]

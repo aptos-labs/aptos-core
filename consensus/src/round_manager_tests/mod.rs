@@ -438,6 +438,7 @@ impl NodeSetup {
             PayloadTxnsSize::new(20, 1000),
             10,
             PayloadTxnsSize::new(5, 500),
+            u64::MAX,
             10,
             1,
             Some(30_000),

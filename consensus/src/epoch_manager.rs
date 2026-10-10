@@ -1058,6 +1058,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.max_sending_inline_txns,
                 self.config.max_sending_inline_bytes,
             ),
+            self.config.max_sending_num_batch_entries,
             onchain_consensus_config.max_failed_authors_to_store(),
             self.config
                 .min_max_txns_in_block_after_filtering_from_backpressure,
@@ -1850,6 +1851,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let max_batch_txns = self.config.quorum_store.receiver_max_batch_txns as u64;
             let max_batch_bytes = self.config.quorum_store.receiver_max_batch_bytes as u64;
+            let max_num_batch_entries = self.config.max_receiving_num_batch_entries;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
@@ -1867,6 +1869,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             max_batch_expiry_gap_usecs,
                             max_batch_txns,
                             max_batch_bytes,
+                            max_num_batch_entries,
                             encrypted_enabled,
                         )
                     ) {
