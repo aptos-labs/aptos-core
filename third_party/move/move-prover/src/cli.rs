@@ -267,6 +267,7 @@ impl Options {
                 )
                 .to_vec(),
                 module_instance_names: options::custom_native_options(),
+                provides_cmp_model: true,
             });
             self.move_named_address_values
                 .push("Extensions=0x1".to_string());

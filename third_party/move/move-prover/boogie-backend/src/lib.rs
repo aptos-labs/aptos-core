@@ -100,6 +100,11 @@ struct TypeInfo {
     /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
     /// avoid undeclared-function errors.
     cmp_available: bool,
+    /// True iff comparing values of this type walks a vector, an intrinsic map or a
+    /// function value (see `mono_analysis::compare_reaches_vector`). Vector comparison is
+    /// costly for the solver and the other two have no comparison model, so facts that
+    /// only help proofs, rather than define a role, are not emitted for such keys.
+    cmp_reaches_vector: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -511,6 +516,27 @@ pub fn add_prelude(
         filtered.into_iter().flatten().collect_vec()
     };
     let mut cmp_instances = filter_native_with_contained_types(CMP_MODULE);
+    // Adding the position-read keys is only possible when a custom template declares
+    // `compare` and `Ordering`; otherwise they would reference undeclared functions.
+    if options
+        .custom_natives
+        .as_ref()
+        .is_some_and(|natives| natives.provides_cmp_model)
+    {
+        for ty in &mono_info.position_read_keys {
+            for bv_flag in [false, true] {
+                cmp_instances.extend(
+                    ty.get_all_contained_types_with_skip_reference(env)
+                        .into_iter()
+                        .filter(|i| !bv_flag || !never_renders_bv(i))
+                        .map(|i| {
+                            let info = TypeInfo::new(env, options, &i, bv_flag);
+                            (i, info)
+                        }),
+                );
+            }
+        }
+    }
     cmp_instances.sort();
     cmp_instances.dedup();
     // Mark each MapImpl's K as `cmp_available` when its suffix is in `cmp_instances`,
@@ -609,6 +635,7 @@ impl TypeInfo {
             is_bv: bv_flag && ty.is_number(),
             is_type_param: matches!(ty, Type::TypeParameter(_)),
             cmp_available: false,
+            cmp_reaches_vector: mono_analysis::compare_reaches_vector(env, ty),
         }
     }
 }

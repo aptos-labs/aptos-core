@@ -75,6 +75,10 @@ pub struct CustomNativeOptions {
     /// List of (module name, module instance key, single_type_expected) tuples,
     /// used to generate instantiated versions of generic native functions.
     pub module_instance_names: Vec<(String, String, bool)>,
+    /// Whether the template declares the `cmp` comparison model (`$1.cmp.Ordering` and
+    /// `$1.cmp.$compare`). Facts stated through `compare` are emitted only when it does.
+    #[serde(default)]
+    pub provides_cmp_model: bool,
 }
 
 pub fn custom_native_options() -> Vec<(String, String, bool)> {

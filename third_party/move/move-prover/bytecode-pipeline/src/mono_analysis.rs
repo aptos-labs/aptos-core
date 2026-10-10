@@ -134,6 +134,10 @@ pub struct MonoInfo {
     /// callee. `info.funs` isn't populated for these callees, so post-passes use this
     /// map to ask which intrinsic roles were called and with which type args.
     pub intrinsic_calls: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
+    /// Key types of key-ordered maps whose positions a spec reads. Their order facts
+    /// need `cmp::compare<K>`, which only the backend can tell is declared, so they are
+    /// kept apart from `native_inst`; the backend adds them to its `cmp` instances.
+    pub position_read_keys: BTreeSet<Type>,
     pub all_types: BTreeSet<Type>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
     /// A map from function types used in the program to the closures appearing in
@@ -261,6 +265,7 @@ impl MonoAnalysisProcessor {
             node_deps: BTreeMap::new(),
             node_types: BTreeMap::new(),
             selected_root: root,
+            native_spec_fun_insts: BTreeSet::new(),
         };
         // Analyze axioms found in modules.
         for module_env in env.get_modules() {
@@ -404,6 +409,9 @@ struct Analyzer<'a> {
     node_deps: BTreeMap<MonoNode, BTreeSet<MonoNode>>,
     node_types: BTreeMap<MonoNode, BTreeSet<Type>>,
     selected_root: Option<VerificationRoot>,
+    /// Instantiations of native spec functions reached from this analysis, by function.
+    /// `info.native_inst` keeps them only per module.
+    native_spec_fun_insts: BTreeSet<(QualifiedId<SpecFunId>, Vec<Type>)>,
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -441,6 +449,35 @@ fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
         }
     }
     None
+}
+
+/// Whether comparing values of `ty` reaches a vector or an intrinsic map, directly or
+/// through a field. Intrinsic structs are judged as maps, not by their declared Move
+/// fields: their comparison has no model.
+pub fn compare_reaches_vector(env: &GlobalEnv, ty: &Type) -> bool {
+    match ty {
+        Type::Vector(_) => true,
+        // Function values have no comparison model here; treat them like vectors so
+        // the facts that need one are not emitted.
+        Type::Fun(..) => true,
+        Type::Reference(_, inner) => compare_reaches_vector(env, inner),
+        Type::Tuple(elems) => elems.iter().any(|elem| compare_reaches_vector(env, elem)),
+        Type::Struct(mid, sid, targs) => {
+            let qid = mid.qualified(*sid);
+            env.get_intrinsics().get_decl_for_struct(&qid).is_some()
+                || env
+                    .get_struct(qid)
+                    .get_fields()
+                    .any(|field| compare_reaches_vector(env, &field.get_type().instantiate(targs)))
+        },
+        Type::Primitive(_)
+        | Type::TypeParameter(_)
+        | Type::TypeDomain(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => false,
+    }
 }
 
 /// How a data invariant can observe hidden validity slots: by (transitively)
@@ -515,6 +552,7 @@ impl Analyzer<'_> {
         let mut option_v_to_register: Vec<Type> = vec![];
         let mut option_k_to_register: Vec<Type> = vec![];
         let mut cmp_k_to_register: Vec<Type> = vec![];
+        let mut position_read_keys: Vec<Type> = vec![];
         let mut vec_k_to_register: Vec<Type> = vec![];
         let mut iter_ptr_to_register: Vec<Type> = vec![];
         let mut spec_fun_to_register: Vec<(QualifiedId<SpecFunId>, Vec<Type>)> = vec![];
@@ -529,6 +567,26 @@ impl Analyzer<'_> {
             if needs_option_v {
                 for (_k, v) in ty_args.iter() {
                     option_v_to_register.push(v.clone());
+                }
+            }
+            // The key-ordered enumeration ascends under `cmp::compare<K>`, and that
+            // axiom is stated through `compare`. A spec that reads positions needs it
+            // even when no ordering role is called, so a use of the sorted `key_at`
+            // records K for the backend, which registers `compare<K>` when `compare`
+            // is declared. The map's own frame clauses read positions too, so this
+            // reaches most keyed maps; keys for which `compare_reaches_vector` holds
+            // (a vector, an intrinsic map or a function value) are skipped, since
+            // their comparison is costly or has no model, and they keep the
+            // behaviour of an uncalled ordering role.
+            if let Some(key_at) = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT) {
+                for (sf, actuals) in &self.native_spec_fun_insts {
+                    if *sf == key_at {
+                        if let Some(k) = actuals.first() {
+                            if !compare_reaches_vector(self.env, k) {
+                                position_read_keys.push(k.clone());
+                            }
+                        }
+                    }
                 }
             }
             let needs_vec_k = vec_k_roles_eager
@@ -1161,7 +1219,11 @@ impl Analyzer<'_> {
                 .flatten()
                 .filter_map(|inst| inst.first().cloned())
                 .collect::<Vec<_>>();
-            for ty in existing_cmp_ks.iter().chain(cmp_k_to_register.iter()) {
+            for ty in existing_cmp_ks
+                .iter()
+                .chain(cmp_k_to_register.iter())
+                .chain(position_read_keys.iter())
+            {
                 cmp_closure.extend(ty.get_all_contained_types_with_skip_reference(self.env));
             }
             for (struct_qid, ty_args) in self.info.table_inst.iter() {
@@ -1200,6 +1262,7 @@ impl Analyzer<'_> {
                     .insert(vec![ty]);
             }
         }
+        self.info.position_read_keys.extend(position_read_keys);
         for (spec_fun_qid, ty_args) in spec_fun_to_register {
             self.info
                 .spec_funs
@@ -2086,6 +2149,8 @@ impl Analyzer<'_> {
                 }
 
                 if spec_fun.is_native && !actuals.is_empty() {
+                    self.native_spec_fun_insts
+                        .insert((mid.qualified(*fid), actuals.clone()));
                     // Add module to native modules
                     self.info
                         .native_inst

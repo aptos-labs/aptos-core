@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/intrinsic_map_insertion_keys.move:52:9
+   │
+52 │         ensures len(result) == 2 ==> result[0] < result[1];
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/intrinsic_map_insertion_keys.move:46: keys_in_insertion_order
+   =         m = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_keys.move:47: keys_in_insertion_order
+   =         m = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_keys.move:48: keys_in_insertion_order
+   =         m = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_keys.move:49: keys_in_insertion_order
+   =     at tests/sources/functional/intrinsic_map_insertion_keys.move:45: keys_in_insertion_order
+   =         result = <redacted>
+   =     at tests/sources/functional/intrinsic_map_insertion_keys.move:52: keys_in_insertion_order (spec)
