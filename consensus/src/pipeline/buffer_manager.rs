@@ -924,7 +924,18 @@ impl BufferManager {
     fn need_back_pressure(&self) -> bool {
         const MAX_BACKLOG: Round = 20;
 
-        self.back_pressure_enabled && self.highest_committed_round + MAX_BACKLOG < self.latest_round
+        // A pending commit proof is for a block the network has already committed but that has
+        // not reached this buffer yet (e.g. ordered blocks replayed from ConsensusDB after a
+        // restart). Keep ingesting until that block arrives. Otherwise the proof can never be
+        // applied, nothing commits, and the backlog never drains.
+        let waiting_for_proof_block = self
+            .pending_commit_proofs
+            .last_key_value()
+            .is_some_and(|(round, _)| *round > self.latest_round);
+
+        self.back_pressure_enabled
+            && self.highest_committed_round + MAX_BACKLOG < self.latest_round
+            && !waiting_for_proof_block
     }
 
     pub async fn start(mut self) {
