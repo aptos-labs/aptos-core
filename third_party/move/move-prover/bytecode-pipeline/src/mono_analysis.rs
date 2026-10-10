@@ -574,8 +574,9 @@ impl Analyzer<'_> {
             // even when no ordering role is called, so a use of the sorted `key_at`
             // records K for the backend, which registers `compare<K>` when `compare`
             // is declared. The map's own frame clauses read positions too, so this
-            // reaches most keyed maps; keys whose comparison walks a vector are
-            // skipped, since that model is costly for the solver and they keep the
+            // reaches most keyed maps; keys for which `compare_reaches_vector` holds
+            // (a vector, an intrinsic map or a function value) are skipped, since
+            // their comparison is costly or has no model, and they keep the
             // behaviour of an uncalled ordering role.
             if let Some(key_at) = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT) {
                 for (sf, actuals) in &self.native_spec_fun_insts {

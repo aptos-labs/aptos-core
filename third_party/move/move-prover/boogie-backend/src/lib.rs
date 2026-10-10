@@ -100,9 +100,10 @@ struct TypeInfo {
     /// types in `MapImpl::insts`; templates referencing cmp for K must guard on this to
     /// avoid undeclared-function errors.
     cmp_available: bool,
-    /// True iff comparing values of this type walks a vector. The element-wise vector
-    /// comparison is costly for the solver, so facts that only help proofs, rather than
-    /// define a role, are not emitted for such keys.
+    /// True iff comparing values of this type walks a vector, an intrinsic map or a
+    /// function value (see `mono_analysis::compare_reaches_vector`). Vector comparison is
+    /// costly for the solver and the other two have no comparison model, so facts that
+    /// only help proofs, rather than define a role, are not emitted for such keys.
     cmp_reaches_vector: bool,
 }
 

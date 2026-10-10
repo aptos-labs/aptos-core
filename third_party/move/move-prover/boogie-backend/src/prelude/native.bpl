@@ -815,8 +815,9 @@ procedure {:inline 2} {{impl.fun_keys}}{{S}}(t: ({{Self}})) returns (result: Vec
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)));
-{%- if instance.0.cmp_available %}
-    // Keys are returned in ascending `cmp::compare` order.
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+    // Keys are returned in ascending `cmp::compare` order. An insertion-ordered map
+    // returns them in insertion order instead.
     assume (forall i: int, j: int :: {ReadVec(result, i), ReadVec(result, j)}
         InRangeVec(result, i) ==> InRangeVec(result, j) ==> i < j ==>
         $1.cmp.$compare'{{instance.0.suffix}}'(ReadVec(result, i), ReadVec(result, j)) == $1.cmp.Ordering.Less());
@@ -867,8 +868,9 @@ procedure {:inline 2} {{impl.fun_to_vec_pair}}{{S}}(t: ({{Self}})) returns (resu
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i != j ==>
         !$IsEqual'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)));
-{%- if instance.0.cmp_available %}
-    // Keys are returned in ascending `cmp::compare` order.
+{%- if instance.0.cmp_available and not impl.insertion_ordered %}
+    // Keys are returned in ascending `cmp::compare` order. An insertion-ordered map
+    // returns them in insertion order instead.
     assume (forall i: int, j: int :: {ReadVec(result_keys, i), ReadVec(result_keys, j)}
         InRangeVec(result_keys, i) ==> InRangeVec(result_keys, j) ==> i < j ==>
         $1.cmp.$compare'{{instance.0.suffix}}'(ReadVec(result_keys, i), ReadVec(result_keys, j)) == $1.cmp.Ordering.Less());
