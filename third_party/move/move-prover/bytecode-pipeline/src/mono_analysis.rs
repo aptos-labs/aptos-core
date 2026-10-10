@@ -136,7 +136,7 @@ pub struct MonoInfo {
     pub intrinsic_calls: BTreeMap<QualifiedId<FunId>, BTreeSet<Vec<Type>>>,
     /// Key types of key-ordered maps whose positions a spec reads. Their order facts
     /// need `cmp::compare<K>`, which only the backend can tell is declared, so they are
-    /// kept apart from `native_inst` and added there by the backend.
+    /// kept apart from `native_inst`; the backend adds them to its `cmp` instances.
     pub position_read_keys: BTreeSet<Type>,
     pub all_types: BTreeSet<Type>,
     pub axioms: Vec<(Condition, Vec<Vec<Type>>)>,
@@ -457,7 +457,11 @@ fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
 pub fn compare_reaches_vector(env: &GlobalEnv, ty: &Type) -> bool {
     match ty {
         Type::Vector(_) => true,
+        // Function values have no comparison model here; treat them like vectors so
+        // the facts that need one are not emitted.
+        Type::Fun(..) => true,
         Type::Reference(_, inner) => compare_reaches_vector(env, inner),
+        Type::Tuple(elems) => elems.iter().any(|elem| compare_reaches_vector(env, elem)),
         Type::Struct(mid, sid, targs) => {
             let qid = mid.qualified(*sid);
             env.get_intrinsics().get_decl_for_struct(&qid).is_some()
@@ -466,7 +470,13 @@ pub fn compare_reaches_vector(env: &GlobalEnv, ty: &Type) -> bool {
                     .get_fields()
                     .any(|field| compare_reaches_vector(env, &field.get_type().instantiate(targs)))
         },
-        _ => false,
+        Type::Primitive(_)
+        | Type::TypeParameter(_)
+        | Type::TypeDomain(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => false,
     }
 }
 

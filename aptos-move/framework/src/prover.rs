@@ -455,5 +455,6 @@ pub fn configure_aptos_custom_natives(options: &mut Options) {
         Some(move_prover_boogie_backend::options::CustomNativeOptions {
             template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
             module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+            provides_cmp_model: true,
         });
 }

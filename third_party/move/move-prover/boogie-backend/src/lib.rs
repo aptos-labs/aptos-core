@@ -515,9 +515,13 @@ pub fn add_prelude(
         filtered.into_iter().flatten().collect_vec()
     };
     let mut cmp_instances = filter_native_with_contained_types(CMP_MODULE);
-    // `compare` and `Ordering` are declared by the Aptos natives template; without it,
-    // adding the position-read keys would only reference undeclared functions.
-    if options.custom_natives.is_some() {
+    // Adding the position-read keys is only possible when a custom template declares
+    // `compare` and `Ordering`; otherwise they would reference undeclared functions.
+    if options
+        .custom_natives
+        .as_ref()
+        .is_some_and(|natives| natives.provides_cmp_model)
+    {
         for ty in &mono_info.position_read_keys {
             for bv_flag in [false, true] {
                 cmp_instances.extend(

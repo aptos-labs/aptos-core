@@ -579,7 +579,11 @@ procedure {:inline 2} {{impl.fun_has_key}}{{S}}(t: ({{Self}}), k: {{K}}) returns
      would fail Boogie name resolution (`is_bv` is a Boogie-level tag, not a Move
      type, so no registration path mints e.g. `Option'bv64'`); for the rest it
      would only bloat every shard's prelude. Bit-vector-classified maps are not
-     supported through these roles. #}
+     supported through these roles.
+   - `not instance.0.cmp_reaches_vector`: skips facts that only help proofs (the
+     end-position bounds and the insertion survival assumes) for keys whose comparison
+     walks a vector or an intrinsic map. Each instantiation of such a key's `compare`
+     is costly for the solver, and an intrinsic map has no comparison model. #}
 {%- if impl.fun_get != "" and not instance.1.is_bv %}
 // Read-only lookup. Returns `Some(value)` when `k` is in the map, `None` otherwise.
 // Never aborts.
