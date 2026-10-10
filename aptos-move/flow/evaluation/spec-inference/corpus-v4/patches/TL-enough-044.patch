@@ -1,0 +1,23 @@
+diff --git a/sources/framework/extracted_transaction_limits.move b/sources/framework/extracted_transaction_limits.move
+index 451fa28fdb..4437c2c365 100644
+--- a/sources/framework/extracted_transaction_limits.move
++++ b/sources/framework/extracted_transaction_limits.move
+@@ -152,4 +152,18 @@ module aptos_framework::extracted_transaction_limits {
+             stake_amount >= io_threshold, error::permission_denied(EINSUFFICIENT_STAKE)
+         );
+     }
++
++    spec module {
++        /// The first tier whose multiplier covers the request.
++        fun covers(tiers: vector<TxnLimitTier>, multiplier_percent: u64, j: num): bool {
++            tiers[j].multiplier_percent >= multiplier_percent
++        }
++    }
++
++    spec find_min_stake_required {
++        pragma opaque;
++        aborts_if !(exists j in 0..len(tiers): covers(tiers, multiplier_percent, j));
++        // The least covering tier, not the cheapest one.
++        ensures result == tiers[choose min j in 0..len(tiers) where covers(tiers, multiplier_percent, j)].min_stake;
++    }
+ }

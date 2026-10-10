@@ -37,4 +37,5 @@ fun run(): u64
 // Reading y on an Fa must abort with a variant mismatch on BOTH VMs, before
 // boom() runs (not boom()'s code 777).
 // RUN: execute 0x55::chain_abort_order::run
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch

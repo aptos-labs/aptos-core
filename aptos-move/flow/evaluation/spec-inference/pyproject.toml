@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "move-spec-inference-evaluation"
+version = "0.1.0"
+description = "Reproducible controller, judge, and corpus builder for Move specification inference"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+claude = ["claude-agent-sdk==0.2.139"]
+
+[project.scripts]
+move-inference-eval = "harness.controller:main"
+move-inference-corpus = "harness.corpus:main"
+move-inference-schedule = "harness.schedule:main"
+move-inference-judge = "harness.judge:main"
+move-inference-mutants = "harness.mutants:main"
+move-inference-check-compatibility = "harness.compatibility:main"
+move-inference-replace-task = "harness.replacement:main"
+move-inference-prepare-corpus = "harness.prepare:main"
+move-inference-catalog-corpus = "harness.catalog:main"
+move-inference-consolidate-corpus = "harness.consolidate:main"
+move-inference-screen-corpus = "harness.screen:main"
+move-inference-merge-screening = "harness.ledger:main"
+move-inference-stage-reviews = "harness.review_stage:main"
+move-inference-audit-reviews = "harness.review_audit:main"
+move-inference-pilot = "harness.pilot:main"
+move-inference-audit-pilot = "harness.pilot_audit:main"
+move-inference-mine-transcripts = "harness.mine:main"
+move-inference-failure-taxonomy = "harness.taxonomy:main"
+move-inference-preflight-pilot = "harness.pilot_preflight:main"
+move-inference-run-pilot = "harness.pilot_run:main"
+move-inference-pilot-sandbox = "harness.pilot_sandbox:main"
+move-inference-audit-warnings = "harness.warning_audit:main"
+move-inference-refresh-corpus = "harness.refresh:main"
+move-inference-verify-dependency-contracts = "harness.verify_dependency_contracts:main"
+move-inference-restore-reference-contracts = "harness.restore_reference_contracts:main"
+move-inference-reset-reference-specs = "harness.reset_reference_specs:main"
+move-inference-clean-unused-aliases = "harness.clean_unused_aliases:main"
+
+[tool.setuptools]
+packages = ["harness"]

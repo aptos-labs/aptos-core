@@ -16,7 +16,7 @@ use move_core_types::vm_status::StatusCode;
 fn run_binary_test(name: &str, bytes: &str) -> VMResult<()> {
     let bytes = hex::decode(bytes).expect("invalid hex string");
     let m = CompiledModule::deserialize(&bytes).expect("invalid module");
-    verifier::verify_module_with_config_for_test(name, &VerifierConfig::production(), &m)
+    verifier::verify_module_with_config_for_test(name, &VerifierConfig::production_testing(), &m)
 }
 
 #[test]

@@ -9,7 +9,7 @@ use crate::{
                 SystemSessionChangeSet, UserSessionChangeSet,
             },
         },
-        AptosMoveResolver, SessionId,
+        AptosMoveResolver,
     },
     transaction_metadata::TransactionMetadata,
     AptosVM,
@@ -79,7 +79,7 @@ impl<'r> EpilogueSession<'r> {
         module_write_set: ModuleWriteSet,
         storage_refund: Fee,
     ) -> Self {
-        let session_id = SessionId::epilogue_meta(txn_meta);
+        let session_id = txn_meta.epilogue_session_id();
         let session = RespawnedSession::spawn(
             vm,
             session_id,

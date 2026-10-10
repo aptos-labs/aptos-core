@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: DEPRECATED. will be removed
+   ┌─ tests/checking/receiver/generic_calls_typed.move:30:35
+   │
+30 │         s.receiver_needs_type_args::<u64, u8>(x);
+   │                                   ^^ The `::` qualifier is obsolete since Move 2.2
+
+warning: DEPRECATED. will be removed
+   ┌─ tests/checking/receiver/generic_calls_typed.move:31:35
+   │
+31 │         s.receiver_needs_type_args::<u64, u8>(x);
+   │                                   ^^ The `::` qualifier is obsolete since Move 2.2
+
 // -- Model dump before first bytecode pipeline
 module 0x42::m {
     struct S<T> {

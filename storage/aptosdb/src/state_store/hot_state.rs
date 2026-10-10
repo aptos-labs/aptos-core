@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::metrics::{
-    COUNTER, GAUGE, HOT_STATE_SHARD_GAUGE, OTHER_TIMERS_SECONDS, SHARD_NAME_BY_ID,
+use crate::{
+    metrics::{COUNTER, GAUGE, HOT_STATE_SHARD_GAUGE, OTHER_TIMERS_SECONDS, SHARD_NAME_BY_ID},
+    state_kv_db::LoadedHotStateShard,
 };
 use anyhow::{ensure, Result};
 use aptos_config::config::HotStateConfig;
@@ -11,10 +12,15 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
-    state::State, state_delta::StateDelta, state_view::hot_state_view::HotStateView,
+    state::{HotStateMetadata, State},
+    state_delta::StateDelta,
+    state_view::hot_state_view::HotStateView,
 };
 use aptos_types::{
-    state_store::{hot_state::THotStateSlot, state_slot::StateSlot, NUM_STATE_SHARDS},
+    state_store::{
+        hot_state::THotStateSlot, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
+        NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 #[cfg(test)]
@@ -145,12 +151,56 @@ impl HotStateView for LayeredHotStateView {
     }
 }
 
+/// Snapshot rows paired with their version and reconstructed LRU metadata.
+/// Keeping them together prevents installing metadata with a different set of rows.
+pub(crate) struct LoadedHotState {
+    state: State,
+    shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
+}
+
+impl LoadedHotState {
+    pub(crate) fn new(
+        version: Version,
+        usage: StateStorageUsage,
+        config: HotStateConfig,
+        loaded: [LoadedHotStateShard; NUM_STATE_SHARDS],
+    ) -> Self {
+        let metadata = std::array::from_fn(|i| {
+            HotStateMetadata::new(
+                loaded[i].head,
+                loaded[i].tail,
+                loaded[i].num_items,
+                loaded[i].total_value_bytes,
+            )
+        });
+        Self {
+            state: State::new_at_version_with_hot_state_metadata(
+                Some(version),
+                usage,
+                config,
+                metadata,
+            ),
+            shards: loaded.map(|shard| shard.map),
+        }
+    }
+
+    /// Builds an empty base while preserving the supplied state's layer family.
+    pub(crate) fn empty(state: State) -> Self {
+        assert!((0..NUM_STATE_SHARDS).all(|i| state.num_hot_items(i) == 0));
+        let shards = std::array::from_fn(|_| DashMap::new());
+        Self { state, shards }
+    }
+
+    pub(crate) fn state(&self) -> &State {
+        &self.state
+    }
+}
+
 enum CommitMsg {
     Commit(State),
-    /// Sent by `hack_reset` to synchronously reset the Committer's `merged_state` and `old_views`.
-    /// The caller blocks on `ack` until the Committer has finished processing the reset.
-    HackReset {
-        state: State,
+    /// Acknowledged after the new base and matching state are published.
+    InstallSnapshot {
+        snapshot: LoadedHotState,
         ack: Sender<()>,
     },
 }
@@ -162,27 +212,18 @@ struct CommittedSnapshot {
 }
 
 pub struct HotState {
-    base: Arc<HotStateBase>,
     committed: Arc<Mutex<CommittedSnapshot>>,
     commit_tx: SyncSender<CommitMsg>,
-    /// Updated by the Committer after each successful DashMap merge. Tests use this to wait for
-    /// the merge to complete before inspecting DashMaps. Only read by test helpers.
+    /// Next version represented by the base, updated after merges and snapshot installation.
+    /// Tests use it to wait before inspecting the base.
     #[cfg(test)]
     merged_version: Arc<AtomicU64>,
 }
 
 impl HotState {
-    pub fn new(state: State, config: HotStateConfig) -> Self {
-        let empty_shards =
-            std::array::from_fn(|_| DashMap::with_capacity(config.max_items_per_shard));
-        Self::new_from_loaded(state, empty_shards)
-    }
-
-    pub fn new_from_loaded(
-        state: State,
-        loaded_shards: [DashMap<HashValue, StateSlot>; NUM_STATE_SHARDS],
-    ) -> Self {
-        let base = Arc::new(HotStateBase::from_loaded(loaded_shards));
+    pub fn new_empty(state: State) -> Self {
+        let LoadedHotState { state, shards } = LoadedHotState::empty(state);
+        let base = Arc::new(HotStateBase::from_loaded(shards));
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
@@ -193,14 +234,13 @@ impl HotState {
         }));
         let merged_version = Arc::new(AtomicU64::new(state.next_version()));
         let commit_tx = Committer::spawn(
-            Arc::clone(&base),
+            base,
             Arc::clone(&committed),
             state,
             Arc::clone(&merged_version),
         );
 
         Self {
-            base,
             committed,
             commit_tx,
             #[cfg(test)]
@@ -208,26 +248,19 @@ impl HotState {
         }
     }
 
-    pub(crate) fn hack_reset(&self, state: State) {
-        {
-            let mut committed = self.committed.lock();
-            committed.state = state.clone();
-            // Reset view to base-only (no delta). hack_reset is only called when no commits are in
-            // flight, so DashMaps and committed state are in sync from the readers' perspective.
-            committed.view = Arc::new(LayeredHotStateView {
-                delta: None,
-                base: Arc::clone(&self.base),
-            });
-        }
-        // Synchronously reset the Committer's merged_state and old_views. Block until processed,
-        // so the caller has a hard guarantee that no stale Committer state remains.
+    /// Publishes a snapshot synchronously; existing reader views remain valid.
+    /// Callers must wait for queued commits to be processed and prevent new commits until return.
+    pub(crate) fn install_snapshot(&self, snapshot: LoadedHotState) {
         let (ack_tx, ack_rx) = std::sync::mpsc::channel();
         self.commit_tx
-            .send(CommitMsg::HackReset { state, ack: ack_tx })
-            .expect("Failed to send reset to hot state committer.");
+            .send(CommitMsg::InstallSnapshot {
+                snapshot,
+                ack: ack_tx,
+            })
+            .expect("Failed to send snapshot installation to hot state committer.");
         ack_rx
             .recv()
-            .expect("Failed to receive reset ack from hot state committer.");
+            .expect("Failed to receive snapshot installation ack from hot state committer.");
     }
 
     pub fn get_committed(&self) -> (Arc<dyn HotStateView>, State) {
@@ -254,9 +287,12 @@ impl HotState {
         }
     }
 
+    /// Returns merged base entries; committed deltas may still be pending.
     #[cfg(test)]
     pub fn get_all_entries(&self, shard_id: usize) -> BTreeMap<HashValue, StateSlot> {
-        self.base.shards[shard_id].iter().collect()
+        self.committed.lock().view.base.shards[shard_id]
+            .iter()
+            .collect()
     }
 }
 
@@ -299,11 +335,11 @@ struct Committer {
     /// is deferred.
     merged_state: State,
 
-    /// Weak refs to all previously published views. Merge is deferred until every one is dropped
-    /// (strong_count == 0). See struct doc.
+    /// Weak refs to previously published views of the current base. Merges wait until these
+    /// readers release their views (strong_count == 0). See struct doc.
     old_views: Vec<Weak<LayeredHotStateView>>,
 
-    /// Shared with HotState; updated after each successful DashMap merge.
+    /// Next version represented by the base, shared with HotState in tests.
     merged_version: Arc<AtomicU64>,
 }
 
@@ -407,26 +443,18 @@ impl Committer {
         info!("HotState committer quitting.");
     }
 
-    /// Process a `HackReset` message: synchronize `merged_state` / `old_views` with the caller and
-    /// ack.
-    ///
-    /// `HackReset` is a hack used by `hack_reset` and is only sent when no commits are in flight,
-    /// so it must be the sole message in the channel. `next_to_commit` asserts this before
-    /// calling.
-    ///
-    // TODO(HotState): The DashMaps and the LRU metadata in `State` are loaded together (from
-    // `load_hot_state_kvs`) but arrive here through separate paths — the DashMaps via
-    // `new_from_loaded` at `PersistedState` construction, the `State` via `hack_reset`. The
-    // assertions below guard against the two getting out of sync. Consider passing them
-    // together through a single path to make consistency structural.
-    fn handle_reset(&mut self, state: State, ack: Sender<()>) {
+    fn install_snapshot(&mut self, snapshot: LoadedHotState) {
+        let LoadedHotState { state, shards } = snapshot;
+        // Retained views need their original base for keys outside their deltas.
+        self.base = Arc::new(HotStateBase::from_loaded(shards));
+
         for i in 0..NUM_STATE_SHARDS {
             let head = state.latest_hot_key(i);
             let tail = state.oldest_hot_key(i);
             assert_eq!(
                 self.base.shards[i].len(),
                 state.num_hot_items(i),
-                "Shard {i}: DashMap/metadata item count mismatch on reset.",
+                "Shard {i}: DashMap/metadata item count mismatch on snapshot installation.",
             );
             match (head, tail) {
                 (None, None) => assert_eq!(
@@ -459,24 +487,40 @@ impl Committer {
         self.merged_state = state;
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);
+        // Views of the old base cannot block merges into the new one.
         self.old_views.clear();
-        let _ = ack.send(());
+
+        {
+            let mut committed = self.committed.lock();
+            committed.state = self.merged_state.clone();
+            // The loaded base already represents this state, so the view needs no delta.
+            committed.view = Arc::new(LayeredHotStateView {
+                delta: None,
+                base: Arc::clone(&self.base),
+            });
+        }
+
+        self.report_size_metrics();
+        self.report_age_metrics();
+        info!(
+            next_version = self.merged_state.next_version(),
+            num_items = self.base.len(),
+            "HotState snapshot installed.",
+        );
     }
 
     fn next_to_commit(&mut self) -> Option<State> {
-        // Block until we receive the first Commit, retrying merges on timeout.
-        // HackReset messages are processed inline — they are only sent when no commits are in
-        // flight, so we assert the channel is empty after processing one.
+        // Wait for commits, retrying deferred merges on timeout.
         let first = loop {
             match self.rx.recv_timeout(DEFERRED_MERGE_RETRY_INTERVAL) {
                 Ok(CommitMsg::Commit(state)) => break state,
-                Ok(CommitMsg::HackReset { state, ack }) => {
+                Ok(CommitMsg::InstallSnapshot { snapshot, ack }) => {
                     assert!(
                         self.rx.try_recv().is_err(),
-                        "HackReset must be the only message in the channel — \
-                         hack_reset is only valid when no commits are in flight."
+                        "Snapshot installation requires an empty commit queue."
                     );
-                    self.handle_reset(state, ack);
+                    self.install_snapshot(snapshot);
+                    let _ = ack.send(());
                 },
                 Err(RecvTimeoutError::Timeout) => {
                     self.try_merge();
@@ -485,7 +529,7 @@ impl Committer {
             }
         };
 
-        // Drain backlog — only the latest Commit matters. HackReset must not appear here.
+        // Each queued state subsumes earlier commits, so only the newest needs publication.
         let mut ret = first;
         let mut n_backlog = 0;
         while let Ok(msg) = self.rx.try_recv() {
@@ -494,11 +538,8 @@ impl Committer {
                     n_backlog += 1;
                     ret = state;
                 },
-                CommitMsg::HackReset { .. } => {
-                    unreachable!(
-                        "HackReset must not appear alongside Commit messages — \
-                         hack_reset is only valid when no commits are in flight."
-                    );
+                CommitMsg::InstallSnapshot { .. } => {
+                    unreachable!("Snapshot installation requires all commits to finish.");
                 },
             }
         }
@@ -601,10 +642,17 @@ impl Committer {
             debug_assert!(self.validate_lru(shard_id).is_ok());
         }
 
-        let total_items = self.base.len();
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
+
+        self.report_size_metrics();
+        self.report_age_metrics();
+    }
+
+    /// Reports item count and key/value bytes in the base, excluding deferred deltas.
+    fn report_size_metrics(&self) {
+        let total_items = self.base.len();
         GAUGE.set_with(&["hot_state_items"], total_items as i64);
         GAUGE.set_with(
             &["hot_state_key_bytes"],
@@ -614,8 +662,6 @@ impl Committer {
             &["hot_state_value_bytes"],
             self.total_value_bytes.iter().sum::<usize>() as i64,
         );
-
-        self.report_age_metrics();
     }
 
     /// Reports per-shard MRU/LRU `hot_since_version` gauges and aggregate max/min LRU across shards.
@@ -917,7 +963,7 @@ mod tests {
     #[test]
     fn test_deferred_merge_basic() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+        let hot_state = HotState::new_empty(state0.clone());
 
         let state1 = build_empty_descendant(&state0, &state0, 0);
         hot_state.enqueue_commit(state1);
@@ -930,7 +976,7 @@ mod tests {
     #[test]
     fn test_deferred_merge_with_lingering_reader() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+        let hot_state = HotState::new_empty(state0.clone());
 
         // Grab a view — this reader holds a strong ref to the initial view.
         let (held_view, _) = hot_state.get_committed();
@@ -977,7 +1023,7 @@ mod tests {
     #[test]
     fn test_try_merge_tracks_replaced_view() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+        let hot_state = HotState::new_empty(state0.clone());
 
         // Hold the initial view (V0_clean). This blocks merge while S1 is committed,
         // keeping V1_delta in committed.view long enough for us to grab it.
@@ -1039,7 +1085,7 @@ mod tests {
     #[test]
     fn test_commit_with_advanced_base_layer() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+        let hot_state = HotState::new_empty(state0.clone());
 
         // Hold a view to block all merges (merged_state stays at S0).
         let (held_view, _) = hot_state.get_committed();
@@ -1071,7 +1117,7 @@ mod tests {
     #[test]
     fn test_rapid_commits_with_lingering_reader() {
         let state0 = State::new_empty(TEST_CONFIG);
-        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+        let hot_state = HotState::new_empty(state0.clone());
 
         // Grab a view.
         let (held_view, _) = hot_state.get_committed();

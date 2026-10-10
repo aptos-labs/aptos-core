@@ -77,14 +77,8 @@ fn build_dir() -> PathBuf {
 }
 
 // Returns a `Command` for invoking the `aptos-debugger` binary.
-//
-// Sets `MALLOC_CONF=hpa:false` on the child to work around a jemalloc HPA deadlock that hangs the
-// subprocess on exit under concurrent load. All smoke-test call sites that spawn `aptos-debugger`
-// should use this helper.
 pub fn get_aptos_debugger_command() -> Command {
-    let mut cmd = Command::new(get_bin("aptos-debugger"));
-    cmd.env("MALLOC_CONF", "hpa:false");
-    cmd
+    Command::new(get_bin("aptos-debugger"))
 }
 
 // Path to a specified binary

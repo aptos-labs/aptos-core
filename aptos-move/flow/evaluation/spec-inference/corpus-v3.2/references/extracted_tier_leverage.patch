@@ -1,0 +1,31 @@
+--- a/sources/etna/extracted_tier_leverage.move
++++ b/sources/etna/extracted_tier_leverage.move
+@@ -29,0 +30,6 @@ module decibel_campaign::extracted_tier_leverage {
++        } spec {
++            invariant i <= n;
++            invariant n == len(leverages);
++            invariant max == max_upto(leverages, i);
++            invariant forall j: u64 where j < i:
++                leverages[j] <= market_max_leverage;
+@@ -32,0 +39,21 @@ module decibel_campaign::extracted_tier_leverage {
++
++    spec module {
++        /// Greatest of the first `k` leverages, or zero for none.
++        fun max_upto(v: vector<u64>, k: num): num {
++            if (k <= 0) { 0 }
++            else {
++                let rest = max_upto(v, k - 1);
++                if (v[k - 1] > rest) { v[k - 1] } else { rest }
++            }
++        }
++    }
++
++    spec checked_max_tier_leverage {
++        pragma opaque;
++        // The scan asserts before accumulating, so any offending element aborts
++        // -- the condition is existential even though the loop stops at the
++        // first one.
++        aborts_if [inferred] exists j: u64 where j < len(leverages):
++            leverages[j] > market_max_leverage;
++        ensures [inferred] result == max_upto(leverages, len(leverages));
++    }

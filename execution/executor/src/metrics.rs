@@ -80,6 +80,15 @@ pub static EXECUTOR_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!("aptos_executor_error_total", "Cumulative number of errors").unwrap()
 });
 
+pub static CHUNK_EXECUTOR_REQUEST_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_executor_chunk_executor_request_rejected_total",
+        "Cumulative number of rejected chunk executor requests, by entry point and reason",
+        &["entry_point", "reason"]
+    )
+    .unwrap()
+});
+
 pub static BLOCK_EXECUTION_WORKFLOW_WHOLE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
@@ -329,8 +338,8 @@ pub fn update_counters_for_processed_chunk<T>(
                         sample!(
                             SampleRate::Duration(Duration::from_secs(15)),
                             warn!(
-                                "[sampled] Txn being discarded is {:?} with status code {:?}",
-                                txn, discard_status_code
+                                "[sampled] Txn discarded with status code {:?}: {:?}",
+                                discard_status_code, txn
                             );
                         );
                         "discard"

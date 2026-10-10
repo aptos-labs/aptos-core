@@ -10,6 +10,7 @@ The stackless execution IR is then lowered into monomorphic micro-ops, when all 
 - preserve polymorphism until later just-in-time monomorphization
 - make dataflow explicit enough for local optimization and allocation
 - remain simple enough that correctness is easy to reason about
+- carry each instruction's originating bytecode offset through every pass
 
 ## Test Infrastructure
 

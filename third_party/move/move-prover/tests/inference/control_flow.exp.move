@@ -43,8 +43,7 @@ module 0x42::control_flow {
     }
     spec if_different_return(x: u64, y: u64, cond: bool): u64 {
         pragma opaque = true;
-        ensures [inferred] cond ==> result == x;
-        ensures [inferred] !cond ==> result == y;
+        ensures [inferred] result == (if (cond) x else y);
         aborts_if [inferred] false;
     }
 
@@ -59,8 +58,7 @@ module 0x42::control_flow {
     }
     spec if_mixed_return(x: u64, cond: bool): u64 {
         pragma opaque = true;
-        ensures [inferred] cond ==> result == x;
-        ensures [inferred] !cond ==> result == x + 1;
+        ensures [inferred] result == (if (cond) x else x + 1);
         aborts_if [inferred] !cond && x == MAX_U64;
     }
 
@@ -71,8 +69,7 @@ module 0x42::control_flow {
     }
     spec test_chain_cmp(x: u64, y: u64, z: u64): bool {
         pragma opaque = true;
-        ensures [inferred] x < y ==> result == (y < z);
-        ensures [inferred] x >= y ==> result == false;
+        ensures [inferred] result == (x < y && y < z);
         aborts_if [inferred] false;
     }
 

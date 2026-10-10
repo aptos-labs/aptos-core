@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/bv_internal_wrapping.move:10:9
+   │
+10 │         ensures result == (x as num) + 256;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bv_internal_wrapping.move:4: f
+   =         x = <redacted>
+   =     at tests/sources/functional/bv_internal_wrapping.move:5: f
+   =         result = <redacted>
+   =     at tests/sources/functional/bv_internal_wrapping.move:10: f (spec)

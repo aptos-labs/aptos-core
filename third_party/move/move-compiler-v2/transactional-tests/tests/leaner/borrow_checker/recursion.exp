@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-32:  publish [import LeanerMove]
+task 1 lines 34-34:  run 0x0::LeanerBorrowRecursion::run
+return values: 0
+task 2 lines 36-36:  run 0x0::LeanerBorrowRecursion::run_mutual
+return values: 22

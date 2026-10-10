@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: `map_spec_key_at` is bound but `map_spec_rank` is not; the two must be bound together, since the intrinsic model defines each through the other
+   ┌─ tests/sources/functional/intrinsic_map_rank_pair_err.move:22:10
+   │
+22 │     spec native fun spec_key_at<K, V>(m: Map<K, V>, i: num): K;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

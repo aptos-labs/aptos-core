@@ -1,0 +1,37 @@
+{
+  "version": 10,
+  "structs": [
+    {"name": "A", "fields": [{"name": "x", "ty": "u64"}]},
+    {"name": "B", "fields": [{"name": "x", "ty": "u64"}, {"name": "y", "ty": "u64"}]}
+  ],
+  "funs": [
+    {
+      "name": "f",
+      "params": 1,
+      "locals": ["address", "u64"],
+      "returns": ["u64"],
+      "blocks": [{"instrs": [{"load": [1, {"num": "0"}]}], "term": {"ret": [1]}}],
+      "loops": [],
+      "spec": {
+        "requires": [],
+        "aborts_if": [],
+        "ensures": [
+          {
+            "binop": [
+              "implies",
+              {"exists": [0, null, {"local": 0}]},
+              {
+                "binop": [
+                  "eq",
+                  {"select": [0, {"global": [0, null, {"local": 0}]}]},
+                  {"select": [1, {"global": [1, null, {"local": 0}]}]}
+                ]
+              }
+            ]
+          }
+        ],
+        "modifies": []
+      }
+    }
+  ]
+}

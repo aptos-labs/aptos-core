@@ -11,8 +11,8 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_resource_viewer::{AptosValueAnnotator, MoveTableInfo};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
-    AptosDbError, DbReader, Result,
+    db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion, DbReader,
+    Result,
 };
 use aptos_types::{
     access_path::Path,
@@ -262,6 +262,7 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
                     self.collect_table_info_from_table_item(*handle, bytes)?
                 },
                 StateKeyInner::Raw(_) => (),
+                // Out of scope for table-info collection.
                 StateKeyInner::TradingNative(_) => (),
             }
         }

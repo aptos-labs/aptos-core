@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-14:  publish [import LeanerMove]
+task 1 lines 16-16:  run 0x0::LeanerBorrowFreeze::run
+return values: 8

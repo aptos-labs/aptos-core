@@ -4,6 +4,7 @@
 use crate::{
     error::Error,
     metadata_storage::MetadataStorageInterface,
+    snapshot_chunk::SnapshotChunk,
     storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info},
 };
@@ -12,7 +13,7 @@ use aptos_crypto::HashValue;
 use aptos_data_streaming_service::{
     data_notification::NotificationId,
     data_stream::{DataStreamId, DataStreamListener},
-    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback},
+    streaming_client::{DataStreamingClient, Epoch, NotificationAndFeedback, SnapshotKind},
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
@@ -116,6 +117,9 @@ pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockSto
     let mut mock_storage_synchronizer = create_mock_storage_synchronizer();
     mock_storage_synchronizer
         .expect_pending_storage_data()
+        .return_const(false);
+    mock_storage_synchronizer
+        .expect_pending_storage_data_error()
         .return_const(false);
     if expect_reset_executor {
         mock_storage_synchronizer
@@ -311,18 +315,18 @@ mock! {
         fn is_snapshot_sync_complete(
             &self,
             target_ledger_info: &LedgerInfoWithSignatures,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<bool, Error>;
 
         fn get_last_persisted_index(
             &self,
             target_ledger_info: &LedgerInfoWithSignatures,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<u64, Error>;
 
         fn previous_snapshot_sync_target(
             &self,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<Option<LedgerInfoWithSignatures>, Error>;
 
         fn update_last_persisted_index(
@@ -330,7 +334,7 @@ mock! {
             target_ledger_info: &LedgerInfoWithSignatures,
             last_persisted_index: u64,
             snapshot_sync_completed: bool,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> Result<(), Error>;
     }
 
@@ -360,7 +364,7 @@ mock! {
             &self,
             version: Version,
             start_index: Option<u64>,
-            state_kind: StateKind,
+            snapshot_kind: SnapshotKind,
         ) -> AnyhowResult<DataStreamListener, aptos_data_streaming_service::error::Error>;
 
         async fn get_all_epoch_ending_ledger_infos(
@@ -450,15 +454,19 @@ mock! {
             &mut self,
             target_ledger_info: LedgerInfoWithSignatures,
             expected_root: HashValue,
-            kind: StateKind,
+            kind: SnapshotKind,
         ) -> AnyhowResult<JoinHandle<()>, crate::error::Error>;
 
         fn pending_storage_data(&self) -> bool;
 
+        fn pending_storage_data_error(&self) -> bool;
+
+        fn acknowledge_storage_data_error(&self);
+
         async fn save_state_values(
             &mut self,
             notification_id: NotificationId,
-            state_value_chunk_with_proof: StateValueChunkWithProof,
+            snapshot_chunk: SnapshotChunk,
         ) -> AnyhowResult<(), crate::error::Error>;
 
         async fn finalize_fast_sync(

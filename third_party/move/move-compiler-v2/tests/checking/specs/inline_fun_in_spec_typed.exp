@@ -4,14 +4,11 @@ module 0x42::m {
       invariant forall a: address: TypeDomain<address>(): Implies(exists<0x42::m::S>(a), {
       let (x: address): (address) = Tuple(a);
       {
-        let r: bool = {
-          let (a: address): (address) = Tuple(x);
-          Lt(select m::S.f<0x42::m::S>({
-            let (a: address): (address) = Tuple(a);
-            global<0x42::m::S>(a)
-          }), 10)
-        };
-        r
+        let (a: address): (address) = Tuple(x);
+        Lt(select m::S.f<0x42::m::S>({
+          let (a: address): (address) = Tuple(a);
+          global<0x42::m::S>(a)
+        }), 10)
       }
     });
     }
@@ -23,35 +20,22 @@ module 0x42::m {
       invariant {
       let (x: u64): (u64) = Tuple(select m::S.f());
       {
-        let r: bool = {
-          let (x: u64): (u64) = Tuple(x);
-          Gt(x, 0)
-        };
-        r
+        let (x: u64): (u64) = Tuple(x);
+        Gt(x, 0)
       }
     };
     }
 
     private inline fun exec<T,R>(f: |T|R,x: T): R {
-        {
-          let r: R = (f)(x);
-          spec {
-            assert Eq<#1>(r, (f)($t1));
-          }
-          ;
-          r
-        }
+        (f)(x)
     }
     private fun function_code_spec_block(x: u64): u64 {
         spec {
           assert {
           let (x: u64): (u64) = Tuple($t0);
           {
-            let r: bool = {
-              let (y: u64): (u64) = Tuple(x);
-              Gt(y, 0)
-            };
-            r
+            let (y: u64): (u64) = Tuple(x);
+            Gt(y, 0)
           }
         };
         }
@@ -65,11 +49,8 @@ module 0x42::m {
       ensures Eq<u64>(result0(), {
       let (x: u64): (u64) = Tuple($t0);
       {
-        let r: num = {
-          let (x: u64): (u64) = Tuple(x);
-          Add(x, 1)
-        };
-        r
+        let (x: u64): (u64) = Tuple(x);
+        Add(x, 1)
       }
     });
     }
@@ -88,30 +69,20 @@ module 0x42::m {
     spec S {
         invariant {
             let x = f;
-            let r = {
-                let x = x;
-                x > 0
-            };
-            r
+            let x = x;
+            x > 0
         };
     }
 
     inline fun exec<T, R>(f: |T|R, x: T): R {
-        let r = f(x);
-        spec {
-            assert r == f(x);
-        };
-        r
+        f(x)
     }
     fun function_code_spec_block(x: u64): u64 {
         spec {
             assert {
                 let x = x;
-                let r = {
-                    let y = x;
-                    y > 0
-                };
-                r
+                let y = x;
+                y > 0
             };
         };
         x + 1
@@ -123,11 +94,8 @@ module 0x42::m {
     spec function_spec_block(x: u64): u64 {
         ensures result == {
             let x = x;
-            let r = {
-                let x = x;
-                x + 1
-            };
-            r
+            let x = x;
+            x + 1
         };
     }
 

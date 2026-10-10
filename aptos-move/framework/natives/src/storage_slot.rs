@@ -11,17 +11,31 @@ use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
     SafeNativeError, SafeNativeResult,
 };
-use move_core_types::{account_address::AccountAddress, vm_status::StatusCode};
+use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    values::{Reference, StructRef, Value},
+    values::{GlobalValue, Reference, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 // Error codes
 const ESTORAGE_SLOT_NOT_FOUND: u64 = 0x2;
+const ENOT_A_RESOURCE_TYPE: u64 = 0x3;
+
+/// The natives below take the resource type to borrow as an unconstrained type parameter, and
+/// Move cannot restrict a type parameter to structs and enums. Reject other runtime types before
+/// the global storage lookup, where they would cause an invariant violation.
+fn check_is_resource_type(ty: &Type) -> SafeNativeResult<()> {
+    if !ty.is_struct_or_enum() {
+        return Err(SafeNativeError::abort_with_message(
+            ENOT_A_RESOURCE_TYPE,
+            "Storage slot resource type argument must be a struct type",
+        ));
+    }
+    Ok(())
+}
 
 /***************************************************************************************************
  * native fun borrow_storage_slot_resource<T: store, BR>(self: &StorageSlot<T>): &BR
@@ -53,25 +67,20 @@ fn native_borrow_storage_slot_resource(
 
     // ty_args[1] is StorageSlotResource<T> - the type we want to borrow from global storage
     let storage_slot_resource_ty = &ty_args[1];
+    check_is_resource_type(storage_slot_resource_ty)?;
 
     // Borrow the resource from global storage
-    let (ref_val, num_bytes) = context
-        .borrow_resource(addr, storage_slot_resource_ty)
-        .map_err(|err| {
-            // Check if resource doesn't exist
-            if err.major_status() == StatusCode::MISSING_DATA {
-                SafeNativeError::abort_with_message(
-                    ESTORAGE_SLOT_NOT_FOUND,
-                    format!("StorageSlotResource at address {} not found", addr),
-                )
-            } else {
-                err.into()
-            }
-        })?;
+    let (gv, num_bytes, amount) =
+        context.load_resource_with_abs_sizes(addr, storage_slot_resource_ty)?;
+    let ref_val = borrow_gv(gv, addr)?;
 
     // Charge for loaded bytes
     if let Some(num_bytes) = num_bytes {
         context.charge(STORAGE_SLOT_BORROW_PER_BYTE_LOADED * num_bytes)?;
+    }
+    if let Some((heap_size, val_size)) = amount {
+        context.use_heap_memory(heap_size)?;
+        context.charge_value_traversal(val_size)?;
     }
 
     Ok(smallvec![ref_val])
@@ -107,28 +116,34 @@ fn native_borrow_storage_slot_resource_mut(
 
     // ty_args[1] is StorageSlotResource<T> - the type we want to borrow from global storage
     let storage_slot_resource_ty = &ty_args[1];
+    check_is_resource_type(storage_slot_resource_ty)?;
 
     // Borrow the resource mutably from global storage
-    let (ref_val, num_bytes) = context
-        .borrow_resource_mut(addr, storage_slot_resource_ty)
-        .map_err(|err| {
-            // Check if resource doesn't exist
-            if err.major_status() == StatusCode::MISSING_DATA {
-                SafeNativeError::abort_with_message(
-                    ESTORAGE_SLOT_NOT_FOUND,
-                    format!("StorageSlotResource at address {} not found", addr),
-                )
-            } else {
-                err.into()
-            }
-        })?;
+    let (gv, num_bytes, amount) =
+        context.load_resource_mut_with_abs_sizes(addr, storage_slot_resource_ty)?;
+    let ref_val = borrow_gv(gv, addr)?;
 
     // Charge for loaded bytes
     if let Some(num_bytes) = num_bytes {
         context.charge(STORAGE_SLOT_BORROW_MUT_PER_BYTE_LOADED * num_bytes)?;
     }
+    if let Some((heap_size, val_size)) = amount {
+        context.use_heap_memory(heap_size)?;
+        context.charge_value_traversal(val_size)?;
+    }
 
     Ok(smallvec![ref_val])
+}
+
+fn borrow_gv(gv: &GlobalValue, addr: AccountAddress) -> SafeNativeResult<Value> {
+    if gv.exists() {
+        Ok(gv.borrow_global()?)
+    } else {
+        Err(SafeNativeError::abort_with_message(
+            ESTORAGE_SLOT_NOT_FOUND,
+            format!("StorageSlotResource at address {} not found", addr),
+        ))
+    }
 }
 
 /***************************************************************************************************

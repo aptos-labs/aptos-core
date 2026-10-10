@@ -24,7 +24,7 @@ use aptos_executor_benchmark::{
         },
     },
     pipeline::PipelineConfig,
-    BenchmarkWorkload, StorageTestConfig,
+    BenchmarkWorkload, BlockSource, FeatureFlagOverrides, StorageTestConfig,
 };
 use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
@@ -437,6 +437,33 @@ enum Command {
             help = "Optional custom enabling/disabling of the feature flags in the Move source. Enable / disable flags cannot overlap.\
             Sample usage: --enable-feature=V1 --disable-feature=V2 V3 where V1, V2, V3 are FeatureFlag enum variants.")]
         disable_feature: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Feature flags to enable on-chain after the init/publish phase and before the measured run, via a governance transaction that reconfigures. Enable / disable flags cannot overlap.")]
+        enable_feature_after_init: Vec<FeatureFlag>,
+
+        #[clap(
+            long,
+            num_args=1..,
+            value_delimiter = ' ',
+            help = "Feature flags to disable on-chain after the init/publish phase and before the measured run, via a governance transaction that reconfigures. Enable / disable flags cannot overlap.")]
+        disable_feature_after_init: Vec<FeatureFlag>,
+
+        /// Generate the blocks, write them here, and exit without executing.
+        /// Leaves --checkpoint-dir holding the initialized DB the blocks were
+        /// generated against; pass that as --data-dir when replaying. No feature
+        /// flag override is applied, since each replay applies its own.
+        #[clap(long, value_parser, conflicts_with = "replay_blocks")]
+        dump_blocks: Option<PathBuf>,
+
+        /// Execute blocks recorded by an earlier --dump-blocks run instead of
+        /// generating them, so that two runs execute identical transactions.
+        /// --data-dir must be that run's --checkpoint-dir.
+        #[clap(long, value_parser)]
+        replay_blocks: Option<PathBuf>,
     },
     AddAccounts {
         #[clap(long, value_parser)]
@@ -510,11 +537,17 @@ where
             checkpoint_dir,
             enable_feature,
             disable_feature,
+            enable_feature_after_init,
+            disable_feature_after_init,
+            dump_blocks,
+            replay_blocks,
         } => {
-            // aptos_types::on_chain_config::hack_enable_default_features_for_genesis(enable_feature);
-            // aptos_types::on_chain_config::hack_disable_default_features_for_genesis(
-            //     disable_feature,
-            // );
+            let block_source = match (dump_blocks, replay_blocks) {
+                (Some(blocks_path), None) => BlockSource::Record { blocks_path },
+                (None, Some(blocks_path)) => BlockSource::Replay { blocks_path },
+                (None, None) => BlockSource::Generate,
+                (Some(_), Some(_)) => unreachable!("clap rejects both"),
+            };
 
             let workload = if transaction_type.is_empty() {
                 BenchmarkWorkload::Transfer {
@@ -558,6 +591,11 @@ where
                     .pipeline_config(opt.storage_opt.enable_indexer_grpc),
                 get_init_features(enable_feature, disable_feature),
                 opt.use_keyless_accounts,
+                FeatureFlagOverrides {
+                    enable: enable_feature_after_init,
+                    disable: disable_feature_after_init,
+                },
+                block_source,
             );
         },
         Command::AddAccounts {

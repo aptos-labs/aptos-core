@@ -63,6 +63,17 @@ impl SecretShareVerifier {
         Ok(())
     }
 
+    pub fn verify(&self, share: &SecretShare, sender: &Author) -> anyhow::Result<()> {
+        ensure!(
+            share.author() == sender,
+            "Author {} does not match sender {}",
+            share.author(),
+            sender
+        );
+        self.verify_structural(share)?;
+        share.verify(&self.config)
+    }
+
     pub fn optimistic_verify(&self, share: &SecretShare, sender: &Author) -> anyhow::Result<()> {
         ensure!(
             share.author() == sender,

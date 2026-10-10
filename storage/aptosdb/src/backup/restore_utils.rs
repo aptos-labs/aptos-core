@@ -21,7 +21,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, AptosDbError, Result,
+    db_ensure as ensure, state_store::state_update_refs::StateUpdateRefs, Result,
 };
 use aptos_types::{
     account_config::new_block_event_key,

@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-native-position-types-005/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-5s0assob/package",
+            "--output",
+            "/tmp/move-inference-mutant-5s0assob/unused.json"
+          ],
+          "duration_ms": 5315,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-native-position-types-005-flips-side",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-5s0assob/package",
+            "--target",
+            "0x7::native_position_types",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-5s0assob/prover-report.json"
+          ],
+          "duration_ms": 6585,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-0cuj7xng/package",
+            "--output",
+            "/tmp/move-inference-mutant-0cuj7xng/unused.json"
+          ],
+          "duration_ms": 3125,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-native-position-types-005-index-off-by-one",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-0cuj7xng/package",
+            "--target",
+            "0x7::native_position_types",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-0cuj7xng/prover-report.json"
+          ],
+          "duration_ms": 6391,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-97i2hahl/package",
+            "--output",
+            "/tmp/move-inference-mutant-97i2hahl/unused.json"
+          ],
+          "duration_ms": 3386,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-native-position-types-005-unpack-flips-side",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-97i2hahl/package",
+            "--target",
+            "0x7::native_position_types",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-97i2hahl/prover-report.json"
+          ],
+          "duration_ms": 6240,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::native_position_types"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-native-position-types-005/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-tvnhn4cn/package",
+            "--output",
+            "/tmp/move-inference-mutant-tvnhn4cn/unused.json"
+          ],
+          "duration_ms": 2488,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-native-position-types-005-zero-leverage",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-tvnhn4cn/package",
+            "--target",
+            "0x7::native_position_types",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-tvnhn4cn/prover-report.json"
+          ],
+          "duration_ms": 7210,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-amx9wezp/package",
+            "--output",
+            "/tmp/move-inference-mutant-amx9wezp/unused.json"
+          ],
+          "duration_ms": 3382,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-native-position-types-005-halved-index-value",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-amx9wezp/package",
+            "--target",
+            "0x7::native_position_types",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-amx9wezp/prover-report.json"
+          ],
+          "duration_ms": 7179,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-cdusw1ed/package",
+            "--output",
+            "/tmp/move-inference-mutant-cdusw1ed/unused.json"
+          ],
+          "duration_ms": 2862,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-native-position-types-005-unpack-bumps-timestamp",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-cdusw1ed/package",
+            "--target",
+            "0x7::native_position_types",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-cdusw1ed/prover-report.json"
+          ],
+          "duration_ms": 6243,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::native_position_types"
+  }
+}

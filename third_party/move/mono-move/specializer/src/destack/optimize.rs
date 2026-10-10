@@ -1,12 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Post-slot allocation optimization passes.
-//!
-//! Pass: Copy propagation
-//! Pass: Identity move elimination
-//! Pass: Dead instruction elimination
-//! Pass: Slot renumbering
+//! Post-slot-allocation optimization passes over the named-slot IR; see
+//! [`optimize_module`] for the pass pipeline.
 
 use crate::stackless_exec_ir::{
     instr_utils::{
@@ -15,15 +11,16 @@ use crate::stackless_exec_ir::{
     },
     FunctionIR, HomeIndex, Instr, ModuleIR, NamedSlot,
 };
+use mono_move_core::PreparedModule;
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Optimize all functions in a module IR.
-/// Operates on the slot-allocated (named-slot) IR.
 pub fn optimize_module(module_ir: &mut ModuleIR) {
-    for func in module_ir.functions.iter_mut().flatten() {
-        eliminate_identity_moves(func);
-        copy_propagation(func);
-        eliminate_identity_moves(func);
+    let ModuleIR { module, functions } = module_ir;
+    for func in functions.iter_mut().flatten() {
+        eliminate_identity_moves(func, module);
+        copy_propagation(func, module);
+        eliminate_identity_moves(func, module);
         dead_instruction_elimination(func);
         renumber_slots(func);
     }
@@ -36,72 +33,94 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 ///
 /// # Correctness
 ///
-/// ## Move verifier guarantees we rely on
-/// - **StLoc(L) forbidden while L is borrowed** (immutably or mutably)
-/// - **MoveLoc(L) forbidden while L is borrowed**
-/// - **CopyLoc(L) forbidden while L is mutably borrowed**
-///
-/// ## Two kinds of slot use
-/// 1. **Value use** — reads the slot's current value (e.g., `Add(dst, r, #5)`)
-/// 2. **Place use** — takes a reference to the slot's place
-///    (only `ImmBorrowLoc` and `MutBorrowLoc`)
-///
-/// Copy propagation is sound for value uses (value equality suffices) but
-/// unsound for place uses (identity of the slot matters).
+/// ## Value uses vs. place uses
+/// Propagation is sound for value uses (value equality suffices) but unsound
+/// for place uses (slot identity matters) — see "Operand roles" on [`Instr`].
 /// `remap_source_slots_with` skips BorrowLoc sources to enforce this.
 ///
 /// ## The MutBorrowLoc hidden-write problem
 /// Once a slot is mutably borrowed, it can be silently modified through the
 /// reference (via `WriteRef`, function calls, etc.) without appearing as a
-/// def in `get_defs_uses`. So we kill subst entries for the borrowed slot
-/// at `MutBorrowLoc` — conservatively assuming hidden writes may follow.
-/// `MutBorrowLocField` and `WriteLocField` have the same hazard.
-///
-/// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
-/// borrowed slot cannot be modified while immutably borrowed. The same
-/// holds for `ImmBorrowLocField` and `ReadLocField`.
+/// def. So we kill subst entries for the borrowed slot at `MutBorrowLoc` and
+/// `MutBorrowLocField` — conservatively assuming hidden writes may follow. A
+/// mut borrow cannot predate an entry: the verifier forbids `MoveLoc` on a
+/// borrowed local and `CopyLoc` on a mutably borrowed one. `ImmBorrowLoc`,
+/// `ImmBorrowLocField`, and `ReadLocField` need no kill: `StLoc`/`MoveLoc`
+/// on a borrowed local are forbidden, so a slot cannot change while
+/// immutably borrowed.
 ///
 /// ## Why cross-block mutable borrows are safe
-///
 /// Subst is reset at every block boundary. If `MutBorrowLoc` is in the same
 /// block as the copy, the kill fires before any hidden write. If it's in a
 /// different block, that block's subst is empty — no stale propagation occurs.
-fn copy_propagation(func: &mut FunctionIR) {
-    for block in &mut func.blocks {
-        // TODO(perf): `retain` scans all entries to kill by value, making each kill O(|subst|).
-        // For typical small blocks this is fine, but if subst grows large, consider a
-        // reverse index (value → keys) for O(1) value-based kills.
+///
+/// ## Why `Move` sources are safe but `Copy` sources need a type guard
+/// See the interchangeability rules on [`Instr::Copy`]/[`Instr::Move`].
+/// Applied here: a `Move` entry can never go stale — the verifier makes the
+/// source unusable until redefinition, which kills the entry. A `Copy` entry
+/// for a heap-owning type has no such protection: the source stays usable, so
+/// remapping a consuming use of `dst` would transfer the wrong object, and the
+/// source's object may be consumed or mutated while the entry is live. `Copy`
+/// entries are therefore only created for bitwise-copy types.
+fn copy_propagation(func: &mut FunctionIR, module: &PreparedModule) {
+    let FunctionIR {
+        blocks,
+        home_slot_types,
+        ..
+    } = func;
+    for block in blocks {
+        // TODO(perf): value-based kills `retain`-scan all entries; a reverse
+        // index (value → keys) would make them O(1).
         let mut subst: UnorderedMap<NamedSlot, NamedSlot> = UnorderedMap::new();
 
-        for instr in &mut block.instrs {
-            remap_source_slots_with(instr, |s| *subst.get(&s).unwrap_or(&s));
-
-            // Kill subst for locals whose storage may be mutated without a
-            // full def: mut borrows (writes go through the ref) and
-            // `WriteLocField` (partial write). `WriteLocFieldChain`
-            // reports its root local as a def, so it is covered by the
-            // `for_each_def` kill below; the ref-rooted `WriteFieldChain`
-            // writes through a reference whose originating mut borrow was
-            // already killed here.
-            let mut hidden_write = mut_local_borrow_target(instr);
-            if let Instr::WriteLocField { local, .. } = instr {
-                hidden_write = Some(*local);
-            }
-            if let Some(src) = hidden_write {
-                subst.remove(&src);
-                subst.retain(|_, v| *v != src);
-            }
-
+        for instr in block.instrs.iter_mut() {
+            // Kill entries invalidated by this def before remapping sources
+            // (see the interchangeability rules on `Instr::Copy`/`Instr::Move`):
+            // remapping through a stale entry would rewrite a source onto this
+            // instruction's own def, manufacturing `dst == src` `Copy` shapes
+            // whose elimination is unsound for heap-owning types (see
+            // `eliminate_identity_moves`). `WriteLocField`/`WriteLocFieldChain`
+            // report the partially written local as a def, so they are covered.
             for_each_def(instr, |d| {
                 subst.remove(&d);
                 subst.retain(|_, v| *v != d);
             });
 
+            // Mut borrows allow hidden writes that never appear as defs (see
+            // the hidden-write section above). The ref-rooted `WriteFieldChain`
+            // writes through a reference whose originating mut borrow was
+            // already killed here.
+            if let Some(src) = mut_local_borrow_target(instr) {
+                subst.remove(&src);
+                subst.retain(|_, v| *v != src);
+            }
+
+            remap_source_slots_with(instr, |s| *subst.get(&s).unwrap_or(&s));
+
+            // Record new entries. Transfer slot values don't survive a call
+            // boundary, so never propagate from them; `Copy` additionally
+            // needs the bitwise-copy type guard (see "Why `Move` sources are
+            // safe but `Copy` sources need a type guard" above).
             match instr {
-                Instr::Copy { dst, src } | Instr::Move { dst, src } => {
-                    // Transfer slot values don't survive a call boundary,
-                    // so don't copy propagate from them.
+                Instr::Move { dst, src } => {
                     if !matches!(src, NamedSlot::Transfer(_)) {
+                        subst.insert(*dst, *src);
+                    }
+                },
+                Instr::Copy { dst, src } => {
+                    // TODO(perf): a non-capturing closure has a null
+                    // captured-data pointer, so its deep copy is pure overhead
+                    // — but the type-based guard can't tell it from a capturing
+                    // one. Recover the propagation by tracking slots defined in
+                    // this block by a `PackClosure` with an empty `captured`
+                    // list.
+                    let interchangeable = match src {
+                        NamedSlot::Home(idx) => {
+                            module.is_bitwise_copy_type(home_slot_types[idx.0 as usize])
+                        },
+                        NamedSlot::Transfer(_) => false,
+                    };
+                    if interchangeable {
                         subst.insert(*dst, *src);
                     }
                 },
@@ -111,14 +130,41 @@ fn copy_propagation(func: &mut FunctionIR) {
     }
 }
 
-/// Pass: Remove `Move` and `Copy` instructions whose `dst == src`.
-fn eliminate_identity_moves(func: &mut FunctionIR) {
-    for block in &mut func.blocks {
-        block
-            .instrs
-            .retain(|instr| {
-                !matches!(instr, Instr::Move { dst, src } | Instr::Copy { dst, src } if dst == src)
-            });
+/// Pass: Remove `Move` and `Copy` instructions whose `dst == src`, except
+/// `Copy`s of heap-owning types.
+///
+/// An identity `Move` is a no-op for every type, and so is an identity
+/// `Copy` of a bitwise-copy type (no deep copy is emitted). An identity
+/// `Copy` of a heap-owning type is a real effect — an in-place deep copy,
+/// "replace the slot's object with a fresh copy" — whose deletion is sound
+/// only when no other slot co-owns the object, which is not locally
+/// checkable. Thus, it is kept.
+fn eliminate_identity_moves(func: &mut FunctionIR, module: &PreparedModule) {
+    let FunctionIR {
+        blocks,
+        home_slot_types,
+        ..
+    } = func;
+    for block in blocks {
+        block.instrs.retain(|instr| {
+            let (is_copy, dst) = match instr {
+                Instr::Move { dst, src } if dst == src => (false, dst),
+                Instr::Copy { dst, src } if dst == src => (true, dst),
+                _ => return true,
+            };
+            // A Transfer identity can't currently arise: SSA `Copy`/`Move`
+            // always carry a Home slot on one side, and copy propagation
+            // never remaps a source onto a Transfer slot.
+            let NamedSlot::Home(idx) = dst else {
+                // A Transfer identity would resolve to distinct frame offsets
+                // at lowering, so deleting one would be wrong: keep it.
+                debug_assert!(false, "identity Copy/Move on a Transfer slot");
+                return true;
+            };
+            let removable =
+                !is_copy || module.is_bitwise_copy_type(home_slot_types[idx.0 as usize]);
+            !removable
+        });
     }
 }
 
@@ -129,6 +175,10 @@ fn eliminate_identity_moves(func: &mut FunctionIR) {
 ///
 /// Slots that appear in more than one basic block are excluded from
 /// removal — their liveness cannot be determined by block-local analysis.
+///
+/// Deleting a *dead* Copy is sound for every type, including a heap-typed
+/// identity Copy kept by `eliminate_identity_moves`: a Copy's only effect
+/// is its dst slot, and dead means no instruction reads it.
 fn dead_instruction_elimination(func: &mut FunctionIR) {
     // Pre-scan: identify Home slots that appear in more than one block.
     // (Transfer slots are intra-block and never cross block boundaries.)
@@ -175,14 +225,9 @@ fn dead_instruction_elimination(func: &mut FunctionIR) {
         }
 
         if !dead_indices.is_empty() {
-            // `retain` visits elements in order, so `idx` tracks the original
-            // pre-retain index of each instruction.
-            let mut idx = 0;
-            block.instrs.retain(|_| {
-                let keep = !dead_indices.contains(&idx);
-                idx += 1;
-                keep
-            });
+            block
+                .instrs
+                .retain_indexed(|index, _| !dead_indices.contains(&index));
         }
     }
 }
@@ -209,7 +254,6 @@ fn renumber_slots(func: &mut FunctionIR) {
     }
 
     // Build remap[old_index] = Some(new_index) or None if unused.
-    // Params keep their ABI indices; non-params are compacted sequentially.
     let mut remap: Vec<Option<u16>> = vec![None; old_num_home as usize];
     let mut next_slot = num_params;
     let mut num_surviving_locals: u16 = 0;

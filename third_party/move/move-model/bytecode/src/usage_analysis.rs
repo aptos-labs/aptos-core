@@ -62,6 +62,13 @@ pub struct UsageState {
     /// so callers must resolve the wildcard against *their* accessed
     /// footprint at each use site (loop-header havoc, Invoke, etc.).
     pub invoke_frame_wildcard: bool,
+    /// `invoke_frame` without the enclosing function's own parameter frames: the
+    /// struct-field frames and the callees' `invoke_frame`s. At a call site, the
+    /// parameter frames can be replaced by what the arguments actually modify.
+    pub invoke_frame_other: SetDomain<QualifiedInstId<StructId>>,
+    /// The memory read or written by the code of this function or its callees, excluding
+    /// memory only mentioned by specifications.
+    pub code_accessed: SetDomain<QualifiedInstId<StructId>>,
     /// The memory mentioned by the assume expressions in this function.
     pub assumed: MemoryUsage,
     /// The memory mentioned by the assert expressions in this function.
@@ -202,7 +209,16 @@ impl UsageState {
         self.add_transitive_modified_iter(callee.modified.get_all_inst(inst).into_iter());
         self.add_transitive_assumed_iter(callee.assumed.get_all_inst(inst).into_iter());
         self.add_transitive_asserted_iter(callee.asserted.get_all_inst(inst).into_iter());
-        self.add_transitive_invoke_frame_iter(callee.invoke_frame.get_all_inst(inst).into_iter());
+        self.code_accessed.extend(
+            callee
+                .code_accessed
+                .iter()
+                .map(|mem| mem.instantiate_ref(inst)),
+        );
+        let callee_invoke_frame = callee.invoke_frame.get_all_inst(inst);
+        self.invoke_frame_other
+            .extend(callee_invoke_frame.iter().cloned());
+        self.add_transitive_invoke_frame_iter(callee_invoke_frame.into_iter());
         self.invoke_frame_wildcard |= callee.invoke_frame_wildcard;
     }
 }
@@ -247,13 +263,16 @@ impl TransferFunctions for MemoryUsageAnalysis<'_> {
                 | MoveFrom(mid, sid, inst)
                 | BorrowGlobal(mid, sid, inst) => {
                     let mem = mid.qualified_inst(*sid, inst.to_owned());
+                    state.code_accessed.insert(mem.clone());
                     state.add_direct_modified(mem);
                 },
                 WriteBack(BorrowNode::GlobalRoot(mem), _) => {
+                    state.code_accessed.insert(mem.clone());
                     state.add_direct_modified(mem.clone());
                 },
                 Exists(mid, sid, inst) | GetGlobal(mid, sid, inst) => {
                     let mem = mid.qualified_inst(*sid, inst.to_owned());
+                    state.code_accessed.insert(mem.clone());
                     state.add_direct_accessed(mem);
                 },
                 _ => {},
@@ -390,6 +409,7 @@ impl MemoryUsageAnalysis<'_> {
                     for mem in &access.old_memory {
                         if mem_is_closed(mem) {
                             state.add_direct_invoke_frame(mem.clone());
+                            state.invoke_frame_other.insert(mem.clone());
                         } else {
                             wildcard = true;
                         }

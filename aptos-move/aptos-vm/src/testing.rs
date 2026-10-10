@@ -103,6 +103,9 @@ impl AptosVM {
             None,
             gas_meter_balance.into(),
             &NoopBlockSynchronizationKillSwitch {},
+            self.timed_features().is_enabled(
+                aptos_types::on_chain_config::TimedFeatureFlag::MeterValueNodesOnDeserialize,
+            ),
         );
 
         let change_set_configs = &self

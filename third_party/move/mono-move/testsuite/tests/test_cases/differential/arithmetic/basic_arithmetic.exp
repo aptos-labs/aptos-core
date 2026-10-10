@@ -18,8 +18,8 @@ fun add(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: r2 := add r0, r1
-    1: ret [r2]
+    0: r2 := add r0, r1 @2
+    1: ret [r2] @3
 }
 === micro-ops ===
 // module 0x1::test
@@ -28,7 +28,7 @@ fun add() {
   frame_data_size: 24
   entry_gas: 59
   code:
-    0: AddU64 [16] <- [0] + [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: AddU64 [16] <- [0] + [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
 }

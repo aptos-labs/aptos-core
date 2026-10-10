@@ -169,7 +169,7 @@ impl Inner {
     }
 
     fn drain_children_for_drop(&self) -> Vec<Arc<Self>> {
-        self.children.lock().drain(..).collect()
+        std::mem::take(&mut *self.children.lock())
     }
 
     fn log_generation(&self, name: &'static str) {

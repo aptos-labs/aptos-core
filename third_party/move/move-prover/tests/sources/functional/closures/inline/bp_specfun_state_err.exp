@@ -1,0 +1,60 @@
+Move prover returns: exiting with compilation errors
+error: the lambda has global state effects, which require a unique application of the function parameter in the inline function body to anchor the predicate's states
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state_err.move:31:20
+   │
+31 │             assert requires_of<f>(x); // error: needs a unique application of the function parameter
+   │                    ^^^^^^^^^^^^^^^^^
+   ·
+37 │         apply_twice(|y| y spec { requires spec_get_v(a) > 0; ensures result == y; }, a, x)
+   │         ----------------------------------------------------------------------------------
+   │         │           │
+   │         │           lambda argument
+   │         from a call inlined at this callsite
+
+error: the lambda's result depends on global state, which cannot be anchored in a value position; use `ensures_of` with an explicit result argument instead
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state_err.move:50:27
+   │
+50 │             assert res == result_of<f>(x); // error: result depends on global state (through the spec function)
+   │                           ^^^^^^^^^^^^^^^
+   ·
+56 │         apply_then_bump(|y| R[a].v + y spec { ensures result == spec_get_v(a) + y; }, a, x)
+   │         -----------------------------------------------------------------------------------
+   │         │               │
+   │         │               lambda argument
+   │         from a call inlined at this callsite
+
+warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state_err.move:66:41
+   │
+66 │     inline fun apply_once(f: |u64| u64, a: address, x: u64): u64 {
+   │                                         ^
+
+error: the lambda's `requires` conditions call a two-state spec function (one using `old(..)`), but describe a single state
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state_err.move:69:20
+   │
+69 │             assert requires_of<f>(x); // error: two-state spec function in a `requires` condition
+   │                    ^^^^^^^^^^^^^^^^^
+   ·
+75 │         apply_once(|y| y spec { requires spec_delta(a) == 0; ensures result == y; }, a, x)
+   │         ----------------------------------------------------------------------------------
+   │         │          │
+   │         │          lambda argument
+   │         from a call inlined at this callsite
+
+warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state_err.move:82:44
+   │
+82 │     inline fun apply_once_na(f: |u64| u64, a: address, x: u64): u64 {
+   │                                            ^
+
+error: the lambda's `aborts_if` conditions call a two-state spec function (one using `old(..)`), but describe a single state
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state_err.move:85:21
+   │
+85 │             assert !aborts_of<f>(x); // error: two-state spec function in an `aborts_if` condition
+   │                     ^^^^^^^^^^^^^^^
+   ·
+91 │         apply_once_na(|y| y spec { aborts_if spec_delta(a) > 0; ensures result == y; }, a, x)
+   │         -------------------------------------------------------------------------------------
+   │         │             │
+   │         │             lambda argument
+   │         from a call inlined at this callsite

@@ -1,0 +1,81 @@
+% Shared body of the paper: everything the two drivers have in common.
+% `main.tex` builds the named-author version, `main-anon.tex` the double-blind
+% submission; they differ only in `\ifAnonymous`, which drives every
+% `\Anon{...}{...}` below and in the section files.
+%
+% Do not add a \documentclass here -- the drivers own that.
+
+\usepackage[utf8]{inputenc}
+
+\input{prelude.tex}
+\input{tables/tasks}
+
+\bibliographystyle{splncs04}
+
+\title{Hybrid Mechanical and Agentic\texorpdfstring{\\}{} Specification Inference}
+\titlerunning{Hybrid Mechanical and Agentic Specification Inference}
+
+\Anon{%
+	\author{Wolfgang Grieskamp \and Teng Zhang \and Vineeth Kashyap}
+	\authorrunning{W. Grieskamp et al.}
+	\institute{Aptos Labs, Palo Alto, USA\\ \email{wg@aptoslabs.com}}
+}{%
+	\author{Anonymous Author(s)}
+	\institute{Anonymous Institution(s)}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Formal verification suffers from the cost of specification: to establish high-level facts, contracts have to be written for supporting functions, many of them mechanical and low-level. 
+Specification inference derives such contracts from the program. 
+We present a hybrid of agentic and mechanical inference for Move, a smart contract language similar to Rust, integrated with the Move Prover.
+An agent controls inference and verification through a tool that, besides calling the Move Prover, derives specifications from code by weakest-precondition analysis.
+With this tool, and with loop invariants it proposes itself, the agent derives complete specifications for non-trivial problems.
+We evaluate the approach on 26 verification targets, 24 of them extracted from public Move code of the Aptos framework that has no specification, under a frontier model, Sol~5.6, and a mid-tier model of the same family, Terra~5.6. Without \WP, the agent completes 99\% of its cells under the frontier model and 93\% under the mid-tier model. \WP leaves completeness unchanged and lowers the cost by 11--21\%; on targets without loops, the hybrid tactics cost 36--60\% of the agent alone. The mid-tier model costs 53--59\% of the frontier model and falls behind it mainly on one target that needs a permutation argument.
+
+	\keywords{Specification inference \and Weakest precondition \and Reference elimination \and LLM agents \and Move Prover}
+\end{abstract}
+
+\input{intro}
+\input{example}
+\input{wp}
+\input{skills}
+\input{evaluation}
+\input{conclusion}
+
+\subsubsection*{Data Availability Statement.}
+The corpus is published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}: the package extracted from a pinned commit of the Aptos repository, the reference specifications, and both mutant sets.
+The round archives behind every table and figure --- per-cell costs, token counters, wall times, and mutant outcomes --- and the scripts that produce them from the archives are published there as well; \Anon{\cite{SpecInferenceCorpus}}{\cite{MoveFlowAnon}} explains how to verify the corpus, re-score a round, and rerun the experiment.
+
+\bibliography{biblio}
+
+\appendix
+\Section{Per-Target Results}
+\label{sec:appendix}
+
+Tables~\ref{tab:sol} and~\ref{tab:terra} give, for each target and arm, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification killed every withheld mutant in all four replicates (\Checkmark) or a mutant survived (\XSolidBrush, subscripted with the count where more than one replicate failed); $\circ$ marks an unmeasured cell.
+Input counts include cached tokens.
+The targets above the middle rule have no loop that needs an invariant.
+
+\begin{sidewaystable}
+\centering
+\caption{Sol~5.6 by target. Summed over the 26 targets the arms cost \$36.72, \$31.67, and \$31.81.}
+\label{tab:sol}
+\scriptsize
+\setlength{\tabcolsep}{2.2pt}
+\input{tables/sol}
+\end{sidewaystable}
+
+\begin{sidewaystable}
+\centering
+\caption{Terra~5.6 by target. Summed over the 26 targets the arms cost \$21.05, \$16.71, and \$18.79.}
+\label{tab:terra}
+\scriptsize
+\setlength{\tabcolsep}{2.2pt}
+\input{tables/terra}
+\end{sidewaystable}
+
+\end{document}

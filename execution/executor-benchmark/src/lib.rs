@@ -3,6 +3,7 @@
 
 mod account_generator;
 pub mod block_preparation;
+pub mod block_recording;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
@@ -17,6 +18,7 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
+    block_recording::{RecordedBlocks, RecordingHeader},
     db_access::DbAccessUtil,
     pipeline::Pipeline,
     transaction_committer::TransactionCommitter,
@@ -50,7 +52,10 @@ use aptos_transaction_generator_lib::{
     TransactionGeneratorCreator,
     TransactionType::{self, CoinTransfer},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features},
+    transaction::{Script, Transaction, TransactionArgument},
+};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
@@ -62,10 +67,10 @@ use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
 use std::{
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
-        Arc,
+        mpsc, Arc,
     },
     time::Instant,
 };
@@ -105,6 +110,49 @@ pub fn default_benchmark_features() -> Features {
     features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
     features
 }
+
+/// Where the measured run's blocks come from.
+///
+/// Every run takes two directories. `source_dir` (`--data-dir`) holds the DB the
+/// run starts from and is only read. `checkpoint_dir` (`--checkpoint-dir`) gets a
+/// fresh copy of it, and everything the run writes lands there. Recording and
+/// replaying chain the two: a recording's `checkpoint_dir` is the `source_dir`
+/// every replay of it starts from.
+#[derive(Clone, Debug, Default)]
+pub enum BlockSource {
+    /// Generate blocks and execute them.
+    #[default]
+    Generate,
+    /// Generate blocks, write them to `blocks_path`, and exit without executing
+    /// them or applying any feature flag overrides. Leaves the initialized,
+    /// un-overridden DB the blocks were generated against in `checkpoint_dir`.
+    Record { blocks_path: PathBuf },
+    /// Execute the blocks in `blocks_path`. Workload initialization is skipped:
+    /// `source_dir` is the `checkpoint_dir` a recording left behind, so the
+    /// workload is already set up there.
+    Replay { blocks_path: PathBuf },
+}
+
+/// Feature flags to toggle on-chain after the init/publish phase and before the
+/// measured run. Applied as a delta to the current on-chain `Features`, so a
+/// flag not listed here keeps its genesis value.
+#[derive(Clone, Default)]
+pub struct FeatureFlagOverrides {
+    pub enable: Vec<FeatureFlag>,
+    pub disable: Vec<FeatureFlag>,
+}
+
+impl FeatureFlagOverrides {
+    fn is_empty(&self) -> bool {
+        self.enable.is_empty() && self.disable.is_empty()
+    }
+}
+
+// Compiled from the adjacent `.move` source with `aptos move compile-script`
+// against the local framework. Regenerate when the source or the framework
+// signatures it calls change; the `apply_features_after_init` test fails if it
+// is stale.
+const TOGGLE_FEATURES_SCRIPT: &[u8] = include_bytes!("scripts/toggle_features_for_next_epoch.mv");
 
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
     DbReaderWriter::new(
@@ -274,6 +322,81 @@ enum InitializedBenchmarkWorkload {
     },
 }
 
+/// Commits one block that runs the governance feature-toggle script, applying
+/// `overrides` to the on-chain `Features` and reconfiguring so the change takes
+/// effect for the next block. Runs under the V1 VM. The block executor
+/// rereads `Features` from committed state each block, so the measured run picks
+/// up the new flags. Panics if the override transaction is not committed as a
+/// success.
+fn apply_features_after_init(
+    db: &DbReaderWriter,
+    root_account: &LocalAccount,
+    ts: &BenchmarkTimestamp,
+    overrides: &FeatureFlagOverrides,
+) {
+    assert!(
+        overrides
+            .enable
+            .iter()
+            .all(|f| !overrides.disable.contains(f)),
+        "a feature flag cannot be both enabled and disabled after init"
+    );
+
+    let enable = overrides
+        .enable
+        .iter()
+        .map(|f| *f as u64)
+        .collect::<Vec<u64>>();
+    let disable = overrides
+        .disable
+        .iter()
+        .map(|f| *f as u64)
+        .collect::<Vec<u64>>();
+
+    info!(
+        "Feature flag overrides after init: enable={:?} disable={:?}",
+        overrides.enable, overrides.disable
+    );
+
+    let script = Script::new(TOGGLE_FEATURES_SCRIPT.to_vec(), vec![], vec![
+        TransactionArgument::Serialized(bcs::to_bytes(&enable).unwrap()),
+        TransactionArgument::Serialized(bcs::to_bytes(&disable).unwrap()),
+    ]);
+
+    let txn_factory = TransactionGenerator::create_transaction_factory(ts);
+    let txn = Transaction::UserTransaction(
+        root_account.sign_with_transaction_builder(txn_factory.script(script)),
+    );
+
+    // Prepend a block-metadata prologue so the block timestamp advances past the
+    // last reconfiguration time. Otherwise force_end_epoch's reconfiguration is
+    // skipped (it no-ops while the time is unchanged), and the epoch would not
+    // advance for the first block after genesis.
+    commit_single_block(db, vec![ts.next_block_metadata_txn(db), txn]);
+}
+
+/// Commits `txns` as one block under the V1 VM and waits for it to land.
+/// Panics if the block does not advance the committed version.
+fn commit_single_block(db: &DbReaderWriter, txns: Vec<Transaction>) {
+    let version_before = db.reader.expect_synced_version();
+    let (pipeline, block_sender) = Pipeline::<AptosVMBlockExecutor>::new(
+        BlockExecutor::new(db.clone()),
+        version_before,
+        &PipelineConfig::default(),
+        None,
+        None,
+        None,
+    );
+    block_sender.send(txns).unwrap();
+    drop(block_sender);
+    pipeline.join();
+
+    assert!(
+        db.reader.expect_synced_version() > version_before,
+        "block did not commit"
+    );
+}
+
 /// Runs the benchmark with given parameters.
 #[allow(clippy::too_many_arguments)]
 pub fn run_benchmark<V>(
@@ -290,7 +413,9 @@ pub fn run_benchmark<V>(
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
-) -> SingleRunResults
+    features_after_init: FeatureFlagOverrides,
+    block_source: BlockSource,
+) -> Option<SingleRunResults>
 where
     V: VMBlockExecutor + 'static,
 {
@@ -304,9 +429,22 @@ where
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     storage_test_config.init_storage_config(&mut config);
     let db = init_db(&config);
-    let ts = Arc::new(BenchmarkTimestamp::from_db(&db));
+    let mut ts = Arc::new(BenchmarkTimestamp::from_db(&db));
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
+
+    if let BlockSource::Replay { blocks_path } = &block_source {
+        return Some(replay_benchmark::<V>(
+            blocks_path,
+            &db,
+            &root_account,
+            ts,
+            &config,
+            storage_test_config,
+            pipeline_config,
+            features_after_init,
+        ));
+    }
 
     let mut num_accounts_to_load = num_main_signer_accounts;
     if let BenchmarkWorkload::TransactionMix(mix) = &workload {
@@ -393,6 +531,26 @@ where
         },
     };
 
+    let recording = match &block_source {
+        BlockSource::Record { blocks_path } => Some(blocks_path.clone()),
+        BlockSource::Generate => None,
+        // Returned above, before any workload initialization.
+        BlockSource::Replay { .. } => unreachable!(),
+    };
+
+    // Apply the feature flag overrides after init/publish but before the
+    // measured run, so they are not counted in the measured transactions.
+    //
+    // A recording is the one run that applies no overrides. Its DB is the shared
+    // base every replay starts from, so it has to stay neutral between the VMs
+    // being compared; each replay overrides on top of it.
+    if recording.is_none() && !features_after_init.is_empty() {
+        apply_features_after_init(&db, &root_account, &ts, &features_after_init);
+        // The override ends the epoch, so refresh the cached epoch; otherwise
+        // the measured run's block metadata would carry the stale old epoch.
+        ts = Arc::new(BenchmarkTimestamp::from_db(&db));
+    }
+
     let start_version = db.reader.expect_synced_version();
 
     let transaction_feedback = match &initialized_workload {
@@ -416,18 +574,48 @@ where
         pipeline_config
     };
 
-    // Initialize table_info_service and grpc stream if indexer_grpc is enabled
-    let indexer_wrapper = init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
+    // State the recorded blocks are only valid against; a replay checks it. Read
+    // fresh rather than from `ts`, whose base_usecs predates workload init: a
+    // replay reads the DB as it stands now, and the two have to match.
+    let recorded_at = recording.is_some().then(|| {
+        let now = BenchmarkTimestamp::from_db(&db);
+        (start_version, now.base_usecs(), now.epoch())
+    });
 
-    let executor = BlockExecutor::<V>::new(db.clone());
-    let (pipeline, block_sender) = Pipeline::new(
-        executor,
-        start_version,
-        &pipeline_config,
-        Some(num_blocks),
-        indexer_wrapper,
-        transaction_feedback,
+    // A recording never executes, so a generator that blocks in
+    // `wait_until_ready` until its transactions commit would never be released.
+    assert!(
+        recording.is_none() || transaction_feedback.is_none(),
+        "cannot record a workload that needs transaction feedback"
     );
+
+    // A recording never executes, so it collects blocks instead of building a
+    // pipeline.
+    let (pipeline, block_sender, collector) = if recording.is_some() {
+        let (sender, receiver) = mpsc::sync_channel::<Vec<Transaction>>(num_blocks.max(1));
+        let collector = std::thread::spawn(move || {
+            receiver
+                .into_iter()
+                .map(block_recording::user_transactions)
+                .collect::<Vec<_>>()
+        });
+        (None, sender, Some(collector))
+    } else {
+        // Initialize table_info_service and grpc stream if indexer_grpc is enabled
+        let indexer_wrapper =
+            init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
+
+        let executor = BlockExecutor::<V>::new(db.clone());
+        let (pipeline, block_sender) = Pipeline::new(
+            executor,
+            start_version,
+            &pipeline_config,
+            Some(num_blocks),
+            indexer_wrapper,
+            transaction_feedback,
+        );
+        (Some(pipeline), block_sender, None)
+    };
 
     let root_account = Arc::into_inner(root_account).unwrap();
     let mut generator = TransactionGenerator::new_with_existing_db(
@@ -481,6 +669,27 @@ where
     }
     generator.drop_sender();
     info!("Done creating workload");
+
+    if let Some(path) = recording {
+        let blocks = collector.unwrap().join().expect("block collector panicked");
+        let (version, base_usecs, epoch) = recorded_at.expect("set whenever recording");
+        RecordedBlocks {
+            header: RecordingHeader {
+                format_version: block_recording::FORMAT_VERSION,
+                workload_name,
+                block_size,
+                version,
+                base_usecs,
+                epoch,
+            },
+            blocks,
+        }
+        .write(&path)
+        .expect("failed to write recorded blocks");
+        return None;
+    }
+    let pipeline = pipeline.expect("pipeline is only absent while recording");
+
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
     let (num_pipeline_txns, staged_results, staged_events) = pipeline.join();
@@ -502,6 +711,107 @@ where
             generator.verify_sequence_numbers(db.reader.clone());
         }
         log_total_supply(&db.reader);
+        log_final_state(&db.reader);
+    }
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+
+    OverallMeasurement::print_end_table(&staged_results, &overall_results);
+    staged_events.print_end_table();
+    Some(SingleRunResults {
+        measurements: overall_results,
+        per_stage_measurements: staged_results,
+        per_stage_events: staged_events,
+    })
+}
+
+/// Executes blocks recorded by an earlier [`BlockSource::Record`] run.
+///
+/// The recording's `checkpoint_dir` is this run's `source_dir`, so the workload
+/// is already initialized and only the feature flag overrides are left to
+/// apply. Those overrides are what makes two replays of the same file differ.
+#[allow(clippy::too_many_arguments)]
+fn replay_benchmark<V>(
+    blocks_path: &Path,
+    db: &DbReaderWriter,
+    root_account: &LocalAccount,
+    ts: Arc<BenchmarkTimestamp>,
+    config: &NodeConfig,
+    storage_test_config: StorageTestConfig,
+    mut pipeline_config: PipelineConfig,
+    features_after_init: FeatureFlagOverrides,
+) -> SingleRunResults
+where
+    V: VMBlockExecutor + 'static,
+{
+    // The blocks are read from a file, so there is nothing to overlap execution
+    // with. This also sizes the pipeline's input channel to hold them all, which
+    // the loop below relies on.
+    pipeline_config.generate_then_execute = true;
+
+    let recorded = RecordedBlocks::read(blocks_path).expect("failed to read recorded blocks");
+
+    // Checked before the overrides, since the recording never applied any.
+    recorded
+        .check_replayable_at(
+            db.reader.expect_synced_version(),
+            ts.base_usecs(),
+            ts.epoch(),
+        )
+        .expect("recorded blocks are not replayable against this DB");
+
+    let mut ts = ts;
+    if !features_after_init.is_empty() {
+        apply_features_after_init(db, root_account, &ts, &features_after_init);
+        ts = Arc::new(BenchmarkTimestamp::from_db(db));
+    }
+
+    let num_blocks = recorded.blocks.len();
+    let start_version = db.reader.expect_synced_version();
+    let indexer_wrapper = init_indexer_wrapper(config, db, &storage_test_config, start_version);
+
+    let executor = BlockExecutor::<V>::new(db.clone());
+    let (pipeline, block_sender) = Pipeline::new(
+        executor,
+        start_version,
+        &pipeline_config,
+        Some(num_blocks),
+        indexer_wrapper,
+        None,
+    );
+
+    // Blocks are already in memory, so this only measures execution.
+    let mut overall_measuring = OverallMeasuring::start();
+
+    for block in recorded.blocks {
+        let mut txns = Vec::with_capacity(block.len() + 1);
+        txns.push(ts.next_block_metadata_txn(db));
+        txns.extend(block.into_iter().map(Transaction::UserTransaction));
+        block_sender.send(txns).unwrap();
+    }
+    drop(block_sender);
+
+    overall_measuring.start_time = Instant::now();
+    pipeline.start_pipeline_processing();
+    info!("Waiting for pipeline to finish");
+    let (num_pipeline_txns, staged_results, staged_events) = pipeline.join();
+
+    info!("Replayed workload {}", recorded.header.workload_name);
+
+    let num_txns = if !pipeline_config.skip_commit {
+        db.reader.expect_synced_version() - start_version - num_blocks as u64
+    } else {
+        num_pipeline_txns.unwrap_or_default()
+    };
+
+    let overall_results =
+        overall_measuring.elapsed("Overall".to_string(), "".to_string(), num_txns);
+    overall_results.print_end();
+
+    if !pipeline_config.skip_commit {
+        log_total_supply(&db.reader);
+        log_final_state(&db.reader);
     }
 
     // Assert there were no error log lines in the run.
@@ -738,6 +1048,19 @@ fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
     info!("total supply is {:?} octas", total_supply)
 }
 
+/// Logs the version and accumulator root hash the run ended at. Two runs over
+/// the same transactions must agree on both.
+fn log_final_state(db_reader: &Arc<dyn DbReader>) {
+    let version = db_reader.expect_synced_version();
+    let root_hash = db_reader
+        .get_accumulator_root_hash(version)
+        .expect("failed to read accumulator root hash");
+    info!(
+        "final state: version {}, root hash {:x}",
+        version, root_hash
+    );
+}
+
 pub enum SingleRunMode {
     TEST,
     BENCHMARK {
@@ -774,12 +1097,34 @@ pub fn run_single_with_default_params(
     use_blockstm_v2: bool,
     mode: SingleRunMode,
 ) -> SingleRunResults {
-    run_mix_with_default_params(
+    run_single_with_default_params_and_features(
+        transaction_type,
+        test_folder,
+        concurrency_level,
+        use_blockstm_v2,
+        mode,
+        FeatureFlagOverrides::default(),
+    )
+}
+
+/// Like [`run_single_with_default_params`], but also toggles `features_after_init`
+/// in the on-chain `Features` after the init/publish phase and before the
+/// measured run.
+pub fn run_single_with_default_params_and_features(
+    transaction_type: TransactionType,
+    test_folder: impl AsRef<Path>,
+    concurrency_level: usize,
+    use_blockstm_v2: bool,
+    mode: SingleRunMode,
+    features_after_init: FeatureFlagOverrides,
+) -> SingleRunResults {
+    run_mix_with_default_params_and_features(
         vec![(transaction_type, 1)],
         test_folder,
         concurrency_level,
         use_blockstm_v2,
         mode,
+        features_after_init,
     )
 }
 
@@ -795,6 +1140,27 @@ pub fn run_mix_with_default_params(
     concurrency_level: usize,
     use_blockstm_v2: bool,
     mode: SingleRunMode,
+) -> SingleRunResults {
+    run_mix_with_default_params_and_features(
+        transaction_mix,
+        test_folder,
+        concurrency_level,
+        use_blockstm_v2,
+        mode,
+        FeatureFlagOverrides::default(),
+    )
+}
+
+/// Like [`run_mix_with_default_params`], but also toggles `features_after_init`
+/// in the on-chain `Features` after the init/publish phase and before the
+/// measured run.
+pub fn run_mix_with_default_params_and_features(
+    transaction_mix: Vec<(TransactionType, usize)>,
+    test_folder: impl AsRef<Path>,
+    concurrency_level: usize,
+    use_blockstm_v2: bool,
+    mode: SingleRunMode,
+    features_after_init: FeatureFlagOverrides,
 ) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
@@ -970,12 +1336,16 @@ pub fn run_mix_with_default_params(
         execute_pipeline_config,
         features,
         is_keyless,
+        features_after_init,
+        BlockSource::Generate,
     )
+    .expect("generated runs always produce results")
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
+        apply_features_after_init,
         db_generator::bootstrap_with_genesis,
         default_benchmark_features, init_db,
         native::{
@@ -991,20 +1361,21 @@ mod tests {
         run_single_with_default_params,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::{BenchmarkTimestamp, TransactionGenerator},
-        BenchmarkWorkload, StorageTestConfig,
+        BenchmarkWorkload, BlockSource, FeatureFlagOverrides, StorageTestConfig,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
     use aptos_executor::block_executor::BlockExecutor;
     use aptos_executor_types::BlockExecutorTrait;
     use aptos_sdk::{transaction_builder::aptos_stdlib, types::LocalAccount};
+    use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::WorkflowProgress;
     use aptos_transaction_workloads_lib::args::TransactionTypeArg;
     use aptos_types::{
         access_path::Path,
         account_address::AccountAddress,
-        on_chain_config::{FeatureFlag, Features},
+        on_chain_config::{FeatureFlag, Features, OnChainConfig},
         state_store::state_key::inner::StateKeyInner,
         transaction::{
             signature_verified_transaction::into_signature_verified_block, Transaction,
@@ -1287,6 +1658,8 @@ mod tests {
             },
             features,
             false,
+            FeatureFlagOverrides::default(),
+            BlockSource::Generate,
         );
     }
 
@@ -1410,6 +1783,61 @@ mod tests {
                 num_blocks: 50,
                 num_init_accounts: 200,
             },
+        );
+    }
+
+    fn fetch_features(db: &crate::DbReaderWriter) -> Features {
+        Features::fetch_config(&db.reader.latest_state_checkpoint_view().unwrap())
+            .unwrap()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_apply_features_after_init() {
+        aptos_logger::Logger::new().init();
+
+        // `enable` starts disabled in the benchmark genesis, `disable` starts
+        // enabled, so a successful override is observable on both.
+        let enable = FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION;
+        let disable = FeatureFlag::ENABLE_ENUM_TYPES;
+
+        let features = default_benchmark_features();
+
+        let db_dir = TempPath::new();
+        fs::create_dir_all(db_dir.as_ref()).unwrap();
+        bootstrap_with_genesis(&db_dir, features.clone());
+
+        let (mut config, genesis_key) =
+            aptos_genesis::test_utils::test_config_with_custom_features(features);
+        config.storage.dir = db_dir.as_ref().to_path_buf();
+        config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
+        config.indexer_grpc.enabled = false;
+
+        let db = init_db(&config);
+
+        let before = fetch_features(&db);
+        assert!(!before.is_enabled(enable));
+        assert!(before.is_enabled(disable));
+
+        let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+        let ts = BenchmarkTimestamp::from_db(&db);
+        let epoch_before = ts.epoch();
+
+        apply_features_after_init(&db, &root_account, &ts, &FeatureFlagOverrides {
+            enable: vec![enable],
+            disable: vec![disable],
+        });
+
+        let after = fetch_features(&db);
+        assert!(after.is_enabled(enable));
+        assert!(!after.is_enabled(disable));
+
+        // The override ends the epoch; callers must refresh
+        // `BenchmarkTimestamp`.
+        assert_eq!(
+            BenchmarkTimestamp::from_db(&db).epoch(),
+            epoch_before + 1,
+            "feature flag override did not advance the epoch"
         );
     }
 }

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 13,
+        "offset": 462,
+        "sha256": "01ed60dbfd74c3e02ebac1aa314442fc877d60146d49593b1c8e1baafbab654a"
+      },
+      "edit": {
+        "at": 6,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_median.move",
+      "mutant_id": "MD-median-015-outer-comparison-reversed",
+      "obligation_category": "normal-result",
+      "rationale": "The top-level ordering split is reversed, sending most inputs through the wrong decision tree.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 43,
+        "offset": 462,
+        "sha256": "254ffaa812e8c0dd786dae0b0fd4b5496147b4922656a59fec09d255e71ea42b"
+      },
+      "edit": {
+        "at": 30,
+        "kind": "substitute",
+        "length": 6,
+        "to": "b <= c"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_median.move",
+      "mutant_id": "MD-median-015-upper-nested-comparison-reversed",
+      "obligation_category": "normal-result",
+      "rationale": "When a is at least b, the test deciding whether b is the median is reversed.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 623,
+        "sha256": "aaabe8f65d7b380f414ea3e3f3556991df4b1ea118ac98a9190ceb90005bbc11"
+      },
+      "edit": {
+        "at": 35,
+        "kind": "substitute",
+        "length": 10,
+        "to": "else { a }"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_median.move",
+      "mutant_id": "MD-median-015-final-branch-returns-a",
+      "obligation_category": "normal-result",
+      "rationale": "For strictly increasing inputs the function returns the minimum instead of the middle value.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "5bee9e2c3b2b7a5d473a41ef2db2fd9745222cea29a59e53135b3c2ef053afbe",
+  "task_id": "MD-median-015"
+}

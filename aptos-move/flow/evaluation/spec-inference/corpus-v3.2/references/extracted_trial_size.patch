@@ -1,0 +1,33 @@
+--- a/sources/etna/extracted_trial_size.move
++++ b/sources/etna/extracted_trial_size.move
+@@ -34,0 +35,30 @@ module decibel_dex::extracted_trial_size {
++
++    spec module {
++        /// The exact truncating ratio the body forms in `u128`.
++        fun size_value(
++            protected_amount: num, mark: num, size_decimals_pow10: num,
++            leverage: num, max_ioc_slippage_bps: num
++        ): num {
++            protected_amount * leverage * size_decimals_pow10 * BPS_DENOM
++                / (mark * (BPS_DENOM + max_ioc_slippage_bps))
++        }
++    }
++
++    spec trial_size_for {
++        pragma opaque;
++        aborts_if [inferred] mark == 0;
++        // The slippage denominator is formed in `u64` before the widening cast.
++        aborts_if [inferred] BPS_DENOM + max_ioc_slippage_bps > MAX_U64;
++        // Four widened factors: the product can leave `u128` before the range
++        // check that guards the way back to `u64` ever runs.
++        aborts_if [inferred]
++            protected_amount * leverage * size_decimals_pow10 * BPS_DENOM > MAX_U128;
++        aborts_if [inferred]
++            mark * (BPS_DENOM + max_ioc_slippage_bps) > MAX_U128;
++        aborts_if [inferred] mark != 0
++            && size_value(protected_amount, mark, size_decimals_pow10,
++                          leverage, max_ioc_slippage_bps) > MAX_U64;
++        ensures [inferred] result
++            == size_value(protected_amount, mark, size_decimals_pow10,
++                          leverage, max_ioc_slippage_bps);
++    }

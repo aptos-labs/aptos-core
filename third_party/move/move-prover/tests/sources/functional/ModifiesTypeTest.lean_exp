@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/ModifiesTypeTest.move:26:1: error: the continuation after `0x0::A::mutate_at` is not established
+tests/sources/functional/ModifiesTypeTest.move:26:1: error: the continuation after `0x0::A::mutate_at` is not established
+tests/sources/functional/ModifiesTypeTest.move:32:5: error: leaner verification failed: the automatic verification of `mutate_S_test1_incorrect` failed; provide a proof: `verify mutate_S_test1_incorrect by …` in the module (`verify mutate_S_test1_incorrect by skip` shows the obligations it leaves)

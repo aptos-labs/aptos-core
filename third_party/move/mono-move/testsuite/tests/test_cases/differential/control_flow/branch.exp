@@ -22,12 +22,12 @@ fun clamp(r0): u64 {
     r1: u64
   code:
   L2:
-    0: br_gt L0, r0, #10
+    0: br_gt L0, r0, #10 @1
   L1:
-    1: ret [r0]
+    1: ret [r0] @5
   L0:
-    2: r1 := ld_u64 10
-    3: ret [r1]
+    2: r1 := ld_u64 10 @6
+    3: ret [r1] @7
 }
 === micro-ops ===
 // module 0x1::test
@@ -36,9 +36,9 @@ fun clamp() {
   frame_data_size: 16
   entry_gas: 3
   code:
-    0: JumpGreaterU64Imm @2 [0] > #10 gas_taken=56 gas_fallthrough=54
-    1: Return
-    2: StoreImm8 [8] <- #10
-    3: Move8 [0] <- [8]
-    4: Return
+    0: JumpGreaterU64Imm @2 [0] > #10 gas_taken=56 gas_fallthrough=54 @1
+    1: Return @5
+    2: StoreImm8 [8] <- #10 @6
+    3: Move8 [0] <- [8] @7
+    4: Return @7
 }

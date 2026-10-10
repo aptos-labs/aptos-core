@@ -68,10 +68,12 @@ module 0x43::variant_field_divergent_write {
 // RUN: execute 0x43::variant_field_divergent_write::run_read_y --args 1
 // CHECK: results: 7
 // RUN: execute 0x43::variant_field_divergent_write::run_read_y --args 0
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch
 
 // Divergent write: value on Fb, variant-mismatch abort on Fa.
 // RUN: execute 0x43::variant_field_divergent_write::run_write_y --args 1, 9
 // CHECK: results: 10
 // RUN: execute 0x43::variant_field_divergent_write::run_write_y --args 0, 9
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch

@@ -10,34 +10,122 @@
 use crate::{options::BoogieOptions, COMPILED_MODULE_AVAILABLE};
 use itertools::Itertools;
 use move_binary_format::file_format::TypeParameterIndex;
-use move_core_types::{
-    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
-};
+use move_core_types::{ability::AbilitySet, function::ClosureMask};
 use move_model::{
-    ast::{Address, BehaviorKind, MemoryLabel, TempIndex, Value},
+    ast::{Address, BehaviorKind, ConditionKind, MemoryLabel, TempIndex, Value},
     model::{
-        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedInstId,
-        SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
+        FieldEnv, FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId,
+        QualifiedInstId, SpecFunId, StructEnv, StructId, SCRIPT_MODULE_NAME,
     },
     pragmas::INTRINSIC_TYPE_MAP,
+    spec_derivation,
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_prover_bytecode_pipeline::number_operation::{
-    GlobalNumberOperationState, NumOperation::Bitwise,
+    GlobalNumberOperationState, NumOperation, NumOperation::Bitwise,
 };
 use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecode::Constant};
 use num::BigUint;
-use once_cell::sync::Lazy;
-use regex::Regex;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Builds an entity key for an emission loop: the qualified id at the given
+/// instantiation, with nested function types normalized. Abilities are not part of Boogie
+/// names, so instantiations differing only in them are one entity.
+pub fn normalized_inst_id<Id: Clone>(id: QualifiedId<Id>, inst: &[Type]) -> QualifiedInstId<Id> {
+    id.instantiate(
+        inst.iter()
+            .map(|t| t.clone().normalize_nested_funs())
+            .collect(),
+    )
+}
+
+/// Tracks which entities an emission loop has already translated. Keyed on the entity,
+/// not its rendered Boogie name, so entities sharing a name are all translated; such a
+/// collision is reported through `GlobalEnv::error`.
+pub struct EmittedEntities<K: Ord + Clone> {
+    emitted: BTreeSet<K>,
+    by_name: BTreeMap<String, K>,
+    reported: BTreeSet<String>,
+}
+
+impl<K: Ord + Clone> Default for EmittedEntities<K> {
+    fn default() -> Self {
+        Self {
+            emitted: BTreeSet::new(),
+            by_name: BTreeMap::new(),
+            reported: BTreeSet::new(),
+        }
+    }
+}
+
+impl<K: Ord + Clone> EmittedEntities<K> {
+    /// Returns true if `key` has not been translated yet, and reports an error if a
+    /// *different* entity has already rendered to `name`. `what` names the kind of
+    /// entity for the diagnostic, e.g. "struct" or "function".
+    pub fn insert(&mut self, env: &GlobalEnv, key: K, name: &str, what: &str) -> bool {
+        match self.by_name.get(name) {
+            Some(existing) if existing != &key => {
+                // Report a given name once, so repeated instantiations do not exhaust
+                // the error limit.
+                if self.reported.insert(name.to_string()) {
+                    env.error(
+                        &env.internal_loc(),
+                        &format!(
+                            "two different {}s render to the Boogie name `{}`. Boogie \
+                             name rendering must be injective, so this is a bug in the \
+                             name mangling: the name shows which module and entity \
+                             parts fused",
+                            what, name
+                        ),
+                    );
+                }
+            },
+            None => {
+                self.by_name.insert(name.to_string(), key.clone());
+            },
+            Some(_) => {},
+        }
+        self.emitted.insert(key)
+    }
+}
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
-pub const MAX_TUPLE_SIZE: usize = 8;
+pub const MAX_TUPLE_SIZE: usize = 11;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
 const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
+
+/// Returns memory whose pre-state is needed by a function behavioral predicate
+/// at a concrete type instantiation. In addition to ordinary parameterized
+/// resources, this resolves resource memory selected by a bare function type
+/// parameter (for example the `T` in `object::spec_exists_at<T>`).
+pub fn behavioral_old_memory_instantiated(
+    fun_env: &FunctionEnv<'_>,
+    inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut result = fun_env.get_spec_old_memory_instantiated(inst);
+    let spec = fun_env.get_spec();
+    for cond in &spec.conditions {
+        if matches!(cond.kind, ConditionKind::LetPre(..)) {
+            result.extend(
+                cond.exp
+                    .directly_used_memory(fun_env.env())
+                    .into_iter()
+                    .map(|memory| memory.instantiate(inst)),
+            );
+            for type_param in cond.exp.directly_generic_used_memory(fun_env.env()) {
+                if let Some(Type::Struct(module_id, struct_id, type_args)) =
+                    inst.get(type_param as usize).map(Type::skip_reference)
+                {
+                    result.insert(module_id.qualified_inst(*struct_id, type_args.clone()));
+                }
+            }
+        }
+    }
+    result
+}
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -48,7 +136,7 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
         mod_sym.to_string().replace(['<', '>'], "#")
     } else if let Address::Numerical(a) = mod_name.addr() {
         // qualify module by address.
-        format!("{}_{}", a.short_str_lossless(), mod_sym)
+        format!("{}.{}", a.short_str_lossless(), mod_sym)
     } else {
         env.env
             .error(&env.get_loc(), "unsupported symbolic address");
@@ -65,7 +153,7 @@ pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bo
             // convention including the value's bv twin, so twin instances
             // reference their own carrier.
             return format!(
-                "${}_{}{}",
+                "${}.{}{}",
                 boogie_module_name(&struct_env.module_env),
                 struct_env.get_name().display(struct_env.symbol_pool()),
                 boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
@@ -78,7 +166,7 @@ pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bo
         format!("Table int ({})", boogie_type(env, &inst[1], bv_flag))
     } else {
         format!(
-            "${}_{}{}",
+            "${}.{}{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
             // Non-Table structs use bv_flag=false for all type parameters: bv classification
@@ -96,22 +184,16 @@ pub fn boogie_struct_variant_name(
 ) -> String {
     let struct_name = boogie_struct_name(struct_env, inst, false);
     let variant_name = variant.display(struct_env.symbol_pool());
-    format!("{}_{}", struct_name, variant_name)
+    format!("{}.{}", struct_name, variant_name)
 }
 
 /// Return field selector for given field.
 pub fn boogie_field_sel(field_env: &FieldEnv<'_>) -> String {
     let struct_env = &field_env.struct_env;
-    // Attach variant name to field name if it is an enum field
-    // to distinguish fields with the same name but different types in different variants
-    let variant = if field_env.get_variant().is_some() {
-        format!(
-            "_{}",
-            field_env
-                .get_variant()
-                .unwrap()
-                .display(struct_env.symbol_pool())
-        )
+    // An enum field carries its variant, joined with `.`, which a Move identifier cannot
+    // contain, so same-named fields of different variants stay distinct.
+    let variant = if let Some(variant) = field_env.get_variant() {
+        format!(".{}", variant.display(struct_env.symbol_pool()))
     } else {
         "".to_string()
     };
@@ -140,20 +222,29 @@ pub fn boogie_variant_field_update(
     inst: &[Type],
 ) -> String {
     let struct_env = &field_env.struct_env;
-    let suffix = boogie_type_suffix_for_struct(struct_env, inst, false);
+    // The field name comes before the type, separated by `.`: a field name contains no
+    // `.`, while a rendered type may, so the first `.` marks the boundary.
     format!(
-        "$Update'{}'_{}_{}",
-        suffix,
-        // remove parentheses and spaces from field type name
-        field_type_name.replace(['(', ')'], "").replace(' ', "_"),
+        "$Update'{}'_{}.{}",
+        boogie_type_suffix_for_struct(struct_env, inst, false),
         field_env.get_name().display(struct_env.symbol_pool()),
+        boogie_field_type_name_component(&field_type_name),
     )
 }
 
-/// Return true if the field is a bitwise field
+/// Mangles a rendered field type into a Boogie name component. Shared by the enum `$Update`
+/// wrapper's emitter and `boogie_variant_field_update`, whose names must match.
+pub fn boogie_field_type_name_component(field_type_name: &str) -> String {
+    field_type_name.replace(['(', ')'], "").replace(' ', "_")
+}
+
+/// Return whether the field renders as a bitvector. `ty` is the field's
+/// (instantiated) type; signed-containing types never render as bitvectors.
 pub fn field_bv_flag_global_state(
     global_state: &GlobalNumberOperationState,
     field_env: &FieldEnv,
+    env: &GlobalEnv,
+    ty: &Type,
 ) -> bool {
     // Ghost fields are model-only and never participate in number-operation
     // (bitvector) analysis; on enums they also carry no variant.
@@ -175,21 +266,21 @@ pub fn field_bv_flag_global_state(
     } else {
         field_env.get_id()
     };
-    if let Some(struct_info) = operation_map.get(&(mid, sid)) {
-        matches!(struct_info.get(&field_id), Some(&Bitwise))
-    } else {
-        false
-    }
+    operation_map
+        .get(&(mid, sid))
+        .and_then(|struct_info| struct_info.get(&field_id))
+        .is_some_and(|oper| bv_flag_for_type(env, oper, ty))
 }
 
-/// Return boogie type for given field
+/// Return boogie type for given field. `ty` is the field's (instantiated)
+/// type.
 pub fn boogie_type_for_struct_field(
     global_state: &GlobalNumberOperationState,
     field: &FieldEnv,
     env: &GlobalEnv,
     ty: &Type,
 ) -> String {
-    let bv_flag = field_bv_flag_global_state(global_state, field);
+    let bv_flag = field_bv_flag_global_state(global_state, field, env, ty);
     boogie_type(env, ty, bv_flag)
 }
 
@@ -198,7 +289,7 @@ pub fn boogie_type_for_struct_field(
 /// Otherwise uses standard type suffixes.
 pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type], bv_flag: &[bool]) -> String {
     format!(
-        "${}_{}{}",
+        "${}.{}{}",
         boogie_module_name(&fun_env.module_env),
         fun_env.get_name().display(fun_env.symbol_pool()),
         boogie_inst_suffix(fun_env.module_env.env, inst, bv_flag)
@@ -207,36 +298,28 @@ pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type], bv_flag: &
 
 /// Return the boogie "$-spec" function name for a native function.
 /// Native function prelude templates follow the naming convention
-/// `$module_$fname'inst'` for their pure, side-effect-free spec versions
-/// (e.g. `$1_vector_$empty'address'`).  When a native function has no
+/// `$module.$fname'inst'` for their pure, side-effect-free spec versions
+/// (e.g. `$1.vector.$empty'address'`).  When a native function has no
 /// Move-level spec, the Boogie backend can use this name to produce a
 /// concrete, deterministic body for the behavioral result function instead
 /// of leaving it as an unconstrained uninterpreted function.
 pub fn boogie_native_spec_fun_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String {
     format!(
-        "${}_${}{}",
+        "${}.${}{}",
         boogie_module_name(&fun_env.module_env),
         fun_env.get_name().display(fun_env.symbol_pool()),
         boogie_inst_suffix(fun_env.module_env.env, inst, &[])
     )
 }
 
-/// Reverse map mangled function name to source level function name.
-pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
-    // TODO: in order to make this actually reversible, we can't use ${}_{}{} above
-    //   but must use something like ${}${}{}. This requires also changes in the prelude.
-    static REX: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"^\$([0-9,a-f,A-F]+)_(\w+)_(\w+)").expect("regex compiles"));
-    let cap = REX.captures(s)?;
-    let addr = cap.get(1)?;
-    let module_name = cap.get(2)?;
-    let fun_name = cap.get(3)?;
-    Some(format!(
-        "0x{}::{}::{}",
-        addr.as_str(),
-        module_name.as_str(),
-        fun_name.as_str()
-    ))
+/// Whether the prelude templates define a Boogie "$-spec" function
+/// (see [`boogie_native_spec_fun_name`]) for this native function. Only
+/// these natives can delegate their behavioral result function to the
+/// "$-spec" form; any other native has no Boogie-level function form and
+/// its result function must stay uninterpreted. The list mirrors the
+/// `$<module>_$<name>` function definitions in `src/prelude/*.bpl`.
+pub fn boogie_native_fun_has_spec_fun(fun_env: &FunctionEnv<'_>) -> bool {
+    move_model::well_known::is_boogie_prelude_spec_native(fun_env)
 }
 
 /// Return boogie name of given spec var.
@@ -247,7 +330,7 @@ pub fn boogie_spec_var_name(
     memory_label: &Option<MemoryLabel>,
 ) -> String {
     format!(
-        "${}_{}{}{}",
+        "${}.{}{}{}",
         boogie_module_name(module_env),
         name.display(module_env.symbol_pool()),
         boogie_inst_suffix(module_env.env, inst, &[]),
@@ -268,7 +351,7 @@ pub fn boogie_spec_fun_name(
         .position(|(overload_id, _)| &id == overload_id)
         .expect("spec fun env inconsistent");
     let overload_qualifier = if pos > 0 {
-        format!("_{}", pos)
+        format!(".{}", pos)
     } else {
         "".to_string()
     };
@@ -283,7 +366,7 @@ pub fn boogie_spec_fun_name(
         suffix = boogie_inst_suffix(env.env, inst, &v);
     };
     format!(
-        "${}_{}{}{}",
+        "${}.{}{}{}",
         boogie_module_name(env),
         decl.name.display(env.symbol_pool()),
         overload_qualifier,
@@ -320,6 +403,12 @@ pub fn boogie_resource_memory_name(
     )
 }
 
+/// Creates the name of the unique identity constant for a resource type's memory, given
+/// that memory's name. The constant is the `t` component of a `$Global` location.
+pub fn boogie_resource_memory_id_name(memory_name: &str) -> String {
+    format!("{}_$id", memory_name)
+}
+
 /// Creates a string for a memory label.
 fn boogie_memory_label(memory_label: &Option<MemoryLabel>) -> String {
     if let Some(l) = memory_label {
@@ -351,6 +440,88 @@ pub fn boogie_make_vec_from_strings(args: &[String]) -> String {
         }
         make
     }
+}
+
+/// Return whether `ty`'s containment closure (vector elements, type arguments,
+/// struct fields) includes a signed integer. Signed integers are always Boogie
+/// `int` — they have no bitvector rendering — so such types must not select bv
+/// encodings; the prelude generates no bv twins for them. This mirrors the
+/// traversal of `Type::get_all_contained_types_with_skip_reference`, but
+/// short-circuits on the first signed integer instead of materializing the
+/// closure, and additionally checks the intrinsic-map value type argument: it
+/// is declared phantom, yet the Boogie representation (`Table int (V)`)
+/// embeds it. Keys are not checked — they encode to int regardless of the
+/// map's bv rendering.
+pub fn type_contains_signed_int(env: &GlobalEnv, ty: &Type) -> bool {
+    type_contains_prim(env, ty, &|p| p.is_signed())
+}
+
+/// Like `type_contains_signed_int`, for widthless `num`: it has no
+/// bitvector rendering either, and can appear nested (e.g. `vector<num>`
+/// in a spec-function instantiation whose slot acquired `Bitwise` from an
+/// unrelated caller).
+pub fn type_contains_widthless_num(env: &GlobalEnv, ty: &Type) -> bool {
+    type_contains_prim(env, ty, &|p| matches!(p, PrimitiveType::Num))
+}
+
+fn type_contains_prim(env: &GlobalEnv, ty: &Type, pred: &impl Fn(&PrimitiveType) -> bool) -> bool {
+    use Type::*;
+    match ty {
+        Primitive(p) => pred(p),
+        Tuple(ts) => ts.iter().any(|t| type_contains_prim(env, t, pred)),
+        Vector(et) => type_contains_prim(env, et, pred),
+        Struct(mid, sid, ts) => {
+            let struct_env = env.get_module(*mid).into_struct(*sid);
+            let args_contain = if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
+                // Only the value type is rendered: the representation is
+                // `Table int (V)` with keys encoded to int by `$EncodeKey`,
+                // and bv twin supply likewise keys on the value type alone.
+                // A signed key must not clamp an unsigned bitwise value to
+                // the int twin while value operands render bv.
+                ts.get(1).is_some_and(|t| type_contains_prim(env, t, pred))
+            } else {
+                // Phantom arguments cannot reach a field type of an ordinary
+                // struct, matching the containment closure.
+                ts.iter().enumerate().any(|(i, t)| {
+                    !struct_env.is_phantom_parameter(i) && type_contains_prim(env, t, pred)
+                })
+            };
+            if args_contain {
+                return true;
+            }
+            if struct_env.has_variants() {
+                struct_env.get_variants().any(|variant| {
+                    struct_env
+                        .get_fields_of_variant(variant)
+                        .any(|f| type_contains_prim(env, &f.get_type().instantiate(ts), pred))
+                })
+            } else {
+                struct_env
+                    .get_fields()
+                    .any(|f| type_contains_prim(env, &f.get_type().instantiate(ts), pred))
+            }
+        },
+        Fun(arg, result, _) => {
+            type_contains_prim(env, arg, pred) || type_contains_prim(env, result, pred)
+        },
+        Reference(_, bt) | TypeDomain(bt) => type_contains_prim(env, bt, pred),
+        ResourceDomain(_, _, Some(ts)) => ts.iter().any(|t| type_contains_prim(env, t, pred)),
+        ResourceDomain(_, _, None) | TypeParameter(_) | StateDomain | Error | Var(_) => false,
+    }
+}
+
+/// Effective bitvector flag for a value of type `ty`: a `Bitwise`
+/// classification selects bv rendering only for types that have one.
+/// Number-operation slots shared across generic instantiations (parameters,
+/// fields) can carry `Bitwise` acquired from an unsigned instantiation; values
+/// of signed instantiations must still render as `int`. Widthless `num`
+/// values (spec lets, spec fun results) have no bitvector rendering either:
+/// a caller's bitwise argument can mark a callee's parameter slot `Bitwise`
+/// and reach `num`-typed expressions in the callee's spec through it.
+pub fn bv_flag_for_type(env: &GlobalEnv, num_oper: &NumOperation, ty: &Type) -> bool {
+    *num_oper == Bitwise
+        && !type_contains_widthless_num(env, ty)
+        && !type_contains_signed_int(env, ty)
 }
 
 /// Returns `"bvN"` when `bv_flag` is true, `"int"` otherwise.
@@ -431,19 +602,22 @@ fn boogie_tuple_type(ty: &Type, elems: &[Type], type_fn: impl Fn(&Type) -> Strin
 fn fun_type(env: &GlobalEnv, params: &Type, results: &Type, _abilities: AbilitySet) -> String {
     // Abilities are abstracted out in the prover, but for completeness and future changes,
     // we pass them into this function.
-    let params = params
-        .clone()
-        .flatten()
-        .iter()
-        .map(|t| boogie_type_suffix(env, t, false))
-        .join("_");
-    let results = results
-        .clone()
-        .flatten()
-        .iter()
-        .map(|t| boogie_type_suffix(env, t, false))
-        .join("_");
-    format!("$fun_{}_{}", params, results)
+    let params = params.clone().flatten();
+    let results = results.clone().flatten();
+    let render = |tys: &[Type]| {
+        tys.iter()
+            .map(|t| boogie_type_suffix(env, t, false))
+            .join("_")
+    };
+    // The arities are part of the name, as for tuples, so the split between parameters
+    // and results is recoverable.
+    format!(
+        "$fun{}_{}_{}_{}",
+        params.len(),
+        render(&params),
+        results.len(),
+        render(&results)
+    )
 }
 
 /// Return boogie BV type for a number type.
@@ -491,12 +665,14 @@ pub fn boogie_int_suffix(ty: &Type, bv_flag: bool) -> String {
         Type::Primitive(U64) => boogie_num_type_string_capital("U", "64", bv_flag),
         Type::Primitive(U128) => boogie_num_type_string_capital("U", "128", bv_flag),
         Type::Primitive(U256) => boogie_num_type_string_capital("U", "256", bv_flag),
-        Type::Primitive(I8) => boogie_num_type_string_capital("I", "8", bv_flag),
-        Type::Primitive(I16) => boogie_num_type_string_capital("I", "16", bv_flag),
-        Type::Primitive(I32) => boogie_num_type_string_capital("I", "32", bv_flag),
-        Type::Primitive(I64) => boogie_num_type_string_capital("I", "64", bv_flag),
-        Type::Primitive(I128) => boogie_num_type_string_capital("I", "128", bv_flag),
-        Type::Primitive(I256) => boogie_num_type_string_capital("I", "256", bv_flag),
+        // Signed integers have no bv rendering; ignore `bv_flag` rather than
+        // alias to the unsigned bv procedure names.
+        Type::Primitive(I8) => "I8".to_string(),
+        Type::Primitive(I16) => "I16".to_string(),
+        Type::Primitive(I32) => "I32".to_string(),
+        Type::Primitive(I64) => "I64".to_string(),
+        Type::Primitive(I128) => "I128".to_string(),
+        Type::Primitive(I256) => "I256".to_string(),
         _ => unreachable!("non-integer dest for arithmetic op"),
     }
 }
@@ -580,12 +756,14 @@ pub fn boogie_type_suffix(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
             U64 => boogie_num_type_string("u", "64", bv_flag),
             U128 => boogie_num_type_string("u", "128", bv_flag),
             U256 => boogie_num_type_string("u", "256", bv_flag),
-            I8 => boogie_num_type_string("i", "8", bv_flag),
-            I16 => boogie_num_type_string("i", "16", bv_flag),
-            I32 => boogie_num_type_string("i", "32", bv_flag),
-            I64 => boogie_num_type_string("i", "64", bv_flag),
-            I128 => boogie_num_type_string("i", "128", bv_flag),
-            I256 => boogie_num_type_string("i", "256", bv_flag),
+            // Signed integers have no bv rendering; ignore `bv_flag` rather
+            // than alias to the unsigned bv suffixes.
+            I8 => "i8".to_string(),
+            I16 => "i16".to_string(),
+            I32 => "i32".to_string(),
+            I64 => "i64".to_string(),
+            I128 => "i128".to_string(),
+            I256 => "i256".to_string(),
             Num => {
                 if bv_flag {
                     //TODO(#19036): add error message with accurate location info
@@ -640,7 +818,7 @@ pub fn boogie_type_suffix_for_struct(
 ) -> String {
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
         format!(
-            "${}_{}{}",
+            "${}.{}{}",
             boogie_module_name(&struct_env.module_env),
             struct_env.get_name().display(struct_env.symbol_pool()),
             boogie_inst_suffix(struct_env.module_env.env, inst, &[false, bv_flag])
@@ -777,13 +955,13 @@ pub fn boogie_constant(env: &GlobalEnv, _options: &BoogieOptions, val: &Constant
         Constant::U32(num) => num.to_string(),
         Constant::U64(num) => num.to_string(),
         Constant::U128(num) => num.to_string(),
-        Constant::U256(num) => num.to_string(),
+        Constant::U256(num) => move_core_types::int256::U256::from(*num).to_string(),
         Constant::I8(num) => num.to_string(),
         Constant::I16(num) => num.to_string(),
         Constant::I32(num) => num.to_string(),
         Constant::I64(num) => num.to_string(),
         Constant::I128(num) => num.to_string(),
-        Constant::I256(num) => num.to_string(),
+        Constant::I256(num) => move_core_types::int256::I256::from(*num).to_string(),
         Constant::Address(v) => boogie_address(env, v),
         Constant::ByteArray(v) => boogie_byte_blob(_options, v, false),
         Constant::AddressArray(v) => boogie_address_blob(env, _options, v),
@@ -988,45 +1166,34 @@ impl TypeIdentToken {
     }
 }
 
-/// A formatter for address
-pub struct AddressFormatter {
-    /// whether the `0x` prefix is needed
-    pub prefix: bool,
-    /// whether to include leading zeros
-    pub full_length: bool,
-    /// whether to capitalize the hex repr
-    pub capitalized: bool,
-}
-
-impl AddressFormatter {
-    pub fn format(&self, addr: &AccountAddress) -> String {
-        let result = addr.to_big_uint().to_str_radix(16);
-        // into correct length
-        let result = if self.full_length {
-            format!("{:0>32}", result)
-        } else {
-            result
-        };
-        // into correct case
-        let result = if self.capitalized {
-            result.to_uppercase()
-        } else {
-            result
-        };
-        // with or without prefix
-        if self.prefix {
-            format!("0x{}", result)
-        } else {
-            result
-        }
-    }
-}
-
-fn type_name_to_ident_tokens(
+/// Renders `Name<arg0, arg1>`: the tail of a canonical struct type name and the
+/// `struct_name` of `type_info::type_of`.
+fn struct_name_with_type_args(
     env: &GlobalEnv,
-    ty: &Type,
-    formatter: &AddressFormatter,
+    struct_env: &StructEnv,
+    ty_args: &[Type],
 ) -> Vec<TypeIdentToken> {
+    let mut tokens = TypeIdentToken::make(
+        &struct_env
+            .get_name()
+            .display(struct_env.symbol_pool())
+            .to_string(),
+    );
+    if !ty_args.is_empty() {
+        tokens.extend(TypeIdentToken::make("<"));
+        let ty_args_tokens = ty_args
+            .iter()
+            .map(|t| type_name_to_ident_tokens(env, t))
+            .collect();
+        tokens.extend(TypeIdentToken::join(", ", ty_args_tokens));
+        tokens.extend(TypeIdentToken::make(">"));
+    }
+    tokens
+}
+
+/// Renders `ty` as `TypeTag::to_canonical_string` does: struct addresses as `0x` followed by
+/// the address without leading zeroes, type arguments joined by `", "`.
+fn type_name_to_ident_tokens(env: &GlobalEnv, ty: &Type) -> Vec<TypeIdentToken> {
     match ty {
         Type::Primitive(PrimitiveType::Bool) => TypeIdentToken::make("bool"),
         Type::Primitive(PrimitiveType::U8) => TypeIdentToken::make("u8"),
@@ -1045,32 +1212,26 @@ fn type_name_to_ident_tokens(
         Type::Primitive(PrimitiveType::Signer) => TypeIdentToken::make("signer"),
         Type::Vector(element) => {
             let mut tokens = TypeIdentToken::make("vector<");
-            tokens.extend(type_name_to_ident_tokens(env, element, formatter));
+            tokens.extend(type_name_to_ident_tokens(env, element));
             tokens.extend(TypeIdentToken::make(">"));
             tokens
         },
         Type::Struct(mid, sid, ty_args) => {
             let module_env = env.get_module(*mid);
             let struct_env = module_env.get_struct(*sid);
-            let type_name = format!(
-                "{}::{}::{}",
-                formatter.format(&module_env.get_name().addr().expect_numerical()),
+            let mut tokens = TypeIdentToken::make(&format!(
+                "0x{}::{}::",
+                module_env
+                    .get_name()
+                    .addr()
+                    .expect_numerical()
+                    .short_str_lossless(),
                 module_env
                     .get_name()
                     .name()
                     .display(module_env.symbol_pool()),
-                struct_env.get_name().display(module_env.symbol_pool())
-            );
-            let mut tokens = TypeIdentToken::make(&type_name);
-            if !ty_args.is_empty() {
-                tokens.extend(TypeIdentToken::make("<"));
-                let ty_args_tokens = ty_args
-                    .iter()
-                    .map(|t| type_name_to_ident_tokens(env, t, formatter))
-                    .collect();
-                tokens.extend(TypeIdentToken::join(", ", ty_args_tokens));
-                tokens.extend(TypeIdentToken::make(">"));
-            }
+            ));
+            tokens.extend(struct_name_with_type_args(env, &struct_env, ty_args));
             tokens
         },
         Type::TypeParameter(idx) => {
@@ -1078,6 +1239,35 @@ fn type_name_to_ident_tokens(
                 "$TypeName(#{}_info)",
                 *idx
             ))]
+        },
+        // `|args|(results)` followed by the abilities; references as `&T` and `&mut T`.
+        Type::Fun(params, results, abilities) => {
+            let render_list = |ty: &Type| {
+                let items = ty
+                    .clone()
+                    .flatten()
+                    .iter()
+                    .map(|t| match t {
+                        Type::Reference(kind, bt) => {
+                            let mut tokens = TypeIdentToken::make(match kind {
+                                ReferenceKind::Immutable => "&",
+                                ReferenceKind::Mutable => "&mut ",
+                            });
+                            tokens.extend(type_name_to_ident_tokens(env, bt));
+                            tokens
+                        },
+                        _ => type_name_to_ident_tokens(env, t),
+                    })
+                    .collect();
+                TypeIdentToken::join(", ", items)
+            };
+            let mut tokens = TypeIdentToken::make("|");
+            tokens.extend(render_list(params));
+            tokens.extend(TypeIdentToken::make("|("));
+            tokens.extend(render_list(results));
+            tokens.extend(TypeIdentToken::make(")"));
+            tokens.extend(TypeIdentToken::make(&abilities.display_postfix()));
+            tokens
         },
         // move types that are not allowed
         Type::Reference(..) | Type::Tuple(..) => {
@@ -1087,7 +1277,6 @@ fn type_name_to_ident_tokens(
         Type::Primitive(PrimitiveType::Num)
         | Type::Primitive(PrimitiveType::Range)
         | Type::Primitive(PrimitiveType::EventStore)
-        | Type::Fun(..)
         | Type::TypeDomain(..)
         | Type::ResourceDomain(..)
         | Type::StateDomain => {
@@ -1107,30 +1296,17 @@ fn type_name_to_ident_tokens(
 /// - false --> `ext::type_info`.
 /// TODO(mengxu): the above is a very hacky, we need a better way to differentiate
 pub fn boogie_reflection_type_name(env: &GlobalEnv, ty: &Type, stdlib: bool) -> String {
-    let formatter = if stdlib {
-        AddressFormatter {
-            prefix: false,
-            full_length: true,
-            capitalized: false,
-        }
-    } else {
-        AddressFormatter {
-            prefix: true,
-            full_length: false,
-            capitalized: false,
-        }
-    };
-    let bytes = TypeIdentToken::convert_to_bytes(type_name_to_ident_tokens(env, ty, &formatter));
+    let bytes = TypeIdentToken::convert_to_bytes(type_name_to_ident_tokens(env, ty));
     if stdlib {
         format!(
-            "${}_type_name_TypeName(${}_ascii_String({}))",
+            "${}.type_name.TypeName(${}.ascii.String({}))",
             env.get_stdlib_address().expect_numerical().to_big_uint(),
             env.get_stdlib_address().expect_numerical().to_big_uint(),
             bytes
         )
     } else {
         format!(
-            "${}_string_String({})",
+            "${}.string.String({})",
             env.get_stdlib_address().expect_numerical().to_big_uint(),
             bytes
         )
@@ -1138,13 +1314,14 @@ pub fn boogie_reflection_type_name(env: &GlobalEnv, ty: &Type, stdlib: bool) -> 
 }
 
 enum TypeInfoPack {
-    Struct(Address, String, String),
+    /// Address, module name, and `struct_name` (`Name<args>`).
+    Struct(Address, String, Vec<TypeIdentToken>),
     Symbolic(TypeParameterIndex),
 }
 
 fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
     match ty {
-        Type::Struct(mid, sid, _) => {
+        Type::Struct(mid, sid, ty_args) => {
             let module_env = env.get_module(*mid);
             let struct_env = module_env.get_struct(*sid);
             let module_name = module_env.get_name();
@@ -1154,10 +1331,7 @@ fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
                     .name()
                     .display(module_env.symbol_pool())
                     .to_string(),
-                struct_env
-                    .get_name()
-                    .display(module_env.symbol_pool())
-                    .to_string(),
+                struct_name_with_type_args(env, &struct_env, ty_args),
             ))
         },
         Type::TypeParameter(idx) => Some(TypeInfoPack::Symbolic(*idx)),
@@ -1219,17 +1393,17 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
         None => (
             "false".to_string(),
             format!(
-                "${}_type_info_TypeInfo(0, EmptyVec(), EmptyVec())",
+                "${}.type_info.TypeInfo(0, EmptyVec(), EmptyVec())",
                 extlib_address.to_big_uint()
             ),
         ),
         Some(TypeInfoPack::Struct(addr, module_name, struct_name)) => {
             let module_repr = TypeIdentToken::convert_to_bytes(TypeIdentToken::make(&module_name));
-            let struct_repr = TypeIdentToken::convert_to_bytes(TypeIdentToken::make(&struct_name));
+            let struct_repr = TypeIdentToken::convert_to_bytes(struct_name);
             (
                 "true".to_string(),
                 format!(
-                    "${}_type_info_TypeInfo({}, {}, {})",
+                    "${}.type_info.TypeInfo({}, {}, {})",
                     extlib_address.to_big_uint(),
                     addr.expect_numerical().to_big_uint(),
                     module_repr,
@@ -1240,7 +1414,7 @@ pub fn boogie_reflection_type_info(env: &GlobalEnv, ty: &Type) -> (String, Strin
         Some(TypeInfoPack::Symbolic(idx)) => (
             get_symbol_is_struct(idx),
             format!(
-                "${}_type_info_TypeInfo({}, {}, {})",
+                "${}.type_info.TypeInfo({}, {}, {})",
                 extlib_address.to_big_uint(),
                 get_symbol_account_address(idx),
                 get_symbol_module_name(idx),
@@ -1303,9 +1477,9 @@ pub fn boogie_behavioral_spec_fun_name(
     let fun_name = fun_name_sym.display(env.symbol_pool());
     let param_name = param_sym.display(env.symbol_pool());
     // The spec function name format matches what spec_rewriter generates and what
-    // spec_translator expects: ${module}_$${kind}$${fun}$${param}${suffix}
+    // spec_translator expects: ${module}.$${kind}$${fun}$${param}${suffix}
     format!(
-        "${}_${}${}${}{}",
+        "${}.${}${}${}{}",
         module_name,
         kind,
         fun_name,
@@ -1317,9 +1491,9 @@ pub fn boogie_behavioral_spec_fun_name(
 /// Return name of a behavioral predicate result function for ensures_of.
 /// This is an uninterpreted function that returns the result value(s) for a given input.
 /// When `multi_result` is false (single result), the format is
-/// `${module}_$ensures_of_result$${fun}$${param}${suffix}`.
+/// `${module}.$ensures_of_result$${fun}$${param}${suffix}`.
 /// When `multi_result` is true (2+ results as a tuple), the format is
-/// `${module}_$ensures_of_results$${fun}$${param}${suffix}`.
+/// `${module}.$ensures_of_results$${fun}$${param}${suffix}`.
 pub fn boogie_behavioral_result_fun_name(
     env: &GlobalEnv,
     fun: &QualifiedInstId<FunId>,
@@ -1334,7 +1508,7 @@ pub fn boogie_behavioral_result_fun_name(
     let param_name = param_sym.display(env.symbol_pool());
     let plural = if multi_result { "s" } else { "" };
     format!(
-        "${}_$ensures_of_result{}${}${}{}",
+        "${}.$ensures_of_result{}${}${}{}",
         module_name,
         plural,
         fun_name,
@@ -1359,7 +1533,7 @@ pub fn boogie_struct_field_name(
 
 /// Return name of a behavioral predicate spec function for a struct field variant.
 /// These are uninterpreted functions parameterized by instance id `n`.
-/// Format: `${module}_$sf_{kind}${struct}${field}${suffix}`
+/// Format: `${module}.$sf_{kind}${struct}${field}${suffix}`
 pub fn boogie_struct_field_spec_fun_name(
     env: &GlobalEnv,
     struct_id: &QualifiedInstId<StructId>,
@@ -1373,7 +1547,7 @@ pub fn boogie_struct_field_spec_fun_name(
     let struct_name = struct_name_sym.display(env.symbol_pool());
     let field_name = field_sym.display(env.symbol_pool());
     format!(
-        "${}_$sf_{}${}${}{}",
+        "${}.$sf_{}${}${}{}",
         module_name,
         kind,
         struct_name,
@@ -1383,7 +1557,7 @@ pub fn boogie_struct_field_spec_fun_name(
 }
 
 /// Return name of a behavioral predicate result function for a struct field variant.
-/// Format: `${module}_$sf_ensures_of_result(s?)${struct}${field}${suffix}`
+/// Format: `${module}.$sf_ensures_of_result(s?)${struct}${field}${suffix}`
 pub fn boogie_struct_field_result_fun_name(
     env: &GlobalEnv,
     struct_id: &QualifiedInstId<StructId>,
@@ -1398,7 +1572,7 @@ pub fn boogie_struct_field_result_fun_name(
     let field_name = field_sym.display(env.symbol_pool());
     let plural = if multi_result { "s" } else { "" };
     format!(
-        "${}_$sf_ensures_of_result{}${}${}{}",
+        "${}.$sf_ensures_of_result{}${}${}{}",
         module_name,
         plural,
         struct_name,
@@ -1436,7 +1610,7 @@ pub fn boogie_behavioral_eval_fun_name(
 /// Return name of a per-function behavioral spec function for a closure target function.
 /// These inline functions have concrete bodies derived from the function's spec.
 /// Format: `$bp_{kind}'{fun_name}'`
-/// For example: `$bp_ensures_of'$1_m_callee'`
+/// For example: `$bp_ensures_of'$1.m.callee'`
 pub fn boogie_behavioral_fun_spec_name(
     env: &GlobalEnv,
     fun: &QualifiedInstId<FunId>,
@@ -1488,12 +1662,12 @@ pub fn compute_evaluator_memory_union(
         }
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            for mem in fun_env.get_spec_used_memory() {
-                union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
-            }
-            for mem in fun_env.get_spec_old_memory() {
-                union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
-            }
+            union_used_memory.extend(spec_derivation::behavioral_target_memory(
+                env,
+                info.fun.to_qualified_id(),
+                &info.fun.inst,
+            ));
+            union_old_memory.extend(behavioral_old_memory_instantiated(&fun_env, &info.fun.inst));
         }
     }
 
@@ -1544,4 +1718,40 @@ pub fn compute_evaluator_memory_union(
     }
 
     (union_used_memory, union_old_memory)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A colliding entity is still translated, and the collision reported once.
+
+    #[test]
+    fn distinct_entities_sharing_a_name_are_both_emitted_and_reported_once() {
+        let env = GlobalEnv::new();
+        let mut emitted = EmittedEntities::<u32>::default();
+
+        assert!(emitted.insert(&env, 1, "$42_a_b_c", "function"));
+        assert_eq!(env.error_count(), 0);
+
+        // A different entity with the same rendered name is still emitted.
+        assert!(emitted.insert(&env, 2, "$42_a_b_c", "function"));
+        assert_eq!(env.error_count(), 1);
+
+        // A third colliding entity is emitted without repeating the report.
+        assert!(emitted.insert(&env, 3, "$42_a_b_c", "function"));
+        assert_eq!(env.error_count(), 1);
+    }
+
+    #[test]
+    fn an_entity_seen_again_is_not_re_emitted_and_not_reported() {
+        let env = GlobalEnv::new();
+        let mut emitted = EmittedEntities::<u32>::default();
+
+        assert!(emitted.insert(&env, 1, "$42.a.b_c", "struct"));
+        assert!(!emitted.insert(&env, 1, "$42.a.b_c", "struct"));
+        assert!(emitted.insert(&env, 2, "$42.a_b.c", "struct"));
+        assert!(!emitted.insert(&env, 2, "$42.a_b.c", "struct"));
+        assert_eq!(env.error_count(), 0);
+    }
 }

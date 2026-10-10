@@ -1,0 +1,18 @@
+Move prover returns: exiting with compilation errors
+error: cannot resolve `result_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/inline/spoofed_map_ref.move:30:17
+   │
+30 │             vec(result_of<f>(v[end - 1]))
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^
+   ·
+44 │         map_ref(v, |inner| map_ref(inner, |x| *x + 1))
+   │                    ---------------------------------- lambda argument
+
+error: cannot resolve `aborts_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/inline/spoofed_map_ref.move:39:20
+   │
+39 │                 || aborts_of<f>(v[end - 1])
+   │                    ^^^^^^^^^^^^^^^^^^^^^^^^
+   ·
+44 │         map_ref(v, |inner| map_ref(inner, |x| *x + 1))
+   │                    ---------------------------------- lambda argument

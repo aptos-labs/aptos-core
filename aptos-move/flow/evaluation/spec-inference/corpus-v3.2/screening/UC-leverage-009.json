@@ -1,0 +1,16 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_tier_lookup",
+  "reference_proved": true,
+  "reference_sha256": "fe7f28a8cb579c41b3167c0849bc543a94f6ccdb12cea6f964b2b7c9ff7287b4",
+  "schema_version": 2,
+  "target": "decibel_campaign::extracted_tier_lookup::leverage_for_tier_rank",
+  "task_id": "UC-leverage-009",
+  "threshold_seconds": 40,
+  "wall_seconds": 6.5,
+  "well_formed": true,
+  "wp_failure_kind": "implementation_failure",
+  "wp_hard": true
+}

@@ -6,12 +6,12 @@ fun loop_down(r0) {
     r0: u64
   code:
   L2:
-    0: br_le L0, r0, #0
+    0: br_le L0, r0, #0 @1
   L1:
-    1: r0 := sub r0, #1
-    2: branch L2
+    1: r0 := sub r0, #1 @6
+    2: branch L2 @8
   L0:
-    3: ret []
+    3: ret [] @9
 }
 
 fun conditional(r0): u64 {
@@ -20,13 +20,13 @@ fun conditional(r0): u64 {
     r1: u64
   code:
   L2:
-    0: br_true L0, r0
+    0: br_true L0, r0 @1
   L1:
-    1: r1 := ld_u64 0
-    2: ret [r1]
+    1: r1 := ld_u64 0 @2
+    2: ret [r1] @3
   L0:
-    3: r1 := ld_u64 1
-    4: ret [r1]
+    3: r1 := ld_u64 1 @4
+    4: ret [r1] @5
 }
 === micro-ops ===
 // module 0x66::test
@@ -35,21 +35,21 @@ fun loop_down() {
   frame_data_size: 8
   entry_gas: 3
   code:
-    0: JumpLessEqualU64Imm @3 [0] <= #0 gas_taken=2 gas_fallthrough=7
-    1: SubU64Imm [0] <- [0] - #1
-    2: Jump @0 gas=3
-    3: Return
+    0: JumpLessEqualU64Imm @3 [0] <= #0 gas_taken=2 gas_fallthrough=7 @1
+    1: SubU64Imm [0] <- [0] - #1 @6
+    2: Jump @0 gas=3 @8
+    3: Return @9
 }
 
 fun conditional() {
   frame_data_size: 16
   entry_gas: 3
   code:
-    0: JumpNotZeroByte @4 [0] gas_taken=56 gas_fallthrough=56
-    1: StoreImm8 [8] <- #0
-    2: Move8 [0] <- [8]
-    3: Return
-    4: StoreImm8 [8] <- #1
-    5: Move8 [0] <- [8]
-    6: Return
+    0: JumpNotZeroByte @4 [0] gas_taken=56 gas_fallthrough=56 @1
+    1: StoreImm8 [8] <- #0 @2
+    2: Move8 [0] <- [8] @3
+    3: Return @3
+    4: StoreImm8 [8] <- #1 @4
+    5: Move8 [0] <- [8] @5
+    6: Return @5
 }

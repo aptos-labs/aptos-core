@@ -85,9 +85,10 @@ module std::vector {
         let len = length(v);
         while ({
             spec {
+                // Note: conditions over `f` would need behavioral predicates
+                // (`result_of<f>(..)`), which require language version 2.4;
+                // this module must remain compilable at earlier versions.
                 invariant i <= len;
-                invariant forall j: num where j >= 0 && j < i: !f(borrow(v, j));
-                invariant find ==> i < len && f(borrow(v, i));
             };
             i < len
             }) {
@@ -98,9 +99,6 @@ module std::vector {
                 break
             };
             i = i + 1;
-        };
-        spec {
-            assert !find <==> (forall j: num where j >= 0 && j < len: !f(v[j]));
         };
         (find, found_index)
     }

@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    common::{HOT_STATE_KV_DB_FOLDER_NAME, STATE_KV_DB_FOLDER_NAME},
     db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
@@ -64,9 +65,9 @@ const _: () = assert!(
 
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
-        "hot_state_kv_db"
+        HOT_STATE_KV_DB_FOLDER_NAME
     } else {
-        "state_kv_db"
+        STATE_KV_DB_FOLDER_NAME
     }
 }
 
@@ -629,7 +630,7 @@ impl StateKvDb {
         mut entries: Vec<(HashValue, Version, StateSlotKind)>,
     ) -> LoadedHotStateShard {
         // Index 0 = oldest (LRU tail), last = newest (MRU head).
-        entries.sort_by(|a, b| (a.1, a.0).cmp(&(b.1, b.0)));
+        entries.sort_by_key(|e| (e.1, e.0));
 
         let num_items = entries.len();
         let map = DashMap::with_capacity(num_items);

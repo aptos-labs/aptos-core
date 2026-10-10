@@ -40,6 +40,12 @@ impl std::fmt::Debug for FileHash {
 
 /// Extension for Move source language files
 pub const MOVE_EXTENSION: &str = "move";
+/// Extension for Lean sources which elaborate to Move XIR.
+pub const LEAN_EXTENSION: &str = "lean";
+/// Suffix of the proof file beside a Move source (`foo.proof.lean` beside
+/// `foo.move`): the Lean proofs of the source's specifications, read by
+/// the Leaner verifier and never a Lean source of the package.
+pub const LEAN_PROOF_SUFFIX: &str = ".proof.lean";
 /// Extension for Move IR files
 pub const MOVE_IR_EXTENSION: &str = "mvir";
 /// Extension for Move ASM files
@@ -123,6 +129,16 @@ pub fn path_to_string(path: &Path) -> anyhow::Result<String> {
         Some(p) => Ok(p.to_string()),
         None => Err(anyhow!("non-Unicode file name")),
     }
+}
+
+/// Whether `path` is a Lean source of a package: a `.lean` file that is
+/// not the proof file of a Move source.
+pub fn is_lean_source(path: &Path) -> bool {
+    extension_equals(path, LEAN_EXTENSION)
+        && !path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(LEAN_PROOF_SUFFIX))
 }
 
 pub fn extension_equals(path: &Path, target_ext: &str) -> bool {

@@ -1,0 +1,77 @@
+--- a/sources/etna/lomuto_partition.move
++++ b/sources/etna/lomuto_partition.move
+@@ -24,0 +25,7 @@
++        } spec {
++            invariant len(values) == len(old(values));
++            invariant store <= i && i <= last;
++            invariant values[last] == p;
++            invariant forall k in 0..store: values[k] < p;
++            invariant forall k in store..i: values[k] >= p;
++            invariant forall x: num: count(values, x, len(values)) == count(old(values), x, len(values));
+@@ -27,0 +35,66 @@
++    }
++
++    spec module {
++        /// Occurrences of `x` among the first `k` elements. The weight keeps
++        /// the solver from unrolling this definition on its own: every use
++        /// below goes through the two lemmas, one step at a time.
++        fun count(v: vector<u64>, x: num, k: num): num [weight = 20] {
++            if (k <= 0) { 0 }
++            else { count(v, x, k - 1) + (if (v[k - 1] == x) { 1 } else { 0 }) }
++        }
++
++        /// Vectors that agree on positions `m..k` accumulate the same counts
++        /// there. Proved by induction on `k`: one unfolding plus the hypothesis.
++        lemma count_agree(a: vector<u64>, b: vector<u64>, x: num, m: num, k: num) {
++            requires 0 <= m;
++            requires m <= k;
++            requires forall t in m..k: a[t] == b[t];
++            ensures count(a, x, k) - count(a, x, m) == count(b, x, k) - count(b, x, m);
++        } proof {
++            if (m < k) {
++                apply count_agree(a, b, x, m, k - 1);
++            }
++        }
++
++        /// Exchanging two positions preserves every count over the whole
++        /// vector: the two positions contribute the same pair of elements, and
++        /// the three stretches around them are untouched. Stated for any order
++        /// of `i` and `j`, because the loop swaps downwards and the final swap
++        /// upwards.
++        lemma count_swap(v: vector<u64>, i: num, j: num, x: num) {
++            ensures (0 <= i && i < len(v) && 0 <= j && j < len(v)) ==>
++                count(update(update(v, i, v[j]), j, v[i]), x, len(v)) == count(v, x, len(v));
++        } proof {
++            if (0 <= i && i < len(v) && 0 <= j && j < len(v)) {
++                if (i < j) {
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, 0, i);
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, i + 1, j);
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, j + 1, len(v));
++                } else if (j < i) {
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, 0, j);
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, j + 1, i);
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, i + 1, len(v));
++                } else {
++                    apply count_agree(v, update(update(v, i, v[j]), j, v[i]), x, 0, len(v));
++                }
++            }
++        }
++    }
++
++    spec partition {
++        pragma opaque;
++        aborts_if [inferred] len(values) == 0;
++        aborts_if [inferred] pivot >= len(values);
++        ensures [inferred] len(values) == len(old(values));
++        ensures [inferred] result < len(values);
++        ensures [inferred] values[result] == old(values)[pivot];
++        ensures [inferred] forall k in 0..result: values[k] < values[result];
++        ensures [inferred] forall k in result..len(values): values[k] >= values[result];
++        ensures [inferred] forall x: num: count(values, x, len(values)) == count(old(values), x, len(values));
++    } proof {
++        // Entry-point instantiation with the swapped vector as the trigger, so
++        // every `vector::swap` in the body -- which the prover encodes as
++        // exactly this double update -- meets the lemma.
++        forall v: vector<u64>, i: num, j: num, x: num
++            {count(update(update(v, i, v[j]), j, v[i]), x, len(v))}
++            apply count_swap(v, i, j, x);

@@ -1,0 +1,22 @@
+{
+  "apparatus_ok": true,
+  "exceeded_stage": null,
+  "passed": true,
+  "reference_package": "references/build/extracted_rate_limiter",
+  "reference_proved": true,
+  "reference_sha256": "b6dcddbf64696687c8871357247833b914344d17356192d0b325b25800cd325c",
+  "schema_version": 2,
+  "target": "aptos_framework::extracted_rate_limiter::refill",
+  "task_id": "RL-refill-037",
+  "task_tree_sha256": "8835054068d73cd84ed248086aabb06703e30afd04414402e93126444e816fde",
+  "threshold_seconds": 20,
+  "wall_seconds": 13.5,
+  "well_formed": true,
+  "wp_failure_kind": null,
+  "wp_hard": false,
+  "wp_model_gate": {
+    "errors": [],
+    "passed": true,
+    "stripped_spec_blocks": 1
+  }
+}

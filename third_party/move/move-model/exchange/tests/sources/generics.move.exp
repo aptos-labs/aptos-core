@@ -1,0 +1,280 @@
+{
+  "version": 10,
+  "structs": [
+    {
+      "name": "Box",
+      "type_parameters": [{"name": "T", "abilities": ["copy", "drop", "store"]}],
+      "fields": [{"name": "value", "ty": {"type_parameter": 0}}]
+    },
+    {
+      "name": "Choice",
+      "type_parameters": [{"name": "T", "abilities": ["copy", "drop"]}],
+      "fields": [],
+      "variants": [
+        {"name": "None", "fields": []},
+        {"name": "Some", "fields": [{"name": "0", "ty": {"type_parameter": 0}}]}
+      ]
+    },
+    {
+      "name": "Marker",
+      "type_parameters": [{"name": "T", "phantom": true}],
+      "fields": [{"name": "id", "ty": "u64"}]
+    },
+    {
+      "name": "Vault",
+      "type_parameters": [{"name": "T", "phantom": true}],
+      "fields": [{"name": "value", "ty": "u64"}]
+    }
+  ],
+  "funs": [
+    {
+      "name": "contains",
+      "type_parameters": [{"name": "T"}],
+      "params": 1,
+      "locals": ["address", "address", "bool"],
+      "returns": ["bool"],
+      "blocks": [
+        {
+          "instrs": [{"assign": [1, 0]}, {"call": [[2], {"exists_inst": [3, [{"type_parameter": 0}]]}, [1]]}],
+          "term": {"ret": [2]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "publish",
+      "type_parameters": [{"name": "T"}],
+      "params": 2,
+      "locals": [
+        {"ref": "signer"},
+        "u64",
+        {"ref": "signer"},
+        "u64",
+        {"struct_inst": [3, [{"type_parameter": 0}]]}
+      ],
+      "returns": [],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [2, 0]},
+            {"assign": [3, 1]},
+            {"call": [[4], {"pack_inst": [{"type_parameter": 0}]}, [3]]},
+            {"call": [[], {"move_to_inst": [3, [{"type_parameter": 0}]]}, [2, 4]]}
+          ],
+          "term": {"ret": []}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "choose",
+      "type_parameters": [{"name": "T", "abilities": ["copy", "drop"]}],
+      "params": 3,
+      "locals": [
+        {"type_parameter": 0},
+        {"type_parameter": 0},
+        "bool",
+        "bool",
+        {"type_parameter": 0},
+        {"type_parameter": 0}
+      ],
+      "returns": [{"type_parameter": 0}],
+      "blocks": [
+        {"instrs": [{"assign": [3, 2]}], "term": {"branch": [3, 1, 2]}},
+        {"instrs": [{"assign": [4, 0]}], "term": {"ret": [4]}},
+        {"instrs": [{"assign": [5, 1]}], "term": {"ret": [5]}}
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "identity",
+      "type_parameters": [{"name": "T", "abilities": ["copy", "drop"]}],
+      "params": 1,
+      "locals": [{"type_parameter": 0}, {"type_parameter": 0}],
+      "returns": [{"type_parameter": 0}],
+      "blocks": [{"instrs": [{"assign": [1, 0]}], "term": {"ret": [1]}}],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "inspect_choice",
+      "params": 1,
+      "locals": [
+        "u64",
+        {"enum_inst": [1, ["u64"]]},
+        {"ref": {"enum_inst": [1, ["u64"]]}},
+        "u64",
+        {"enum_inst": [1, ["u64"]]},
+        {"ref": {"enum_inst": [1, ["u64"]]}},
+        {"ref": {"enum_inst": [1, ["u64"]]}},
+        "bool",
+        {"ref": {"enum_inst": [1, ["u64"]]}},
+        {"enum_inst": [1, ["u64"]]},
+        "u64",
+        {"ref": {"enum_inst": [1, ["u64"]]}},
+        "bool",
+        {"enum_inst": [1, ["u64"]]},
+        "u64",
+        "u64",
+        {"enum_inst": [1, ["u64"]]},
+        {"enum_inst": [1, ["u64"]]}
+      ],
+      "returns": ["u64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [3, 0]},
+            {"call": [[4], {"pack_variant_inst": [1, ["u64"]]}, [3]]},
+            {"assign": [1, 4]},
+            {"call": [[5], "borrow_loc", [1]]},
+            {"assign": [2, 5]},
+            {"assign": [6, 2]},
+            {"call": [[16], "read_ref", [6]]},
+            {"call": [[7], {"test_variant_inst": [0, ["u64"]]}, [16]]}
+          ],
+          "term": {"branch": [7, 1, 2]}
+        },
+        {
+          "instrs": [
+            {"assign": [8, 2]},
+            {"assign": [9, 1]},
+            {"call": [[], {"unpack_variant_inst": [0, ["u64"]]}, [9]]},
+            {"load": [10, {"num": "0"}]}
+          ],
+          "term": {"ret": [10]}
+        },
+        {
+          "instrs": [
+            {"assign": [11, 2]},
+            {"call": [[17], "read_ref", [11]]},
+            {"call": [[12], {"test_variant_inst": [1, ["u64"]]}, [17]]}
+          ],
+          "term": {"branch": [12, 3, 4]}
+        },
+        {
+          "instrs": [{"assign": [13, 1]}, {"call": [[14], {"unpack_variant_inst": [1, ["u64"]]}, [13]]}],
+          "term": {"ret": [14]}
+        },
+        {"instrs": [{"load": [15, {"num": "14566554180833181697"}]}], "term": {"abort": 15}}
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "marker",
+      "params": 1,
+      "locals": ["u64", "u64", {"struct_inst": [2, [{"vector": "u64"}]]}],
+      "returns": [{"struct_inst": [2, [{"vector": "u64"}]]}],
+      "blocks": [
+        {
+          "instrs": [{"assign": [1, 0]}, {"call": [[2], {"pack_inst": [{"vector": "u64"}]}, [1]]}],
+          "term": {"ret": [2]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "read",
+      "type_parameters": [{"name": "T"}],
+      "params": 1,
+      "locals": [
+        "address",
+        "address",
+        {"ref": {"struct_inst": [3, [{"type_parameter": 0}]]}},
+        {"ref": "u64"},
+        "u64"
+      ],
+      "returns": ["u64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [1, 0]},
+            {"call": [[2], {"borrow_global_inst": [3, [{"type_parameter": 0}]]}, [1]]},
+            {"call": [[3], {"borrow_field_inst": [0, [{"type_parameter": 0}]]}, [2]]},
+            {"call": [[4], "read_ref", [3]]}
+          ],
+          "term": {"ret": [4]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "replace",
+      "type_parameters": [{"name": "T"}],
+      "params": 2,
+      "locals": [
+        "address",
+        "u64",
+        {"mut_ref": "u64"},
+        "address",
+        {"mut_ref": {"struct_inst": [3, [{"type_parameter": 0}]]}},
+        {"mut_ref": "u64"},
+        "u64",
+        {"mut_ref": "u64"}
+      ],
+      "returns": [],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [3, 0]},
+            {"call": [[4], {"borrow_global_inst": [3, [{"type_parameter": 0}]]}, [3]]},
+            {"call": [[5], {"borrow_field_inst": [0, [{"type_parameter": 0}]]}, [4]]},
+            {"assign": [2, 5]},
+            {"assign": [6, 1]},
+            {"assign": [7, 2]},
+            {"call": [[], "write_ref", [7, 6]]}
+          ],
+          "term": {"ret": []}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "round_trip",
+      "params": 1,
+      "locals": ["u64", "u64", "u64", {"struct_inst": [0, ["u64"]]}, "u64", "u64", "bool", "u64"],
+      "returns": ["u64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [1, 0]},
+            {"call": [[2], {"function_inst": [3, ["u64"]]}, [1]]},
+            {"call": [[3], {"pack_inst": ["u64"]}, [2]]},
+            {"call": [[4], {"unpack_inst": ["u64"]}, [3]]},
+            {"load": [5, {"num": "0"}]},
+            {"load": [6, {"bool": true}]},
+            {"call": [[7], {"function_inst": [2, ["u64"]]}, [4, 5, 6]]}
+          ],
+          "term": {"ret": [7]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "take",
+      "type_parameters": [{"name": "T"}],
+      "params": 1,
+      "locals": ["address", "address", {"struct_inst": [3, [{"type_parameter": 0}]]}, "u64"],
+      "returns": ["u64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [1, 0]},
+            {"call": [[2], {"move_from_inst": [3, [{"type_parameter": 0}]]}, [1]]},
+            {"call": [[3], {"unpack_inst": [{"type_parameter": 0}]}, [2]]}
+          ],
+          "term": {"ret": [3]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    }
+  ]
+}

@@ -542,7 +542,7 @@ fn parse_service_name_from_stateful_set_name(
     let cap = re.captures(stateful_set_name).unwrap();
     let service_base_name = format!("{}-{}", &cap[1], &cap[2]);
     if enable_haproxy {
-        format!("{}-{}", &service_base_name, HAPROXY_SERVICE_SUFFIX)
+        format!("{}-{}", service_base_name, HAPROXY_SERVICE_SUFFIX)
     } else {
         service_base_name
     }
@@ -564,7 +564,7 @@ fn get_k8s_node_from_stateful_set(
     // if we're not using port-forward and expecting to hit the service directly, we should use the full service name
     // since the test runner may be in a separate namespace
     if !use_port_forward {
-        service_name = format!("{}.{}.svc", &service_name, &namespace);
+        service_name = format!("{}.{}.svc", service_name, namespace);
     }
 
     // Append the cluster name if its a multi-cluster deployment
@@ -574,7 +574,7 @@ fn get_k8s_node_from_stateful_set(
         .as_ref()
         .and_then(|labels| labels.get("multicluster/targetcluster"))
     {
-        format!("{}.{}", &service_name, &target_cluster_name)
+        format!("{}.{}", service_name, target_cluster_name)
     } else {
         service_name
     };
@@ -598,7 +598,7 @@ fn get_k8s_node_from_stateful_set(
         .tag;
 
     K8sNode {
-        name: format!("{}-{}", &node_type, index),
+        name: format!("{}-{}", node_type, index),
         stateful_set_name: stateful_set_name.clone(),
         // TODO: fetch this from running node
         peer_id: PeerId::random(),
@@ -728,7 +728,7 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
                     },
                     Err(err) => {
                         let err = anyhow::Error::from(err);
-                        info!("Node {} unhealthy: {}", node.name(), &err);
+                        info!("Node {} unhealthy: {}", node.name(), err);
                         Err(err)
                     },
                 }

@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-37:  publish [import LeanerMove]
+task 1 lines 39-39:  run 0x0::LeanerBorrowVectors::insert_without_element_borrow
+return values: 3
+task 2 lines 41-41:  run 0x0::LeanerBorrowVectors::freeze_element
+return values: 6
+task 3 lines 43-43:  run 0x0::LeanerBorrowVectors::pop_without_element_borrow
+return values: 4
+task 4 lines 45-45:  run 0x0::LeanerBorrowVectors::swap_without_element_borrow
+return values: 2

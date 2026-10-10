@@ -16,7 +16,7 @@ pub(crate) enum ParallelBlockExecutionError {
 // This is separate error because we need to match the error variant to provide a specialized
 // fallback logic if a resource group serialization error occurs.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ResourceGroupSerializationError;
+pub struct ResourceGroupSerializationError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// Logging is bottlenecked in constructors.

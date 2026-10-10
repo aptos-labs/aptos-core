@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-16:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LIR-SEMANTIC-BORROW-CONFLICT: mutable reference use conflicts with an active shared loan
+   ┌─ TEMPFILE:12:6
+   │
+12 │     *vectorRef := core.prim.insertVector(*vectorRef, 2, 3)
+   │      ^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

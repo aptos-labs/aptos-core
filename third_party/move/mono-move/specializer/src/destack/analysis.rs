@@ -105,7 +105,10 @@ pub(crate) struct BlockAnalysis {
     pub stloc_targets: UnorderedMap<SsaSlot, HomeIndex>,
     /// `ValueId` → Home slot index of the local it was copied/moved out of,
     /// when the local is neither redefined nor mut-borrowed during the
-    /// `ValueId`'s live range.
+    /// `ValueId`'s live range. A `Copy` coalesces only when its type is
+    /// bitwise-copy: coalescing elides the copy, which is unsound for a value
+    /// owning heap storage (see the equivalence rules on
+    /// [`Instr::Copy`]/[`Instr::Move`]).
     pub coalesce_to_local: UnorderedMap<SsaSlot, HomeIndex>,
     /// `ValueId` → `Transfer` position, for call args or rets whose live
     /// range doesn't cross any other call. See the file-header section
@@ -121,6 +124,10 @@ pub(crate) struct BlockAnalysis {
 impl BlockAnalysis {
     /// Analyze a basic block and produce hint maps for slot allocation.
     ///
+    /// `is_bitwise_copy_value(id)` reports whether `ValueId(id)`'s type is
+    /// bitwise-copy (fully captured by its frame bytes); gates `Copy`
+    /// coalescing.
+    ///
     /// Pre: `instrs` is one basic block's SSA slice; each `ValueId` is
     /// defined exactly once.
     ///
@@ -131,7 +138,10 @@ impl BlockAnalysis {
     /// ValueIds already in either earlier map. (`coalesce_to_local` ∩ call
     /// rets is empty by SSA: a ValueId defined by a `Call` is never the
     /// `dst` of `Copy`/`Move { dst: value_id, src: Home }`.)
-    pub(crate) fn analyze(instrs: &[Instr<SsaSlot>]) -> Self {
+    pub(crate) fn analyze(
+        instrs: &[Instr<SsaSlot>],
+        is_bitwise_copy_value: impl Fn(u16) -> bool,
+    ) -> Self {
         // Forward scan: build per-`ValueId` and per-`Home` position indices.
         // `ValueId` -> last instruction index where it appears as def or use.
         let mut live_end: UnorderedMap<SsaSlot, usize> = UnorderedMap::new();
@@ -213,9 +223,14 @@ impl BlockAnalysis {
         let mut coalesce_to_local: UnorderedMap<SsaSlot, HomeIndex> = UnorderedMap::new();
         for (i, instr) in instrs.iter().enumerate() {
             if let Instr::Copy { dst, src } | Instr::Move { dst, src } = instr
-                && dst.is_value_id()
+                && let SsaSlot::ValueId(id) = dst
                 && let SsaSlot::Home(home_idx) = src
             {
+                // A `Copy` of a value owning heap storage must materialize an
+                // independent object; coalescing would elide the deep copy.
+                if matches!(instr, Instr::Copy { .. }) && !is_bitwise_copy_value(*id) {
+                    continue;
+                }
                 let value_id = *dst;
                 if let Some(&lu) = live_end.get(&value_id)
                     && lu > i
@@ -736,7 +751,7 @@ mod tests {
                 args,
             }),
         }];
-        let analysis = BlockAnalysis::analyze(&instrs);
+        let analysis = BlockAnalysis::analyze(&instrs, |_| true);
         assert_eq!(analysis.max_transfer_positions, 200);
     }
 }

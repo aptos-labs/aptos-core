@@ -82,8 +82,7 @@ pub async fn test_save_and_list_metadata_files_impl(
             buf.lines()
                 .map(TextLine::new)
                 .collect::<Result<Vec<_>>>()
-                .unwrap()
-                .into_iter(),
+                .unwrap(),
         )
     }
     read_back.sort();

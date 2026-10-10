@@ -37,10 +37,8 @@ pub fn read_env_var(v: &str) -> String {
 
 /// Build the test-mode `ProverOptions` shared by both the panic-on-error
 /// and baseline-driven entry points.
-fn build_test_options(shards: usize, only_shard: Option<usize>) -> ProverOptions {
+fn build_test_options() -> ProverOptions {
     let mut options = ProverOptions::default_for_test();
-    options.shards = Some(shards);
-    options.only_shard = only_shard;
     options.check_inconsistency = read_env_var(ENV_TEST_INCONSISTENCY) == "1";
     options.unconditional_abort_as_inconsistency =
         read_env_var(ENV_TEST_UNCONDITIONAL_ABORT_AS_INCONSISTENCY) == "1";
@@ -69,13 +67,9 @@ fn assert_prover_tools_available(options: &ProverOptions) {
     }
 }
 
-pub fn run_prover_for_pkg(
-    path_to_pkg: impl Into<String>,
-    shards: usize,
-    only_shard: Option<usize>,
-) {
+pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let options = build_test_options(shards, only_shard);
+    let options = build_test_options();
     assert_prover_tools_available(&options);
     options
         .prove(
@@ -100,25 +94,27 @@ pub fn run_prover_for_pkg(
 /// The error is captured into the baseline output, so subsequent runs verify
 /// the captured text against the stored baseline. Set `UB=1` (or `UPBL=1` /
 /// `UPDATE_BASELINE=1`) to (re)create the baseline from the current output.
-pub fn run_prover_for_pkg_with_baseline(
-    test_file: &str,
-    path_to_pkg: impl Into<String>,
-    shards: usize,
-    only_shard: Option<usize>,
-) {
+pub fn run_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
-    let mut options = build_test_options(shards, only_shard);
+    let mut options = build_test_options();
     // Redact non-deterministic values (signer addresses, fresh temp ids, …)
     // in the prover's diagnostic output so the captured baseline is stable
     // across runs — same mechanism as `move-prover/tests/testsuite.rs`.
     options.stable_test_output = true;
     assert_prover_tools_available(&options);
+    prove_against_baseline(test_file, &pkg_path, options, "Move prover");
+}
 
+/// Run `options` on `pkg_path` and compare the result against the `.exp`
+/// baseline next to `test_file`. Mirrors the format produced by
+/// `move-prover/tests/testsuite.rs`: error message (if any) first, then the
+/// captured diagnostic buffer. An empty baseline means clean verification.
+fn prove_against_baseline(test_file: &str, pkg_path: &Path, options: ProverOptions, tool: &str) {
     let (mut writer, buf) = DiagWriter::new_buffer();
     let result = options.prove_to(
         &mut writer,
         false,
-        pkg_path.as_path(),
+        pkg_path,
         BTreeMap::default(),
         Some(VERSION_DEFAULT),
         Some(CompilerVersion::latest_stable()),
@@ -127,16 +123,11 @@ pub fn run_prover_for_pkg_with_baseline(
         extended_checks::get_all_attribute_names(),
         &[],
     );
-
-    // Mirror the format produced by `move-prover/tests/testsuite.rs`: error
-    // message (if any) first, then the captured diagnostic buffer. An empty
-    // baseline means clean verification.
     let mut diags = match &result {
         Ok(()) => String::new(),
-        Err(err) => format!("Move prover returns: {err}\n"),
+        Err(err) => format!("{tool} returns: {err}\n"),
     };
     diags += &String::from_utf8_lossy(buf.lock().unwrap().as_slice());
-
     check_baseline(test_file, &diags);
 }
 
@@ -177,20 +168,39 @@ fn check_baseline(test_file: &str, output: &str) {
 
 #[test]
 fn move_framework_prover_tests() {
-    run_prover_for_pkg("aptos-framework", 5, None);
+    run_prover_for_pkg("aptos-framework");
 }
 
 #[test]
 fn move_token_prover_tests() {
-    run_prover_for_pkg("aptos-token", 1, None);
+    run_prover_for_pkg("aptos-token");
 }
 
 #[test]
 fn move_aptos_stdlib_prover_tests() {
-    run_prover_for_pkg("aptos-stdlib", 1, None);
+    run_prover_for_pkg("aptos-stdlib");
 }
 
 #[test]
 fn move_stdlib_prover_tests() {
-    run_prover_for_pkg("move-stdlib", 1, None);
+    run_prover_for_pkg("move-stdlib");
+}
+
+/// Verify `path_to_pkg` with the Leaner verifier (`prove --lean`) and compare
+/// its messages against the `.exp` baseline next to `test_file`. Skips where
+/// the verifier is not built (`third_party/move/lean/leaner-move`).
+pub fn run_lean_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<String>) {
+    if !move_prover::leaner::verifier_available() {
+        eprintln!("skipping Leaner prover test: the Leaner Move verifier is not built");
+        return;
+    }
+    let pkg_path = path_in_crate(path_to_pkg);
+    let mut options = ProverOptions::default_for_test();
+    options.lean = true;
+    prove_against_baseline(test_file, &pkg_path, options, "Leaner verifier");
+}
+
+#[test]
+fn move_stdlib_lean_prover_tests() {
+    run_lean_prover_for_pkg_with_baseline(file!(), "move-stdlib");
 }

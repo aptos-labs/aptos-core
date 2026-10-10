@@ -1308,7 +1308,10 @@ module 0x42::m {
 In general, `opaque` functions enable modular verification, as they abstract from the implementation
 of functions, resulting in much faster verification.
 
-If an `opaque` function modifies state, it is advised to use the [`modifies` condition](#modifies-condition) in its specification. If this is omitted, verification of the state changes will fail.
+If an `opaque` function modifies state, use the
+[`modifies` condition](#modifies-condition) when callers need a precise frame.
+For modified resource types omitted from the frame, the prover warns and
+conservatively havocs every address at call sites.
 
 ## Abstract specifications
 

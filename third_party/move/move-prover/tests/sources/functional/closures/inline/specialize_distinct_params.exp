@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/specialize_distinct_params.move:46:9
+   │
+46 │         ensures result == 2 * x + 4; // error: off by one
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:41: call_wrong
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:45: call_wrong (spec)
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:41: call_wrong
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:12: apply2
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:42: call_wrong
+   =         r1 = <redacted>
+   =         r2 = <redacted>
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:16: apply2
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:17: apply2
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:19: apply2
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:12: apply2
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/specialize_distinct_params.move:46: call_wrong (spec)

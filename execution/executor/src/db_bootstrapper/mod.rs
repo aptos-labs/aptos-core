@@ -11,8 +11,8 @@ use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
-    state_store::state_view::cached_state_view::CachedStateView, DbReaderWriter, DbWriter,
-    LedgerSummary,
+    state_store::{positions::PositionParent, state_view::cached_state_view::CachedStateView},
+    DbReaderWriter, DbWriter, LedgerSummary,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -96,6 +96,33 @@ impl GenesisCommitter {
         self.waypoint
     }
 
+    /// The epoch-0 ledger info produced by executing genesis. Available without
+    /// committing, so a caller that only needs provenance to genesis (e.g. a
+    /// node about to fast sync past it) can take this and drop the rest.
+    pub fn ledger_info(&self) -> Option<&LedgerInfoWithSignatures> {
+        self.output.ledger_info_opt.as_ref()
+    }
+
+    /// Commits genesis, leaving the ledger info alone.
+    ///
+    /// For a node that recorded the epoch-0 ledger info up front to establish
+    /// provenance before it knew whether it would fast sync past genesis. That
+    /// ledger info is already durable and is already the latest, so writing it
+    /// again would be rejected as a gap in epoch history.
+    pub fn commit_without_ledger_info(self) -> Result<()> {
+        self.db.save_transactions(
+            self.output
+                .output
+                .expect_complete_result()
+                .as_chunk_to_commit(),
+            None,
+            true, /* sync_commit */
+        )?;
+        info!("Genesis committed without ledger info.");
+
+        Ok(())
+    }
+
     pub fn commit(self) -> Result<()> {
         self.db.save_transactions(
             self.output
@@ -134,6 +161,12 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         get_state_epoch(&base_state_view)?
     };
 
+    let position_floor = db.writer.advance_position_base(None)?;
+    let parent_positions = ledger_summary
+        .positions
+        .as_ref()
+        .zip(position_floor.as_ref())
+        .map(|(overlay, floor)| PositionParent { overlay, floor });
     let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
         &V::new(),
         vec![genesis_txn.clone().into()].into(),
@@ -141,6 +174,7 @@ pub fn calculate_genesis<V: VMBlockExecutor>(
         // will need it.
         vec![AuxiliaryInfo::new_empty()],
         &ledger_summary.state,
+        parent_positions,
         base_state_view,
         onchain_config,
         TransactionSliceMetadata::unknown(),

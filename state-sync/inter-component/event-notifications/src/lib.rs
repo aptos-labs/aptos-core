@@ -259,15 +259,39 @@ impl EventSubscriptionService {
         Ok(reconfig_event_found)
     }
 
+    /// Notifies reconfiguration subscribers of the on-chain configs held by
+    /// `reader` rather than by the node's own storage.
+    ///
+    /// A node that is about to fast sync has no state of its own yet, but its
+    /// subscribers still need the genesis configs to make progress: on-chain
+    /// network discovery needs the validator set before it can connect to the
+    /// peers it would fast sync from.
+    pub fn notify_initial_configs_from(
+        &mut self,
+        reader: Arc<dyn DbReader>,
+        version: Version,
+    ) -> Result<(), Error> {
+        self.notify_reconfiguration_subscribers_from(reader, version)
+    }
+
     /// This notifies all the reconfiguration subscribers of the on-chain
     /// configurations at the specified version.
     fn notify_reconfiguration_subscribers(&mut self, version: Version) -> Result<(), Error> {
+        let reader = self.storage.read().reader.clone();
+        self.notify_reconfiguration_subscribers_from(reader, version)
+    }
+
+    fn notify_reconfiguration_subscribers_from(
+        &mut self,
+        reader: Arc<dyn DbReader>,
+        version: Version,
+    ) -> Result<(), Error> {
         if self.reconfig_subscriptions.is_empty() {
             return Ok(()); // No reconfiguration subscribers!
         }
 
-        let new_configs = self.read_on_chain_configs(version)?;
-        for (_, reconfig_subscription) in self.reconfig_subscriptions.iter_mut() {
+        let new_configs = self.read_on_chain_configs(reader, version)?;
+        for reconfig_subscription in self.reconfig_subscriptions.values_mut() {
             reconfig_subscription.notify_subscriber_of_configs(version, new_configs.clone())?;
         }
 
@@ -280,12 +304,10 @@ impl EventSubscriptionService {
     /// to handle on-chain configs not existing in a reconfiguration notification.
     fn read_on_chain_configs(
         &self,
+        reader: Arc<dyn DbReader>,
         version: Version,
     ) -> Result<OnChainConfigPayload<DbBackedOnChainConfig>, Error> {
-        let db_state_view = &self
-            .storage
-            .read()
-            .reader
+        let db_state_view = &reader
             .state_view_at_version(Some(version))
             .map_err(|error| {
                 Error::UnexpectedErrorEncountered(format!(
@@ -304,7 +326,7 @@ impl EventSubscriptionService {
         // Return the new on-chain config payload (containing all found configs at this version).
         Ok(OnChainConfigPayload::new(
             epoch,
-            DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version),
+            DbBackedOnChainConfig::new(reader, version),
         ))
     }
 }
@@ -350,7 +372,7 @@ impl EventSubscription {
 
     fn notify_subscriber_of_events(&mut self, version: Version) -> Result<(), Error> {
         let event_notification = EventNotification {
-            subscribed_events: self.event_buffer.drain(..).collect(),
+            subscribed_events: std::mem::take(&mut self.event_buffer),
             version,
         };
 

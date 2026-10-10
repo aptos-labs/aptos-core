@@ -1,0 +1,221 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::specialize_bodyless {
+    use std::vector;
+    private inline fun fold(v: &vector<u64>,init: u64,f: |u64, u64|u64): u64 {
+        {
+          let acc: u64 = init;
+          {
+            let i: u64 = 0;
+            {
+              let n: u64 = vector::length<u64>(v);
+              loop {
+                if spec {
+                  invariant Le(i, n);
+                  invariant Eq<u64>(acc, specialize_bodyless::opaque_fold($t2, $t0, $t1, i));
+                }
+                ;
+                Lt<u64>(i, n) {
+                  acc: u64 = (f)(acc, Deref(vector::borrow<u64>(v, i)));
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                } else {
+                  break
+                }
+              };
+              acc
+            }
+          }
+        }
+    }
+    private fun sum(v: &vector<u64>): u64 {
+        {
+          let (v: &vector<u64>, init: u64): (&vector<u64>, u64) = Tuple(v, 0);
+          {
+            let acc: u64 = init;
+            {
+              let i: u64 = 0;
+              {
+                let n: u64 = vector::length<u64>(v);
+                loop {
+                  if spec {
+                    invariant true;
+                    invariant true;
+                  }
+                  ;
+                  Lt<u64>(i, n) {
+                    acc: u64 = {
+                      let (acc: u64, e: u64): (u64, u64) = Tuple(acc, Deref(vector::borrow<u64>(v, i)));
+                      Add<u64>(acc, e)
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                acc
+              }
+            }
+          }
+        }
+    }
+    spec {
+    }
+
+    spec fun opaque_fold(f: |u64, u64|u64,v: vector<u64>,init: u64,end: u64): u64;
+} // end 0x42::specialize_bodyless
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::specialize_bodyless {
+    use std::vector;
+    inline fun fold(v: &vector<u64>, init: u64, f: |u64, u64|u64): u64 {
+        let acc = init;
+        let i = 0;
+        let n = 0x1::vector::length<u64>(v);
+        while (i < n) {
+            acc = f(acc, *0x1::vector::borrow<u64>(v, i));
+            i = i + 1;
+        } spec {
+            invariant i <= n;
+            invariant acc == opaque_fold(f, v, init, i);
+        };
+        acc
+    }
+    fun sum(v: &vector<u64>): u64 {
+        let (v,init) = (v, 0);
+        let acc = init;
+        let i = 0;
+        let n = 0x1::vector::length<u64>(v);
+        while (i < n) {
+            acc = {
+                let (acc,e) = (acc, *0x1::vector::borrow<u64>(v, i));
+                acc + e
+            };
+            i = i + 1;
+        } spec {
+            invariant true;
+            invariant true;
+        };
+        acc
+    }
+
+    spec sum(v: &vector<u64>): u64 {
+        pragma aborts_if_is_partial = true;
+    }
+
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::specialize_bodyless {
+    use std::vector;
+    private inline fun fold(v: &vector<u64>,init: u64,f: |u64, u64|u64): u64 {
+        {
+          let acc: u64 = init;
+          {
+            let i: u64 = 0;
+            {
+              let n: u64 = vector::length<u64>(v);
+              loop {
+                if spec {
+                  invariant Le(i, n);
+                  invariant Eq<u64>(acc, specialize_bodyless::opaque_fold($t2, $t0, $t1, i));
+                }
+                ;
+                Lt<u64>(i, n) {
+                  acc: u64 = (f)(acc, Deref(vector::borrow<u64>(v, i)));
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                } else {
+                  break
+                }
+              };
+              acc
+            }
+          }
+        }
+    }
+    private fun sum(v: &vector<u64>): u64 {
+        {
+          let (v: &vector<u64>, init: u64): (&vector<u64>, u64) = Tuple(v, 0);
+          {
+            let acc: u64 = 0;
+            {
+              let i: u64 = 0;
+              {
+                let n: u64 = vector::length<u64>(v);
+                loop {
+                  if spec {
+                    invariant true;
+                    invariant true;
+                  }
+                  ;
+                  Lt<u64>(i, n) {
+                    acc: u64 = {
+                      let (acc: u64, e: u64): (u64, u64) = Tuple(acc, Deref(vector::borrow<u64>(v, i)));
+                      Add<u64>(acc, e)
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                acc
+              }
+            }
+          }
+        }
+    }
+    spec {
+    }
+
+    spec fun opaque_fold(f: |u64, u64|u64,v: vector<u64>,init: u64,end: u64): u64;
+} // end 0x42::specialize_bodyless
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::specialize_bodyless
+// Function definition at index 0
+fun sum(l0: &vector<u64>): u64
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    local l4: u64
+    local l5: u64
+    ld_u64 0
+    st_loc l1
+    ld_u64 0
+    st_loc l2
+    copy_loc l0
+    // @5
+    vec_len <u64>
+    st_loc l3
+l1: nop
+    copy_loc l2
+    copy_loc l3
+    // @10
+    lt
+    br_false l0
+    move_loc l1
+    copy_loc l0
+    copy_loc l2
+    // @15
+    vec_borrow <u64>
+    read_ref
+    add
+    st_loc l1
+    move_loc l2
+    // @20
+    ld_u64 1
+    add
+    st_loc l2
+    branch l1
+l0: move_loc l0
+    // @25
+    pop
+    move_loc l1
+    ret
+
+
+============ bytecode verification succeeded ========

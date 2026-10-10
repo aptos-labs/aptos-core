@@ -166,11 +166,11 @@ fn compile_and_run_samples_asm(
                     executor.add_module(&module_id, module_blob);
 
                     for func_identifier in func_identifiers {
-                        println!("Benchmarking {}::{}\n", &identifier, func_identifier.0);
+                        println!("Benchmarking {}::{}\n", identifier, func_identifier.0);
 
                         gas_measurement
                             .equation_names
-                            .push(format!("{}::{}", &identifier, func_identifier.0));
+                            .push(format!("{}::{}", identifier, func_identifier.0));
 
                         let elapsed = executor
                             .exec_func_record_running_time(

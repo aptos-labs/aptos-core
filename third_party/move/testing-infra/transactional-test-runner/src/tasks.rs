@@ -11,7 +11,7 @@ use clap::*;
 use legacy_move_compiler::shared::NumericalAddress;
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{MOVE_ASM_EXTENSION, MOVE_EXTENSION},
+    files::{LEAN_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION},
     types::{ParsedStructType, ParsedType},
     values::{ParsableValue, ParsedValue},
 };
@@ -90,13 +90,25 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
     let re_is_tera = Regex::new(r"(?m)^\s*\{(%|#)").unwrap();
     // checks for lines that are entirely whitespace
     let re_whitespace = Regex::new(r"^\s*$").unwrap();
-    // checks for lines that start with // comments
+    let is_lean = filename.extension().and_then(|ext| ext.to_str()) == Some(LEAN_EXTENSION);
+    // Checks for ordinary source comments. Lean additionally uses `--`.
     // here the next character is whitespace or an ASCII character other than #
-    let re_comment = Regex::new(r"^\s*//(\s|[\x20-\x22]|[[\x24-\x7E]])").unwrap();
-    // checks for lines that start with //# commands
+    let comment_pattern = if is_lean {
+        r"^\s*(?://|--)(\s|[\x20-\x22]|[[\x24-\x7E]])"
+    } else {
+        r"^\s*//(\s|[\x20-\x22]|[[\x24-\x7E]])"
+    };
+    let re_comment = Regex::new(comment_pattern).unwrap();
+    // Checks for transactional commands. Leaner sources may use `--#`, which
+    // is also a valid Lean line comment; retain `//#` for compatibility.
     // cutting leading/trailing whitespace
     // capturing the command text
-    let re_command_text = Regex::new(r"^\s*//#\s*(.*)\s*$").unwrap();
+    let command_pattern = if is_lean {
+        r"^\s*(?://#|--#)\s*(.*)\s*$"
+    } else {
+        r"^\s*//#\s*(.*)\s*$"
+    };
+    let re_command_text = Regex::new(command_pattern).unwrap();
 
     let mut file_content = fs::read_to_string(filename)?;
     if re_is_tera.is_match(&file_content) {
@@ -207,7 +219,14 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             None
         } else {
             let content = file_text_vec.join("\n");
-            let data = NamedTempFile::new()?;
+            // Preserve the test's source extension. Compiler frontends use it
+            // to distinguish Move, MASM, and Leaner source blocks.
+            let suffix = filename
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| format!(".{ext}"))
+                .unwrap_or_default();
+            let data = tempfile::Builder::new().suffix(&suffix).tempfile()?;
             data.reopen()?.write_all(content.as_bytes())?;
             Some(data)
         };
@@ -255,6 +274,7 @@ impl<T> TaskInput<T> {
 pub enum SyntaxChoice {
     Source,
     ASM,
+    Leaner,
 }
 
 /// When printing bytecode, the input program must either be a script or a module.
@@ -271,7 +291,8 @@ pub struct PrintBytecodeCommand {
     /// The kind of input: either a script, or a module.
     #[clap(long = "input", value_enum, ignore_case = true, default_value_t = PrintBytecodeInputChoice::Script)]
     pub input: PrintBytecodeInputChoice,
-    /// Select Move source ("move") or Move Assembler ("masm"). Is inferred
+    /// Select Move source ("move"), Move Assembler ("masm"), or Leaner
+    /// source ("lean"). Is inferred
     /// from filename if absent.
     #[clap(long = "syntax")]
     pub syntax: Option<SyntaxChoice>,
@@ -463,6 +484,7 @@ impl fmt::Display for SyntaxChoice {
         f.write_str(match self {
             SyntaxChoice::Source => MOVE_EXTENSION,
             SyntaxChoice::ASM => MOVE_ASM_EXTENSION,
+            SyntaxChoice::Leaner => LEAN_EXTENSION,
         })
     }
 }
@@ -474,10 +496,12 @@ impl FromStr for SyntaxChoice {
         match s {
             MOVE_EXTENSION => Ok(SyntaxChoice::Source),
             MOVE_ASM_EXTENSION => Ok(SyntaxChoice::ASM),
+            LEAN_EXTENSION => Ok(SyntaxChoice::Leaner),
             _ => Err(anyhow!(
-                "Invalid syntax choice. Expected '{}' or '{}'",
+                "Invalid syntax choice. Expected '{}', '{}', or '{}'",
                 MOVE_EXTENSION,
-                MOVE_ASM_EXTENSION
+                MOVE_ASM_EXTENSION,
+                LEAN_EXTENSION
             )),
         }
     }

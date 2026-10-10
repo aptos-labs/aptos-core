@@ -1,0 +1,288 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    struct R {
+        v: u64,
+    }
+    private inline fun apply_one(f: |address|,a: address,other: address) {
+        (f)(a);
+        spec {
+          assert Implies(Neq<address>($t2, $t1), unchanged_of($t0, $t2));
+        }
+        ;
+        Tuple()
+    }
+    private fun apply_unchanged(f: |u64|,x: u64) {
+        (f)(x)
+    }
+    spec {
+      ensures unchanged_of($t0, $t1);
+    }
+
+    private fun apply_unchanged_binary(f: |u64, u64|,a: u64,b: u64) {
+        (f)(a, b)
+    }
+    spec {
+      ensures unchanged_of($t0, $t1, $t2);
+    }
+
+    private fun caller(a: address,b: address) {
+        {
+          let (a: address, other: address): (address, address) = Tuple(a, b);
+          {
+            let (x: address): (address) = Tuple(a);
+            {
+              let v: u64 = select M::R.v<R>(BorrowGlobal(Immutable)<R>(x));
+              BorrowGlobal(Mutable)<R>(x) = pack M::R(Add<u64>(v, 1));
+              Tuple()
+            }
+          };
+          spec {
+            assert Implies(Neq<address>(other, a), And(Eq(exists<0x42::M::R>(other), Old(exists<0x42::M::R>(other))), Implies(Old(exists<0x42::M::R>(other)), Eq(global<0x42::M::R>(other), Old(global<0x42::M::R>(other))))));
+          }
+          ;
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    struct R has drop, key {
+        v: u64,
+    }
+    inline fun apply_one(f: |address|, a: address, other: address) {
+        f(a);
+        spec {
+            assert other != a ==> unchanged_of<f>(other);
+        };
+    }
+    fun apply_unchanged(f: |u64|, x: u64) {
+        f(x)
+    }
+
+    spec apply_unchanged(f: |u64|, x: u64) {
+        ensures unchanged_of<f>(x);
+    }
+
+    fun apply_unchanged_binary(f: |u64, u64|, a: u64, b: u64) {
+        f(a, b)
+    }
+
+    spec apply_unchanged_binary(f: |u64, u64|, a: u64, b: u64) {
+        ensures unchanged_of<f>(a, b);
+    }
+
+    fun caller(a: address, b: address) {
+        {
+            let (a,other) = (a, b);
+            {
+                let x = a;
+                let v = borrow_global<R>(x).v;
+                *borrow_global_mut<R>(x) = R{v: v + 1};
+            };
+            spec {
+                assert other != a ==> exists<R>(other) == old(exists<R>(other)) && (old(exists<R>(other)) ==> R[other] == old(R[other]));
+            };
+        };
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_unchanged($t0: |u64|, $t1: u64) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::apply_unchanged_binary($t0: |u64, u64|, $t1: u64, $t2: u64) {
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: invoke($t3, $t2, $t0)
+  2: return ()
+}
+
+
+[variant baseline]
+fun M::caller($t0: address, $t1: address) {
+     var $t2: address
+     var $t3: address
+     var $t4: address
+     var $t5: u64
+     var $t6: &0x42::M::R
+     var $t7: &u64
+     var $t8: 0x42::M::R
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: &mut 0x42::M::R
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t1)
+  2: $t4 := infer($t2)
+  3: $t6 := borrow_global<0x42::M::R>($t4)
+  4: $t7 := borrow_field<0x42::M::R>.v($t6)
+  5: $t5 := read_ref($t7)
+  6: $t10 := infer($t5)
+  7: $t11 := 1
+  8: $t9 := +($t10, $t11)
+  9: $t8 := pack 0x42::M::R($t9)
+ 10: $t12 := borrow_global<0x42::M::R>($t4)
+ 11: write_ref($t12, $t8)
+ 12: spec {
+  assert Implies(Neq<address>($t3, $t2), And(Eq(exists<0x42::M::R>($t3), Old(exists<0x42::M::R>($t3))), Implies(Old(exists<0x42::M::R>($t3)), Eq(global<0x42::M::R>($t3), Old(global<0x42::M::R>($t3))))));
+}
+
+ 13: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    struct R {
+        v: u64,
+    }
+    private inline fun apply_one(f: |address|,a: address,other: address) {
+        (f)(a);
+        spec {
+          assert Implies(Neq<address>($t2, $t1), unchanged_of($t0, $t2));
+        }
+        ;
+        Tuple()
+    }
+    private fun apply_unchanged(f: |u64|,x: u64) {
+        (f)(x)
+    }
+    spec {
+      ensures unchanged_of($t0, $t1);
+    }
+
+    private fun apply_unchanged_binary(f: |u64, u64|,a: u64,b: u64) {
+        (f)(a, b)
+    }
+    spec {
+      ensures unchanged_of($t0, $t1, $t2);
+    }
+
+    private fun caller(a: address,b: address) {
+        {
+          let (a: address, other: address): (address, address) = Tuple(a, b);
+          {
+            let (x: address): (address) = Tuple(a);
+            {
+              let v: u64 = select M::R.v<R>(BorrowGlobal(Immutable)<R>(x));
+              BorrowGlobal(Mutable)<R>(x) = pack M::R(Add<u64>(v, 1));
+              Tuple()
+            }
+          };
+          spec {
+            assert Implies(Neq<address>(other, a), And(Eq(exists<0x42::M::R>(other), Old(exists<0x42::M::R>(other))), Implies(Old(exists<0x42::M::R>(other)), Eq(global<0x42::M::R>(other), Old(global<0x42::M::R>(other))))));
+          }
+          ;
+          Tuple()
+        };
+        Tuple()
+    }
+} // end 0x42::M
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::apply_unchanged($t0: |u64|, $t1: u64) {
+  0: invoke($t1, $t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun M::apply_unchanged_binary($t0: |u64, u64|, $t1: u64, $t2: u64) {
+     var $t3: u64
+  0: $t3 := infer($t1)
+  1: invoke($t3, $t2, $t0)
+  2: return ()
+}
+
+
+[variant baseline]
+fun M::caller($t0: address, $t1: address) {
+     var $t2: address
+     var $t3: address
+     var $t4: address
+     var $t5: u64
+     var $t6: &0x42::M::R
+     var $t7: &u64
+     var $t8: 0x42::M::R
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: &mut 0x42::M::R
+  0: $t2 := infer($t0)
+  1: $t3 := infer($t1)
+  2: $t4 := infer($t2)
+  3: $t6 := borrow_global<0x42::M::R>($t4)
+  4: $t7 := borrow_field<0x42::M::R>.v($t6)
+  5: $t5 := read_ref($t7)
+  6: $t10 := infer($t5)
+  7: $t11 := 1
+  8: $t9 := +($t10, $t11)
+  9: $t8 := pack 0x42::M::R($t9)
+ 10: $t12 := borrow_global<0x42::M::R>($t4)
+ 11: write_ref($t12, $t8)
+ 12: spec {
+  assert Implies(Neq<address>($t3, $t2), And(Eq(exists<0x42::M::R>($t3), Old(exists<0x42::M::R>($t3))), Implies(Old(exists<0x42::M::R>($t3)), Eq(global<0x42::M::R>($t3), Old(global<0x42::M::R>($t3))))));
+}
+
+ 13: return ()
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::M
+struct R has drop + key
+  v: u64
+
+// Function definition at index 0
+fun apply_unchanged(l0: |u64|, l1: u64)
+    move_loc l1
+    move_loc l0
+    call_closure <|u64|>
+    ret
+
+// Function definition at index 1
+fun apply_unchanged_binary(l0: |u64, u64|, l1: u64, l2: u64)
+    move_loc l1
+    move_loc l2
+    move_loc l0
+    call_closure <|u64, u64|>
+    ret
+
+// Function definition at index 2
+fun caller(l0: address, l1: address) acquires R
+    local l2: address
+    local l3: address
+    move_loc l0
+    st_loc l2
+    move_loc l1
+    st_loc l3
+    copy_loc l2
+    // @5
+    st_loc l0
+    copy_loc l0
+    borrow_global R
+    borrow_field R, v
+    read_ref
+    // @10
+    ld_u64 1
+    add
+    pack R
+    move_loc l0
+    mut_borrow_global R
+    // @15
+    write_ref
+    nop
+    ret
+
+
+============ bytecode verification succeeded ========

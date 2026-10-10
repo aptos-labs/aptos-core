@@ -1,0 +1,11 @@
+0x42::account: clean -> Account.lean
+aptos_framework::counter: clean -> AptosFramework/Counter.lean
+  relies on E1 nested namespace
+0x42::basic_coin: clean -> BasicCoin.lean
+0x42::constants: clean -> Constants.lean
+0x42::enums: clean -> Enums.lean
+0x42::function_values: clean -> FunctionValues.lean
+0x42::generics: clean -> Generics.lean
+0x42::loops: clean -> Loops.lean
+0x42::ordered_map: clean -> OrderedMap.lean
+0x42::vectors: clean -> Vectors.lean

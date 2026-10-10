@@ -36,34 +36,25 @@ fn v1_native_u64_identity(
     ]))
 }
 
-/// The address byte array for index `i`, with `i` little-endian encoded in the
-/// first 8 bytes.
-fn address_bytes_for_index(i: u64) -> [u8; AccountAddress::LENGTH] {
-    let bytes = i.to_le_bytes();
-    let mut result = [0u8; AccountAddress::LENGTH];
-    result[..bytes.len()].clone_from_slice(bytes.as_ref());
-    result
-}
-
-/// Mirrors `std::unit_test::create_signers_for_testing`
-/// (`aptos-move/framework/move-stdlib/src/natives/unit_test.rs`): returns
-/// `num_signers` master signers whose addresses are the little-endian encodings
-/// of `0, 1, ..., num_signers - 1`.
-///
-/// Registered here because the testsuite does not enable
-/// `aptos-move-stdlib/testing`, so `aptos_natives` omits this test-only native;
-/// the V2 side registers it via `make_all_unit_test_natives`.
-fn v1_native_create_signers_for_testing(
+fn v1_native_split_bytes(
     _ctx: &mut NativeContext,
     _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    let num_signers = pop_arg!(args, u64);
-    let signers = Value::vector_unchecked(
-        (0..num_signers)
-            .map(|i| Value::master_signer(AccountAddress::new(address_bytes_for_index(i)))),
-    )?;
-    Ok(NativeResult::ok(InternalGas::zero(), smallvec![signers]))
+    let chunk = pop_arg!(args, u64) as usize;
+    let bytes = pop_arg!(args, Vec<u8>);
+    // `chunks(0)` panics.
+    let chunks = if chunk == 0 {
+        vec![]
+    } else {
+        bytes
+            .chunks(chunk)
+            .map(|c| Value::vector_u8(c.to_vec()))
+            .collect::<Vec<_>>()
+    };
+    Ok(NativeResult::ok(InternalGas::zero(), smallvec![
+        Value::vector_unchecked(chunks)?
+    ]))
 }
 
 /// Build a list of test natives for the v1 VM, matching the ones we have for v2
@@ -82,15 +73,15 @@ pub fn make_all_v1_test_natives() -> NativeFunctionTable {
         ),
         (
             AccountAddress::ONE,
-            module,
+            module.clone(),
             ident_str!("u64_identity").to_owned(),
             Arc::new(v1_native_u64_identity) as NativeFunction,
         ),
         (
             AccountAddress::ONE,
-            ident_str!("unit_test").to_owned(),
-            ident_str!("create_signers_for_testing").to_owned(),
-            Arc::new(v1_native_create_signers_for_testing) as NativeFunction,
+            module,
+            ident_str!("split_bytes").to_owned(),
+            Arc::new(v1_native_split_bytes) as NativeFunction,
         ),
     ]
 }

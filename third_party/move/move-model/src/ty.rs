@@ -1854,16 +1854,38 @@ impl Type {
     /// Normalize a function type into the canonical form used to index and
     /// compare function types: abilities are stripped (they are abstracted by
     /// the prover) and both argument and result tuples are unwrapped-if-
-    /// singleton. Panics if not called on a function type.
+    /// singleton, at every nesting depth — matching the erasure the Boogie
+    /// type name applies, so two types normalize equal exactly when their
+    /// names mangle equal. Panics if not called on a function type.
     pub fn normalize_fun(self) -> Type {
-        let Type::Fun(params, results, _) = self else {
-            panic!("expected fun type")
-        };
-        Type::Fun(
-            Box::new(Type::tuple(params.flatten())),
-            Box::new(Type::tuple(results.flatten())),
-            AbilitySet::EMPTY,
-        )
+        assert!(matches!(self, Type::Fun(..)), "expected fun type");
+        self.normalize_nested_funs()
+    }
+
+    /// Normalize every function type nested anywhere inside `self` into the
+    /// canonical form of `normalize_fun`, leaving other type constructors
+    /// unchanged.
+    pub fn normalize_nested_funs(self) -> Type {
+        match self {
+            Type::Fun(params, results, _) => Type::Fun(
+                Box::new(Type::tuple(params.flatten()).normalize_nested_funs()),
+                Box::new(Type::tuple(results.flatten()).normalize_nested_funs()),
+                AbilitySet::EMPTY,
+            ),
+            Type::Vector(et) => Type::Vector(Box::new(et.normalize_nested_funs())),
+            Type::Struct(mid, sid, ts) => Type::Struct(
+                mid,
+                sid,
+                ts.into_iter().map(Type::normalize_nested_funs).collect(),
+            ),
+            Type::Tuple(ts) => {
+                Type::Tuple(ts.into_iter().map(Type::normalize_nested_funs).collect())
+            },
+            Type::Reference(kind, bt) => {
+                Type::Reference(kind, Box::new(bt.normalize_nested_funs()))
+            },
+            _ => self,
+        }
     }
 
     /// If this is a vector of more than one type, make a tuple out of it, otherwise return the
@@ -2896,12 +2918,12 @@ impl Substitution {
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
                 if m1 == m2 && s1 == s2 {
-                    // For structs, also pass on `variance`, not `sub_variance`, to inherit
-                    // shallow processing to fields.
+                    // Shallow variance does not apply to struct type arguments. Bytecode
+                    // assignability requires complete struct instantiations to be equal.
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(context, variance, order, None, ts1, ts2)
+                        self.unify_vec(context, sub_variance, order, None, ts1, ts2)
                             .map_err(TypeUnificationError::lift(order, t1, t2))?,
                     ));
                 }
@@ -3352,7 +3374,7 @@ impl TypeUnificationError {
             | TypeUnificationError::MissingAbilities(loc, ..) => Some(loc.clone()),
             _ => None,
         }
-        .and_then(|loc| if loc.is_default() { None } else { Some(loc) })
+        .filter(|loc| !loc.is_default())
     }
 
     /// Return the message for this error.
@@ -3748,6 +3770,8 @@ pub struct TypeDisplayContext<'a> {
     pub use_module_qualification: bool,
     /// Whether to display module addresses in types, to accommodate special cases
     pub display_module_addr: bool,
+    /// Whether types outside the current module must include their address.
+    pub fully_qualify_external_types: bool,
     /// Var types that are recursive and should appear as `..` in display
     pub recursive_vars: Option<BTreeSet<u32>>,
 }
@@ -3764,6 +3788,7 @@ impl<'a> TypeDisplayContext<'a> {
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
             display_module_addr: false,
+            fully_qualify_external_types: false,
             recursive_vars: None,
         }
     }
@@ -3789,6 +3814,7 @@ impl<'a> TypeDisplayContext<'a> {
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
             display_module_addr: false,
+            fully_qualify_external_types: false,
             recursive_vars: None,
         }
     }
@@ -4042,6 +4068,17 @@ impl TypeDisplay<'_> {
             .display(env.symbol_pool())
             .to_string();
         let struct_name = struct_symbol.display(env.symbol_pool()).to_string();
+
+        if self.context.fully_qualify_external_types
+            && !self.context.is_current_module(&struct_module_name)
+        {
+            return format!(
+                "0x{}::{}::{}",
+                struct_module_addr.short_str_lossless(),
+                struct_module_idstr,
+                struct_name
+            );
+        }
 
         // If we are not able to get the type info, OR
         // the type is not inside or the host module is not imported into the current module,

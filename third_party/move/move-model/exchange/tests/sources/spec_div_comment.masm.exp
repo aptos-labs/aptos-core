@@ -1,0 +1,5 @@
+error: error: expected a spec expression
+  ┌─ <masm>:4:21
+  │
+4 │     requires x < 10//2
+  │                     ^

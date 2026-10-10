@@ -1,0 +1,32 @@
+{
+  "version": 10,
+  "structs": [{"name": "Account", "fields": [{"name": "balance", "ty": "u64"}]}],
+  "funs": [
+    {
+      "name": "take",
+      "params": 1,
+      "locals": ["address", "address", {"struct": 0}, "u64"],
+      "returns": ["u64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"assign": [1, 0]},
+            {"call": [[2], {"move_from": 0}, [1]]},
+            {"call": [[3], "unpack", [2]]}
+          ],
+          "term": {"ret": [3]}
+        }
+      ],
+      "loops": [],
+      "spec": {
+        "requires": [],
+        "aborts_if": [{"not": {"exists": [0, null, {"local": 0}]}}],
+        "ensures": [
+          {"binop": ["eq", {"result": 0}, {"select": [0, {"global": [0, 0, {"local": 0}]}]}]},
+          {"not": {"exists": [0, null, {"local": 0}]}}
+        ],
+        "modifies": [{"resource": 0, "addr": {"local": 0}}]
+      }
+    }
+  ]
+}

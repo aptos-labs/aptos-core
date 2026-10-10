@@ -31,6 +31,7 @@
 
 use super::{accept_type::AcceptType, bcs_payload::Bcs};
 use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue, LedgerInfo};
+use aptos_storage_interface::AptosDbError;
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::StructTag,
@@ -680,6 +681,55 @@ pub fn version_pruned<E: GoneError>(ledger_version: u64, ledger_info: &LedgerInf
     )
 }
 
+/// Reports pruned events under `VersionPruned` rather than a code of their own.
+///
+/// A sequence number is not a version, so this is imprecise, but every new
+/// `AptosErrorCode` value is a breaking change for existing clients: `AptosErrorCode`
+/// has no serde catch-all, so an older `aptos-rest-client` fails to deserialize the
+/// body, discards the 410, and retries a terminal error. The message carries the
+/// sequence numbers a caller actually needs.
+pub fn events_pruned<E: GoneError>(
+    requested_seq_num: u64,
+    min_available_seq_num: u64,
+    ledger_info: &LedgerInfo,
+) -> E {
+    E::gone_with_code(
+        format!(
+            "Events at sequence number({}) have been pruned, the oldest available sequence number is {}",
+            requested_seq_num, min_available_seq_num
+        ),
+        AptosErrorCode::VersionPruned,
+        ledger_info,
+    )
+}
+
+/// Converts a storage error into a response, returning a 410 if the read fell
+/// below the pruner's retained window and a 500 otherwise.
+///
+/// Unlike the by_version endpoints, these reads cannot pre-check the request
+/// against the ledger info: a transaction range only fails once storage compares
+/// it to the pruner's min readable version, and events are addressed by sequence
+/// number, so pruning surfaces as a gap at the start of the requested range.
+pub fn pruned_or_internal_error<E: GoneError + InternalError>(
+    err: anyhow::Error,
+    ledger_info: &LedgerInfo,
+) -> E {
+    let db_error = err
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<AptosDbError>());
+    if let Some(AptosDbError::LedgerPruned { version, .. }) = db_error {
+        return version_pruned(*version, ledger_info);
+    }
+    if let Some(AptosDbError::EventPruned {
+        requested_seq_num,
+        min_available_seq_num,
+    }) = db_error
+    {
+        return events_pruned(*requested_seq_num, *min_available_seq_num, ledger_info);
+    }
+    E::internal_with_code(err, AptosErrorCode::InternalError, ledger_info)
+}
+
 pub fn account_not_found<E: NotFoundError>(
     address: Address,
     ledger_version: u64,
@@ -800,4 +850,109 @@ pub fn block_pruned_by_height<E: GoneError>(block_height: u64, ledger_info: &Led
         AptosErrorCode::BlockPruned,
         ledger_info,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::chain_id::ChainId;
+    use poem::IntoResponse;
+
+    fn test_ledger_info() -> LedgerInfo {
+        LedgerInfo::new_ledger_info(
+            &ChainId::test(),
+            /*epoch=*/ 1,
+            /*ledger_version=*/ 200,
+            /*oldest_ledger_version=*/ 100,
+            /*oldest_block_height=*/ 5,
+            /*block_height=*/ 10,
+            /*ledger_timestamp=*/ 0,
+            None,
+        )
+    }
+
+    fn map(err: anyhow::Error) -> (u16, AptosErrorCode) {
+        let mut mapped: BasicErrorWith404 = pruned_or_internal_error(err, &test_ledger_info());
+        let error_code = mapped.inner_mut().error_code;
+        (mapped.into_response().status().as_u16(), error_code)
+    }
+
+    fn ledger_pruned_error() -> AptosDbError {
+        AptosDbError::LedgerPruned {
+            data_type: "Transaction".to_string(),
+            version: 42,
+            min_available_version: 100,
+        }
+    }
+
+    #[test]
+    fn pruned_error_maps_to_gone() {
+        assert_eq!(
+            map(anyhow::Error::new(ledger_pruned_error())),
+            (410, AptosErrorCode::VersionPruned)
+        );
+    }
+
+    /// Handlers wrap storage errors in `.context(..)` before mapping them, so the
+    /// pruned error is never the outermost cause by the time it reaches us.
+    #[test]
+    fn pruned_error_maps_to_gone_through_context_layers() {
+        let err = anyhow::Error::new(ledger_pruned_error())
+            .context("Failed to read raw transactions from storage")
+            .context("outer");
+        assert_eq!(map(err), (410, AptosErrorCode::VersionPruned));
+    }
+
+    #[test]
+    fn pruned_error_reports_the_pruned_version() {
+        let mut mapped: BasicErrorWith404 = pruned_or_internal_error(
+            anyhow::Error::new(ledger_pruned_error()).context("Failed to find events by key"),
+            &test_ledger_info(),
+        );
+        assert_eq!(
+            mapped.inner_mut().message,
+            "Ledger version(42) has been pruned"
+        );
+    }
+
+    /// Events are pruned by sequence number, not version, so this arrives as a
+    /// different variant than a pruned transaction range but must still be a 410.
+    #[test]
+    fn pruned_events_map_to_gone() {
+        let err = anyhow::Error::new(AptosDbError::EventPruned {
+            requested_seq_num: 0,
+            min_available_seq_num: 4_000_000,
+        })
+        .context("Failed to find events by key 0x300000000000000000000000000000001");
+        assert_eq!(map(err), (410, AptosErrorCode::VersionPruned));
+    }
+
+    #[test]
+    fn pruned_events_report_the_oldest_available_sequence_number() {
+        let mut mapped: BasicErrorWith404 = pruned_or_internal_error(
+            anyhow::Error::new(AptosDbError::EventPruned {
+                requested_seq_num: 0,
+                min_available_seq_num: 4_000_000,
+            }),
+            &test_ledger_info(),
+        );
+        assert_eq!(
+            mapped.inner_mut().message,
+            "Events at sequence number(0) have been pruned, the oldest available sequence number is 4000000"
+        );
+    }
+
+    #[test]
+    fn other_storage_errors_still_map_to_internal() {
+        let err = anyhow::Error::new(AptosDbError::Other("boom".to_string())).context("outer");
+        assert_eq!(map(err), (500, AptosErrorCode::InternalError));
+    }
+
+    #[test]
+    fn non_storage_errors_still_map_to_internal() {
+        assert_eq!(
+            map(anyhow::anyhow!("no start version from database")),
+            (500, AptosErrorCode::InternalError)
+        );
+    }
 }

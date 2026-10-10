@@ -287,6 +287,11 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Condition> {
         None
     }
+    /// Called before the expressions of a spec condition are rewritten,
+    /// allowing implementations to track which condition is being processed.
+    /// There is no exit notification; state set here is overwritten when the
+    /// next condition is entered.
+    fn rewrite_enter_condition(&mut self, target: &SpecBlockTarget, cond: &Condition) {}
 
     // Core traversal functions, not intended to be re-implemented
     // -----------------------------------------------------------
@@ -419,15 +424,22 @@ pub trait ExpRewriterFunctions {
             },
             Quant(id, kind, ranges, triggers, cond, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
-                let (ranges_changed, new_ranges) = self.internal_rewrite_quant_ranges(ranges);
-                self.rewrite_enter_scope(
-                    new_id,
-                    ranges
-                        .iter()
-                        .flat_map(|(pat, _)| pat.vars())
-                        .collect::<Vec<_>>()
-                        .iter(),
-                );
+                // Each range is rewritten with the binders of the ranges before it in scope. A
+                // state-domain binder names a state, not a local, so it scopes nothing.
+                let mut ranges_changed = false;
+                let mut new_ranges = Vec::with_capacity(ranges.len());
+                for (pat, range) in ranges {
+                    let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
+                    let (range_changed, new_range) = self.internal_rewrite_exp(range);
+                    ranges_changed = ranges_changed || pat_changed || range_changed;
+                    let binders = if matches!(range.as_ref(), Call(_, Operation::StateDomain, _)) {
+                        vec![]
+                    } else {
+                        new_pat.vars()
+                    };
+                    self.rewrite_enter_scope(new_id, binders.iter());
+                    new_ranges.push((new_pat, new_range));
+                }
                 let mut triggers_changed = false;
                 let new_triggers = triggers
                     .iter()
@@ -447,7 +459,9 @@ pub trait ExpRewriterFunctions {
                     new_c
                 });
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
-                self.rewrite_exit_scope(new_id);
+                for _ in ranges {
+                    self.rewrite_exit_scope(new_id);
+                }
                 if let Some(new_exp) =
                     self.rewrite_quant(new_id, &new_ranges, &new_triggers, &new_cond, &new_body)
                 {
@@ -746,6 +760,7 @@ pub trait ExpRewriterFunctions {
         target: &SpecBlockTarget,
         cond: &Condition,
     ) -> (bool, Condition) {
+        self.rewrite_enter_condition(target, cond);
         let (mut changed, exp) = self.internal_rewrite_exp(&cond.exp);
         let additional_exps =
             if let Some(additional_exps) = self.internal_rewrite_vec(&cond.additional_exps) {
@@ -904,22 +919,6 @@ pub trait ExpRewriterFunctions {
             },
         }
     }
-
-    fn internal_rewrite_quant_ranges(
-        &mut self,
-        ranges: &[(Pattern, Exp)],
-    ) -> (bool, Vec<(Pattern, Exp)>) {
-        let (changevec, new_ranges): (Vec<_>, Vec<_>) = ranges
-            .iter()
-            .map(|(pat, exp)| {
-                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
-                let (exp_changed, new_exp) = self.internal_rewrite_exp(exp);
-                (pat_changed || exp_changed, (new_pat, new_exp))
-            })
-            .unzip();
-        let change = changevec.into_iter().any(|x| x);
-        (change, new_ranges)
-    }
 }
 
 // =================================================================================================
@@ -929,28 +928,29 @@ pub trait ExpRewriterFunctions {
 /// Used when inlining opaque function specs at call sites to avoid label collisions
 /// between different inlining instances.
 ///
-/// Uses a local counter rather than `GlobalEnv::new_global_id()` to ensure
-/// deterministic label IDs regardless of prior global allocations — the global
-/// counter depends on compilation order which can vary across machines.
-pub struct MemoryLabelFreshener {
-    counter: usize,
+/// Fresh labels are allocated through `GlobalEnv::new_global_id()`: all
+/// memory labels in one environment must come from this single allocator.
+/// Labels from an independent counter can collide with labels allocated
+/// elsewhere — e.g. with the state anchor labels of inline-function
+/// expansions — letting one label's memory snapshot overwrite another's.
+pub struct MemoryLabelFreshener<'a> {
+    env: &'a GlobalEnv,
     label_map: BTreeMap<MemoryLabel, MemoryLabel>,
 }
 
-impl MemoryLabelFreshener {
-    pub fn new(start: usize) -> Self {
+impl<'a> MemoryLabelFreshener<'a> {
+    pub fn new(env: &'a GlobalEnv) -> Self {
         Self {
-            counter: start,
+            env,
             label_map: BTreeMap::new(),
         }
     }
 
     fn freshen(&mut self, label: MemoryLabel) -> MemoryLabel {
-        *self.label_map.entry(label).or_insert_with(|| {
-            let id = MemoryLabel::new(self.counter);
-            self.counter += 1;
-            id
-        })
+        *self
+            .label_map
+            .entry(label)
+            .or_insert_with(|| MemoryLabel::new(self.env.new_global_id().as_usize()))
     }
 
     fn freshen_range(&mut self, range: &MemoryRange) -> MemoryRange {
@@ -963,14 +963,9 @@ impl MemoryLabelFreshener {
     pub fn label_map(&self) -> &BTreeMap<MemoryLabel, MemoryLabel> {
         &self.label_map
     }
-
-    /// Returns the next available counter value for chaining multiple freshenings.
-    pub fn next_counter(&self) -> usize {
-        self.counter
-    }
 }
 
-impl ExpRewriterFunctions for MemoryLabelFreshener {
+impl ExpRewriterFunctions for MemoryLabelFreshener<'_> {
     fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         let new_oper = match oper {
             Operation::Global(Some(l)) => Some(Operation::Global(Some(self.freshen(*l)))),
@@ -989,6 +984,11 @@ impl ExpRewriterFunctions for MemoryLabelFreshener {
             },
             Operation::SpecUpdate(r) if !r.is_default() => {
                 Some(Operation::SpecUpdate(self.freshen_range(r)))
+            },
+            Operation::SaveStateAnchor(l) => Some(Operation::SaveStateAnchor(self.freshen(*l))),
+            Operation::WithStateAnchor(l) => Some(Operation::WithStateAnchor(self.freshen(*l))),
+            Operation::FoldsCaptureAnchor(l) => {
+                Some(Operation::FoldsCaptureAnchor(self.freshen(*l)))
             },
             _ => None,
         };

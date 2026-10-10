@@ -9,7 +9,7 @@ use crate::{
                 session_change_sets::SystemSessionChangeSet, user::UserSession,
             },
         },
-        AptosMoveResolver, SessionId,
+        AptosMoveResolver,
     },
     transaction_metadata::TransactionMetadata,
     AptosVM,
@@ -34,7 +34,7 @@ impl<'r> PrologueSession<'r> {
         txn_meta: &TransactionMetadata,
         resolver: &'r impl AptosMoveResolver,
     ) -> Self {
-        let session_id = SessionId::prologue_meta(txn_meta);
+        let session_id = txn_meta.prologue_session_id();
         let session = RespawnedSession::spawn(
             vm,
             session_id,

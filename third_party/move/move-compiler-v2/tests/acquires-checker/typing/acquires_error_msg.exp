@@ -1,9 +1,12 @@
 
 Diagnostics:
 error: missing acquires annotation for `Test`
-  ┌─ tests/acquires-checker/typing/acquires_error_msg.move:6:16
-  │
-6 │     public fun call_modify_without_acquire() {
-  │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-7 │         modify(); // expect error message here
-  │         -------- acquired by the call to `modify`
+   ┌─ tests/acquires-checker/typing/acquires_error_msg.move:10:16
+   │
+10 │     public fun call_modify_without_acquire() acquires Other {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 │         borrow_global<Other>(@0xcafe);
+12 │         modify(); // expect error message here: `Test` acquired via this call
+   │         -------- acquired by the call to `modify`
+   │
+   = since Move 2.2, `acquires` is inferred by the compiler and can be omitted from the function declaration.

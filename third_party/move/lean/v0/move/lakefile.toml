@@ -1,0 +1,18 @@
+# Leaner Move: the source language, its source contracts and `verify` proof
+# engine, and lowering to XIR.
+name = "move"
+defaultTargets = ["Move"]
+testDriver = "MoveTests"
+
+[[require]]
+name = "move-model"
+path = "../move-model"
+
+[[lean_lib]]
+name = "Move"
+
+# Source-verification and compiler-lowering regressions, in this library's own
+# namespace.
+[[lean_lib]]
+name = "MoveTests"
+roots = ["Move.Tests"]

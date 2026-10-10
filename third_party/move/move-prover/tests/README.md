@@ -51,7 +51,8 @@ MVC_LOG="move_compiler_v2=info,debug@prover.log" \
 - In order to regenerate baseline files, use `UPBL=1 cargo test <optional test filter>`
 - In order to narrow tests to a particular feature, use `MVP_TEST_FEATURE=<feature> cargo test`. If not set, all
   features will be tested for each test they are enabled for. (See discussion below about feature enabling).
-- In order to run tests with consistency checking enabled, use `MVP_TEST_INCONSISTENCY=1 cargo test`.
+- In order to run tests with consistency checking enabled, add `// flag: --check-inconsistency` to
+  the test file or use `MVP_TEST_FLAGS=--check-inconsistency cargo test`.
 - In order to run tests with a specific flag combination, use `MVP_TEST_FLAGS=<flags> cargo test`.
 - In order to run the tests in the `tests/xsources` tree instead of the default locations, use
   `MVP_TEST_X=1 cargo test`.
@@ -75,6 +76,7 @@ Currently, the following features are available:
 - `no_opaque`: runs tests in a special mode where the `opaque` pragma is ignored. This increases the load on the prover,
   and functions as a stress test.
 - `cvc5`: runs tests configured to use the cvc5 solver as a backend.
+- `lean`: runs tests with the Lean-based Leaner verifier (`--lean`), only on request and not in CI. See below.
 
 ## Conventions
 
@@ -83,6 +85,21 @@ mixed in a file. The first type of test cases are "correct" Move functions which
 type of test cases are incorrect Move functions which are expected to be disproven, with the created errors stored in
 so-called 'expectation baseline files' (`.exp`). The incorrect functions have suffix `_incorrect` in their names, by
 convention. It is expected that only errors for functions with this suffix appear in `.exp` files.
+
+## Leaner Verifier Tests
+
+`MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite` verifies each test with the Leaner verifier
+(`third_party/move/lean/leaner-move`, built with `lake build leaner-move` in that directory; without it, the tests are
+skipped). Its messages differ from Boogie's, so its baselines are `.lean_exp` files.
+
+- Each function's verification has a tight budget of 25 thousand `maxHeartbeats` (`--heartbeats=25`). A function that
+  verifies but needs more raises its own budget with `pragma heartbeats = N;` in its spec block.
+  `MVP_TEST_FLAGS=--heartbeats=N` runs with another default budget.
+- A function the automatic verification does not prove, e.g. where Boogie relies on a Move `proof` block or on
+  nonlinear arithmetic, is proved in a LeanerLang proof file beside the test, `foo.proof.lean` for `foo.move`. The
+  failure message names the file, and `verify f by skip` there shows the obligations left. Only a file declaring a
+  single module can have one.
+- The run uses every core, and each verifier process takes up to about 2 GB of memory.
 
 ## Debugging Long Running Tests
 
@@ -97,9 +114,20 @@ MVP_TEST_FLAGS="-T=20" cargo test -p move-prover
 ## Inconsistency Check
 
 If the flag `--check-inconsistency` is given, the prover not only verifies a target, but also checks if there is any
-inconsistent assumption in the verification. If the environment variable `MVP_TEST_INCONSISTENCY=1` is set, `cargo test`
-will perform the inconsistency check while running the tests in `sources` (i.e., the prover will run those tests with the flag `--check-inconsistency`).
+inconsistent assumption in the verification.
+
+To enable it for a single test, put the flag directive at the head of the test source:
+
+```move
+// flag: --check-inconsistency
+```
+
+To enable it for a whole run, pass it through `MVP_TEST_FLAGS`:
 
 ```shell script
-MVP_TEST_INCONSISTENCY=1 cargo test -p move-prover
+MVP_TEST_FLAGS=--check-inconsistency cargo test -p move-prover
 ```
+
+A run with the check enabled takes noticeably longer than one without, since each target gets a
+second verification condition. That difference is a useful confirmation that the flag actually took
+effect.

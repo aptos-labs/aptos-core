@@ -1,0 +1,14 @@
+step 0: 0x46::batching::add(1, 2)
+  mono:       returned 3
+  LIR:        returned 3
+  round trip: returned 3
+
+step 1: 0x46::batching::add(1, 2)
+  mono:       returned 3
+  LIR:        returned 3
+  round trip: returned 3
+
+step 2: 0x46::batching::add(40, 2)
+  mono:       returned 42
+  LIR:        returned 42
+  round trip: returned 42

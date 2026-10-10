@@ -32,9 +32,10 @@ use mono_move_core::{
         EMPTY_TYPE_LIST,
     },
     value_layout::REF_LAYOUT_ID,
-    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset, Function,
-    Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule, SizedSlot,
-    SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE, MAX_ALIGN,
+    Code, DescriptorId, FieldTypes, FieldValueLayout, FrameLayoutInfo, FrameOffset,
+    FrameworkSymbols, Function, Interner, LayoutFlags, LayoutId, LayoutProvider, PreparedModule,
+    SizedSlot, SortedSafePointEntries, VMInternalError, VMResult, ValueLayout, FRAME_METADATA_SIZE,
+    MAX_ALIGN,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -97,13 +98,12 @@ pub struct CallSiteInfo {
     pub required_descriptors: Vec<DescriptorId>,
 }
 
-/// The global-storage resource types a native reads or writes — the types for
-/// which the specializer must publish a layout (to deserialize upon a map
-/// miss) and a struct descriptor (so the deserialized value is GC-traceable),
-/// just as it does for resource micro-ops.
+/// The types a native needs a published layout and descriptor for, so it can
+/// build or deserialize a value of that type at runtime — a global-storage
+/// resource in most cases, just as for the resource micro-ops.
 ///
-/// These are conceptually the native's resource types -- fetching them from
-/// the callee's arguments is merely a convenience.
+/// These are conceptually the native's own types -- fetching them from the
+/// callee's arguments is merely a convenience.
 //
 // TODO(completeness): Instead of hard-coding them here, figure out a way to allow natives to declare them.
 fn resource_types_for_native(
@@ -118,9 +118,23 @@ fn resource_types_for_native(
     // interned module ids / identifiers once.
     let table = interner.module_id_of(&AccountAddress::ONE, ident_str!("table"));
     let object = interner.module_id_of(&AccountAddress::ONE, ident_str!("object"));
+    let event = interner.module_id_of(&AccountAddress::ONE, ident_str!("event"));
 
     if module_id == object && func_name == interner.identifier_of(ident_str!("exists_at")) {
         return callee_ty_args.first().copied().into_iter().collect();
+    }
+
+    // The test-only event queries return `vector<T>`, which they allocate
+    // themselves.
+    if module_id == event
+        && (func_name == interner.identifier_of(ident_str!("emitted_events"))
+            || func_name == interner.identifier_of(ident_str!("emitted_events_by_handle")))
+    {
+        return callee_ty_args
+            .first()
+            .map(|elem| interner.vector_of(*elem))
+            .into_iter()
+            .collect();
     }
 
     if module_id == table {
@@ -136,6 +150,26 @@ fn resource_types_for_native(
             None
         };
         return value_ty.into_iter().collect();
+    }
+
+    Vec::new()
+}
+
+/// Returns type arguments for which the native function should know the layout.
+/// For example, `bcs::constant_serialized_size<T>` needs to know layout of `T`.
+//
+// TODO(completeness): Instead of hard-coding them here, figure out a way to allow natives to declare them.
+fn layout_type_args_for_native(
+    interner: &impl Interner,
+    module_id: InternedModuleId,
+    func_name: InternedIdentifier,
+    callee_ty_args: &[InternedType],
+) -> Vec<InternedType> {
+    let bcs = interner.module_id_of(&AccountAddress::ONE, ident_str!("bcs"));
+    if module_id == bcs
+        && func_name == interner.identifier_of(ident_str!("constant_serialized_size"))
+    {
+        return callee_ty_args.to_vec();
     }
 
     Vec::new()
@@ -276,12 +310,10 @@ pub(crate) fn resolve_variant_field_access(
 /// discovery pass into lowering.
 #[derive(Default)]
 pub struct LoweringDescriptors {
-    /// Type -> published descriptor id: a `vector<T>` for vector descriptors,
-    /// or a resource struct type for `move_to`/`move_from` descriptors.
-    ///
-    /// TODO(cleanup): rename to a type-generic name now that it also holds struct
-    /// descriptors, and extend to enum descriptors.
-    pub vec: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete `vector<T>` -> the descriptor published for its element.
+    pub vectors: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete resource or box type -> its struct descriptor.
+    pub structs: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
     pub enum_layouts: UnorderedMap<InternedType, EnumLayout>,
     /// Captured-data layout per `PackClosure`, in IR order; consumed
@@ -314,6 +346,8 @@ pub struct LoweringContext<'a> {
     /// Where `Instr::Ret` writes before the `Return` micro-op. Laid out
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SizedSlot>,
+    /// Substituted return types, corresponding to `return_slots`.
+    pub return_types: InternedTypeList,
     pub num_transfer_positions: u16,
     /// TODO(cleanup): we should consider unifying the various scratch slots below,
     /// even though they are used for different purposes, only one is ever
@@ -351,14 +385,16 @@ pub struct LoweringContext<'a> {
     /// micro-op (`EnumNew` is the only allocator and writes the pointer here
     /// after allocating), so it needs no GC tracking.
     pub enum_ptr_scratch: Option<FrameOffset>,
-    /// Maps a type to the [`DescriptorId`] published for it: a `vector<T>` for
-    /// vector descriptors, or the resource struct type for `move_to`/`move_from`
-    /// descriptors.
+    /// Concrete `vector<T>` -> the descriptor published for its element.
     ///
-    /// Invariant: contains an entry for every vector or resource type used in
-    /// this function.
-    pub descriptors: UnorderedMap<InternedType, DescriptorId>,
-    /// TODO(cleanup): consider reconciling with the descriptors map above.
+    /// Invariant: contains an entry for every vector type used in this
+    /// function.
+    pub vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+    /// Concrete resource or box type -> its struct descriptor.
+    ///
+    /// Invariant: contains an entry for every resource type used in this
+    /// function.
+    pub struct_descriptors: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
     ///
     /// Invariant: contains an entry for every enum type whose concrete
@@ -372,11 +408,16 @@ pub struct LoweringContext<'a> {
 }
 
 impl LoweringContext<'_> {
-    /// `DescriptorId` published for `ty`, or `None` if no entry exists. The key
-    /// is the type itself: a `vector<T>` for vector descriptors, or the resource
-    /// struct type for `move_to`/`move_from` descriptors.
-    pub fn descriptor_id(&self, ty: InternedType) -> Option<DescriptorId> {
-        self.descriptors.get(&ty).copied()
+    /// Descriptor published for the elements of the concrete vector type
+    /// `vec_ty`, or `None` if no entry exists.
+    pub fn vec_descriptor_id(&self, vec_ty: InternedType) -> Option<DescriptorId> {
+        self.vec_descriptors.get(&vec_ty).copied()
+    }
+
+    /// Struct descriptor published for the concrete resource or box type
+    /// `struct_ty`, or `None` if no entry exists.
+    pub fn struct_descriptor_id(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.struct_descriptors.get(&struct_ty).copied()
     }
 
     /// Layout published for the concrete enum type `enum_ty`, or `None` if
@@ -711,7 +752,7 @@ pub fn try_build_context<'a>(
         // Descriptor IDs for the native's resource types (published by the
         // discovery pass, keyed on the concrete type); e.g. `add_box` uses its
         // entry to box the inserted value.
-        let required_descriptors: Vec<DescriptorId> = resource_types_for_native(
+        let required_descriptors = resource_types_for_native(
             interner,
             callee_module_id,
             callee_func_name,
@@ -719,8 +760,14 @@ pub fn try_build_context<'a>(
             view_type_list(call_ty_args),
         )
         .iter()
-        .filter_map(|ty| descriptors.vec.get(ty).copied())
-        .collect();
+        .filter_map(|ty| {
+            if matches!(view_type(*ty), Type::Vector { .. }) {
+                descriptors.vectors.get(ty).copied()
+            } else {
+                descriptors.structs.get(ty).copied()
+            }
+        })
+        .collect::<Vec<_>>();
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
@@ -750,11 +797,13 @@ pub fn try_build_context<'a>(
         frame_data_size,
         call_sites,
         return_slots,
+        return_types: own_ret_list,
         num_transfer_positions: func_ir.num_transfer_positions,
         scratch,
         resource_box_slot,
         enum_ptr_scratch,
-        descriptors: descriptors.vec,
+        vec_descriptors: descriptors.vectors,
+        struct_descriptors: descriptors.structs,
         enum_layouts: descriptors.enum_layouts,
         closure_pack_sites,
         closure_call_sites,
@@ -878,8 +927,13 @@ pub trait SpecializerContext: LayoutProvider {
         pointer_offsets: &[FrameOffset],
     ) -> DescriptorId;
 
-    /// Publishes `layout` for `ty` and returns its assigned id. Idempotent.
-    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId;
+    /// Publishes `layout` for the type it was built for and returns its
+    /// assigned id. Idempotent. [`None`] if the layout carries no type, which
+    /// only variant bodies and the reserved reference and function layouts do.
+    fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId>;
+
+    /// The framework symbols, interned once per context.
+    fn framework_symbols(&self) -> &FrameworkSymbols;
 
     /// Publishes the variant-body layouts of `enum_ty` (one per variant, in tag
     /// order), returning their ids. Idempotent on `enum_ty`: re-publishing the
@@ -972,6 +1026,7 @@ pub fn try_lower_function(
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
     let LoweredFunction {
         code,
+        origins,
         entry_gas,
         mut safe_points,
     } = lower_function(func_ir, &ctx)?;
@@ -981,8 +1036,10 @@ pub fn try_lower_function(
     // net for now.
     safe_points.sort_by_key(|e| e.code_offset.0);
 
-    // Per-parameter (offset, size, align), in declaration order.
+    // Per-parameter (offset, size, align) and substituted type, in
+    // declaration order.
     let param_slots = ctx.home_slots[..func_ir.num_params as usize].to_vec();
+    let param_tys = view_type_list(ctx.home_types)[..func_ir.num_params as usize].to_vec();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
     let extended_frame_size = ctx
         .call_sites
@@ -1003,9 +1060,13 @@ pub fn try_lower_function(
     Ok(LoweringOutcome::Built(Function {
         name,
         module_id: module_ir.module.id(),
-        code: Code::from_vec(code),
+        def_idx: func_ir.def_idx,
+        code: Code::with_origins(code, origins),
         entry_gas,
         param_slots,
+        param_tys,
+        return_slots: ctx.return_slots,
+        return_tys: ctx.return_types,
         param_region_size: derived.param_region_size as usize,
         param_and_local_sizes_sum,
         extended_frame_size,
@@ -1068,6 +1129,44 @@ pub fn try_discover_types_for_lowering_in_function(
         &mut descriptors,
     )?;
     Ok(descriptors)
+}
+
+/// Publishes the layout and struct descriptor of the resource type `ty`, so a
+/// global-storage read of it can be materialized outside lowered code.
+/// Returns whether the layout could be published.
+pub fn publish_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+) -> VMResult<bool> {
+    let mut visited = UnorderedSet::new();
+    let mut descriptors = LoweringDescriptors::default();
+    let layout = discover_resource_type(
+        ctx,
+        interner,
+        ty,
+        EMPTY_TYPE_LIST,
+        &mut visited,
+        &mut descriptors,
+    )?;
+    Ok(layout.is_some())
+}
+
+/// Discovers the layout of the resource type `ty` under `ty_args` and
+/// publishes its struct descriptor, so a global-storage read of it can be
+/// materialized as a GC-traceable heap object.
+fn discover_resource_type(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    ty: InternedType,
+    ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
+) -> VMResult<Option<LayoutId>> {
+    let layout = discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
+    let ty = interner.subst_type(ty, ty_args)?;
+    publish_struct_descriptor_for(ctx, ty, &mut descriptors.structs)?;
+    Ok(layout)
 }
 
 fn try_discover_types_for_lowering_in_function_impl(
@@ -1137,9 +1236,17 @@ fn try_discover_types_for_lowering_in_function_impl(
                 arg_types,
                 view_type_list(callee_ty_args),
             ) {
-                discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-                let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-                publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+                discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
+            }
+
+            // Here we only need layout, so there is no need to publish the type descriptor.
+            for layout_ty in layout_type_args_for_native(
+                interner,
+                module_id,
+                func_name,
+                view_type_list(callee_ty_args),
+            ) {
+                discover_type_metadata(ctx, interner, layout_ty, ty_args, visited, descriptors)?;
             }
         }
 
@@ -1175,9 +1282,7 @@ fn try_discover_types_for_lowering_in_function_impl(
         // resource's layout, then publish a struct descriptor keyed on the
         // concrete resource type.
         if let Some(resource_ty) = resource_type_in_instr(instr) {
-            discover_type_metadata(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
-            let resource_ty = interner.subst_type(resource_ty, ty_args)?;
-            publish_struct_descriptor_for(ctx, resource_ty, &mut descriptors.vec)?;
+            discover_resource_type(ctx, interner, resource_ty, ty_args, visited, descriptors)?;
         }
 
         // The walks above don't reach a constant's own type. A vector
@@ -1260,13 +1365,15 @@ fn layout_inline_fields(
 
 /// Builds the [`ValueLayout`] for an inline aggregate — a struct, or one enum
 /// variant body — from its field layouts and the published layout id of each
-/// field. `total`/`align` are the aggregate's in-memory size and alignment.
+/// field. `ty` is the struct's type, or [`None`] for a variant body.
+/// `total`/`align` are the aggregate's in-memory size and alignment.
 ///
 /// Returns `Ok(None)` when any field's layout is not yet published (the
 /// aggregate is deferred, mirroring a deferred struct). Errors only on an
 /// internal inconsistency (a published id that does not resolve to a layout).
 fn try_build_inline_value_layout(
     ctx: &impl SpecializerContext,
+    ty: Option<InternedType>,
     field_layouts: &[VariantFieldLayout],
     field_ids: &[Option<LayoutId>],
     total: u32,
@@ -1275,6 +1382,8 @@ fn try_build_inline_value_layout(
     let mut layout_fields = Vec::with_capacity(field_layouts.len());
     let mut fixed_bcs_total: u64 = 0;
     let mut data_dependent = false;
+    let mut packed_size: u64 = 0;
+    let mut fields_no_pointers_no_padding = true;
     let mut all_bytes_valid = true;
     for (field, &fid) in field_layouts.iter().zip(field_ids) {
         // A field can be sized yet still lack a published layout (e.g. a
@@ -1293,6 +1402,8 @@ fn try_build_inline_value_layout(
             Some(bcs_sz) => fixed_bcs_total = fixed_bcs_total.saturating_add(bcs_sz as u64),
             None => data_dependent = true,
         }
+        packed_size = packed_size.saturating_add(child.size as u64);
+        fields_no_pointers_no_padding &= child.has_no_pointers_no_padding();
         all_bytes_valid &= child.all_byte_patterns_valid();
     }
 
@@ -1301,19 +1412,20 @@ fn try_build_inline_value_layout(
     } else {
         Some(fixed_bcs_total as u32)
     };
-    // No pointers and no padding exactly when the packed BCS size equals the
-    // in-memory size: a pointer field makes the BCS size data-dependent
-    // (`None`), and alignment padding makes it strictly smaller than `total`.
+    // No pointers and no padding exactly when every field is itself pointer-
+    // and padding-free and the fields fill `total` with no alignment gaps. Not
+    // derived from `fixed_bcs_size`: `signer` is pointer-free yet `None`.
     let mut flags = LayoutFlags::empty();
-    if fixed_bcs_size == Some(total) {
+    if fields_no_pointers_no_padding && packed_size == total as u64 {
         flags |= LayoutFlags::NO_POINTERS_NO_PADDING;
-        // Blittable on deserialize only when no field reaches a `bool`, which
+        // Raw-copy deserialization only when no field reaches a `bool`, which
         // needs per-byte validation that a single `memcpy` would skip.
         if all_bytes_valid {
             flags |= LayoutFlags::ALL_BYTE_PATTERNS_VALID;
         }
     }
     Ok(Some(ValueLayout::struct_layout(
+        ty,
         total,
         align,
         fixed_bcs_size,
@@ -1342,6 +1454,37 @@ fn chain_path_is_inline_contained<SlotForm>(
             .subst_type(module.interned_field_type_at(field_handle), *ty_args)
             .is_ok_and(|field_ty| field_ty == next_owner)
     })
+}
+
+/// Publishes the layout and struct descriptor of the resources an
+/// `0x1::object::Object<T>` is read through: `T` itself and
+/// `0x1::object::ObjectCore`. A no-op for every other nominal.
+///
+/// Neither is reachable from the object's own fields, but checking an object
+/// argument reads both from storage.
+//
+// TODO(completeness): hard-coded here, like `resource_types_for_native`.
+fn discover_object_resource_types(
+    ctx: &mut impl SpecializerContext,
+    interner: &impl Interner,
+    module_id: InternedModuleId,
+    name: InternedIdentifier,
+    ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
+) -> VMResult<()> {
+    let &[resource] = view_type_list(ty_args) else {
+        return Ok(());
+    };
+    let symbols = ctx.framework_symbols();
+    if module_id != symbols.object || name != symbols.object_struct {
+        return Ok(());
+    }
+    for ty in [resource, symbols.object_core] {
+        discover_type_metadata(ctx, interner, ty, EMPTY_TYPE_LIST, visited, descriptors)?;
+        publish_struct_descriptor_for(ctx, ty, &mut descriptors.structs)?;
+    }
+    Ok(())
 }
 
 /// Recursive post-order DFS that visits every nominal reachable from the given
@@ -1421,15 +1564,18 @@ fn discover_type_metadata(
                 None
             };
             if let Some(id) = descriptor_id {
-                descriptors.vec.insert(ty, id);
+                descriptors.vectors.insert(ty, id);
             }
             // Publish the vector layout only when both the element layout and
             // the descriptor are available (the same condition the descriptor
             // uses), so `descriptor_id` is always valid on the layout.
             match (elem_id, descriptor_id) {
                 (Some(elem_id), Some(descriptor_id)) => {
-                    let layout = ValueLayout::vector(elem_id, descriptor_id);
-                    Ok(Some(ctx.publish_layout(ty, layout)))
+                    let layout = ValueLayout::vector(ty, elem_id, descriptor_id);
+                    let id = ctx
+                        .publish_layout(layout)
+                        .ok_or(LoweringError::LayoutWithoutType)?;
+                    Ok(Some(id))
                 },
                 _ => Ok(None),
             }
@@ -1447,6 +1593,15 @@ fn discover_type_metadata(
             if !is_closed_type(ty) {
                 return Ok(None);
             }
+            discover_object_resource_types(
+                ctx,
+                interner,
+                *module_id,
+                *name,
+                *nominal_ty_args,
+                visited,
+                descriptors,
+            )?;
             match ctx.get_fields(module_id, name)? {
                 None => {
                     // The context does not have field information for this
@@ -1488,6 +1643,7 @@ fn discover_type_metadata(
                     // deferred), before recording any nominal layout.
                     let Some(value_layout) = try_build_inline_value_layout(
                         &*ctx,
+                        Some(ty),
                         &field_layouts,
                         &field_ids,
                         total,
@@ -1496,7 +1652,10 @@ fn discover_type_metadata(
                     else {
                         return Ok(None);
                     };
-                    Ok(Some(ctx.publish_layout(ty, value_layout)))
+                    let id = ctx
+                        .publish_layout(value_layout)
+                        .ok_or(LoweringError::LayoutWithoutType)?;
+                    Ok(Some(id))
                 },
                 Some(FieldTypes::Enum(variants)) => {
                     // An enum is an 8-byte heap pointer at the type level.
@@ -1564,6 +1723,7 @@ fn discover_type_metadata(
                         if all_value_layouts {
                             match try_build_inline_value_layout(
                                 &*ctx,
+                                None,
                                 &variant_layout,
                                 &field_ids,
                                 variant_size,
@@ -1607,8 +1767,11 @@ fn discover_type_metadata(
                             let variant_ids =
                                 ctx.publish_variant_layouts(ty, variant_value_layouts);
                             let value_layout =
-                                ValueLayout::frozen_enum(descriptor_id, variant_ids, size);
-                            return Ok(Some(ctx.publish_layout(ty, value_layout)));
+                                ValueLayout::frozen_enum(ty, descriptor_id, variant_ids, size);
+                            let id = ctx
+                                .publish_layout(value_layout)
+                                .ok_or(LoweringError::LayoutWithoutType)?;
+                            return Ok(Some(id));
                         }
                     }
 

@@ -17,11 +17,13 @@ Given the high stakes, Aptos runs a bug bounty program, which has surfaced verif
 In a permissionless blockchain setting, executed transactions cannot be reversed, and anyone can deploy hand-crafted compiler-bypassed bytecode.
 Static verification is thus a single point of failure: one exploited bug can have catastrophic consequences.
 As a practical security measure, the Move VM implements defense-in-depth \emph{runtime safety checks} that, after static verification, independently verify the critical invariants during execution.
+These runtime safety checks do not share implementation with the static verifier.
+Multiple proof-of-concept exploits, surfaced through bug bounty reports and internal audits, bypassed the static verifier but were caught by the runtime checks: the defense in depth working as intended.
 
 In this paper, we describe three groups of runtime checks, each motivated by real-world examples.
 \emph{Type checks} (\S\ref{sec:type}) verify that the dynamically tracked type of every value matches the static type the bytecode expects to consume.
 \emph{Ability checks} (\S\ref{sec:ability}) verify that operations such as copy, drop, or store to the global state are only performed on values whose declared abilities permit them.
-\emph{Reference checks} (\S\ref{sec:ref}) verify the same freedom from dangling references and aliased mutable access that the static verifier is supposed to enforce.
+\emph{Reference checks} (\S\ref{sec:ref}) verify the same freedom from dangling references and aliased mutable access that the static verifier is supposed to enforce, but using fundamentally different representations and algorithms.
 
 We then describe two techniques for reducing the runtime costs of these checks: \emph{trusted code} (\S\ref{sec:trusted}) that waives them under certain conditions, and an \emph{asynchronous mode} (\S\ref{sec:async}) that leverages idle threads in Block-STM~\cite{BlockSTM} (Aptos's parallel transaction execution engine).
 We present an evaluation of the performance impact of the checks on real-world benchmarks (\S\ref{sec:perf}).

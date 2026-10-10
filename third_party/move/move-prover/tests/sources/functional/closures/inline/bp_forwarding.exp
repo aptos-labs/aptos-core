@@ -1,0 +1,37 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/bp_forwarding.move:178:9
+    │
+178 │         ensures forall i in 0..len(entries): entries[i].value == 2; // error: values are 1
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:172: set_values_wrong
+    =         entries = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:36: each_mut
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:172: set_values_wrong
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:37: each_mut
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:38: each_mut
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:42: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:43: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:44: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:45: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:46: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:47: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:48: each_mut
+    =     enter loop, variable(s) entries, i havocked and reassigned
+    =         entries = <redacted>
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:43: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:44: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:45: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:46: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:47: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:48: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:39: each_mut
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:172: set_values_wrong
+    =         entries = <redacted>
+    =     at tests/sources/functional/closures/inline/bp_forwarding.move:178: set_values_wrong (spec)

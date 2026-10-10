@@ -1,0 +1,18 @@
+[package]
+name = "leaner-rust-cargo-fixture"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+default = ["extra"]
+extra = []
+
+[dependencies]
+leaner-rust-cargo-fixture-dependency = { path = "dependency" }
+
+[package.metadata.cargo-machete]
+# Exercise dependency compilation without exporting the dependency's functions.
+ignored = ["leaner-rust-cargo-fixture-dependency"]
+
+[workspace]

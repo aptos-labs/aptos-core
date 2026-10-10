@@ -991,7 +991,7 @@ impl fmt::Display for AttributeName_ {
 
 impl fmt::Display for ModuleIdent_ {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}::{}", self.address, &self.module)
+        write!(f, "{}::{}", self.address, self.module)
     }
 }
 
@@ -2188,6 +2188,8 @@ impl AstDebug for Exp_ {
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
                     BehaviorKind::ResultOf => "result_of",
+                    BehaviorKind::UnchangedOf => "unchanged_of",
+                    BehaviorKind::FoldsOf => "folds_of",
                 };
                 w.write(kind_str);
                 w.write("<");

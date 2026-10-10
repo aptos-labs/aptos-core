@@ -1,0 +1,3 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/spec_functions.move:93:9: error: the specification clause `ensures counter_is_positive(addr)` is not established
+tests/sources/functional/state_labels/spec_functions.move:91:5: error: leaner verification failed: the automatic verification of `test_spec_fun_wrong_claim` failed; provide a proof: `verify test_spec_fun_wrong_claim by …` in `tests/sources/functional/state_labels/spec_functions.proof.lean` (`verify test_spec_fun_wrong_claim by skip` shows the obligations it leaves)

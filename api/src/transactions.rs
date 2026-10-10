@@ -11,7 +11,7 @@ use crate::{
     metrics::WAIT_TRANSACTION_GAUGE,
     page::Page,
     response::{
-        api_disabled, api_forbidden, transaction_not_found_by_hash,
+        api_disabled, api_forbidden, pruned_or_internal_error, transaction_not_found_by_hash,
         transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
         ForbiddenError, InsufficientStorageError, InternalError,
@@ -882,13 +882,7 @@ impl TransactionsApi {
             .context
             .get_transactions(start_version, limit, ledger_version)
             .context("Failed to read raw transactions from storage")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &latest_ledger_info,
-                )
-            })?;
+            .map_err(|err| pruned_or_internal_error(err, &latest_ledger_info))?;
 
         match accept_type {
             AcceptType::Json => {

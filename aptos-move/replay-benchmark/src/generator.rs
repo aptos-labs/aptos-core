@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    execution::execute_workload,
+    execution::{execute_workload, local_config},
     overrides::OverrideConfig,
     state_view::{ReadSet, ReadSetCapturingStateView},
     workload::Workload,
@@ -10,7 +10,7 @@ use crate::{
 use aptos_logger::error;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_types::transaction::{TransactionBlock, Version};
-use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
+use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use std::{
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -79,8 +79,11 @@ impl InputOutputDiffGenerator {
         let workload = Workload::from(txn_block);
 
         // First, we execute transactions without overrides.
-        let onchain_outputs =
-            execute_workload(&AptosVMBlockExecutor::new(), &workload, &state_view, 1);
+        let onchain_outputs = execute_workload(
+            &AptosVMBlockExecutor::new_with_local_config(local_config(1)),
+            &workload,
+            &state_view,
+        );
 
         // Check on-chain outputs do not modify the state we override. If so, benchmarking results
         // may not be correct.
@@ -104,10 +107,9 @@ impl InputOutputDiffGenerator {
 
         // Execute transactions with an override.
         execute_workload(
-            &AptosVMBlockExecutor::new(),
+            &AptosVMBlockExecutor::new_with_local_config(local_config(1)),
             &workload,
             &state_view_with_override,
-            1,
         );
         state_view_with_override.into_read_set()
     }

@@ -1,0 +1,34 @@
+{
+  "version": 10,
+  "structs": [],
+  "funs": [
+    {
+      "name": "f",
+      "params": 5,
+      "locals": ["u64", "u64", "u64", "u64", "u64", "u64"],
+      "returns": ["u64"],
+      "blocks": [{"instrs": [{"assign": [5, 0]}], "term": {"ret": [5]}}],
+      "loops": [],
+      "spec": {
+        "requires": [],
+        "aborts_if": [],
+        "ensures": [
+          {
+            "binop": [
+              "and",
+              {
+                "binop": [
+                  "and",
+                  {"binop": ["lt", {"local": 0}, {"local": 1}]},
+                  {"binop": ["lt", {"local": 2}, {"local": 3}]}
+                ]
+              },
+              {"binop": ["lt", {"local": 4}, {"value": {"num": "100"}}]}
+            ]
+          }
+        ],
+        "modifies": []
+      }
+    }
+  ]
+}

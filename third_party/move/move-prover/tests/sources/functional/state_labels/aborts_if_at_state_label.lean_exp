@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/state_labels/aborts_if_at_state_label.move:4:1: error: state label `S1` is not bound in this clause; a label a state-change predicate or an invocation defines is not carried yet

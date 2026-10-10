@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/loop_unroll.move:2:5: error: in-body specification condition `LeanerIR.ConditionKind.loopInvariant` with 1 properties and 0 auxiliary expressions is outside the current LeanerLang parser

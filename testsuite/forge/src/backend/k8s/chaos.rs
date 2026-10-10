@@ -107,13 +107,13 @@ impl K8sSwarm {
 
             network_chaos_specs.push(format!(
                 include_str!(DELAY_NETWORK_CHAOS_TEMPLATE!()),
-                name = &group_network_delay.name,
+                name = group_network_delay.name,
                 namespace = self.kube_namespace,
                 latency_ms = group_network_delay.latency_ms,
                 jitter_ms = group_network_delay.jitter_ms,
                 correlation_percentage = group_network_delay.correlation_percentage,
-                instance_labels = &source_instance_labels,
-                target_instance_labels = &target_instance_labels,
+                instance_labels = source_instance_labels,
+                target_instance_labels = target_instance_labels,
             ));
         }
         Ok(network_chaos_specs.join("\n---\n"))
@@ -171,17 +171,17 @@ impl K8sSwarm {
 
             network_chaos_specs.push(format!(
                 include_str!(NETEM_CHAOS_TEMPLATE!()),
-                name = &group_netem.name,
+                name = group_netem.name,
                 namespace = self.kube_namespace,
                 delay_latency_ms = group_netem.delay_latency_ms,
                 delay_jitter_ms = group_netem.delay_jitter_ms,
                 delay_correlation_percentage = group_netem.delay_correlation_percentage,
                 loss_percentage = group_netem.loss_percentage,
                 loss_correlation_percentage = group_netem.loss_correlation_percentage,
-                instance_labels = &source_instance_labels,
-                target_instance_labels = &target_instance_labels,
+                instance_labels = source_instance_labels,
+                target_instance_labels = target_instance_labels,
                 rate = group_netem.rate_in_mbps,
-                service_targets = &service_targets,
+                service_targets = service_targets,
             ));
         }
 
@@ -200,11 +200,11 @@ impl K8sSwarm {
 
             cpu_stress_specs.push(format!(
                 include_str!(CPU_STRESS_CHAOS_TEMPLATE!()),
-                name = &group_cpu_stress.name,
+                name = group_cpu_stress.name,
                 namespace = self.kube_namespace,
                 num_workers = group_cpu_stress.num_workers,
                 load_per_worker = group_cpu_stress.load_per_worker,
-                instance_labels = &instance_labels,
+                instance_labels = instance_labels,
             ));
         }
 

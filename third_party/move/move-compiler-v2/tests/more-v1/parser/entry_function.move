@@ -1,4 +1,4 @@
-module 0x8675309::M {
+module 0x8::M {
     public entry fun f0() {}
     entry public fun f1() {}
     entry fun f2() {}

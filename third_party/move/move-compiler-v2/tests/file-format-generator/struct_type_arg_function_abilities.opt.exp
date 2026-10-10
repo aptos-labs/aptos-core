@@ -1,0 +1,39 @@
+
+Diagnostics:
+error: cannot pass `S<|u64|u64 has copy + drop>` to a function which expects argument of type `S<|u64|u64 has drop>`
+   ┌─ tests/file-format-generator/struct_type_arg_function_abilities.move:15:15
+   │
+15 │         takes(s)
+   │               ^
+
+error: cannot return `S<|u64|u64 has copy + drop>` from a function with result type `S<|u64|u64 has drop>`
+   ┌─ tests/file-format-generator/struct_type_arg_function_abilities.move:20:9
+   │
+20 │         s
+   │         ^
+
+error: expected `S<|u64|u64 has drop>` but found a value of type `S<|u64|u64 has copy + drop>`
+   ┌─ tests/file-format-generator/struct_type_arg_function_abilities.move:25:16
+   │
+25 │         S { v: s }
+   │                ^
+
+error: cannot adapt `S<|u64|u64 has copy + drop>` to annotated type `S<|u64|u64 has drop>`
+   ┌─ tests/file-format-generator/struct_type_arg_function_abilities.move:30:39
+   │
+30 │         let t: S<|u64|u64 has drop> = s;
+   │                                       ^
+
+error: cannot use `S<|u64|u64 has copy + drop>` with an operator which expects a value of type `S<|u64|u64 has drop>`
+   ┌─ tests/file-format-generator/struct_type_arg_function_abilities.move:37:14
+   │
+37 │         b == a
+   │              ^
+
+error: reference type `&S<|u64|u64 has drop>` is not allowed as a type argument (type was inferred)
+   ┌─ tests/file-format-generator/struct_type_arg_function_abilities.move:42:11
+   │
+42 │         b == a
+   │           ^^
+   │
+   = required by instantiating type parameter `T` of function `==`

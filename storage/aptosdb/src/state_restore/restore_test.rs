@@ -10,11 +10,15 @@ use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::{
     mock_tree_store::MockTreeStore,
     node_type::{LeafNode, Node, NodeKey},
+    restore::JellyfishMerkleRestore,
     test_helper::{init_mock_db, ValueBlob},
     JellyfishMerkleTree, NodeBatch, TestKey, TestValue, TreeReader, TreeWriter,
 };
 use aptos_storage_interface::{Result, StateSnapshotReceiver};
-use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
+use aptos_types::{
+    proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
+    transaction::Version,
+};
 use proptest::{collection::btree_map, prelude::*};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -187,7 +191,7 @@ proptest! {
         let restore_db = Arc::new(MockSnapshotStore::default());
         {
             let mut restore =
-                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
+                StateSnapshotRestore::new(Arc::clone(&restore_db), Arc::clone(&restore_db),  version, expected_root_hash, true /* async_commit */, StateSnapshotRestoreMode::Default).unwrap();
             let proof = tree
                 .get_range_proof(batch1.last().map(|(key, _value)| *key).unwrap(), version)
                 .unwrap();
@@ -199,7 +203,7 @@ proptest! {
             let remaining_accounts: Vec<_> = all.clone().into_iter().skip(batch1_size - overlap_size).collect();
 
             let mut restore =
-                StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash, true /* async commit */, StateSnapshotRestoreMode::Default ).unwrap();
+                StateSnapshotRestore::new(Arc::clone(&restore_db), Arc::clone(&restore_db),  version, expected_root_hash, true /* async commit */, StateSnapshotRestoreMode::Default ).unwrap();
             let proof = tree
                 .get_range_proof(
                     remaining_accounts.last().map(|(h, _)| *h).unwrap(),
@@ -225,6 +229,22 @@ proptest! {
         restore_without_interruption(&btree, target_version, &restore_db, true);
         // overwrite, an entirely different tree
         restore_without_interruption(&btree, target_version, &restore_db, false);
+    }
+
+    #[test]
+    fn test_finish_rejects_truncated_tree(btree in arb_btree_map(2)) {
+        // Truncating to one key ends with a single-leaf root; to all but one, an internal root.
+        for num_restored in [1, btree.len() - 1] {
+            assert_finish_rejects_truncated_tree(&btree, num_restored);
+        }
+    }
+
+    #[test]
+    fn test_finish_rejects_unverified_replay(btree in arb_btree_map(1)) {
+        // Forging one key ends with a single-leaf root; forging all of them, an internal root.
+        for num_forged in [1, btree.len()] {
+            assert_finish_rejects_unverified_replay(&btree, num_forged);
+        }
     }
 }
 
@@ -275,8 +295,8 @@ fn restore_without_interruption<V>(
 
     let mut restore = if try_resume {
         StateSnapshotRestore::new(
-            target_db,
-            target_db,
+            Arc::clone(target_db),
+            Arc::clone(target_db),
             target_version,
             expected_root_hash,
             true, /* async_commit */
@@ -285,8 +305,8 @@ fn restore_without_interruption<V>(
         .unwrap()
     } else {
         StateSnapshotRestore::new_overwrite(
-            target_db,
-            target_db,
+            Arc::clone(target_db),
+            Arc::clone(target_db),
             target_version,
             expected_root_hash,
             StateSnapshotRestoreMode::Default,
@@ -302,4 +322,87 @@ fn restore_without_interruption<V>(
     Box::new(restore).finish().unwrap();
 
     assert_success(target_db, expected_root_hash, btree, target_version);
+}
+
+/// After an honest chunk with the first `num_restored` keys, a chunk that only repeats the last
+/// of them is skipped by both the tree and KV restores without verification, yet claims to be the
+/// last one. Finishing must reject the truncated tree.
+fn assert_finish_rejects_truncated_tree(
+    btree: &BTreeMap<HashValue, (ValueBlob, ValueBlob)>,
+    num_restored: usize,
+) {
+    let (db, version) = init_mock_store(&btree.values().cloned().collect());
+    let tree = JellyfishMerkleTree::new(&db);
+    let expected_root_hash = tree.get_root_hash(version).unwrap();
+
+    let chunk: Vec<_> = btree.values().take(num_restored).cloned().collect();
+    let last_hashed_key = *btree.keys().nth(num_restored - 1).unwrap();
+    let proof = tree.get_range_proof(last_hashed_key, version).unwrap();
+    let overlap = chunk.last().unwrap().clone();
+
+    let restore_db = Arc::new(MockSnapshotStore::default());
+    let mut restore = StateSnapshotRestore::new(
+        Arc::clone(&restore_db),
+        Arc::clone(&restore_db),
+        version,
+        expected_root_hash,
+        false, /* async_commit */
+        StateSnapshotRestoreMode::Default,
+    )
+    .unwrap();
+    restore.add_chunk(chunk, proof).unwrap();
+    // No right siblings, so the chunk claims to be the last one.
+    restore
+        .add_chunk(vec![overlap], SparseMerkleRangeProof::new(vec![]))
+        .unwrap();
+    assert!(restore.finish().is_err());
+
+    assert!(restore_db
+        .get_node_option(&NodeKey::new_empty_path(version), "test")
+        .unwrap()
+        .is_none());
+}
+
+/// A forged chunk fails verification but stays staged in the tree restore, so replaying it on
+/// the same restore is skipped as an overlap without verification. Finishing must still reject
+/// the resulting tree.
+fn assert_finish_rejects_unverified_replay(
+    btree: &BTreeMap<HashValue, (ValueBlob, ValueBlob)>,
+    num_forged: usize,
+) {
+    let (db, version) = init_mock_store(&btree.values().cloned().collect());
+    let expected_root_hash = JellyfishMerkleTree::new(&db)
+        .get_root_hash(version)
+        .unwrap();
+
+    let forged_value_hash = CryptoHash::hash(&ValueBlob::from(b"forged".to_vec()));
+    let forged_chunk: Vec<_> = btree
+        .values()
+        .take(num_forged)
+        .map(|(k, _v)| (k, forged_value_hash))
+        .collect();
+    // No right siblings, so the chunk claims to be the last one.
+    let proof = SparseMerkleRangeProof::new(vec![]);
+
+    // Drive the tree restore directly, since `StateSnapshotRestore` rejects any chunk after a
+    // failed one.
+    let restore_db = Arc::new(MockSnapshotStore::<ValueBlob, ValueBlob>::default());
+    let mut restore = JellyfishMerkleRestore::new(
+        Arc::clone(&restore_db),
+        version,
+        expected_root_hash,
+        false, /* async_commit */
+    )
+    .unwrap();
+    assert!(restore
+        .verify_chunk(forged_chunk.clone(), proof.clone())
+        .is_err());
+    restore.verify_chunk(forged_chunk, proof).unwrap();
+    restore.commit_chunk().unwrap();
+    assert!(restore.finish_impl().is_err());
+
+    assert!(restore_db
+        .get_node_option(&NodeKey::new_empty_path(version), "test")
+        .unwrap()
+        .is_none());
 }

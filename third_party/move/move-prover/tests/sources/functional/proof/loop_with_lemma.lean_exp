@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/loop_with_lemma.move:16:13
+   │
+16 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+tests/sources/functional/proof/loop_with_lemma.move:54:14: error: the assertion `_result > n` does not hold
+tests/sources/functional/proof/loop_with_lemma.move:51:5: error: leaner verification failed: the automatic verification of `count_up` failed; provide a proof: `verify count_up by …` in `tests/sources/functional/proof/loop_with_lemma.proof.lean` (`verify count_up by skip` shows the obligations it leaves)

@@ -1,85 +1,91 @@
 
 Diagnostics:
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: no matching declaration of `<`
   ┌─ tests/checking/typing/binary_lt_invalid.move:8:9
   │
-8 │         false < true;
-  │         ^^^^^
-
-error: cannot use `bool` with an operator which expects a value of type `integer`
-  ┌─ tests/checking/typing/binary_lt_invalid.move:9:13
+8 │         1 < false;
+  │         ^^^^^^^^^
   │
-9 │         1 < false;
-  │             ^^^^^
+  = outruled candidate `<<T>(&T, &T): bool` (cannot use `integer` with an operator which expects a value of type `&_`)
+  = outruled candidate `<<T>(T, T): bool` (cannot use `bool` with an operator which expects a value of type `integer`)
 
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: no matching declaration of `<`
+  ┌─ tests/checking/typing/binary_lt_invalid.move:9:9
+  │
+9 │         false < 1;
+  │         ^^^^^^^^^
+  │
+  = outruled candidate `<<T>(&T, &T): bool` (cannot use `bool` with an operator which expects a value of type `&_`)
+  = outruled candidate `<<T>(T, T): bool` (cannot use `integer` with an operator which expects a value of type `bool`)
+
+error: no matching declaration of `<`
    ┌─ tests/checking/typing/binary_lt_invalid.move:10:9
    │
-10 │         false < 1;
-   │         ^^^^^
+10 │         (0: u8) < (1: u128);
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `u8` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (cannot use `u128` with an operator which expects a value of type `u8`)
 
-error: cannot use `address` with an operator which expects a value of type `integer`
+error: no matching declaration of `<`
    ┌─ tests/checking/typing/binary_lt_invalid.move:11:9
    │
-11 │         @0x0 < @0x1;
-   │         ^^^^
-
-error: cannot use `u128` with an operator which expects a value of type `u8`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:12:20
+11 │         0 < 1 < 2;
+   │         ^^^^^^^^^
    │
-12 │         (0: u8) < (1: u128);
-   │                    ^
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `bool` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (cannot use `integer` with an operator which expects a value of type `bool`)
 
-error: cannot use `R` with an operator which expects a value of type `integer`
+error: no matching declaration of `<`
+   ┌─ tests/checking/typing/binary_lt_invalid.move:12:9
+   │
+12 │         (1 < false) && (@0x0 < 0);
+   │         ^^^^^^^^^^^
+   │
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `integer` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (cannot use `bool` with an operator which expects a value of type `integer`)
+
+error: no matching declaration of `<`
+   ┌─ tests/checking/typing/binary_lt_invalid.move:12:24
+   │
+12 │         (1 < false) && (@0x0 < 0);
+   │                        ^^^^^^^^^^
+   │
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `address` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (cannot use `integer` with an operator which expects a value of type `address`)
+
+error: no matching declaration of `<`
    ┌─ tests/checking/typing/binary_lt_invalid.move:13:9
    │
-13 │         r < r;
-   │         ^
+13 │         () < ();
+   │         ^^^^^^^
+   │
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `()` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (tuple type `()` is not allowed as a type argument (type was inferred))
 
-error: cannot use `S` with an operator which expects a value of type `integer`
+error: no matching declaration of `<`
    ┌─ tests/checking/typing/binary_lt_invalid.move:14:9
    │
-14 │         s < s;
-   │         ^
+14 │         1 < ();
+   │         ^^^^^^
+   │
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `integer` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (cannot use `()` with an operator which expects a value of type `integer`)
 
-error: cannot use `bool` with an operator which expects a value of type `integer`
+error: no matching declaration of `<`
    ┌─ tests/checking/typing/binary_lt_invalid.move:15:9
    │
-15 │         0 < 1 < 2;
-   │         ^^^^^
-
-error: cannot use `bool` with an operator which expects a value of type `integer`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:16:14
+15 │         (0, 1) < (0, 1, 2);
+   │         ^^^^^^^^^^^^^^^^^^
    │
-16 │         (1 < false) && (@0x0 < 0);
-   │              ^^^^^
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `(integer, integer)` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (tuple type `(integer, integer)` is not allowed as a type argument (type was inferred))
 
-error: cannot use `address` with an operator which expects a value of type `integer`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:16:25
+error: no matching declaration of `<`
+   ┌─ tests/checking/typing/binary_lt_invalid.move:16:9
    │
-16 │         (1 < false) && (@0x0 < 0);
-   │                         ^^^^
-
-error: cannot use `()` with an operator which expects a value of type `integer`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:17:9
+16 │         (1, 2) < (0, 1);
+   │         ^^^^^^^^^^^^^^^
    │
-17 │         () < ();
-   │         ^^
-
-error: cannot use `()` with an operator which expects a value of type `integer`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:18:13
-   │
-18 │         1 < ();
-   │             ^^
-
-error: cannot use `(integer, integer)` with an operator which expects a value of type `integer`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:19:9
-   │
-19 │         (0, 1) < (0, 1, 2);
-   │         ^^^^^^
-
-error: cannot use `(integer, integer)` with an operator which expects a value of type `integer`
-   ┌─ tests/checking/typing/binary_lt_invalid.move:20:9
-   │
-20 │         (1, 2) < (0, 1);
-   │         ^^^^^^
+   = outruled candidate `<<T>(&T, &T): bool` (cannot use `(integer, integer)` with an operator which expects a value of type `&_`)
+   = outruled candidate `<<T>(T, T): bool` (tuple type `(integer, integer)` is not allowed as a type argument (type was inferred))

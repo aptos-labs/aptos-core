@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Control/LiteralLoops.lean:57:4: error: the specification clause `ensures result == 8` is not established
+LeanerE2ETests/Check/Control/LiteralLoops.lean:56:7: error: leaner verification failed: the automatic verification of `max_three_incorrect` failed; provide a proof: `verify max_three_incorrect by …` in the module (`verify max_three_incorrect by skip` shows the obligations it leaves)

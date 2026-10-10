@@ -1,0 +1,38 @@
+Move prover returns: exiting with verification errors
+error: global memory invariant does not hold
+   ┌─ tests/sources/regression/generic_aliasing_ghost_pair.move:15:9
+   │
+15 │ ╭         invariant<T, U> (!exists<N>(@0x42) ==> !exists<P<T, U>>(@0x42))
+16 │ │             && (exists<M>(@0x42) ==> !exists<P<T, U>>(@0x42));
+   │ ╰──────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:20: concrete
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:26: concrete (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:27: concrete (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:20: concrete
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:21: concrete
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:15
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:22: concrete
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:15
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:23: concrete
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:15
+
+error: global memory invariant does not hold
+   ┌─ tests/sources/regression/generic_aliasing_ghost_pair.move:15:9
+   │
+15 │ ╭         invariant<T, U> (!exists<N>(@0x42) ==> !exists<P<T, U>>(@0x42))
+16 │ │             && (exists<M>(@0x42) ==> !exists<P<T, U>>(@0x42));
+   │ ╰──────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:31: declared
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:37: declared (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:38: declared (spec)
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:31: declared
+   =         s = <redacted>
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:32: declared
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:15
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:33: declared
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:15
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:34: declared
+   =     at tests/sources/regression/generic_aliasing_ghost_pair.move:15

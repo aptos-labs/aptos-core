@@ -1,43 +1,29 @@
 {% if once(name="core_tools") %}
-## Checking Move Code
+## Inspecting a Move package
 
-Use the `{{ tool(name="move_package_status") }}` MCP tool to check for compilation errors and warnings.
+- Call only the tool which answers a concrete question you have. Avoid a
+  routine status/manifest/query sequence and repeated unchanged read-only
+  queries.
+- Minimize `{{ tool(name="move_package_status") }}` calls. Skip routine setup
+  and after-edit status calls when the next operation is inference,
+  verification, or a candidate check;
+  those operations already compile the package and report compilation
+  diagnostics. Reserve package status for a standalone compiler-diagnostic
+  request when no such operation is otherwise needed.
+- Use `{{ tool(name="move_package_manifest") }}` only when you need to
+  distinguish target source files (`source_paths`) from dependency files
+  (`dep_paths`). Package status is not a file or module discovery tool.
+- Use `{{ tool(name="move_package_query") }}` only when a structural query
+  answers a specific unresolved question. Prefer the narrowest query:
+  - `function_usage` with `function: "module::function"` for the direct and
+    transitive calls and closure captures relevant to one function;
+  - `module_summary` with `module: "module"` for signatures and declarations;
+  - `facts` only when detailed attributes or source locations are necessary;
+    set `module: "module"` whenever possible because package-wide output can
+    be large;
+  - `dep_graph` for module dependencies;
+  - `call_graph` for package-wide calls;
 
-- Call `{{ tool(name="move_package_status") }}` with `package_path` set to the package directory.
-- The tool sets error and returns detailed error messages if the package does not compile.
-
-Notice that like with a build system, the tool is idempotent, and does not cause recompilation
-if the compilation result and sources are up-to-date.
-
-
-## Package Manifest
-
-Use the `{{ tool(name="move_package_manifest") }}` MCP tool to discover source files and dependencies
-of a Move package:
-
-- Call `{{ tool(name="move_package_manifest") }}` with `package_path` set to the package directory.
-- The result includes `source_paths` (target modules) and `dep_paths` (dependencies).
-
-
-## Querying Package Structure
-
-Use the `{{ tool(name="move_package_query") }}` MCP tool to inspect the structure of a Move package.
-
-Parameters:
-
-- **`package_path`** (required) — path to the Move package directory.
-- **`query`** (required) — one of the query types below.
-- **`function`** (required for `function_usage`) — function name in the form `module_name::function_name`.
-
-### Query Types
-
-- **`dep_graph`** — returns a map from each module to the modules it depends on.
-  Useful for understanding module layering and import structure.
-- **`module_summary`** — returns a summary of each module's constants, structs,
-  and functions. Useful for getting an overview without reading all source files.
-- **`call_graph`** — returns a function-level call graph as a map from each
-  function to the functions it calls.
-- **`function_usage`** — returns direct and transitive calls/uses for a given
-  function. "called" = direct calls; "used" = direct calls + closure captures.
-  Requires the `function` parameter.
+All tools take `package_path`, which must name the directory containing
+`Move.toml`.
 {% endif %}

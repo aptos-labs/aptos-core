@@ -102,7 +102,7 @@ mod test {
 
     #[test]
     fn test_traversal_in_invalid_value() {
-        let a = Value::master_signer_reference(AccountAddress::random());
+        let a = Value::signer_reference(AccountAddress::random());
         assert_err!(find_identifiers_in_value(&a, &mut HashSet::new()));
     }
 

@@ -172,11 +172,12 @@ module 0x42::frame_conditions {
     }
 
     // =========================================================================
-    // 4. WritesAt — only the specified address can change
+    // 4. WritesAt — the frame names the address, but `apply_void` may invoke `f`
+    //    at any address
     // =========================================================================
 
-    /// After increment_balance(addr), Config is unchanged (reads-only)
-    /// and Balance at other addresses is unchanged (writes-at frame).
+    /// After increment_balance(addr), Config is unchanged (reads-only).
+    /// Balance at other addresses is not known to be unchanged.
     fun test_writes_at_frame(addr: address) acquires Balance, Config {
         apply_void(|a| increment_balance(a) spec {
             modifies Balance[a];
@@ -187,7 +188,7 @@ module 0x42::frame_conditions {
         pragma aborts_if_is_partial;
         ensures Config[addr] == old(Config[addr]);
         ensures forall a: address where a != addr:
-            Balance[a] == old(Balance[a]);
+            Balance[a] == old(Balance[a]); // error: post-condition does not hold
     }
 
     // =========================================================================
@@ -233,5 +234,26 @@ module 0x42::frame_conditions {
         pragma aborts_if_is_partial;
         ensures Counter[addr] == old(Counter[addr]);
         ensures Config[addr] == old(Config[addr]);
+    }
+
+    /// Deliberately omits `modifies` but still provides a memory postcondition.
+    fun set_balance_without_frame(addr: address) acquires Balance {
+        Balance[addr].coins = 7;
+    }
+    spec set_balance_without_frame {
+        pragma opaque;
+        ensures Balance[addr].coins == 7;
+    }
+
+    /// An opaque closure's postcondition survives conservative pre-call havoc.
+    fun test_unframed_opaque_closure_ensures(addr: address) acquires Balance {
+        let f = |a| set_balance_without_frame(a) spec {
+            ensures Balance[a].coins == 7;
+        };
+        f(addr);
+    }
+    spec test_unframed_opaque_closure_ensures {
+        pragma aborts_if_is_partial;
+        ensures Balance[addr].coins == 7;
     }
 }

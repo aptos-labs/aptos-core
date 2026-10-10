@@ -27,7 +27,8 @@ module 0x42::enum_variant_mismatch {
 // CHECK: results: 8
 
 // RUN: execute 0x42::enum_variant_mismatch::read_y --args 0
-// CHECK-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
+// CHECK-V2-SUBSTR: enum variant mismatch
 
 // RUN: execute 0x42::enum_variant_mismatch::read_y --args 1
 // CHECK: results: 9

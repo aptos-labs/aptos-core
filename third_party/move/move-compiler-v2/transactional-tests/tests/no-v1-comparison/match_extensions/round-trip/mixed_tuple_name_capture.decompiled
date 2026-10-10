@@ -1,0 +1,64 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/mixed_tuple_name_capture.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum E has copy, drop {
+        V {
+            x: u64,
+        }
+        N,
+    }
+    enum W has copy, drop {
+        W1 {
+            _0: u64,
+        }
+        W2 {
+            _0: u64,
+        }
+    }
+    public fun capture_after_inlining(): u64 {
+        let _v0 = E::V{x: 5};
+        if (!(&_v0 is V)) ();
+        0
+    }
+    public fun capture_binding(p0: u64, p1: u64): u64 {
+        let _v0 = W::W1{_0: p0};
+        let _v1 = &_v0;
+        if (!((_v1 is W1) && p1 == 5)) {
+            if (_v1 is W1) {
+                let W::W1{_0: _v2} = _v0;
+                return p1 * 100 + _v2
+            };
+            return 0
+        };
+        let W::W1{_0: _v3} = _v0;
+        _v3
+    }
+    public fun capture_literal(p0: u64, p1: u64): u64 {
+        let _v0 = W::W1{_0: p0};
+        if (!((&_v0 is W1) && p1 == 5)) return 0;
+        let W::W1{_0: _v1} = _v0;
+        _v1
+    }
+    public fun capture_swap(p0: u64, p1: u64): u64 {
+        let _v0 = W::W1{_0: 0};
+        if (&_v0 is W1) {
+            let W::W1{_0: _v1} = _v0;
+            return p1 * 100 + p0
+        };
+        0
+    }
+}
+
+
+//# run 0xc0ffee::m::capture_literal --args 5u64 7u64
+
+//# run 0xc0ffee::m::capture_literal --args 7u64 5u64
+
+//# run 0xc0ffee::m::capture_binding --args 7u64 5u64
+
+//# run 0xc0ffee::m::capture_binding --args 7u64 3u64
+
+//# run 0xc0ffee::m::capture_swap --args 1u64 2u64
+
+//# run 0xc0ffee::m::capture_after_inlining

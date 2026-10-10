@@ -59,6 +59,10 @@ impl AbstractFunction for MockFunction {
     fn to_canonical_string(&self) -> String {
         "0x1::mock::mock".to_string()
     }
+
+    fn ty_args_pseudo_gas_cost(&self) -> u64 {
+        0
+    }
 }
 
 #[test]

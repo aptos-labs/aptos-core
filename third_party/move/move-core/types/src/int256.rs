@@ -6,7 +6,9 @@
 //! This uses the `ethnum` crate for the underlying representation. This is one of the
 //! most downloaded 256 bit implementation for Rust, and has full integration of both
 //! signed and unsigned integers with the standard Rust int types. This module is
-//! merely a wrapper around the provided types.
+//! a wrapper around the provided types, except for decimal formatting: format the
+//! wrappers, never the underlying `ethnum` values, whose formatter is undefined
+//! behavior.
 
 use num::{bigint::Sign, BigInt};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -76,7 +78,7 @@ impl From<U256> for BigInt {
 
 impl std::fmt::Debug for U256 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "U256({})", self.repr)
+        write!(f, "U256({})", self)
     }
 }
 
@@ -141,7 +143,7 @@ impl From<I256> for BigInt {
 
 impl std::fmt::Debug for I256 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "I256({})", self.repr)
+        write!(f, "I256({})", self)
     }
 }
 
@@ -236,17 +238,80 @@ mod proptest_impl {
 
 // ---- String Representation
 
-macro_rules! string_repr {
+/// Writes `magnitude` in decimal through `Formatter::pad_integral`, so width,
+/// fill, and sign flags behave as for the primitive integers.
+///
+/// Not delegated to `ethnum`, whose formatter writes through a raw pointer
+/// derived from a single array element (undefined behavior), nor to `BigInt`,
+/// which heap-allocates twice per value on production formatting paths.
+fn fmt_decimal(
+    mut magnitude: ethnum::U256,
+    is_nonnegative: bool,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    // Nearly every value fits in 128 bits; the primitive formatters produce
+    // the identical rendering.
+    let (high, low) = magnitude.into_words();
+    if high == 0 {
+        if is_nonnegative {
+            return std::fmt::Display::fmt(&low, f);
+        }
+        if low <= i128::MIN.unsigned_abs() {
+            return std::fmt::Display::fmt(&(low.wrapping_neg() as i128), f);
+        }
+    }
+
+    // One `U256` division peels off this many decimal digits: `10^19` is the
+    // largest power of ten that fits in a `u64`.
+    const CHUNK_DIGITS: usize = 19;
+    const CHUNK_VALUE: u128 = 10_u128.pow(CHUNK_DIGITS as u32);
+    const _: () = assert!(CHUNK_VALUE <= u64::MAX as u128);
+    const CHUNK: ethnum::U256 = ethnum::U256::new(CHUNK_VALUE);
+    // `2^256 < 10^78`, so five chunks hold any magnitude.
+    const CHUNKS: usize = 5;
+    const _: () = assert!(CHUNKS * CHUNK_DIGITS >= 78);
+
+    // Chunks are written back to front, each zero-padded to full width. The
+    // leading zeros, from prefilled unused chunks and from the top chunk, are
+    // stripped below.
+    let mut digits = [b'0'; CHUNKS * CHUNK_DIGITS];
+    let mut end = digits.len();
+    while magnitude != ethnum::U256::ZERO {
+        let (quotient, remainder) = magnitude.div_rem(CHUNK);
+        let mut chunk = remainder.as_u64();
+        for digit in digits[end - CHUNK_DIGITS..end].iter_mut().rev() {
+            *digit = b'0' + (chunk % 10) as u8;
+            chunk /= 10;
+        }
+        end -= CHUNK_DIGITS;
+        magnitude = quotient;
+    }
+    // Zero keeps one digit, so the loop is correct without the fast path.
+    let first_nonzero = digits
+        .iter()
+        .position(|digit| *digit != b'0')
+        .unwrap_or(digits.len() - 1);
+    let text = std::str::from_utf8(&digits[first_nonzero..]).expect("decimal digits are ASCII");
+    f.pad_integral(is_nonnegative, "", text)
+}
+
+impl std::fmt::Display for U256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_decimal(self.repr, true, f)
+    }
+}
+
+impl std::fmt::Display for I256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_decimal(self.repr.unsigned_abs(), !self.repr.is_negative(), f)
+    }
+}
+
+macro_rules! string_parsing {
     ($wrapper:ty, $repr:ty) => {
         impl $wrapper {
             pub fn from_str_radix(s: &str, radix: u32) -> anyhow::Result<Self> {
                 Ok(<$repr>::from_str_radix(s, radix)?.into())
-            }
-        }
-
-        impl std::fmt::Display for $wrapper {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", self.repr)
             }
         }
 
@@ -260,8 +325,8 @@ macro_rules! string_repr {
     };
 }
 
-string_repr!(U256, ethnum::U256);
-string_repr!(I256, ethnum::I256);
+string_parsing!(U256, ethnum::U256);
+string_parsing!(I256, ethnum::I256);
 
 // ---- Arithmetics
 

@@ -1,0 +1,15 @@
+Move prover returns: exiting with bytecode transformation errors
+error: a `map_spec_key_at` function must have two type parameters and the signature (map<K, V>, num): K
+   ┌─ tests/sources/functional/intrinsic_map_rank_sig_err.move:27:10
+   │
+27 │     spec native fun spec_key_at<K, V>(m: Map<K, V>, k: K): num;
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: a `map_spec_rank` binding must be a `spec native fun`; its definition is provided by the intrinsic model
+   ┌─ tests/sources/functional/intrinsic_map_rank_sig_err.move:29:10
+   │
+29 │       spec fun spec_rank<K, V>(m: Map<K, V>, k: K): num {
+   │ ╭──────────^
+30 │ │         spec_len(m)
+31 │ │     }
+   │ ╰─────^

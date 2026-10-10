@@ -1,0 +1,588 @@
+# Copyright (c) Aptos Foundation
+# Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+import contextlib
+import io
+import json
+import os
+import re
+import shutil
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import tomllib
+import unittest
+from unittest.mock import patch
+
+from select_tests import main, planner_inputs_changed, REGISTRY, selections
+
+
+def plan(mode, tests):
+    return {
+        "schema_version": 1,
+        "mode": mode,
+        "explicit_packages": False,
+        "e2e_tests": {test: ["reason"] for test in tests},
+    }
+
+
+class E2eSelectionTest(unittest.TestCase):
+    @staticmethod
+    def workflow_job(workflow, job):
+        return re.search(
+            r"^  " + re.escape(job) + r":\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)",
+            workflow,
+            re.M | re.S,
+        ).group(1)
+
+    @staticmethod
+    def workflow_jobs(workflow):
+        return dict(
+            re.findall(
+                r"^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)",
+                workflow,
+                re.M | re.S,
+            )
+        )
+
+    @staticmethod
+    def job_needs(body):
+        block = re.search(r"^    needs:(.*?)(?=^    [a-z]|\Z)", body, re.M | re.S)
+        if not block:
+            return set()
+        lines = (line.split("#", 1)[0] for line in block.group(1).splitlines())
+        return set(re.findall(r"[a-z][a-z0-9_-]*", " ".join(lines)))
+
+    def test_registry_has_real_workflow_jobs_and_required_nightly_coverage(self):
+        root = Path(__file__).resolve().parents[3]
+        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
+        nightly_jobs = set(re.findall(r"^  ([a-z][a-z0-9-]*):$", nightly, re.M))
+        required = (
+            re.search(r"  result:\n.*?    needs: \[(.*?)\]", nightly, re.S)
+            .group(1)
+            .split(", ")
+        )
+        for name, runner in REGISTRY.items():
+            with self.subTest(name=name):
+                workflow = (root / runner["workflow"]).read_text()
+                self.assertRegex(
+                    workflow, r"(?m)^  " + re.escape(runner["job"]) + r":$"
+                )
+                self.assertTrue(runner["nightly_jobs"])
+                for job in runner["nightly_jobs"]:
+                    self.assertIn(job, nightly_jobs)
+                    self.assertIn(job, required)
+        self.assertNotIn("flow-evaluation", REGISTRY)
+
+    def test_manual_suites_bypass_selection_but_keep_trigger_gates(self):
+        root = Path(__file__).resolve().parents[3]
+        for filename, label in (
+            ("mono-move-tests-parity.yaml", "mono-move-e2e-tests"),
+            ("mono-move-e2e-perf.yaml", "mono-move-e2e-perf"),
+            ("faucet-tests-prod.yaml", "CICD:non-required-tests"),
+        ):
+            workflow = (root / ".github/workflows" / filename).read_text()
+            with self.subTest(workflow=filename):
+                self.assertNotIn("e2e-selection", workflow)
+                self.assertIn(label, workflow)
+                if filename.startswith("mono-move"):
+                    self.assertIn("head.repo.full_name == github.repository", workflow)
+                else:
+                    self.assertEqual(workflow.count("needs: [permission-check]"), 2)
+        workflow = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        for job, label in (
+            ("forge-framework-upgrade-test", "CICD:run-framework-upgrade-test"),
+            ("forge-consensus-only-perf-test", "CICD:run-consensus-only-perf-test"),
+            ("forge-multiregion-test", "CICD:run-multiregion-test"),
+        ):
+            body = re.search(r"^  " + job + r":\n(.*?)(?=^  [a-z][a-z0-9-]*:|\Z)",
+                             workflow, re.M | re.S).group(1)
+            with self.subTest(job=job):
+                self.assertNotIn("e2e-test-determinator", body)
+                self.assertNotIn("SELECTION_RESULT", body)
+                self.assertIn("- permission-check", body)
+                self.assertIn(label, body)
+                if job == "forge-framework-upgrade-test":
+                    caller_gate = body.split("    uses:", 1)[0]
+                    self.assertIn("CICD:run-e2e-tests", caller_gate)
+                    self.assertIn("CICD:run-all-e2e-tests", caller_gate)
+                    self.assertIn("SKIP_JOB: ${{ !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') }}", body)
+        self.assertTrue({"mono-move-parity", "mono-move-performance",
+                         "forge-framework-upgrade", "forge-consensus-only-performance",
+                         "forge-multiregion", "faucet-integration",
+                         "execution-performance"}.isdisjoint(REGISTRY))
+        # Execution performance has its own dispatched nightly; PRs opt in by label.
+        performance = (root / ".github/workflows/execution-performance.yaml").read_text()
+        self.assertIn("CICD:run-execution-performance-test", performance)
+        for automatic in ("auto_merge", "CICD:run-e2e-tests", "CICD:run-all-e2e-tests"):
+            self.assertNotIn(automatic, performance)
+        # Manual suites stay manual: the nightly calls none of them.
+        nightly = (root / ".github/workflows/nightly-full-suite.yaml").read_text()
+        for manual in (
+            "mono-move-tests-parity.yaml",
+            "mono-move-e2e-perf.yaml",
+            "faucet-tests-prod.yaml",
+            "faucet-tests-main.yaml",
+            "suite: framework_upgrade",
+            "suite: consensus_only_realistic_env_max_tps",
+            "suite: multiregion_benchmark_test",
+            "execution-performance",
+        ):
+            with self.subTest(nightly=manual):
+                self.assertNotIn(manual, nightly)
+
+    def test_image_flags_match_selected_consumers(self):
+        root = Path(__file__).resolve().parents[3]
+        consumers = {}
+        for filename in ("docker-build-test.yaml", "lint-test-gated.yaml", "lean.yaml"):
+            workflow = (root / ".github/workflows" / filename).read_text()
+            for body in self.workflow_jobs(workflow).values():
+                for name in REGISTRY:
+                    if f"'{name}')" in body:
+                        consumers.setdefault(name, []).append(self.job_needs(body))
+        self.assertEqual(set(consumers), set(REGISTRY))
+        for name, runner in REGISTRY.items():
+            with self.subTest(name=name):
+                self.assertIs(
+                    runner["docker_images"],
+                    any("rust-images" in needs for needs in consumers[name]),
+                )
+
+    def test_lean_workflow_selects_transitive_dependencies_and_fails_closed(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/lean.yaml").read_text()
+        # A path allowlist would hide Rust dependencies outside the Lean tree.
+        self.assertNotIn("paths:", workflow)
+        jobs = self.workflow_jobs(workflow)
+        self.assertIn("e2e-test-selection.yaml", jobs["e2e-selection"])
+        self.assertIn("inputs.GIT_SHA != ''", jobs["e2e-selection"])
+        runner = jobs["build-and-test"]
+        self.assertIn("e2e-selection", self.job_needs(runner))
+        self.assertIn("known_e2e_tests", runner)  # older trusted registry runs Lean
+        self.assertIn("selected_e2e_tests", runner)
+        self.assertIn("move-compiler-v2 leaner::tests", runner)
+        self.assertIn("working-directory: third_party/move/lean/leaner-e2e-tests", runner)
+        result = jobs["result"]
+        self.assertIn("if: always()", result)
+        self.assertIn('test "$SELECTION_RESULT" = success', result)
+        self.assertIn('test "$TEST_RESULT" = success', result)
+        self.assertIn('test "$TEST_RESULT" = skipped', result)
+
+    def test_release_images_skip_only_without_consumers(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        jobs = self.workflow_jobs(workflow)
+        images = jobs["rust-images"]
+        self.assertIn("e2e-test-determinator", self.job_needs(images))
+        skip = next(line for line in images.splitlines() if "SKIP_JOB:" in line)
+        self.assertIn("needs.e2e-test-determinator.outputs.docker_images == 'false'", skip)
+        self.assertIn("'CICD:build-'", skip)
+        for job, body in jobs.items():
+            if "rust-images" not in self.job_needs(body):
+                continue
+            with self.subTest(job=job):
+                # A consumer skipped with the build would never report its check.
+                self.assertNotIn("needs.rust-images.result == 'success'", body)
+                if "e2e-test-determinator" in self.job_needs(body):
+                    continue
+                # Selection decides the E2E gate labels; every other label of an
+                # image consumer must force the build.
+                for label in set(re.findall(r"CICD:[a-z0-9-]+", body)) - {
+                    "CICD:run-e2e-tests",
+                    "CICD:run-all-e2e-tests",
+                }:
+                    self.assertIn(f"'{label}'", skip)
+        build = (root / ".github/workflows/workflow-run-docker-rust-build.yaml").read_text()
+        gate = self.workflow_job(build, "rust-all").split("    runs-on:", 1)[0]
+        self.assertIn("!inputs.SKIP_JOB", gate)
+
+    def test_skipped_suites_reserve_no_runner_but_fail_on_failed_selection(self):
+        root = Path(__file__).resolve().parents[3]
+        caller = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        called = set()
+        for job, body in self.workflow_jobs(caller).items():
+            uses = re.search(r"^    uses: (?:aptos-labs/aptos-core/|\./)(\S+?)(?:@main)?$", body, re.M)
+            if not uses or "SKIP_JOB:" not in body:
+                continue
+            called.add(uses.group(1))
+            workflow = (root / uses.group(1)).read_text()
+            for name, steps in self.workflow_jobs(workflow.split("\njobs:\n", 1)[1]).items():
+                with self.subTest(job=job, workflow=uses.group(1), called=name):
+                    gate = steps.split("    runs-on:", 1)[0]
+                    self.assertIn("!inputs.SKIP_JOB", gate)
+                    if "SELECTION_RESULT:" in body:
+                        self.assertIn("inputs.SELECTION_RESULT != 'success'", gate)
+        self.assertLessEqual(
+            {
+                ".github/workflows/workflow-run-forge.yaml",
+                ".github/workflows/cli-e2e-tests.yaml",
+                ".github/workflows/node-api-compatibility-tests.yaml",
+                ".github/workflows/workflow-run-docker-rust-build.yaml",
+            },
+            called,
+        )
+
+    def test_release_tag_follows_its_consumers(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        jobs = self.workflow_jobs(workflow)
+        fetch = jobs["fetch-last-released-docker-image-tag"]
+        self.assertIn("e2e-test-determinator", self.job_needs(fetch))
+        selection = fetch.split("needs.e2e-test-determinator.result != 'success'", 1)[1]
+        self.assertIn("'forge-compatibility')", selection)
+        self.assertIn("'CICD:run-framework-upgrade-test'", selection)
+        for job, body in jobs.items():
+            if "fetch-last-released-docker-image-tag" in self.job_needs(body):
+                with self.subTest(job=job):
+                    self.assertNotIn(
+                        "needs.fetch-last-released-docker-image-tag.result == 'success'", body
+                    )
+
+    def test_docker_job_outputs_are_consumed(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        for job, body in self.workflow_jobs(workflow).items():
+            block = re.search(r"^    outputs:\n((?:      .*\n)+)", body, re.M)
+            for key in re.findall(r"^      ([A-Za-z_]+):", block.group(1) if block else "", re.M):
+                with self.subTest(job=job, output=key):
+                    self.assertIn(f"needs.{job}.outputs.{key}", workflow)
+
+    def test_lint_suites_follow_selection_and_fail_on_failed_prerequisites(self):
+        root = Path(__file__).resolve().parents[3]
+        jobs = self.workflow_jobs((root / ".github/workflows/lint-test-gated.yaml").read_text())
+        self.assertIn("e2e-test-selection.yaml", jobs["e2e-test-determinator"])
+        self.assertIn("'smoke-tests')", jobs["rust-smoke-tests-workflow"])
+        shim = jobs["rust-smoke-tests"]
+        self.assertLessEqual(
+            {"gated_file_change_determinator", "e2e-test-determinator"},
+            self.job_needs(shim),
+        )
+        self.assertIn('[ "$SELECTION_RESULT" != "success" ]', shim)
+        batch = jobs["rust-batch-encryption-tests"]
+        gate = batch.split("    runs-on:", 1)[0]
+        self.assertIn("'batch-encryption')", gate)
+        self.assertIn("needs.e2e-test-determinator.result != 'success'", gate)
+        self.assertIn('test "$SELECTION_RESULT" = success', batch)
+        # The selection and both suites react to the same labels, including the full run.
+        gates = [
+            set(re.findall(r"CICD:[a-z0-9-]+", jobs[job].split("    runs-on:", 1)[0].split("    uses:", 1)[0]))
+            for job in ("e2e-test-determinator", "rust-smoke-tests", "rust-batch-encryption-tests")
+        ]
+        self.assertIn("CICD:run-all-e2e-tests", gates[0])
+        self.assertEqual(gates[0], gates[1])
+        self.assertEqual(gates[0], gates[2])
+
+    def test_lint_gate_events_do_not_replace_code_change_checks(self):
+        root = Path(__file__).resolve().parents[3] / ".github/workflows"
+        static = (root / "lint-test.yaml").read_text()
+        gated = (root / "lint-test-gated.yaml").read_text()
+        self.assertIn("types: [opened, synchronize, reopened]", static)
+        self.assertNotIn("auto_merge_enabled", static)
+        self.assertIn(
+            "types: [labeled, opened, synchronize, reopened, auto_merge_enabled]",
+            gated,
+        )
+        self.assertNotIn("rust-targeted-unit-tests", gated)
+        self.assertNotIn("general-lints", gated)
+        # Release PRs run all unit tests on code changes only.
+        self.assertIn("'-release-'", self.workflow_job(static, "rust-unit-tests"))
+        self.assertNotIn("  rust-unit-tests:", gated)
+        self.assertIn("gated_file_change_determinator", gated)
+        self.assertNotEqual(static.splitlines()[0], gated.splitlines()[0])
+
+    def test_docker_gate_events_share_concurrency_with_code_changes(self):
+        root = Path(__file__).resolve().parents[3] / ".github/workflows"
+        workflow = (root / "docker-build-test.yaml").read_text()
+        concurrency = workflow.split("\nconcurrency:\n", 1)[1].split("\nenv:\n", 1)[0]
+        group = re.search(r"^  group: (.*)$", concurrency, re.M).group(1)
+        # All PR events share caches and Forge namespaces. Neither the action
+        # nor the head SHA may partition the concurrency group for those events.
+        self.assertEqual(
+            group,
+            "${{ github.workflow }}-${{ github.event_name }}-${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.sha || github.head_ref || github.ref }}",
+        )
+        self.assertIn("cancel-in-progress: true", concurrency)
+
+    def test_full_run_label_reaches_compat_prerequisite(self):
+        root = Path(__file__).resolve().parents[3]
+        workflow = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        fetch = self.workflow_job(workflow, "fetch-last-released-docker-image-tag")
+        self.assertIn("CICD:run-all-e2e-tests", fetch)
+
+    def test_explicit_forge_label_forces_legacy_e2e_selection(self):
+        root = Path(__file__).resolve().parents[3]
+        selection = (root / ".github/workflows/e2e-test-selection.yaml").read_text()
+        self.assertIn("CICD:run-forge-e2e-perf", selection)
+
+    def test_selected_reusable_jobs_reach_their_work(self):
+        root = Path(__file__).resolve().parents[3]
+        faucet = (
+            root / ".github/workflows/faucet-tests-main.yaml"
+        ).read_text()
+        faucet_job = self.workflow_job(faucet, "run-tests-main")
+        faucet_gate = faucet_job.split("    runs-on:", 1)[0]
+        self.assertIn("!inputs.SKIP_JOB", faucet_gate)
+
+        caller = (root / ".github/workflows/docker-build-test.yaml").read_text()
+        faucet_call = self.workflow_job(caller, "faucet-tests-main")
+        self.assertNotIn("e2e-test-determinator", faucet_call)
+        skip = next(line for line in faucet_call.splitlines() if "SKIP_JOB:" in line)
+        self.assertIn("CICD:non-required-tests", skip)
+        self.assertIn("CICD:run-all-e2e-tests", skip)
+
+        performance = (
+            root / ".github/workflows/workflow-run-execution-performance.yaml"
+        ).read_text()
+        performance_job = self.workflow_job(performance, "single-node-performance")
+        gate = performance_job.split("    concurrency:", 1)[0]
+        self.assertIn("needs.test-target-determinator.result != 'success'", gate)
+        self.assertIn(
+            "needs.test-target-determinator.outputs.run_execution_performance_test == 'true'",
+            gate,
+        )
+        determinator = self.workflow_job(performance, "test-target-determinator")
+        self.assertNotIn("mode != 'subsystem'", determinator)
+        self.assertNotIn("mode == 'subsystem'", determinator)
+
+    def test_pr_generated_directories_are_archived_before_artifact_upload(self):
+        root = Path(__file__).resolve().parents[3]
+        trusted_event_guard = (
+            "github.event_name != 'pull_request' && "
+            "github.event_name != 'pull_request_target'"
+        )
+        for filename, step, archive, raw_path in (
+            (
+                "cli-e2e-tests.yaml",
+                "Preserve CLI test output",
+                "cli-e2e-output.tar.gz",
+                "aptos-e2e-tests-*/out/",
+            ),
+            (
+                "node-api-compatibility-tests.yaml",
+                "Preserve generated API specs",
+                "api-compatibility-specs.tar.gz",
+                "specs/",
+            ),
+        ):
+            workflow = (root / ".github/workflows" / filename).read_text()
+            with self.subTest(workflow=filename):
+                self.assertIn("tar --create --gzip", workflow)
+                self.assertGreaterEqual(workflow.count(trusted_event_guard), 2)
+                upload = re.search(
+                    r"- name: " + re.escape(step) + r"\n(.*?)(?=\n      - |\Z)",
+                    workflow,
+                    re.S,
+                ).group(1)
+                self.assertIn(f"path: ${{{{ runner.temp }}}}/{archive}", upload)
+                self.assertNotIn(raw_path, upload)
+
+    def test_checked_in_config_uses_only_registered_names(self):
+        root = Path(__file__).resolve().parents[3]
+        config = tomllib.loads((root / ".config/test-subsystems.toml").read_text())
+        definitions = set(config["e2e_tests"])
+        self.assertEqual(definitions, set(REGISTRY))
+        for subsystem in config["subsystems"].values():
+            self.assertLessEqual(set(subsystem.get("e2e_tests", [])), definitions)
+
+    def test_selected_and_empty_plans(self):
+        self.assertEqual(
+            selections(plan("subsystem", ["cli-e2e"]), "subsystem"), ["cli-e2e"]
+        )
+        self.assertEqual(selections(plan("subsystem", []), "subsystem"), [])
+
+    def test_compare_preserves_full_execution_even_on_comparison_error(self):
+        value = plan("compare", REGISTRY)
+        value["comparison_error"] = "Invalid subsystem config"
+        self.assertEqual(selections(value, "compare"), sorted(REGISTRY))
+        with self.assertRaises(ValueError):
+            selections(plan("compare", ["cli-e2e"]), "compare")
+
+    def test_invalid_plans_fail_instead_of_skipping(self):
+        for change in (
+            {"schema_version": 2},
+            {"mode": "legacy"},
+            {"explicit_packages": True},
+            {"e2e_tests": None},
+            {"e2e_tests": []},
+            {"e2e_tests": {"typo": []}},
+        ):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                selections({**plan("subsystem", []), **change}, "subsystem")
+
+    def run_action(self, mode, cargo_result=None, error=None, changed_paths=""):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outputs, summary, artifact = (
+                root / name for name in ("outputs", "summary", "plan.json")
+            )
+            with patch.dict(
+                os.environ,
+                {"GITHUB_OUTPUT": str(outputs), "GITHUB_STEP_SUMMARY": str(summary)},
+            ), patch(
+                "sys.argv",
+                [
+                    "select_tests.py",
+                    "--mode",
+                    mode,
+                    "--base",
+                    "origin/release",
+                    "--plan-file",
+                    str(artifact),
+                ],
+            ), patch(
+                "select_tests.subprocess.run",
+                return_value=cargo_result,
+                side_effect=error,
+            ) as cargo, patch(
+                "select_tests.subprocess.check_output",
+                return_value=changed_paths,
+            ) as diff, contextlib.redirect_stdout(
+                io.StringIO()
+            ):
+                if error:
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        main()
+                    self.assertFalse(outputs.exists())
+                    self.assertFalse(artifact.exists())
+                else:
+                    main()
+                    recorded = json.loads(artifact.read_text())
+                    self.assertIn('"e2e_tests"', summary.read_text())
+                    selected = selections(recorded, mode)
+                    images = any(REGISTRY[name]["docker_images"] for name in selected)
+                    self.assertEqual(
+                        outputs.read_text(),
+                        f"selected_e2e_tests={json.dumps(selected)}\n"
+                        f"docker_images={str(images).lower()}\n",
+                    )
+                    written = outputs.read_text()
+                if mode == "legacy":
+                    diff.assert_not_called()
+                    cargo.assert_not_called()
+                elif changed_paths:
+                    diff.assert_called_once()
+                    cargo.assert_not_called()
+                else:
+                    diff.assert_called_once()
+                    self.assertEqual(
+                        cargo.call_args.args[0],
+                        [
+                            "cargo",
+                            "x",
+                            "--determinator",
+                            mode,
+                            "--base",
+                            "origin/release",
+                            "test-plan",
+                            "--format",
+                            "json",
+                        ],
+                    )
+                return None if error else written
+
+    def test_docker_images_follow_selected_runners(self):
+        for tests, images in (
+            ([], "false"),
+            (["batch-encryption", "smoke-tests"], "false"),
+            (["cli-e2e", "smoke-tests"], "true"),
+        ):
+            with self.subTest(tests=tests):
+                written = self.run_action(
+                    "subsystem",
+                    subprocess.CompletedProcess(
+                        [], 0, json.dumps(plan("subsystem", tests))
+                    ),
+                )
+                self.assertTrue(written.endswith(f"docker_images={images}\n"))
+
+    def test_legacy_action_does_not_require_cargo_or_config(self):
+        self.run_action("legacy")
+
+    def test_legacy_planner_runs_against_workspace_without_new_ci_files(self):
+        # Model an older PR checkout: execute the workflow revision's consumer
+        # with no action, registry, subsystem config or Cargo in the workspace.
+        consumer = Path(__file__).with_name("select_tests.py").resolve()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outputs = root / "outputs"
+            subprocess.run(
+                [
+                    sys.executable, str(consumer), "--mode", "legacy", "--base",
+                    "origin/main", "--plan-file", str(root / "plan.json"),
+                ],
+                cwd=root,
+                env={
+                    **os.environ,
+                    "PATH": "",
+                    "GITHUB_OUTPUT": str(outputs),
+                    "GITHUB_STEP_SUMMARY": str(root / "summary"),
+                },
+                check=True,
+                stdout=subprocess.PIPE,
+                text=True,
+            )
+            selected = json.loads(outputs.read_text().splitlines()[0].split("=", 1)[1])
+            self.assertEqual(set(selected), set(REGISTRY))
+
+    def test_action_consumes_plan_and_preserves_base_branch(self):
+        self.run_action(
+            "subsystem",
+            subprocess.CompletedProcess(
+                [], 0, json.dumps(plan("subsystem", ["cli-e2e"]))
+            ),
+        )
+
+    def test_planner_input_changes_select_all_before_parsing(self):
+        for path in (
+            ".config/test-subsystems.toml",
+            ".github/actions/e2e-test-determinator/registry.json",
+            "devtools/aptos-cargo-cli/src/test_selection.rs",
+        ):
+            with self.subTest(path=path):
+                self.run_action("subsystem", changed_paths=path + "\n")
+
+    def test_planner_input_matching_is_exact(self):
+        with patch(
+            "select_tests.subprocess.check_output",
+            return_value="docs/devtools/aptos-cargo-cli/readme.md\n",
+        ):
+            self.assertFalse(planner_inputs_changed("origin/main"))
+
+    def test_prebuilt_planner_bypasses_pr_cargo_alias(self):
+        consumer = Path(__file__).with_name("select_tests.py").resolve()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            planner = root / "trusted-planner"
+            planner.write_text(
+                f"#!{sys.executable}\nimport json\nprint(json.dumps({plan('subsystem', ['cli-e2e'])!r}))\n"
+            )
+            planner.chmod(0o755)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                 "commit", "--allow-empty", "-qm", "baseline"],
+                cwd=root, check=True,
+            )
+            # A PR-controlled Cargo alias must never execute during selection.
+            (root / ".cargo").mkdir()
+            (root / ".cargo/config.toml").write_text('[alias]\nx = "!exit 99"\n')
+            subprocess.run(
+                [sys.executable, str(consumer), "--mode", "subsystem",
+                "--base", "HEAD", "--plan-file", str(root / "plan.json"),
+                 "--planner-bin", str(planner)],
+                cwd=root,
+                env={**os.environ, "PATH": str(Path(shutil.which("git")).parent),
+                     "GITHUB_OUTPUT": str(root / "outputs"),
+                     "GITHUB_STEP_SUMMARY": str(root / "summary")},
+                check=True, stdout=subprocess.PIPE, text=True,
+            )
+            selected = json.loads((root / "outputs").read_text().splitlines()[0].split("=", 1)[1])
+            self.assertEqual(selected, ["cli-e2e"])
+
+    def test_cargo_failure_cannot_produce_skip_outputs(self):
+        self.run_action("subsystem", error=subprocess.CalledProcessError(1, ["cargo"]))
+
+
+if __name__ == "__main__":
+    unittest.main()

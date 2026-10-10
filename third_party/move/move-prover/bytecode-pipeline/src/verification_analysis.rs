@@ -235,7 +235,7 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
     fn initialize(&self, env: &GlobalEnv, targets: &mut FunctionTargetsHolder) {
         let options = ProverOptions::get(env);
 
-        // If we are verifying only one function or module, check that this indeed exists.
+        // If we are verifying only some functions or a module, check that these indeed exist.
         match &options.verify_scope {
             VerificationScope::OnlyModule(name) => {
                 let sym = env.symbol_pool().make(name);
@@ -246,16 +246,18 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
                     )
                 }
             },
-            VerificationScope::Only(name) => {
-                let target_exists = env
-                    .get_modules()
-                    .filter(|m| m.is_target())
-                    .any(|m| m.get_functions().any(|f| f.matches_name(name)));
-                if !target_exists {
-                    env.error(
-                        &env.unknown_loc(),
-                        &format!("function target {} does not exist in target modules", name),
-                    )
+            VerificationScope::Only(names) => {
+                for name in names {
+                    let target_exists = env
+                        .get_modules()
+                        .filter(|m| m.is_target())
+                        .any(|m| m.get_functions().any(|f| f.matches_name(name)));
+                    if !target_exists {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!("function target {} does not exist in target modules", name),
+                        )
+                    }
                 }
             },
             _ => {},
@@ -276,19 +278,22 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
                         )
                     }
                 },
-                VerificationScope::Only(name) => {
-                    let target_exists = env
-                        .get_modules()
-                        .filter(|m| m.is_target())
-                        .any(|m| m.get_functions().any(|f| f.matches_name(name)));
-                    if !target_exists {
-                        env.error(
-                            &env.unknown_loc(),
-                            &format!(
-                                "exclusion function target `{}` does not exist in target modules",
-                                name
-                            ),
-                        )
+                VerificationScope::Only(names) => {
+                    for name in names {
+                        let target_exists = env
+                            .get_modules()
+                            .filter(|m| m.is_target())
+                            .any(|m| m.get_functions().any(|f| f.matches_name(name)));
+                        if !target_exists {
+                            env.error(
+                                &env.unknown_loc(),
+                                &format!(
+                                    "exclusion function target `{}` does not exist in target \
+                                     modules",
+                                    name
+                                ),
+                            )
+                        }
                     }
                 },
                 _ => {},
@@ -412,7 +417,10 @@ impl VerificationAnalysisProcessor {
         if fun_env.is_lemma() {
             return true;
         }
+        let env = fun_env.module_env.env;
+        let options = ProverOptions::get(env);
         if fun_env.is_test_only()
+            || (options.inference && fun_env.is_verify_only())
             || fun_env.is_intrinsic()
             || fun_env.is_native()
             || (fun_env.is_inline() && !fun_env.is_inline_verified())
@@ -422,14 +430,12 @@ impl VerificationAnalysisProcessor {
             // verified if they have an explicitly given spec
             return false;
         }
-        let env = fun_env.module_env.env;
-        let options = ProverOptions::get(env);
         // Scope matching and exclusions go by the spec-carrying function, so a
         // lifted lambda is in scope exactly when its enclosing function is.
         let in_scope = match &options.verify_scope {
             VerificationScope::Public => carrier.is_exposed(),
             VerificationScope::All => true,
-            VerificationScope::Only(name) => carrier.matches_name(name),
+            VerificationScope::Only(names) => carrier.matches_any_name(names),
             VerificationScope::OnlyModule(name) => carrier.module_env.matches_name(name),
             VerificationScope::None => false,
         };
@@ -439,7 +445,7 @@ impl VerificationAnalysisProcessor {
     /// Check whether the function matches any entry in the exclusion list.
     fn is_excluded_from_verification(fun_env: &FunctionEnv, options: &ProverOptions) -> bool {
         options.verify_exclude.iter().any(|excl| match excl {
-            VerificationScope::Only(name) => fun_env.matches_name(name),
+            VerificationScope::Only(names) => fun_env.matches_any_name(names),
             VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
             _ => false,
         })

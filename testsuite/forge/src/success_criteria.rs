@@ -602,10 +602,7 @@ impl SuccessCriteriaChecker {
             || gap_info.non_epoch_time_gap.max_gap
                 > chain_progress_threshold.max_non_epoch_no_progress_secs
         {
-            bail!(
-                "Failed non-epoch-change chain progress check. {}",
-                &gap_text
-            );
+            bail!("Failed non-epoch-change chain progress check. {}", gap_text);
         }
         info!("Passed non-epoch-change progress check. {}", gap_text);
 
@@ -615,7 +612,7 @@ impl SuccessCriteriaChecker {
         {
             bail!(
                 "Failed epoch-change chain progress check. {}",
-                &epoch_gap_text
+                epoch_gap_text
             );
         }
         info!("Passed epoch-change progress check. {}", epoch_gap_text);

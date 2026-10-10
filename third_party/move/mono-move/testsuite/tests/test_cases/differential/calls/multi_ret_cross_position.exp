@@ -8,10 +8,10 @@ fun three_rets(): u64 * u64 * u64 {
     r2: u64
   code:
   L0:
-    0: r0 := ld_u64 1
-    1: r1 := ld_u64 2
-    2: r2 := ld_u64 3
-    3: ret [r0, r1, r2]
+    0: r0 := ld_u64 1 @0
+    1: r1 := ld_u64 2 @1
+    2: r2 := ld_u64 3 @2
+    3: ret [r0, r1, r2] @3
 }
 
 fun sink(r0, r1, r2) {
@@ -21,7 +21,7 @@ fun sink(r0, r1, r2) {
     r2: u64
   code:
   L0:
-    0: ret []
+    0: ret [] @0
 }
 
 fun caller(r0) {
@@ -30,9 +30,9 @@ fun caller(r0) {
     r1: u64
   code:
   L0:
-    0: [x1, x2, r1] := call three_rets, []
-    1: [] := call sink, [r0, x1, x2]
-    2: ret []
+    0: [x1, x2, r1] := call three_rets, [] @1
+    1: [] := call sink, [r0, x1, x2] @3
+    2: ret [] @4
 }
 === micro-ops ===
 // module 0x66::test
@@ -41,28 +41,28 @@ fun three_rets() {
   frame_data_size: 32
   entry_gas: 164
   code:
-    0: StoreImm8 [0] <- #1
-    1: StoreImm8 [8] <- #2
-    2: StoreImm8 [16] <- #3
-    3: Return
+    0: StoreImm8 [0] <- #1 @0
+    1: StoreImm8 [8] <- #2 @1
+    2: StoreImm8 [16] <- #3 @2
+    3: Return @3
 }
 
 fun sink() {
   frame_data_size: 24
   entry_gas: 2
   code:
-    0: Return
+    0: Return @0
 }
 
 fun caller() {
   frame_data_size: 16
   entry_gas: 126
   code:
-    0: CallIndirect 0x66::test::three_rets
-    1: Move8 [8] <- [56]
-    2: Move8 [56] <- [48]
-    3: Move8 [48] <- [40]
-    4: Move8 [40] <- [0]
-    5: CallIndirect 0x66::test::sink
-    6: Return
+    0: CallIndirect 0x66::test::three_rets @1
+    1: Move8 [8] <- [56] @1
+    2: Move8 [56] <- [48] @3
+    3: Move8 [48] <- [40] @3
+    4: Move8 [40] <- [0] @3
+    5: CallIndirect 0x66::test::sink @3
+    6: Return @4
 }

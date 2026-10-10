@@ -20,7 +20,7 @@ EOF
 
 # NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
 # uses internally, so we may need to upgrade this when upgrading Rust versions.
-ARG CLANG_VERSION=21
+ARG CLANG_VERSION=22
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get --no-install-recommends install -y \
@@ -76,7 +76,7 @@ FROM builder-base as aptos-node-builder
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=node-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=node-builder-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=node-builder-target-cache-trixie \
+    --mount=type=cache,target=/aptos/target,id=node-builder-target-cache-trixie-v2 \
     docker/builder/build-with-feature.sh
 
 FROM builder-base as forge-builder
@@ -84,7 +84,7 @@ FROM builder-base as forge-builder
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=forge-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=forge-builder-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=forge-builder-target-cache-trixie \
+    --mount=type=cache,target=/aptos/target,id=forge-builder-target-cache-trixie-v2 \
     docker/builder/build-forge-cli.sh
 
 FROM builder-base as tools-builder
@@ -92,7 +92,7 @@ FROM builder-base as tools-builder
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=tools-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=tools-builder-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache-trixie \
+    --mount=type=cache,target=/aptos/target,id=tools-builder-target-cache-trixie-v2 \
     docker/builder/build-tools-with-cli-profile.sh
 
 FROM builder-base as indexer-builder
@@ -100,5 +100,5 @@ FROM builder-base as indexer-builder
 RUN --mount=type=secret,id=GIT_CREDENTIALS,target=/root/.git-credentials \
     --mount=type=cache,target=/usr/local/cargo/git,id=indexer-builder-cargo-git-cache \
     --mount=type=cache,target=/usr/local/cargo/registry,id=indexer-builder-cargo-registry-cache \
-    --mount=type=cache,target=/aptos/target,id=indexer-builder-target-cache-trixie \
+    --mount=type=cache,target=/aptos/target,id=indexer-builder-target-cache-trixie-v2 \
     docker/builder/build-indexer.sh

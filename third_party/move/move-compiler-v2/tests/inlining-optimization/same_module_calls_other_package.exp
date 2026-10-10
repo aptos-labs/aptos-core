@@ -1,0 +1,52 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun compute(v: &vector<u64>): bool {
+        m::helper(v)
+    }
+    private fun helper(v: &vector<u64>): bool {
+        vector::is_empty<u64>(v)
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun compute(v: &vector<u64>): bool {
+        helper(v)
+    }
+    fun helper(v: &vector<u64>): bool {
+        0x1::vector::is_empty<u64>(v)
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    public fun compute(v: &vector<u64>): bool {
+        {
+          let (v: &vector<u64>): (&vector<u64>) = Tuple(v);
+          vector::is_empty<u64>(v)
+        }
+    }
+    private fun helper(v: &vector<u64>): bool {
+        vector::is_empty<u64>(v)
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m
+use 0x1::vector
+// Function definition at index 0
+#[persistent] public fun compute(l0: &vector<u64>): bool
+    move_loc l0
+    call vector::is_empty<u64>
+    ret
+
+// Function definition at index 1
+fun helper(l0: &vector<u64>): bool
+    move_loc l0
+    call vector::is_empty<u64>
+    ret
+
+
+============ bytecode verification succeeded ========

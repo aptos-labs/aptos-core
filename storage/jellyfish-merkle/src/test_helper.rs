@@ -359,25 +359,29 @@ fn compute_root_hash_impl(kvs: Vec<(&[bool], HashValue)>) -> HashValue {
     // Otherwise the tree has more than one leaves, which means we can find which ones are in the
     // left subtree and which ones are in the right subtree. So we find the first key that starts
     // with a 1-bit.
-    let left_hash;
-    let right_hash;
-    match kvs.iter().position(|(key, _value)| key[0]) {
+    let (left_hash, right_hash) = match kvs.iter().position(|(key, _value)| key[0]) {
         Some(0) => {
             // Every key starts with a 1-bit, i.e., they are all in the right subtree.
-            left_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
-            right_hash = compute_root_hash_impl(reduce(&kvs));
+            (
+                *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                compute_root_hash_impl(reduce(&kvs)),
+            )
         },
         Some(index) => {
             // Both left subtree and right subtree have some keys.
-            left_hash = compute_root_hash_impl(reduce(&kvs[..index]));
-            right_hash = compute_root_hash_impl(reduce(&kvs[index..]));
+            (
+                compute_root_hash_impl(reduce(&kvs[..index])),
+                compute_root_hash_impl(reduce(&kvs[index..])),
+            )
         },
         None => {
             // Every key starts with a 0-bit, i.e., they are all in the left subtree.
-            left_hash = compute_root_hash_impl(reduce(&kvs));
-            right_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
+            (
+                compute_root_hash_impl(reduce(&kvs)),
+                *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            )
         },
-    }
+    };
 
     SparseMerkleInternalNode::new(left_hash, right_hash).hash()
 }

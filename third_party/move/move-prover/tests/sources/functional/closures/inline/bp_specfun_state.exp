@@ -1,0 +1,92 @@
+Move prover returns: exiting with verification errors
+warning: cannot derive `requires_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:118:41
+    │
+118 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `loop_false_at_entry` caller
+    │                                         ^^^^^^^^^^^^^^^^^^^^
+    ·
+125 │         for_each_bump(v, a, |y| y spec { requires spec_get_v(a) == 0; ensures result == y; });
+    │         -------------------------------------------------------------------------------------
+    │         │                   │
+    │         │                   lambda argument
+    │         from a call inlined at this callsite
+
+warning: cannot derive `requires_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:118:41
+    │
+118 │             invariant forall j in 0..i: requires_of<f>(v[j]); // error: false at entry for the `loop_false_at_entry` caller
+    │                                         ^^^^^^^^^^^^^^^^^^^^
+    ·
+137 │         for_each_bump(v, a, |y| y spec { requires spec_get_v(a) > 0; ensures result == y; });
+    │         ------------------------------------------------------------------------------------
+    │         │                   │
+    │         │                   lambda argument
+    │         from a call inlined at this callsite
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
+   │
+37 │             assert requires_of<f>(x); // error: false at the application for the `requires_false_*` callers
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:54: requires_false_at_application
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:58: requires_false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:54: requires_false_at_application
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:31: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:58: requires_false_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:33: apply_then_bump
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:37: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
+   │
+37 │             assert requires_of<f>(x); // error: false at the application for the `requires_false_*` callers
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:161: requires_false_mutual_recursive
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:172: requires_false_mutual_recursive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:161: requires_false_mutual_recursive
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:31: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:172: requires_false_mutual_recursive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:33: apply_then_bump
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:37: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:37:13
+   │
+37 │             assert requires_of<f>(x); // error: false at the application for the `requires_false_*` callers
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:63: requires_false_transitive
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:68: requires_false_transitive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:63: requires_false_transitive
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:31: apply_then_bump
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:68: requires_false_transitive (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:33: apply_then_bump
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:37: apply_then_bump
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/bp_specfun_state.move:78:13
+   │
+78 │             assert !aborts_of<f>(x); // error: the abort condition holds at the application for the `aborts_at_application` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:97: aborts_at_application
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:102: aborts_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:97: aborts_at_application
+   =         a = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:74: apply_then_bump_na
+   =         a' = <redacted>
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:102: aborts_at_application (spec)
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:76: apply_then_bump_na
+   =     at tests/sources/functional/closures/inline/bp_specfun_state.move:78: apply_then_bump_na

@@ -138,7 +138,6 @@ impl BlockCorrespondence {
     /// Start offset of the bytecode block corresponding to IR block
     /// `block_idx`. Pair with the bytecode CFG's `block_end` to recover the
     /// block's full instruction range.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn bytecode_block_start(&self, block_idx: usize) -> Option<CodeOffset> {
         self.block_starts.get(block_idx).copied()
     }
@@ -382,9 +381,11 @@ fn check_fallthrough(
 mod tests {
     use super::*;
     use crate::stackless_exec_ir::{
-        BasicBlock, CmpKind, FunctionIR, HomeIndex, ImmValue, Instr, Label, NamedSlot,
+        BasicBlock, CmpKind, FunctionIR, HomeIndex, ImmValue, Instr, InstrSeq, Label, NamedSlot,
     };
-    use move_binary_format::file_format::{Bytecode, FunctionHandleIndex, IdentifierIndex};
+    use move_binary_format::file_format::{
+        Bytecode, FunctionDefinitionIndex, FunctionHandleIndex, IdentifierIndex,
+    };
 
     fn slot() -> NamedSlot {
         NamedSlot::Home(HomeIndex(0))
@@ -401,7 +402,7 @@ mod tests {
     fn block(label: u16, instrs: Vec<Instr<NamedSlot>>) -> BasicBlock<NamedSlot> {
         BasicBlock {
             label: Label(label),
-            instrs,
+            instrs: InstrSeq::for_tests(instrs),
         }
     }
 
@@ -409,6 +410,7 @@ mod tests {
         FunctionIR {
             name_idx: IdentifierIndex(0),
             handle_idx: FunctionHandleIndex(0),
+            def_idx: FunctionDefinitionIndex(0),
             num_params: 0,
             num_locals: 0,
             num_home_slots: 1,
@@ -571,7 +573,7 @@ mod tests {
     #[test]
     fn dropped_edge_fails() {
         let mut blocks = diamond_ir();
-        blocks[0].instrs = vec![ld()];
+        blocks[0].instrs = InstrSeq::for_tests(vec![ld()]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -584,12 +586,12 @@ mod tests {
     #[test]
     fn inserted_edge_fails() {
         let mut blocks = diamond_ir();
-        blocks[1].instrs = vec![ld(), Instr::BrCmp {
+        blocks[1].instrs = InstrSeq::for_tests(vec![ld(), Instr::BrCmp {
             target: Label(3),
             op: CmpKind::Eq,
             lhs: slot(),
             rhs: slot(),
-        }];
+        }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -602,7 +604,7 @@ mod tests {
     #[test]
     fn conditional_to_unconditional_degeneration_fails() {
         let mut blocks = diamond_ir();
-        blocks[0].instrs = vec![ld(), Instr::Branch { target: Label(2) }];
+        blocks[0].instrs = InstrSeq::for_tests(vec![ld(), Instr::Branch { target: Label(2) }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -616,10 +618,10 @@ mod tests {
     #[test]
     fn swapped_conditional_targets_fail() {
         let mut blocks = diamond_ir();
-        blocks[0].instrs = vec![ld(), Instr::BrTrue {
+        blocks[0].instrs = InstrSeq::for_tests(vec![ld(), Instr::BrTrue {
             target: Label(1),
             cond: slot(),
-        }];
+        }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -641,10 +643,10 @@ mod tests {
     #[test]
     fn redirected_target_fails() {
         let mut blocks = diamond_ir();
-        blocks[0].instrs = vec![ld(), Instr::BrTrue {
+        blocks[0].instrs = InstrSeq::for_tests(vec![ld(), Instr::BrTrue {
             target: Label(3),
             cond: slot(),
-        }];
+        }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -657,10 +659,10 @@ mod tests {
     #[test]
     fn conditional_variant_swap_fails() {
         let mut blocks = diamond_ir();
-        blocks[0].instrs = vec![ld(), Instr::BrFalse {
+        blocks[0].instrs = InstrSeq::for_tests(vec![ld(), Instr::BrFalse {
             target: Label(2),
             cond: slot(),
-        }];
+        }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -672,7 +674,7 @@ mod tests {
     #[test]
     fn exit_kind_swap_fails() {
         let mut blocks = diamond_ir();
-        blocks[3].instrs = vec![Instr::Abort { code: slot() }];
+        blocks[3].instrs = InstrSeq::for_tests(vec![Instr::Abort { code: slot() }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -686,7 +688,7 @@ mod tests {
     #[test]
     fn interior_terminator_fails() {
         let mut blocks = diamond_ir();
-        blocks[2].instrs = vec![Instr::Branch { target: Label(3) }, ld()];
+        blocks[2].instrs = InstrSeq::for_tests(vec![Instr::Branch { target: Label(3) }, ld()]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),
@@ -724,7 +726,7 @@ mod tests {
     #[test]
     fn out_of_range_target_label_fails() {
         let mut blocks = diamond_ir();
-        blocks[1].instrs = vec![ld(), Instr::Branch { target: Label(9) }];
+        blocks[1].instrs = InstrSeq::for_tests(vec![ld(), Instr::Branch { target: Label(9) }]);
         let func = make_func(blocks, diamond_witness());
         assert!(matches!(
             run(&func, &diamond_code()),

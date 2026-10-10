@@ -13,7 +13,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{NativePositionOp, WriteOp},
 };
 use derivative::Derivative;
 use move_core_types::{
@@ -23,7 +23,10 @@ use move_core_types::{
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rustc_hash::FxHashSet;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -36,6 +39,8 @@ pub struct VMOutput {
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
+    /// Hot state promotions, non-empty only in block epilogues.
+    hotness: BTreeSet<StateKey>,
     /// Trace of the user transaction payload execution in Move VM. Trace is always created as
     /// empty, and users have to set it manually after execution.
     #[derivative(PartialEq = "ignore", Debug = "ignore")]
@@ -54,6 +59,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            hotness: BTreeSet::new(),
             trace: Trace::empty(),
         }
     }
@@ -64,6 +70,7 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
+            hotness: BTreeSet::new(),
             trace: Trace::empty(),
         }
     }
@@ -98,6 +105,18 @@ impl VMOutput {
         &self.status
     }
 
+    /// Sets the keys the block epilogue makes hot. They bypass the change set because they are
+    /// not writes, and are materialized into the `WriteSet`'s hotness bucket.
+    ///
+    /// Panics if hotness is already set.
+    pub fn set_hotness(&mut self, hotness: BTreeSet<StateKey>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
+    }
+
     /// Sets the trace for this output. Should only be called once to replace the default empty
     /// trace with one recorded by the Move VM.
     ///
@@ -114,9 +133,12 @@ impl VMOutput {
 
     pub fn materialized_size(&self) -> u64 {
         let mut size = 0;
+        // Position writes are included here (though not gas-metered) so the
+        // per-block output size limit accounts for them.
         for (state_key, write_size) in self
             .change_set
             .write_set_size_iter()
+            .chain(self.change_set.position_write_set_size_iter())
             .chain(self.module_write_set.write_set_size_iter())
         {
             size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
@@ -155,10 +177,11 @@ impl VMOutput {
     /// Constructs `TransactionOutput`.
     pub fn into_transaction_output(self) -> Result<TransactionOutput, PanicError> {
         let Self {
-            change_set,
+            mut change_set,
             module_write_set,
             fee_statement,
             status,
+            hotness,
             trace,
         } = self;
 
@@ -171,9 +194,26 @@ impl VMOutput {
             ));
         }
 
-        let (write_set, events) = change_set
+        // Drain the position bucket into the WriteSet's `native_positions`
+        // sibling bucket; the storage applier consumes it from there. It must
+        // be empty before combining, which rejects non-materialized positions.
+        let native_positions: BTreeMap<StateKey, NativePositionOp> = change_set
+            .take_position_write_set()
+            .into_iter()
+            .map(|(k, op)| (k, NativePositionOp::from_write_op(op)))
+            .collect();
+
+        let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+        write_set.add_hotness(hotness);
+        if !native_positions.is_empty() {
+            // `freeze()` produces V0, whose extension bucket is `#[serde(skip)]`.
+            // Upgrade so the positions survive serialization (write-set replay,
+            // output sync, remote execution) rather than being silently dropped.
+            write_set = write_set.into_v1();
+            write_set.add_native_positions(native_positions);
+        }
         Ok(TransactionOutput::new(
             write_set,
             events,

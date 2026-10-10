@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use claims::assert_le;
 use clap::Parser;
 use std::{fs, path::PathBuf, sync::Arc};
@@ -45,7 +45,7 @@ impl Cmd {
                 !backup_checkpoint_dir.exists(),
                 "Backup dir already exists."
             );
-            println!("Creating backup at: {:?}", &backup_checkpoint_dir);
+            println!("Creating backup at: {:?}", backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
             AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir)?;
             println!("Done!");

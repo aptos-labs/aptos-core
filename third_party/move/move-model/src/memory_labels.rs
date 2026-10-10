@@ -283,6 +283,32 @@ pub fn substitute_label(exp: &Exp, old_label: MemoryLabel, new_label: MemoryLabe
     sub.rewrite_exp(exp.clone())
 }
 
+/// Whether the expression references any labeled memory state: a labeled
+/// `Global`/`Exists` read, or a non-default `MemoryRange` on a range-carrying
+/// operation.
+pub fn references_labeled_state(exp: &Exp) -> bool {
+    let mut found = false;
+    exp.visit_pre_order(&mut |e| {
+        if let ExpData::Call(_, op, _) = e {
+            match op {
+                Operation::Global(Some(_)) | Operation::Exists(Some(_)) => found = true,
+                Operation::Behavior(_, r)
+                | Operation::SpecFunction(_, _, r)
+                | Operation::SpecPublish(r)
+                | Operation::SpecRemove(r)
+                | Operation::SpecUpdate(r) => {
+                    if !r.is_default() {
+                        found = true;
+                    }
+                },
+                _ => {},
+            }
+        }
+        !found
+    });
+    found
+}
+
 /// Collect all labels referenced by an expression (from any operation carrying a label).
 /// This is used for dependency tracking in topological sort of label definitions.
 pub fn all_labels_in_exp(exp: &Exp) -> BTreeSet<MemoryLabel> {

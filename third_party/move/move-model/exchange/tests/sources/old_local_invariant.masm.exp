@@ -1,0 +1,1 @@
+error: in function `f`: `old(..)` of a local in loop invariants is unsupported because local loop-entry snapshots are not represented

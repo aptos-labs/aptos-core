@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/invariants.move:15:9: error: the data invariant `invariant greater_one(this.x)` does not hold where a value is constructed
+tests/sources/functional/invariants.move:44:5: error: leaner verification failed: the automatic verification of `invalid_R_pack` failed; provide a proof: `verify invalid_R_pack by …` in `tests/sources/functional/invariants.proof.lean` (`verify invalid_R_pack by skip` shows the obligations it leaves)
+tests/sources/functional/invariants.move:15:9: error: the data invariant `invariant greater_one(this.x)` does not hold where a mutation ends
+tests/sources/functional/invariants.move:112:5: error: leaner verification failed: the automatic verification of `lifetime_invalid_R` failed; provide a proof: `verify lifetime_invalid_R by …` in `tests/sources/functional/invariants.proof.lean` (`verify lifetime_invalid_R by skip` shows the obligations it leaves)
+tests/sources/functional/invariants.move:150:9: error: the data invariant `invariant y > 1` does not hold where a mutation ends
+tests/sources/functional/invariants.move:153:5: error: leaner verification failed: the automatic verification of `lifetime_invalid_S_branching` failed; provide a proof: `verify lifetime_invalid_S_branching by …` in `tests/sources/functional/invariants.proof.lean` (`verify lifetime_invalid_S_branching by skip` shows the obligations it leaves)
+tests/sources/functional/invariants.move:174:9: error: the data invariant `invariant this.self > 10` does not hold where a value is constructed
+tests/sources/functional/invariants.move:177:5: error: leaner verification failed: the automatic verification of `pack_struct_self` failed; provide a proof: `verify pack_struct_self by …` in `tests/sources/functional/invariants.proof.lean` (`verify pack_struct_self by skip` shows the obligations it leaves)
+tests/sources/functional/invariants.move:186:9: error: the data invariant `invariant this.x > 10` does not hold where a value is constructed
+tests/sources/functional/invariants.move:189:5: error: leaner verification failed: the automatic verification of `pack_struct_RR` failed; provide a proof: `verify pack_struct_RR by …` in `tests/sources/functional/invariants.proof.lean` (`verify pack_struct_RR by skip` shows the obligations it leaves)

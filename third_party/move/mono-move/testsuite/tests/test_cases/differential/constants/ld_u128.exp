@@ -7,8 +7,8 @@ fun add_const(r0): u128 {
     r1: u128
   code:
   L0:
-    0: r1 := add r0, #1267650600228229401496703205376u128
-    1: ret [r1]
+    0: r1 := add r0, #1267650600228229401496703205376u128 @2
+    1: ret [r1] @3
 }
 
 fun max(): u128 {
@@ -16,8 +16,8 @@ fun max(): u128 {
     r0: u128
   code:
   L0:
-    0: r0 := ld_u128 340282366920938463463374607431768211455
-    1: ret [r0]
+    0: r0 := ld_u128 340282366920938463463374607431768211455 @0
+    1: ret [r0] @1
 }
 
 fun mid(): u128 {
@@ -25,8 +25,8 @@ fun mid(): u128 {
     r0: u128
   code:
   L0:
-    0: r0 := ld_u128 1267650600228229401496703205376
-    1: ret [r0]
+    0: r0 := ld_u128 1267650600228229401496703205376 @0
+    1: ret [r0] @1
 }
 
 fun small(): u128 {
@@ -34,8 +34,8 @@ fun small(): u128 {
     r0: u128
   code:
   L0:
-    0: r0 := ld_u128 42
-    1: ret [r0]
+    0: r0 := ld_u128 42 @0
+    1: ret [r0] @1
 }
 === micro-ops ===
 // module 0x1::test
@@ -44,31 +44,31 @@ fun add_const() {
   frame_data_size: 32
   entry_gas: 107
   code:
-    0: IntAdd [16] <- [0] + u128 #1267650600228229401496703205376
-    1: Move(16) [0] <- [16]
-    2: Return
+    0: IntAdd [16] <- [0] + u128 #1267650600228229401496703205376 @2
+    1: Move(16) [0] <- [16] @3
+    2: Return @3
 }
 
 fun max() {
   frame_data_size: 16
   entry_gas: 104
   code:
-    0: StoreImm16 [0] <- #340282366920938463463374607431768211455
-    1: Return
+    0: StoreImm16 [0] <- #340282366920938463463374607431768211455 @0
+    1: Return @1
 }
 
 fun mid() {
   frame_data_size: 16
   entry_gas: 104
   code:
-    0: StoreImm16 [0] <- #1267650600228229401496703205376
-    1: Return
+    0: StoreImm16 [0] <- #1267650600228229401496703205376 @0
+    1: Return @1
 }
 
 fun small() {
   frame_data_size: 16
   entry_gas: 104
   code:
-    0: StoreImm16 [0] <- #42
-    1: Return
+    0: StoreImm16 [0] <- #42 @0
+    1: Return @1
 }

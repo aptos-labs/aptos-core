@@ -10,7 +10,8 @@ Every inline TODO is `// TODO(<group>): message`, where `<group>` is one or more
 
 | group | covers |
 |---|---|
-| correctness | wrong results, unsoundness, aliasing/security, legacy-VM parity |
+| correctness | wrong results, unsoundness, aliasing, legacy-VM parity |
+| security | attacker-reachable abuse: unbounded user-controlled input, cache pollution |
 | completeness | unimplemented functionality, `todo!()` gaps, future-feature constraints |
 | metering | gas charging and recursion/size/cache-DoS bounds |
 | perf | speed-only optimizations |
@@ -23,5 +24,5 @@ verify (prints nothing if clean):
 ```bash
 grep -rn "TODO" --include='*.rs' third_party/move/mono-move \
   | grep -v 'todo!\|unimplemented!\|unreachable!' \
-  | grep -vE 'TODO\(((correctness|completeness|metering|perf|cleanup|testing)(, )?)+\):'
+  | grep -vE 'TODO\(((correctness|security|completeness|metering|perf|cleanup|testing)(, )?)+\):'
 ```

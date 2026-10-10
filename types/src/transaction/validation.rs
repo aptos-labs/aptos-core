@@ -1,0 +1,141 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! The arguments the transaction prologue and epilogue take, and the abort
+//! codes they raise. Both mirror `transaction_validation.move` (and, for the
+//! abort codes, `transaction_limits.move`) and are shared by every VM.
+//!
+//! The argument enums must keep the same BCS serialization: the framework
+//! deserializes them directly, so neither the variant order nor the field
+//! layout may change. If you need to add a new field, add a new variant here --
+//! never edit an existing one.
+
+use crate::{
+    error::{split_canonical, INVALID_ARGUMENT, NOT_FOUND, PERMISSION_DENIED},
+    fee_statement::FeeStatement,
+    transaction::{ReplayProtector, UserTxnLimitsRequest},
+};
+use move_core_types::{
+    account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::StatusCode,
+};
+use move_value_view_derive::MoveValueView;
+use serde::Serialize;
+
+#[derive(Serialize, MoveValueView)]
+pub enum PrologueArgs {
+    V1 {
+        needs_fee_payer_auth_check: bool,
+        txn_sender_public_key: Option<Vec<u8>>,
+        fee_payer_public_key_hash: Option<Vec<u8>>,
+        replay_protector: ReplayProtector,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        secondary_signer_public_key_hashes: Vec<Option<Vec<u8>>>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        is_simulation: bool,
+        txn_limits_request: Option<UserTxnLimitsRequest>,
+    },
+}
+
+#[derive(Serialize, MoveValueView)]
+pub enum EpilogueArgs {
+    V1 {
+        fee_statement: FeeStatement,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        is_simulation: bool,
+        is_orderless_txn: bool,
+    },
+}
+
+/// Abort codes the prologue raises, which the VM translates into specific
+/// validation statuses. The prologue must not abort with anything else; doing so
+/// is treated as an invariant violation.
+//
+// TODO(testing): find a way to check these against the Move declarations.
+pub const EBAD_ACCOUNT_AUTHENTICATION_KEY: u64 = 1001;
+// Transaction sequence number is too old.
+pub const ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
+// Transaction sequence number is too new.
+pub const ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
+// Transaction sender's account does not exist.
+pub const EACCOUNT_DOES_NOT_EXIST: u64 = 1004;
+// Insufficient balance (to pay for gas deposit).
+pub const ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
+// Transaction expiration time exceeds block time.
+pub const ETRANSACTION_EXPIRED: u64 = 1006;
+// chain_id in transaction doesn't match the one on-chain.
+pub const EBAD_CHAIN_ID: u64 = 1007;
+// Transaction sequence number exceeds u64 max.
+pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
+// Counts of secondary keys and addresses don't match.
+pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
+// Gas payer account missing in gas payer tx
+pub const EGAS_PAYER_ACCOUNT_MISSING: u64 = 1010;
+// Insufficient balance to cover the required deposit.
+pub const EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
+// Nonce is already in the nonce history
+pub const ENONCE_ALREADY_USED: u64 = 1012;
+// Transaction expiration time is too far in the future.
+pub const ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
+
+/// The module the transaction prologue and epilogue live in.
+pub fn transaction_validation_module_id() -> ModuleId {
+    ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_validation").to_owned(),
+    )
+}
+
+/// The module that checks the staking behind a request for raised limits.
+pub fn transaction_limits_module_id() -> ModuleId {
+    ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("transaction_limits").to_owned(),
+    )
+}
+
+/// Abort codes `transaction_limits.move` raises from the prologue, which the
+/// VM translates into specific validation statuses.
+// No stake pool exists at the specified address.
+pub const ESTAKE_POOL_NOT_FOUND: u64 = 1;
+// Fee payer is not the owner of the specified stake pool.
+pub const ENOT_STAKE_POOL_OWNER: u64 = 2;
+// Fee payer is not the delegated voter of the specified stake pool.
+pub const ENOT_DELEGATED_VOTER: u64 = 3;
+// No delegation pool exists at the specified address.
+pub const EDELEGATION_POOL_NOT_FOUND: u64 = 4;
+// Committed stake is insufficient for the requested multiplier tier.
+pub const EINSUFFICIENT_STAKE: u64 = 5;
+// Multiplier is not in the allowed range.
+pub const EINVALID_MULTIPLIER: u64 = 7;
+// Requested multiplier is not available in any configured tier.
+pub const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
+// Stake pool is not in the current-epoch validator set.
+pub const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;
+
+/// The range a requested limits multiplier must fall in, in percent, where 100
+/// is 1x. Must match the Move constants in `0x1::transaction_limits`.
+pub const MIN_MULTIPLIER_PERCENT: u64 = 100;
+pub const MAX_MULTIPLIER_PERCENT: u64 = 10_000;
+
+/// The validation status a `transaction_limits` abort code translates to, or
+/// `None` if the code is not one the prologue is expected to raise.
+pub fn transaction_limits_abort_status(code: u64) -> Option<StatusCode> {
+    Some(match split_canonical(code) {
+        (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
+        (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
+        (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
+        (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
+            StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
+        },
+        (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
+        (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
+        (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,
+        (INVALID_ARGUMENT, EMULTIPLIER_NOT_AVAILABLE) => StatusCode::MULTIPLIER_NOT_AVAILABLE,
+        _ => return None,
+    })
+}

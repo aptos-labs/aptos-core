@@ -1,17 +1,2 @@
 
-Diagnostics:
-error: missing acquires annotation for `R`
-   ┌─ tests/acquires-checker/globals.move:13:9
-   │
-13 │     fun read(a: address): u64 {
-   │         ^^^^
-14 │         let r = borrow_global<R>(a);
-   │                 ------------------- acquired here
-
-error: missing acquires annotation for `R`
-   ┌─ tests/acquires-checker/globals.move:18:9
-   │
-18 │     fun write(a: address): u64 {
-   │         ^^^^^
-19 │         let r = borrow_global_mut<R>(a);
-   │                 ----------------------- acquired here
+============ bytecode verification succeeded ========

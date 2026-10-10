@@ -40,6 +40,7 @@ module 0x42::param_old_labeled_repro {
         b.value = b.value + 1;
     }
     spec inc_both {
+        // Negative: there is no integer strictly between n and n + 1.
         ensures exists S in *:
             (..S |~ both_increased(a, b)) &&
             (S.. |~ both_increased(a, b));
@@ -56,6 +57,31 @@ module 0x42::param_old_labeled_repro {
         s.ticks = s.ticks + 1;
     }
     spec step_both {
+        // Negative, with differently typed intermediate witnesses.
+        ensures exists S in *:
+            (..S |~ pair_progressed(c, s)) &&
+            (S.. |~ pair_progressed(c, s));
+    }
+
+    fun inc_both_twice(a: &mut Counter, b: &mut Counter) {
+        a.value = a.value + 1;
+        b.value = b.value + 1;
+        a.value = a.value + 1;
+        b.value = b.value + 1;
+    }
+    spec inc_both_twice {
+        ensures exists S in *:
+            (..S |~ both_increased(a, b)) &&
+            (S.. |~ both_increased(a, b));
+    }
+
+    fun step_both_twice(c: &mut Counter, s: &mut Stamp) {
+        c.value = c.value + 1;
+        s.ticks = s.ticks + 1;
+        c.value = c.value + 1;
+        s.ticks = s.ticks + 1;
+    }
+    spec step_both_twice {
         ensures exists S in *:
             (..S |~ pair_progressed(c, s)) &&
             (S.. |~ pair_progressed(c, s));

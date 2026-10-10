@@ -31,7 +31,7 @@ impl TelemetryLogSender {
     }
 
     fn drain_batch(&mut self) -> Vec<String> {
-        let batch: Vec<_> = self.batch.drain(..).collect();
+        let batch = std::mem::take(&mut self.batch);
         self.current_bytes = 0;
         batch
     }

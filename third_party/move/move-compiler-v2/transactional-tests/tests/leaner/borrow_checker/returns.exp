@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-28:  publish [import LeanerMove]
+task 1 lines 30-30:  run 0x0::LeanerBorrowReturns::direct
+return values: 13
+task 2 lines 32-32:  run 0x0::LeanerBorrowReturns::nested
+return values: 17

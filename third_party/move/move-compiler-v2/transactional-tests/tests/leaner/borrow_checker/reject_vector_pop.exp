@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-17:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LIR-SEMANTIC-BORROW-CONFLICT: mutable reference use conflicts with an active shared loan
+   ┌─ TEMPFILE:13:6
+   │
+13 │     *vectorRef := rest
+   │      ^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

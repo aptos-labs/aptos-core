@@ -4,10 +4,14 @@
 //! Per-transaction and summary reporting of the timing comparison + correctness verdict.
 
 use crate::{
-    compare::{compare_outcomes, Correctness, ExecOutcome},
+    compare::{compare_outputs, Correctness},
+    data::BenchmarkInput,
     BenchmarkRun,
 };
-use aptos_types::transaction::Version;
+use aptos_types::{
+    state_store::TStateView,
+    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus, Version},
+};
 use std::time::Duration;
 
 /// Everything computed for a single transaction across both VMs.
@@ -21,8 +25,7 @@ pub struct TransactionReport {
 
 impl TransactionReport {
     pub fn new(
-        version: Version,
-        function: String,
+        input: &BenchmarkInput,
         v1: Option<Result<BenchmarkRun, String>>,
         v2: Option<Result<BenchmarkRun, String>>,
     ) -> Self {
@@ -36,7 +39,14 @@ impl TransactionReport {
                         Ok(v2run) => Ok(&v2run.outcome),
                         Err(reason) => Err(reason.as_str()),
                     };
-                    compare_outcomes(&v1run.outcome, v2_outcome)
+                    compare_outputs(&v1run.outcome, v2_outcome, |key| {
+                        input
+                            .state
+                            .get_state_value(key)
+                            .ok()
+                            .flatten()
+                            .map(|value| value.bytes().to_vec())
+                    })
                 },
                 Err(reason) => Correctness::Mismatch {
                     detail: format!(
@@ -48,8 +58,8 @@ impl TransactionReport {
             _ => None,
         };
         Self {
-            version,
-            function,
+            version: input.version,
+            function: input.function_label(),
             v1,
             v2,
             correctness,
@@ -72,7 +82,7 @@ impl TransactionReport {
 
     pub fn print(&self) {
         println!("Transaction {} — {}", self.version, self.function);
-        print_vm("  V1 (legacy MoveVM)", &self.v1);
+        print_vm("  V1 (AptosVM)      ", &self.v1);
         print_vm("  V2 (MonoMove)     ", &self.v2);
         // Speedup and correctness only apply when both VMs ran.
         if self.v1.is_some() && self.v2.is_some() {
@@ -120,24 +130,16 @@ fn print_vm(label: &str, run: &Option<Result<BenchmarkRun, String>>) {
     }
 }
 
-fn describe_outcome(outcome: &ExecOutcome) -> String {
-    match outcome {
-        ExecOutcome::Success { events, writes } => {
-            format!(
-                "success ({} event(s), {} write(s))",
-                events.len(),
-                writes.len()
-            )
-        },
-        ExecOutcome::Aborted {
-            code,
-            message,
-            location,
-        } => match message {
-            Some(m) => format!("Move abort (code {} in {}: {})", code, location, m),
-            None => format!("Move abort (code {} in {})", code, location),
-        },
-        ExecOutcome::Failure { kind, detail } => format!("failure [{}] {}", kind, detail),
+fn describe_outcome(output: &TransactionOutput) -> String {
+    match output.status() {
+        TransactionStatus::Keep(ExecutionStatus::Success) => format!(
+            "success ({} event(s), {} write(s))",
+            output.events().len(),
+            output.write_set().write_op_iter().count()
+        ),
+        TransactionStatus::Keep(status) => format!("kept, not successful: {:?}", status),
+        TransactionStatus::Discard(code) => format!("discarded ({:?})", code),
+        TransactionStatus::Retry => "retry".to_string(),
     }
 }
 

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Move inference task preparation and review recipe",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task_id",
+    "source_commit",
+    "package_module_target",
+    "pristine_snapshot",
+    "pristine_sha256",
+    "prepared_snapshot",
+    "prepared_sha256",
+    "preparation_patch",
+    "preparation_patch_sha256",
+    "package_relpath",
+    "allowed_edit_paths",
+    "required_contract_categories",
+    "reference_path",
+    "reference_sha256",
+    "reference_reviews",
+    "leakage_reviews",
+    "mutant_manifest",
+    "mutant_validation_result",
+    "compatibility_validation_result"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "task_id": {"type": "string"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "package_module_target": {"type": "string"},
+    "pristine_snapshot": {"type": "string"},
+    "pristine_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "prepared_snapshot": {"type": "string"},
+    "prepared_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "preparation_patch": {"type": "string"},
+    "preparation_patch_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "package_relpath": {"type": "string"},
+    "allowed_edit_paths": {"type": "array", "items": {"type": "string"}},
+    "required_contract_categories": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["normal-result", "abort", "state-transition", "frame", "loop-invariant"]
+      }
+    },
+    "reference_path": {"type": "string"},
+    "reference_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "reference_reviews": {"$ref": "#/$defs/reviews"},
+    "leakage_reviews": {"$ref": "#/$defs/reviews"},
+    "mutant_manifest": {"type": "string"},
+    "mutant_validation_result": {"type": "string"},
+    "compatibility_validation_result": {"type": "string"}
+  },
+  "$defs": {
+    "reviews": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": ["reviewer", "approved", "date"],
+        "properties": {
+          "reviewer": {"type": "string"},
+          "approved": {"const": true},
+          "date": {"type": "string", "format": "date"}
+        }
+      }
+    }
+  }
+}

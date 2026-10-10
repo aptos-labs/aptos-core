@@ -3,12 +3,13 @@
 
 use crate::{
     bootstrapper::{Bootstrapper, GENESIS_TRANSACTION_VERSION},
-    driver::DriverConfiguration,
+    driver::{DriverConfiguration, LocalGenesis},
     error::Error,
     tests::{
         mocks::{
-            create_mock_db_reader, create_mock_streaming_client, create_ready_storage_synchronizer,
-            MockMetadataStorage, MockStorageSynchronizer, MockStreamingClient,
+            create_mock_db_reader, create_mock_storage_synchronizer, create_mock_streaming_client,
+            create_ready_storage_synchronizer, MockMetadataStorage, MockStorageSynchronizer,
+            MockStreamingClient,
         },
         utils::{
             create_data_stream_listener, create_empty_epoch_state, create_epoch_ending_ledger_info,
@@ -24,7 +25,7 @@ use aptos_config::config::BootstrappingMode;
 use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
-    streaming_client::{NotificationAndFeedback, NotificationFeedback},
+    streaming_client::{NotificationAndFeedback, NotificationFeedback, SnapshotKind},
 };
 use aptos_storage_interface::StateKind;
 use aptos_time_service::TimeService;
@@ -38,7 +39,96 @@ use mockall::{
     predicate::{always, eq},
     Sequence,
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+
+#[tokio::test]
+async fn test_bootstrapping_waits_for_pending_storage_data() {
+    let pending_data_polls = Arc::new(AtomicUsize::new(0));
+
+    let mut storage_synchronizer = create_mock_storage_synchronizer();
+    let pending_data_polls_for_poll = Arc::clone(&pending_data_polls);
+    storage_synchronizer
+        .expect_pending_storage_data()
+        .returning(move || pending_data_polls_for_poll.fetch_add(1, Ordering::SeqCst) == 0);
+    storage_synchronizer
+        .expect_pending_storage_data_error()
+        .return_const(false);
+
+    let pending_data_polls_at_finish = Arc::clone(&pending_data_polls);
+    storage_synchronizer
+        .expect_finish_chunk_executor()
+        .times(1)
+        .returning(move || {
+            assert_eq!(pending_data_polls_at_finish.load(Ordering::SeqCst), 2);
+        });
+
+    let driver_configuration = create_full_node_driver_configuration();
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), TimeService::mock());
+    let mut database_reader = create_mock_db_reader();
+    database_reader
+        .expect_get_latest_epoch_state()
+        .return_once(|| Ok(create_empty_epoch_state()));
+    let mut bootstrapper = Bootstrapper::new(
+        driver_configuration,
+        MockMetadataStorage::new(),
+        output_fallback_handler,
+        create_mock_streaming_client(),
+        Arc::new(database_reader),
+        storage_synchronizer,
+    );
+
+    bootstrapper.bootstrapping_complete().await.unwrap();
+
+    assert_eq!(pending_data_polls.load(Ordering::SeqCst), 2);
+    assert!(bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
+async fn test_bootstrapping_rejects_pending_storage_error() {
+    let mut storage_synchronizer = create_mock_storage_synchronizer();
+    storage_synchronizer
+        .expect_pending_storage_data()
+        .return_const(false);
+    storage_synchronizer
+        .expect_pending_storage_data_error()
+        .return_const(true);
+    storage_synchronizer.expect_finish_chunk_executor().times(0);
+
+    let driver_configuration = create_full_node_driver_configuration();
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), TimeService::mock());
+    let mut database_reader = create_mock_db_reader();
+    database_reader
+        .expect_get_latest_epoch_state()
+        .return_once(|| Ok(create_empty_epoch_state()));
+    let mut bootstrapper = Bootstrapper::new(
+        driver_configuration,
+        MockMetadataStorage::new(),
+        output_fallback_handler,
+        create_mock_streaming_client(),
+        Arc::new(database_reader),
+        storage_synchronizer,
+    );
+
+    let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
+    bootstrapper
+        .subscribe_to_bootstrap_notifications(bootstrap_notification_sender)
+        .await
+        .unwrap();
+
+    let error = bootstrapper.bootstrapping_complete().await.unwrap_err();
+
+    assert_matches!(error, Error::UnexpectedError(_));
+    assert!(!bootstrapper.is_bootstrapped());
+    assert_none!(bootstrap_notification_receiver.now_or_never());
+}
 
 #[tokio::test]
 async fn test_bootstrap_genesis_waypoint() {
@@ -980,7 +1070,7 @@ async fn test_snapshot_sync_epoch_change() {
         .with(
             eq(target_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::MAIN_STATE),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
@@ -1044,7 +1134,11 @@ async fn test_snapshot_sync_epoch_change_genesis() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(target_version), eq(Some(0)), eq(StateKind::MainState))
+        .with(
+            eq(target_version),
+            eq(Some(0)),
+            eq(SnapshotKind::MAIN_STATE),
+        )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
@@ -1084,6 +1178,155 @@ async fn test_snapshot_sync_epoch_change_genesis() {
 }
 
 #[tokio::test]
+async fn test_snapshot_sync_genesis_committed_locally() {
+    // Create a driver configuration that can commit genesis locally
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+    let num_commits = Arc::new(AtomicUsize::new(0));
+    let num_commits_clone = num_commits.clone();
+    driver_configuration.local_genesis = Some(LocalGenesis {
+        state_reader: Arc::new(create_mock_db_reader()),
+        commit: Arc::new(move || {
+            num_commits_clone.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }),
+    });
+
+    // Create a mock streaming client. No state value stream should ever be
+    // requested, so leave the expectation unset (any call panics).
+    let mock_streaming_client = create_mock_streaming_client();
+
+    // Create the mock metadata storage
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |_| Ok(None));
+
+    // Create the bootstrapper (the node is at genesis)
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        mock_streaming_client,
+        metadata_storage,
+        None,
+        GENESIS_TRANSACTION_VERSION,
+        true,
+    );
+
+    // Drive progress to verify the waypoint
+    let global_data_summary = create_global_summary(0);
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Drive progress again. The target is genesis, so the node should commit
+    // the local genesis blob rather than streaming it back from a peer.
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    assert_eq!(num_commits.load(Ordering::SeqCst), 1);
+    assert!(bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_not_restored_over_committed_data() {
+    // Create a node that holds genesis and a network that has moved well past it
+    let highest_version = 10000;
+    let highest_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 1);
+
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+
+    // No state value stream should ever be requested, so leave the expectation
+    // unset: the mock panics if one is
+    let mock_streaming_client = create_mock_streaming_client();
+
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(|_| Ok(None));
+
+    // Unlike a fresh node, this one reports a committed version of genesis
+    let mut mock_database_reader = create_mock_db_reader();
+    mock_database_reader
+        .expect_get_latest_epoch_state()
+        .returning(|| Ok(create_empty_epoch_state()));
+    mock_database_reader
+        .expect_get_latest_ledger_info()
+        .returning(|| Ok(create_epoch_ending_ledger_info()));
+    mock_database_reader
+        .expect_get_synced_version()
+        .returning(|| Ok(Some(GENESIS_TRANSACTION_VERSION)));
+    mock_database_reader
+        .expect_get_pre_committed_version()
+        .returning(|| Ok(Some(GENESIS_TRANSACTION_VERSION)));
+
+    let output_fallback_handler =
+        OutputFallbackHandler::new(driver_configuration.clone(), TimeService::mock());
+    let mut bootstrapper = Bootstrapper::new(
+        driver_configuration,
+        metadata_storage,
+        output_fallback_handler,
+        mock_streaming_client,
+        Arc::new(mock_database_reader),
+        create_ready_storage_synchronizer(true),
+    );
+    manipulate_verified_epoch_states(&mut bootstrapper, true, true, Some(highest_version));
+
+    // Drive progress. Restoring a snapshot on top of the committed genesis
+    // would leave rows at version 0 that outlive it, so the node has to catch
+    // up by syncing transactions forward instead.
+    let mut global_data_summary = create_global_summary(1);
+    global_data_summary.advertised_data.synced_ledger_infos = vec![highest_ledger_info];
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    assert!(bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
+async fn test_snapshot_sync_genesis_commit_failure() {
+    // Create a driver configuration whose genesis commit fails
+    let mut driver_configuration = create_full_node_driver_configuration();
+    driver_configuration.config.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+    driver_configuration.local_genesis = Some(LocalGenesis {
+        state_reader: Arc::new(create_mock_db_reader()),
+        commit: Arc::new(|| Err(anyhow::anyhow!("Failed to commit genesis!"))),
+    });
+
+    // Create the mock metadata storage
+    let mut metadata_storage = MockMetadataStorage::new();
+    metadata_storage
+        .expect_previous_snapshot_sync_target()
+        .returning(move |_| Ok(None));
+
+    // Create the bootstrapper (the node is at genesis)
+    let mut bootstrapper = create_bootstrapper_with_storage(
+        driver_configuration,
+        create_mock_streaming_client(),
+        metadata_storage,
+        None,
+        GENESIS_TRANSACTION_VERSION,
+        true,
+    );
+
+    // Drive progress to verify the waypoint
+    let global_data_summary = create_global_summary(0);
+    drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap();
+
+    // Drive progress again. The commit fails, so the node must surface the
+    // error rather than reporting itself bootstrapped.
+    let error = drive_progress(&mut bootstrapper, &global_data_summary, false)
+        .await
+        .unwrap_err();
+    assert_matches!(error, Error::UnexpectedError(_));
+    assert!(!bootstrapper.is_bootstrapped());
+}
+
+#[tokio::test]
 async fn test_snapshot_sync_state_values_invalid_chunk_retries() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION;
@@ -1107,7 +1350,7 @@ async fn test_snapshot_sync_state_values_invalid_chunk_retries() {
         mock_streaming_client
             .expect_get_all_state_values()
             .times(1)
-            .with(always(), eq(Some(0)), eq(StateKind::MainState))
+            .with(always(), eq(Some(0)), eq(SnapshotKind::MAIN_STATE))
             .return_once(move |_, _, _| Ok(data_stream_listener))
             .in_sequence(&mut expectation_sequence);
     }
@@ -1202,7 +1445,7 @@ async fn test_snapshot_sync_epoch_change_genesis_restart() {
         .with(
             eq(target_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::MAIN_STATE),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
@@ -1274,7 +1517,7 @@ async fn test_snapshot_sync_existing_state() {
         .with(
             eq(highest_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::MAIN_STATE),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_1))
         .in_sequence(&mut expectation_sequence);
@@ -1297,7 +1540,7 @@ async fn test_snapshot_sync_existing_state() {
         .with(
             eq(highest_version),
             eq(Some(last_persisted_index)),
-            eq(StateKind::MainState),
+            eq(SnapshotKind::MAIN_STATE),
         )
         .return_once(move |_, _, _| Ok(data_stream_listener_2))
         .in_sequence(&mut expectation_sequence);
@@ -1379,7 +1622,11 @@ async fn test_snapshot_sync_fresh_state() {
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
-        .with(eq(highest_version), eq(Some(0)), eq(StateKind::MainState))
+        .with(
+            eq(highest_version),
+            eq(Some(0)),
+            eq(SnapshotKind::MAIN_STATE),
+        )
         .return_once(move |_, _, _| Ok(data_stream_listener_1));
 
     // Create the mock metadata storage
@@ -1731,7 +1978,8 @@ fn create_bootstrapper(
         .expect_previous_snapshot_sync_target()
         .returning(|_| Ok(None));
 
-    // Create the mock db reader with only genesis loaded
+    // Create the mock db reader for a fresh node: it has the genesis ledger
+    // info for provenance, but has committed nothing, so it can be restored into
     let mut mock_database_reader = create_mock_db_reader();
     mock_database_reader
         .expect_get_latest_epoch_state()
@@ -1741,10 +1989,10 @@ fn create_bootstrapper(
         .returning(|| Ok(create_epoch_ending_ledger_info()));
     mock_database_reader
         .expect_get_synced_version()
-        .returning(|| Ok(Some(0)));
+        .returning(|| Ok(None));
     mock_database_reader
         .expect_get_pre_committed_version()
-        .returning(|| Ok(Some(0)));
+        .returning(|| Ok(None));
 
     // Create the output fallback handler
     let time_service = time_service.unwrap_or_else(TimeService::mock);
@@ -1799,12 +2047,17 @@ fn create_bootstrapper_with_storage(
     mock_database_reader
         .expect_get_latest_ledger_info()
         .returning(move || Ok(epoch_ending_ledger_info.clone()));
+    // A latest synced version of genesis means a fresh node in these tests: one
+    // that has committed nothing yet, and so can still be restored into. Tests
+    // that need a node holding genesis build their own reader.
+    let committed_version =
+        (latest_synced_version != GENESIS_TRANSACTION_VERSION).then_some(latest_synced_version);
     mock_database_reader
         .expect_get_synced_version()
-        .returning(move || Ok(Some(latest_synced_version)));
+        .returning(move || Ok(committed_version));
     mock_database_reader
         .expect_get_pre_committed_version()
-        .returning(move || Ok(Some(latest_synced_version)));
+        .returning(move || Ok(committed_version));
 
     // Create the output fallback handler
     let output_fallback_handler =

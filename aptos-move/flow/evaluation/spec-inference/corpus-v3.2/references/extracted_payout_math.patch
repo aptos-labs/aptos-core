@@ -1,0 +1,21 @@
+--- a/sources/etna/extracted_payout_math.move
++++ b/sources/etna/extracted_payout_math.move
+@@ -44,0 +45,18 @@ module decibel_campaign::extracted_payout_math {
++
++    spec compute {
++        pragma opaque;
++        // The descending protected range is reached only in the interpolation
++        // branch. The two clamped branches return before evaluating it.
++        aborts_if [inferred]
++            lock_amount >= cfg.low.lock
++                && lock_amount < cfg.high.lock
++                && cfg.high.protected < cfg.low.protected;
++        // This is WP's exact three-piece result, including floor division in
++        // the widened middle branch.
++        ensures [inferred] result == if (lock_amount < cfg.low.lock) { 0 }
++            else if (lock_amount >= cfg.high.lock) { cfg.high.protected }
++            else { cfg.low.protected
++                + ((((cfg.high.protected - cfg.low.protected) as u128)
++                * ((lock_amount - cfg.low.lock) as u128)
++                / ((cfg.high.lock - cfg.low.lock) as u128)) as u64) };
++    }

@@ -1,0 +1,165 @@
+{
+  "round": "corpus4-run8-codex-terra56-high.tar.gz",
+  "label": "Terra~5.6",
+  "tasks": 26,
+  "replicates": 4,
+  "arms": {
+    "agent_only": {
+      "cells": 104,
+      "complete": 97,
+      "failed": 5,
+      "unmeasured": 2,
+      "failed_cells": {
+        "MS-timelock-047": 1,
+        "QP-part-025": 4
+      },
+      "total_cost": 21.05,
+      "mean_cost": 0.2024,
+      "mean_input_k": 367.2,
+      "mean_output_k": 3.9,
+      "mean_wall_s": 152.9,
+      "first_check_accepted": 38,
+      "rejected_checks": 117
+    },
+    "hybrid_guided": {
+      "cells": 104,
+      "complete": 97,
+      "failed": 6,
+      "unmeasured": 1,
+      "failed_cells": {
+        "JW-upsert-049": 2,
+        "QP-part-025": 2,
+        "TR-cancel-026": 2
+      },
+      "total_cost": 16.71,
+      "mean_cost": 0.1607,
+      "mean_input_k": 289.0,
+      "mean_output_k": 3.08,
+      "mean_wall_s": 148.0,
+      "first_check_accepted": 65,
+      "rejected_checks": 82,
+      "ratio_vs_agent": {
+        "estimate": 0.794,
+        "ci95": [
+          0.59,
+          1.02
+        ]
+      },
+      "ratio_vs_agent_by_group": {
+        "loop_free": {
+          "estimate": 0.36,
+          "ci95": [
+            0.291,
+            0.447
+          ]
+        },
+        "loop": {
+          "estimate": 1.178,
+          "ci95": [
+            0.956,
+            1.437
+          ]
+        }
+      },
+      "cheaper_on_tasks": 17,
+      "task_ratios": {
+        "DM-keepalive-035": 0.22,
+        "DM-valid-036": 0.23,
+        "MS-capacity-048": 0.52,
+        "MS-timelock-047": 0.25,
+        "PT-taker-034": 0.45,
+        "RL-refill-037": 0.35,
+        "RL-request-043": 0.59,
+        "TL-enough-044": 0.65,
+        "TL-find-040": 0.47,
+        "TL-update-050": 0.41,
+        "TR-match-029": 0.25,
+        "TR-reinsert-030": 0.3,
+        "TR-sanitize-028": 0.34,
+        "EA-scheme-041": 1.22,
+        "JW-upsert-049": 0.71,
+        "MS-pending-046": 1.06,
+        "QP-part-025": 2.4,
+        "SM-select-022": 1.65,
+        "SU-split-045": 0.93,
+        "TL-build-039": 1.02,
+        "TL-tiers-038": 1.33,
+        "TR-cancel-026": 1.01,
+        "TR-discard-011": 0.74,
+        "TR-nonzero-031": 1.15,
+        "TR-order-010": 0.91,
+        "VR-range-042": 1.12
+      }
+    },
+    "hybrid_flexible": {
+      "cells": 104,
+      "complete": 98,
+      "failed": 6,
+      "unmeasured": 0,
+      "failed_cells": {
+        "JW-upsert-049": 1,
+        "QP-part-025": 4,
+        "TR-cancel-026": 1
+      },
+      "total_cost": 18.79,
+      "mean_cost": 0.1807,
+      "mean_input_k": 334.5,
+      "mean_output_k": 3.38,
+      "mean_wall_s": 143.1,
+      "first_check_accepted": 68,
+      "rejected_checks": 66,
+      "ratio_vs_agent": {
+        "estimate": 0.893,
+        "ci95": [
+          0.732,
+          1.049
+        ]
+      },
+      "ratio_vs_agent_by_group": {
+        "loop_free": {
+          "estimate": 0.528,
+          "ci95": [
+            0.45,
+            0.638
+          ]
+        },
+        "loop": {
+          "estimate": 1.215,
+          "ci95": [
+            1.118,
+            1.315
+          ]
+        }
+      },
+      "cheaper_on_tasks": 14,
+      "task_ratios": {
+        "DM-keepalive-035": 0.37,
+        "DM-valid-036": 0.41,
+        "MS-capacity-048": 0.75,
+        "MS-timelock-047": 0.41,
+        "PT-taker-034": 0.64,
+        "RL-refill-037": 0.57,
+        "RL-request-043": 1.22,
+        "TL-enough-044": 0.56,
+        "TL-find-040": 0.68,
+        "TL-update-050": 0.66,
+        "TR-match-029": 0.34,
+        "TR-reinsert-030": 0.41,
+        "TR-sanitize-028": 0.55,
+        "EA-scheme-041": 1.42,
+        "JW-upsert-049": 1.08,
+        "MS-pending-046": 1.28,
+        "QP-part-025": 1.29,
+        "SM-select-022": 1.29,
+        "SU-split-045": 1.05,
+        "TL-build-039": 1.38,
+        "TL-tiers-038": 1.64,
+        "TR-cancel-026": 0.98,
+        "TR-discard-011": 0.95,
+        "TR-nonzero-031": 1.12,
+        "TR-order-010": 1.03,
+        "VR-range-042": 1.22
+      }
+    }
+  }
+}

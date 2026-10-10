@@ -10,6 +10,10 @@ module 0x1::event {
         data: vector<u8>,
     }
 
+    struct Tagged<phantom T> has drop, store {
+        a: u64,
+    }
+
     native fun write_module_event_to_store<T: drop + store>(msg: T);
     native fun write_to_event_store<T: drop + store>(guid: vector<u8>, count: u64, msg: T);
 
@@ -36,6 +40,15 @@ module 0x1::event {
         do_emit();
     }
 
+    fun do_emit_function_type_arg() {
+        write_module_event_to_store(Tagged<|u8|(u8, u16) has copy + drop> { a: 11 });
+    }
+
+    // The event's type tag carries a function type argument.
+    public fun emit_module_function_type_arg() {
+        do_emit_function_type_arg();
+    }
+
     // Mock `guid` -- the BCS encoding of an `EventKey { creation_number: 1,
     // account_address: 0x0 }`
     fun handle_guid(): vector<u8> {
@@ -57,6 +70,9 @@ module 0x1::event {
 
 // RUN: execute 0x1::event::emit_module
 // CHECK: events: module 0x1::event::MyEvent 0x070000000000000003010203
+
+// RUN: execute 0x1::event::emit_module_function_type_arg
+// CHECK: events: module 0x1::event::Tagged<|u8|(u8, u16) has copy + drop> 0x0b00000000000000
 
 // RUN: execute 0x1::event::emit_handle
 // CHECK: events: handle creator=0x0 seq=5 0x1::event::MyEvent 0x090000000000000003010203

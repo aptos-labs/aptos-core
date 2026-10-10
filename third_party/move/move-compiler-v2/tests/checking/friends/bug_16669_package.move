@@ -1,4 +1,4 @@
-module 0xc0ffee::m {
+module 0xc::m {
     package inline fun foo(): u64 {
         12
     }

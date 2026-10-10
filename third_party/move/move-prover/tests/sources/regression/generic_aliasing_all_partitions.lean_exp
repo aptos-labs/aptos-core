@@ -1,0 +1,61 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/generic_aliasing_all_partitions.move:19:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:19:5: error: leaner verification failed: the automatic verification of `three_way` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify three_way by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify three_way by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:32:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:32:5: error: leaner verification failed: the automatic verification of `four_way` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify four_way by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify four_way by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:43:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:43:5: error: leaner verification failed: the automatic verification of `pair` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify pair by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify pair by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:55:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:55:5: error: leaner verification failed: the automatic verification of `true_in_every_case` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify true_in_every_case by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify true_in_every_case by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:71:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:71:5: error: leaner verification failed: the automatic verification of `through_concrete` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify through_concrete by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify through_concrete by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:84:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:84:5: error: leaner verification failed: the automatic verification of `across_structs` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify across_structs by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify across_structs by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:96:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:96:5: error: leaner verification failed: the automatic verification of `through_nesting` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify through_nesting by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify through_nesting by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:107:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:107:5: error: leaner verification failed: the automatic verification of `never_alias` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify never_alias by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify never_alias by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:128:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:128:5: error: leaner verification failed: the automatic verification of `two_pairs` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify two_pairs by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify two_pairs by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_all_partitions.move:141:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/regression/generic_aliasing_all_partitions.move:141:5: error: leaner verification failed: the automatic verification of `three_shared` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify three_shared by …` in `tests/sources/regression/generic_aliasing_all_partitions.proof.lean` (`verify three_shared by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

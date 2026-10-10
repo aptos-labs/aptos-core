@@ -2,15 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters::DEC_QUEUE_SIZE,
+    counters::{DEC_QUEUE_SIZE, SECRET_SHARE_RECOVERY_COUNT},
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::secret_sharing::{
         block_queue::{BlockQueue, QueueItem},
         network_messages::{SecretShareMessage, SecretShareRpc},
+        persisted_self_shares::PersistedSelfShares,
         reliable_broadcast_state::SecretShareAggregateState,
         secret_share_store::{SecretShareAggregationResult, SecretShareStore},
+        storage::SecretShareStorage,
         types::RequestSecretShare,
         verifier::SecretShareVerifier,
     },
@@ -62,6 +64,7 @@ pub struct SecretShareManager {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
+    persisted_self_shares: PersistedSelfShares,
     block_queue: BlockQueue,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
@@ -73,6 +76,9 @@ impl SecretShareManager {
         verifier: Arc<SecretShareVerifier>,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
+        secret_share_storage: Arc<dyn SecretShareStorage>,
+        highest_committed_round: Round,
+        retention_rounds: Round,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
         secret_share_request_delay_ms: u64,
@@ -88,7 +94,7 @@ impl SecretShareManager {
             rb_backoff_policy,
             TimeService::real(),
             Duration::from_millis(rb_config.rpc_timeout_ms),
-            bounded_executor,
+            bounded_executor.clone(),
         ));
         let (decision_tx, decision_rx) = unbounded();
 
@@ -98,6 +104,13 @@ impl SecretShareManager {
             verifier.clone(),
             decision_tx,
         )));
+        let persisted_self_shares = PersistedSelfShares::new(
+            epoch_state.epoch,
+            author,
+            secret_share_storage,
+            highest_committed_round,
+            retention_rounds,
+        );
 
         Self {
             author,
@@ -112,6 +125,7 @@ impl SecretShareManager {
             outgoing_blocks,
 
             secret_share_store: dec_store,
+            persisted_self_shares,
             block_queue: BlockQueue::new(),
             pending_derives: FuturesUnordered::new(),
         }
@@ -153,8 +167,8 @@ impl SecretShareManager {
         Ok(())
     }
 
-    /// Handles a completed self-share derivation: updates the store, broadcasts
-    /// the share, and spawns the share requester task.
+    /// Handles a completed self-share derivation. The synchronous database write
+    /// must succeed before the share enters either memory cache or the network.
     fn process_completed_derive(&mut self, round: Round, result: TaskResult<SecretShareResult>) {
         let share = match result {
             Ok(Some(share)) => share,
@@ -163,6 +177,7 @@ impl SecretShareManager {
                     round = round,
                     "Self-share derive returned None (no encrypted txns), resolving round"
                 );
+                self.prune_expired_self_shares(round);
                 if let Some(item) = self.block_queue.item_mut(round) {
                     item.resolve_round_without_key(round);
                 }
@@ -182,6 +197,10 @@ impl SecretShareManager {
             },
         };
 
+        self.persisted_self_shares
+            .persist(share.clone())
+            .expect("Failed to persist self secret share");
+        self.prune_expired_self_shares(round);
         let metadata = share.metadata().clone();
         {
             let mut store = self.secret_share_store.lock();
@@ -209,6 +228,57 @@ impl SecretShareManager {
         }
     }
 
+    fn prune_expired_self_shares(&mut self, latest_round: Round) {
+        self.persisted_self_shares.advance_retention(latest_round);
+    }
+
+    fn handle_share_request(
+        &mut self,
+        request: RequestSecretShare,
+        protocol: ProtocolId,
+        response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    ) {
+        info!(LogSchema::new(LogEvent::ReceiveSecretShareRequest)
+            .author(self.author)
+            .epoch(request.metadata().epoch)
+            .round(request.metadata().round));
+
+        if request.metadata().epoch != self.epoch_state.epoch {
+            warn!(
+                requested_epoch = request.metadata().epoch,
+                current_epoch = self.epoch_state.epoch,
+                "Rejecting secret share request from old or future epoch"
+            );
+            return;
+        }
+
+        let result = self
+            .secret_share_store
+            .lock()
+            .get_self_share(request.metadata());
+        let active_share = match result {
+            Ok(Some(share)) => Some(share),
+            Ok(None) => None,
+            Err(error) => {
+                debug!("Self share not available in active store: {error}");
+                None
+            },
+        };
+        if let Some(share) = active_share {
+            self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
+            return;
+        }
+
+        if let Some(share) = self.persisted_self_shares.get(request.metadata()) {
+            info!(LogSchema::new(LogEvent::ServePersistedSecretShare)
+                .author(self.author)
+                .epoch(request.metadata().epoch)
+                .round(request.metadata().round));
+            SECRET_SHARE_RECOVERY_COUNT.inc();
+            self.process_response(protocol, response_sender, SecretShareMessage::Share(share));
+        }
+    }
+
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
         let rounds: Vec<u64> = ready_blocks
             .iter()
@@ -229,13 +299,18 @@ impl SecretShareManager {
     fn process_reset(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
         let target_round = match signal {
-            ResetSignal::Stop => 0,
-            ResetSignal::TargetRound(round) => round,
+            ResetSignal::Stop => {
+                self.stop = true;
+                0
+            },
+            ResetSignal::TargetRound(round) => {
+                self.prune_expired_self_shares(round);
+                round
+            },
         };
         self.block_queue = BlockQueue::new();
         self.pending_derives = FuturesUnordered::new();
         self.secret_share_store.lock().reset(target_round);
-        self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
 
@@ -408,7 +483,7 @@ impl SecretShareManager {
         DropGuard::new(abort_handle)
     }
 
-    fn handle_incoming_msg(&self, rpc: SecretShareRpc) {
+    fn handle_incoming_msg(&mut self, rpc: SecretShareRpc) {
         let SecretShareRpc {
             msg,
             protocol,
@@ -416,28 +491,7 @@ impl SecretShareManager {
         } = rpc;
         match msg {
             SecretShareMessage::RequestShare(request) => {
-                let result = self
-                    .secret_share_store
-                    .lock()
-                    .get_self_share(request.metadata());
-                match result {
-                    Ok(Some(share)) => {
-                        self.process_response(
-                            protocol,
-                            response_sender,
-                            SecretShareMessage::Share(share),
-                        );
-                    },
-                    Ok(None) => {
-                        warn!(
-                            "Self secret share could not be found for RPC request {}",
-                            request.metadata().round
-                        );
-                    },
-                    Err(e) => {
-                        warn!("[SecretShareManager] Failed to get share: {}", e);
-                    },
-                }
+                self.handle_share_request(request, protocol, response_sender)
             },
             SecretShareMessage::Share(share) => {
                 info!(LogSchema::new(LogEvent::ReceiveSecretShare)
@@ -523,5 +577,442 @@ impl SecretShareManager {
     pub fn observe_queue(&self) {
         let queue = &self.block_queue.queue();
         DEC_QUEUE_SIZE.set(queue.len() as i64);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
+        rand::secret_sharing::{
+            storage::{storage_key, InMemorySecretShareStorage, SecretShareDb, SecretShareKey},
+            test_utils::{create_metadata, create_secret_share, TestContext},
+        },
+    };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_config::{
+        config::ReliableBroadcastConfig,
+        network_id::{NetworkId, PeerNetworkId},
+    };
+    use aptos_network::{
+        application::{interface::NetworkClient, storage::PeersAndMetadata},
+        peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
+        protocols::{network::NewNetworkSender, wire::handshake::v1::ProtocolIdSet},
+        transport::ConnectionMetadata,
+    };
+    use aptos_temppath::TempPath;
+    use aptos_types::secret_sharing::SecretShare;
+    use maplit::hashmap;
+    use std::iter::FromIterator;
+
+    struct FailingStorage;
+
+    impl SecretShareStorage for FailingStorage {
+        fn save_self_share(&self, _share: &SecretShare) -> anyhow::Result<()> {
+            anyhow::bail!("injected failure")
+        }
+
+        fn get_all_self_shares(&self) -> anyhow::Result<Vec<SecretShare>> {
+            Ok(Vec::new())
+        }
+
+        fn prune_self_shares(&self, _keys: &[SecretShareKey]) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn make_manager(
+        ctx: &TestContext,
+        local_index: usize,
+        storage: Arc<dyn SecretShareStorage>,
+    ) -> (
+        SecretShareManager,
+        aptos_channel::Receiver<(Author, ProtocolId), PeerManagerRequest>,
+    ) {
+        make_manager_with_retention(ctx, local_index, storage, 0, 120)
+    }
+
+    fn make_manager_with_retention(
+        ctx: &TestContext,
+        local_index: usize,
+        storage: Arc<dyn SecretShareStorage>,
+        highest_committed_round: Round,
+        retention_rounds: Round,
+    ) -> (
+        SecretShareManager,
+        aptos_channel::Receiver<(Author, ProtocolId), PeerManagerRequest>,
+    ) {
+        let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
+        for peer in &ctx.authors {
+            let peer_network_id = PeerNetworkId::new(NetworkId::Validator, *peer);
+            let mut connection_metadata = ConnectionMetadata::mock(*peer);
+            connection_metadata.application_protocols = ProtocolIdSet::from_iter(DIRECT_SEND);
+            peers_and_metadata
+                .insert_connection_metadata(peer_network_id, connection_metadata)
+                .unwrap();
+        }
+
+        let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 16, None);
+        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 16, None);
+        let network_sender = aptos_network::protocols::network::NetworkSender::new(
+            PeerManagerRequestSender::new(network_reqs_tx),
+            ConnectionRequestSender::new(connection_reqs_tx),
+        );
+        let network_client = NetworkClient::new(
+            DIRECT_SEND.into(),
+            RPC.into(),
+            hashmap! { NetworkId::Validator => network_sender },
+            peers_and_metadata,
+        );
+        let consensus_network_client = ConsensusNetworkClient::new(network_client);
+        let (self_sender, _) = aptos_channels::new_unbounded_test();
+        let network_sender = Arc::new(NetworkSender::new(
+            ctx.authors[local_index],
+            consensus_network_client,
+            self_sender,
+            ctx.validator_verifier.clone(),
+        ));
+        let (outgoing_blocks, _) = unbounded();
+        let bounded_executor = BoundedExecutor::new(4, tokio::runtime::Handle::current());
+        let manager = SecretShareManager::new(
+            ctx.authors[local_index],
+            Arc::new(EpochState {
+                epoch: ctx.epoch,
+                verifier: ctx.validator_verifier.clone(),
+            }),
+            Arc::new(SecretShareVerifier::new(
+                ctx.secret_share_config.clone(),
+                true,
+            )),
+            outgoing_blocks,
+            network_sender,
+            storage,
+            highest_committed_round,
+            retention_rounds,
+            bounded_executor,
+            &ReliableBroadcastConfig::default(),
+            1_000_000,
+        );
+        (manager, network_reqs_rx)
+    }
+
+    fn request_rpc(
+        metadata: SecretShareMetadata,
+    ) -> (SecretShareRpc, oneshot::Receiver<Result<Bytes, RpcError>>) {
+        let (response_sender, response_rx) = oneshot::channel();
+        (
+            SecretShareRpc {
+                msg: SecretShareMessage::RequestShare(RequestSecretShare::new(metadata)),
+                protocol: ProtocolId::ConsensusRpcBcs,
+                response_sender,
+            },
+            response_rx,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_write_completes_before_cache_and_broadcast() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let (mut manager, mut network_rx) = make_manager(&ctx, 0, storage.clone());
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+
+        manager.process_completed_derive(metadata.round, Ok(Some(share.clone())));
+
+        let persisted = storage
+            .get_all_self_shares()
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap();
+        assert_eq!(persisted.metadata(), &metadata);
+        assert!(manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&metadata)));
+        assert!(manager
+            .secret_share_store
+            .lock()
+            .get_self_share(&metadata)
+            .unwrap()
+            .is_some());
+        assert!(network_rx.next().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_write_failure_prevents_publication() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut manager, mut network_rx) = make_manager(&ctx, 0, Arc::new(FailingStorage));
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            manager.process_completed_derive(metadata.round, Ok(Some(share)));
+        }));
+
+        assert!(result.is_err());
+        assert!(manager
+            .secret_share_store
+            .lock()
+            .get_self_share(&metadata)
+            .unwrap()
+            .is_none());
+        assert_eq!(manager.persisted_self_shares.len(), 0);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), network_rx.next())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_retention_prunes_storage_and_recovery_cache() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let previous_epoch_metadata = create_metadata(ctx.epoch - 1, 30);
+        let old_metadata = create_metadata(ctx.epoch, 10);
+        let boundary_metadata = create_metadata(ctx.epoch, 20);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &previous_epoch_metadata))
+            .unwrap();
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &old_metadata))
+            .unwrap();
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &boundary_metadata))
+            .unwrap();
+
+        let (manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 30, 10);
+
+        let recovered = storage.get_all_self_shares().unwrap();
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0].metadata(), &boundary_metadata);
+        assert!(!manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&previous_epoch_metadata)));
+        assert!(!manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&old_metadata)));
+        assert!(manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&boundary_metadata)));
+    }
+
+    #[tokio::test]
+    async fn test_no_share_round_advances_retention() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let metadata = create_metadata(ctx.epoch, 10);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 10, 10);
+
+        manager.process_completed_derive(21, Ok(None));
+
+        assert!(storage.get_all_self_shares().unwrap().is_empty());
+        assert!(!manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&metadata)));
+    }
+
+    #[tokio::test]
+    async fn test_target_round_reset_advances_retention() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let metadata = create_metadata(ctx.epoch, 10);
+        storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager_with_retention(&ctx, 0, storage.clone(), 10, 10);
+        let (tx, rx) = oneshot::channel();
+
+        manager.process_reset(ResetRequest {
+            tx,
+            signal: ResetSignal::TargetRound(21),
+        });
+        rx.await.unwrap();
+
+        assert!(storage.get_all_self_shares().unwrap().is_empty());
+        assert!(!manager
+            .persisted_self_shares
+            .contains_key(&storage_key(&metadata)));
+    }
+
+    #[tokio::test]
+    async fn test_reset_preserves_recovered_self_shares() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let (mut manager, mut network_rx) = make_manager(&ctx, 0, storage.clone());
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        manager.process_completed_derive(metadata.round, Ok(Some(share)));
+        assert!(network_rx.next().await.is_some());
+
+        let (tx, rx) = oneshot::channel();
+        manager.process_reset(ResetRequest {
+            tx,
+            signal: ResetSignal::TargetRound(metadata.round),
+        });
+        rx.await.unwrap();
+
+        assert_eq!(manager.persisted_self_shares.len(), 1);
+        assert!(manager
+            .secret_share_store
+            .lock()
+            .get_self_share(&metadata)
+            .unwrap()
+            .is_none());
+
+        let (request, response) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request);
+        assert!(response.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_cache_miss_uses_preloaded_share() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let storage = Arc::new(InMemorySecretShareStorage::new());
+        let metadata = create_metadata(ctx.epoch, 10);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        storage.save_self_share(&share).unwrap();
+        let (mut manager, _) = make_manager(&ctx, 0, storage.clone());
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let (request_1, response_1) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request_1);
+        let (request_2, response_2) = request_rpc(metadata.clone());
+        manager.handle_incoming_msg(request_2);
+
+        for response in [response_1, response_2] {
+            let bytes = response.await.unwrap().unwrap();
+            let message: ConsensusMsg = ProtocolId::ConsensusRpcBcs.from_bytes(&bytes).unwrap();
+            let SecretShareMessage::Share(recovered) =
+                SecretShareMessage::from_network_message(message).unwrap()
+            else {
+                panic!("expected a secret share response")
+            };
+            assert_eq!(recovered.metadata(), &metadata);
+            assert_eq!(recovered.author(), &ctx.authors[0]);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wrong_author_and_invalid_requests_are_rejected() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 10);
+
+        let wrong_author_storage = Arc::new(InMemorySecretShareStorage::new());
+        wrong_author_storage
+            .save_self_share(&create_secret_share(&ctx, 1, &metadata))
+            .unwrap();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            make_manager(&ctx, 0, wrong_author_storage)
+        }));
+        assert!(result.is_err());
+
+        let forged_storage = Arc::new(InMemorySecretShareStorage::new());
+        forged_storage
+            .save_self_share(&create_secret_share(&ctx, 0, &metadata))
+            .unwrap();
+        let (mut manager, _) = make_manager(&ctx, 0, forged_storage.clone());
+        manager
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        let mut forged_metadata = metadata.clone();
+        forged_metadata.timestamp += 1;
+        let (request, response) = request_rpc(forged_metadata);
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+
+        let old_epoch_metadata = create_metadata(ctx.epoch - 1, metadata.round);
+        let (request, response) = request_rpc(old_epoch_metadata);
+        manager.handle_incoming_msg(request);
+        assert!(response.await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_persisted_threshold_recovers_after_restart_and_lost_handoff() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 10);
+        let mut peer_paths = Vec::new();
+
+        // These three authors formed the threshold that made the original
+        // decryption possible. Persist their shares, then drop the databases to
+        // model full process shutdown.
+        for author_index in 0..3 {
+            let path = TempPath::new();
+            {
+                let db = SecretShareDb::new(&path);
+                db.save_self_share(&create_secret_share(&ctx, author_index, &metadata))
+                    .unwrap();
+            }
+            peer_paths.push(path);
+        }
+
+        // The fourth validator lost its original pipeline handoff. After its
+        // restart/replay, its own derivation succeeds and it requests the
+        // threshold authors' shares from their freshly restarted managers.
+        let target_storage = Arc::new(InMemorySecretShareStorage::new());
+        let (mut target, _) = make_manager(&ctx, 3, target_storage);
+        target
+            .secret_share_store
+            .lock()
+            .update_highest_known_round(metadata.round);
+        target.process_completed_derive(
+            metadata.round,
+            Ok(Some(create_secret_share(&ctx, 3, &metadata))),
+        );
+
+        for (author_index, path) in peer_paths.iter().enumerate() {
+            let restarted_storage = Arc::new(SecretShareDb::new(path));
+            let (mut restarted_peer, _) = make_manager(&ctx, author_index, restarted_storage);
+            restarted_peer
+                .secret_share_store
+                .lock()
+                .update_highest_known_round(metadata.round);
+            let (request, response) = request_rpc(metadata.clone());
+            restarted_peer.handle_incoming_msg(request);
+
+            let bytes = response.await.unwrap().unwrap();
+            let message: ConsensusMsg = ProtocolId::ConsensusRpcBcs.from_bytes(&bytes).unwrap();
+            let SecretShareMessage::Share(recovered) =
+                SecretShareMessage::from_network_message(message).unwrap()
+            else {
+                panic!("expected a secret share response")
+            };
+            target
+                .secret_share_store
+                .lock()
+                .add_share(recovered)
+                .unwrap();
+        }
+
+        let result = tokio::time::timeout(Duration::from_secs(5), target.decision_rx.next())
+            .await
+            .expect("timed out waiting for reconstructed key")
+            .expect("secret share decision channel closed");
+        match result {
+            SecretShareAggregationResult::Success(key) => assert_eq!(key.metadata, metadata),
+            SecretShareAggregationResult::Failure { .. } => {
+                panic!("persisted threshold did not reconstruct the key")
+            },
+        }
     }
 }

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 41,
+        "offset": 4629,
+        "sha256": "eef70fb6f24e7816f1edccda2f42cd61d17af2406a9b246e653b42b8f0461cb8"
+      },
+      "edit": {
+        "at": 23,
+        "kind": "substitute",
+        "length": 17,
+        "to": "= io_tiers"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-update-050-update-swaps-sides",
+      "obligation_category": "normal-result",
+      "rationale": "An existing configuration takes the IO tiers for execution.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 49,
+        "offset": 4470,
+        "sha256": "87d5dccd82bb1f3ca22c94abfc42fc604c7a375a920e39c7bed04b9272adbb05"
+      },
+      "edit": {
+        "at": 20,
+        "kind": "substitute",
+        "length": 29,
+        "to": "{ execution_tiers: io_tiers, io_tiers: execution_tiers }"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-update-050-creation-swaps-sides",
+      "obligation_category": "normal-result",
+      "rationale": "A new configuration stores the two tier vectors on the wrong sides.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 49,
+        "offset": 4350,
+        "sha256": "8a0ed454fd115ff75b1e48dd315daa576227034794abe6b31b2d0f2d06a44d5e"
+      },
+      "edit": {
+        "at": 4,
+        "kind": "substitute",
+        "length": 7,
+        "to": "exists"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-update-050-existence-inverted",
+      "obligation_category": "abort",
+      "rationale": "The configuration is created when it exists and updated when it does not.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-update-050"
+}

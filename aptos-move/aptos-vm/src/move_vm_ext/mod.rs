@@ -16,12 +16,11 @@ pub use crate::move_vm_ext::{
     vm::{GenesisMoveVm, GenesisRuntimeBuilder},
 };
 use aptos_types::state_store::state_key::StateKey;
-pub use aptos_types::transaction::user_transaction_context::UserTransactionContext;
+pub use aptos_types::transaction::{user_transaction_context::UserTransactionContext, SessionId};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, vm_status::StatusCode,
 };
-pub use session::session_id::SessionId;
 
 pub(crate) fn resource_state_key(
     address: &AccountAddress,

@@ -1,0 +1,5 @@
+<TEMPDIR>/lean_bad.move:5:9: error: the specification clause `ensures result == a - b` is not established
+<TEMPDIR>/lean_bad.move:3:5: error: leaner verification failed: the automatic verification of `add` failed; provide a proof: `verify add by …` in `<TEMPDIR>/lean_bad.proof.lean` (`verify add by skip` shows the obligations it leaves)
+{
+  "Error": "Move Prover failed: exiting with verification errors"
+}

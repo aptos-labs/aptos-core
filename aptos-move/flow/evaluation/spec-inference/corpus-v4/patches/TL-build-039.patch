@@ -1,0 +1,51 @@
+diff --git a/sources/framework/extracted_transaction_limits.move b/sources/framework/extracted_transaction_limits.move
+index 451fa28fdb..7c5242a744 100644
+--- a/sources/framework/extracted_transaction_limits.move
++++ b/sources/framework/extracted_transaction_limits.move
+@@ -61,6 +61,11 @@ module aptos_framework::extracted_transaction_limits {
+                 error::invalid_argument(ETHRESHOLDS_NOT_MONOTONIC)
+             );
+             i += 1;
++        } spec {
++            invariant len == std::vector::length(tiers);
++            invariant 1 <= i;
++            invariant len > 0 ==> i <= len;
++            invariant forall k: u64 where 1 <= k && k < i && k < len: ordered_at(tiers, k);
+         };
+     }
+ 
+@@ -152,4 +157,34 @@ module aptos_framework::extracted_transaction_limits {
+             stake_amount >= io_threshold, error::permission_denied(EINSUFFICIENT_STAKE)
+         );
+     }
++
++    spec module {
++        /// Whether a multiplier lies in `(MIN_MULTIPLIER_PERCENT, MAX_MULTIPLIER_PERCENT]`.
++        fun valid_multiplier(multiplier_percent: u64): bool {
++            multiplier_percent > MIN_MULTIPLIER_PERCENT && multiplier_percent <= MAX_MULTIPLIER_PERCENT
++        }
++
++        /// Tier `k` against its predecessor: the stake may repeat, the
++        /// multiplier must grow.
++        fun ordered_at(tiers: vector<TxnLimitTier>, k: num): bool {
++            tiers[k].min_stake >= tiers[k - 1].min_stake
++                && tiers[k].multiplier_percent > tiers[k - 1].multiplier_percent
++        }
++
++        /// Every tier against its predecessor. Vacuous for fewer than two tiers.
++        fun ordered(tiers: vector<TxnLimitTier>): bool {
++            forall k: u64 where 1 <= k && k < len(tiers): ordered_at(tiers, k)
++        }
++    }
++
++    spec new_tier {
++        pragma opaque;
++        aborts_if !valid_multiplier(multiplier_percent);
++        ensures result == TxnLimitTier { min_stake, multiplier_percent };
++    }
++
++    spec validate_tiers {
++        pragma opaque;
++        aborts_if !ordered(tiers);
++    }
+ }

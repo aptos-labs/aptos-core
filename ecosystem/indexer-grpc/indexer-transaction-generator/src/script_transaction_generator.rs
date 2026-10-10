@@ -98,7 +98,7 @@ impl ScriptTransactions {
         let cmd = create_compile_script_cmd(script_current_dir.clone());
         let compile_output = cmd.execute().await.context(format!(
             "Failed to compile the script: {:?}",
-            &script_current_dir
+            script_current_dir
         ))?;
 
         // Use the script location from CompileScript output (script.mv in package root).
@@ -108,7 +108,7 @@ impl ScriptTransactions {
         let cmd = create_run_script_cmd(compiled_script_path);
         let transaction_summary = cmd.execute().await.context(format!(
             "Failed to run the script: {:?}",
-            &script_current_dir
+            script_current_dir
         ))?;
         sender_account
             .delete_profile_file(&script_path)
@@ -118,7 +118,7 @@ impl ScriptTransactions {
         if let Some(true) = transaction_summary.success {
             Ok(transaction_summary.version.unwrap())
         } else {
-            anyhow::bail!("Failed to execute the script: {:?}", &script_current_dir);
+            anyhow::bail!("Failed to execute the script: {:?}", script_current_dir);
         }
     }
 

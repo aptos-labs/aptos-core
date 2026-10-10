@@ -712,6 +712,12 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
+            if chain_id.is_devnet()
+                && config_yaml["hot_state_config"]["delete_on_restart"].is_null()
+            {
+                config.hot_state_config.delete_on_restart = false;
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)
@@ -834,7 +840,7 @@ impl ConfigSanitizer for StorageConfig {
 mod test {
     use super::{ShardPathConfig, ShardedDbPathConfig, StorageConfig};
     use crate::config::{config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PrunerConfig};
-    use aptos_types::chain_id::ChainId;
+    use aptos_types::chain_id::{ChainId, NamedChain};
 
     #[test]
     pub fn test_default_prune_window() {
@@ -948,5 +954,65 @@ mod test {
 
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
         assert!(node_config.storage.assert_rlimit_nofile);
+    }
+
+    #[test]
+    fn test_optimize_delete_on_restart() {
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              rocksdb_configs:
+                enable_storage_sharding: true
+            "#,
+        )
+        .unwrap();
+
+        // Devnet disables it, including for the chain IDs devnet actually rotates through.
+        for chain_id in [
+            ChainId::new(NamedChain::DEVNET.id()),
+            ChainId::new(30),
+            ChainId::new(240),
+        ] {
+            let mut node_config = NodeConfig::default();
+            assert!(node_config.storage.hot_state_config.delete_on_restart);
+
+            let modified_config = StorageConfig::optimize(
+                &mut node_config,
+                &yaml,
+                NodeType::Validator,
+                Some(chain_id),
+            )
+            .unwrap();
+            assert!(modified_config);
+            assert!(!node_config.storage.hot_state_config.delete_on_restart);
+        }
+
+        // Other chains keep the default.
+        for chain_id in [ChainId::mainnet(), ChainId::testnet(), ChainId::test()] {
+            let mut node_config = NodeConfig::default();
+            StorageConfig::optimize(&mut node_config, &yaml, NodeType::Validator, Some(chain_id))
+                .unwrap();
+            assert!(node_config.storage.hot_state_config.delete_on_restart);
+        }
+
+        // An explicit setting in the local config wins over the optimizer.
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              hot_state_config:
+                delete_on_restart: true
+            "#,
+        )
+        .unwrap();
+        let mut node_config = NodeConfig::default();
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &yaml,
+            NodeType::Validator,
+            Some(ChainId::new(NamedChain::DEVNET.id())),
+        )
+        .unwrap();
+        assert!(!modified_config);
+        assert!(node_config.storage.hot_state_config.delete_on_restart);
     }
 }

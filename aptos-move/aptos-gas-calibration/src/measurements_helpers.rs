@@ -146,7 +146,7 @@ pub fn record_gas_usage(
         );
         gas_measurement
             .equation_names
-            .push(format!("{}::{}", &identifier, &func_identifier.0));
+            .push(format!("{}::{}", identifier, func_identifier.0));
 
         // publish package similar to create_publish_package in harness.rs
         println!("Signing txn for module... ");

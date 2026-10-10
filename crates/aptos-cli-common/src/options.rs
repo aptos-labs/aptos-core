@@ -696,13 +696,13 @@ impl SaveFile {
 /// Options specific to using the Rest endpoint
 #[derive(Debug, Parser)]
 pub struct RestOptions {
-    /// URL to a fullnode on the network
+    /// URL to the REST API for the network
     ///
     /// Defaults to the URL in the `default` profile
     #[clap(long)]
     pub url: Option<reqwest::Url>,
 
-    /// Connection timeout in seconds, used for the REST endpoint of the fullnode
+    /// Connection timeout in seconds, used for the REST API endpoint
     #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS, alias = "connection-timeout-s")]
     pub connection_timeout_secs: u64,
 

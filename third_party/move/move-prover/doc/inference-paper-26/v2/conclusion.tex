@@ -1,0 +1,96 @@
+% !TEX root = main.tex
+\Section{Discussion and Conclusion}
+\label{sec:discussion}
+
+\SubSection{Interpreting the Results}
+
+The evaluation has three results. An agent without mechanical help completes 99\% of its
+cells under the frontier model and 93\% under the mid-tier model. \WP does not change
+completeness, but it lowers the cost wherever it derives the contract by itself. And the
+mid-tier model nearly reaches the results of the frontier model, at a cost that follows
+its lower price.
+
+\Paragraph{Where \WP pays off}
+On targets without loops, \WP needs no help: it derives the complete contract, and the
+agent only checks it, at 36--60\% of the cost of writing the contract directly. Half of
+this corpus is of this kind, including four of the five compositions over callee
+contracts and eight of the nine targets with global state. On loop targets the agent still has to find the
+invariant, and \WP's quantified output adds context that is re-read on every turn, so
+the hybrids cost slightly more there. With \WP, the first candidate check is accepted more
+often, most for the mid-tier model (from 37\% to 63--65\% of cells).
+
+\Paragraph{Where it does not}
+The partition needs a permutation argument that \WP cannot supply, and every tactic fails
+on it, the mid-tier model more often. The two scans that leave their loop early fail only
+in the hybrid tactics: the agent accepted the contract that \WP derived from its prefix
+invariants once it verified, and a mutant on the exit path survived. A derived contract
+that verifies can thus still be incomplete, and the tool's diagnostics, which report a
+missing invariant, do not detect this case.
+
+\Paragraph{Mid-tier and frontier models}
+Both models spend about the same number of tokens per cell, so the cost of the mid-tier
+model follows its price. Apart from the permutation target, it handles the loop
+invariants, compositions, and global state of the corpus as well as the frontier model.
+We expect the cost advantage of \WP to extend to cheaper models: for a local model, the
+context \WP adds costs latency rather than money, and a model trained to read \WP output
+should need fewer rounds with the tool.
+
+\Paragraph{Carrying over to prophecies}
+The reverse mapping of Sec.~\ref{sec:reverse} relies on the elimination being
+\emph{path-based}: an eliminated reference is still a path to a location the source can
+name, so the derived predicate has a source-level spelling. A \emph{prophecy}-based
+elimination in the style of RustHorn and Creusot~\cite{RustHorn}, in which a mutable
+reference is a pair of its current value and a prophecy variable for its final value,
+pinned when the borrow ends, has been designed for \MVP but not implemented; it would
+need no borrow paths and would handle borrows through function values, which the
+path-based model cannot. A contract is model-agnostic, so inference could keep running
+on the path-based form regardless. Whether \WP could run on the prophecy form itself
+and still be carried back is open. For a |&mut| parameter the prophecy \emph{is} the
+post-state value and has the spelling |p|; for a reborrow through a function value the
+final value of the borrow has no source-level counterpart at all, and a predicate over it
+would have to be existentially closed or restated through the callee's contract. We do
+not know yet whether that always yields a readable contract.
+
+\Paragraph{Open questions}
+The evaluation leaves the questions of scale open. Its targets are functions, not
+modules; its corpus comes from one codebase; its two models are of one family; and its
+cost measure is dollars under their price schedules. We plan to apply inference to the
+parts of the Aptos framework~\cite{AptosFrameworkBook} that already carry hand-written
+specifications and to compare the inferred contracts with them --- a comparison this
+corpus cannot make, since its targets were selected for having no specification.
+
+\SubSection{Related Work}
+
+Specification inference predates large language models --- Daikon~\cite{DaikonTSE01} learned likely invariants from program traces --- but the techniques that followed stayed tied to particular property classes and source languages, and the advent of LLMs has revived interest in the area.
+Pei et al.~\cite{PeiEtAl23} showed that fine-tuned LLMs can predict program invariants statically at quality competitive with dynamic analysis.
+Kamath et al.~\cite{KamathEtAl23} pair an LLM that \emph{proposes} loop invariants with a symbolic checker that \emph{validates} them, retrying on failure --- a propose-and-validate loop that recurs in much of the subsequent work.
+For Verus, AlphaVerus~\cite{AlphaVerus} bootstraps verified code by self-improving translation with tree search over verifier feedback, and VeriStruct~\cite{VeriStruct26} synthesizes Verus-style specifications and proofs for Rust functions, modules, and data structures through planner-orchestrated phases.
+For smart contracts in Solidity, PropertyGPT~\cite{PropertyGPT25} retrieves human-written Certora properties as input examples for specification generation.
+Most directly related to our work, MSG~\cite{MSG25} targets the same Move specification language through a skill-based agentic design that consumes verifier feedback beyond a binary success/failure verdict.
+Across these systems the LLM remains responsible for the entire specification; the verifier serves as a binary oracle or, in MSG and our setup, as a feedback channel, but never as a contributor of mechanically derived content.
+A separate line of work, exemplified by DafnyPro~\cite{DafnyPro26} and AutoVerus~\cite{AutoVerus25}, tackles the complementary problem of synthesizing the auxiliary proof annotations a verifier needs when the specification is already given. Our plugin can also synthesize proof hints (Sec.~\ref{sec:pow}), but this is not the focus of this paper.
+
+Reference elimination, the transformation underlying our \WP analysis, was introduced in~\cite{DillGPQXZ22}, and equivalents exist for Rust.
+Aeneas~\cite{Aeneas} compiles Rust to a pure functional model in a target prover (Lean, F*, Coq, HOL4) via forward and backward functions, while RustHorn~\cite{RustHorn} encodes a mutable borrow as a pair of its current value and a prophecy for its value at the end of the borrow, reducing verification to constrained Horn clauses.
+Neither infers specifications --- in Aeneas the user writes them in the target prover, against the translated model --- and both consume the reference-free form only in the forward direction.
+Our use of the transformation is the opposite: \WP runs on the reference-free form, and the conditions it derives are carried \emph{back} through the elimination.
+To our knowledge this inversion has not been described before.
+Boogie~\cite{boogie,boogieIVL}, the intermediate verification language that \MVP translates to, also computes weakest preconditions of the procedures it is given~\cite{BL05} and passes them to the SMT solver; the difference is that Boogie's \WP is not intended for external consumption, whereas ours has to be read, which is reflected in the reverse mapping and in the effort spent on simplification.
+
+Two aspects thus distinguish our setup from the work above.
+First, to our knowledge, no prior LLM-based spec-inference system uses a sound mechanical baseline alongside the LLM.
+\WP itself produces a substantial part of the inferred specification --- abort conditions, modifies clauses, and consequence-style postconditions --- so the AI is left only with what \WP cannot recover, and the two streams are validated together by the Move Prover.
+Second, the workflow is delivered as a plugin to a general-purpose, interactive coding agent via skills, edit-time hooks, and an MCP server, rather than as a custom-built tool: the agent participates in the loop and the user can intervene at any point.
+
+\SubSection{Conclusion}
+\label{sec:conclusion}
+
+We have presented a specification inference approach for the Move Prover that runs \WP on reference-eliminated bytecode, where backward propagation is substitution and the derived contracts can be mapped back to the references of the source, and we have combined it with a coding agent that supplies what \WP cannot: loop invariants, simplification, and proof hints. The prover checks both.
+Reference elimination was introduced for verification; this work shows that it serves inference as well, and the approach should carry over to verifiers for Rust-like languages that eliminate references along paths.
+A controlled comparison on 26 targets, 24 of them from public code of the Aptos framework without specifications --- three tactics, four replicates each, two models --- found that a pure agent produces a complete specification in 93--99\% of its cells; that \WP leaves completeness unchanged but lowers the cost by 11--21\%, all of it on targets without loops, where the hybrids cost 36--60\% of the agent alone; and that the mid-tier model costs 53--59\% of the frontier model and falls behind it mainly on one target.
+We expect local and specialized models, for which the additional context costs least, to benefit further from \WP.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

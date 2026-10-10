@@ -976,7 +976,9 @@ impl Bytecode {
                 // write-ref only distorts the value of the reference, but not the pointer itself
                 (add_abort(vec![], aa), vec![(srcs[0], false)])
             },
-            Call(_, dests, Function(..), srcs, aa) => {
+            // A call through a function value modifies the values behind its `&mut`
+            // arguments, like a direct call.
+            Call(_, dests, Function(..) | Invoke, srcs, aa) => {
                 let mut val_targets = vec![];
                 let mut mut_targets = vec![];
                 for src in srcs {
@@ -1570,13 +1572,13 @@ impl fmt::Display for Constant {
             U8(x) => write!(f, "{}", x)?,
             U64(x) => write!(f, "{}", x)?,
             U128(x) => write!(f, "{}", x)?,
-            U256(x) => write!(f, "{}", x)?,
+            U256(x) => write!(f, "{}", move_core_types::int256::U256::from(*x))?,
             I8(x) => write!(f, "{}", x)?,
             I16(x) => write!(f, "{}", x)?,
             I32(x) => write!(f, "{}", x)?,
             I64(x) => write!(f, "{}", x)?,
             I128(x) => write!(f, "{}", x)?,
-            I256(x) => write!(f, "{}", x)?,
+            I256(x) => write!(f, "{}", move_core_types::int256::I256::from(*x))?,
             Address(x) => write!(f, "{}", address_to_string(x))?,
             ByteArray(x) => write!(f, "{:?}", x)?,
             AddressArray(x) => write!(f, "{:?}", x.iter().map(address_to_string).collect_vec())?,

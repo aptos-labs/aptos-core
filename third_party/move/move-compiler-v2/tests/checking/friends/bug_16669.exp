@@ -1,5 +1,5 @@
 // -- Model dump before first bytecode pipeline
-module 0xc0ffee::m {
+module 0xc::m {
     friend inline fun foo(): u64 {
         12
     }
@@ -13,10 +13,10 @@ module 0xc0ffee::m {
     friend entry fun foo_4(): u64 {
         12
     }
-} // end 0xc0ffee::m
+} // end 0xc::m
 
 // -- Sourcified model before first bytecode pipeline
-module 0xc0ffee::m {
+module 0xc::m {
     friend inline fun foo(): u64 {
         12
     }

@@ -1,0 +1,12 @@
+processed 1 task
+task 0 lines 3-9:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LIR-MOVE-RECURSIVE-TYPE: Move nominal fields contain a recursive type definition
+  ┌─ TEMPFILE:6:3
+  │  
+6 │ ╭   struct RecursiveType has Copy, Drop, Store where
+7 │ │     next : RecursiveType
+  │ ╰^
+
+
+exiting with Leaner elaboration errors

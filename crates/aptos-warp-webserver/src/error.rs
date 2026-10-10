@@ -71,7 +71,7 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: {}", self.status_code(), &self.message)?;
+        write!(f, "{}: {}", self.status_code(), self.message)?;
         if let Some(val) = &self.aptos_ledger_version {
             write!(f, "\nAptos ledger version: {}", val)?;
         }

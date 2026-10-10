@@ -11,7 +11,11 @@
 //!
 //! Below are the implemented optimizations (which all retain the control flow behavior):
 //! 1. `StLoc` and `MoveLoc` of the same local `l`: Remove the pair.
-//!    - stack is left unaffected (the top remains the same)
+//!    - the runtime stack is unaffected, but the verifier-visible type can change: `StLoc`
+//!      accepts a value assignable to `l`, while `MoveLoc` pushes `l`'s declared type. For
+//!      function values, the round-trip can erase abilities. Locals used to normalize `Eq`/`Neq`
+//!      operands are "protected" because those instructions require exact operand types. Any new
+//!      consumer with the same requirement must also protect its coercion locals.
 //!    - local `l` would not be accessed again (without a future store), because before
 //!      the transformation, the value in it has been moved from, leaving it invalid.
 //! 2. `CopyLoc` and `StLoc` of the same local `l`: Remove the pair.

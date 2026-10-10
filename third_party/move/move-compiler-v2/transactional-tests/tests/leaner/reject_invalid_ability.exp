@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-12:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LIR-SEMANTIC-ABILITY: in struct InvalidCopy: field type does not satisfy LeanerIR.Ability.copy required by the declaration's LeanerIR.Ability.copy ability
+  ┌─ TEMPFILE:9:5
+  │
+9 │     resource : Resource
+  │     ^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

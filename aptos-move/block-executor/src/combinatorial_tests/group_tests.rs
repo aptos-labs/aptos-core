@@ -13,6 +13,7 @@ use crate::{
     },
     errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
+    single_transaction_executor::LegacyTransactionExecutor,
     task::ExecutorTask,
     txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
@@ -86,7 +87,7 @@ pub(crate) fn run_tests_with_groups(
 
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, MockEvent>,
-            MockTask<KeyType<[u8; 32]>, MockEvent>,
+            LegacyTransactionExecutor<MockTask<KeyType<[u8; 32]>, MockEvent>>,
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<[u8; 32]>, MockEvent>, AuxiliaryInfo>,

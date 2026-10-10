@@ -1,0 +1,259 @@
+{
+  "mutants": {
+    "essential": 2,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-dead-mans-switch-operations-001/mutants.json",
+    "mutants": 2,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-dj3bq7jy/package",
+            "--output",
+            "/tmp/move-inference-mutant-dj3bq7jy/unused.json"
+          ],
+          "duration_ms": 2675,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-dead-mans-switch-operations-001-no-enabled-check",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-dj3bq7jy/package",
+            "--target",
+            "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-dj3bq7jy/prover-report.json"
+          ],
+          "duration_ms": 7887,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-z86vi_0u/package",
+            "--output",
+            "/tmp/move-inference-mutant-z86vi_0u/unused.json"
+          ],
+          "duration_ms": 4395,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-dead-mans-switch-operations-001-returns-when-disabled",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-z86vi_0u/package",
+            "--target",
+            "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-z86vi_0u/prover-report.json"
+          ],
+          "duration_ms": 7929,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-dead-mans-switch-operations-001/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-t7zbwvrr/package",
+            "--output",
+            "/tmp/move-inference-mutant-t7zbwvrr/unused.json"
+          ],
+          "duration_ms": 4529,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-dead-mans-switch-operations-001-enabled-check-always-passes",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-t7zbwvrr/package",
+            "--target",
+            "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-t7zbwvrr/prover-report.json"
+          ],
+          "duration_ms": 6817,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-6eed_ngc/package",
+            "--output",
+            "/tmp/move-inference-mutant-6eed_ngc/unused.json"
+          ],
+          "duration_ms": 2352,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-dead-mans-switch-operations-001-disabled-address-one-proceeds",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-6eed_ngc/package",
+            "--target",
+            "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-6eed_ngc/prover-report.json"
+          ],
+          "duration_ms": 6767,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-ic6zfr0n/package",
+            "--output",
+            "/tmp/move-inference-mutant-ic6zfr0n/unused.json"
+          ],
+          "duration_ms": 4639,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-dead-mans-switch-operations-001-looks-up-address-one",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-ic6zfr0n/package",
+            "--target",
+            "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-ic6zfr0n/prover-report.json"
+          ],
+          "duration_ms": 7210,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::dead_mans_switch_operations::cleanup_expired_bulk_order"
+  }
+}

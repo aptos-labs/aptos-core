@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-11:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LIR-SEMANTIC-BORROW-ESCAPE: a local or Move global loan may escape through a reference-bearing function result
+  ┌─ TEMPFILE:8:3
+  │
+8 │   fun run(addr : Address) -> &u64 := &Counter[addr].value
+  │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

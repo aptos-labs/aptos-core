@@ -1,0 +1,55 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/closure_equality_operand_order.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct DropStore has drop, store {
+        x: u64,
+    }
+    fun lambda_first(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        (|x| with_capture(p0, x)) == p1
+    }
+    public fun with_capture(p0: DropStore, p1: u64): u64 {
+        let DropStore{x: _v0} = p0;
+        _v0 + p1
+    }
+    fun lambda_first_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        (|x| with_capture(p0, x)) != p1
+    }
+    fun lambda_second(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        let _v0: |u64|(u64) has drop = |x| with_capture(p0, x);
+        p1 == _v0
+    }
+    fun lambda_second_neq(p0: DropStore, p1: |u64|(u64) has drop): bool {
+        let _v0: |u64|(u64) has drop = |x| with_capture(p0, x);
+        p1 != _v0
+    }
+    fun main() {
+        let _v0 = DropStore{x: 7};
+        let _v1 = DropStore{x: 7};
+        let _v2: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(lambda_first(_v1, _v2), 0);
+        _v0 = DropStore{x: 7};
+        let _v3 = DropStore{x: 7};
+        let _v4: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(lambda_second(_v3, _v4), 1);
+        _v0 = DropStore{x: 8};
+        let _v5 = DropStore{x: 7};
+        let _v6: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (lambda_first(_v5, _v6)) abort 2;
+        _v0 = DropStore{x: 8};
+        let _v7 = DropStore{x: 7};
+        let _v8: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (lambda_second(_v7, _v8)) abort 3;
+        _v0 = DropStore{x: 7};
+        let _v9 = DropStore{x: 7};
+        let _v10: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        if (lambda_first_neq(_v9, _v10)) abort 4;
+        _v0 = DropStore{x: 8};
+        let _v11 = DropStore{x: 7};
+        let _v12: |u64|u64 has drop + store = |x| with_capture(_v0, x);
+        assert!(lambda_second_neq(_v11, _v12), 5);
+    }
+}
+
+
+//# run 0xc0ffee::m::main

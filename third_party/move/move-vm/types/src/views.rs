@@ -3,7 +3,7 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::delayed_values::delayed_field_id::DelayedFieldID;
+use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::AbstractFunction};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
@@ -139,7 +139,12 @@ pub trait ValueView {
                 Ok(true)
             }
 
-            fn visit_closure(&mut self, _depth: u64, _len: usize) -> PartialVMResult<bool> {
+            fn visit_closure(
+                &mut self,
+                _depth: u64,
+                _fun: &(dyn AbstractFunction + 'static),
+                _len: usize,
+            ) -> PartialVMResult<bool> {
                 self.0 += LEGACY_CLOSURE_SIZE;
                 Ok(true)
             }
@@ -237,7 +242,14 @@ pub trait ValueVisitor {
     fn visit_bool(&mut self, depth: u64, val: bool) -> PartialVMResult<()>;
     fn visit_address(&mut self, depth: u64, val: &AccountAddress) -> PartialVMResult<()>;
     fn visit_struct(&mut self, depth: u64, len: usize) -> PartialVMResult<bool>;
-    fn visit_closure(&mut self, depth: u64, len: usize) -> PartialVMResult<bool>;
+    /// The `'static` bound costs nothing, since `AbstractFunction` requires `for<'a> Tid<'a>`.
+    /// Spelling it out is what lets a visitor call the function's methods.
+    fn visit_closure(
+        &mut self,
+        depth: u64,
+        fun: &(dyn AbstractFunction + 'static),
+        len: usize,
+    ) -> PartialVMResult<bool>;
     fn visit_vec(&mut self, depth: u64, len: usize) -> PartialVMResult<bool>;
     fn visit_ref(&mut self, depth: u64, is_global: bool) -> PartialVMResult<bool>;
 

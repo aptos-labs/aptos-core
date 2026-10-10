@@ -21,7 +21,8 @@ use anyhow::{bail, Context, Result};
 use colored::Colorize;
 use legacy_move_compiler::command_line::DEFAULT_OUTPUT_DIR;
 use move_command_line_common::files::{
-    extension_equals, find_filenames, find_move_filenames, FileHash, MOVE_COMPILED_EXTENSION,
+    extension_equals, find_filenames, is_lean_source, FileHash, MOVE_COMPILED_EXTENSION,
+    MOVE_EXTENSION,
 };
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
@@ -278,7 +279,7 @@ impl ResolvingGraph {
             .dependencies
             .clone()
             .into_iter()
-            .chain(additional_deps.into_iter())
+            .chain(additional_deps)
         {
             if let Some(std_version) = &override_std {
                 if let Some(std_lib) = StdLib::from_package_name(dep_name) {
@@ -645,7 +646,7 @@ impl ResolvingPackage {
                 if other.value != addr_value.value {
                     bail!(
                         "Named address '{}' in dependency '{}' is already set to '{}' but was then reassigned to '{}'",
-                        &addr_name,
+                        addr_name,
                         dep_name,
                         match other.value.take() {
                             None => "unassigned".to_string(),
@@ -768,8 +769,8 @@ impl ResolvedGraph {
 
     pub fn file_sources(&self) -> BTreeMap<FileHash, (Symbol, String)> {
         self.package_table
-            .iter()
-            .flat_map(|(_, rpkg)| {
+            .values()
+            .flat_map(|rpkg| {
                 rpkg.get_sources(&self.build_options)
                     .unwrap()
                     .iter()
@@ -791,10 +792,12 @@ impl ResolvedPackage {
                 .into_iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect::<Vec<_>>();
-        Ok(find_move_filenames(&places_to_look, false)?
-            .into_iter()
-            .map(Symbol::from)
-            .collect())
+        Ok(find_filenames(&places_to_look, |path| {
+            extension_equals(path, MOVE_EXTENSION) || is_lean_source(path)
+        })?
+        .into_iter()
+        .map(Symbol::from)
+        .collect())
     }
 
     pub fn get_bytecodes(&self) -> Result<Vec<FileName>> {

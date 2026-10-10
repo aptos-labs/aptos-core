@@ -34,10 +34,11 @@ use aptos_storage_interface::{DbReader, StateKind};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
     requests::{
-        DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
-        NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        NumberOfStatesRequestV2, StateValuesWithProofRequest, StateValuesWithProofRequestV2,
-        StorageServiceRequest, SubscribeTransactionOutputsWithProofRequest,
+        DataRequest, EpochEndingLedgerInfoRequest, HotStateValuesWithProofRequest,
+        NewTransactionOutputsWithProofRequest, NewTransactionsOrOutputsWithProofRequest,
+        NewTransactionsWithProofRequest, NumberOfStatesRequestV2, StateValuesWithProofRequest,
+        StateValuesWithProofRequestV2, StorageServiceRequest,
+        SubscribeTransactionOutputsWithProofRequest,
         SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
         SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
@@ -52,7 +53,7 @@ use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
+    state_store::{hot_state::HotStateValueChunkWithProof, state_value::StateValueChunkWithProof},
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use arc_swap::ArcSwap;
@@ -1095,6 +1096,33 @@ impl AptosDataClientInterface for AptosDataClient {
                 Ok(response.map(|response| response.state_value_chunk_with_proof))
             },
         }
+    }
+
+    async fn get_number_of_hot_states(
+        &self,
+        version: Version,
+        request_timeout_ms: u64,
+    ) -> crate::error::Result<Response<u64>> {
+        let data_request = DataRequest::GetNumberOfHotStatesAtVersion(version);
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn get_hot_state_values_with_proof(
+        &self,
+        version: u64,
+        start_index: u64,
+        end_index: u64,
+        request_timeout_ms: u64,
+    ) -> crate::error::Result<Response<HotStateValueChunkWithProof>> {
+        let data_request =
+            DataRequest::GetHotStateValuesWithProof(HotStateValuesWithProofRequest {
+                version,
+                start_index,
+                end_index,
+            });
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
     }
 
     async fn get_transaction_outputs_with_proof(

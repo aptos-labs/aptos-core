@@ -3279,6 +3279,114 @@ impl Bytecode {
         self.is_conditional_branch() || self.is_unconditional_branch()
     }
 
+    /// Returns the local this bytecode instruction accesses, if any.
+    pub fn local_index(&self) -> Option<LocalIndex> {
+        use Bytecode::*;
+        match self {
+            CopyLoc(local) | MoveLoc(local) | StLoc(local) | MutBorrowLoc(local)
+            | ImmBorrowLoc(local) => Some(*local),
+            Pop
+            | Ret
+            | BrTrue(..)
+            | BrFalse(..)
+            | Branch(..)
+            | LdU8(..)
+            | LdU16(..)
+            | LdU32(..)
+            | LdU64(..)
+            | LdU128(..)
+            | LdU256(..)
+            | LdI8(..)
+            | LdI16(..)
+            | LdI32(..)
+            | LdI64(..)
+            | LdI128(..)
+            | LdI256(..)
+            | LdConst(..)
+            | LdTrue
+            | LdFalse
+            | CastU8
+            | CastU16
+            | CastU32
+            | CastU64
+            | CastU128
+            | CastU256
+            | CastI8
+            | CastI16
+            | CastI32
+            | CastI64
+            | CastI128
+            | CastI256
+            | Call(..)
+            | CallGeneric(..)
+            | Pack(..)
+            | PackGeneric(..)
+            | PackVariant(..)
+            | PackVariantGeneric(..)
+            | Unpack(..)
+            | UnpackGeneric(..)
+            | UnpackVariant(..)
+            | UnpackVariantGeneric(..)
+            | TestVariant(..)
+            | TestVariantGeneric(..)
+            | ReadRef
+            | WriteRef
+            | FreezeRef
+            | MutBorrowField(..)
+            | MutBorrowVariantField(..)
+            | MutBorrowFieldGeneric(..)
+            | MutBorrowVariantFieldGeneric(..)
+            | ImmBorrowField(..)
+            | ImmBorrowVariantField(..)
+            | ImmBorrowFieldGeneric(..)
+            | ImmBorrowVariantFieldGeneric(..)
+            | MutBorrowGlobal(..)
+            | MutBorrowGlobalGeneric(..)
+            | ImmBorrowGlobal(..)
+            | ImmBorrowGlobalGeneric(..)
+            | Add
+            | Sub
+            | Mul
+            | Mod
+            | Div
+            | BitOr
+            | BitAnd
+            | Xor
+            | Or
+            | And
+            | Not
+            | Negate
+            | Eq
+            | Neq
+            | Lt
+            | Gt
+            | Le
+            | Ge
+            | Shl
+            | Shr
+            | Abort
+            | AbortMsg
+            | Nop
+            | Exists(..)
+            | ExistsGeneric(..)
+            | MoveFrom(..)
+            | MoveFromGeneric(..)
+            | MoveTo(..)
+            | MoveToGeneric(..)
+            | VecPack(..)
+            | VecLen(..)
+            | VecImmBorrow(..)
+            | VecMutBorrow(..)
+            | VecPushBack(..)
+            | VecPopBack(..)
+            | VecUnpack(..)
+            | VecSwap(..)
+            | PackClosure(..)
+            | PackClosureGeneric(..)
+            | CallClosure(..) => None,
+        }
+    }
+
     /// Returns the offset that this bytecode instruction branches to, if any.
     /// Note that return and abort are branch instructions, but have no offset.
     pub fn offset(&self) -> Option<&CodeOffset> {

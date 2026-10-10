@@ -193,7 +193,7 @@ impl ForgeDeployerManager {
     /// Errors are logged and ignored since the resources may not exist.
     async fn cleanup_deployer_resources(&self) {
         let name = self.get_name();
-        info!("Cleaning up pre-existing deployer resources for: {}", &name);
+        info!("Cleaning up pre-existing deployer resources for: {}", name);
 
         let force_delete = DeleteParams {
             grace_period_seconds: Some(0),
@@ -202,27 +202,27 @@ impl ForgeDeployerManager {
 
         // Delete the job first, then the configmap (reverse order of creation)
         match self.jobs_api.delete(&name, &force_delete).await {
-            Ok(_) => info!("Deleted pre-existing deployer job: {}", &name),
+            Ok(_) => info!("Deleted pre-existing deployer job: {}", name),
             Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
-                info!("No pre-existing deployer job found: {}", &name);
+                info!("No pre-existing deployer job found: {}", name);
             },
             Err(e) => {
                 info!(
                     "Failed to delete pre-existing deployer job {}: {:?}. Continuing anyway.",
-                    &name, e
+                    name, e
                 );
             },
         }
 
         match self.config_maps_api.delete(&name, &force_delete).await {
-            Ok(_) => info!("Deleted pre-existing deployer configmap: {}", &name),
+            Ok(_) => info!("Deleted pre-existing deployer configmap: {}", name),
             Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
-                info!("No pre-existing deployer configmap found: {}", &name);
+                info!("No pre-existing deployer configmap found: {}", name);
             },
             Err(e) => {
                 info!(
                     "Failed to delete pre-existing deployer configmap {}: {:?}. Continuing anyway.",
-                    &name, e
+                    name, e
                 );
             },
         }
@@ -273,12 +273,12 @@ impl ForgeDeployerManager {
     async fn ensure_namespace_prepared(&self) -> Result<(), ApiError> {
         info!("Ensuring namespace is prepared");
         let namespace = self.build_namespace();
-        info!("Creating namespace: {}", &namespace.name());
+        info!("Creating namespace: {}", namespace.name());
         maybe_create_k8s_resource(self.namespace_api.clone(), namespace.clone()).await?;
         let service_account = self.build_service_account();
         info!(
             "Creating service account and role binding: {}",
-            &service_account.name()
+            service_account.name()
         );
         maybe_create_k8s_resource(self.serviceaccount_api.clone(), service_account).await?;
         let role_binding = self.build_role_binding();

@@ -1,0 +1,26 @@
+--- a/sources/framework/extracted_sui_derivable_account.move
++++ b/sources/framework/extracted_sui_derivable_account.move
+@@ -22,0 +23,6 @@
++        } spec {
++            invariant len(bytes) == 97;
++            invariant 1 <= i && i <= 65;
++            invariant len(abstract_signature_signature) == i - 1;
++            invariant forall k in 0..i - 1: abstract_signature_signature[k] == bytes[k + 1];
++            invariant len(abstract_signature_public_key) == 0;
+@@ -28,0 +35,7 @@
++        } spec {
++            invariant len(bytes) == 97;
++            invariant 65 <= i && i <= 97;
++            invariant len(abstract_signature_signature) == 64;
++            invariant forall k in 0..64: abstract_signature_signature[k] == bytes[k + 1];
++            invariant len(abstract_signature_public_key) == i - 65;
++            invariant forall k in 0..i - 65: abstract_signature_public_key[k] == bytes[k + 65];
+@@ -31,0 +45,8 @@
++    }
++
++    spec split_signature_bytes {
++        pragma opaque;
++        aborts_if len(bytes) != 97;
++        ensures result_1 == bytes[0];
++        ensures len(result_2) == 64 && (forall k in 0..64: result_2[k] == bytes[k + 1]);
++        ensures len(result_3) == 32 && (forall k in 0..32: result_3[k] == bytes[k + 65]);

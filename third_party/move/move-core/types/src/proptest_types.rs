@@ -4,9 +4,10 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    ability::AbilitySet,
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
     transaction_argument::TransactionArgument,
 };
 use proptest::{collection::vec, prelude::*};
@@ -24,28 +25,56 @@ impl Arbitrary for TypeTag {
             Just(U64),
             Just(U128),
             Just(U256),
+            Just(I8),
+            Just(I16),
+            Just(I32),
+            Just(I64),
+            Just(I128),
+            Just(I256),
             Just(Address),
-            Just(Vector(Box::new(Bool))),
+            Just(Signer),
         ];
         leaf.prop_recursive(
             8,  // levels deep
             16, // max size
             4,  // max number of items per collection
             |inner| {
-                (
-                    any::<AccountAddress>(),
-                    any::<Identifier>(),
-                    any::<Identifier>(),
-                    vec(inner, 0..4),
-                )
-                    .prop_map(|(address, module, name, type_args)| {
-                        Struct(Box::new(StructTag {
-                            address,
-                            module,
-                            name,
-                            type_args,
-                        }))
-                    })
+                let param_or_return = prop_oneof![
+                    inner.clone().prop_map(FunctionParamOrReturnTag::Value),
+                    inner.clone().prop_map(FunctionParamOrReturnTag::Reference),
+                    inner
+                        .clone()
+                        .prop_map(FunctionParamOrReturnTag::MutableReference),
+                ];
+                prop_oneof![
+                    (
+                        any::<AccountAddress>(),
+                        any::<Identifier>(),
+                        any::<Identifier>(),
+                        vec(inner.clone(), 0..4),
+                    )
+                        .prop_map(|(address, module, name, type_args)| {
+                            Struct(Box::new(StructTag {
+                                address,
+                                module,
+                                name,
+                                type_args,
+                            }))
+                        }),
+                    (
+                        vec(param_or_return.clone(), 0..3),
+                        vec(param_or_return, 0..3),
+                        any::<AbilitySet>(),
+                    )
+                        .prop_map(|(args, results, abilities)| {
+                            Function(Box::new(FunctionTag {
+                                args,
+                                results,
+                                abilities,
+                            }))
+                        }),
+                    inner.prop_map(|ty| Vector(Box::new(ty))),
+                ]
             },
         )
         .boxed()

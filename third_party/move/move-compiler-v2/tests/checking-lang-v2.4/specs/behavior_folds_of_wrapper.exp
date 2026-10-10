@@ -1,0 +1,382 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::behavior_folds_of_wrapper {
+    private inline fun each_idx(n: u64,f: |u64|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if spec {
+              invariant Le(i, $t0);
+              invariant folds_of($t1, |j: u64| j, i);
+            }
+            ;
+            Lt<u64>(i, n) {
+              (f)(i);
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Tuple()
+        }
+    }
+    private inline fun each_idx_shifted(n: u64,f: |u64|) {
+        {
+          let (n: u64): (u64) = Tuple(n);
+          {
+            let i: u64 = 0;
+            loop {
+              if spec {
+                invariant true;
+                invariant true;
+              }
+              ;
+              Lt<u64>(i, n) {
+                {
+                  let (x: u64): (u64) = Tuple(i);
+                  (f)(Add<u64>(x, 1))
+                };
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        };
+        Tuple()
+    }
+    private fun sum_shifted(n: u64): u64 {
+        {
+          let sum: u64 = 0;
+          {
+            let (n: u64): (u64) = Tuple(n);
+            {
+              let (n: u64): (u64) = Tuple(n);
+              {
+                let i: u64 = 0;
+                loop {
+                  if spec {
+                    invariant true;
+                    invariant true;
+                  }
+                  ;
+                  Lt<u64>(i, n) {
+                    {
+                      let (x: u64): (u64) = Tuple(i);
+                      {
+                        let (x: u64): (u64) = Tuple(Add<u64>(x, 1));
+                        sum: u64 = Add<u64>(sum, x)
+                      }
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            };
+            Tuple()
+          };
+          sum
+        }
+    }
+} // end 0x42::behavior_folds_of_wrapper
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::behavior_folds_of_wrapper {
+    inline fun each_idx(n: u64, f: |u64|) {
+        let i = 0;
+        while (i < n) {
+            f(i);
+            i = i + 1;
+        } spec {
+            invariant i <= n;
+            invariant folds_of<f>(|j| j, i);
+        };
+    }
+    inline fun each_idx_shifted(n: u64, f: |u64|) {
+        {
+            let n = n;
+            let i = 0;
+            while (i < n) {
+                {
+                    let x = i;
+                    f(x + 1)
+                };
+                i = i + 1;
+            } spec {
+                invariant true;
+                invariant true;
+            };
+        };
+    }
+    fun sum_shifted(n: u64): u64 {
+        let sum = 0;
+        {
+            let n = n;
+            {
+                let n = n;
+                let i = 0;
+                while (i < n) {
+                    {
+                        let x = i;
+                        let x = x + 1;
+                        sum = sum + x
+                    };
+                    i = i + 1;
+                } spec {
+                    invariant true;
+                    invariant true;
+                };
+            };
+        };
+        sum
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun behavior_folds_of_wrapper::sum_shifted($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t2 := 0
+  1: $t3 := infer($t0)
+  2: $t4 := infer($t3)
+  3: $t5 := 0
+  4: label L0
+  5: spec {
+  invariant true;
+  invariant true;
+}
+
+  6: $t7 := infer($t5)
+  7: $t6 := <($t7, $t4)
+  8: if ($t6) goto 9 else goto 23
+  9: label L2
+ 10: $t8 := infer($t5)
+ 11: $t11 := infer($t8)
+ 12: $t12 := 1
+ 13: $t10 := +($t11, $t12)
+ 14: $t9 := infer($t10)
+ 15: $t14 := infer($t2)
+ 16: $t13 := +($t14, $t9)
+ 17: $t2 := infer($t13)
+ 18: $t16 := infer($t5)
+ 19: $t17 := 1
+ 20: $t15 := +($t16, $t17)
+ 21: $t5 := infer($t15)
+ 22: goto 25
+ 23: label L3
+ 24: goto 27
+ 25: label L4
+ 26: goto 4
+ 27: label L1
+ 28: $t1 := infer($t2)
+ 29: return $t1
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::behavior_folds_of_wrapper {
+    private inline fun each_idx(n: u64,f: |u64|) {
+        {
+          let i: u64 = 0;
+          loop {
+            if spec {
+              invariant Le(i, $t0);
+              invariant folds_of($t1, |j: u64| j, i);
+            }
+            ;
+            Lt<u64>(i, n) {
+              (f)(i);
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Tuple()
+        }
+    }
+    private inline fun each_idx_shifted(n: u64,f: |u64|) {
+        {
+          let (n: u64): (u64) = Tuple(n);
+          {
+            let i: u64 = 0;
+            loop {
+              if spec {
+                invariant true;
+                invariant true;
+              }
+              ;
+              Lt<u64>(i, n) {
+                {
+                  let (x: u64): (u64) = Tuple(i);
+                  (f)(Add<u64>(x, 1))
+                };
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        };
+        Tuple()
+    }
+    private fun sum_shifted(n: u64): u64 {
+        {
+          let sum: u64 = 0;
+          {
+            let (n: u64): (u64) = Tuple(n);
+            {
+              let (n: u64): (u64) = Tuple(n);
+              {
+                let i: u64 = 0;
+                loop {
+                  if spec {
+                    invariant true;
+                    invariant true;
+                  }
+                  ;
+                  Lt<u64>(i, n) {
+                    {
+                      let (x: u64): (u64) = Tuple(i);
+                      {
+                        let (x: u64): (u64) = Tuple(Add<u64>(x, 1));
+                        sum: u64 = Add<u64>(sum, x)
+                      }
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              }
+            };
+            Tuple()
+          };
+          sum
+        }
+    }
+} // end 0x42::behavior_folds_of_wrapper
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun behavior_folds_of_wrapper::sum_shifted($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     var $t16: u64
+     var $t17: u64
+  0: $t2 := 0
+  1: $t3 := infer($t0)
+  2: $t4 := infer($t3)
+  3: $t5 := 0
+  4: label L0
+  5: spec {
+  invariant true;
+  invariant true;
+}
+
+  6: $t7 := infer($t5)
+  7: $t6 := <($t7, $t4)
+  8: if ($t6) goto 9 else goto 23
+  9: label L2
+ 10: $t8 := infer($t5)
+ 11: $t11 := infer($t8)
+ 12: $t12 := 1
+ 13: $t10 := +($t11, $t12)
+ 14: $t9 := infer($t10)
+ 15: $t14 := infer($t2)
+ 16: $t13 := +($t14, $t9)
+ 17: $t2 := infer($t13)
+ 18: $t16 := infer($t5)
+ 19: $t17 := 1
+ 20: $t15 := +($t16, $t17)
+ 21: $t5 := infer($t15)
+ 22: goto 25
+ 23: label L3
+ 24: goto 27
+ 25: label L4
+ 26: goto 4
+ 27: label L1
+ 28: $t1 := infer($t2)
+ 29: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x42::behavior_folds_of_wrapper
+// Function definition at index 0
+fun sum_shifted(l0: u64): u64
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    ld_u64 0
+    st_loc l1
+    ld_u64 0
+    st_loc l2
+l1: nop
+    // @5
+    copy_loc l2
+    copy_loc l0
+    lt
+    br_false l0
+    copy_loc l2
+    // @10
+    ld_u64 1
+    add
+    st_loc l3
+    move_loc l1
+    move_loc l3
+    // @15
+    add
+    st_loc l1
+    move_loc l2
+    ld_u64 1
+    add
+    // @20
+    st_loc l2
+    branch l1
+l0: move_loc l1
+    ret
+
+
+============ bytecode verification succeeded ========

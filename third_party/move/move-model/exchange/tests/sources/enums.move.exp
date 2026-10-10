@@ -1,0 +1,114 @@
+{
+  "version": 10,
+  "structs": [
+    {
+      "name": "Choice",
+      "fields": [],
+      "variants": [
+        {"name": "None", "fields": []},
+        {"name": "One", "fields": [{"name": "0", "ty": "u64"}]},
+        {"name": "Pair", "fields": [{"name": "left", "ty": "u64"}, {"name": "right", "ty": "u64"}]}
+      ]
+    }
+  ],
+  "funs": [
+    {
+      "name": "inspect",
+      "params": 1,
+      "locals": [
+        {"enum": 0},
+        {"ref": {"enum": 0}},
+        "u64",
+        "u64",
+        {"ref": {"enum": 0}},
+        {"ref": {"enum": 0}},
+        "bool",
+        {"ref": {"enum": 0}},
+        {"enum": 0},
+        "u64",
+        {"ref": {"enum": 0}},
+        "bool",
+        {"ref": {"enum": 0}},
+        {"enum": 0},
+        "u64",
+        {"ref": {"enum": 0}},
+        "bool",
+        {"enum": 0},
+        "u64",
+        "u64",
+        "u64",
+        "u64",
+        {"enum": 0},
+        {"enum": 0},
+        {"enum": 0}
+      ],
+      "returns": ["u64"],
+      "blocks": [
+        {
+          "instrs": [
+            {"call": [[4], "borrow_loc", [0]]},
+            {"assign": [1, 4]},
+            {"assign": [5, 1]},
+            {"call": [[22], "read_ref", [5]]},
+            {"call": [[6], {"test_variant": 0}, [22]]}
+          ],
+          "term": {"branch": [6, 1, 2]}
+        },
+        {
+          "instrs": [
+            {"assign": [7, 1]},
+            {"assign": [8, 0]},
+            {"call": [[], {"unpack_variant": 0}, [8]]},
+            {"load": [9, {"num": "0"}]}
+          ],
+          "term": {"ret": [9]}
+        },
+        {
+          "instrs": [
+            {"assign": [10, 1]},
+            {"call": [[23], "read_ref", [10]]},
+            {"call": [[11], {"test_variant": 1}, [23]]}
+          ],
+          "term": {"branch": [11, 3, 4]}
+        },
+        {
+          "instrs": [{"assign": [12, 1]}, {"assign": [13, 0]}, {"call": [[14], {"unpack_variant": 1}, [13]]}],
+          "term": {"ret": [14]}
+        },
+        {
+          "instrs": [
+            {"assign": [15, 1]},
+            {"call": [[24], "read_ref", [15]]},
+            {"call": [[16], {"test_variant": 2}, [24]]}
+          ],
+          "term": {"branch": [16, 5, 6]}
+        },
+        {
+          "instrs": [
+            {"assign": [17, 0]},
+            {"call": [[18, 19], {"unpack_variant": 2}, [17]]},
+            {"call": [[20], {"add": "u64"}, [18, 19]]}
+          ],
+          "term": {"ret": [20]}
+        },
+        {"instrs": [{"load": [21, {"num": "14566554180833181697"}]}], "term": {"abort": 21}}
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    },
+    {
+      "name": "make",
+      "params": 1,
+      "locals": ["u64", "u64", {"enum": 0}],
+      "returns": [{"enum": 0}],
+      "blocks": [
+        {
+          "instrs": [{"assign": [1, 0]}, {"call": [[2], {"pack_variant": 1}, [1]]}],
+          "term": {"ret": [2]}
+        }
+      ],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    }
+  ]
+}

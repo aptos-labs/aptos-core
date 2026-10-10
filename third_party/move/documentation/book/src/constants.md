@@ -201,11 +201,12 @@ other expressions, will be added in the future.
 
 Builtin constants are predefined named values which can be used from anywhere in the code. The following constants are supported:
 
-_since language version 2.2_
+`__COMPILE_FOR_TESTING__` is available in all currently supported language versions.
+Its value is `true` when compilation is configured for testing and `false` otherwise.
 
-| Name                            | Value                                                |
-| ------------------------------- | ---------------------------------------------------- |
-| `__COMPILE_FOR_TESTING__: bool` | `true` when compiling unit tests, `false`  otherwise |
+| Name                            | Value                                         |
+| ------------------------------- | --------------------------------------------- |
+| `__COMPILE_FOR_TESTING__: bool` | Whether compilation is configured for testing |
 
 _since language version 2.3_
 

@@ -34,3 +34,4 @@ module 0x66::vec_destroy_empty {
 // RUN: execute 0x66::vec_destroy_empty::destroy_nonempty --args 9
 // CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
 // CHECK-V2-SUBSTR: VecUnpack: expected 0 elements
+// CHECK-ERROR-PARITY

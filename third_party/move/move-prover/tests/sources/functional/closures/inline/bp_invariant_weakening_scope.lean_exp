@@ -1,0 +1,101 @@
+Move prover returns: exiting with verification errors
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:12:42
+   │
+12 │                 invariant forall _j in 0..i: ensures_of<f>(x);
+   │                                              ^^^^^^^^^^^^^^^^
+   ·
+30 │ ╭           apply_both(
+31 │ │ ╭             |a| {
+32 │ │ │                 let i = 0;
+33 │ │ │                 while (i < 1) {
+34 │ │ │                     i = i + 1;
+35 │ │ │                 };
+36 │ │ │                 let _ = a;
+37 │ │ │             },
+   │ │ ╰─────────────' lambda argument
+38 │ │               |a| { let _ = a; } spec { ensures false; },
+39 │ │               x,
+40 │ │           ); // error: the invariant for `g` remains false
+   │ ╰───────────' from a call inlined at this callsite
+
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:13:52
+   │
+13 │                 invariant false && (forall _j in 0..i: ensures_of<f>(x));
+   │                                                        ^^^^^^^^^^^^^^^^
+   ·
+30 │ ╭           apply_both(
+31 │ │ ╭             |a| {
+32 │ │ │                 let i = 0;
+33 │ │ │                 while (i < 1) {
+34 │ │ │                     i = i + 1;
+35 │ │ │                 };
+36 │ │ │                 let _ = a;
+37 │ │ │             },
+   │ │ ╰─────────────' lambda argument
+38 │ │               |a| { let _ = a; } spec { ensures false; },
+39 │ │               x,
+40 │ │           ); // error: the invariant for `g` remains false
+   │ ╰───────────' from a call inlined at this callsite
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25:42
+   │
+25 │             invariant forall _j in 0..i: ensures_of<f>(x);
+   │                                          ^^^^^^^^^^^^^^^^
+   ·
+72 │         apply(|a| uses_generic_type_reflection<T>(a), x);
+   │         ------------------------------------------------
+   │         │     │
+   │         │     lambda argument
+   │         from a call inlined at this callsite
+
+warning: generic type reflection is not yet supported through behavioral predicates; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25:42
+   │
+25 │             invariant forall _j in 0..i: ensures_of<f>(x);
+   │                                          ^^^^^^^^^^^^^^^^
+   ·
+72 │         apply(|a| uses_generic_type_reflection<T>(a), x);
+   │         ------------------------------------------------ from a call inlined at this callsite
+
+warning: cannot derive `ensures_of` exactly for this lambda argument: per-application global pre/post states are not expressible in a loop invariant; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:25:42
+   │
+25 │             invariant forall _j in 0..i: ensures_of<f>(x);
+   │                                          ^^^^^^^^^^^^^^^^
+   ·
+76 │         apply(|a| reflection_in_spec<u64>(a), x);
+   │         ----------------------------------------
+   │         │     │
+   │         │     lambda argument
+   │         from a call inlined at this callsite
+
+warning: the behavior of this lambda argument cannot be determined exactly; weakening loop invariant containing `ensures_of`; see https://github.com/aptos-labs/aptos-core/issues/20371
+   ┌─ tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:44:26
+   │
+44 │             apply_both(|a| f(a), |a| g(a), x);
+   │                              ^
+   ·
+48 │ ╭           forward_both(
+49 │ │ ╭             |a| {
+50 │ │ │                 let i = 0;
+51 │ │ │                 while (i < 1) {
+52 │ │ │                     i = i + 1;
+53 │ │ │                 };
+54 │ │ │                 let _ = a;
+55 │ │ │             },
+   │ │ ╰─────────────' lambda argument
+56 │ │               |a| { let _ = a; } spec { ensures false; },
+57 │ │               x,
+58 │ │           ); // error: nested forwarding weakens only the invariant for `f`
+   │ ╰───────────' from a call inlined at this callsite
+
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:68:9: error: the specification clause `ensures false` is not established
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:66:5: error: leaner verification failed: the automatic verification of `reflection_in_spec` failed; provide a proof: `verify reflection_in_spec by …` in `tests/sources/functional/closures/inline/bp_invariant_weakening_scope.proof.lean` (`verify reflection_in_spec by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:13:13: error: the loop invariant `false && true` is not established at entry
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:29:5: error: leaner verification failed: the automatic verification of `resolved_invariant_is_not_weakened` failed; provide a proof: `verify resolved_invariant_is_not_weakened by …` in `tests/sources/functional/closures/inline/bp_invariant_weakening_scope.proof.lean` (`verify resolved_invariant_is_not_weakened by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:13:13: error: the loop invariant `false && true` is not established at entry
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:47:5: error: leaner verification failed: the automatic verification of `nested_resolved_invariant_is_not_weakened` failed; provide a proof: `verify nested_resolved_invariant_is_not_weakened by …` in `tests/sources/functional/closures/inline/bp_invariant_weakening_scope.proof.lean` (`verify nested_resolved_invariant_is_not_weakened by skip` shows the obligations it leaves)
+tests/sources/functional/closures/inline/bp_invariant_weakening_scope.move:71:5: error: `generic_reflection_invariant_is_weakened` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it

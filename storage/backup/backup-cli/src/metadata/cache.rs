@@ -201,8 +201,7 @@ pub async fn sync_and_load(
                 .err_notes(&cached_file)?
                 .load_metadata_lines()
                 .await
-                .err_notes(&cached_file)?
-                .into_iter(),
+                .err_notes(&cached_file)?,
         )
     }
     info!(

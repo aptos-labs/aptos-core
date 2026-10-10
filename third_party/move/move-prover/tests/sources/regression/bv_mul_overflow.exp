@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/regression/bv_mul_overflow.move:55:5
+   │
+53 │           (x | 0u8) * 129u8
+   │           ----------------- abort happened here with execution failure
+54 │       }
+55 │ ╭     spec multiply_incorrect {
+56 │ │         requires x == 2;
+57 │ │         aborts_if false;
+58 │ │         ensures result <= 255u8;
+59 │ │         ensures result == 2u8;
+60 │ │         ensures result  == (2 * 129);
+61 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/regression/bv_mul_overflow.move:52: multiply_incorrect
+   =     at tests/sources/regression/bv_mul_overflow.move:56: multiply_incorrect (spec)
+   =     at tests/sources/regression/bv_mul_overflow.move:52: multiply_incorrect
+   =         x = <redacted>
+   =     at tests/sources/regression/bv_mul_overflow.move:53: multiply_incorrect
+   =         ABORTED

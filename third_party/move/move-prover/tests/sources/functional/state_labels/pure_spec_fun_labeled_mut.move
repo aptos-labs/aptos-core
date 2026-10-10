@@ -21,6 +21,18 @@ module 0x42::pure_spec_fun_labeled_mut {
         inc(c)
     }
     spec inc_twice {
+        // Negative: starting at 98 ends at 100. The quantified state must
+        // not turn the final-state requirement into an assumption.
+        ensures exists S in *:
+            (..S |~ small(c)) && (S.. |~ small(c));
+    }
+
+    fun inc_twice_small(c: &mut Counter) {
+        inc(c);
+        inc(c)
+    }
+    spec inc_twice_small {
+        requires c.value < 98;
         ensures exists S in *:
             (..S |~ small(c)) && (S.. |~ small(c));
     }

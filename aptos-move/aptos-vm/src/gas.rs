@@ -40,6 +40,7 @@ pub fn make_prod_gas_meter<'a, T: BlockSynchronizationKillSwitch>(
     txn_limits_request: Option<&TxnLimitsRequest>,
     meter_balance: Gas,
     block_synchronization_kill_switch: &'a T,
+    meter_value_nodes_on_deserialize: bool,
 ) -> ProdGasMeter<'a, T> {
     make_prod_gas_meter_impl::<T, StandardMemoryAlgebra>(
         gas_feature_version,
@@ -48,6 +49,7 @@ pub fn make_prod_gas_meter<'a, T: BlockSynchronizationKillSwitch>(
         txn_limits_request,
         meter_balance,
         block_synchronization_kill_switch,
+        meter_value_nodes_on_deserialize,
     )
 }
 
@@ -58,15 +60,19 @@ pub fn make_prod_gas_meter_impl<'a, T: BlockSynchronizationKillSwitch, M: Memory
     txn_limits_request: Option<&TxnLimitsRequest>,
     meter_balance: Gas,
     block_synchronization_kill_switch: &'a T,
+    meter_value_nodes_on_deserialize: bool,
 ) -> MemoryTrackedGasMeterImpl<StandardGasMeter<StandardGasAlgebra<'a, T>>, M> {
-    MemoryTrackedGasMeterImpl::new(StandardGasMeter::new(StandardGasAlgebra::new(
-        gas_feature_version,
-        vm_gas_params,
-        storage_gas_params,
-        txn_limits_request,
-        meter_balance,
-        block_synchronization_kill_switch,
-    )))
+    MemoryTrackedGasMeterImpl::new(StandardGasMeter::new(
+        StandardGasAlgebra::new(
+            gas_feature_version,
+            vm_gas_params,
+            storage_gas_params,
+            txn_limits_request,
+            meter_balance,
+            block_synchronization_kill_switch,
+        ),
+        meter_value_nodes_on_deserialize,
+    ))
 }
 
 pub(crate) fn check_gas(

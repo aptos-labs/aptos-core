@@ -1,4 +1,4 @@
-module 0x42::m {
+module 0x4::m {
 
     fun pure(x: u64): u64 { x + 1 }
 

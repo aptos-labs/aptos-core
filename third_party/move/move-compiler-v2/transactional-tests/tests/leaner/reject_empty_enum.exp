@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-8:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LEANER-ENUM-EMPTY: enum `Empty` declares no variant
+  ┌─ TEMPFILE:6:3
+  │
+6 │   enum Empty has Copy, Drop, Store where
+  │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

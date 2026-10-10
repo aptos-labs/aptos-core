@@ -4,30 +4,61 @@
 //! MonoMove event store → Aptos [`ContractEvent`]s.
 
 use crate::error::OutputError;
-use aptos_types::{contract_event::ContractEvent, event::EventKey};
-use mono_move_core::{
-    native::NativeExtensions, type_tag_of, value_layout::LayoutProvider, VMInternalError, VMResult,
+use aptos_types::{
+    account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
+    contract_event::ContractEvent,
+    event::EventKey,
 };
+use mono_move_core::{type_tag_of, value_layout::LayoutProvider, VMInternalError, VMResult};
 use mono_move_natives::{EventKind, EventStore};
-use mono_move_runtime::serialize;
+use mono_move_runtime::{serialize, SessionEffects};
+
+/// Whether the effects emitted a reconfiguration (new-epoch) event. Only each
+/// event's type is inspected, not its payload, so no value is serialized.
+// TODO(perf): record on event emit or when processing gas cost for storage for all events.
+pub fn has_new_epoch_event(effects: &SessionEffects) -> VMResult<bool> {
+    let store = effects.extension::<EventStore>()?;
+    Ok(store.entries().iter().any(|entry| {
+        type_tag_of(entry.msg_ty).is_some_and(|tag| {
+            tag == *NEW_EPOCH_EVENT_MOVE_TYPE_TAG || tag == *NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG
+        })
+    }))
+}
 
 /// Materializes the emitted events into [`ContractEvent`]s, in emission order.
-/// `layouts` BCS-serializes each event's value.
+/// The effects retain every backing allocation reachable from the event values;
+/// `layouts` must describe those values' interned types.
+//
+// TODO(security): prove at compile time that the execution guard backing
+// `layouts` is held.
+pub fn to_contract_events<L: LayoutProvider + ?Sized>(
+    effects: &SessionEffects,
+    layouts: &L,
+) -> VMResult<Vec<ContractEvent>> {
+    let store = effects.extension::<EventStore>()?;
+
+    // SAFETY: the effects retain their frozen local heap and `layouts` describes
+    // the event values' types; no GC can run after execution.
+    unsafe { to_contract_events_from_store(&store, layouts) }
+}
+
+/// Materializes an [`EventStore`] into [`ContractEvent`]s, in emission order.
 ///
 /// # Safety
 ///
-/// The heap the event values point into must be live.
-pub unsafe fn to_contract_events(
-    extensions: &NativeExtensions,
-    layouts: &impl LayoutProvider,
+/// Every allocation reachable through an entry's `msg_data` must remain live,
+/// `layouts` must describe the entry's interned type, and no GC may run during
+/// serialization.
+pub unsafe fn to_contract_events_from_store<L: LayoutProvider + ?Sized>(
+    store: &EventStore,
+    layouts: &L,
 ) -> VMResult<Vec<ContractEvent>> {
-    let store = extensions.get_mut::<EventStore>()?;
     store
         .entries()
         .iter()
         .map(|entry| {
             let type_tag = type_tag_of(entry.msg_ty).ok_or(OutputError::InvalidEventType)?;
-            // SAFETY: forwarded from this function's contract — the heap is live.
+            // SAFETY: forwarded from this function's contract.
             let data = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }?;
             let event = match &entry.kind {
                 EventKind::V2 => ContractEvent::new_v2(type_tag, data),

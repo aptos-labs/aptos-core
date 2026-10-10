@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "9.5.0"
+version = "9.6.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -312,6 +312,7 @@ dependencies = [
  "aptos-genesis",
  "aptos-github-client",
  "aptos-global-constants",
+ "aptos-governance-bundle",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-processor-sdk",
  "aptos-keygen",
@@ -744,6 +745,11 @@ dependencies = [
  "fail",
  "hashbrown 0.14.3",
  "itertools 0.13.0",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -755,6 +761,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "serde",
  "test-case",
  "triomphe",
 ]
@@ -822,9 +829,14 @@ dependencies = [
  "clap-verbosity-flag",
  "determinator",
  "env_logger",
+ "glob",
  "guppy",
  "log",
  "reqwest 0.11.23",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.7.8",
  "url",
 ]
 
@@ -1292,7 +1304,6 @@ dependencies = [
  "clap 4.5.60",
  "crossbeam-channel",
  "dashmap 7.0.0-rc2",
- "either",
  "hex",
  "indicatif 0.15.0",
  "itertools 0.13.0",
@@ -1361,7 +1372,10 @@ dependencies = [
  "aptos-backup-cli",
  "aptos-backup-service",
  "aptos-block-executor",
+ "aptos-build-info",
+ "aptos-cached-packages",
  "aptos-config",
+ "aptos-crypto",
  "aptos-db",
  "aptos-db-indexer",
  "aptos-executor",
@@ -1377,8 +1391,12 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.60",
  "itertools 0.13.0",
+ "move-binary-format",
+ "move-core-types",
  "rayon",
+ "serde",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -2003,6 +2021,7 @@ dependencies = [
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
+ "aptos-package-builder",
  "aptos-release-bundle",
  "aptos-sdk-builder",
  "aptos-types",
@@ -2234,6 +2253,19 @@ dependencies = [
 [[package]]
 name = "aptos-global-constants"
 version = "0.1.0"
+
+[[package]]
+name = "aptos-governance-bundle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "serde",
+ "sha2 0.9.9",
+ "sha3 0.9.1",
+ "tempfile",
+ "toml 0.7.8",
+]
 
 [[package]]
 name = "aptos-id-generator"
@@ -2954,6 +2986,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-validation"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "ark-bn254",
+ "ark-groth16",
+ "hex",
+ "move-core-types",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "aptos-language-e2e-tests"
 version = "0.1.0"
 dependencies = [
@@ -3192,7 +3237,9 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "clap 4.5.60",
+ "codespan-reporting",
  "colored",
+ "either",
  "futures",
  "hex",
  "itertools 0.13.0",
@@ -3201,6 +3248,7 @@ dependencies = [
  "move-asm",
  "move-binary-format",
  "move-bytecode-source-map",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
@@ -3208,11 +3256,15 @@ dependencies = [
  "move-decompiler",
  "move-linter",
  "move-model",
+ "move-model-exchange",
  "move-package",
+ "move-prover",
  "move-prover-test-utils",
+ "move-stackless-bytecode",
  "move-symbol-pool",
  "move-unit-test",
  "move-vm-runtime",
+ "num 0.4.1",
  "pathsearch",
  "rand 0.7.3",
  "regex",
@@ -3312,6 +3364,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "clap 4.5.60",
+ "mono-move-testsuite",
  "move-model",
  "move-package",
  "move-prover",
@@ -3322,7 +3375,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-move-flow"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
@@ -3340,7 +3393,9 @@ dependencies = [
  "aptos-vm-types",
  "async-trait",
  "clap 4.5.60",
+ "codespan",
  "codespan-reporting",
+ "glob",
  "legacy-move-compiler",
  "log",
  "move-command-line-common",
@@ -3352,6 +3407,7 @@ dependencies = [
  "move-package",
  "move-package-cache",
  "move-prover",
+ "move-prover-bytecode-pipeline",
  "move-prover-test-utils",
  "move-symbol-pool",
  "move-unit-test",
@@ -3363,6 +3419,7 @@ dependencies = [
  "self_update",
  "serde",
  "serde_json",
+ "sha2 0.9.9",
  "tempfile",
  "tera",
  "tokio",
@@ -3417,6 +3474,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "equivalent",
  "fail",
+ "mono-move-runtime",
  "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
@@ -3667,7 +3725,6 @@ dependencies = [
  "aptos-vm-environment",
  "bcs 0.1.4",
  "clap 4.5.60",
- "either",
  "fail",
  "futures",
  "hex",
@@ -3985,21 +4042,27 @@ name = "aptos-release-tool"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-cached-packages",
+ "aptos-cli-common",
+ "aptos-crypto",
+ "aptos-governance-bundle",
+ "aptos-infallible",
+ "aptos-move-cli",
  "aptos-release-builder",
  "aptos-rest-client",
+ "aptos-temppath",
  "aptos-types",
  "chrono",
  "clap 4.5.60",
  "git2 0.16.1",
- "hex",
  "move-command-line-common",
+ "move-core-types",
+ "move-model",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
- "sha2 0.9.9",
  "tempfile",
  "tokio",
- "toml 0.7.8",
  "url",
 ]
 
@@ -4402,10 +4465,12 @@ dependencies = [
 name = "aptos-storage-interface"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.12",
  "anyhow",
  "aptos-config",
  "aptos-crypto",
  "aptos-experimental-layered-map",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
@@ -4550,6 +4615,7 @@ dependencies = [
 name = "aptos-table-natives"
 version = "0.1.0"
 dependencies = [
+ "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-native-interface",
  "aptos-types",
@@ -4920,11 +4986,14 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-crypto-derive",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
  "async-trait",
  "clap 4.5.60",
+ "libsecp256k1",
  "move-binary-format",
  "once_cell",
  "rand 0.7.3",
@@ -4985,6 +5054,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-proptest-helpers",
  "arbitrary",
+ "ark-bls12-381 0.5.0",
  "ark-bn254",
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -5018,6 +5088,8 @@ dependencies = [
  "move-core-types",
  "move-model",
  "move-table-extension",
+ "move-value-view",
+ "move-value-view-derive",
  "move-vm-types",
  "num-bigint 0.3.3",
  "num-derive",
@@ -5116,27 +5188,26 @@ dependencies = [
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
- "aptos-crypto-derive",
  "aptos-experimental-runtimes",
  "aptos-framework-natives",
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-keygen",
+ "aptos-keyless-validation",
  "aptos-language-e2e-tests",
  "aptos-logger",
  "aptos-memory-usage-tracker",
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-native-interface",
+ "aptos-position-natives",
  "aptos-table-natives",
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "ark-bn254",
- "ark-groth16",
  "bcs 0.1.4",
  "bytes",
  "claims",
@@ -5144,7 +5215,6 @@ dependencies = [
  "derive_more 0.99.17",
  "fail",
  "futures",
- "hex",
  "itertools 0.13.0",
  "move-binary-format",
  "move-core-types",
@@ -5471,7 +5541,7 @@ dependencies = [
 [[package]]
 name = "ark-ec"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ahash 0.8.12",
  "ark-ff 0.5.0",
@@ -5512,7 +5582,7 @@ dependencies = [
 [[package]]
 name = "ark-ff"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ark-ff-asm 0.5.0",
  "ark-ff-macros 0.5.0",
@@ -5542,7 +5612,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-asm"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "quote",
  "syn 2.0.87",
@@ -5564,7 +5634,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-macros"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
@@ -5605,7 +5675,7 @@ dependencies = [
 [[package]]
 name = "ark-poly"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ahash 0.8.12",
  "ark-ff 0.5.0",
@@ -5644,7 +5714,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "ark-serialize-derive 0.5.0",
  "ark-std 0.5.0",
@@ -5668,7 +5738,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize-derive"
 version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#b45bdf545601033902fda7df90c185d2161e66f1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8889,6 +8959,7 @@ dependencies = [
  "rstest",
  "serde",
  "sha3 0.9.1",
+ "tempfile",
  "test-case",
  "thousands",
  "tokio",
@@ -9461,9 +9532,9 @@ dependencies = [
 
 [[package]]
 name = "ethnum"
-version = "1.5.2"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca81e6b4777c89fd810c25a4be2b1bd93ea034fbe58e6a75216a34c6b82c539b"
+checksum = "40404c3f5f511ec4da6fe866ddf6a717c309fdbb69fbbad7b0f3edab8f2e835f"
 dependencies = [
  "serde",
 ]
@@ -12882,15 +12953,68 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-aptos-state-view-providers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "fxhash",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "mono-move-aptos-transaction-executor"
+version = "0.1.0"
+dependencies = [
+ "aptos-cached-packages",
+ "aptos-crypto",
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-keyless-validation",
+ "aptos-language-e2e-tests",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "aptos-vm-environment",
+ "bcs 0.1.4",
+ "bytes",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-natives",
+ "mono-move-output",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-value-view",
+ "serde",
+ "shared-dsa",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-types",
  "bitflags 2.11.0",
  "bytes",
  "fxhash",
  "mono-move-alloc",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "shared-dsa",
  "smallvec",
@@ -12903,6 +13027,7 @@ version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
+ "aptos-types",
  "boxcar",
  "dashmap 7.0.0-rc2",
  "fxhash",
@@ -12911,8 +13036,32 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
+ "sha3 0.9.1",
  "shared-dsa",
  "specializer",
+]
+
+[[package]]
+name = "mono-move-lean-link"
+version = "0.1.0"
+dependencies = [
+ "aptos-move-stdlib",
+ "bytes",
+ "codespan-reporting",
+ "legacy-move-compiler",
+ "mono-move-aptos-transaction-executor",
+ "mono-move-core",
+ "mono-move-global-context",
+ "mono-move-loader",
+ "mono-move-runtime",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -12923,6 +13072,8 @@ dependencies = [
  "mono-move-core",
  "mono-move-global-context",
  "mono-move-testsuite",
+ "move-binary-format",
+ "move-bytecode-verifier",
  "move-core-types",
  "shared-dsa",
  "specializer",
@@ -12933,11 +13084,28 @@ dependencies = [
 name = "mono-move-natives"
 version = "0.1.0"
 dependencies = [
+ "aptos-crypto",
+ "aptos-types",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "bcs 0.1.4",
  "blake2-rfc",
+ "bulletproofs",
+ "byteorder",
+ "curve25519-dalek-ng",
  "libsecp256k1",
+ "merlin",
  "mono-move-core",
  "move-core-types",
+ "num-traits",
+ "once_cell",
+ "rand_core 0.5.1",
  "ripemd",
+ "sha2 0.10.9",
  "sha2 0.9.9",
  "sha3 0.9.1",
  "siphasher 0.3.11",
@@ -12962,9 +13130,12 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "mono-move-core",
+ "mono-move-loader",
  "mono-move-natives",
  "mono-move-runtime",
+ "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "thiserror 1.0.69",
 ]
 
@@ -12973,30 +13144,24 @@ name = "mono-move-replay-benchmark"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-block-executor",
  "aptos-cached-packages",
- "aptos-framework-natives",
+ "aptos-logger",
  "aptos-move-debugger",
  "aptos-rest-client",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
+ "aptos-vm-logging",
  "aptos-vm-types",
  "bcs 0.1.4",
- "bytes",
  "clap 4.5.60",
- "mono-move-core",
+ "mono-move-aptos-state-view-providers",
+ "mono-move-aptos-transaction-executor",
  "mono-move-global-context",
- "mono-move-loader",
- "mono-move-natives",
- "mono-move-output",
- "mono-move-runtime",
  "mono-move-testsuite",
  "move-binary-format",
  "move-core-types",
- "move-vm-runtime",
- "move-vm-types",
- "serde",
  "tokio",
  "url",
 ]
@@ -13006,7 +13171,6 @@ name = "mono-move-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-types",
  "bcs 0.1.4",
  "hashbrown 0.14.3",
  "mono-move-alloc",
@@ -13014,11 +13178,14 @@ dependencies = [
  "mono-move-global-context",
  "mono-move-loader",
  "move-core-types",
- "num-bigint 0.3.3",
+ "move-value-view",
+ "move-value-view-derive",
+ "num 0.4.1",
  "paste",
  "proptest",
  "rand 0.7.3",
  "serde",
+ "shared-dsa",
  "thiserror 1.0.69",
 ]
 
@@ -13027,6 +13194,7 @@ name = "mono-move-testsuite"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-framework",
  "aptos-framework-natives",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
@@ -13044,14 +13212,19 @@ dependencies = [
  "mono-move-global-context",
  "mono-move-loader",
  "mono-move-natives",
+ "mono-move-output",
  "mono-move-runtime",
  "move-asm",
  "move-binary-format",
+ "move-bytecode-verifier",
+ "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
  "move-model",
  "move-package",
  "move-prover-test-utils",
+ "move-transactional-test-matrix",
+ "move-transactional-test-runner",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
@@ -13246,6 +13419,7 @@ dependencies = [
  "move-core-types",
  "move-ir-types",
  "move-model",
+ "move-model-exchange",
  "move-prover-test-utils",
  "move-stackless-bytecode",
  "move-stdlib",
@@ -13254,6 +13428,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.6.5",
  "serde_json",
+ "tempfile",
  "walkdir",
 ]
 
@@ -13265,7 +13440,7 @@ dependencies = [
  "itertools 0.13.0",
  "libtest-mimic",
  "move-compiler-v2",
- "move-model",
+ "move-transactional-test-matrix",
  "move-transactional-test-runner",
  "walkdir",
 ]
@@ -13321,14 +13496,12 @@ dependencies = [
  "anyhow",
  "bcs 0.1.4",
  "clap 4.5.60",
- "codespan",
  "codespan-reporting",
  "datatest-stable",
  "libtest-mimic",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
- "move-command-line-common",
  "move-compiler-v2",
  "move-model",
  "move-prover-test-utils",
@@ -13420,8 +13593,24 @@ dependencies = [
  "num 0.4.1",
  "num-traits",
  "once_cell",
+ "petgraph 0.6.5",
  "regex",
  "serde",
+]
+
+[[package]]
+name = "move-model-exchange"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-move-cli",
+ "datatest-stable",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -13527,6 +13716,7 @@ dependencies = [
  "move-command-line-common",
  "move-compiler-v2",
  "move-model",
+ "move-model-exchange",
  "move-package",
  "move-prover-boogie-backend",
  "move-prover-bytecode-pipeline",
@@ -13559,10 +13749,11 @@ dependencies = [
  "move-model",
  "move-prover-bytecode-pipeline",
  "move-stackless-bytecode",
+ "nix 0.29.0",
  "num 0.4.1",
  "once_cell",
+ "petgraph 0.6.5",
  "pretty",
- "rand 0.7.3",
  "regex",
  "serde",
  "tera",
@@ -13737,6 +13928,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-transactional-test-matrix"
+version = "0.1.0"
+dependencies = [
+ "move-bytecode-verifier",
+ "move-command-line-common",
+ "move-compiler-v2",
+ "move-model",
+ "move-transactional-test-runner",
+ "move-vm-runtime",
+ "walkdir",
+]
+
+[[package]]
 name = "move-transactional-test-runner"
 version = "0.1.0"
 dependencies = [
@@ -13744,6 +13948,7 @@ dependencies = [
  "aptos-framework",
  "arbitrary",
  "bcs 0.1.4",
+ "bytes",
  "clap 4.5.60",
  "datatest-stable",
  "dearbitrary",
@@ -13752,6 +13957,7 @@ dependencies = [
  "legacy-move-compiler",
  "move-asm",
  "move-binary-format",
+ "move-bytecode-utils",
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler-v2",
@@ -13766,6 +13972,7 @@ dependencies = [
  "move-vm-types",
  "once_cell",
  "regex",
+ "smallvec",
  "tempfile",
  "tera",
  "termcolor",
@@ -13805,6 +14012,22 @@ dependencies = [
  "regex",
  "tempfile",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "move-value-view"
+version = "0.1.0"
+dependencies = [
+ "move-core-types",
+]
+
+[[package]]
+name = "move-value-view-derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -13905,12 +14128,8 @@ dependencies = [
  "datatest-stable",
  "fail",
  "libtest-mimic",
- "move-bytecode-verifier",
- "move-model",
+ "move-transactional-test-matrix",
  "move-transactional-test-runner",
- "move-vm-runtime",
- "once_cell",
- "walkdir",
 ]
 
 [[package]]
@@ -18467,6 +18686,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
+ "aptos-governance-bundle",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",

@@ -12,7 +12,10 @@ use move_core_types::{
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
 use parking_lot::RwLock;
-use std::hash::{Hash, Hasher};
+use std::{
+    hash::{Hash, Hasher},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 struct PseudoGasContext {
     // Parameters for metering type tag construction:
@@ -62,6 +65,70 @@ impl PseudoGasContext {
             Ok(())
         }
     }
+}
+
+/// Returns the pseudo-gas cost of an already-built type tag. Must stay in sync with the formula
+/// [PseudoGasContext] applies while a tag is constructed from a runtime type.
+///
+/// Unlike tag construction, this does not enforce `type_max_cost`. Tags read back from storage
+/// were not necessarily built under the current limit, so failing here would reject values that
+/// are already stored. Costs saturate instead. The traversal is iterative because such a tag can
+/// also be nested more deeply than construction would allow.
+pub(crate) fn ty_tag_pseudo_gas_cost(ty_tag: &TypeTag, vm_config: &VMConfig) -> u64 {
+    let cost_base = vm_config.type_base_cost;
+    let cost_per_byte = vm_config.type_byte_cost;
+
+    let mut cost = 0u64;
+    let mut worklist = vec![ty_tag];
+
+    while let Some(ty_tag) = worklist.pop() {
+        cost = cost.saturating_add(cost_base);
+
+        match ty_tag {
+            TypeTag::Bool
+            | TypeTag::U8
+            | TypeTag::U16
+            | TypeTag::U32
+            | TypeTag::U64
+            | TypeTag::U128
+            | TypeTag::U256
+            | TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256
+            | TypeTag::Address
+            | TypeTag::Signer => {},
+
+            TypeTag::Vector(elem_ty_tag) => worklist.push(elem_ty_tag),
+
+            TypeTag::Struct(struct_tag) => {
+                let num_bytes = (struct_tag.address.len()
+                    + struct_tag.module.len()
+                    + struct_tag.name.len()) as u64;
+                cost = cost.saturating_add(num_bytes.saturating_mul(cost_per_byte));
+                worklist.extend(struct_tag.type_args.iter());
+            },
+
+            TypeTag::Function(fun_tag) => {
+                let FunctionTag {
+                    args,
+                    results,
+                    abilities: _,
+                } = fun_tag.as_ref();
+                // A reference wrapper is not a node of its own: tag construction charges the base
+                // cost for the type it wraps, not for the wrapper.
+                worklist.extend(args.iter().chain(results).map(|tag| match tag {
+                    FunctionParamOrReturnTag::Value(ty_tag)
+                    | FunctionParamOrReturnTag::Reference(ty_tag)
+                    | FunctionParamOrReturnTag::MutableReference(ty_tag) => ty_tag,
+                }));
+            },
+        }
+    }
+
+    cost
 }
 
 /// Key type for [TypeTagCache] that corresponds to a fully-instantiated struct.
@@ -115,6 +182,21 @@ impl Hash for StructKeyRef<'_> {
     }
 }
 
+/// The maximum sum of pseudo-gas costs of all entries in [TypeTagCache], past which the cache is
+/// flushed. A cached tag occupies roughly 3 bytes per unit of cost, counting the key, the tag
+/// itself and the hash table overhead, so this allows around 800 Mb of tags. That is of the same
+/// order as the limit on the size of the module cache.
+///
+/// The value is sized for normal traffic. A typical entry, such as the tag of
+/// `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`, costs around 300, so this fits around 900k
+/// of them, which is well above any realistic working set. So in practice the cache is never full
+/// and never flushed.
+///
+/// The limit exists to bound memory, and an adversary with enough memory can always reach it. In
+/// that case the cache is flushed and rebuilt, which only costs the time to construct the tags
+/// again: the result of executing a transaction stays the same.
+const MAX_TOTAL_PSEUDO_GAS_COST: u64 = 256 * 1024 * 1024;
+
 /// An entry in [TypeTagCache] that also stores a "cost" of the tag. The cost is proportional to
 /// the size of the tag, which includes the number of inner nodes and the sum of the sizes in bytes
 /// of addresses and identifiers.
@@ -151,24 +233,60 @@ pub(crate) struct PricedStructTag {
 /// fixed type parameters used by thread 3.
 pub struct TypeTagCache {
     cache: RwLock<HashMap<StructKey, PricedStructTag>>,
+    /// Sum of pseudo-gas costs of all cached entries, used to bound the size of the cache. The
+    /// pseudo-gas cost of a tag is proportional to the memory it occupies, so this is a better
+    /// proxy for the size of the cache than the number of entries, which vary widely in size.
+    ///
+    /// Only ever modified while holding the write lock on `cache` above, which keeps the two in
+    /// sync without any additional synchronization.
+    total_pseudo_gas_cost: AtomicU64,
+    /// Value of `total_pseudo_gas_cost` past which the cache is flushed.
+    max_total_pseudo_gas_cost: u64,
 }
 
 impl TypeTagCache {
     /// Creates a new empty cache without any entries.
     pub(crate) fn empty() -> Self {
+        Self::new(MAX_TOTAL_PSEUDO_GAS_COST)
+    }
+
+    /// Creates a new empty cache that is flushed once the sum of the pseudo-gas costs of its
+    /// entries exceeds the specified maximum.
+    pub(crate) fn new(max_total_pseudo_gas_cost: u64) -> Self {
         Self {
             cache: RwLock::new(HashMap::new()),
+            total_pseudo_gas_cost: AtomicU64::new(0),
+            max_total_pseudo_gas_cost,
         }
     }
 
     /// Removes all entries from the cache.
+    ///
+    /// Safe to do at any point, including while other threads are executing. This cache is a leaf:
+    /// it stores indices into the struct name cache, but no other cache stores anything derived
+    /// from it, and reads of it return clones. So the only cost of flushing is that the tags have
+    /// to be constructed again. Construction is metered identically whether the tag is cached or
+    /// not, so flushing cannot change the result of executing a transaction.
     pub(crate) fn flush(&self) {
-        self.cache.write().clear();
+        self.flush_locked(&mut self.cache.write());
+    }
+
+    /// Same as [Self::flush], but for callers that already hold the write lock.
+    fn flush_locked(&self, cache: &mut HashMap<StructKey, PricedStructTag>) {
+        // Replace the map instead of clearing it: clearing drops the entries but keeps the table's
+        // allocated slots, which for a full cache is the larger part of the memory.
+        *cache = HashMap::new();
+        self.total_pseudo_gas_cost.store(0, Ordering::Relaxed);
     }
 
     /// Returns the number of entries in the cache.
     pub fn len(&self) -> usize {
         self.cache.read().len()
+    }
+
+    /// Returns the sum of pseudo-gas costs of all cached entries.
+    pub(crate) fn total_pseudo_gas_cost(&self) -> u64 {
+        self.total_pseudo_gas_cost.load(Ordering::Relaxed)
     }
 
     /// Returns cached struct tag and its pseudo-gas cost if it exists, and [None] otherwise.
@@ -205,12 +323,25 @@ impl TypeTagCache {
             ty_args: ty_args.to_vec(),
         };
         let priced_struct_tag = priced_struct_tag.clone();
+        let pseudo_gas_cost = priced_struct_tag.pseudo_gas_cost;
 
         // Otherwise, we need to insert. We did the clones outside the lock, and also avoid the
         // double insertion.
         let mut cache = self.cache.write();
+
+        // Flush before inserting, so that the tag that has just been built survives. See the
+        // maximum above for why this is rare enough not to matter.
+        let total_pseudo_gas_cost = self.total_pseudo_gas_cost();
+        if total_pseudo_gas_cost.saturating_add(pseudo_gas_cost) > self.max_total_pseudo_gas_cost {
+            self.flush_locked(&mut cache);
+        }
+
         if let Entry::Vacant(entry) = cache.entry(key) {
             entry.insert(priced_struct_tag);
+            // The cost must be accounted here, and not next to the early return above: that check
+            // runs without the write lock, so multiple threads can observe the entry as missing.
+            self.total_pseudo_gas_cost
+                .fetch_add(pseudo_gas_cost, Ordering::Relaxed);
             true
         } else {
             false
@@ -479,8 +610,64 @@ mod tests {
     }
 
     #[test]
+    fn test_type_tag_cache_total_pseudo_gas_cost() {
+        let cache = TypeTagCache::empty();
+        assert_eq!(cache.total_pseudo_gas_cost(), 0);
+
+        let foo_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
+            pseudo_gas_cost: 10,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &foo_tag));
+        assert_eq!(cache.total_pseudo_gas_cost(), 10);
+
+        let bar_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Bar").unwrap(),
+            pseudo_gas_cost: 32,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(1), &[], &bar_tag));
+        assert_eq!(cache.total_pseudo_gas_cost(), 42);
+
+        // Inserting an entry that is already cached does not change the total.
+        assert!(!cache.insert_struct_tag(&StructNameIndex::new(1), &[], &bar_tag));
+        assert_eq!(cache.total_pseudo_gas_cost(), 42);
+
+        cache.flush();
+        assert_eq!(cache.len(), 0);
+        assert_eq!(cache.total_pseudo_gas_cost(), 0);
+    }
+
+    #[test]
+    fn test_type_tag_cache_flushes_when_full() {
+        let cache = TypeTagCache::new(50);
+
+        let foo_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Foo").unwrap(),
+            pseudo_gas_cost: 30,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(0), &[], &foo_tag));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.total_pseudo_gas_cost(), 30);
+
+        // Does not fit, so the cache is flushed first and only the new entry remains.
+        let bar_tag = PricedStructTag {
+            struct_tag: StructTag::from_str("0x1::foo::Bar").unwrap(),
+            pseudo_gas_cost: 25,
+        };
+        assert!(cache.insert_struct_tag(&StructNameIndex::new(1), &[], &bar_tag));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.total_pseudo_gas_cost(), 25);
+        assert!(cache
+            .get_struct_tag(&StructNameIndex::new(0), &[])
+            .is_none());
+        assert!(cache
+            .get_struct_tag(&StructNameIndex::new(1), &[])
+            .is_some());
+    }
+
+    #[test]
     fn test_ty_to_ty_tag() {
-        let ty_builder = TypeBuilder::with_limits(10, 10, true, true);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
@@ -577,7 +764,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag_too_complex() {
-        let ty_builder = TypeBuilder::with_limits(10, 10, true, true);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
 
         let vm_config = VMConfig {
             type_base_cost: 1,
@@ -657,5 +844,146 @@ mod tests {
         ));
         assert_eq!(err.major_status(), StatusCode::TYPE_TAG_LIMIT_EXCEEDED);
         assert_none!(runtime_environment.ty_tag_cache().get_struct_tag(&idx, &[]));
+    }
+
+    #[test]
+    fn test_ty_tag_cost_is_the_same_on_cache_hit_and_miss() {
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
+
+        let vm_config = VMConfig {
+            type_base_cost: 3,
+            type_byte_cost: 2,
+            type_max_cost: u64::MAX,
+            ..VMConfig::default_for_test()
+        };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
+
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let idx = runtime_environment
+            .struct_name_index_map()
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Foo").unwrap(),
+            ))
+            .unwrap();
+
+        let u8_ty = ty_builder.create_u8_ty();
+        let ty_args = [ty_builder.create_vec_ty(&u8_ty).unwrap()];
+
+        // Cache miss: the cost is charged incrementally while the tag is constructed.
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+        let tag_on_miss = assert_ok!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &ty_args,
+            &mut gas_context
+        ));
+        let cost_on_miss = gas_context.current_cost();
+        assert!(cost_on_miss > 0);
+
+        // Cache hit: the full cost is charged at once, and has to be the same as above. Flushing
+        // the cache is only safe as long as this holds.
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+        let tag_on_hit = assert_ok!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &ty_args,
+            &mut gas_context
+        ));
+        assert_eq!(gas_context.current_cost(), cost_on_miss);
+        assert_eq!(tag_on_hit, tag_on_miss);
+
+        // The same holds after the cache has actually been flushed.
+        runtime_environment.ty_tag_cache().flush();
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 0);
+        assert_eq!(
+            runtime_environment.ty_tag_cache().total_pseudo_gas_cost(),
+            0
+        );
+
+        let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+        let tag_after_flush = assert_ok!(ty_tag_converter.struct_name_idx_to_struct_tag_impl(
+            &idx,
+            &ty_args,
+            &mut gas_context
+        ));
+        assert_eq!(gas_context.current_cost(), cost_on_miss);
+        assert_eq!(tag_after_flush, tag_on_miss);
+    }
+
+    #[test]
+    fn test_ty_tag_pseudo_gas_cost_matches_tag_construction() {
+        let ty_builder = TypeBuilder::with_limits(10, 10, true, true, true);
+
+        let vm_config = VMConfig {
+            type_base_cost: 3,
+            type_byte_cost: 2,
+            type_max_cost: u64::MAX,
+            ..VMConfig::default_for_test()
+        };
+        let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
+        let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
+
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let idx = runtime_environment
+            .struct_name_index_map()
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Foo").unwrap(),
+            ))
+            .unwrap();
+        let struct_ty = StructType {
+            idx,
+            layout: StructLayout::Single(vec![(
+                Identifier::new("field").unwrap(),
+                Type::TyParam(0),
+            )]),
+            phantom_ty_params_mask: Default::default(),
+            abilities: AbilitySet::EMPTY,
+            ty_params: vec![StructTypeParameter {
+                constraints: AbilitySet::EMPTY,
+                is_phantom: false,
+            }],
+        };
+
+        let u8_ty = ty_builder.create_u8_ty();
+        let vec_u8_ty = ty_builder.create_vec_ty(&u8_ty).unwrap();
+        let generic_struct_ty = ty_builder
+            .create_struct_instantiation_ty(
+                &struct_ty,
+                &[Type::TyParam(0)],
+                std::slice::from_ref(&vec_u8_ty),
+            )
+            .unwrap();
+
+        let tys = [
+            ty_builder.create_bool_ty(),
+            vec_u8_ty.clone(),
+            ty_builder.create_vec_ty(&vec_u8_ty).unwrap(),
+            generic_struct_ty.clone(),
+            ty_builder.create_vec_ty(&generic_struct_ty).unwrap(),
+            Type::Function {
+                args: vec![
+                    ty_builder.create_ref_ty(&generic_struct_ty, false).unwrap(),
+                    ty_builder.create_ref_ty(&u8_ty, true).unwrap(),
+                    vec_u8_ty,
+                ],
+                results: vec![generic_struct_ty],
+                abilities: AbilitySet::EMPTY,
+            },
+        ];
+
+        for ty in tys {
+            let mut gas_context = PseudoGasContext::new(runtime_environment.vm_config());
+            let ty_tag = assert_ok!(ty_tag_converter.ty_to_ty_tag_impl(&ty, &mut gas_context));
+
+            assert_eq!(
+                ty_tag_pseudo_gas_cost(&ty_tag, runtime_environment.vm_config()),
+                gas_context.current_cost(),
+                "cost mismatch for {:?}",
+                ty_tag
+            );
+        }
     }
 }

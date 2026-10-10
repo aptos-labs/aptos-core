@@ -6,16 +6,16 @@ fun identity(r0): u64 {
     r0: u64
   code:
   L0:
-    0: ret [r0]
+    0: ret [r0] @1
 }
 
 fun caller(): u64 {
   slots: params(0), locals(0), temps(0), transfer(1)
   code:
   L0:
-    0: x0 := ld_u64 10
-    1: [x0] := call identity, [x0]
-    2: ret [x0]
+    0: x0 := ld_u64 10 @0
+    1: [x0] := call identity, [x0] @1
+    2: ret [x0] @2
 }
 === micro-ops ===
 // module 0x66::test
@@ -24,15 +24,15 @@ fun identity() {
   frame_data_size: 8
   entry_gas: 54
   code:
-    0: Return
+    0: Return @1
 }
 
 fun caller() {
   frame_data_size: 8
   entry_gas: 92
   code:
-    0: StoreImm8 [32] <- #10
-    1: CallIndirect 0x66::test::identity
-    2: Move8 [0] <- [32]
-    3: Return
+    0: StoreImm8 [32] <- #10 @0
+    1: CallIndirect 0x66::test::identity @1
+    2: Move8 [0] <- [32] @2
+    3: Return @2
 }

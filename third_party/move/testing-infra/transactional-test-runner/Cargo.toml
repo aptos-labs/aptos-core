@@ -16,11 +16,13 @@ fuzzing = ["arbitrary", "dearbitrary", "aptos-framework", "bcs"]
 [dependencies]
 anyhow = { workspace = true }
 aptos-framework = { workspace = true, optional = true }
+bytes = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 either = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true, features = ["testing"] }
+move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
@@ -35,6 +37,7 @@ move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
+smallvec = { workspace = true }
 tempfile = { workspace = true }
 tera = { workspace = true }
 termcolor = { workspace = true }
@@ -51,3 +54,6 @@ difference = { workspace = true }
 [[test]]
 name = "tests"
 harness = false
+
+[[test]]
+name = "baseline_target"

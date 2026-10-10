@@ -1,0 +1,32 @@
+{
+  "version": 10,
+  "structs": [],
+  "funs": [
+    {
+      "name": "id",
+      "params": 1,
+      "locals": ["u64", "u64"],
+      "returns": ["u64"],
+      "blocks": [{"instrs": [{"assign": [1, 0]}], "term": {"ret": [1]}}],
+      "loops": [],
+      "spec": {
+        "requires": [],
+        "aborts_if": [],
+        "ensures": [
+          {"binop": ["eq", {"result": 0}, {"local": 0}]},
+          {
+            "quant": [
+              "all",
+              "u64",
+              {
+                "binop": ["lt", {"bvar": 0}, {"binop": ["add", {"bvar": 0}, {"value": {"num": "1"}}]}]
+              }
+            ]
+          },
+          {"quant": ["ex", "u64", {"binop": ["eq", {"bvar": 0}, {"result": 0}]}]}
+        ],
+        "modifies": []
+      }
+    }
+  ]
+}

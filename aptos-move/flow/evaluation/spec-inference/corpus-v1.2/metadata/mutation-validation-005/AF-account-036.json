@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-account-036/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-k9xnm679/package",
+            "--output",
+            "/tmp/move-inference-mutant-k9xnm679/unused.json"
+          ],
+          "duration_ms": 3967,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-account-036-no-account-check",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-k9xnm679/package",
+            "--target",
+            "0x1::account::revoke_any_signer_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-k9xnm679/prover-report.json"
+          ],
+          "duration_ms": 6158,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-bd9rq4or/package",
+            "--output",
+            "/tmp/move-inference-mutant-bd9rq4or/unused.json"
+          ],
+          "duration_ms": 3202,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-account-036-skip-when-none",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-bd9rq4or/package",
+            "--target",
+            "0x1::account::revoke_any_signer_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-bd9rq4or/prover-report.json"
+          ],
+          "duration_ms": 5778,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-pgejgtdp/package",
+            "--output",
+            "/tmp/move-inference-mutant-pgejgtdp/unused.json"
+          ],
+          "duration_ms": 3492,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-account-036-read-instead-of-extract",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-pgejgtdp/package",
+            "--target",
+            "0x1::account::revoke_any_signer_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-pgejgtdp/prover-report.json"
+          ],
+          "duration_ms": 5576,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::account::revoke_any_signer_capability"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-account-036/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-x5te5758/package",
+            "--output",
+            "/tmp/move-inference-mutant-x5te5758/unused.json"
+          ],
+          "duration_ms": 3894,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-account-036-refill-after-extract",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-x5te5758/package",
+            "--target",
+            "0x1::account::revoke_any_signer_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-x5te5758/prover-report.json"
+          ],
+          "duration_ms": 6134,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-damn722v/package",
+            "--output",
+            "/tmp/move-inference-mutant-damn722v/unused.json"
+          ],
+          "duration_ms": 3265,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-account-036-extra-abort-on-fresh-account",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-damn722v/package",
+            "--target",
+            "0x1::account::revoke_any_signer_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-damn722v/prover-report.json"
+          ],
+          "duration_ms": 5726,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-_s2onpzx/package",
+            "--output",
+            "/tmp/move-inference-mutant-_s2onpzx/unused.json"
+          ],
+          "duration_ms": 3510,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-account-036-clear-only-fresh-accounts",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-_s2onpzx/package",
+            "--target",
+            "0x1::account::revoke_any_signer_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-_s2onpzx/prover-report.json"
+          ],
+          "duration_ms": 7075,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::account::revoke_any_signer_capability"
+  }
+}

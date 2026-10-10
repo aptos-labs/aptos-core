@@ -34,6 +34,9 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
     fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering>;
     fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>>;
     fn to_canonical_string(&self) -> String;
+    /// Deliberately has no default, so that a new implementation has to make a choice instead of
+    /// silently reporting no cost.
+    fn ty_args_pseudo_gas_cost(&self) -> u64;
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
@@ -328,6 +331,10 @@ pub(crate) mod mock {
                 self.data.fun_id,
                 ty_args_str
             )
+        }
+
+        fn ty_args_pseudo_gas_cost(&self) -> u64 {
+            0
         }
     }
 }

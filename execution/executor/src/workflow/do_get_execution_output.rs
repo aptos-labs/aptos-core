@@ -4,6 +4,7 @@
 use crate::{
     metrics,
     metrics::{EXECUTOR_ERRORS, OTHER_TIMERS},
+    workflow::do_positions::DoPositions,
 };
 use anyhow::{anyhow, ensure, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
@@ -24,6 +25,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
+    positions::PositionParent,
     state::LedgerState,
     state_view::cached_state_view::{CachedStateView, PrimingPolicy},
 };
@@ -61,6 +63,7 @@ impl DoGetExecutionOutput {
         transactions: ExecutableTransactions,
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -72,6 +75,7 @@ impl DoGetExecutionOutput {
                     txns,
                     auxiliary_infos,
                     parent_state,
+                    parent_positions,
                     state_view,
                     onchain_config,
                     transaction_slice_metadata,
@@ -82,6 +86,7 @@ impl DoGetExecutionOutput {
                 txns,
                 auxiliary_infos,
                 parent_state,
+                parent_positions,
                 state_view,
                 onchain_config,
                 transaction_slice_metadata.append_state_checkpoint_to_block(),
@@ -108,6 +113,7 @@ impl DoGetExecutionOutput {
         transactions: Vec<SignatureVerifiedTransaction>,
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
@@ -145,28 +151,6 @@ impl DoGetExecutionOutput {
             auxiliary_infos.push(block_epilogue_aux_info);
         }
 
-        // Manually create hotness write sets for block epilogue transaction(s), based on the block
-        // end info saved. Note that even if we are re-executing transactions during a state sync,
-        // the block end info is not re-computed and has to come from the previous execution.
-        //
-        // If the input transactions are from a normal block, the last one should be the epilogue.
-        // If they are from a chunk (i.e. we are re-executing transactions during state sync), then
-        // there could be zero or more block epilogue transactions, and we need to handle all of
-        // them.
-        //
-        // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
-        // but we need to figure out how to properly construct `VMOutput` from block end info.
-        for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
-            if let Transaction::BlockEpilogue(payload) = transaction {
-                assert!(output.status().is_kept(), "Block epilogue must be kept");
-                output.add_hotness(
-                    payload
-                        .try_get_keys_to_make_hot()
-                        .cloned()
-                        .unwrap_or_default(),
-                );
-            }
-        }
         if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
@@ -177,6 +161,7 @@ impl DoGetExecutionOutput {
             .transaction_outputs(transaction_outputs)
             .auxiliary_infos(auxiliary_infos)
             .parent_state(parent_state)
+            .maybe_parent_positions(parent_positions)
             .base_state_view(state_view)
             .prime_state_cache(false)
             .is_block(
@@ -194,6 +179,7 @@ impl DoGetExecutionOutput {
         transactions: PartitionedTransactions,
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
@@ -226,6 +212,7 @@ impl DoGetExecutionOutput {
             .transaction_outputs(transaction_outputs)
             .auxiliary_infos(auxiliary_infos)
             .parent_state(parent_state)
+            .maybe_parent_positions(parent_positions)
             .base_state_view(state_view)
             .prime_state_cache(false)
             .is_block(append_state_checkpoint_to_block.is_some())
@@ -246,6 +233,7 @@ impl DoGetExecutionOutput {
         transaction_outputs: Vec<TransactionOutput>,
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ExecutionOutput> {
@@ -255,6 +243,7 @@ impl DoGetExecutionOutput {
             .transaction_outputs(transaction_outputs)
             .auxiliary_infos(auxiliary_infos)
             .parent_state(parent_state)
+            .maybe_parent_positions(parent_positions)
             .base_state_view(state_view)
             .prime_state_cache(true)
             .is_block(false)
@@ -373,6 +362,7 @@ impl Parser {
         mut transaction_outputs: Vec<TransactionOutput>,
         auxiliary_infos: Vec<AuxiliaryInfo>,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         base_state_view: CachedStateView,
         prime_state_cache: bool,
         is_block: bool,
@@ -452,6 +442,9 @@ impl Parser {
             base_state_view.memorized_reads(),
         )?;
         let state_reads = base_state_view.into_memorized_reads();
+        // Beside `result_state`: same inputs, same chaining off the parent,
+        // and the same split at the inner state checkpoint.
+        let positions = DoPositions::run(&to_commit, first_version, parent_positions)?;
 
         let out = ExecutionOutput::builder()
             .is_block(is_block)
@@ -461,6 +454,7 @@ impl Parser {
             .to_discard(to_discard)
             .to_retry(to_retry)
             .result_state(result_state)
+            .maybe_positions(positions)
             .state_reads(state_reads)
             .hot_state_updates(hot_state_updates)
             .maybe_block_end_info(block_end_info)

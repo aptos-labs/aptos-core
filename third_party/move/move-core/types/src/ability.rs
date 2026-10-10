@@ -119,6 +119,11 @@ impl AbilitySet {
     pub const VECTOR: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
 
+    /// Returns whether this set can describe a function value.
+    pub fn is_valid_for_function_type(self) -> bool {
+        self.is_subset(Self::PUBLIC_FUNCTIONS)
+    }
+
     /// Create a representation as a display postfix if the ability set is not empty.
     pub fn display_postfix(&self) -> String {
         if self.is_empty() {
@@ -334,6 +339,9 @@ impl fmt::Debug for AbilitySet {
     }
 }
 
+// This proptest strategy covers only defined ability sets. The derived
+// `arbitrary` implementation covers all 256 raw bytes, including encodings
+// rejected by `from_u8`.
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for AbilitySet {
     type Parameters = ();

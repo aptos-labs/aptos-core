@@ -40,8 +40,8 @@ module 0x42::shadowed_behavior_pred {
         pragma verify = false;
         let set_value = 0u64; // shadows the function 'set_value'
         pragma opaque = true;
-        ensures [inferred] ensures_of<0x42::shadowed_behavior_pred::set_value>(s, v, s);
-        aborts_if [inferred] aborts_of<0x42::shadowed_behavior_pred::set_value>(s, v);
+        ensures [inferred] ensures_of<0x42::shadowed_behavior_pred::set_value>(old(s), v, s);
+        aborts_if [inferred] false;
     }
 }
 /*

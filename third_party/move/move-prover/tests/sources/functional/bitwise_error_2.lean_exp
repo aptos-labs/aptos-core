@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/bitwise_error_2.move:1:1: error: a storage clause names a type that is not a resource

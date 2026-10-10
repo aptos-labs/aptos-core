@@ -1,0 +1,20 @@
+--- a/sources/etna/extracted_deviation.move
++++ b/sources/etna/extracted_deviation.move
+@@ -28,0 +29,17 @@ module decibel_dex::extracted_deviation {
++
++    spec calculate_deviation_bps {
++        pragma opaque;
++        // A zero price is a sentinel, not an abort: the contract must say the
++        // function returns rather than fails on the degenerate input.
++        aborts_if [inferred] price1 != 0 && price2 != 0
++            && abs_diff_value(price1, price2) * 10000 / price1 > MAX_U64;
++        ensures [inferred] price1 == 0 || price2 == 0 ==> result == MAX_U64;
++        ensures [inferred] price1 != 0 && price2 != 0 ==> result
++            == abs_diff_value(price1, price2) * 10000 / price1;
++    }
++
++    spec module {
++        fun abs_diff_value(x: num, y: num): num {
++            if (x > y) { x - y } else { y - x }
++        }
++    }

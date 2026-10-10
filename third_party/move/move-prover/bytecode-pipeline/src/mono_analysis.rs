@@ -30,17 +30,23 @@ use move_model::{
         INTRINSIC_FUN_MAP_SPEC_ABORTS_UPSERT_ALL, INTRINSIC_FUN_MAP_SPEC_DEL,
         INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
-        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
-        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_SET,
-        INTRINSIC_FUN_MAP_TO_ORDERED_MAP, INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT,
-        INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
+        INTRINSIC_FUN_MAP_SPEC_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+        INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID, INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+        INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW, INTRINSIC_FUN_MAP_SPEC_RANK,
+        INTRINSIC_FUN_MAP_SPEC_SET, INTRINSIC_FUN_MAP_TO_ORDERED_MAP,
+        INTRINSIC_FUN_MAP_TO_VEC_PAIR, INTRINSIC_FUN_MAP_UPSERT, INTRINSIC_TYPE_MAP,
+        INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
     },
+    spec_derivation,
     symbol::Symbol,
-    ty::{NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext, Variance},
+    ty::{
+        NoUnificationContext, PrimitiveType, ReferenceKind, Substitution, Type, TypeDisplayContext,
+        Variance, WideningOrder,
+    },
     ty_invariant_analysis::{TypeInstantiationDerivation, TypeUnificationAdapter},
     well_known::{
-        TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE, TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE,
-        TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
+        OBJECT_SPEC_EXISTS_AT, TYPE_INFO_MOVE, TYPE_INFO_SPEC, TYPE_NAME_GET_MOVE,
+        TYPE_NAME_GET_SPEC, TYPE_NAME_MOVE, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT,
     },
 };
 use move_stackless_bytecode::{
@@ -55,12 +61,69 @@ use std::{
     rc::Rc,
 };
 
+/// Maximum number of aliasing cases verified for one function; exceeding it is an error.
+const MAX_ALIASING_INSTANCES: usize = 256;
+
+/// The type parameters occurring in `tys`, in order of first occurrence.
+pub fn type_params_in_order(tys: &[Type]) -> Vec<u16> {
+    let mut order = vec![];
+    for ty in tys {
+        ty.visit(&mut |t| {
+            if let Type::TypeParameter(idx) = t {
+                if !order.contains(idx) {
+                    order.push(*idx);
+                }
+            }
+        });
+    }
+    order
+}
+
+/// Renames the type parameters of an aliasing instantiation in order of first occurrence, so
+/// that instantiations describing the same case compare equal.
+fn canonical_aliasing_inst(inst: &[Type], arity: usize) -> Vec<Type> {
+    let renaming = Type::type_param_map_to_inst(
+        arity,
+        type_params_in_order(inst)
+            .into_iter()
+            .enumerate()
+            .map(|(new, old)| (old, Type::new_param(new)))
+            .collect(),
+    );
+    inst.iter().map(|t| t.instantiate(&renaming)).collect()
+}
+
+/// Maps `Var(i)` to `TypeParameter(i)`.
+fn vars_to_type_params(ty: &Type) -> Type {
+    match ty {
+        Type::Var(i) => Type::TypeParameter(*i as u16),
+        Type::Vector(et) => Type::Vector(Box::new(vars_to_type_params(et))),
+        Type::Struct(mid, sid, inst) => {
+            Type::Struct(*mid, *sid, inst.iter().map(vars_to_type_params).collect())
+        },
+        Type::Tuple(ts) => Type::Tuple(ts.iter().map(vars_to_type_params).collect()),
+        Type::Reference(kind, bt) => Type::Reference(*kind, Box::new(vars_to_type_params(bt))),
+        Type::Fun(params, results, abilities) => Type::Fun(
+            Box::new(vars_to_type_params(params)),
+            Box::new(vars_to_type_params(results)),
+            *abilities,
+        ),
+        Type::TypeDomain(bt) => Type::TypeDomain(Box::new(vars_to_type_params(bt))),
+        Type::Primitive(_)
+        | Type::TypeParameter(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error => ty.clone(),
+    }
+}
+
 /// The environment extension computed by this analysis.
 #[derive(Clone, Default, Debug)]
 pub struct MonoInfo {
     pub structs: BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
     pub funs: BTreeMap<(QualifiedId<FunId>, FunctionVariant), BTreeSet<Vec<Type>>>,
     pub spec_funs: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<Vec<Type>>>,
+    pub move_equality_congruence_spec_funs: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub spec_vars: BTreeMap<QualifiedId<SpecVarId>, BTreeSet<Vec<Type>>>,
     pub type_params: BTreeSet<u16>,
     pub vec_inst: BTreeSet<Type>,
@@ -76,13 +139,34 @@ pub struct MonoInfo {
     /// A map from function types used in the program to the closures appearing in
     /// code constructing values of this function type.
     pub fun_infos: BTreeMap<Type, BTreeSet<ClosureInfo>>,
+    /// Function types used by a behavioral predicate in the analyzed program.
+    pub behavioral_fun_types: BTreeSet<Type>,
+    /// Function types invoked dynamically in the analyzed program.
+    pub applied_fun_types: BTreeSet<Type>,
     /// A map from function types to function-typed parameters of verification target functions.
     /// This enables the Boogie backend to generate parameter variants in the function type datatype.
     pub fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
-    /// A map from function types to struct fields containing storable function values.
+    /// A map from function types to struct fields containing function values.
     /// This enables the Boogie backend to generate struct field variants in the function type
     /// datatype with uninterpreted behavioral predicates.
     pub fun_struct_field_infos: BTreeMap<Type, BTreeSet<StructFieldInfo>>,
+    /// Semantic slice for the selected verification root. Concrete struct
+    /// instances localize validity and equality definitions in the Boogie backend.
+    pub root_slices: BTreeMap<VerificationRoot, MonoSlice>,
+}
+
+/// A concrete verification entry point emitted by the Boogie backend.
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct VerificationRoot {
+    pub fun: QualifiedId<FunId>,
+    pub variant: FunctionVariant,
+    pub inst: Vec<Type>,
+}
+
+/// Semantic instances reachable from one verification root.
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+pub struct MonoSlice {
+    pub structs: BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
 }
 
 impl MonoInfo {
@@ -122,7 +206,7 @@ pub struct FunParamInfo {
     pub param_sym: Symbol,
 }
 
-/// Information about a struct field that has a storable function type.
+/// Information about a struct field that has a function type.
 /// This is used to track function-valued fields in structs so the Boogie backend
 /// can generate appropriate datatype variants with uninterpreted behavioral predicates.
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -144,6 +228,58 @@ pub struct MonoAnalysisProcessor();
 impl MonoAnalysisProcessor {
     pub fn new() -> Box<Self> {
         Box::new(Self())
+    }
+
+    /// Compute monomorphization information for one already-transformed
+    /// verification root without replacing the package-wide environment
+    /// extension.
+    pub fn analyze_for_root(
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+        root: VerificationRoot,
+    ) -> MonoInfo {
+        Self::compute(env, targets, Some(root))
+    }
+
+    fn compute(
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+        root: Option<VerificationRoot>,
+    ) -> MonoInfo {
+        let mut analyzer = Analyzer {
+            env,
+            targets,
+            info: MonoInfo::default(),
+            todo_funs: vec![],
+            done_funs: BTreeSet::new(),
+            todo_spec_funs: vec![],
+            done_spec_funs: BTreeSet::new(),
+            done_function_specs: BTreeSet::new(),
+            done_types: BTreeSet::new(),
+            inst_opt: None,
+            current_node: None,
+            node_deps: BTreeMap::new(),
+            node_types: BTreeMap::new(),
+            selected_root: root,
+        };
+        // Analyze axioms found in modules.
+        for module_env in env.get_modules() {
+            for axiom in module_env.get_spec().filter_kind_axiom() {
+                analyzer.analyze_exp(&axiom.exp)
+            }
+        }
+        analyzer.analyze_funs();
+        analyzer.register_intrinsic_associated_types();
+        if analyzer.selected_root.is_some() {
+            analyzer.info.root_slices = analyzer.compute_root_slices();
+        }
+        let Analyzer {
+            mut info,
+            done_types,
+            ..
+        } = analyzer;
+        info.all_types = done_types;
+        info
     }
 }
 
@@ -222,6 +358,23 @@ impl FunctionTargetProcessor for MonoAnalysisProcessor {
             }
             writeln!(f, "}}")?;
         }
+        for (root, slice) in &info.root_slices {
+            let fname = env.get_function(root.fun).get_full_name_str();
+            writeln!(
+                f,
+                "root {} [{}] <{}> = {{",
+                fname,
+                root.variant,
+                display_inst(&root.inst)
+            )?;
+            for (sid, insts) in &slice.structs {
+                let sname = env.get_struct(*sid).get_full_name_str();
+                for inst in insts {
+                    writeln!(f, "  {}<{}>", sname, display_inst(inst))?;
+                }
+            }
+            writeln!(f, "}}")?;
+        }
 
         Ok(())
     }
@@ -232,35 +385,7 @@ impl FunctionTargetProcessor for MonoAnalysisProcessor {
 
 impl MonoAnalysisProcessor {
     fn analyze<'a>(&self, env: &'a GlobalEnv, targets: &'a FunctionTargetsHolder) {
-        let mut analyzer = Analyzer {
-            env,
-            targets,
-            info: MonoInfo::default(),
-            todo_funs: vec![],
-            done_funs: BTreeSet::new(),
-            todo_spec_funs: vec![],
-            done_spec_funs: BTreeSet::new(),
-            done_types: BTreeSet::new(),
-            inst_opt: None,
-        };
-        // Analyze axioms found in modules.
-        for module_env in env.get_modules() {
-            for axiom in module_env.get_spec().filter_kind_axiom() {
-                analyzer.analyze_exp(&axiom.exp)
-            }
-        }
-        // Analyze functions
-        analyzer.analyze_funs();
-        // Intrinsic role templates build values of types no Move source references
-        // directly (e.g. `Option<V>` from `map_upsert`); register them explicitly.
-        analyzer.register_intrinsic_associated_types();
-        let Analyzer {
-            mut info,
-            done_types,
-            ..
-        } = analyzer;
-        info.all_types = done_types;
-        env.set_extension(info);
+        env.set_extension(Self::compute(env, targets, None));
     }
 }
 
@@ -272,12 +397,23 @@ struct Analyzer<'a> {
     done_funs: BTreeSet<(QualifiedId<FunId>, FunctionVariant, Vec<Type>)>,
     todo_spec_funs: Vec<(QualifiedId<SpecFunId>, Vec<Type>)>,
     done_spec_funs: BTreeSet<(QualifiedId<SpecFunId>, Vec<Type>)>,
+    done_function_specs: BTreeSet<QualifiedInstId<FunId>>,
     done_types: BTreeSet<Type>,
     inst_opt: Option<Vec<Type>>,
+    current_node: Option<MonoNode>,
+    node_deps: BTreeMap<MonoNode, BTreeSet<MonoNode>>,
+    node_types: BTreeMap<MonoNode, BTreeSet<Type>>,
+    selected_root: Option<VerificationRoot>,
+}
+
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+enum MonoNode {
+    Fun(QualifiedId<FunId>, FunctionVariant, Vec<Type>),
+    SpecFun(QualifiedId<SpecFunId>, Vec<Type>),
 }
 
 /// Locate the `0x1::option::Option` struct. Pinned to `0x1` because the backend
-/// hard-codes `$1_option_*` Boogie symbols.
+/// hard-codes `$1.option.*` Boogie symbols.
 fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
     let option_module_sym = env.symbol_pool().make("option");
     let option_struct_sym = env.symbol_pool().make("Option");
@@ -294,7 +430,7 @@ fn find_option_struct(env: &GlobalEnv) -> Option<QualifiedId<StructId>> {
 }
 
 /// Locate the `0x1::cmp` module. Pinned to `0x1` because the backend hard-codes
-/// `$1_cmp_*` Boogie symbols.
+/// `$1.cmp.*` Boogie symbols.
 fn find_cmp_module(env: &GlobalEnv) -> Option<ModuleId> {
     let cmp_sym = env.symbol_pool().make("cmp");
     let std_addr = Address::Numerical(AccountAddress::ONE);
@@ -442,24 +578,23 @@ impl Analyzer<'_> {
                 } else if let Some(Type::Struct(mid, sid, inst)) =
                     param_tys.first().map(|ty| ty.skip_reference())
                 {
-                    // The fabricated `Iter<K>` instantiation assumes the
-                    // iterator enum has exactly one type parameter; visiting
-                    // a fabricated instance of a wider enum would index its
-                    // argument list out of bounds. Report a diagnostic for a
-                    // malformed binding instead of crashing.
-                    if self
+                    // The fabricated instantiation mirrors the enum's own arity:
+                    // a keyed iterator is `Iter<K>`, a position-based one is
+                    // unparameterized. Anything wider would index its argument
+                    // list out of bounds, so reject it with a diagnostic rather
+                    // than crashing.
+                    let iter_ty_params = self
                         .env
                         .get_struct(mid.qualified(*sid))
                         .get_type_parameters()
-                        .len()
-                        != 1
-                    {
+                        .len();
+                    if iter_ty_params > 1 {
                         self.env.error(
                             &fun_env.get_loc(),
                             "the iterator enum of a `map_iter_borrow_mut` function must \
-                             have exactly one type parameter (the key type)",
+                             have at most one type parameter (the key type)",
                         );
-                    } else if inst.first() != Some(&Type::TypeParameter(0)) {
+                    } else if iter_ty_params == 1 && inst.first() != Some(&Type::TypeParameter(0)) {
                         // The template hardcodes the map instance's key type
                         // for the iterator parameter; a binding instantiated
                         // with anything but the function's first (key) type
@@ -503,10 +638,14 @@ impl Analyzer<'_> {
                              function's type parameters) and return a mutable reference \
                              to the value type parameter",
                         );
-                    } else {
+                    } else if iter_ty_params == 1 {
                         for (k, _v) in ty_args.iter() {
                             iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![k.clone()]));
                         }
+                    } else {
+                        // Unparameterized iterator: one instance covers every
+                        // map instance.
+                        iter_ptr_to_register.push(Type::Struct(*mid, *sid, vec![]));
                     }
                 }
             }
@@ -576,7 +715,7 @@ impl Analyzer<'_> {
                 let v = || Type::TypeParameter(1);
                 let num = || Type::Primitive(PrimitiveType::Num);
                 let boolean = || Type::Primitive(PrimitiveType::Bool);
-                let fixed_sigs: [(&str, Vec<Type>, Type, &str); 11] = [
+                let fixed_sigs: [(&str, Vec<Type>, Type, &str); 13] = [
                     (
                         INTRINSIC_FUN_MAP_SPEC_NEW,
                         vec![],
@@ -588,6 +727,18 @@ impl Analyzer<'_> {
                         vec![map_ty()],
                         num(),
                         "(map<K, V>): num",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                        vec![map_ty(), num()],
+                        k(),
+                        "(map<K, V>, num): K",
+                    ),
+                    (
+                        INTRINSIC_FUN_MAP_SPEC_RANK,
+                        vec![map_ty(), k()],
+                        num(),
+                        "(map<K, V>, K): num",
                     ),
                     (
                         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY,
@@ -761,9 +912,25 @@ impl Analyzer<'_> {
             // key type parameter; anything else would emit ill-typed Boogie.
             // Register the iterator enum's instances eagerly: the template
             // references them per map instance.
-            for role in [
-                INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
-                INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+            // The validity predicates answer a yes/no question about a walker;
+            // the leaf offset answers where it sits. Same parameter shape, so
+            // the expected result type travels with the role.
+            for (role, expected_result, result_name) in [
+                (
+                    INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
+                    Type::Primitive(PrimitiveType::Bool),
+                    "bool",
+                ),
+                (
+                    INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                    Type::Primitive(PrimitiveType::Bool),
+                    "bool",
+                ),
+                (
+                    INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
+                    Type::Primitive(PrimitiveType::Num),
+                    "num",
+                ),
             ] {
                 let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
                     continue;
@@ -784,16 +951,16 @@ impl Analyzer<'_> {
                     || sf.params.len() != 2
                     || !iter_ok
                     || sf.params[1].1 != expected_map
-                    || sf.result_type != Type::Primitive(PrimitiveType::Bool)
+                    || sf.result_type != expected_result
                 {
                     self.env.error(
                         &sf.loc,
                         &format!(
                             "a `{}` function must have two type parameters and the \
-                             signature (iterator_enum, map<K, V>): bool, with the \
+                             signature (iterator_enum, map<K, V>): {}, with the \
                              iterator enum either unparameterized or instantiated \
                              with the key type parameter",
-                            role
+                            role, result_name
                         ),
                     );
                     continue;
@@ -847,12 +1014,15 @@ impl Analyzer<'_> {
                 INTRINSIC_FUN_MAP_SPEC_GET,
                 INTRINSIC_FUN_MAP_SPEC_SET,
                 INTRINSIC_FUN_MAP_SPEC_DEL,
+                INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                INTRINSIC_FUN_MAP_SPEC_RANK,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
                 INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
                 INTRINSIC_FUN_MAP_SPEC_ITER_VALID,
                 INTRINSIC_FUN_MAP_SPEC_LEAF_ITER_VALID,
+                INTRINSIC_FUN_MAP_SPEC_LEAF_OFFSET,
                 INTRINSIC_FUN_MAP_SPEC_ITER_PRESERVED,
             ] {
                 let Some(sf_qid) = decl.lookup_spec_fun(self.env, role) else {
@@ -867,6 +1037,41 @@ impl Analyzer<'_> {
                             "a `{}` binding must be a `spec native fun`; \
                              its definition is provided by the intrinsic model",
                             role
+                        ),
+                    );
+                }
+            }
+            // The enumeration roles define each other: the template emits both
+            // declarations or neither, since `key_at`'s axioms are stated
+            // through `rank` and vice versa. Binding only one would pass the
+            // per-role checks above and then reach Boogie as a call to a
+            // function that was never declared, so require the pair.
+            {
+                let key_at = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_KEY_AT);
+                let rank = decl.lookup_spec_fun(self.env, INTRINSIC_FUN_MAP_SPEC_RANK);
+                let missing = match (key_at, rank) {
+                    (Some(qid), None) => Some((
+                        qid,
+                        INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                        INTRINSIC_FUN_MAP_SPEC_RANK,
+                    )),
+                    (None, Some(qid)) => Some((
+                        qid,
+                        INTRINSIC_FUN_MAP_SPEC_RANK,
+                        INTRINSIC_FUN_MAP_SPEC_KEY_AT,
+                    )),
+                    _ => None,
+                };
+                if let Some((sf_qid, bound_role, absent_role)) = missing {
+                    let module_env = self.env.get_module(sf_qid.module_id);
+                    let sf = module_env.get_spec_fun(sf_qid.id);
+                    self.env.error(
+                        &sf.loc,
+                        &format!(
+                            "`{}` is bound but `{}` is not; the two must be bound \
+                             together, since the intrinsic model defines each \
+                             through the other",
+                            bound_role, absent_role
                         ),
                     );
                 }
@@ -976,10 +1181,7 @@ impl Analyzer<'_> {
             }
         }
         if let Some(option_qid) = option_qid {
-            for ty in option_v_to_register
-                .into_iter()
-                .chain(option_k_to_register.into_iter())
-            {
+            for ty in option_v_to_register.into_iter().chain(option_k_to_register) {
                 self.add_type(&Type::Struct(option_qid.module_id, option_qid.id, vec![ty]));
             }
         }
@@ -1113,22 +1315,26 @@ impl Analyzer<'_> {
     fn analyze_funs(&mut self) {
         // Analyze top-level, verified functions. Any functions they call will be queued
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
-        for module in self.env.get_modules() {
-            for fun in module.get_functions() {
-                if fun.is_not_prover_target() {
-                    continue;
-                }
-                for (variant, target) in self.targets.get_targets(&fun) {
-                    if !variant.is_verified() {
+        if let Some(root) = self.selected_root.clone() {
+            let fun = self.env.get_function(root.fun);
+            let target = self.targets.get_target(&fun, &root.variant);
+            self.analyze_verification_root(root, target);
+        } else {
+            for module in self.env.get_modules() {
+                for fun in module.get_functions() {
+                    if fun.is_not_prover_target() {
                         continue;
                     }
-                    self.analyze_fun(target.clone());
-
-                    // We also need to analyze all modify targets because they are not
-                    // included in the bytecode.
-                    for (_, exps) in target.get_modify_ids_and_exps() {
-                        for exp in exps {
-                            self.analyze_exp(&exp);
+                    for (variant, target) in self.targets.get_targets(&fun) {
+                        if variant.is_verified() {
+                            self.analyze_verification_root(
+                                VerificationRoot {
+                                    fun: fun.get_qualified_id(),
+                                    variant,
+                                    inst: vec![],
+                                },
+                                target,
+                            );
                         }
                     }
                 }
@@ -1138,6 +1344,7 @@ impl Analyzer<'_> {
         // Next do todo-list for regular functions, while self.inst_opt contains the
         // specific instantiation.
         while let Some((fun, variant, inst)) = self.todo_funs.pop() {
+            self.current_node = Some(MonoNode::Fun(fun, variant.clone(), inst.clone()));
             self.inst_opt = Some(inst);
             self.analyze_fun(
                 self.targets
@@ -1151,6 +1358,7 @@ impl Analyzer<'_> {
                 .or_default()
                 .insert(inst.clone());
             self.done_funs.insert((fun, variant, inst));
+            self.current_node = None;
         }
 
         // Next do axioms, based on the types discovered for regular functions.
@@ -1165,6 +1373,7 @@ impl Analyzer<'_> {
 
         // Finally do spec functions, after all regular functions and axioms are done.
         while let Some((fun, inst)) = self.todo_spec_funs.pop() {
+            self.current_node = Some(MonoNode::SpecFun(fun, inst.clone()));
             self.inst_opt = Some(inst);
             self.analyze_spec_fun(fun);
             let inst = std::mem::take(&mut self.inst_opt).unwrap();
@@ -1175,7 +1384,35 @@ impl Analyzer<'_> {
                 .or_default()
                 .insert(inst.clone());
             self.done_spec_funs.insert((fun, inst));
+            self.current_node = None;
         }
+    }
+
+    fn analyze_verification_root(&mut self, root: VerificationRoot, target: FunctionTarget<'_>) {
+        if !root.inst.is_empty() {
+            self.info
+                .funs
+                .entry((root.fun, root.variant.clone()))
+                .or_default()
+                .insert(root.inst.clone());
+        }
+        self.current_node = Some(MonoNode::Fun(
+            root.fun,
+            root.variant.clone(),
+            root.inst.clone(),
+        ));
+        self.inst_opt = (!root.inst.is_empty()).then(|| root.inst.clone());
+        self.analyze_fun(target.clone());
+
+        // Modify targets are not represented in the bytecode.
+        for (memory, exps) in target.get_modify_ids_and_exps() {
+            self.add_type_root(&memory.to_type());
+            for exp in exps {
+                self.analyze_exp(&exp);
+            }
+        }
+        self.inst_opt = None;
+        self.current_node = None;
     }
 
     /// Analyze axioms, computing all the instantiations needed. We over-approximate the
@@ -1245,17 +1482,30 @@ impl Analyzer<'_> {
                 self.analyze_exp(exp);
             }
         }
-        // Analyze instantiations (when this function is a verification target)
-        if self.inst_opt.is_none() {
+        // Analyze behavioral parameters when this function is a verification root.
+        // A selected concrete root has an instantiation, while package-wide analysis
+        // reaches this block with no instantiation.
+        let analyzing_selected_root = self.selected_root.as_ref().is_some_and(|root| {
+            self.current_node
+                == Some(MonoNode::Fun(
+                    root.fun,
+                    root.variant.clone(),
+                    root.inst.clone(),
+                ))
+        });
+        if self.inst_opt.is_none() || analyzing_selected_root {
             // Collect function-typed parameters for behavioral predicate support.
             // This enables the Boogie backend to generate parameter variants.
             for param in target.func_env.get_parameters() {
                 let param_ty = self.instantiate(&param.1);
                 if let Type::Fun(fn_params, fn_results, _) = &param_ty {
                     let normalized_ty = self.normalize_fun_ty(param_ty.clone());
-                    let fun_id = target.func_env.get_qualified_id().instantiate(vec![]);
+                    let fun_id = target
+                        .func_env
+                        .get_qualified_id()
+                        .instantiate(self.inst_opt.clone().unwrap_or_default());
                     let info = FunParamInfo {
-                        fun: fun_id,
+                        fun: fun_id.clone(),
                         param_sym: param.0,
                     };
                     self.info
@@ -1265,6 +1515,7 @@ impl Analyzer<'_> {
                         .insert(info);
                     // Ensure the function type is also registered in fun_infos
                     self.info.fun_infos.entry(normalized_ty).or_default();
+                    self.analyze_function_spec(&fun_id);
                     // Add the param and result types to done_types
                     self.add_type(fn_params.as_ref());
                     self.add_type(fn_results.as_ref());
@@ -1289,39 +1540,147 @@ impl Analyzer<'_> {
                     }
                 }
             }
-            // collect information
+        }
+
+        // Derive additional verification instantiations only during package-wide
+        // analysis. A root-specific analysis must remain rooted at exactly one
+        // verification procedure.
+        if self.inst_opt.is_none() && self.selected_root.is_none() {
             let fun_type_params_arity = target.get_type_parameter_count();
             let usage_state = UsageProcessor::analyze(self.targets, target.func_env, target.data);
 
-            // collect instantiations
-            let mut all_insts = BTreeSet::new();
-            for lhs_m in usage_state.accessed.all.iter() {
-                let lhs_ty = lhs_m.to_type();
-                for rhs_m in usage_state.accessed.all.iter() {
-                    let rhs_ty = rhs_m.to_type();
-
-                    // make sure these two types unify before trying to instantiate them
-                    let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
-                    if adapter
-                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
-                        .is_none()
-                    {
-                        continue;
+            // Collect aliasing instantiations: substitutions of the function's type parameters
+            // under which some accessed memories have the same type. Each case is the most
+            // general unifier of a set of equations between memories; the search extends every
+            // case found by each pair of memories it can still make equal.
+            //
+            // Ghost type parameters (indices at or above the declared count) are added by global
+            // invariant instrumentation. The search does not extend into them; pairs mentioning a
+            // ghost are matched by `progressive_instantiation` instead.
+            // Memory a function value may write by its `modifies_of` frame is included.
+            let accessed: Vec<Type> = usage_state
+                .accessed
+                .all
+                .iter()
+                .chain(usage_state.invoke_frame.all.iter())
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .map(|m| m.to_type())
+                .collect();
+            let declared_arity = target.func_env.get_type_parameters().len();
+            let mentions_ghost: Vec<bool> = accessed
+                .iter()
+                .map(|ty| {
+                    type_params_in_order(std::slice::from_ref(ty))
+                        .iter()
+                        .any(|i| *i as usize >= declared_arity)
+                })
+                .collect();
+            let as_vars: Vec<Type> = (0..fun_type_params_arity)
+                .map(|i| Type::Var(i as u32))
+                .collect();
+            let adapted: Vec<Type> = accessed.iter().map(|m| m.instantiate(&as_vars)).collect();
+            // A case is verified as read back and identified by its canonical form.
+            let inst_of = |subst: &Substitution| -> Vec<Type> {
+                (0..fun_type_params_arity)
+                    .map(|i| vars_to_type_params(&subst.specialize(&Type::Var(i as u32))))
+                    .collect()
+            };
+            // Whether a ghost is bound, or occurs in another type parameter's binding.
+            let involves_ghost = |subst: &Substitution| -> bool {
+                let bound: Vec<Type> = (0..fun_type_params_arity)
+                    .map(|i| subst.specialize(&Type::Var(i as u32)))
+                    .collect();
+                (declared_arity..fun_type_params_arity).any(|g| {
+                    bound[g] != Type::Var(g as u32)
+                        || bound
+                            .iter()
+                            .enumerate()
+                            .any(|(v, ty)| v != g && ty.get_vars().contains(&(g as u32)))
+                })
+            };
+            let mut all_insts: BTreeSet<Vec<Type>> = BTreeSet::new();
+            let mut cases: BTreeSet<Vec<Type>> = BTreeSet::new();
+            // A function accessing no memory has no aliasing case.
+            if !adapted.is_empty() {
+                let open = inst_of(&Substitution::new());
+                cases.insert(canonical_aliasing_inst(&open, fun_type_params_arity));
+                all_insts.insert(open);
+                let mut work = vec![Substitution::new()];
+                'search: while let Some(subst) = work.pop() {
+                    let current: Vec<Type> = adapted.iter().map(|m| subst.specialize(m)).collect();
+                    for i in 0..current.len() {
+                        for j in i + 1..current.len() {
+                            if current[i] == current[j] {
+                                continue;
+                            }
+                            let mut next = subst.clone();
+                            // Exact unification: memories alias only if their types are equal.
+                            if next
+                                .unify(
+                                    &mut NoUnificationContext,
+                                    Variance::NoVariance,
+                                    WideningOrder::LeftToRight,
+                                    &current[i],
+                                    &current[j],
+                                )
+                                .is_err()
+                            {
+                                continue;
+                            }
+                            if involves_ghost(&next) {
+                                continue;
+                            }
+                            // Unifiers equal up to renaming extend alike.
+                            let inst = inst_of(&next);
+                            if !cases.insert(canonical_aliasing_inst(&inst, fun_type_params_arity))
+                            {
+                                continue;
+                            }
+                            all_insts.insert(inst);
+                            if cases.len() > MAX_ALIASING_INSTANCES {
+                                self.env.error(
+                                    &target.get_loc(),
+                                    &format!(
+                                        "too many type-aliasing cases to verify for `{}` (more \
+                                         than {}): the function accesses too many global \
+                                         resources whose types can coincide under some \
+                                         instantiation of its type parameters",
+                                        target.func_env.get_full_name_str(),
+                                        MAX_ALIASING_INSTANCES
+                                    ),
+                                );
+                                break 'search;
+                            }
+                            work.push(next);
+                        }
                     }
-
-                    // find all instantiation combinations given by this unification
-                    let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
-                        std::iter::once(&lhs_ty),
-                        std::iter::once(&rhs_ty),
-                        true,
-                        false,
-                        true,
-                        false,
-                        fun_type_params_arity,
-                        true,
-                        false,
-                    );
-                    all_insts.extend(fun_insts);
+                }
+                for (i, lhs_ty) in accessed.iter().enumerate() {
+                    for (j, rhs_ty) in accessed.iter().enumerate() {
+                        if !(mentions_ghost[i] || mentions_ghost[j]) {
+                            continue;
+                        }
+                        let adapter = TypeUnificationAdapter::new_pair(lhs_ty, rhs_ty, true, true);
+                        if adapter
+                            .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
+                            .is_none()
+                        {
+                            continue;
+                        }
+                        let fun_insts = TypeInstantiationDerivation::progressive_instantiation(
+                            std::iter::once(lhs_ty),
+                            std::iter::once(rhs_ty),
+                            true,
+                            false,
+                            true,
+                            false,
+                            fun_type_params_arity,
+                            true,
+                            false,
+                        );
+                        all_insts.extend(fun_insts);
+                    }
                 }
             }
 
@@ -1342,7 +1701,24 @@ impl Analyzer<'_> {
         // For monomorphization, we only need to analyze function calls, not `pack` or other
         // instructions because the types those are using are reflected in locals which are analyzed
         // elsewhere.
+        //
+        // `Exists` and `HavocGlobal` reflect their resource type in no local, so it must be
+        // registered here or the translator emits an undeclared `<T>_$memory`. `HavocGlobal` has
+        // its own arm below. The rest need nothing: `BorrowGlobal` yields `&T`, `MoveFrom` yields
+        // `T`, `MoveTo` consumes `T`.
         match bc {
+            Call(_, _, Exists(mid, sid, inst), ..) => {
+                let inst = self.instantiate_vec(inst);
+                let struct_env = self.env.get_module(*mid).into_struct(*sid);
+                self.add_struct(struct_env, &inst);
+            },
+            Call(_, _, Invoke, srcs, _) => {
+                if let Some(fun) = srcs.last() {
+                    let fun_type =
+                        self.normalize_fun_ty(self.instantiate(target.get_local_type(*fun)));
+                    self.info.applied_fun_types.insert(fun_type);
+                }
+            },
             Call(_, _, Function(mid, fid, targs), ..)
             | Call(_, _, Closure(mid, fid, targs, ..), ..) => {
                 let module_env = &self.env.get_module(*mid);
@@ -1387,13 +1763,18 @@ impl Analyzer<'_> {
                         .entry(mid.qualified(*fid))
                         .or_default()
                         .insert(actuals);
-                } else if !callee_env.is_opaque() && !callee_env.is_struct_api() {
+                } else if !callee_env.is_opaque()
+                    && !callee_env.is_struct_api()
+                    && (!callee_env.is_inline() || callee_env.is_inline_verified())
+                {
                     // This call needs to be inlined, with targs instantiated by self.inst_opt.
                     // Struct API wrappers are excluded: their call sites are translated to native
-                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator, so there is
-                    // no independent bytecode target to schedule for monomorphization.
+                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator. Ordinary
+                    // inline functions are expanded at their call sites and likewise have no
+                    // independent bytecode target (verified inline functions are the exception).
                     // Schedule for later processing if this instance has not been processed yet.
                     let entry = (mid.qualified(*fid), FunctionVariant::Baseline, actuals);
+                    self.add_dependency(MonoNode::Fun(entry.0, entry.1.clone(), entry.2.clone()));
                     if !self.done_funs.contains(&entry) {
                         self.todo_funs.push(entry);
                     }
@@ -1404,8 +1785,19 @@ impl Analyzer<'_> {
                 if let Call(_, dests, Closure(_mid, _fid, _targs, mask), ..) = bc {
                     let fun_type =
                         self.normalize_fun_ty(self.instantiate(target.get_local_type(dests[0])));
-                    let fun = mid.qualified_inst(*fid, self.instantiate_vec(targs));
-                    self.add_closure_spec_memory(&fun);
+                    // Closure constructor names use Boogie type names, which
+                    // intentionally erase function abilities. Canonicalize
+                    // nested function types in the target instantiation too,
+                    // so equivalent ability variants do not become duplicate
+                    // constructors in one function-value datatype.
+                    let fun = mid.qualified_inst(
+                        *fid,
+                        self.instantiate_vec(targs)
+                            .into_iter()
+                            .map(Type::normalize_nested_funs)
+                            .collect(),
+                    );
+                    self.analyze_function_spec(&fun);
                     self.info
                         .fun_infos
                         .entry(fun_type)
@@ -1468,19 +1860,72 @@ impl Analyzer<'_> {
     /// must be in `structs` for Boogie to emit the `_$memory` declarations —
     /// even when the closure is never called directly under the current
     /// verification filter.
-    fn add_closure_spec_memory(&mut self, fun: &QualifiedInstId<FunId>) {
+    fn analyze_function_spec(&mut self, fun: &QualifiedInstId<FunId>) {
+        if !self.done_function_specs.insert(fun.clone()) {
+            return;
+        }
         let fun_env = self.env.get_function(fun.to_qualified_id());
-        let mems: Vec<_> = fun_env
-            .get_spec_used_memory()
-            .iter()
-            .chain(fun_env.get_spec_old_memory().iter())
-            .cloned()
-            .collect();
+        let mut mems = fun_env.get_spec_used_memory_instantiated(&fun.inst);
+        mems.extend(fun_env.get_spec_old_memory_instantiated(&fun.inst));
         for mem in mems {
-            let mem = mem.instantiate(&fun.inst);
             let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
             self.add_struct(struct_env, &mem.inst);
         }
+
+        let exps = {
+            let spec = fun_env.get_spec();
+            spec.conditions
+                .iter()
+                .flat_map(|cond| cond.all_exps().cloned())
+                .chain(spec.proof_exps().into_iter().cloned())
+                .collect::<Vec<_>>()
+        };
+
+        // When no caller-visible `aborts_if` constrains the aborts, the Boogie
+        // backend does not default `aborts_of` to `false`; it derives the abort
+        // behavior from the body instead (`derived_aborts` in
+        // `bytecode_translator::translate_fun_spec_conditions`). Those derived
+        // expressions call the functions the body calls, so unless they are walked
+        // here the callees are never registered and the emitted predicate refers to
+        // declarations that were never produced. Reachable whenever a spec-less
+        // lambda is named by a behavioral predicate -- its spec is empty by design,
+        // so the loop above sees nothing.
+        let derived = if spec_derivation::spec_aborts_are_exact(self.env, fun.to_qualified_id()) {
+            None
+        } else {
+            spec_derivation::derive_fun_aborts_conditions(
+                self.env,
+                fun.to_qualified_id(),
+                &fun.inst,
+            )
+        };
+        // The backend also interprets a spec-less function's ensures from its
+        // body. These expressions can introduce dependencies absent from both
+        // its source specification and its derived abort conditions.
+        let derived_ensures =
+            if spec_derivation::has_derived_behavior(self.env, fun.to_qualified_id(), &fun.inst) {
+                spec_derivation::derive_fun_ensures_conditions(
+                    self.env,
+                    fun.to_qualified_id(),
+                    &fun.inst,
+                )
+            } else {
+                None
+            };
+        let saved_inst = self.inst_opt.replace(fun.inst.clone());
+        for exp in exps {
+            self.analyze_exp(&exp);
+        }
+        // Derived conditions are already instantiated at `fun.inst`.
+        self.inst_opt = None;
+        for exp in derived
+            .into_iter()
+            .flatten()
+            .chain(derived_ensures.into_iter().flatten())
+        {
+            self.analyze_exp(&exp);
+        }
+        self.inst_opt = saved_inst;
     }
 
     fn instantiate_mem(&self, mem: QualifiedInstId<StructId>) -> QualifiedInstId<StructId> {
@@ -1506,6 +1951,26 @@ impl Analyzer<'_> {
         }
     }
 
+    fn add_move_equality_congruence_spec_fun(&mut self, root: QualifiedInstId<SpecFunId>) {
+        let mut todo = vec![root];
+        while let Some(id) = todo.pop() {
+            if !self
+                .info
+                .move_equality_congruence_spec_funs
+                .insert(id.clone())
+            {
+                continue;
+            }
+            if let Some(body) = self.env.get_spec_fun(id.to_qualified_id()).body.clone() {
+                todo.extend(
+                    body.called_spec_funs(self.env)
+                        .into_iter()
+                        .map(|callee| callee.instantiate(&id.inst)),
+                );
+            }
+        }
+    }
+
     fn analyze_exp(&mut self, exp: &ExpData) {
         exp.visit_post_order(&mut |e| {
             let node_id = e.node_id();
@@ -1515,11 +1980,18 @@ impl Analyzer<'_> {
             }
             // Handle Closure operations in spec expressions
             if let ExpData::Call(node_id, ast::Operation::Closure(mid, fid, mask), _) = e {
-                let inst = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
+                // Keep `ClosureInfo` keyed by the same ability-erased form as
+                // `boogie_closure_pack_name`; otherwise two generic uses of
+                // a function value can emit the same Boogie constructor twice.
+                let inst: Vec<Type> = self
+                    .instantiate_vec(&self.env.get_node_instantiation(*node_id))
+                    .into_iter()
+                    .map(Type::normalize_nested_funs)
+                    .collect();
                 let fun = mid.qualified_inst(*fid, inst.clone());
                 let fun_type =
                     self.normalize_fun_ty(self.instantiate(&self.env.get_node_type(*node_id)));
-                self.add_closure_spec_memory(&fun);
+                self.analyze_function_spec(&fun);
                 self.info
                     .fun_infos
                     .entry(fun_type)
@@ -1538,18 +2010,45 @@ impl Analyzer<'_> {
                     if !callee_env.is_native_or_intrinsic()
                         && !callee_env.is_opaque()
                         && !callee_env.is_struct_api()
+                        && (!callee_env.is_inline() || callee_env.is_inline_verified())
                     {
                         let entry = (fun.to_qualified_id(), FunctionVariant::Baseline, inst);
+                        self.add_dependency(MonoNode::Fun(
+                            entry.0,
+                            entry.1.clone(),
+                            entry.2.clone(),
+                        ));
                         if !self.done_funs.contains(&entry) {
                             self.todo_funs.push(entry);
                         }
                     }
                 }
             }
+            if let ExpData::Call(_, ast::Operation::Behavior(..), args) = e {
+                if let Some(target) = args.first() {
+                    let fun_type = self.normalize_fun_ty(
+                        self.instantiate(&self.env.get_node_type(target.node_id())),
+                    );
+                    self.info.behavioral_fun_types.insert(fun_type);
+                }
+            }
+            if let ExpData::Invoke(_, target, _) = e {
+                let fun_type = self
+                    .normalize_fun_ty(self.instantiate(&self.env.get_node_type(target.node_id())));
+                self.info.applied_fun_types.insert(fun_type);
+            }
             if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
                 let module = self.env.get_module(*mid);
                 let spec_fun = module.get_spec_fun(*fid);
+                if self
+                    .env
+                    .spec_fun_call_needs_move_equality_congruence(*node_id, mid.qualified(*fid))
+                {
+                    self.add_move_equality_congruence_spec_fun(
+                        mid.qualified_inst(*fid, actuals.clone()),
+                    );
+                }
 
                 // the type reflection functions are specially handled here
                 if self.env.get_extlib_address() == *module.get_name().addr() {
@@ -1558,7 +2057,17 @@ impl Analyzer<'_> {
                         module.get_name().name().display(self.env.symbol_pool()),
                         spec_fun.name.display(self.env.symbol_pool()),
                     );
-                    if qualified_name == TYPE_NAME_SPEC
+                    if qualified_name == OBJECT_SPEC_EXISTS_AT {
+                        // `object::spec_exists_at<T>` is modelled exactly as
+                        // `exists<T>`. Record its concrete resource instance
+                        // so the backend declares the memory read by the
+                        // direct translation of the predicate. It is a
+                        // direct translation (rather than a normal spec-fun
+                        // call), so preserve the type in the current root's
+                        // semantic slice as well.
+                        self.add_node_type(actuals[0].clone());
+                        self.add_type(&actuals[0]);
+                    } else if qualified_name == TYPE_NAME_SPEC
                         || qualified_name == TYPE_INFO_SPEC
                         || qualified_name == TYPE_SPEC_IS_STRUCT
                     {
@@ -1585,6 +2094,7 @@ impl Analyzer<'_> {
                         .insert(actuals);
                 } else {
                     let entry = (mid.qualified(*fid), actuals);
+                    self.add_dependency(MonoNode::SpecFun(entry.0, entry.1.clone()));
                     // Only if this call has not been processed yet, queue it for future processing.
                     if !self.done_spec_funs.contains(&entry) {
                         self.todo_spec_funs.push(entry);
@@ -1601,8 +2111,10 @@ impl Analyzer<'_> {
     fn add_type_root(&mut self, ty: &Type) {
         if let Some(inst) = &self.inst_opt {
             let ty = ty.instantiate(inst);
+            self.add_node_type(ty.clone());
             self.add_type(&ty)
         } else {
+            self.add_node_type(ty.clone());
             self.add_type(ty)
         }
     }
@@ -1638,6 +2150,11 @@ impl Analyzer<'_> {
     }
 
     fn add_struct(&mut self, struct_: StructEnv<'_>, targs: &[Type]) {
+        self.add_node_type(Type::Struct(
+            struct_.module_env.get_id(),
+            struct_.get_id(),
+            targs.to_owned(),
+        ));
         if struct_.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
             self.info
                 .table_inst
@@ -1682,7 +2199,7 @@ impl Analyzer<'_> {
         }
     }
 
-    /// Check if a struct field has a storable function type and register it in
+    /// Check if a struct field has a function type and register it in
     /// `fun_struct_field_infos` if so.
     fn check_struct_fun_field(
         &mut self,
@@ -1691,21 +2208,42 @@ impl Analyzer<'_> {
         field_ty: &Type,
         targs: &[Type],
     ) {
-        if let Type::Fun(_, _, abilities) = field_ty {
-            if abilities.has_store() {
-                let normalized = self.normalize_fun_ty(field_ty.clone());
-                let info = StructFieldInfo {
-                    struct_id: struct_env.get_qualified_id().instantiate(targs.to_vec()),
-                    field_sym: field.get_name(),
-                };
-                self.info
-                    .fun_struct_field_infos
-                    .entry(normalized.clone())
-                    .or_default()
-                    .insert(info);
-                // Ensure the function type is also registered in fun_infos
-                self.info.fun_infos.entry(normalized).or_default();
+        if let Type::Fun(..) = field_ty {
+            let normalized = self.normalize_fun_ty(field_ty.clone());
+            // Normalize fun-type elements of the containing struct's
+            // instantiation too: the constructor name is derived from
+            // the boogie struct name, which drops fun abilities at every
+            // nesting depth. Without normalizing here, two
+            // ability-variant instantiations of the same wrapper (e.g.
+            // `Option<|u64| has drop>` and
+            // `Option<|u64| has drop + copy + store>`, directly or
+            // nested as in `Option<Option<|u64| has drop>>`) would
+            // produce two `StructFieldInfo` set entries mangling to one
+            // datatype constructor.
+            let normalized_targs: Vec<Type> = targs
+                .iter()
+                .map(|t| t.clone().normalize_nested_funs())
+                .collect();
+            let info = StructFieldInfo {
+                struct_id: struct_env.get_qualified_id().instantiate(normalized_targs),
+                field_sym: field.get_name(),
+            };
+            self.info
+                .fun_struct_field_infos
+                .entry(normalized.clone())
+                .or_default()
+                .insert(info);
+            for access in struct_env
+                .get_field_access_of()
+                .iter()
+                .filter(|access| access.fun_param == field.get_name())
+            {
+                for memory in access.used_memory.iter().chain(&access.old_memory) {
+                    self.add_type(&memory.clone().instantiate(targs).to_type());
+                }
             }
+            // Ensure the function type is also registered in fun_infos
+            self.info.fun_infos.entry(normalized).or_default();
         }
     }
 
@@ -1724,5 +2262,108 @@ impl Analyzer<'_> {
                 }
             },
         }
+    }
+
+    fn add_dependency(&mut self, dependency: MonoNode) {
+        if let Some(node) = &self.current_node {
+            self.node_deps
+                .entry(node.clone())
+                .or_default()
+                .insert(dependency);
+        }
+    }
+
+    fn add_node_type(&mut self, ty: Type) {
+        if let Some(node) = &self.current_node {
+            self.node_types.entry(node.clone()).or_default().insert(ty);
+        }
+    }
+
+    fn compute_root_slices(&self) -> BTreeMap<VerificationRoot, MonoSlice> {
+        self.selected_root
+            .iter()
+            .map(|root| {
+                let root_node = MonoNode::Fun(root.fun, root.variant.clone(), root.inst.clone());
+                let mut todo = vec![root_node];
+                let mut seen_nodes = BTreeSet::new();
+                let mut root_types = BTreeSet::new();
+                while let Some(node) = todo.pop() {
+                    if !seen_nodes.insert(node.clone()) {
+                        continue;
+                    }
+                    if let Some(types) = self.node_types.get(&node) {
+                        root_types.extend(types.iter().cloned());
+                    }
+                    if let Some(dependencies) = self.node_deps.get(&node) {
+                        todo.extend(dependencies.iter().cloned());
+                    }
+                }
+
+                let mut slice = MonoSlice::default();
+                let mut seen_types = BTreeSet::new();
+                for ty in root_types {
+                    self.collect_slice_structs(&ty, &mut seen_types, &mut slice.structs);
+                }
+                // Only retain instances for which the package-wide analysis emits
+                // a concrete datatype and generated validity/equality predicates.
+                slice.structs.retain(|qid, insts| {
+                    if let Some(global_insts) = self.info.structs.get(qid) {
+                        insts.retain(|inst| global_insts.contains(inst));
+                        !insts.is_empty()
+                    } else {
+                        false
+                    }
+                });
+                (root.clone(), slice)
+            })
+            .collect()
+    }
+
+    fn collect_slice_structs(
+        &self,
+        ty: &Type,
+        seen: &mut BTreeSet<Type>,
+        structs: &mut BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
+    ) {
+        ty.visit(&mut |nested| {
+            if !seen.insert(nested.clone()) {
+                return;
+            }
+            if let Type::Struct(mid, sid, inst) = nested {
+                let struct_env = self.env.get_struct(mid.qualified(*sid));
+                if !struct_env.is_intrinsic() {
+                    structs
+                        .entry(mid.qualified(*sid))
+                        .or_default()
+                        .insert(inst.clone());
+                    if struct_env.has_variants() {
+                        for variant in struct_env.get_variants() {
+                            for field in struct_env.get_fields_of_variant(variant) {
+                                self.collect_slice_structs(
+                                    &field.get_type().instantiate(inst),
+                                    seen,
+                                    structs,
+                                );
+                            }
+                        }
+                    } else {
+                        for field in struct_env.get_fields() {
+                            self.collect_slice_structs(
+                                &field.get_type().instantiate(inst),
+                                seen,
+                                structs,
+                            );
+                        }
+                    }
+                    for field in struct_env.get_ghost_fields() {
+                        self.collect_slice_structs(
+                            &field.get_type().instantiate(inst),
+                            seen,
+                            structs,
+                        );
+                    }
+                }
+            }
+        });
     }
 }

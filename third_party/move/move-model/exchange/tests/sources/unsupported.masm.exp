@@ -1,0 +1,15 @@
+{
+  "version": 10,
+  "structs": [],
+  "funs": [
+    {
+      "name": "f",
+      "params": 0,
+      "locals": ["u8"],
+      "returns": ["u8"],
+      "blocks": [{"instrs": [{"load": [0, {"num": "1"}]}], "term": {"ret": [0]}}],
+      "loops": [],
+      "spec": {"requires": [], "aborts_if": [], "ensures": [], "modifies": []}
+    }
+  ]
+}

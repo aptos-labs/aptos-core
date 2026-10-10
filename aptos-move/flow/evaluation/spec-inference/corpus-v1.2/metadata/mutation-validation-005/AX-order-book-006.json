@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-order-book-006/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-uq35q2zv/package",
+            "--output",
+            "/tmp/move-inference-mutant-uq35q2zv/unused.json"
+          ],
+          "duration_ms": 4867,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-order-book-006-negated",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-uq35q2zv/package",
+            "--target",
+            "0x7::order_book::client_order_id_exists",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-uq35q2zv/prover-report.json"
+          ],
+          "duration_ms": 6322,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-zpnsfnoe/package",
+            "--output",
+            "/tmp/move-inference-mutant-zpnsfnoe/unused.json"
+          ],
+          "duration_ms": 3855,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-order-book-006-always-false",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-zpnsfnoe/package",
+            "--target",
+            "0x7::order_book::client_order_id_exists",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-zpnsfnoe/prover-report.json"
+          ],
+          "duration_ms": 8347,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-nevygzx1/package",
+            "--output",
+            "/tmp/move-inference-mutant-nevygzx1/unused.json"
+          ],
+          "duration_ms": 3331,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-order-book-006-excludes-address-one",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-nevygzx1/package",
+            "--target",
+            "0x7::order_book::client_order_id_exists",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-nevygzx1/prover-report.json"
+          ],
+          "duration_ms": 8097,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::order_book::client_order_id_exists"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-order-book-006/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-gp4udhda/package",
+            "--output",
+            "/tmp/move-inference-mutant-gp4udhda/unused.json"
+          ],
+          "duration_ms": 4655,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-order-book-006-aborts-on-zero-address",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-gp4udhda/package",
+            "--target",
+            "0x7::order_book::client_order_id_exists",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-gp4udhda/prover-report.json"
+          ],
+          "duration_ms": 6441,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: abort not covered by any of the `aborts_if` clauses"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-hmajgppu/package",
+            "--output",
+            "/tmp/move-inference-mutant-hmajgppu/unused.json"
+          ],
+          "duration_ms": 2859,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-order-book-006-wrong-creator",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-hmajgppu/package",
+            "--target",
+            "0x7::order_book::client_order_id_exists",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-hmajgppu/prover-report.json"
+          ],
+          "duration_ms": 6524,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-i784ch2t/package",
+            "--output",
+            "/tmp/move-inference-mutant-i784ch2t/unused.json"
+          ],
+          "duration_ms": 3077,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-order-book-006-always-true",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-i784ch2t/package",
+            "--target",
+            "0x7::order_book::client_order_id_exists",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-i784ch2t/prover-report.json"
+          ],
+          "duration_ms": 6394,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::order_book::client_order_id_exists"
+  }
+}

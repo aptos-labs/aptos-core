@@ -63,7 +63,7 @@ fn test_vec_pack() {
 
     let res = move_bytecode_verifier::verify_module_with_config_for_test(
         "test_vec_pack",
-        &VerifierConfig::production(),
+        &VerifierConfig::production_testing(),
         &m,
     )
     .unwrap_err();

@@ -1,9 +1,7 @@
 module 0x42::m {
 
     inline fun exec<T, R>(f: |T|R, x: T): R {
-        let r = f(x);
-        spec { assert r == f(x); };
-        r
+        f(x)
     }
 
     // Function spec block

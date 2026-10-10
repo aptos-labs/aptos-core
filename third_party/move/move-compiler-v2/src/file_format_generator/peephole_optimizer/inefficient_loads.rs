@@ -55,30 +55,26 @@ impl WindowOptimizer for InefficientLoads {
             _ => return None,
         };
         for (index, instr) in window[2..].iter().enumerate() {
-            match instr {
-                CopyLoc(v) | StLoc(v) | ImmBorrowLoc(v) | MutBorrowLoc(v) if u == *v => {
-                    // We have encountered an instruction that involves `u`.
-                    return None;
-                },
-                MoveLoc(v) if u == *v => {
-                    // We have reached the end of the pattern (point 4 in the module documentation).
-                    let sequence = &window[2..index + 2];
-                    let load_constant = &window[0..1];
-                    let transformed_code = [sequence, load_constant].concat();
-                    // original_offsets are 2..index+2 (representing `sequence`),
-                    // followed by 0 (representing `load_constant`).
-                    let original_offsets = (2..(index + 2) as CodeOffset)
-                        .chain(iter::once(0))
-                        .collect::<Vec<_>>();
-                    return Some((
-                        TransformedCodeChunk::new(transformed_code, original_offsets),
-                        index + Self::MIN_WINDOW_SIZE,
-                    ));
-                },
-                _ => {
-                    // Instruction that does not involve `u`, including `MoveLoc` of a different local.
-                },
+            if instr.local_index() != Some(u) {
+                continue;
             }
+            if !matches!(instr, MoveLoc(_)) {
+                // We have encountered an instruction that involves `u`.
+                return None;
+            }
+            // We have reached the end of the pattern (point 4 in the module documentation).
+            let sequence = &window[2..index + 2];
+            let load_constant = &window[0..1];
+            let transformed_code = [sequence, load_constant].concat();
+            // original_offsets are 2..index+2 (representing `sequence`),
+            // followed by 0 (representing `load_constant`).
+            let original_offsets = (2..(index + 2) as CodeOffset)
+                .chain(iter::once(0))
+                .collect::<Vec<_>>();
+            return Some((
+                TransformedCodeChunk::new(transformed_code, original_offsets),
+                index + Self::MIN_WINDOW_SIZE,
+            ));
         }
         // The full pattern was not found.
         None

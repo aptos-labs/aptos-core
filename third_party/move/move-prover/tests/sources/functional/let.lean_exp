@@ -1,0 +1,55 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/let.move:3:1: error: verification failed with a residual obligation:
+case left.right.left.left.right.right
+registry✝ : LeanerIR.Validation.SemanticsRegistry
+executable✝ : LeanerIR.Validation.ExecutableUnit unit
+prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+a a_final : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
+b b_final : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+assumed permitted : True
+leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
+    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).ref
+        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
+          (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+            (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+              (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit LeanerIR.Proofs.Denote.NRow.nil))))))
+    LeanerIR.Proofs.Denote.NTy.unit.carrier →
+  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value)
+      (fun result final =>
+        (¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val) →
+            LeanerIR.Proofs.Obligation "let.lean" 2020 2038
+              (a_final.val = a.val.tdiv (a.val + b.val))) ∧
+          (¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val) →
+              LeanerIR.Proofs.Obligation "let.lean" 2043 2063 (b_final.val = a.val * b.val)) ∧
+            final = initialState✝ ∧
+              ¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val))
+      (fun failure =>
+        (LeanerIR.Proofs.Obligation "let.lean" 1935 1953 ¬a.val + b.val = 0 ∨
+            LeanerIR.Proofs.Obligation "let.lean" 1958 1982 (18446744073709551615 ≤ a.val + b.val)) ∨
+          LeanerIR.Proofs.Obligation "let.lean" 1987 2015 (18446744073709551615 ≤ a.val * b.val))
+      state
+named✝¹ : LeanerIR.SpecInt (LeanerIR.IntWidth.bits 64) false
+a✝⁹ : named✝¹.val = a.val + b.val
+a✝⁸ : 0 ≤ a.val + b.val
+a✝⁷ : a.val + b.val ≤ 18446744073709551615
+x✝ : ¬named✝¹.val = 0
+named✝ : LeanerIR.SpecInt (LeanerIR.IntWidth.bits 64) false
+a✝⁶ : named✝.val = a.val.tdiv named✝¹.val
+a✝⁵ : 0 ≤ a.val.tdiv named✝¹.val
+a✝⁴ : a.val.tdiv named✝¹.val ≤ 18446744073709551615
+named : LeanerIR.SpecInt (LeanerIR.IntWidth.bits 64) false
+a✝³ : named.val = a.val * b.val
+a✝² : 0 ≤ a.val * b.val
+a✝¹ : a.val * b.val ≤ 18446744073709551615
+a✝ : named✝ = a_final
+x : named = b_final
+⊢ ¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val)
+tests/sources/functional/let.move:77:9: error: the specification clause `aborts_if sum != 0` is not established
+tests/sources/functional/let.move:78:9: error: the specification clause `aborts_if sum >= MAX_U64` is not established
+tests/sources/functional/let.move:79:9: error: the specification clause `aborts_if product >= MAX_U64` is not established
+tests/sources/functional/let.move:74:5: error: leaner verification failed: the automatic verification of `spec_let_with_abort_incorrect` failed; provide a proof: `verify spec_let_with_abort_incorrect by …` in `tests/sources/functional/let.proof.lean` (`verify spec_let_with_abort_incorrect by skip` shows the obligations it leaves)

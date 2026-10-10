@@ -1,0 +1,55 @@
+
+Diagnostics:
+error: expected 1 argument(s) for unchanged_of but 2 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:11:17
+   │
+11 │         ensures unchanged_of<f>(x, x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot use `bool` with an operator which expects a value of type `num`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:13:17
+   │
+13 │         ensures unchanged_of<f>(x) + 1 == 2;
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: behavior predicate target must have function type, found `u64`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:15:17
+   │
+15 │         ensures unchanged_of<x>(x);
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: `unchanged_of` implicitly relates the pre-state to the current state and cannot have a post-state label
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:17:27
+   │
+17 │         ensures ..post |~ unchanged_of<f>(x);
+   │                           ^^^^^^^^^^^^^^^^^^
+
+error: state label `post` is defined but never referenced; every post-state label must be referenced by a pre-state label in the same spec
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:17:27
+   │
+17 │         ensures ..post |~ unchanged_of<f>(x);
+   │                           ^^^^^^^^^^^^^^^^^^
+
+error: `unchanged_of` implicitly relates the pre-state to the current state and cannot have a post-state label
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:19:25
+   │
+19 │         ensures a..a |~ unchanged_of<f>(x);
+   │                         ^^^^^^^^^^^^^^^^^^
+
+error: ensures_of/result_of/unchanged_of/folds_of require two-state range notation; use `..S |~` (post-only), `S.. |~` (pre-only), or `A..S |~` (full range) instead of `S |~`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:19:25
+   │
+19 │         ensures a..a |~ unchanged_of<f>(x);
+   │                         ^^^^^^^^^^^^^^^^^^
+
+error: cyclic state label reference detected: a -> a
+   ┌─ tests/checking-lang-v2.4/specs/behavior_unchanged_of_err.move:9:5
+   │
+ 9 │ ╭     spec apply {
+10 │ │         // Error: f takes 1 arg, but 2 provided
+11 │ │         ensures unchanged_of<f>(x, x);
+12 │ │         // Error: bool result used as integer
+   · │
+19 │ │         ensures a..a |~ unchanged_of<f>(x);
+20 │ │     }
+   │ ╰─────^

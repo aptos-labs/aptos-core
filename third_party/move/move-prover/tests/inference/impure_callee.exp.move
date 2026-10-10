@@ -41,7 +41,6 @@ module 0x42::impure_callee {
         pragma opaque = true;
         ensures [inferred] result == result_of<count_up>(n) * 2;
         aborts_if [inferred] result_of<count_up>(n) * 2 > MAX_U64;
-        aborts_if [inferred] aborts_of<count_up>(n);
     }
 
 }

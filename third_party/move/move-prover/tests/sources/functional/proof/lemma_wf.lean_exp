@@ -1,0 +1,70 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/proof/lemma_wf.move:36:9: error: a recursive application of the lemma does not decrease its measure
+n_0 : Int
+premise : «0x42».lemma_wf.circular_same.lemmaRequires (n_0, ())
+a✝ :
+  ∀ (y : «0x42».lemma_wf.circular_same.lemmaRequires (n_0, ())),
+    InvImage (fun x1 x2 => x1 < x2) (fun x => LeanerIR.Proofs.lemmaMeasure n_0) y premise →
+      «0x42».lemma_wf.circular_same.lemmaEnsures (n_0, ())
+statedPremise : «0x42».lemma_wf.circular_same.lemmaRequires (n_0, ())
+step_0 : «0x42».lemma_wf.circular_same.lemmaStep_0 (n_0, ())
+⊢ (n_0 + 1).toNat < (n_0 + 1).toNat
+tests/sources/functional/proof/lemma_wf.move:36:9: error: leaner verification failed: the lemma `circular_same` is not established
+tests/sources/functional/proof/lemma_wf.move:42:9: error: a recursive application of the lemma does not decrease its measure
+n_0 : Int
+premise : «0x42».lemma_wf.circular_ascending.lemmaRequires (n_0, ())
+a✝ :
+  ∀ (y : (n_0 : Int) ×' «0x42».lemma_wf.circular_ascending.lemmaRequires (n_0, ())),
+    InvImage (fun x1 x2 => x1 < x2) (fun x => PSigma.casesOn x fun n_0 premise => LeanerIR.Proofs.lemmaMeasure n_0) y
+        ⟨n_0, premise⟩ →
+      «0x42».lemma_wf.circular_ascending.lemmaEnsures (y.1, ())
+statedPremise : «0x42».lemma_wf.circular_ascending.lemmaRequires (n_0, ())
+step_0 : «0x42».lemma_wf.circular_ascending.lemmaStep_0 (n_0, ())
+⊢ (n_0 + 1 + 1).toNat < (n_0 + 1).toNat
+tests/sources/functional/proof/lemma_wf.move:42:9: error: leaner verification failed: the lemma `circular_ascending` is not established
+tests/sources/functional/proof/lemma_wf.move:49:9: error: a recursive application of the lemma does not decrease its measure
+n_0 : Int
+premise : «0x42».lemma_wf.unbounded.lemmaRequires (n_0, ())
+a✝ :
+  ∀ (y : (n_0 : Int) ×' «0x42».lemma_wf.unbounded.lemmaRequires (n_0, ())),
+    InvImage (fun x1 x2 => x1 < x2) (fun x => PSigma.casesOn x fun n_0 premise => LeanerIR.Proofs.lemmaMeasure n_0) y
+        ⟨n_0, premise⟩ →
+      «0x42».lemma_wf.unbounded.lemmaEnsures (y.1, ())
+statedPremise : «0x42».lemma_wf.unbounded.lemmaRequires (n_0, ())
+step_0 : «0x42».lemma_wf.unbounded.lemmaStep_0 (n_0, ())
+⊢ (n_0 - 1 + 1).toNat < (n_0 + 1).toNat
+tests/sources/functional/proof/lemma_wf.move:49:9: error: leaner verification failed: the lemma `unbounded` is not established
+tests/sources/functional/proof/lemma_wf.move:57:9: error: a recursive application of the lemma does not decrease its measure
+n_0 : Int
+i_1✝ : (i_1 : Int) ×' «0x42».lemma_wf.second_param_default.lemmaRequires (n_0, i_1, ())
+a✝² :
+  ∀ (y : (n_0 : Int) ×' (i_1 : Int) ×' «0x42».lemma_wf.second_param_default.lemmaRequires (n_0, i_1, ())),
+    (invImage
+            (fun x =>
+              PSigma.casesOn x fun n_0 i_1 =>
+                PSigma.casesOn i_1 fun i_1 premise =>
+                  (LeanerIR.Proofs.lemmaMeasure n_0, LeanerIR.Proofs.lemmaMeasure i_1))
+            Prod.instWellFoundedRelation).1
+        y ⟨n_0, i_1✝⟩ →
+      «0x42».lemma_wf.second_param_default.lemmaEnsures (y.1, y.2.1, ())
+i_1 : Int
+premise : «0x42».lemma_wf.second_param_default.lemmaRequires (n_0, i_1, ())
+a✝¹ :
+  ∀ (y : (n_0 : Int) ×' (i_1 : Int) ×' «0x42».lemma_wf.second_param_default.lemmaRequires (n_0, i_1, ())),
+    (invImage
+            (fun x =>
+              PSigma.casesOn x fun n_0 i_1 =>
+                PSigma.casesOn i_1 fun i_1 premise =>
+                  (LeanerIR.Proofs.lemmaMeasure n_0, LeanerIR.Proofs.lemmaMeasure i_1))
+            Prod.instWellFoundedRelation).1
+        y ⟨n_0, ⟨i_1, premise⟩⟩ →
+      «0x42».lemma_wf.second_param_default.lemmaEnsures (y.1, y.2.1, ())
+statedPremise : «0x42».lemma_wf.second_param_default.lemmaRequires (n_0, i_1, ())
+step_0 : «0x42».lemma_wf.second_param_default.lemmaStep_0 (n_0, i_1, ())
+h✝ : 0 < i_1
+step_1 : «0x42».lemma_wf.second_param_default.lemmaStep_1 (n_0, i_1, ())
+x✝¹ : 0 ≤ i_1
+a✝ : ¬1 ≤ «0x42».lemma_wf.math_pow.spec (2, i_1, ())
+x✝ : 0 < i_1
+⊢ (n_0 + 1 + 1).toNat < (n_0 + 1).toNat ∨ (n_0 + 1 + 1).toNat = (n_0 + 1).toNat ∧ (i_1 - 1 + 1).toNat < (i_1 + 1).toNat
+tests/sources/functional/proof/lemma_wf.move:57:9: error: leaner verification failed: the lemma `second_param_default` is not established

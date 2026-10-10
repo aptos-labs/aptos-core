@@ -17,5 +17,7 @@ fn higher_order_paper_examples() {
 
 #[test]
 fn inference_paper_examples() {
-    move_prover_e2e_tests::run_paper_with_baseline(paper_pkg("../doc/inference-paper-26/examples"));
+    move_prover_e2e_tests::run_paper_with_baseline(paper_pkg(
+        "../doc/inference-paper-26/v2/examples",
+    ));
 }

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 47,
+        "offset": 6056,
+        "sha256": "bfe45f381588d1cf0b0c7363bcd6edb3caef6b5c7797ebf89c71612fb810c252"
+      },
+      "edit": {
+        "at": 33,
+        "kind": "substitute",
+        "length": 2,
+        "to": "!="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-reinsert-030-merge-on-different-price",
+      "obligation_category": "normal-result",
+      "rationale": "The size merges into the first level when its price differs.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 63,
+        "offset": 6333,
+        "sha256": "3d46609e362d9815e8b5da32ceefcf34853b5891c496b7e55a70820071d1bed4"
+      },
+      "edit": {
+        "at": 22,
+        "kind": "substitute",
+        "length": 37,
+        "to": "get_price_from_match_details"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-reinsert-030-new-size-is-price",
+      "obligation_category": "normal-result",
+      "rationale": "A new level records the price as its size.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 55,
+        "offset": 5988,
+        "sha256": "62da87290b45c328c47a2d41730c8c77366b8c797ee2917f4cf3d1400c4b6d78"
+      },
+      "edit": {
+        "at": 24,
+        "kind": "substitute",
+        "length": 28,
+        "to": "get_remaining_size_from_match_details"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-reinsert-030-price-from-size",
+      "obligation_category": "normal-result",
+      "rationale": "The remaining size is used as the price.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored from the target source as a held-out scoring set, disjoint from the refutation set; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "edfb877ee10f48c2bfdd8c3ff4036817d5fc8bcf682649caeca0d410cdef3b7e",
+  "task_id": "TR-reinsert-030"
+}

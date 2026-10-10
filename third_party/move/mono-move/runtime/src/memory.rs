@@ -1,61 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Owned VM memory buffer ([`MemoryRegion`]) and heap-object header access. The
-//! raw value read/write helpers live in [`mono_move_core::memory`] and are
-//! re-exported here.
+//! Heap-object header access. The owned VM memory buffer ([`MemoryRegion`])
+//! lives in [`mono_move_alloc`] and the raw value read/write helpers in
+//! [`mono_move_core::memory`]; both are re-exported here.
 
 use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
+pub use mono_move_alloc::MemoryRegion;
 pub use mono_move_core::memory::*;
-use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET, MAX_ALIGN};
-use std::alloc::{self, Layout};
-
-// ---------------------------------------------------------------------------
-// Aligned buffer — owns a zeroed, [`MAX_ALIGN`]-aligned allocation
-// ---------------------------------------------------------------------------
-
-pub struct MemoryRegion {
-    ptr: *mut u8,
-    layout: Layout,
-}
-
-impl MemoryRegion {
-    /// Allocates a zeroed, [`MAX_ALIGN`]-aligned memory region of the given size.
-    ///
-    /// OOM is handled by aborting via `handle_alloc_error`.
-    pub fn new(size: usize) -> Self {
-        debug_assert!(size > 0);
-        let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
-        // SAFETY: layout is valid (power-of-two alignment) and `alloc_zeroed` handles
-        // zero-size layouts per the GlobalAlloc contract. Null is checked below.
-        let ptr = unsafe { alloc::alloc_zeroed(layout) };
-        if ptr.is_null() {
-            alloc::handle_alloc_error(layout);
-        }
-        Self { ptr, layout }
-    }
-
-    #[inline(always)]
-    pub fn as_ptr(&self) -> *mut u8 {
-        self.ptr
-    }
-
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.layout.size()
-    }
-
-    #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.layout.size() == 0
-    }
-}
-
-impl Drop for MemoryRegion {
-    fn drop(&mut self) {
-        unsafe { alloc::dealloc(self.ptr, self.layout) };
-    }
-}
+use mono_move_core::{DescriptorId, ENUM_TAG_OFFSET};
 
 /// Reads a vector's length, treating the null pointer as the empty vector.
 ///

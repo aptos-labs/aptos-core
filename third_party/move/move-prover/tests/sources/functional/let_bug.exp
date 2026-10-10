@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-error: verification out of resources/timeout (global timeout set to 40s)
+error: verification out of resources/timeout (timeout set to 40s)
     ┌─ tests/sources/functional/let_bug.move:117:5
     │
 117 │ ╭     entry fun number(s: &signer, x: u64) acquires State {

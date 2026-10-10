@@ -17,11 +17,11 @@ module 0x42::intrinsic_map {
     fun has(m: &SimpleMap<u64, u64>, k: u64): bool {
         simple_map::contains_key(m, &k)
     }
-    spec has(m: &simple_map::SimpleMap<u64, u64>, k: u64): bool {
+    spec has(m: &0x1::simple_map::SimpleMap<u64, u64>, k: u64): bool {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_contains_key<u64, u64>(m, k);
-        aborts_if [inferred] aborts_of<simple_map::contains_key<u64, u64>>(m, k);
+        aborts_if [inferred] false;
     }
 
 
@@ -29,11 +29,11 @@ module 0x42::intrinsic_map {
     fun size(m: &SimpleMap<u64, u64>): u64 {
         simple_map::length(m)
     }
-    spec size(m: &simple_map::SimpleMap<u64, u64>): u64 {
+    spec size(m: &0x1::simple_map::SimpleMap<u64, u64>): u64 {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_len<u64, u64>(m);
-        aborts_if [inferred] aborts_of<simple_map::length<u64, u64>>(m);
+        aborts_if [inferred] false;
     }
 
 
@@ -41,11 +41,11 @@ module 0x42::intrinsic_map {
     fun make(): SimpleMap<u64, u64> {
         simple_map::create()
     }
-    spec make(): simple_map::SimpleMap<u64, u64> {
+    spec make(): 0x1::simple_map::SimpleMap<u64, u64> {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_new<u64, u64>();
-        aborts_if [inferred] aborts_of<simple_map::create<u64, u64>>();
+        aborts_if [inferred] false;
     }
 
 
@@ -55,10 +55,11 @@ module 0x42::intrinsic_map {
     fun drop(m: SimpleMap<u64, u64>) {
         simple_map::destroy_empty(m)
     }
-    spec drop(m: simple_map::SimpleMap<u64, u64>) {
+    spec drop(m: 0x1::simple_map::SimpleMap<u64, u64>) {
+        use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] ensures_of<simple_map::destroy_empty<u64, u64>>(m);
-        aborts_if [inferred] aborts_of<simple_map::destroy_empty<u64, u64>>(m);
+        aborts_if [inferred] simple_map::spec_aborts_destroy_empty<u64, u64>(m);
     }
 
 
@@ -69,11 +70,11 @@ module 0x42::intrinsic_map {
     fun get_value(m: &SimpleMap<u64, u64>, k: u64): u64 {
         *simple_map::borrow(m, &k)
     }
-    spec get_value(m: &simple_map::SimpleMap<u64, u64>, k: u64): u64 {
+    spec get_value(m: &0x1::simple_map::SimpleMap<u64, u64>, k: u64): u64 {
         use 0x1::simple_map;
         pragma opaque = true;
         ensures [inferred] result == simple_map::spec_get<u64, u64>(m, k);
-        aborts_if [inferred] aborts_of<simple_map::borrow<u64, u64>>(m, k);
+        aborts_if [inferred] simple_map::spec_aborts_borrow<u64, u64>(m, k);
     }
 
 }

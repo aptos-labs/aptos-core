@@ -1,0 +1,90 @@
+=== stackless ===
+// module 0x42::copy_prop_allowed
+
+fun bump(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := add r0, #1 @2
+    1: ret [r1] @3
+}
+
+fun consume_len(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: vector<u64>
+    r1: &vector<u64>
+    r2: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_loc r0 @0
+    1: r2 := vec_len u64, r1 @1
+    2: ret [r2] @2
+}
+
+fun make(r0): vector<u64> {
+  slots: params(1), locals(1), temps(2)
+    r0: u64
+    r1: vector<u64>
+    r2: &mut vector<u64>
+    r3: u64
+  code:
+  L0:
+    0: r1 := vec_pack u64, 0, [] @0
+    1: r2 := mut_borrow_loc r1 @2
+    2: vec_push_back u64, r2, r0 @4
+    3: r2 := mut_borrow_loc r1 @5
+    4: r3 := add r0, #1 @8
+    5: vec_push_back u64, r2, r3 @9
+    6: ret [r1] @11
+}
+
+fun pair_sum(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: 0x42::copy_prop_allowed::Pair
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r1 := read_loc_field Pair::a, r0 @0
+    1: r2 := read_loc_field Pair::b, r0 @3
+    2: r2 := add r1, r2 @6
+    3: ret [r2] @7
+}
+
+fun scalar_copy(r0): u64 {
+  slots: params(1), locals(0), temps(1), transfer(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: [x0] := call bump, [r0] @1
+    1: r1 := add x0, r0 @3
+    2: ret [r1] @4
+}
+
+fun struct_copy(r0): u64 {
+  slots: params(1), locals(1), temps(1), transfer(1)
+    r0: u64
+    r1: 0x42::copy_prop_allowed::Pair
+    r2: u64
+  code:
+  L0:
+    0: r2 := ld_u64 2 @1
+    1: r1 := pack 0x42::copy_prop_allowed::Pair, [r0, r2] @2
+    2: [x0] := call pair_sum, [r1] @5
+    3: r2 := read_loc_field Pair::a, r1 @6
+    4: r2 := add x0, r2 @9
+    5: ret [r2] @10
+}
+
+fun vector_move(r0): u64 {
+  slots: params(1), locals(0), temps(0), transfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call make, [r0] @1
+    1: [x0] := call consume_len, [x0] @2
+    2: ret [x0] @3
+}

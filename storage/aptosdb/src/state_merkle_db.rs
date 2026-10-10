@@ -18,6 +18,7 @@
 
 pub(crate) use crate::sharded_jmt_merkle_db::{LeafNode, Node};
 use crate::{
+    common::{HOT_STATE_MERKLE_DB_FOLDER_NAME, STATE_MERKLE_DB_FOLDER_NAME},
     db_options::gen_state_merkle_cfds,
     sharded_jmt_merkle_db::ShardedJmtMerkleDb,
     utils::truncation_helper::{get_state_merkle_commit_progress, truncate_state_merkle_db_shards},
@@ -27,7 +28,7 @@ use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{Cache, Env, DB};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
@@ -40,9 +41,9 @@ use std::{
 
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
-        "hot_state_merkle_db"
+        HOT_STATE_MERKLE_DB_FOLDER_NAME
     } else {
-        "state_merkle_db"
+        STATE_MERKLE_DB_FOLDER_NAME
     }
 }
 

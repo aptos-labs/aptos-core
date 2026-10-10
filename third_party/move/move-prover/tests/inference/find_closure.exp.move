@@ -24,10 +24,9 @@ module 0x42::find_closure {
     }
     spec find<T>(v: &vector<T>, pred: |&T|bool has copy + drop): u64 {
         pragma opaque = true;
-        ensures [inferred] (forall x: u64: x < len(v) ==> !result_of<pred>(v[x])) && (forall x: u64: x < len(v) ==> !aborts_of<pred>(v[x])) ==> result == len(v);
-        ensures [inferred = sathard] forall y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x])) && ((forall x: u64: x < y ==> !aborts_of<pred>(v[x])) && (y < len(v) && result_of<pred>(v[y]))) ==> result == y;
-        aborts_if [inferred = sathard] exists y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x])) && ((forall x: u64: x < y ==> !aborts_of<pred>(v[x])) && (y < len(v) && aborts_of<pred>(v[y])));
-        aborts_if [inferred = sathard] exists y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x])) && ((forall x: u64: x < y ==> !aborts_of<pred>(v[x])) && (y < len(v) && !in_range(v, y)));
+        ensures [inferred] (forall x: u64: x < len(v) ==> !result_of<pred>(v[x]) && !aborts_of<pred>(v[x])) ==> result == len(v);
+        ensures [inferred = sathard] forall y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x]) && !aborts_of<pred>(v[x])) && (y < len(v) && result_of<pred>(v[y])) ==> result == y;
+        aborts_if [inferred = sathard] exists y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x]) && !aborts_of<pred>(v[x])) && (y < len(v) && aborts_of<pred>(v[y]));
     }
 
 }

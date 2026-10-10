@@ -120,11 +120,12 @@ module 0x42::state_labels {
         modifies Resource[addr];
         ensures [inferred] result == old(Resource[addr]);
         ensures [inferred] {
-            let a = Container{inner: old(Resource[addr]).value};
-            S1.. |~ publish<Container>(signer::address_of(account), a)
+            let a = signer::address_of(account);
+            let b = Container{inner: old(Resource[addr]).value};
+            S1.. |~ publish<Container>(a, b)
         };
         ensures [inferred] ..S1 |~ remove<Resource>(addr);
-        aborts_if [inferred] S1 |~ exists<Container>(signer::address_of(account));
+        aborts_if [inferred] S1 |~ (exists<Container>(signer::address_of(account)));
         aborts_if [inferred] !exists<Resource>(addr);
     }
 
@@ -149,9 +150,8 @@ module 0x42::state_labels {
     spec conditional_remove(addr: address, cond: bool): Resource {
         pragma opaque = true;
         modifies Resource[addr];
-        ensures [inferred] cond ==> result == old(Resource[addr]);
         ensures [inferred] cond ==> remove<Resource>(addr);
-        ensures [inferred] !cond ==> result == Resource{value: 0};
+        ensures [inferred] result == (if (cond) old(Resource[addr]) else Resource{value: 0});
         aborts_if [inferred] cond && !exists<Resource>(addr);
     }
 
@@ -194,13 +194,14 @@ module 0x42::state_labels {
         modifies Resource[signer::address_of(account)];
         modifies Resource[addr];
         ensures [inferred] {
-            let a = Resource{value: old(Resource[addr]).value + 1};
-            S1.. |~ publish<Resource>(signer::address_of(account), a)
+            let a = signer::address_of(account);
+            let b = Resource{value: old(Resource[addr]).value + 1};
+            S1.. |~ publish<Resource>(a, b)
         };
         ensures [inferred] ..S1 |~ remove<Resource>(addr);
-        aborts_if [inferred] S1 |~ exists<Resource>(signer::address_of(account));
-        aborts_if [inferred] Resource[addr].value == MAX_U64;
+        aborts_if [inferred] S1 |~ (exists<Resource>(signer::address_of(account)));
         aborts_if [inferred] !exists<Resource>(addr);
+        aborts_if [inferred] Resource[addr].value == MAX_U64;
     }
 
 
@@ -291,8 +292,11 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[signer::address_of(account)];
         ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr));
-        ensures [inferred] ..S1 |~ publish<Resource>(signer::address_of(account), Resource{value: 42});
-        aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr);
+        ensures [inferred] {
+            let a = signer::address_of(account);
+            ..S1 |~ publish<Resource>(a, Resource{value: 42})
+        };
+        aborts_if [inferred] S1 |~ (aborts_of<read_resource>(addr));
         aborts_if [inferred] exists<Resource>(signer::address_of(account));
     }
 
@@ -310,13 +314,12 @@ module 0x42::state_labels {
     }
     spec remove_then_try_read(addr1: address, addr2: address): u64 {
         pragma opaque = true;
-        modifies Resource[addr1];
         ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr2));
-        ensures [inferred] ..S1 |~ {
+        ensures [inferred] ({
             let a = ..S1 |~ result_of<remove_resource>(addr1);
-            ensures_of<remove_resource>(addr1, a)
-        };
-        aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr2);
+            ..S1 |~ ensures_of<remove_resource>(addr1, a)
+        });
+        aborts_if [inferred] S1 |~ (aborts_of<read_resource>(addr2));
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
 
@@ -336,7 +339,7 @@ module 0x42::state_labels {
         modifies Resource[addr1];
         ensures [inferred] result_1 == (..S1 |~ result_of<remove_resource>(addr1));
         ensures [inferred] result_2 == (S1.. |~ result_of<remove_resource>(addr2));
-        aborts_if [inferred] S1 |~ aborts_of<remove_resource>(addr2);
+        aborts_if [inferred] S1 |~ (aborts_of<remove_resource>(addr2));
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
 
@@ -354,9 +357,9 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[signer::address_of(account2)];
         modifies Resource[signer::address_of(account1)];
-        ensures [inferred] S1.. |~ ensures_of<publish_resource>(account2, v2);
-        ensures [inferred] ..S1 |~ ensures_of<publish_resource>(account1, v1);
-        aborts_if [inferred] S1 |~ aborts_of<publish_resource>(account2, v2);
+        ensures [inferred] S1.. |~ (ensures_of<publish_resource>(account2, v2));
+        ensures [inferred] ..S1 |~ (ensures_of<publish_resource>(account1, v1));
+        aborts_if [inferred] S1 |~ (aborts_of<publish_resource>(account2, v2));
         aborts_if [inferred] aborts_of<publish_resource>(account1, v1);
     }
 
@@ -405,18 +408,18 @@ module 0x42::state_labels {
             };
             S2.. |~ result_of<swap_value>(a3, a)
         };
-        aborts_if [inferred] S2 |~ {
+        aborts_if [inferred] aborts_of<swap_value>(a1, 0);
+        aborts_if [inferred] ({
+            let a = ..S1 |~ result_of<swap_value>(a1, 0);
+            S1 |~ aborts_of<swap_value>(a2, a)
+        });
+        aborts_if [inferred] ({
             let a = {
                 let b = ..S1 |~ result_of<swap_value>(a1, 0);
                 S1..S2 |~ result_of<swap_value>(a2, b)
             };
-            aborts_of<swap_value>(a3, a)
-        };
-        aborts_if [inferred] S1 |~ {
-            let a = ..S1 |~ result_of<swap_value>(a1, 0);
-            aborts_of<swap_value>(a2, a)
-        };
-        aborts_if [inferred] aborts_of<swap_value>(a1, 0);
+            S2 |~ aborts_of<swap_value>(a3, a)
+        });
     }
 
 }

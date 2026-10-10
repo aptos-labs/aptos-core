@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
-use aptos_db::common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
+use aptos_db::common::{LEDGER_DB_FOLDER_NAME, STATE_MERKLE_DB_FOLDER_NAME};
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
@@ -209,8 +209,8 @@ impl Node for K8sNode {
 
     async fn clear_storage(&self) -> Result<()> {
         // Remove all storage files
-        let ledger_db_path = format!("{}/db/{}", APTOS_DATA_DIR, LEDGER_DB_NAME);
-        let state_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_MERKLE_DB_NAME);
+        let ledger_db_path = format!("{}/db/{}", APTOS_DATA_DIR, LEDGER_DB_FOLDER_NAME);
+        let state_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_MERKLE_DB_FOLDER_NAME);
         let state_sync_db_path = format!("{}/db/{}", APTOS_DATA_DIR, STATE_SYNC_DB_NAME);
 
         let delete_storage_paths = [
@@ -293,7 +293,7 @@ impl Node for K8sNode {
     fn inspection_service_endpoint(&self) -> Url {
         Url::parse(&format!(
             "http://{}:{}",
-            &self.service_name(),
+            self.service_name(),
             self.rest_api_port()
         ))
         .unwrap()

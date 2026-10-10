@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 21,
+        "offset": 364,
+        "sha256": "ca98e117fc7c410530a238f90731740c5000b90e4c0f05c447d4d227688982e4"
+      },
+      "edit": {
+        "at": 13,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/stdlib/extracted_vector_range.move",
+      "mutant_id": "VR-range-042-end-inclusive",
+      "obligation_category": "normal-result",
+      "rationale": "The end of the range is included.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 21,
+        "offset": 398,
+        "sha256": "4bbb2914ceecb9331234c4666bfc99ceb0a34ee9f6b58cb54b7856115af93cd1"
+      },
+      "edit": {
+        "at": 14,
+        "kind": "substitute",
+        "length": 5,
+        "to": "start + step"
+      },
+      "essential": true,
+      "file": "sources/stdlib/extracted_vector_range.move",
+      "mutant_id": "VR-range-042-shifted-by-step",
+      "obligation_category": "normal-result",
+      "rationale": "Every element is one step too far.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 26,
+        "offset": 420,
+        "sha256": "6061b908c6906b7d7f2785654a3d44f064d33c2cf2d79a4388888514bffb45af"
+      },
+      "edit": {
+        "at": 21,
+        "kind": "substitute",
+        "length": 4,
+        "to": "1"
+      },
+      "essential": true,
+      "file": "sources/stdlib/extracted_vector_range.move",
+      "mutant_id": "VR-range-042-unit-step",
+      "obligation_category": "normal-result",
+      "rationale": "The range advances by one regardless of the step.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "96e9a23e050bdc8b21aa042149fe93cb269c59d7a92e86ddcd5694aabc20344c",
+  "task_id": "VR-range-042"
+}

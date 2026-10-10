@@ -1,0 +1,2 @@
+is_error: true
+timeout must be between 1 and 60 seconds; read the instructions about timeout management in the verification agent guide

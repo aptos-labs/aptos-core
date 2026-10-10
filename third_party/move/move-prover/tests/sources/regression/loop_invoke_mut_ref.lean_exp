@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/loop_invoke_mut_ref.move:7:1: error: a loop invariant at an iteration is not established
+tests/sources/regression/loop_invoke_mut_ref.move:29:5: error: leaner verification failed: the automatic verification of `apply_in_loop` failed; provide a proof: `verify apply_in_loop by …` in `tests/sources/regression/loop_invoke_mut_ref.proof.lean` (`verify apply_in_loop by skip` shows the obligations it leaves)
+tests/sources/regression/loop_invoke_mut_ref.move:7:1: error: a loop invariant at an iteration is not established
+tests/sources/regression/loop_invoke_mut_ref.move:44:5: error: leaner verification failed: the automatic verification of `invoke_with_destination_in_loop` failed; provide a proof: `verify invoke_with_destination_in_loop by …` in `tests/sources/regression/loop_invoke_mut_ref.proof.lean` (`verify invoke_with_destination_in_loop by skip` shows the obligations it leaves)

@@ -52,14 +52,16 @@
 use crate::maintenance_config::MaintenanceConfig;
 use anyhow::Result;
 use dashmap::DashMap;
-use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
+use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard, MemoryRegion};
 use mono_move_core::{
     reserved_layout_id, reserved_layouts, DescriptorId, DescriptorProvider, FrameOffset,
-    FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
-    TypeSubstitutionError, ValueLayout, TRIVIAL_DESCRIPTOR_ID,
+    FrameworkSymbols, FunctionRef, Interner, LayoutId, LayoutProvider, ModuleId, ObjectDescriptor,
+    TypeSubstitutionError, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
     hash::{Hash, Hasher},
     marker::PhantomData,
 };
@@ -71,12 +73,16 @@ mod module_ids;
 use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
-    FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
+    FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies,
+    ModuleSlot,
 };
 mod module_cache;
 use module_cache::ModuleCache;
+mod script_cache;
 use mono_move_core::interner::{InternedFunctionRef, InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use script_cache::ScriptCache;
+pub use script_cache::ScriptHash;
 
 mod types;
 pub use types::{
@@ -127,11 +133,16 @@ struct Context {
         ahash::RandomState,
     >,
     module_cache: ModuleCache,
+    /// Scripts loaded as modules, keyed by the hash of their bytes.
+    script_cache: ScriptCache,
     /// Published object descriptors.
     descriptors: Descriptors,
     /// Published type layouts (the type-driven walk shape, separate from the
     /// GC object descriptors above).
     layouts: Layouts,
+    /// Values a client preinstalls before execution for execution guards to
+    /// read, keyed by their type. See [`GlobalContext::preinstall`].
+    preinstalled: HashMap<TypeId, Box<dyn Any + Send + Sync>, ahash::RandomState>,
 }
 
 /// Storage for the published object-descriptor set.
@@ -208,11 +219,12 @@ impl Descriptors {
     }
 }
 
-/// Initial descriptor table: the two reserved entries.
+/// Returns the initial descriptor table with the reserved entries.
 fn initial_descriptors() -> boxcar::Vec<ObjectDescriptor> {
     let table = boxcar::Vec::new();
     table.push(ObjectDescriptor::trivial());
     table.push(ObjectDescriptor::closure());
+    table.push(ObjectDescriptor::pointer_vec());
     table
 }
 
@@ -318,37 +330,22 @@ pub struct ArenaRef<'guard, T: ?Sized> {
 
 impl GlobalContext {
     /// Creates a new global context with the specified number of workers that
-    /// can acquire [`ExecutionGuard`] and default maintenance config.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the number of workers is 0, greater than 128 or is not a
-    /// power of two.
+    /// can acquire [`ExecutionGuard`] and default maintenance config. The number
+    /// of workers is clamped to at least 1.
     pub fn with_num_execution_workers(num_workers: usize) -> Self {
         Self::with_num_execution_workers_and_config(num_workers, MaintenanceConfig::default())
     }
 
     /// Creates a new global context with the specified number of execution
     /// workers that can acquire [`ExecutionGuard`] and the maintenance config.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the number of workers is 0, greater than 128 or is not a
-    /// power of two.
+    /// The number of workers is clamped to at least 1.
     pub fn with_num_execution_workers_and_config(
         num_workers: usize,
         maintenance_config: MaintenanceConfig,
     ) -> Self {
-        assert!(
-            num_workers > 0 && num_workers <= 128,
-            "Number of workers must be between 1 and 128, got {num_workers}"
-        );
-        assert!(
-            num_workers.is_power_of_two(),
-            "Number of workers must be a power of two, got {num_workers}"
-        );
+        let num_workers = num_workers.max(1);
 
-        Self {
+        let mut this = Self {
             ctx: Context {
                 identifiers: DashMap::default(),
                 module_ids: DashMap::default(),
@@ -356,12 +353,27 @@ impl GlobalContext {
                 type_lists: DashMap::default(),
                 function_refs: DashMap::default(),
                 module_cache: ModuleCache::new(),
+                script_cache: ScriptCache::new(),
                 descriptors: Descriptors::default(),
                 layouts: Layouts::default(),
+                preinstalled: HashMap::default(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
-        }
+        };
+        install_framework_symbols(&mut this.ctx, &this.global_arena);
+        this
+    }
+
+    /// Makes `value` available to every execution guard through
+    /// [`ExecutionGuard::preinstalled`]. This is for things a client needs in
+    /// every transaction but only has to prepare once per context. A value of
+    /// the same type replaces the previous one, and all values are cleared
+    /// when the arenas are reset.
+    pub fn preinstall<T: Any + Send + Sync>(&mut self, value: T) {
+        self.ctx
+            .preinstalled
+            .insert(TypeId::of::<T>(), Box::new(value));
     }
 
     /// Transitions to maintenance mode by obtaining a [`MaintenanceGuard`]
@@ -425,6 +437,11 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.type_lists.len()
     }
 
+    /// Returns the number of preinstalled values.
+    pub fn preinstalled_count(&self) -> usize {
+        self.ctx.preinstalled.len()
+    }
+
     /// Resets all caches that store pointers to the arenas, and then resets
     /// the arenas as well.
     pub fn reset_arena_pool(&mut self) {
@@ -440,11 +457,52 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         unsafe {
             self.global_arena.reset_all_arenas_unchecked();
         }
+
+        // The interner started over, so the framework symbols are interned
+        // again. A client's preinstalled values are its own to redo.
+        install_framework_symbols(self.ctx, self.global_arena);
     }
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
+    /// A region of exactly `size` bytes, reusing one parked on this guard's
+    /// arena when there is one.
+    ///
+    /// The region's contents are unspecified: it may hold whatever its
+    /// previous owner left behind. The caller must write every byte before
+    /// reading it, and zero the region itself if it needs zeroed memory.
+    /// Return it with [`Self::return_region`] when done.
+    pub fn take_region(&self, size: usize) -> MemoryRegion {
+        self.global_arena.take_region(size)
+    }
+
+    /// Parks a region on this guard's arena for its next user. A region whose
+    /// size is not pooled is dropped.
+    pub fn return_region(&self, region: MemoryRegion) {
+        self.global_arena.return_region(region)
+    }
+
+    /// The value of type `T` the context preinstalled (see
+    /// [`GlobalContext::preinstall`]), if any.
+    pub fn preinstalled<T: Any + Send + Sync>(&self) -> Option<&'ctx T> {
+        let ctx: &'ctx Context = self.ctx;
+        ctx.preinstalled
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref::<T>())
+    }
+
+    /// The framework symbols the system refers to, interned once per context
+    /// rather than on every use.
+    pub fn framework_symbols(&self) -> &'ctx FrameworkSymbols {
+        self.preinstalled::<FrameworkSymbols>()
+            .expect("the framework symbols are installed at construction and after every reset")
+    }
+
     /// Inserts a loaded module into the cache, keyed by its interned ID.
+    ///
+    /// TODO(correctness): include deserializer and verifier configs in module
+    /// and script cache keys, or clear both caches when on-chain configs
+    /// change. Reusing cached code would bypass the updated rules.
     ///
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
@@ -458,6 +516,21 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // already in the cache, it is also alive (maintenance has not reset
         // caches).
         Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Inserts a script loaded as a module into the cache, keyed by the hash
+    /// of the script's bytes.
+    pub fn insert_script(&self, hash: ScriptHash, module: Box<LoadedModule>) -> &LoadedModule {
+        let ptr = self.ctx.script_cache.insert(hash, module);
+        // SAFETY: as for `insert_module`.
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    /// Looks up a cached script by the hash of its bytes.
+    pub fn get_script<'guard>(&'guard self, hash: &ScriptHash) -> Option<&'guard LoadedModule> {
+        let ptr = self.ctx.script_cache.get(hash)?;
+        // SAFETY: as for `get_module`.
+        Some(unsafe { ptr.as_ref_unchecked() })
     }
 
     /// Looks up a cached loaded module by its interned ID and returns a
@@ -557,6 +630,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
         if elem_ptr_offsets.is_empty() {
             return TRIVIAL_DESCRIPTOR_ID;
         }
+        if elem_size == 8 && elem_ptr_offsets == [FrameOffset(0)] {
+            return POINTER_VEC_DESCRIPTOR_ID;
+        }
         // Fast path: existing entry returns without touching the shard
         // write-lock.
         if let Some(id) = self.ctx.descriptors.vector_by_elem.get(&elem_ty) {
@@ -573,6 +649,15 @@ impl<'ctx> ExecutionGuard<'ctx> {
                     .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}"));
                 self.append_descriptor(desc)
             })
+    }
+
+    /// The struct-object descriptor already published for `struct_ty`, if any.
+    pub fn struct_descriptor(&self, struct_ty: InternedType) -> Option<DescriptorId> {
+        self.ctx
+            .descriptors
+            .struct_by_ty
+            .get(&struct_ty)
+            .map(|id| *id)
     }
 
     /// Materializes a struct-object descriptor for `struct_ty` (the inline
@@ -691,18 +776,24 @@ impl<'ctx> ExecutionGuard<'ctx> {
         self.ctx.layouts.by_ty.get(&ty).map(|r| *r)
     }
 
-    /// Publishes the layout for the given type and returns its assigned
-    /// [`LayoutId`].
-    pub fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
+    /// Publishes the layout for the type it was built for and returns its
+    /// assigned [`LayoutId`]. Idempotent on the type.
+    ///
+    /// Expects a layout that carries its type: a struct, a vector or a frozen
+    /// enum. Returns [`None`] for a layout without one, which never belongs in
+    /// the by-type table: references and functions have reserved ids, and
+    /// enum variant bodies go through [`Self::publish_variant_layouts`].
+    pub fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
+        let ty = layout.ty?;
         if let Some(id) = self.ctx.layouts.by_ty.get(&ty) {
-            return *id;
+            return Some(*id);
         }
 
         // TODO(perf): consider if we should append to the table without holding the shard lock.
-        *self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
+        Some(*self.ctx.layouts.by_ty.entry(ty).or_insert_with(|| {
             let idx = self.ctx.layouts.table.push(layout);
             LayoutId::from_usize(idx)
-        })
+        }))
     }
 
     /// Publishes the variant-body layouts of enum and returns their [`LayoutId`]s.
@@ -964,6 +1055,20 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 // Only private APIs below.
 // ------------------------
 
+/// Interns the framework symbols the system refers to and preinstalls them
+/// for [`ExecutionGuard::framework_symbols`]. Runs at construction and after
+/// every reset, when the interner starts over, so no execution is in progress.
+fn install_framework_symbols(ctx: &mut Context, global_arena: &GlobalArenaPool) {
+    let symbols = FrameworkSymbols::new(&ExecutionGuard {
+        ctx,
+        global_arena: global_arena
+            .try_lock_arena(0)
+            .expect("no execution is in progress on a fresh or reset context"),
+    });
+    ctx.preinstalled
+        .insert(TypeId::of::<FrameworkSymbols>(), Box::new(symbols));
+}
+
 impl<'ctx> MaintenanceGuard<'ctx> {
     /// Clears all caches stored in [`Context`]. Triggered when the global
     /// arena requires a full reset (and thus, any cache that stores pointers
@@ -986,8 +1091,10 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             type_lists,
             function_refs,
             module_cache,
+            script_cache,
             descriptors,
             layouts,
+            preinstalled,
         } = self.ctx;
 
         identifiers.clear();
@@ -997,12 +1104,16 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         function_refs.clear();
         descriptors.reset();
         layouts.reset();
+        // Dropped, not rebuilt: `reset_arena_pool` reinstalls the framework
+        // symbols, and whoever resets preinstalls its own values again.
+        preinstalled.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules
         // alive, and it is safe to free the allocation behind the box.
         unsafe {
             module_cache.clear();
+            script_cache.clear();
         }
     }
 }

@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 38,
+        "offset": 1307,
+        "sha256": "8f54cf008a98ae64f8f5e3009f6ab44ede50665bfa4d6b7119991316d14d8432"
+      },
+      "edit": {
+        "at": 6,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_price_time_index.move",
+      "mutant_id": "PT-taker-034-ask-touch-not-taker",
+      "obligation_category": "normal-result",
+      "rationale": "A bid at the best ask is not treated as a taker.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 38,
+        "offset": 1459,
+        "sha256": "8190f11dd1cb3a1e0c90a9bf1dab7789b538774650b500a4a5e2ec7893a7191a"
+      },
+      "edit": {
+        "at": 6,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_price_time_index.move",
+      "mutant_id": "PT-taker-034-ask-test-inverted",
+      "obligation_category": "normal-result",
+      "rationale": "An ask takes when it is above the best bid.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 43,
+        "offset": 1223,
+        "sha256": "b9144a05412889d29dc173d4dbc48f861584ae18497be2e126e649eed44d8cef"
+      },
+      "edit": {
+        "at": 21,
+        "kind": "substitute",
+        "length": 21,
+        "to": "self.best_bid_price()"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_price_time_index.move",
+      "mutant_id": "PT-taker-034-bid-checks-bids",
+      "obligation_category": "normal-result",
+      "rationale": "A bid is compared against the best bid.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "7f2a21dde79157dd2cb82ae185588384fe71ab20775e9a1a3ff8d70e822e50c9",
+  "task_id": "PT-taker-034"
+}

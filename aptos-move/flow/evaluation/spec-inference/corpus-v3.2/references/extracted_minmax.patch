@@ -1,0 +1,46 @@
+--- a/sources/etna/extracted_minmax.move
++++ b/sources/etna/extracted_minmax.move
+@@ -17,0 +18,3 @@ module decibel_dex::extracted_minmax {
++        } spec {
++            invariant 1 <= i && i <= len(values);
++            invariant min == min_of(values, i);
+@@ -29,0 +33,3 @@ module decibel_dex::extracted_minmax {
++        } spec {
++            invariant i <= len(values);
++            invariant max == max_of(values, i);
+@@ -32,0 +39,35 @@ module decibel_dex::extracted_minmax {
++
++    spec module {
++        /// Least of the first `k` elements. Undefined for `k == 0`, which is
++        /// exactly the case `find_min_value` aborts on.
++        fun min_of(v: vector<u64>, k: num): num {
++            if (k <= 1) { v[0] }
++            else {
++                let rest = min_of(v, k - 1);
++                if (v[k - 1] < rest) { v[k - 1] } else { rest }
++            }
++        }
++
++        /// Greatest of the first `k` elements, or zero for none -- the
++        /// accumulator's starting value, which is what makes the empty case
++        /// return rather than abort.
++        fun max_of(v: vector<u64>, k: num): num {
++            if (k <= 0) { 0 }
++            else {
++                let rest = max_of(v, k - 1);
++                if (v[k - 1] > rest) { v[k - 1] } else { rest }
++            }
++        }
++    }
++
++    spec find_min_value {
++        pragma opaque;
++        aborts_if [inferred] len(values) == 0;
++        ensures [inferred] result == min_of(values, len(values));
++    }
++
++    spec find_max_value {
++        pragma opaque;
++        aborts_if [inferred] false;
++        ensures [inferred] result == max_of(values, len(values));
++    }

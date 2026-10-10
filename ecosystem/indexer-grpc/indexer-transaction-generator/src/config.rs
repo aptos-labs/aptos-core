@@ -249,7 +249,7 @@ impl TransactionImporterConfig {
     fn validate(&self) -> anyhow::Result<()> {
         // Validate the configuration. This is to make sure that no output file shares the same name.
         let mut output_files = HashSet::new();
-        for (_, network_config) in self.configs.iter() {
+        for network_config in self.configs.values() {
             for output_file in network_config.versions_to_import.values() {
                 if !output_files.insert(output_file) {
                     return Err(anyhow::anyhow!(

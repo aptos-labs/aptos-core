@@ -25,13 +25,15 @@ pub mod utils;
 
 #[cfg(feature = "db-debugger")]
 pub mod db_debugger;
-pub mod fast_sync_storage_wrapper;
+pub(crate) mod hot_state_restore;
 
 mod db_options;
 mod event_store;
 mod ledger_db;
 mod lru_node_cache;
 pub mod native_state_committer;
+pub mod native_state_reader;
+pub mod native_state_store;
 pub mod position_buffered_state;
 pub mod position_db;
 pub(crate) mod position_merkle_batch_committer;
@@ -49,7 +51,9 @@ mod trading_native;
 #[cfg(test)]
 mod native_storage_tests;
 
-pub use native_state_committer::{MerkleLeafUpdate, NativeMerkleLeafUpdates, NativeStateCommitter};
+pub use native_state_committer::NativeStateCommitter;
+pub use native_state_reader::{InMemoryNativeStateReader, NativeStateReader};
+pub use native_state_store::{AccountKey, PositionBase, PositionKey, PositionOverlay};
 mod state_kv_db;
 mod state_merkle_db;
 mod state_store;

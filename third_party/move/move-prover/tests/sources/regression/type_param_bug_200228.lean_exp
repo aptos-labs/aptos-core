@@ -1,0 +1,4 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/type_param_bug_200228.move:12:5: error: the specification clause `ensures old(exists<Balance<Tok_1> >(addr))
+        ==> old(exists<Balance<Tok_2> >(addr))` is not established
+tests/sources/regression/type_param_bug_200228.move:9:3: error: leaner verification failed: the automatic verification of `type_param_bug` failed; provide a proof: `verify type_param_bug by …` in `tests/sources/regression/type_param_bug_200228.proof.lean` (`verify type_param_bug by skip` shows the obligations it leaves)

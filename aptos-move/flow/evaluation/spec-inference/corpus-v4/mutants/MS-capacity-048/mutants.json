@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 58,
+        "offset": 3235,
+        "sha256": "0549fa47c2cb0c3d69e869b06235c5665c2a17551d87f80dcdadb8087d6e7a2e"
+      },
+      "edit": {
+        "at": 29,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-capacity-048-clamp-inverted",
+      "obligation_category": "normal-result",
+      "rationale": "The capacity is zero whenever the queue is not over full.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 60,
+        "offset": 3166,
+        "sha256": "354296025447d740275226348596ad02bed0938f9d9d7fe7e2cda436ae379b7e"
+      },
+      "edit": {
+        "at": 55,
+        "kind": "substitute",
+        "length": 4,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-capacity-048-pending-off-by-one",
+      "obligation_category": "normal-result",
+      "rationale": "The pending count includes one transaction too many.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 64,
+        "offset": 3325,
+        "sha256": "3990f5b11b94fe3c7bf815e39822fbcbd72b6c789493c5bbd891b1b564f99846"
+      },
+      "edit": {
+        "at": 12,
+        "kind": "substitute",
+        "length": 51,
+        "to": "num_pending_transactions"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_multisig_account.move",
+      "mutant_id": "MS-capacity-048-returns-pending",
+      "obligation_category": "normal-result",
+      "rationale": "The pending count is returned instead of the remaining capacity.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "7de2017b0c339dfe8021333ff3eea5f590b8cc1b96ea29e793f22a7edcb52e97",
+  "task_id": "MS-capacity-048"
+}

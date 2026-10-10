@@ -1,0 +1,183 @@
+# The Leaner verification benchmark (third_party/move/lean/designs/verification-benchmarks.md):
+# measures the standard problems of third_party/move/lean/bench/problems.toml,
+# keeps the results as an artifact, and reports them against the recent runs.
+name: Leaner verification benchmark
+
+on:
+  # PIES dispatches this workflow nightly on main. GitHub cron is prohibited by
+  # repository policy. See devtools/aptos-cargo-cli/README.md.
+  workflow_dispatch:
+    inputs:
+      PROBLEMS:
+        description: Comma-separated problem names to measure (all when empty)
+        required: false
+        type: string
+        default: ""
+      WINDOW:
+        description: Number of recent runs the report plots
+        required: false
+        type: choice
+        options: ["10", "30", "60", "90"]
+        default: "30"
+  # A pull request of this repository runs it on request, with the
+  # `CICD:run-leaner-bench` label, and is compared with main's nightlies.
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+# Every nightly produces a point; never cancel one for another.
+concurrency:
+  group: leaner-bench-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    # Untrusted pull request code runs on a self-hosted runner: forks are
+    # excluded.
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-leaner-bench') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    # The dedicated runner of the execution performance test, in its queue,
+    # so no other benchmark shares the machine.
+    runs-on: benchmark-c3d-60
+    concurrency:
+      group: execution-benchmark-benchmark-c3d-60
+      cancel-in-progress: false
+      queue: max
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The pull request's head, not its merge with the base.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Lean toolchain
+        run: |
+          scripts/dev_setup.sh -b -p -l -k
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Build the standalone exchange frontend
+        run: cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
+
+      - name: Install the Rust exporter's pinned toolchain
+        working-directory: third_party/move/lean/leaner-rust/rust-exporter
+        run: cargo --version
+
+      - name: Build the benchmark executable
+        working-directory: third_party/move/lean/leaner-e2e-tests
+        run: |
+          source "$HOME/.profile"
+          lake build leaner-bench
+
+      - name: Measure the problems
+        env:
+          RUNNER_NAME: benchmark-c3d-60
+          PROBLEMS: ${{ inputs.PROBLEMS }}
+        run: |
+          source "$HOME/.profile"
+          python3 third_party/move/lean/scripts/leaner-bench.py run \
+            --out "$RUNNER_TEMP/leaner-bench/results.json" ${PROBLEMS:+--only "$PROBLEMS"}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leaner-bench-results
+          path: ${{ runner.temp }}/leaner-bench/results.json
+          if-no-files-found: error
+          retention-days: 90
+
+  report:
+    needs: bench
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: read
+      actions: read # the results of earlier runs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: third_party/move/lean/scripts
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: leaner-bench-results
+          path: ${{ runner.temp }}/current
+
+      - name: Render the report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEANER_BENCH_CACHE: ${{ runner.temp }}/cache
+          WINDOW: ${{ inputs.WINDOW || '30' }}
+          PAGE_URL: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && format('https://{0}.github.io/{1}/leaner-bench/', github.repository_owner, github.event.repository.name) || '' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          python3 third_party/move/lean/scripts/leaner-bench.py report \
+            --current "$RUNNER_TEMP/current/results.json" --window "$WINDOW" \
+            --branch main --page-url "$PAGE_URL" \
+            --html "$RUNNER_TEMP/report/index.html" \
+            --markdown "$RUNNER_TEMP/summary.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: leaner-bench-report
+          path: ${{ runner.temp }}/report
+          retention-days: 90
+
+  publish:
+    # Publish only main's latest report at the stable Pages URL. The charts
+    # contain the run history, so no per-run HTML pages are kept.
+    needs: report
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: write # the gh-pages branch
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: pages
+          fetch-depth: 1
+          sparse-checkout: leaner-bench
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: leaner-bench-report
+          path: ${{ runner.temp }}/report
+
+      - name: Publish the report
+        env:
+          COMMIT: ${{ github.sha }}
+        run: |
+          cd pages
+          git rm -rq --ignore-unmatch leaner-bench/runs
+          mkdir -p leaner-bench
+          cp "$RUNNER_TEMP/report/index.html" leaner-bench/index.html
+          git add leaner-bench
+          git diff --cached --quiet && exit 0
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "leaner-bench: run $GITHUB_RUN_ID of $COMMIT"
+          # A concurrent deploy to gh-pages moves the branch: rebase and retry.
+          for attempt in 1 2 3; do
+            git push -q origin HEAD:gh-pages && exit 0
+            git pull -q --rebase origin gh-pages
+          done
+          exit 1

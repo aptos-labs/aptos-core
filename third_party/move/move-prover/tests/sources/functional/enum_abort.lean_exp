@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/enum_abort.move:18:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/enum_abort.move:17:5: error: leaner verification failed: the automatic verification of `select_abort` failed; provide a proof: `verify select_abort by …` in `tests/sources/functional/enum_abort.proof.lean` (`verify select_abort by skip` shows the obligations it leaves)
+tests/sources/functional/enum_abort.move:32:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/enum_abort.move:31:5: error: leaner verification failed: the automatic verification of `unpack_abort` failed; provide a proof: `verify unpack_abort by …` in `tests/sources/functional/enum_abort.proof.lean` (`verify unpack_abort by skip` shows the obligations it leaves)
+tests/sources/functional/enum_abort.move:62:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/enum_abort.move:61:5: error: leaner verification failed: the automatic verification of `test_borrow_field_abort` failed; provide a proof: `verify test_borrow_field_abort by …` in `tests/sources/functional/enum_abort.proof.lean` (`verify test_borrow_field_abort by skip` shows the obligations it leaves)
+tests/sources/functional/enum_abort.move:103:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/enum_abort.move:102:5: error: leaner verification failed: the automatic verification of `test_get_field_abort` failed; provide a proof: `verify test_get_field_abort by …` in `tests/sources/functional/enum_abort.proof.lean` (`verify test_get_field_abort by skip` shows the obligations it leaves)
+tests/sources/functional/enum_abort.move:130:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/enum_abort.move:129:5: error: leaner verification failed: the automatic verification of `test_match_abort` failed; provide a proof: `verify test_match_abort by …` in `tests/sources/functional/enum_abort.proof.lean` (`verify test_match_abort by skip` shows the obligations it leaves)

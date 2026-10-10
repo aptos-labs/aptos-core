@@ -64,6 +64,12 @@ pub struct BlockExecutorLocalConfig {
     pub enable_pre_write: bool,
 }
 
+impl Default for BlockExecutorLocalConfig {
+    fn default() -> Self {
+        Self::default_with_concurrency_level(1)
+    }
+}
+
 impl BlockExecutorLocalConfig {
     /// Returns a new config with specified concurrency level and:
     ///   - Allowed fallback to sequential execution from parallel.

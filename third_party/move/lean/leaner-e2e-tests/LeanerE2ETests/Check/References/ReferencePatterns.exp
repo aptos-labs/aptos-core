@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/References/ReferencePatterns.lean:59:4: error: the specification clause `aborts_if false` is not established
+LeanerE2ETests/Check/References/ReferencePatterns.lean:58:7: error: leaner verification failed: the automatic verification of `reset_incorrect` failed; provide a proof: `verify reset_incorrect by …` in the module (`verify reset_incorrect by skip` shows the obligations it leaves)

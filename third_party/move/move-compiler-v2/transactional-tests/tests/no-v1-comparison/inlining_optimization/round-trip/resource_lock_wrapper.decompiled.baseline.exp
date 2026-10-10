@@ -1,0 +1,15 @@
+processed 6 tasks
+task 0 lines 3-30:  publish [module 0x42::b {]
+task 1 lines 33-39:  publish [module 0x42::c {]
+task 2 lines 42-52:  publish [module 0x42::a {]
+task 3 lines 55-55:  run 0x42::b::init --signers 0x42
+task 4 lines 57-57:  run 0x42::a::go
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::b,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 1)],
+}
+task 5 lines 59-59:  run 0x42::a::check
+return values: 0

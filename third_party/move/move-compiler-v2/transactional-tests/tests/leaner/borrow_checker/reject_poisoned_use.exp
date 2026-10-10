@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-14:  publish [import LeanerMove]
+Error: compilation errors:
+ error: LIR-SEMANTIC-BORROW-CONFLICT: borrow conflicts with an active mutable loan
+  ┌─ TEMPFILE:9:21
+  │
+9 │     let poisoned := &mut owner
+  │                     ^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

@@ -71,38 +71,46 @@ module 0x1::test {
 // 2^64 doesn't fit u64.
 // RUN: execute 0x1::test::u128_to_u64 --args 18446744073709551616
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.u128->u64: value 18446744073709551616 out of range for u64
+// CHECK-ERROR-PARITY
 
 // u256 value above u128::MAX.
 // RUN: execute 0x1::test::u256_to_u128 --args 340282366920938463463374607431768211456
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.u256->u128: value 340282366920938463463374607431768211456 out of range for u128
+// CHECK-ERROR-PARITY
 
 // i64::MAX + 1 doesn't fit i64.
 // RUN: execute 0x1::test::i128_to_i64 --args 9223372036854775808
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.i128->i64: value 9223372036854775808 out of range for i64
+// CHECK-ERROR-PARITY
 
 // u64::MAX > i64::MAX.
 // RUN: execute 0x1::test::u64_to_i64 --args 18446744073709551615
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.u64->i64: value 18446744073709551615 out of range for i64
+// CHECK-ERROR-PARITY
 
 // u256::MAX > i256::MAX (top half of the unsigned range).
 // RUN: execute 0x1::test::u256_to_i256 --args 115792089237316195423570985008687907853269984665640564039457584007913129639935
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.u256->i256: value 115792089237316195423570985008687907853269984665640564039457584007913129639935 out of range for i256
+// CHECK-ERROR-PARITY
 
 // Negative -> unsigned aborts.
 // RUN: execute 0x1::test::i64_to_u64 --args -1
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.i64->u64: value -1 out of range for u64
+// CHECK-ERROR-PARITY
 
 // Negative -> wider unsigned still aborts.
 // RUN: execute 0x1::test::i64_to_u128 --args -5
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.i64->u128: value -5 out of range for u128
+// CHECK-ERROR-PARITY
 
 // RUN: execute 0x1::test::i256_to_u256 --args -1
 // CHECK-V1-SUBSTR: ARITHMETIC_ERROR
-// CHECK-V2-SUBSTR: value out of range
+// CHECK-V2-SUBSTR: Cast.i256->u256: value -1 out of range for u256
+// CHECK-ERROR-PARITY

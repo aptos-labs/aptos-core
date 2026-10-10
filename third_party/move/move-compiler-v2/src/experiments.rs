@@ -105,16 +105,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
-            name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
-            description: "Turns on or off inlining across package boundaries".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
-        },
-        Experiment {
-            name: Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS.to_string(),
-            description: "Turns on or off restricting inlining optimization to primary target modules".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
-        },
-        Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
             description: "Turns on or off specification checks".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
@@ -134,6 +124,12 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             name: Experiment::LAMBDA_LIFTING_INLINE.to_string(),
             description: "Whether inline functions shall be included in lambda lifting".to_string(),
             default: Given(false),
+        },
+        Experiment {
+            name: Experiment::NATIVE_CHECK.to_string(),
+            description: "Whether to check for native functions/structs in non-special modules"
+                .to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
             name: Experiment::RECURSIVE_TYPE_CHECK.to_string(),
@@ -297,11 +293,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
-        Experiment {
-            name: Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string(),
-            description: "Set of optimizations that are safe to perform on the framework, but are disabled otherwise".to_string(),
-            default: Given(false),
-        },
     ];
     experiments
         .into_iter()
@@ -314,7 +305,6 @@ impl Experiment {
     pub const ABILITY_CHECK: &'static str = "ability-check";
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
-    pub const ACROSS_PACKAGE_INLINING: &'static str = "across-package-inlining";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
@@ -324,19 +314,17 @@ impl Experiment {
     pub const COMPILE_FOR_TESTING: &'static str = "compile-for-testing";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
-    pub const EXTENDED_FRAMEWORK_OPTIMIZATIONS: &'static str = "extended-framework-optimizations";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
     pub const INLINING: &'static str = "inlining";
     pub const INLINING_OPTIMIZATION: &'static str = "inlining-optimization";
-    pub const INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS: &'static str =
-        "inlining-optimization-to-non-primary-targets";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
     pub const LIFT_INLINE_FUNS: &'static str = "lift-inline-funs";
     pub const LINT_CHECKS: &'static str = "lint-checks";
     pub const MESSAGE_FORMAT_JSON: &'static str = "compiler-message-format-json";
+    pub const NATIVE_CHECK: &'static str = "native-check";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const OPTIMIZE_EXTRA: &'static str = "optimize-extra";
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =

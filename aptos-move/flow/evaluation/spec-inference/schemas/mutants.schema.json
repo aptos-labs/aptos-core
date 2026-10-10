@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviewed essential mutants for one task",
+  "type": "object",
+  "required": ["schema_version", "task_id", "target", "mutants"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "task_id": {"type": "string"},
+    "target": {"type": "string"},
+    "mutants": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "mutant_id",
+          "description",
+          "obligation_category",
+          "essential",
+          "patch",
+          "patch_sha256",
+          "reviews"
+        ],
+        "properties": {
+          "mutant_id": {"type": "string"},
+          "description": {"type": "string"},
+          "obligation_category": {
+            "enum": ["result", "abort", "state-transition", "frame", "loop-invariant"]
+          },
+          "essential": {"const": true},
+          "patch": {"type": "string"},
+          "patch_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "reviews": {"type": "array", "minItems": 2}
+        }
+      }
+    }
+  }
+}

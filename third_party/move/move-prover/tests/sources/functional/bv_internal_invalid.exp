@@ -1,0 +1,26 @@
+Move prover returns: exiting with bytecode transformation errors
+error: `pragma bv_internal` requires `pragma opaque`: callers must not see the function's bitvector representation
+  ┌─ tests/sources/functional/bv_internal_invalid.move:7:5
+  │
+7 │ ╭     spec not_opaque {
+8 │ │         pragma bv_internal;
+9 │ │     }
+  │ ╰─────^
+
+error: the specification of a `bv_internal` function must stay in integer world and cannot use bitwise operators or int2bv
+   ┌─ tests/sources/functional/bv_internal_invalid.move:17:9
+   │
+17 │         ensures result == (x | 2);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the specification of a `bv_internal` function must stay in integer world and cannot use bitwise operators or int2bv
+   ┌─ tests/sources/functional/bv_internal_invalid.move:26:9
+   │
+26 │         ensures [abstract] result == or_four(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: inside a `bv_internal` function, bitwise-classified values cannot flow through struct fields; exchange them as plain parameters and return values
+   ┌─ tests/sources/functional/bv_internal_invalid.move:37:9
+   │
+37 │         Wrap { v: x & 3 }
+   │         ^^^^^^^^^^^^^^^^^

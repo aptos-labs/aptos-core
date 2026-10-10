@@ -26,9 +26,8 @@ module 0xc0ffee::m {
         }
     }
 
-    // Nested mixed-tuple matches: inner match in arm body of outer match.
-    // Both produce _$disc_0/_$disc_1/_$np_0/_$prim_0 bindings; inner must
-    // shadow outer correctly without binding conflicts.
+    // The inner bindings must shadow the outer bindings within the inner match
+    // without changing which values either match reads.
     fun test_nested(x: u8): u8 {
         match (make_pair(x)) {
             (Data::V1(a), 1) => match (make_pair(a)) {

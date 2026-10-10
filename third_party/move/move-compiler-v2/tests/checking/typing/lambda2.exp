@@ -1,19 +1,39 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M {
+    public fun fun_arg_lambda_not_allowed(x: |u64|) {
+        Tuple()
+    }
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public inline fun inline_result_lambda_not_allowed(): |u64| {
+        Abort(1)
+    }
+    public fun lambda_not_allowed() {
+        {
+          let _x: |u64|u64 = closure#0M::__lambda__1__lambda_not_allowed();
+          Tuple()
+        }
+    }
+    private fun __lambda__1__lambda_not_allowed(i: u64): u64 {
+        Add<u64>(i, 1)
+    }
+} // end 0x8675309::M
 
-Diagnostics:
-error: Only inline functions may have function-typed parameters, but non-inline function `M::fun_arg_lambda_not_allowed` has a function parameter:
-   ┌─ tests/checking/typing/lambda2.move:84:16
-   │
-84 │     public fun fun_arg_lambda_not_allowed(x: |u64|) {} // expected lambda not allowed
-   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^ - Parameter `x` has function-valued type `|u64|`.
-
-error: Functions may not return function-typed values, but function `M::inline_result_lambda_not_allowed` return type is the function type `|u64|`:
-   ┌─ tests/checking/typing/lambda2.move:86:59
-   │
-86 │     public inline fun inline_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-   │                                                           ^^^^^
-
-error: Functions may not return function-typed values, but function `M::fun_result_lambda_not_allowed` return type is the function type `|u64|`:
-   ┌─ tests/checking/typing/lambda2.move:89:49
-   │
-89 │     public fun fun_result_lambda_not_allowed(): |u64| {  // expected lambda not allowed
-   │                                                 ^^^^^
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M {
+    public fun fun_arg_lambda_not_allowed(x: |u64|) {
+    }
+    public fun fun_result_lambda_not_allowed(): |u64| {
+        abort 1
+    }
+    public inline fun inline_result_lambda_not_allowed(): |u64| {
+        abort 1
+    }
+    public fun lambda_not_allowed() {
+        let _x = |x| lambda__1__lambda_not_allowed(x);
+    }
+    fun lambda__1__lambda_not_allowed(i: u64): u64 {
+        i + 1
+    }
+}

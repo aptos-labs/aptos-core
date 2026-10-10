@@ -1,0 +1,17 @@
+%% Named-author build: arXiv preprint and camera-ready.
+%%
+%% Springer LNCS format (llncs.cls, splncs04.bst) for TACAS 2027.
+%% The body lives in paper.tex, shared with main-anon.tex.
+%%
+%% Built by `latexmk` (see latexmkrc); packaged by make-arxiv.sh.
+
+\documentclass[runningheads]{llncs}
+
+\newif\ifAnonymous
+
+\input{paper.tex}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

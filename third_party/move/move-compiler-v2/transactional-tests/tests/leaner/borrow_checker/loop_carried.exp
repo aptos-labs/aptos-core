@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-18:  publish [import LeanerMove]
+task 1 lines 20-20:  run 0x0::LeanerBorrowLoop::run
+return values: 6

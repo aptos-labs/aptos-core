@@ -1,0 +1,892 @@
+--- a/sources/AptosExperimental/trading/market/dead_mans_switch_operations.spec.move
++++ b/sources/AptosExperimental/trading/market/dead_mans_switch_operations.spec.move
+@@ -0,0 +1,17 @@
++spec aptos_experimental::dead_mans_switch_operations {
++    use aptos_framework::big_ordered_map;
++
++    /// The switch must be enabled and the account must hold a bulk order; the
++    /// validity check and the cancellation path add aborts of their own.
++    spec cleanup_expired_bulk_order<M: store + copy + drop, R: store + copy + drop>(
++        market: &mut Market<M>,
++        account: address,
++        callbacks: &MarketClearinghouseCallbacks<M, R>
++    ) {
++        pragma aborts_if_is_partial;
++        aborts_if !market.config.enable_dead_mans_switch;
++        aborts_if !big_ordered_map::spec_contains_key(
++            market.order_book.bulk_order_book.orders, account
++        );
++    }
++}
+--- a/sources/AptosExperimental/trading/order_book/bulk_order_book.move
++++ b/sources/AptosExperimental/trading/order_book/bulk_order_book.move
+@@ -369,13 +369,11 @@
+     public(friend) fun get_remaining_size<M: store + copy + drop>(
+         self: &BulkOrderBook<M>, account: address, is_bid: bool
+     ): u64 {
+-        let result_option =
+-            self.orders.get_and_map(
+-                &account,
+-                |order| order.get_order_request().get_total_remaining_size(is_bid)
+-            );
+-        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+-        result_option.destroy_some()
++        // Read the order the way `get_bulk_order` does rather than through
++        // `get_and_map`'s lambda: effectful HOF verification does not scale
++        // yet (TODO(#20391)).
++        assert!(self.orders.contains(&account), EORDER_NOT_FOUND);
++        self.orders.borrow(&account).get_order_request().get_total_remaining_size(is_bid)
+     }
+ 
+     public(friend) fun get_prices<M: store + copy + drop>(
+--- a/sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move
++++ b/sources/AptosExperimental/trading/order_book/bulk_order_book.spec.move
+@@ -0,0 +1,16 @@
++spec aptos_experimental::bulk_order_book {
++    use aptos_framework::big_ordered_map;
++    use aptos_trading::bulk_order_types;
++
++    spec get_remaining_size<M: store + copy + drop>(
++        self: &BulkOrderBook<M>, account: address, is_bid: bool
++    ): u64 {
++        pragma opaque;
++        let sizes = bulk_order_types::spec_side_sizes(
++            big_ordered_map::spec_get(self.orders, account).order_request, is_bid
++        );
++        aborts_if !big_ordered_map::spec_contains_key(self.orders, account);
++        aborts_if bulk_order_types::spec_sum_from(sizes, 0) > MAX_U64;
++        ensures result == bulk_order_types::spec_sum_from(sizes, 0);
++    }
++}
+--- a/sources/AptosExperimental/trading/order_book/order_book.spec.move
++++ b/sources/AptosExperimental/trading/order_book/order_book.spec.move
+@@ -0,0 +1,15 @@
++spec aptos_experimental::order_book {
++    use aptos_framework::big_ordered_map;
++    use aptos_trading::order_book_types::AccountClientOrderId;
++
++    spec client_order_id_exists<M: store + copy + drop>(
++        self: &OrderBook<M>, order_creator: address, client_order_id: String
++    ): bool {
++        pragma opaque;
++        aborts_if false;
++        ensures result == big_ordered_map::spec_contains_key(
++            self.single_order_book.client_order_ids,
++            AccountClientOrderId { account: order_creator, client_order_id }
++        );
++    }
++}
+--- a/sources/AptosExperimental/trading/order_book/pending_order_book_index.move
++++ b/sources/AptosExperimental/trading/order_book/pending_order_book_index.move
+@@ -125,6 +125,9 @@
+         orders: &mut vector<OrderId>,
+         limit: u64
+     ) {
++        let taken_from = orders.length();
++        let orders_before = *orders;
++        let index_before = self.price_move_up_index.compute_length();
+         while (!self.price_move_up_index.is_empty() && orders.length() < limit) {
+             let (key, order_id) = self.price_move_up_index.borrow_front();
+             if (current_price >= key.price) {
+@@ -133,6 +136,11 @@
+             } else {
+                 break;
+             }
++        } spec {
++            invariant len(orders) >= taken_from;
++            invariant len(orders) <= taken_from || len(orders) <= limit;
++            invariant forall i in 0..taken_from: orders[i] == orders_before[i];
++            invariant big_ordered_map::spec_len(self.price_move_up_index) <= index_before;
+         };
+     }
+ 
+--- a/sources/AptosExperimental/trading/order_book/pending_order_book_index.spec.move
++++ b/sources/AptosExperimental/trading/order_book/pending_order_book_index.spec.move
+@@ -0,0 +1,22 @@
++spec aptos_experimental::pending_order_book_index {
++    use aptos_framework::big_ordered_map;
++
++    /// Orders already collected are kept in place; at most `limit` are held
++    /// afterwards unless more were held before; the index only shrinks. The
++    /// front is borrowed only while the index is non-empty and removed under
++    /// its own key, so nothing aborts.
++    spec take_ready_price_move_up_orders(
++        self: &mut PendingOrderBookIndex,
++        current_price: u64,
++        orders: &mut vector<OrderId>,
++        limit: u64
++    ) {
++        pragma opaque;
++        aborts_if false;
++        ensures len(orders) >= old(len(orders));
++        ensures len(orders) <= old(len(orders)) || len(orders) <= limit;
++        ensures forall i in 0..old(len(orders)): orders[i] == old(orders)[i];
++        ensures big_ordered_map::spec_len(self.price_move_up_index)
++            <= old(big_ordered_map::spec_len(self.price_move_up_index));
++    }
++}
+--- a/sources/AptosExperimental/trading/order_book/price_time_index.spec.move
++++ b/sources/AptosExperimental/trading/order_book/price_time_index.spec.move
+@@ -0,0 +1,13 @@
++spec aptos_experimental::price_time_index {
++    use aptos_framework::big_ordered_map;
++
++    /// Both sides start as empty maps under the default configuration, whose
++    /// degrees are within the range the map accepts.
++    spec new_price_time_idx(): PriceTimeIndex {
++        pragma opaque;
++        aborts_if false;
++        ensures result is PriceTimeIndex::V1;
++        ensures big_ordered_map::spec_len(result.buys) == 0;
++        ensures big_ordered_map::spec_len(result.sells) == 0;
++    }
++}
+--- a/sources/AptosExperimental/trading/position/native_position_types.spec.move
++++ b/sources/AptosExperimental/trading/position/native_position_types.spec.move
+@@ -0,0 +1,53 @@
++spec aptos_experimental::native_position_types {
++    spec new_accumulative_index(index: i128): AccumulativeIndex {
++        pragma opaque;
++        aborts_if false;
++        ensures result == AccumulativeIndex { index };
++    }
++
++    spec accumulative_index_value(idx: &AccumulativeIndex): i128 {
++        pragma opaque;
++        aborts_if false;
++        ensures result == idx.index;
++    }
++
++    spec new_perp_v1(
++        size: u64,
++        is_long: bool,
++        entry_px_times_size_sum: u128,
++        avg_acquire_entry_px: u64,
++        user_leverage: u8,
++        is_isolated: bool,
++        funding_index_at_last_update: AccumulativeIndex,
++        unrealized_funding_amount_before_last_update: i64,
++        timestamp: u64,
++    ): Position {
++        pragma opaque;
++        aborts_if false;
++        ensures result == Position::PerpV1 {
++            size,
++            is_long,
++            entry_px_times_size_sum,
++            avg_acquire_entry_px,
++            user_leverage,
++            is_isolated,
++            funding_index_at_last_update,
++            unrealized_funding_amount_before_last_update,
++            timestamp,
++        };
++    }
++
++    spec unpack_perp_v1(pos: Position): (u64, bool, u128, u64, u8, bool, AccumulativeIndex, i64, u64) {
++        pragma opaque;
++        aborts_if false;
++        ensures result_1 == pos.size;
++        ensures result_2 == pos.is_long;
++        ensures result_3 == pos.entry_px_times_size_sum;
++        ensures result_4 == pos.avg_acquire_entry_px;
++        ensures result_5 == pos.user_leverage;
++        ensures result_6 == pos.is_isolated;
++        ensures result_7 == pos.funding_index_at_last_update;
++        ensures result_8 == pos.unrealized_funding_amount_before_last_update;
++        ensures result_9 == pos.timestamp;
++    }
++}
+--- a/sources/AptosExperimental/trading/position/trading_native_capability.spec.move
++++ b/sources/AptosExperimental/trading/position/trading_native_capability.spec.move
+@@ -0,0 +1,102 @@
++spec aptos_experimental::trading_native_capability {
++    use std::features::TRADING_NATIVE;
++
++    spec fun spec_registry(): ExchangeRegistry {
++        global<ExchangeRegistry>(@aptos_experimental)
++    }
++
++    /// The feature flag, registration and denial checks every capability use
++    /// shares.
++    spec fun spec_active_aborts(addr: address): bool {
++        !features::spec_is_enabled(TRADING_NATIVE)
++            || !exists<ExchangeRegistry>(@aptos_experimental)
++            || !big_ordered_map::spec_contains_key(spec_registry().registered, addr)
++            || big_ordered_map::spec_contains_key(spec_registry().denied, addr)
++    }
++
++    spec init_module(deployer: &signer) {
++        pragma opaque;
++        aborts_if signer::address_of(deployer) != @aptos_experimental;
++        modifies global<ExchangeRegistry>(@aptos_experimental);
++        ensures exists<ExchangeRegistry>(@aptos_experimental);
++        ensures old(exists<ExchangeRegistry>(@aptos_experimental))
++            ==> spec_registry() == old(spec_registry());
++        ensures !old(exists<ExchangeRegistry>(@aptos_experimental))
++            ==> big_ordered_map::spec_len(spec_registry().registered) == 0
++                && big_ordered_map::spec_len(spec_registry().denied) == 0;
++    }
++
++    spec is_denied(exchange: address): bool {
++        pragma opaque;
++        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
++        ensures result == big_ordered_map::spec_contains_key(spec_registry().denied, exchange);
++    }
++
++    spec register(framework: &signer, exchange: address) {
++        pragma opaque;
++        aborts_if signer::address_of(framework) != @aptos_framework;
++        aborts_if !features::spec_is_enabled(TRADING_NATIVE);
++        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
++        modifies global<ExchangeRegistry>(@aptos_experimental);
++        ensures big_ordered_map::spec_contains_key(spec_registry().registered, exchange);
++        ensures spec_registry().denied == old(spec_registry().denied);
++        ensures spec_registry().registered
++            == (if (big_ordered_map::spec_contains_key(old(spec_registry().registered), exchange)) {
++                old(spec_registry().registered)
++            } else {
++                big_ordered_map::spec_set(old(spec_registry().registered), exchange, Empty {})
++            });
++    }
++
++    spec assert_active(addr: address) {
++        pragma opaque;
++        aborts_if spec_active_aborts(addr);
++    }
++
++    spec get_capability(exchange: &signer): TradingNativeCapability {
++        pragma opaque;
++        aborts_if spec_active_aborts(signer::address_of(exchange));
++        ensures result == TradingNativeCapability { exchange: signer::address_of(exchange) };
++    }
++
++    spec assert_valid(cap: &TradingNativeCapability) {
++        pragma opaque;
++        aborts_if spec_active_aborts(cap.exchange);
++    }
++
++    spec deny(framework: &signer, exchange: address) {
++        pragma opaque;
++        aborts_if signer::address_of(framework) != @aptos_framework;
++        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
++        modifies global<ExchangeRegistry>(@aptos_experimental);
++        ensures big_ordered_map::spec_contains_key(spec_registry().denied, exchange);
++        ensures spec_registry().registered == old(spec_registry().registered);
++        ensures spec_registry().denied
++            == (if (big_ordered_map::spec_contains_key(old(spec_registry().denied), exchange)) {
++                old(spec_registry().denied)
++            } else {
++                big_ordered_map::spec_set(old(spec_registry().denied), exchange, Empty {})
++            });
++    }
++
++    spec reenable(framework: &signer, exchange: address) {
++        pragma opaque;
++        aborts_if signer::address_of(framework) != @aptos_framework;
++        aborts_if !exists<ExchangeRegistry>(@aptos_experimental);
++        modifies global<ExchangeRegistry>(@aptos_experimental);
++        ensures !big_ordered_map::spec_contains_key(spec_registry().denied, exchange);
++        ensures spec_registry().registered == old(spec_registry().registered);
++        ensures spec_registry().denied
++            == (if (big_ordered_map::spec_contains_key(old(spec_registry().denied), exchange)) {
++                big_ordered_map::spec_remove(old(spec_registry().denied), exchange)
++            } else {
++                old(spec_registry().denied)
++            });
++    }
++
++    spec exchange(cap: &TradingNativeCapability): address {
++        pragma opaque;
++        aborts_if false;
++        ensures result == cap.exchange;
++    }
++}
+--- a/sources/AptosFramework/account/account.spec.move
++++ b/sources/AptosFramework/account/account.spec.move
+@@ -545,6 +545,7 @@
+         aborts_if !exists<Account>(signer::address_of(account));
+         let account_resource = global<Account>(signer::address_of(account));
+         aborts_if !option::is_some(account_resource.signer_capability_offer.for);
++        ensures option::is_none(global<Account>(signer::address_of(account)).signer_capability_offer.for);
+     }
+ 
+     spec revoke_rotation_capability(account: &signer, to_be_revoked_address: address) {
+--- a/sources/AptosFramework/aptos_coin.move
++++ b/sources/AptosFramework/aptos_coin.move
+@@ -151,6 +151,10 @@
+                 break
+             };
+             i += 1;
++        } spec {
++            invariant i <= len;
++            invariant option::is_none(index);
++            invariant forall k in 0..i: delegations[k].to != addr;
+         };
+         index
+     }
+--- a/sources/AptosFramework/aptos_coin.spec.move
++++ b/sources/AptosFramework/aptos_coin.spec.move
+@@ -84,6 +84,12 @@
+ 
+     spec find_delegation(addr: address): Option<u64> {
+         aborts_if !exists<Delegations>(@core_resources);
++        let delegations = global<Delegations>(@core_resources).inner;
++        ensures option::is_some(result) ==> option::borrow(result) < len(delegations)
++            && delegations[option::borrow(result)].to == addr;
++        ensures option::is_some(result) ==>
++            (forall k in 0..option::borrow(result): delegations[k].to != addr);
++        ensures option::is_none(result) ==> (forall k in 0..len(delegations): delegations[k].to != addr);
+     }
+ 
+     spec schema ExistsAptosCoin {
+--- a/sources/AptosFramework/aptos_governance.spec.move
++++ b/sources/AptosFramework/aptos_governance.spec.move
+@@ -117,15 +117,13 @@
+         required_proposer_stake: u64,
+         voting_duration_secs: u64,
+     ) {
++        pragma verify = true;
+         let addr = signer::address_of(aptos_framework);
+         let governance_config = global<GovernanceConfig>(@aptos_framework);
+ 
+         let post new_governance_config = global<GovernanceConfig>(@aptos_framework);
+         aborts_if addr != @aptos_framework;
+         aborts_if !exists<GovernanceConfig>(@aptos_framework);
+-        aborts_if !features::spec_is_enabled(features::MODULE_EVENT_MIGRATION) && !exists<GovernanceEvents>(
+-            @aptos_framework
+-        );
+         modifies global<GovernanceConfig>(addr);
+ 
+         ensures new_governance_config.voting_duration_secs == voting_duration_secs;
+--- a/sources/AptosFramework/code.move
++++ b/sources/AptosFramework/code.move
+@@ -240,14 +240,25 @@
+ 
+         let registry = borrow_global_mut<PackageRegistry>(code_object_addr);
+         // `for_each_mut` is not used because effectful HOF verification
+-        // does not scale yet (TODO(#20391)).
++        // does not scale yet (TODO(#20391)). The packages are rebuilt into a
++        // fresh vector rather than mutated in place through `borrow_mut`, so
++        // the only write to the registry is the single assignment below.
++        let packages_before = registry.packages;
++        let frozen = vector::empty();
+         let i = 0;
+-        let len = registry.packages.length();
+-        while (i < len) {
+-            let package: &mut PackageMetadata = registry.packages.borrow_mut(i);
++        let n = packages_before.length();
++        while (i < n) {
++            let package = packages_before[i];
+             package.upgrade_policy = upgrade_policy_immutable();
++            frozen.push_back(package);
+             i += 1;
++        } spec {
++            invariant i <= len(packages_before);
++            invariant len(frozen) == i;
++            invariant forall k in 0..i: frozen[k]
++                == update_field(packages_before[k], upgrade_policy, UpgradePolicy { policy: 2 });
+         };
++        registry.packages = frozen;
+ 
+         // We unfortunately have to make a copy of each package to avoid borrow checker issues as check_dependencies
+         // needs to borrow PackageRegistry from the dependency packages.
+@@ -257,9 +268,11 @@
+         // `for_each` is not used because effectful HOF verification
+         // does not scale yet (TODO(#20391)).
+         let i = 0;
+-        while (i < len) {
++        while (i < n) {
+             check_dependencies(code_object_addr, packages.borrow(i));
+             i += 1;
++        } spec {
++            invariant i <= len(packages);
+         };
+     }
+ 
+@@ -306,8 +319,14 @@
+     acquires PackageRegistry {
+         let allowed_module_deps = vector::empty();
+         let deps = &pack.deps;
+-        deps.for_each_ref(|dep| {
+-            let dep: &PackageDep = dep;
++        // Explicit loops in place of `for_each_ref` and `any`: their lambdas
++        // mutated a capture, which effectful HOF verification does not scale
++        // to yet (TODO(#20391)). `spec_allowed_deps` states what the loop has
++        // accumulated after `d` dependencies.
++        let d = 0;
++        let nd = deps.length();
++        while (d < nd) {
++            let dep: &PackageDep = deps.borrow(d);
+             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
+             if (is_policy_exempted_address(dep.account)) {
+                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
+@@ -316,40 +335,54 @@
+                 vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
+             } else {
+                 let registry = borrow_global<PackageRegistry>(dep.account);
+-                let found = vector::any(&registry.packages, |dep_pack| {
+-                    let dep_pack: &PackageMetadata = dep_pack;
+-                    if (dep_pack.name == dep.package_name) {
+-                        // Check policy
+-                        assert!(
+-                            dep_pack.upgrade_policy.policy >= pack.upgrade_policy.policy,
+-                            error::invalid_argument(EDEP_WEAKER_POLICY)
+-                        );
+-                        if (dep_pack.upgrade_policy == upgrade_policy_arbitrary()) {
+-                            assert!(
+-                                dep.account == publish_address,
+-                                error::invalid_argument(EDEP_ARBITRARY_NOT_SAME_ADDRESS)
+-                            )
+-                        };
+-                        // Add allowed deps
+-                        let account = dep.account;
+-                        let k = 0;
+-                        let r = vector::length(&dep_pack.modules);
+-                        while (k < r) {
+-                            let module_name = vector::borrow(&dep_pack.modules, k).name;
+-                            vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
+-                            k += 1;
+-                        };
+-                        true
+-                    } else {
+-                        false
+-                    }
++                let packages = &registry.packages;
++                let np = packages.length();
++                let j = 0;
++                while (j < np && packages.borrow(j).name != dep.package_name) {
++                    j += 1;
++                } spec {
++                    invariant j <= len(packages);
++                    // The first match is not before `j`: one unfolding of the
++                    // definition carries this across each step.
++                    invariant spec_first_package_named(packages, dep.package_name, 0)
++                        == spec_first_package_named(packages, dep.package_name, j);
++                };
++                assert!(j < np, error::not_found(EPACKAGE_DEP_MISSING));
++                let dep_pack: &PackageMetadata = packages.borrow(j);
++                // Check policy
++                assert!(
++                    dep_pack.upgrade_policy.policy >= pack.upgrade_policy.policy,
++                    error::invalid_argument(EDEP_WEAKER_POLICY)
++                );
++                if (dep_pack.upgrade_policy == upgrade_policy_arbitrary()) {
++                    assert!(
++                        dep.account == publish_address,
++                        error::invalid_argument(EDEP_ARBITRARY_NOT_SAME_ADDRESS)
++                    )
++                };
++                // Add allowed deps
++                let account = dep.account;
++                let new_deps = vector::empty();
++                let k = 0;
++                let r = dep_pack.modules.length();
++                while (k < r) {
++                    let module_name = dep_pack.modules.borrow(k).name;
++                    vector::push_back(&mut new_deps, AllowedDep { account, module_name });
++                    k += 1;
+                 } spec {
+-                    // State the result because the lambda mutates its capture.
+-                    ensures result == (dep_pack.name == dep.package_name);
+-                });
+-                assert!(found, error::not_found(EPACKAGE_DEP_MISSING));
++                    invariant k <= len(dep_pack.modules);
++                    invariant new_deps == spec_module_deps(account, dep_pack.modules, k);
++                };
++                vector::append(&mut allowed_module_deps, new_deps);
+             };
+-        });
++            d += 1;
++        } spec {
++            invariant d <= len(deps);
++            // Everything before `d` passed, so the unprocessed suffix decides.
++            invariant spec_deps_abort_from(publish_address, pack, 0)
++                == spec_deps_abort_from(publish_address, pack, d);
++            invariant allowed_module_deps == spec_allowed_deps(pack, d);
++        };
+         allowed_module_deps
+     }
+ 
+@@ -364,10 +397,16 @@
+     /// Get the names of the modules in a package.
+     fun get_module_names(pack: &PackageMetadata): vector<String> {
+         let module_names = vector::empty();
+-        pack.modules.for_each_ref(|pack_module| {
+-            let pack_module: &ModuleMetadata = pack_module;
+-            vector::push_back(&mut module_names, pack_module.name);
+-        });
++        let i = 0;
++        let n = pack.modules.length();
++        while (i < n) {
++            vector::push_back(&mut module_names, pack.modules.borrow(i).name);
++            i += 1;
++        } spec {
++            invariant i <= len(pack.modules);
++            invariant len(module_names) == i;
++            invariant forall x in 0..i: module_names[x] == pack.modules[x].name;
++        };
+         module_names
+     }
+ 
+--- a/sources/AptosFramework/code.spec.move
++++ b/sources/AptosFramework/code.spec.move
+@@ -99,9 +99,77 @@
+ 
+     spec get_module_names(pack: &PackageMetadata): vector<String> {
+         pragma opaque;
+-        aborts_if [abstract] false;
+-        ensures [abstract] len(result) == len(pack.modules);
+-        ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
++        aborts_if false;
++        ensures len(result) == len(pack.modules);
++        ensures forall i in 0..len(result): result[i] == pack.modules[i].name;
++    }
++
++    spec fun spec_is_policy_exempted_address(addr: address): bool {
++        addr == @1 || addr == @2 || addr == @3 || addr == @4 || addr == @5
++            || addr == @6 || addr == @7 || addr == @8 || addr == @9 || addr == @10
++    }
++
++    /// Index of the first package named `name` at or after `i`, or `len(packages)`.
++    spec fun spec_first_package_named(packages: vector<PackageMetadata>, name: String, i: u64): u64 [weight = 20] {
++        if (i >= len(packages) || packages[i].name == name) i
++        else spec_first_package_named(packages, name, i + 1)
++    }
++
++    /// The first `k` modules of `modules`, as allowed dependencies of `account`.
++    spec fun spec_module_deps(account: address, modules: vector<ModuleMetadata>, k: u64): vector<AllowedDep> [weight = 20] {
++        if (k == 0) vec()
++        else concat(
++            spec_module_deps(account, modules, k - 1),
++            vec(AllowedDep { account, module_name: modules[k - 1].name })
++        )
++    }
++
++    /// What `check_dependencies` admits for one dependency that passed its checks.
++    spec fun spec_dep_allowed(dep: PackageDep): vector<AllowedDep> {
++        if (spec_is_policy_exempted_address(dep.account)) {
++            vec(AllowedDep { account: dep.account, module_name: string::spec_utf8(b"") })
++        } else {
++            let packages = global<PackageRegistry>(dep.account).packages;
++            let j = spec_first_package_named(packages, dep.package_name, 0);
++            spec_module_deps(dep.account, packages[j].modules, len(packages[j].modules))
++        }
++    }
++
++    /// What `check_dependencies` has accumulated after its first `d` dependencies.
++    spec fun spec_allowed_deps(pack: PackageMetadata, d: u64): vector<AllowedDep> [weight = 20] {
++        if (d == 0) vec()
++        else concat(spec_allowed_deps(pack, d - 1), spec_dep_allowed(pack.deps[d - 1]))
++    }
++
++    /// Whether checking dependency `d` of `pack` aborts. The checks are
++    /// independent of one another: each reads its own registry and changes
++    /// nothing, so the loop aborts exactly when some dependency's check does.
++    spec fun spec_dep_step_aborts(publish_address: address, pack: PackageMetadata, d: u64): bool {
++        let dep = pack.deps[d];
++        !exists<PackageRegistry>(dep.account)
++            || (!spec_is_policy_exempted_address(dep.account) && {
++                let packages = global<PackageRegistry>(dep.account).packages;
++                let j = spec_first_package_named(packages, dep.package_name, 0);
++                j >= len(packages)
++                    || packages[j].upgrade_policy.policy < pack.upgrade_policy.policy
++                    || (packages[j].upgrade_policy == UpgradePolicy { policy: 0 }
++                        && dep.account != publish_address)
++            })
++    }
++
++    /// Whether checking the dependencies from `d` on aborts. Recursing over the
++    /// suffix lets the loop carry one fact -- the unprocessed suffix decides --
++    /// across each step with a single unfolding.
++    spec fun spec_deps_abort_from(publish_address: address, pack: PackageMetadata, d: u64): bool [weight = 20] {
++        d < len(pack.deps)
++            && (spec_dep_step_aborts(publish_address, pack, d)
++                || spec_deps_abort_from(publish_address, pack, d + 1))
++    }
++
++    spec check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep> {
++        pragma opaque;
++        aborts_if spec_deps_abort_from(publish_address, pack, 0);
++        ensures result == spec_allowed_deps(pack, len(pack.deps));
+     }
+ 
+     spec freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) {
+--- a/sources/AptosFramework/coin.spec.move
++++ b/sources/AptosFramework/coin.spec.move
+@@ -147,10 +147,21 @@
+     }
+ 
+     spec balance<CoinType>(owner: address): u64 {
+-        // TODO(fa_migration)
+-        pragma verify = false;
+-        aborts_if !exists<CoinStore<CoinType>>(owner);
+-        ensures result == global<CoinStore<CoinType>>(owner).coin.value;
++        pragma verify = true;
++        // `derived_balance` runs a user hook and is only partially specified.
++        pragma aborts_if_is_partial;
++        let metadata_opt = spec_paired_metadata<CoinType>();
++        let coin_part = if (exists<CoinStore<CoinType>>(owner)) {
++            global<CoinStore<CoinType>>(owner).coin.value
++        } else { 0 };
++        let fa_part = if (option::is_some(metadata_opt)
++            && primary_fungible_store::spec_primary_store_exists(owner, option::borrow(metadata_opt))) {
++            aptos_framework::dispatchable_fungible_asset::spec_derived_balance_at(
++                primary_fungible_store::spec_primary_store_address(owner, option::borrow(metadata_opt))
++            )
++        } else { 0 };
++        aborts_if coin_part + fa_part > MAX_U64;
++        ensures result == coin_part + fa_part;
+     }
+ 
+     spec is_coin_initialized<CoinType>(): bool {
+@@ -313,6 +324,19 @@
+             == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
+     }
+ 
++    spec get_paired_mint_copy_ref<CoinType>(mint_cap: &MintCapability<CoinType>): MintRef {
++        pragma opaque;
++        pragma aborts_if_is_partial = false;
++        aborts_if !type_info::spec_is_struct<CoinType>();
++        let metadata_opt = spec_paired_metadata<CoinType>();
++        aborts_if option::is_none(metadata_opt);
++        let metadata_addr = object::object_address(option::borrow(metadata_opt));
++        aborts_if !exists<PairedFungibleAssetRefs>(metadata_addr);
++        aborts_if option::is_none(global<PairedFungibleAssetRefs>(metadata_addr).mint_ref_opt);
++        ensures result.metadata
++            == option::borrow(global<PairedFungibleAssetRefs>(metadata_addr).mint_ref_opt).metadata;
++    }
++
+     spec coin_to_fungible_asset<CoinType>(coin: Coin<CoinType>): FungibleAsset {
+         // TODO(fa_migration)
+         pragma verify = false;
+--- a/sources/AptosFramework/dispatchable_fungible_asset.spec.move
++++ b/sources/AptosFramework/dispatchable_fungible_asset.spec.move
+@@ -1,4 +1,15 @@
+ spec aptos_framework::dispatchable_fungible_asset {
++    /// The balance a store reports through its dispatch hook, if any: the hook
++    /// is user code, so the summary is uninterpreted and only its stability is
++    /// promised.
++    spec fun spec_derived_balance_at(store_addr: address): u64;
++
++    spec derived_balance<T: key>(store: Object<T>): u64 {
++        pragma opaque;
++        pragma aborts_if_is_partial;
++        ensures result == spec_derived_balance_at(object::object_address(store));
++    }
++
+     spec module {
+         pragma verify = false;
+     }
+--- a/sources/AptosFramework/fungible_asset.spec.move
++++ b/sources/AptosFramework/fungible_asset.spec.move
+@@ -142,6 +142,29 @@
+         ensures result == exists<FungibleStore>(store);
+     }
+ 
++    /// The balance test reads the store and, when the plain balance is zero,
++    /// the concurrent balance aggregator; neither read can abort.
++    spec is_address_balance_at_least(store_addr: address, amount: u64): bool {
++        pragma opaque;
++        aborts_if false;
++        ensures result == spec_is_address_balance_at_least(store_addr, amount);
++    }
++
++    spec fun spec_is_address_balance_at_least(store_addr: address, amount: u64): bool {
++        if (exists<FungibleStore>(store_addr)) {
++            let store_balance = global<FungibleStore>(store_addr).balance;
++            if (store_balance == 0 && exists<ConcurrentFungibleBalance>(store_addr)) {
++                aggregator_v2::spec_get_value(
++                    global<ConcurrentFungibleBalance>(store_addr).balance
++                ) >= amount
++            } else {
++                store_balance >= amount
++            }
++        } else {
++            amount == 0
++        }
++    }
++
+     spec name<T: key>(metadata: Object<T>): String {
+         pragma opaque;
+         aborts_if !exists<Metadata>(metadata.inner);
+--- a/sources/AptosFramework/multisig_account.move
++++ b/sources/AptosFramework/multisig_account.move
+@@ -1533,12 +1533,23 @@
+ 
+     fun validate_owners(owners: &vector<address>, multisig_account: address) {
+         let distinct_owners: vector<address> = vector[];
+-        owners.for_each_ref(|owner| {
++        let i = 0;
++        let n = owners.length();
++        while (i < n) {
++            let owner = owners.borrow(i);
+             assert!(owner != &multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));
+             let (found, _) = distinct_owners.index_of(owner);
+             assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));
+             distinct_owners.push_back(*owner);
+-        });
++            i = i + 1;
++        } spec {
++            invariant i <= n;
++            invariant n == len(owners);
++            invariant len(distinct_owners) == i;
++            invariant forall k in 0..i: distinct_owners[k] == owners[k];
++            invariant forall k in 0..i: owners[k] != multisig_account;
++            invariant forall j in 0..i, k in 0..i where j < k: owners[j] != owners[k];
++        };
+     }
+ 
+     inline fun assert_is_owner_internal(owner: &signer, multisig_account: &MultisigAccount) {
+--- a/sources/AptosFramework/multisig_account.spec.move
++++ b/sources/AptosFramework/multisig_account.spec.move
+@@ -503,9 +503,8 @@
+ 
+     spec validate_owners(owners: &vector<address>, multisig_account: address) {
+         pragma opaque;
+-        pragma verify = false;
+-        aborts_if [abstract] exists i in 0..len(owners): owners[i] == multisig_account;
+-        aborts_if [abstract] exists i in 0..len(owners), j in 0..len(owners) where i < j:
++        aborts_if exists i in 0..len(owners): owners[i] == multisig_account;
++        aborts_if exists i in 0..len(owners), j in 0..len(owners) where i < j:
+             owners[i] == owners[j];
+     }
+ 
+--- a/sources/AptosFramework/object.spec.move
++++ b/sources/AptosFramework/object.spec.move
+@@ -549,6 +549,7 @@
+     }
+ 
+     spec is_owner<T: key>(object: Object<T>, owner: address): bool {
++        pragma opaque;
+         aborts_if !exists<ObjectCore>(object.inner);
+         ensures result == (global<ObjectCore>(object.inner).owner == owner);
+     }
+--- a/sources/AptosFramework/stake.move
++++ b/sources/AptosFramework/stake.move
+@@ -2028,7 +2028,14 @@
+     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
+         while (!v2.is_empty()) {
+             v1.push_back(v2.pop_back());
+-        }
++        } spec {
++            invariant len(v1) + len(v2) == old(len(v1)) + old(len(v2));
++            invariant len(v1) >= old(len(v1));
++            invariant forall i in 0..old(len(v1)): v1[i] == old(v1)[i];
++            invariant forall i in 0..len(v2): v2[i] == old(v2)[i];
++            invariant forall i in old(len(v1))..len(v1):
++                v1[i] == old(v2)[old(len(v2)) - (i - old(len(v1))) - 1];
++        };
+     }
+ 
+     fun find_validator(v: &vector<ValidatorInfo>, addr: address): Option<u64> {
+--- a/sources/AptosFramework/stake.spec.move
++++ b/sources/AptosFramework/stake.spec.move
+@@ -781,7 +781,7 @@
+     }
+ 
+     spec append {
+-        pragma opaque, verify = false;
++        pragma opaque;
+         aborts_if false;
+         ensures len(v1) == old(len(v1) + len(v2));
+         ensures len(v2) == 0;
+--- a/sources/AptosFramework/transaction_fee.spec.move
++++ b/sources/AptosFramework/transaction_fee.spec.move
+@@ -162,13 +162,19 @@
+     spec store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+         use std::signer;
+ 
+-        // TODO(fa_migration)
+-        pragma verify = false;
++        pragma verify = true;
+ 
+         let addr = signer::address_of(aptos_framework);
+         aborts_if !system_addresses::is_aptos_framework_address(addr);
+         aborts_if exists<AptosFAMintCapabilities>(addr);
+         aborts_if exists<AptosCoinMintCapability>(addr);
++        let metadata_opt = aptos_framework::coin::spec_paired_metadata<AptosCoin>();
++        aborts_if std::option::is_none(metadata_opt);
++        let metadata_addr = aptos_framework::object::object_address(std::option::borrow(metadata_opt));
++        aborts_if !exists<aptos_framework::coin::PairedFungibleAssetRefs>(metadata_addr);
++        aborts_if std::option::is_none(
++            global<aptos_framework::coin::PairedFungibleAssetRefs>(metadata_addr).mint_ref_opt
++        );
+         ensures exists<AptosFAMintCapabilities>(addr);
+         ensures exists<AptosCoinMintCapability>(addr);
+     }
+--- a/sources/AptosFramework/vesting.spec.move
++++ b/sources/AptosFramework/vesting.spec.move
+@@ -151,6 +151,7 @@
+ 
+     spec vesting_schedule(vesting_contract_address: address): VestingSchedule {
+         aborts_if !exists<VestingContract>(vesting_contract_address);
++        ensures result == global<VestingContract>(vesting_contract_address).vesting_schedule;
+     }
+ 
+     spec total_accumulated_rewards(vesting_contract_address: address): u64 {
+--- a/sources/AptosTrading/orders/bulk_order_types.move
++++ b/sources/AptosTrading/orders/bulk_order_types.move
+@@ -238,11 +238,20 @@
+     public fun get_total_remaining_size<M: store + copy + drop>(
+         self: &BulkOrderRequest<M>, is_bid: bool
+     ): u64 {
+-        if (is_bid) {
+-            self.bid_sizes.fold(0, |acc, size| acc + size)
+-        } else {
+-            self.ask_sizes.fold(0, |acc, size| acc + size)
+-        }
++        // An explicit loop in place of `fold`: the invariant states what has
++        // been summed and what remains, which the fold's lambda cannot carry.
++        let sizes = if (is_bid) &self.bid_sizes else &self.ask_sizes;
++        let total = 0;
++        let i = 0;
++        let n = sizes.length();
++        while (i < n) {
++            total = total + sizes[i];
++            i = i + 1;
++        } spec {
++            invariant i <= len(sizes);
++            invariant total + spec_sum_from(sizes, i) == spec_sum_from(sizes, 0);
++        };
++        total
+     }
+ 
+     /// Gets the active price for a specific side of a bulk order.
+--- a/sources/AptosTrading/orders/bulk_order_types.spec.move
++++ b/sources/AptosTrading/orders/bulk_order_types.spec.move
+@@ -0,0 +1,34 @@
++spec aptos_trading::bulk_order_types {
++    /// Sum of the sizes from `i` on, as unbounded arithmetic.
++    spec fun spec_sum_from(sizes: vector<u64>, i: u64): num [weight = 20] {
++        if (i >= len(sizes)) 0 else sizes[i] + spec_sum_from(sizes, i + 1)
++    }
++
++    spec fun spec_side_sizes<M>(request: BulkOrderRequest<M>, is_bid: bool): vector<u64> {
++        if (is_bid) request.bid_sizes else request.ask_sizes
++    }
++
++    spec module {
++        /// A sum of unsigned sizes is not negative.
++        lemma sum_from_nonneg(sizes: vector<u64>, i: u64) {
++            requires i <= len(sizes);
++            ensures spec_sum_from(sizes, i) >= 0;
++            decreases len(sizes) - i;
++        } proof {
++            if (i < len(sizes)) {
++                apply sum_from_nonneg(sizes, i + 1);
++            }
++        }
++    }
++
++    /// The sizes are summed with `u64` addition, which aborts on overflow;
++    /// partial sums never decrease, so the total decides.
++    spec get_total_remaining_size<M: store + copy + drop>(self: &BulkOrderRequest<M>, is_bid: bool): u64 {
++        pragma opaque;
++        let sizes = spec_side_sizes(self, is_bid);
++        aborts_if spec_sum_from(sizes, 0) > MAX_U64;
++        ensures result == spec_sum_from(sizes, 0);
++    } proof {
++        forall i: u64 {spec_sum_from(sizes, i)} [weight = 20] apply sum_from_nonneg(sizes, i);
++    }
++}

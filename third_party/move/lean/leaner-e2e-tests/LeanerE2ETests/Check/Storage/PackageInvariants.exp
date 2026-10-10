@@ -1,0 +1,4 @@
+LeanerE2ETests/Check/Storage/PackageInvariants.lean:31:4: error: the module invariant `invariant forall (a : Address), exists<R>(a) ==> global<R>(a).value > 0` does not hold after a write of memory it reads
+LeanerE2ETests/Check/Storage/PackageInvariants.lean:27:14: error: leaner verification failed: the automatic verification of `0x42::store::put` failed; provide a proof: `verify 0x42::store::put by …` in the module (`verify 0x42::store::put by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Storage/PackageInvariants.lean:31:4: error: the specification clause `invariant forall (a : Address), exists<R>(a) ==> global<R>(a).value > 0` is not established
+LeanerE2ETests/Check/Storage/PackageInvariants.lean:41:13: error: leaner verification failed: the automatic verification of `put_zero` failed; provide a proof: `verify put_zero by …` in the module (`verify put_zero by skip` shows the obligations it leaves)

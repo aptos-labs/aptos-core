@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 41,
+        "offset": 1153,
+        "sha256": "bda9bf8844343863285270a76ae18f321b4d3b64199d0a4132b560f6e56296d8"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 1,
+        "to": "<="
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_payout_math.move",
+      "mutant_id": "PM-curve-027-low-boundary-inclusive",
+      "obligation_category": "normal-result",
+      "rationale": "At the low anchor the implementation must enter interpolation and return the low protected amount rather than zero.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 71,
+        "offset": 1203,
+        "sha256": "263dee69ea3867ebac9db4569df4a436d6d6c7b1392f9a7a51cbaef1ac7283e0"
+      },
+      "edit": {
+        "at": 16,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_payout_math.move",
+      "mutant_id": "PM-curve-027-high-boundary-exclusive",
+      "obligation_category": "abort",
+      "rationale": "At the high anchor a descending protected range must still clamp and return; entering interpolation would underflow.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 45,
+        "offset": 1336,
+        "sha256": "5e12f75b85d28536afa28f166461f116f7ac8164173e9631495b490afa7a5f34"
+      },
+      "edit": {
+        "at": 23,
+        "kind": "substitute",
+        "length": 3,
+        "to": " + "
+      },
+      "essential": true,
+      "file": "sources/etna/extracted_payout_math.move",
+      "mutant_id": "PM-curve-027-range-added",
+      "obligation_category": "normal-result",
+      "rationale": "The interpolation uses the sum of the protected anchors and can also introduce an addition overflow.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "50c0735a483ecee4e97ec4d588307db2b4b2aa9bfdd705ef8b8ba53b43c341cb",
+  "task_id": "PM-curve-027"
+}

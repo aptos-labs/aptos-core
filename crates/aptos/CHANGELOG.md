@@ -4,6 +4,17 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+- Deprecate macOS x86_64 (Intel) CLI builds. This release still publishes an Intel binary and prints a deprecation warning on startup. The next macOS CLI release will be Apple Silicon (arm64) only.
+
+## [9.6.0]
+- Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.
+- `aptos governance propose` and `execute-proposal` now print a hint pointing at the bundle commands.
+- `aptos move compile --optimize extra` no longer inlines calls to functions in other modules.
+
+## [9.5.1]
+- Change default REST URLs for `aptos init` from `fullnode.*.aptoslabs.com` to `api.*.aptoslabs.com` for mainnet, testnet, and devnet.
+- Improve CLI help text and crate README: document `--is-multi-step` and `--next-execution-hash` on governance proposals, and fix a 404 in the multisig payload mismatch error.
+
 ## [9.5.0]
 - Compiler now uses receiver style calls for macro-generated code.
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.

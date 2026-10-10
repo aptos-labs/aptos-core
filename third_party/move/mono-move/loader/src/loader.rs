@@ -23,21 +23,29 @@ use crate::{
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
-    interner::{InternedIdentifier, InternedModuleId},
+    interner::{
+        script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
+    },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, GasMeter, LayoutId,
-    LayoutProvider, ModuleId, ModuleProvider, VMInternalError, VMResult, ValueLayout,
+    verify_function, DescriptorId, ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols,
+    Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider,
+    VMInternalError, VMResult, ValueLayout,
 };
 use mono_move_global_context::{
-    ArenaRef, ExecutionGuard, FunctionSlot, LoadedModule, LoadedModuleSlot,
-    ModuleMandatoryDependencies, ModuleSlot,
+    ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
+    ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
+};
+use move_binary_format::{
+    access::ScriptAccess, errors::VMError, file_format::CompiledScript,
+    module_script_conversion::script_into_module,
 };
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
-        try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
-        try_lower_function, LoweringOutcome, SpecializerContext,
+        publish_resource_type, try_discover_types_for_lowering_in_function,
+        try_discover_types_for_lowering_in_module, try_lower_function, LoweringOutcome,
+        SpecializerContext,
     },
     ModuleIR,
 };
@@ -96,6 +104,11 @@ pub struct Loader<'guard, 'ctx> {
     module_provider: &'guard dyn ModuleProvider,
     policy: LoadingPolicy,
     natives: &'guard dyn NativeResolver,
+}
+
+/// Preserves the verifier's error details, including its location.
+fn script_verification_failed(error: VMError) -> VMInternalError {
+    VMInternalError::new(LoaderError::ScriptVerificationFailed { error })
 }
 
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
@@ -181,11 +194,22 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         // Non-generic call.
         if ty_args.is_empty() {
+            // No lowered-code slot: either a native (present by name, no IR)
+            // or genuinely absent: report which.
             let slot = module.get_function_slot(func_name).ok_or_else(|| {
-                LoaderError::FunctionNotFound {
-                    address: *id.address(),
-                    module: id.name().to_string(),
-                    name: view_name(func_name).to_string(),
+                match module.get_function_ir(func_name) {
+                    FunctionIrLookup::Native => LoaderError::NativeFunctionNotLoadable {
+                        address: *id.address(),
+                        module: id.name().to_string(),
+                        name: view_name(func_name).to_string(),
+                    },
+                    FunctionIrLookup::Ir(_) | FunctionIrLookup::NotDefined => {
+                        LoaderError::FunctionNotFound {
+                            address: *id.address(),
+                            module: id.name().to_string(),
+                            name: view_name(func_name).to_string(),
+                        }
+                    },
                 }
             })?;
             if let Some(loaded) = slot.get() {
@@ -242,6 +266,143 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
     }
 
+    /// Publishes the layout and GC descriptor of the resource type `ty`, so a
+    /// read of it can be materialized outside lowered code. Loads and charges
+    /// for the modules its definition pulls in.
+    pub fn publish_resource_type(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        ty: InternedType,
+    ) -> VMResult<()> {
+        let mut ctx = LoweringContext::new(self, read_set);
+        let published = publish_resource_type(&mut ctx, self.guard, ty)?;
+        let discovered = Arc::<[LoadedModuleSlot]>::from(ctx.discovered);
+        self.record_loaded_and_charge_slots(read_set, gas_meter, &discovered, |_, _| {
+            invariant_violation!(UnexpectedReadSetMiss);
+        })?;
+        if !published {
+            return Err(VMInternalError::new(
+                LoaderError::ResourceLayoutNotDerivable,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Loads a script from its bytes and returns its `main` instantiated with
+    /// `ty_args`. A script is loaded as a module holding that one function,
+    /// under a module ID all scripts share, and cached by the hash of its
+    /// bytes. Its cost and its dependencies' loads are charged on every call.
+    /// On a cache miss, the module provider's configs govern deserialization
+    /// and verification.
+    ///
+    /// # Precondition
+    ///
+    /// No script has been loaded into this read-set yet.
+    pub fn load_script(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        script_code: &[u8],
+        ty_args: InternedTypeList,
+    ) -> VMResult<FunctionPtr> {
+        let module_id = script_module_id(self.guard);
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        read_set.record_pending_loading(id)?;
+
+        let hash = ScriptHash::of(script_code);
+        let module = match self.guard.get_script(&hash) {
+            Some(module) => {
+                // A miss loads the dependencies to link the script. A hit loads
+                // them too, so that gas and the read-set do not depend on cache
+                // warmth.
+                let script = &module.ir().module;
+                for &dependency in script.module_ids() {
+                    if dependency != script.id() {
+                        self.get_or_load_module(read_set, gas_meter, dependency)?;
+                    }
+                }
+                module
+            },
+            // TODO(perf): evaluate whether waiting for a concurrent insertion
+            // beats every thread verifying the script itself.
+            None => self.build_and_insert_script(read_set, gas_meter, hash, script_code)?,
+        };
+        read_set.record_ready_for_lowering(id, module)?;
+        gas_meter.charge(module.cost())?;
+
+        let main = view_module_id(module_id).name();
+        self.load_function(read_set, gas_meter, module_id, main, ty_args)
+    }
+
+    /// Deserializes, verifies, and links `script_code` against its
+    /// dependencies, then caches it as a module.
+    fn build_and_insert_script(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        hash: ScriptHash,
+        script_code: &[u8],
+    ) -> VMResult<&'guard LoadedModule> {
+        let script = CompiledScript::deserialize_with_config(
+            script_code,
+            self.module_provider.deserializer_config(),
+        )
+        .map_err(|err| {
+            VMInternalError::new(LoaderError::ScriptDeserializationFailed {
+                message: err.to_string(),
+            })
+            .at(ErrorLocation::Script)
+        })?;
+        let verifier_config = self.module_provider.verifier_config();
+        move_bytecode_verifier::verify_script_with_config(verifier_config, &script)
+            .map_err(script_verification_failed)?;
+        let dependencies = script
+            .immediate_dependencies_iter()
+            .map(|(address, name)| {
+                let module_id = self.guard.module_id_of(address, name);
+                self.get_or_load_module(read_set, gas_meter, module_id)
+            })
+            .collect::<VMResult<Vec<_>>>()?;
+        move_bytecode_verifier::dependencies::verify_script(
+            verifier_config,
+            &script,
+            dependencies
+                .iter()
+                .map(|dependency| &*dependency.ir().module),
+        )
+        .map_err(script_verification_failed)?;
+
+        // TODO(metering): placeholder cost model, as for modules.
+        let cost = script_code.len() as u64;
+        let module_ir =
+            specializer::destack(script_into_module(script, SCRIPT_MAIN.as_str()), self.guard)?;
+        let module = LoadedModule::new(
+            module_ir,
+            cost,
+            ModuleMandatoryDependencies::lazy_unset(),
+            self.guard,
+        )
+        .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
+        Ok(self.guard.insert_script(hash, module))
+    }
+
+    /// Returns the module from the read-set, loading it first if this
+    /// transaction has not yet.
+    fn get_or_load_module(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+    ) -> VMResult<&'guard LoadedModule> {
+        let id = self.guard.arena_ref_for_module_id(module_id);
+        match read_set.get(id) {
+            Some(ModuleRead::Loaded { module, .. }) => Ok(module),
+            Some(ModuleRead::Pending) => invariant_violation!(ReadSetEntryNotLoaded),
+            None => self.load_module(read_set, gas_meter, id),
+        }
+    }
+
     /// Runs the lowering pipeline for a single function with the given
     /// substitution table. Returns a fresh `FunctionSlot` containing the
     /// lowered code and its mandatory-dependency set.
@@ -254,9 +415,18 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         ty_args: InternedTypeList,
     ) -> VMResult<(Function, Arc<[LoadedModuleSlot]>)> {
         let func_ir = match module.get_function_ir(func_name) {
-            Some(Some(ir)) => ir,
-            Some(None) => return Err(VMInternalError::new(LoaderError::FunctionIrMissing)),
-            None => {
+            FunctionIrLookup::Ir(ir) => ir,
+            FunctionIrLookup::Native => {
+                let id = self.guard.arena_ref_for_module_id(module.id());
+                return Err(VMInternalError::new(
+                    LoaderError::NativeFunctionNotLoadable {
+                        address: *id.address(),
+                        module: id.name().to_string(),
+                        name: view_name(func_name).to_string(),
+                    },
+                ));
+            },
+            FunctionIrLookup::NotDefined => {
                 let id = self.guard.arena_ref_for_module_id(module.id());
                 return Err(VMInternalError::new(LoaderError::FunctionNotFound {
                     address: *id.address(),
@@ -265,7 +435,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
-        // TODO(metering): the lowering work needs to be charged deterministically.
+        // TODO(metering): the lowering work, including micro-op verification
+        // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
@@ -312,6 +483,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }))
             },
         };
+        // Verify once per lowering, before the function is leaked into a
+        // cache: a rejected function is dropped here and never executed.
+        let errors = verify_function(&function, self.guard);
+        if !errors.is_empty() {
+            invariant_violation!(MicroOpVerificationFailed { errors });
+        }
         Ok((function, function_ms))
     }
 }
@@ -610,8 +787,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         deps: ModuleMandatoryDependencies,
     ) -> VMResult<&'guard LoadedModule> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
+        let module = LoadedModule::new(module_ir, cost, deps, self.guard)
+            .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
         self.guard
-            .insert_module(LoadedModule::new(module_ir, cost, deps))
+            .insert_module(module)
             .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))
     }
 
@@ -786,8 +965,12 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             .publish_captured_data_descriptor(values_size, pointer_offsets)
     }
 
-    fn publish_layout(&self, ty: InternedType, layout: ValueLayout) -> LayoutId {
-        self.loader.guard.publish_layout(ty, layout)
+    fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {
+        self.loader.guard.publish_layout(layout)
+    }
+
+    fn framework_symbols(&self) -> &FrameworkSymbols {
+        self.loader.guard.framework_symbols()
     }
 
     fn publish_variant_layouts(

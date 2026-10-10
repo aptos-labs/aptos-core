@@ -23,8 +23,11 @@ use move_binary_format::{
 };
 use move_command_line_common::{
     address::ParsedAddress,
-    files::{DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION},
-    testing::{add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT},
+    files::{
+        DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, LEAN_EXTENSION, MOVE_ASM_EXTENSION,
+        MOVE_EXTENSION,
+    },
+    testing::{add_exp_suffix, add_update_baseline_fix, format_diff, read_env_update_baseline},
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
 };
@@ -85,6 +88,13 @@ impl CompiledState<'_> {
         }
     }
 
+    pub fn resolve_signers(&self, signers: Vec<ParsedAddress>) -> Vec<AccountAddress> {
+        signers
+            .into_iter()
+            .map(|signer| self.resolve_address(&signer))
+            .collect()
+    }
+
     pub fn resolve_args<Extra: ParsableValue>(
         &self,
         args: Vec<ParsedValue<Extra>>,
@@ -114,11 +124,11 @@ pub(crate) fn merge_output(left: Option<String>, right: Option<String>) -> Optio
 }
 
 pub trait MoveTestAdapter<'a>: Sized {
-    type ExtraPublishArgs: Parser;
-    type ExtraValueArgs: ParsableValue;
-    type ExtraRunArgs: Parser;
-    type Subcommand: Parser;
-    type ExtraInitArgs: Parser;
+    type ExtraPublishArgs: Parser + Debug;
+    type ExtraValueArgs: ParsableValue + Debug;
+    type ExtraRunArgs: Parser + Debug;
+    type Subcommand: Parser + Debug;
+    type ExtraInitArgs: Parser + Debug;
 
     fn deserialize(&self, bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value>;
     fn compiled_state(&mut self) -> &mut CompiledState<'a>;
@@ -209,11 +219,22 @@ pub trait MoveTestAdapter<'a>: Sized {
                 start_line, command_lines_stop
             ),
         };
+        let source_path = data.path().to_str().unwrap().to_owned();
+        self.register_temp_filename(&data);
+        let data = match syntax {
+            SyntaxChoice::Source => temp_with_extension(data, MOVE_EXTENSION)?,
+            SyntaxChoice::Leaner => temp_with_extension(data, LEAN_EXTENSION)?,
+            SyntaxChoice::ASM => data,
+        };
+        // Keep an extension-normalized compiler input associated with the
+        // original task file. This both redacts diagnostics on failures and
+        // preserves stable TEMPFILE numbering for cross-compiled sources.
+        self.register_temp_filename_alias(&data, &source_path);
         let data_path = data.path().to_str().unwrap();
         let run_config = self.run_config();
         let state = self.compiled_state();
         let (named_addr_opt, module, opt_model, warnings_opt) = match syntax {
-            SyntaxChoice::Source => {
+            SyntaxChoice::Source | SyntaxChoice::Leaner => {
                 // It is possible that a module gets republished. In this case, we need to filter
                 // existing pre-compiled dependencies to remove old module. Because we do not know
                 // in advance the module we are compiling, we need to see if the module matches the
@@ -245,6 +266,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         run_config.language_version,
                         run_config.experiments,
+                        syntax == SyntaxChoice::Leaner,
                     )?
                 };
                 let (named_addr_opt, module) = match unit {
@@ -316,6 +338,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.known_attributes(),
                         run_config.language_version,
                         run_config.experiments,
+                        false,
                     )?
                 };
                 match unit {
@@ -330,6 +353,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let script = compile_asm_script(state.dep_modules(), data_path)?;
                 (script, None, None)
             },
+            SyntaxChoice::Leaner => bail!("Leaner XIR currently represents modules, not scripts"),
         };
         Ok((script, opt_model, warning_opt))
     }
@@ -545,7 +569,8 @@ pub trait MoveTestAdapter<'a>: Sized {
             };
             let cleaned_source = cleaned_source
                 .replace("--syntax=move", "")
-                .replace("--syntax=masm", "");
+                .replace("--syntax=masm", "")
+                .replace("--syntax=lean", "");
 
             let lines = self
                 .compiled_state()
@@ -580,6 +605,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     move_asm::disassembler::disassemble_module(&mut out, module)?;
                     out
                 },
+                SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
             };
             self.compiled_state()
                 .cross_compiled
@@ -611,6 +637,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     move_asm::disassembler::disassemble_script(&mut out, script)?;
                     out
                 },
+                SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
             };
             self.compiled_state()
                 .cross_compiled
@@ -627,12 +654,22 @@ pub trait MoveTestAdapter<'a>: Sized {
             let compiled_state = self.compiled_state();
             let mapping = &mut compiled_state.temp_file_mapping;
             if !mapping.contains_key(data_path) {
-                let generic_name = match mapping.len() {
-                    0 => "TEMPFILE".to_string(),
-                    idx => format!("TEMPFILE{}", idx),
-                };
-                mapping.insert(data_path.to_owned(), generic_name);
+                mapping.insert(data_path.to_owned(), next_temp_filename(mapping));
             }
+        }
+    }
+
+    fn register_temp_filename_alias(&mut self, data: &NamedTempFile, alias: &str) {
+        let data_path = data.path().to_str().unwrap();
+        if data_path.is_empty() || data_path == alias {
+            return;
+        }
+        let compiled_state = self.compiled_state();
+        let mapping = &mut compiled_state.temp_file_mapping;
+        if let Some(alias_name) = mapping.get(alias).cloned() {
+            mapping.entry(data_path.to_owned()).or_insert(alias_name);
+        } else if !mapping.contains_key(data_path) {
+            mapping.insert(data_path.to_owned(), next_temp_filename(mapping));
         }
     }
 
@@ -838,6 +875,23 @@ impl<'a> CompiledState<'a> {
     }
 }
 
+fn next_temp_filename(mapping: &BTreeMap<String, String>) -> String {
+    match mapping.values().collect::<BTreeSet<_>>().len() {
+        0 => "TEMPFILE".to_string(),
+        idx => format!("TEMPFILE{idx}"),
+    }
+}
+
+fn temp_with_extension(data: NamedTempFile, extension: &str) -> Result<NamedTempFile> {
+    if data.path().extension().and_then(|ext| ext.to_str()) == Some(extension) {
+        return Ok(data);
+    }
+    let suffix = format!(".{extension}");
+    let mut result = tempfile::Builder::new().suffix(&suffix).tempfile()?;
+    std::io::copy(&mut data.reopen()?, result.as_file_mut())?;
+    Ok(result)
+}
+
 fn compile_source_unit_v2(
     pre_compiled_deps: &PrecompiledFilesModules,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
@@ -846,6 +900,7 @@ fn compile_source_unit_v2(
     known_attributes: &BTreeSet<String>,
     language_version: LanguageVersion,
     experiments: Vec<(String, bool)>,
+    include_error_detail: bool,
 ) -> Result<(AnnotatedCompiledUnit, Option<GlobalEnv>, Option<String>)> {
     let all_deps = {
         // The v2 compiler does not really support precompiled programs, so we must include all the
@@ -887,8 +942,13 @@ fn compile_source_unit_v2(
         move_compiler_v2::run_move_compiler(emitter.as_mut(), options)
     };
     let error_str = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
-    let (model, mut units) =
-        result.map_err(|_| anyhow::anyhow!("compilation errors:\n {}", error_str))?;
+    let (model, mut units) = result.map_err(|error| {
+        if include_error_detail || error_str.is_empty() {
+            anyhow::anyhow!("compilation errors:\n {}\n{error:#}", error_str)
+        } else {
+            anyhow::anyhow!("compilation errors:\n {}", error_str)
+        }
+    })?;
     let unit = if units.len() != 1 {
         anyhow::bail!("expected either one script or one module")
     } else {
@@ -945,23 +1005,37 @@ fn compile_asm<'a>(
 }
 
 pub fn run_test_impl<'a, Adapter>(
-    mut config: TestRunConfig,
+    config: TestRunConfig,
     path: &Path,
     pre_compiled_deps_v2: &'a PrecompiledFilesModules,
     exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     Adapter: MoveTestAdapter<'a>,
-    Adapter::ExtraInitArgs: Debug,
-    Adapter::ExtraPublishArgs: Debug,
-    Adapter::ExtraValueArgs: Debug,
-    Adapter::ExtraRunArgs: Debug,
-    Adapter::Subcommand: Debug,
+{
+    run_test_impl_with_baseline::<Adapter>(
+        config,
+        path,
+        pre_compiled_deps_v2,
+        &BaselineTarget::beside_source(exp_suffix.clone()),
+    )
+}
+
+/// Runs a test against an explicit [`BaselineTarget`].
+pub fn run_test_impl_with_baseline<'a, Adapter>(
+    mut config: TestRunConfig,
+    path: &Path,
+    pre_compiled_deps_v2: &'a PrecompiledFilesModules,
+    baseline: &BaselineTarget,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    Adapter: MoveTestAdapter<'a>,
 {
     let extension = path.extension().unwrap().to_str().unwrap();
     let default_syntax = match extension {
         MOVE_EXTENSION | DECOMPILED_EXTENSION => SyntaxChoice::Source,
         MOVE_ASM_EXTENSION | DISASSEMBLED_EXTENSION => SyntaxChoice::ASM,
+        LEAN_EXTENSION => SyntaxChoice::Leaner,
         _ => {
             panic!("unexpected extensions `{}`", extension)
         },
@@ -1021,7 +1095,7 @@ where
         handle_known_task(&mut output, &mut adapter, task);
     }
 
-    handle_expected_output(path, output, exp_suffix)?;
+    handle_expected_output(path, output, baseline, read_env_update_baseline())?;
 
     config.cross_compilation_targets.clear();
     for target in &adapter.run_config().cross_compilation_targets {
@@ -1031,14 +1105,16 @@ where
             .remove(&target.syntax)
             .unwrap_or_default();
         if !source_lines.is_empty() {
-            let exp_suffix = if exp_suffix.is_some() {
-                exp_suffix
-            } else {
-                &target.suffix
-            };
             let path = handle_cross_compiled_output(path, target, &source_lines)?;
             if target.run_after {
-                run_test_impl::<Adapter>(config.clone(), &path, pre_compiled_deps_v2, exp_suffix)?
+                // The artifact's baseline sits beside it, named by the target's
+                // own suffix, under the policy already in force.
+                run_test_impl_with_baseline::<Adapter>(
+                    config.clone(),
+                    &path,
+                    pre_compiled_deps_v2,
+                    &baseline.beside(target.suffix.clone()),
+                )?
             }
         }
     }
@@ -1102,6 +1178,7 @@ fn handle_cross_compiled_output(
     let ending = match target.syntax {
         SyntaxChoice::Source => DECOMPILED_EXTENSION,
         SyntaxChoice::ASM => DISASSEMBLED_EXTENSION,
+        SyntaxChoice::Leaner => unreachable!("Leaner is not a cross-compilation target"),
     };
     let file_name = test_path
         .with_extension(ending)
@@ -1121,30 +1198,140 @@ fn handle_cross_compiled_output(
             test_path.display()
         ),
     );
-    let _ = fs::create_dir_all(path.parent().expect("parent path"));
-    fs::write(&path, &text)?;
+    write_creating_parent(&path, &text)?;
     Ok(path)
 }
 
+/// Controls whether a suite may create or update a baseline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdatePolicy {
+    /// Never creates or updates the baseline. An update request is ignored;
+    /// missing baselines and mismatches still fail.
+    Forbidden,
+    /// Updates an existing baseline but never creates one.
+    ExistingOnly,
+    /// Creates or updates the baseline.
+    CreateOrUpdate,
+}
+
+impl UpdatePolicy {
+    fn may_write(self, exists: bool) -> bool {
+        match self {
+            UpdatePolicy::Forbidden => false,
+            UpdatePolicy::ExistingOnly => exists,
+            UpdatePolicy::CreateOrUpdate => true,
+        }
+    }
+
+    /// Why the baseline could not be created, for a missing-file failure.
+    fn cannot_create_hint(self) -> &'static str {
+        match self {
+            UpdatePolicy::Forbidden => {
+                "\nThis baseline is owned by another test suite and cannot be created from here; \
+                 add the test to the owning suite first."
+            },
+            UpdatePolicy::ExistingOnly => {
+                "\nThis baseline overrides another suite's, so it must be declared in the \
+                 exception manifest before it can be written."
+            },
+            UpdatePolicy::CreateOrUpdate => "",
+        }
+    }
+}
+
+/// Where a test's expected output lives.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BaselineLocation {
+    /// Beside the test source, using the suffix or `exp` by default.
+    BesideSource { suffix: Option<String> },
+    /// At an explicit path.
+    At(PathBuf),
+}
+
+/// Where a test's expected output lives, and whether this suite may write it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BaselineTarget {
+    pub location: BaselineLocation,
+    pub update_policy: UpdatePolicy,
+}
+
+impl BaselineTarget {
+    /// A source-adjacent baseline that may be created or updated.
+    pub fn beside_source(suffix: Option<String>) -> Self {
+        Self::beside_source_with(suffix, UpdatePolicy::CreateOrUpdate)
+    }
+
+    /// The baseline beside its source, under an explicit policy.
+    pub fn beside_source_with(suffix: Option<String>, update_policy: UpdatePolicy) -> Self {
+        Self {
+            location: BaselineLocation::BesideSource { suffix },
+            update_policy,
+        }
+    }
+
+    /// A baseline at `path`, under an explicit policy.
+    pub fn at(path: impl Into<PathBuf>, update_policy: UpdatePolicy) -> Self {
+        Self {
+            location: BaselineLocation::At(path.into()),
+            update_policy,
+        }
+    }
+
+    /// A source-adjacent target that preserves the current update policy.
+    fn beside(&self, suffix: Option<String>) -> Self {
+        Self::beside_source_with(suffix, self.update_policy)
+    }
+
+    fn path(&self, test_path: &Path) -> PathBuf {
+        match &self.location {
+            BaselineLocation::BesideSource { suffix } => {
+                add_exp_suffix(test_path, suffix.as_deref())
+            },
+            BaselineLocation::At(path) => path.clone(),
+        }
+    }
+}
+
+/// Writes `text` to `path`, creating parent directories as needed for
+/// override baselines and cross-compiled outputs.
+fn write_creating_parent(path: &Path, text: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, text)?;
+    Ok(())
+}
+
+/// Compares `output` with `target`, or updates the baseline when requested and
+/// permitted. Passing `update_requested` explicitly keeps policy behavior
+/// testable without changing the process environment.
 fn handle_expected_output(
     test_path: &Path,
     output: impl AsRef<str>,
-    exp_suffix: &Option<String>,
+    target: &BaselineTarget,
+    update_requested: bool,
 ) -> Result<()> {
     let output = output.as_ref();
     assert!(!output.is_empty());
-    let exp_path = add_exp_suffix(test_path, exp_suffix);
+    let exp_path = target.path(test_path);
 
-    if read_env_update_baseline() {
-        std::fs::write(exp_path, output).unwrap();
+    if update_requested && target.update_policy.may_write(exp_path.exists()) {
+        write_creating_parent(&exp_path, output)?;
         return Ok(());
     }
 
     if !exp_path.exists() {
-        std::fs::write(&exp_path, "").unwrap();
+        match target.update_policy {
+            UpdatePolicy::CreateOrUpdate => write_creating_parent(&exp_path, "")?,
+            UpdatePolicy::Forbidden | UpdatePolicy::ExistingOnly => anyhow::bail!(
+                "missing baseline `{}` for `{}`{}",
+                exp_path.display(),
+                test_path.display(),
+                target.update_policy.cannot_create_hint(),
+            ),
+        }
     }
-    let expected_output = std::fs::read_to_string(&exp_path)
-        .unwrap()
+    let expected_output = std::fs::read_to_string(&exp_path)?
         .replace("\r\n", "\n")
         .replace('\r', "\n");
     if output != expected_output {
@@ -1153,21 +1340,183 @@ fn handle_expected_output(
             test_path.display(),
             format_diff(expected_output, output),
         );
-        anyhow::bail!(add_update_baseline_fix(msg))
+        match target.update_policy {
+            UpdatePolicy::CreateOrUpdate | UpdatePolicy::ExistingOnly => {
+                anyhow::bail!(add_update_baseline_fix(msg))
+            },
+            UpdatePolicy::Forbidden => anyhow::bail!(
+                "{msg}\nThis baseline is owned by another test suite, so the output above is a \
+                 divergence between the two suites' implementations. Either make this suite \
+                 produce the recorded output, or record the divergence in this suite's own \
+                 override baseline; the shared baseline cannot be updated from here."
+            ),
+        }
     } else {
         Ok(())
     }
 }
 
-fn add_exp_suffix(path: &Path, suffix: &Option<String>) -> PathBuf {
-    // Only replace move or masm extension, otherwise add suffix.
-    // So for paths resulting from cross-compilation, like `foo.decompiled`,
-    // we won't generate `foo.exp` but `foo.decompiled.exp`.
-    let suffix = suffix.as_ref().map(|s| s.as_str()).unwrap_or(EXP_EXT);
-    let path_str = path.display().to_string();
-    if path_str.ends_with(".move") || path_str.ends_with(".masm") {
-        path.with_extension(suffix)
-    } else {
-        PathBuf::from(format!("{}.{}", path.display(), suffix))
+#[cfg(test)]
+mod baseline_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn check(
+        exp_path: &Path,
+        output: &str,
+        update_policy: UpdatePolicy,
+        update_requested: bool,
+    ) -> Result<()> {
+        handle_expected_output(
+            Path::new("some/test.move"),
+            output,
+            &BaselineTarget::at(exp_path, update_policy),
+            update_requested,
+        )
+    }
+
+    #[test]
+    fn a_forbidden_baseline_is_not_written_even_when_an_update_is_requested() {
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("test.exp");
+        std::fs::write(&exp, "recorded").unwrap();
+
+        let error = check(&exp, "different", UpdatePolicy::Forbidden, true).unwrap_err();
+        assert!(
+            error.to_string().contains("cannot be updated from here"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(std::fs::read_to_string(&exp).unwrap(), "recorded");
+    }
+
+    #[test]
+    fn a_forbidden_baseline_that_matches_passes_even_under_an_update_request() {
+        // Ignoring a forbidden update must not turn a match into a failure.
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("test.exp");
+        std::fs::write(&exp, "recorded").unwrap();
+
+        check(&exp, "recorded", UpdatePolicy::Forbidden, true).unwrap();
+        assert_eq!(std::fs::read_to_string(&exp).unwrap(), "recorded");
+    }
+
+    #[test]
+    fn a_forbidden_baseline_that_is_missing_fails_without_being_created() {
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("test.exp");
+
+        let error = check(&exp, "output", UpdatePolicy::Forbidden, false).unwrap_err();
+        assert!(
+            error.to_string().contains("missing baseline"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            !exp.exists(),
+            "a compare-only run must not create baselines"
+        );
+    }
+
+    #[test]
+    fn a_mismatch_against_a_forbidden_baseline_does_not_suggest_updating_it() {
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("test.exp");
+        std::fs::write(&exp, "recorded").unwrap();
+
+        let error = check(&exp, "different", UpdatePolicy::Forbidden, false).unwrap_err();
+        let message = error.to_string();
+        assert!(
+            !message.contains("UB=1"),
+            "unexpected suggestion: {message}"
+        );
+        assert!(message.contains("cannot be updated from here"));
+    }
+
+    #[test]
+    fn an_existing_only_baseline_is_updated_but_never_created() {
+        let dir = TempDir::new().unwrap();
+        let present = dir.path().join("present.exp");
+        std::fs::write(&present, "old").unwrap();
+        check(&present, "new", UpdatePolicy::ExistingOnly, true).unwrap();
+        assert_eq!(std::fs::read_to_string(&present).unwrap(), "new");
+
+        let absent = dir.path().join("absent.exp");
+        let error = check(&absent, "new", UpdatePolicy::ExistingOnly, true).unwrap_err();
+        assert!(
+            error.to_string().contains("exception manifest"),
+            "unexpected error: {error}"
+        );
+        assert!(!absent.exists());
+    }
+
+    #[test]
+    fn a_mismatching_existing_only_baseline_suggests_updating_not_declaring() {
+        // The file exists, so it is already declared; the remedy is `UB=1`.
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("test.exp");
+        std::fs::write(&exp, "recorded").unwrap();
+
+        let error = check(&exp, "different", UpdatePolicy::ExistingOnly, false).unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("UB=1"), "unexpected message: {message}");
+        assert!(
+            !message.contains("exception manifest"),
+            "an existing override is already declared: {message}"
+        );
+    }
+
+    #[test]
+    fn an_owned_baseline_keeps_the_legacy_write_and_empty_create_behavior() {
+        let dir = TempDir::new().unwrap();
+
+        // An update request replaces an existing owned baseline.
+        let exp = dir.path().join("test.exp");
+        std::fs::write(&exp, "old").unwrap();
+        check(&exp, "new", UpdatePolicy::CreateOrUpdate, true).unwrap();
+        assert_eq!(std::fs::read_to_string(&exp).unwrap(), "new");
+
+        // A missing baseline is created empty, then compared against, so the
+        // first run of a new test reports its whole output as a diff.
+        let fresh = dir.path().join("fresh.exp");
+        let error = check(&fresh, "output", UpdatePolicy::CreateOrUpdate, false).unwrap_err();
+        assert!(error.to_string().contains("UB=1"));
+        assert_eq!(std::fs::read_to_string(&fresh).unwrap(), "");
+    }
+
+    #[test]
+    fn a_created_baseline_gets_its_directory() {
+        let dir = TempDir::new().unwrap();
+        let exp = dir.path().join("corpus/nested/test.exp");
+        check(&exp, "output", UpdatePolicy::CreateOrUpdate, true).unwrap();
+        assert_eq!(std::fs::read_to_string(&exp).unwrap(), "output");
+    }
+
+    #[test]
+    fn a_matching_output_passes_under_every_policy() {
+        let dir = TempDir::new().unwrap();
+        for (index, policy) in [
+            UpdatePolicy::Forbidden,
+            UpdatePolicy::ExistingOnly,
+            UpdatePolicy::CreateOrUpdate,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let exp = dir.path().join(format!("test{index}.exp"));
+            std::fs::write(&exp, "same").unwrap();
+            check(&exp, "same", policy, false).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_source_adjacent_target_derives_its_path_from_the_source() {
+        assert_eq!(
+            BaselineTarget::beside_source(None).path(Path::new("a/b.move")),
+            PathBuf::from("a/b.exp")
+        );
+        assert_eq!(
+            BaselineTarget::beside_source(Some("optimize.exp".to_owned()))
+                .path(Path::new("a/b.move")),
+            PathBuf::from("a/b.optimize.exp")
+        );
     }
 }

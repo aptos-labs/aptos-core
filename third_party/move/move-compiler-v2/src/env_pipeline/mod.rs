@@ -22,6 +22,7 @@ pub mod literal_pattern_checker;
 pub mod match_coverage_checks;
 pub mod match_transforms;
 pub mod model_ast_lints;
+pub mod native_checker;
 pub mod recursive_struct_checker;
 pub mod rewrite_target;
 pub mod spec_checker;

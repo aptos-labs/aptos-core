@@ -276,7 +276,7 @@ async fn resolve_package(
                     package_manifest
                         .dependencies
                         .into_iter()
-                        .chain(package_manifest.dev_dependencies.into_iter()),
+                        .chain(package_manifest.dev_dependencies),
                 )
             } else {
                 Either::Right(package_manifest.dependencies.into_iter())

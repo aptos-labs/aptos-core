@@ -19,6 +19,7 @@ use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, create_init_num_operation_state,
     generate_boogie, verify_boogie,
 };
+use move_prover_boogie_backend::bytecode_translator::BoogieTranslator;
 use move_prover_bytecode_pipeline::options::ProverOptions;
 use std::{
     fmt::Debug,
@@ -218,7 +219,7 @@ impl Runner {
 
         // Scope verification to the given function
         let env = fun.module_env.env;
-        self.options.prover.verify_scope = VerificationScope::Only(fun.get_full_name_str());
+        self.options.prover.verify_scope = VerificationScope::Only(vec![fun.get_full_name_str()]);
         ProverOptions::set(env, self.options.prover.clone());
         create_init_num_operation_state(env);
         // Run benchmark
@@ -271,6 +272,10 @@ impl Runner {
             &mut self.error_writer,
             "unexpected transformation errors",
         )?;
+        if BoogieTranslator::verification_roots(env, &self.options.backend, &targets).is_empty() {
+            env.clear_diag();
+            return Ok((Duration::ZERO, "no-vc".to_string()));
+        }
 
         // Generate boogie code.
         let code_writer = generate_boogie(env, &self.options, None, &targets)?;
@@ -367,7 +372,7 @@ impl Benchmark {
         self.data
             .iter()
             .filter_map(|d| {
-                if d.status == "ok" || d.status == "error" {
+                if d.status == "ok" || d.status == "error" || d.status == "errors" {
                     Some(d.duration as u32)
                 } else {
                     None

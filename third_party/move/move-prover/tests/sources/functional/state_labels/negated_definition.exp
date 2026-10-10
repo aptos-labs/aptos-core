@@ -1,0 +1,55 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/negated_definition.move:16:9
+   │
+16 │         ensures !(..S |~ update<R>(addr, R { value: 1 })) && (S |~ exists<R>(addr));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/negated_definition.move:10: write_negated
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/negated_definition.move:11: write_negated
+   =     at tests/sources/functional/state_labels/negated_definition.move:12: write_negated
+   =     at tests/sources/functional/state_labels/negated_definition.move:15: write_negated (spec)
+   =     at tests/sources/functional/state_labels/negated_definition.move:16: write_negated (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/negated_definition.move:17:9
+   │
+17 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/negated_definition.move:10: write_negated
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/negated_definition.move:11: write_negated
+   =     at tests/sources/functional/state_labels/negated_definition.move:12: write_negated
+   =     at tests/sources/functional/state_labels/negated_definition.move:15: write_negated (spec)
+   =     at tests/sources/functional/state_labels/negated_definition.move:16: write_negated (spec)
+   =     at tests/sources/functional/state_labels/negated_definition.move:17: write_negated (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/negated_definition.move:26:9
+   │
+26 │ ╭         ensures ((..S |~ update<R>(addr, R { value: 1 })) ==> false) &&
+27 │ │             (S |~ exists<R>(addr));
+   │ ╰───────────────────────────────────^
+   │
+   =     at tests/sources/functional/state_labels/negated_definition.move:20: write_in_antecedent
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/negated_definition.move:21: write_in_antecedent
+   =     at tests/sources/functional/state_labels/negated_definition.move:22: write_in_antecedent
+   =     at tests/sources/functional/state_labels/negated_definition.move:25: write_in_antecedent (spec)
+   =     at tests/sources/functional/state_labels/negated_definition.move:26: write_in_antecedent (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/negated_definition.move:28:9
+   │
+28 │         ensures false;
+   │         ^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/negated_definition.move:20: write_in_antecedent
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/negated_definition.move:21: write_in_antecedent
+   =     at tests/sources/functional/state_labels/negated_definition.move:22: write_in_antecedent
+   =     at tests/sources/functional/state_labels/negated_definition.move:25: write_in_antecedent (spec)
+   =     at tests/sources/functional/state_labels/negated_definition.move:26: write_in_antecedent (spec)
+   =     at tests/sources/functional/state_labels/negated_definition.move:28: write_in_antecedent (spec)

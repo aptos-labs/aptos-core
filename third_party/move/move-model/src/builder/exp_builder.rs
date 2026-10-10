@@ -31,9 +31,10 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        AbilityContext, Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType,
-        ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
-        TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
+        AbilityContext, AbilityInference, Constraint, ConstraintContext, ErrorMessageContext,
+        PrimitiveType, ReceiverFunctionInstance, ReferenceKind, Substitution, Type,
+        TypeDisplayContext, TypeUnificationError, UnificationContext, Variance, WideningOrder,
+        BOOL_TYPE,
     },
     well_known::{
         BORROW_GLOBAL, BORROW_GLOBAL_MUT, UNSPECIFIED_ABORT_CODE,
@@ -129,6 +130,10 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// Boogie translator interpret them as field-path expressions over the
     /// underlying mut-ref param).
     pub in_behavior_pred_arg: bool,
+    /// Whether the expression currently translated is the function target of
+    /// a behavioral predicate. Inline functions are legal in this position:
+    /// the inliner resolves the predicate before function-value lowering.
+    pub in_behavior_pred_target: bool,
 }
 
 #[derive(Debug)]
@@ -203,6 +208,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             loop_stack: vec![],
             state_label_map: BTreeMap::new(),
             in_behavior_pred_arg: false,
+            in_behavior_pred_target: false,
         }
     }
 
@@ -217,17 +223,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             et.old_status = OldExpStatus::NotSupported;
         };
         et
-    }
-
-    /// Returns `true` if language version is ok. Otherwise,
-    /// issues an error message and returns `false`.
-    pub fn test_language_version(
-        &self,
-        loc: &Loc,
-        feature: &str,
-        version_min: LanguageVersion,
-    ) -> bool {
-        self.parent.test_language_version(loc, feature, version_min)
     }
 
     /// Returns `Some(())` if language version checks out.  Otherwise,
@@ -798,10 +793,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         params: &[(PA::Var, EA::Type)],
         for_move_fun: bool,
     ) -> Vec<Parameter> {
-        let is_lang_version_2_1 = self
-            .env()
-            .language_version
-            .is_at_least(LanguageVersion::V2_1);
         params
             .iter()
             .enumerate()
@@ -811,7 +802,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let sym = self.symbol_pool().make(var_str);
                 let loc = self.to_loc(&v.loc());
 
-                if !is_lang_version_2_1 || var_str != "_" {
+                if var_str != "_" {
                     self.define_local(
                         &loc,
                         sym,
@@ -969,6 +960,8 @@ impl AbilityContext for ExpTranslator<'_, '_, '_> {
         }
     }
 }
+
+impl AbilityInference for ExpTranslator<'_, '_, '_> {}
 
 /// # Type Translation
 
@@ -1377,13 +1370,6 @@ impl ExpTranslator<'_, '_, '_> {
                 ResourceSpecifier::Any
             },
         };
-        if !matches!(resource, ResourceSpecifier::Resource(..)) {
-            self.check_language_version(
-                &loc,
-                "address and wildcard access specifiers. Only resource type names can be provided.",
-                LanguageVersion::V2_0,
-            )?;
-        };
         let address = self.translate_address_specifier(address)?;
         let kind = match kind {
             EA::AccessSpecifierKind::LegacyAcquires => AccessSpecifierKind::LegacyAcquires,
@@ -1403,31 +1389,12 @@ impl ExpTranslator<'_, '_, '_> {
         let loc = self.to_loc(&specifier.loc);
         let res = match &specifier.value {
             EA::AddressSpecifier_::Empty => (loc, AddressSpecifier::Any),
-            EA::AddressSpecifier_::Any => {
-                self.check_language_version(
-                    &loc,
-                    "wildcard address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
-                (loc, AddressSpecifier::Any)
-            },
-            EA::AddressSpecifier_::Literal(addr) => {
-                self.check_language_version(
-                    &loc,
-                    "literal address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
-                (
-                    loc,
-                    AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
-                )
-            },
+            EA::AddressSpecifier_::Any => (loc, AddressSpecifier::Any),
+            EA::AddressSpecifier_::Literal(addr) => (
+                loc,
+                AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
+            ),
             EA::AddressSpecifier_::Name(name) => {
-                self.check_language_version(
-                    &loc,
-                    "named address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
                 self.translate_name(
@@ -1443,11 +1410,6 @@ impl ExpTranslator<'_, '_, '_> {
                 )
             },
             EA::AddressSpecifier_::Call(maccess, type_args, name) => {
-                self.check_language_version(
-                    &loc,
-                    "derived address specifiers",
-                    LanguageVersion::V2_0,
-                )?;
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
@@ -2837,6 +2799,315 @@ impl ExpTranslator<'_, '_, '_> {
         });
     }
 
+    /// Checks that guards do not modify pattern bindings or the variables being matched.
+    /// Must run after `post_process_body` and type finalization so inserted borrows, freezes,
+    /// and resolved types are available.
+    pub fn check_match_guards(&mut self, params: &[Parameter], result_exp: &ExpData) {
+        // Earlier errors can leave types unresolved and make ability checks unreliable.
+        if *self.had_errors.borrow() {
+            return;
+        }
+        result_exp.visit_pre_order(&mut |exp| {
+            if let ExpData::Match(_, discriminator, arms) = exp {
+                if arms.iter().all(|arm| arm.condition.is_none()) {
+                    return true;
+                }
+                let mut matched = GuardVars::new();
+                self.collect_matched_vars(params, discriminator, &mut vec![], &mut matched);
+                for arm in arms {
+                    if let Some(guard) = &arm.condition {
+                        let mut vars = matched.clone();
+                        for (_, sym) in arm.pattern.vars() {
+                            vars.insert(sym, GuardVarKind::PatternVar);
+                        }
+                        self.check_guard(params, guard, &vars, &mut vec![], GuardUse::Consume);
+                    }
+                }
+            }
+            true
+        });
+    }
+
+    /// Collects the locals and parameters whose storage the match reads while testing its
+    /// arms. A guard must not modify these, since later arms would then test a different
+    /// value.
+    fn collect_matched_vars(
+        &self,
+        params: &[Parameter],
+        exp: &Exp,
+        shadowed: &mut Vec<Symbol>,
+        vars: &mut GuardVars,
+    ) {
+        use ExpData::*;
+        match exp.as_ref() {
+            // The variable itself is matched.
+            LocalVar(_, sym) => {
+                if !shadowed.contains(sym) {
+                    vars.insert(*sym, GuardVarKind::Matched);
+                }
+            },
+            Temporary(_, idx) => {
+                vars.insert(params[*idx].0, GuardVarKind::Matched);
+            },
+            Call(_, oper, args) => match arg_access(oper) {
+                // Tuple elements are matched individually; a frozen reference still
+                // denotes the same storage.
+                ArgAccess::Tuple | ArgAccess::Freeze => {
+                    for arg in args {
+                        self.collect_matched_vars(params, arg, shadowed, vars);
+                    }
+                },
+                // `&x` matches the storage of `x`. `&mut *r` re-borrows the storage
+                // behind `r` only if `r` is a `&mut`; otherwise it borrows a copy.
+                ArgAccess::Borrow(kind) => {
+                    let target = match args[0].as_ref() {
+                        Call(_, Operation::Deref, inner) => {
+                            match self.get_node_type(inner[0].node_id()) {
+                                Type::Reference(inner_kind, _) if inner_kind == kind => &inner[0],
+                                _ => return,
+                            }
+                        },
+                        _ => &args[0],
+                    };
+                    self.collect_matched_vars(params, target, shadowed, vars);
+                },
+                // Everything else yields a value, which the match tests as a snapshot.
+                // A borrowed selection such as `&mut s.f` is a fresh reference into `s`
+                // that reference safety keeps guards from writing through.
+                ArgAccess::Deref | ArgAccess::Select | ArgAccess::Read | ArgAccess::ByValue => {},
+            },
+            // The result of a block, branch, or sequence is what gets matched.
+            Block(_, pat, _, body) => {
+                let saved = shadowed.len();
+                shadowed.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+                self.collect_matched_vars(params, body, shadowed, vars);
+                shadowed.truncate(saved);
+            },
+            IfElse(_, _, then_exp, else_exp) => {
+                self.collect_matched_vars(params, then_exp, shadowed, vars);
+                self.collect_matched_vars(params, else_exp, shadowed, vars);
+            },
+            Sequence(_, exps) => {
+                if let Some(last) = exps.last() {
+                    self.collect_matched_vars(params, last, shadowed, vars);
+                }
+            },
+            // Everything else produces a value rather than naming storage.
+            Invalid(_) | Value(..) | Invoke(..) | Lambda(..) | Quant(..) | Match(..)
+            | Return(..) | Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) | SpecBlock(..) => {},
+        }
+    }
+
+    /// Checks variable uses in a guard, tracking access kinds and locally shadowed names.
+    fn check_guard(
+        &mut self,
+        params: &[Parameter],
+        exp: &Exp,
+        vars: &GuardVars,
+        shadowed: &mut Vec<Symbol>,
+        usage: GuardUse,
+    ) {
+        use ExpData::*;
+        match exp.as_ref() {
+            LocalVar(id, sym) => {
+                if !shadowed.contains(sym)
+                    && let Some(kind) = vars.get(sym)
+                {
+                    self.check_guard_var_use(*id, *sym, usage, *kind);
+                }
+            },
+            Temporary(id, idx) => {
+                let sym = params[*idx].0;
+                if let Some(kind) = vars.get(&sym) {
+                    self.check_guard_var_use(*id, sym, usage, *kind);
+                }
+            },
+            Assign(_, pat, rhs) => {
+                for (var_id, sym) in pat.vars() {
+                    if !shadowed.contains(&sym)
+                        && let Some(kind) = vars.get(&sym)
+                    {
+                        self.guard_error(var_id, "assign to", sym, *kind);
+                    }
+                }
+                self.check_guard(params, rhs, vars, shadowed, GuardUse::Consume);
+            },
+            Mutate(_, lhs, rhs) => {
+                self.check_guard(params, lhs, vars, shadowed, GuardUse::Write);
+                self.check_guard(params, rhs, vars, shadowed, GuardUse::Consume);
+            },
+            Call(_, oper, args) => {
+                let arg_usage = match arg_access(oper) {
+                    ArgAccess::Freeze
+                    | ArgAccess::Read
+                    | ArgAccess::Borrow(ReferenceKind::Immutable) => GuardUse::Read,
+                    ArgAccess::Deref => match usage {
+                        // `&mut *r` can write through `r` when `r` is mutable.
+                        GuardUse::MutBorrow => GuardUse::Write,
+                        // Otherwise a dereference yields a copy.
+                        GuardUse::Read | GuardUse::Write | GuardUse::Consume => GuardUse::Read,
+                    },
+                    // A mutable borrow used only for reading cannot modify its target.
+                    ArgAccess::Borrow(ReferenceKind::Mutable) => match usage {
+                        GuardUse::Read => GuardUse::Read,
+                        GuardUse::Write | GuardUse::MutBorrow | GuardUse::Consume => {
+                            GuardUse::MutBorrow
+                        },
+                    },
+                    // Reading a selection copies the selected value. Mutably borrowing
+                    // or writing the selection is a write to part of the selected variable.
+                    ArgAccess::Select => match usage {
+                        GuardUse::Write | GuardUse::MutBorrow => GuardUse::Write,
+                        GuardUse::Read | GuardUse::Consume => GuardUse::Read,
+                    },
+                    ArgAccess::Tuple | ArgAccess::ByValue => GuardUse::Consume,
+                };
+                for arg in args {
+                    self.check_guard(params, arg, vars, shadowed, arg_usage);
+                }
+            },
+            Invoke(_, target, args) => {
+                self.check_guard(params, target, vars, shadowed, GuardUse::Consume);
+                // Calls through function values do not insert freezes. Parameter types
+                // identify arguments that are only read through immutable references.
+                let param_tys = match self.get_node_type(target.node_id()) {
+                    Type::Fun(param_ty, _, _) => param_ty.flatten(),
+                    _ => vec![],
+                };
+                for (pos, arg) in args.iter().enumerate() {
+                    let arg_usage = if param_tys
+                        .get(pos)
+                        .is_some_and(|ty| ty.is_immutable_reference())
+                    {
+                        GuardUse::Read
+                    } else {
+                        GuardUse::Consume
+                    };
+                    self.check_guard(params, arg, vars, shadowed, arg_usage);
+                }
+            },
+            Lambda(_, pat, body, _, _) => {
+                // Protected variables can only be captured by copy: mutable references
+                // and non-copyable values are rejected. The body uses the closure's copies.
+                let bound: Vec<Symbol> = pat.vars().into_iter().map(|(_, sym)| sym).collect();
+                let mut captured: BTreeMap<Symbol, NodeId> = BTreeMap::new();
+                body.visit_free_local_vars(|var_id, sym| {
+                    if !bound.contains(&sym) && !shadowed.contains(&sym) {
+                        captured.entry(sym).or_insert(var_id);
+                    }
+                });
+                // Parameters are temporaries, which no binder can shadow.
+                body.visit_pre_order(&mut |sub_exp| {
+                    if let Temporary(temp_id, idx) = sub_exp {
+                        captured.entry(params[*idx].0).or_insert(*temp_id);
+                    }
+                    true
+                });
+                for (sym, var_id) in captured {
+                    if let Some(kind) = vars.get(&sym) {
+                        self.check_guard_var_use(var_id, sym, GuardUse::Consume, *kind);
+                    }
+                }
+            },
+            Quant(_, _, ranges, _, cond, body) => {
+                let saved = shadowed.len();
+                for (pat, range) in ranges {
+                    self.check_guard(params, range, vars, shadowed, GuardUse::Consume);
+                    shadowed.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+                }
+                if let Some(cond) = cond {
+                    self.check_guard(params, cond, vars, shadowed, GuardUse::Consume);
+                }
+                self.check_guard(params, body, vars, shadowed, GuardUse::Consume);
+                shadowed.truncate(saved);
+            },
+            Block(_, pat, binding, body) => {
+                if let Some(binding) = binding {
+                    self.check_guard(params, binding, vars, shadowed, GuardUse::Consume);
+                }
+                let saved = shadowed.len();
+                shadowed.extend(pat.vars().into_iter().map(|(_, sym)| sym));
+                self.check_guard(params, body, vars, shadowed, usage.of_result());
+                shadowed.truncate(saved);
+            },
+            IfElse(_, cond, then_exp, else_exp) => {
+                self.check_guard(params, cond, vars, shadowed, GuardUse::Consume);
+                self.check_guard(params, then_exp, vars, shadowed, usage.of_result());
+                self.check_guard(params, else_exp, vars, shadowed, usage.of_result());
+            },
+            Match(_, discriminator, arms) => {
+                self.check_guard(params, discriminator, vars, shadowed, GuardUse::Consume);
+                for arm in arms {
+                    let saved = shadowed.len();
+                    shadowed.extend(arm.pattern.vars().into_iter().map(|(_, sym)| sym));
+                    if let Some(cond) = &arm.condition {
+                        self.check_guard(params, cond, vars, shadowed, GuardUse::Consume);
+                    }
+                    self.check_guard(params, &arm.body, vars, shadowed, GuardUse::Consume);
+                    shadowed.truncate(saved);
+                }
+            },
+            Sequence(_, exps) => {
+                if let Some((last, init)) = exps.split_last() {
+                    for sub_exp in init {
+                        self.check_guard(params, sub_exp, vars, shadowed, GuardUse::Consume);
+                    }
+                    self.check_guard(params, last, vars, shadowed, usage.of_result());
+                }
+            },
+            Return(_, value) | Loop(_, value) => {
+                self.check_guard(params, value, vars, shadowed, GuardUse::Consume);
+            },
+            Invalid(_) | Value(..) | LoopCont(..) | SpecBlock(..) => {},
+        }
+    }
+
+    /// Rejects guard uses that can modify or move a protected variable or expose mutable access.
+    fn check_guard_var_use(
+        &mut self,
+        id: NodeId,
+        name: Symbol,
+        usage: GuardUse,
+        kind: GuardVarKind,
+    ) {
+        let ty = self.get_node_type(id);
+        let action = match usage {
+            GuardUse::Read => return,
+            GuardUse::MutBorrow => "mutably borrow",
+            GuardUse::Write if ty.is_mutable_reference() => "write through mutable reference",
+            // `&mut *r` with `r: &T` mutably borrows a copy of the referenced value.
+            GuardUse::Write if ty.is_immutable_reference() => return,
+            GuardUse::Write => "modify",
+            GuardUse::Consume if ty.is_mutable_reference() => "pass or copy mutable reference",
+            GuardUse::Consume
+                if !ty.is_reference()
+                    && !self.infer_abilities(&ty).1.has_ability(Ability::Copy) =>
+            {
+                "move"
+            },
+            GuardUse::Consume => return,
+        };
+        self.guard_error(id, action, name, kind);
+    }
+
+    fn guard_error(&mut self, id: NodeId, action: &str, name: Symbol, kind: GuardVarKind) {
+        let note = match kind {
+            GuardVarKind::PatternVar => "pattern variables are read-only until an arm is selected",
+            GuardVarKind::Matched => {
+                "the value being matched must not change while guards are evaluated"
+            },
+        };
+        self.error_with_notes(
+            &self.get_node_loc(id),
+            &format!(
+                "cannot {} `{}` inside a match guard",
+                action,
+                name.display(self.symbol_pool())
+            ),
+            vec![note.to_string()],
+        );
+    }
+
     /// Check whether types of lambda expressions are valid.
     pub fn check_lambda_types(&self, exp: &ExpData) {
         exp.visit_pre_order(&mut |e| {
@@ -3940,7 +4211,6 @@ impl ExpTranslator<'_, '_, '_> {
         // handles call of struct/variant with positional fields
         let expected_type = &self.subs.specialize(expected_type);
         if self.can_resolve_to_struct(expected_type, maccess) {
-            self.check_language_version(loc, "positional fields", LanguageVersion::V2_0)?;
             // translates StructName(e0, e1, ...) to pack<StructName> { 0: e0, 1: e1, ... }
             let fields: EA::Fields<_> =
                 EA::Fields::maybe_from_iter(args.iter().enumerate().map(|(i, &arg)| {
@@ -4369,7 +4639,7 @@ impl ExpTranslator<'_, '_, '_> {
         }
 
         if let Some(entry) = self.parent.parent.fun_table.get(&global_var_sym) {
-            if entry.kind == FunctionKind::Inline {
+            if entry.kind == FunctionKind::Inline && !self.in_behavior_pred_target {
                 self.error(loc, "inline function cannot be used as a function value");
                 return self.new_error_exp();
             }
@@ -4815,7 +5085,6 @@ impl ExpTranslator<'_, '_, '_> {
                 .struct_table
                 .contains_key(&global_var_sym)
             {
-                self.check_language_version(loc, "resource indexing", LanguageVersion::V2_0)?;
                 if self
                     .parent
                     .parent
@@ -4841,7 +5110,6 @@ impl ExpTranslator<'_, '_, '_> {
             }
         }
         if !self.is_spec_mode() {
-            self.check_language_version(loc, "vector indexing", LanguageVersion::V2_0)?;
             // Translate to vector indexing in impl mode if the target is not a resource or a spec schema
             // spec mode is handled in `translate_index`
             if call.is_none() {
@@ -5172,7 +5440,21 @@ impl ExpTranslator<'_, '_, '_> {
                     value_exp.into_exp(),
                 ])
             } else {
-                // Error reported
+                if !matches!(expected_type, Type::Error) {
+                    // Not a follow-up of an already reported type error: the
+                    // context does not (yet) determine the struct type, e.g.
+                    // for an unannotated lambda parameter. Report instead of
+                    // producing a silent error expression.
+                    self.error(
+                        loc,
+                        &format!(
+                            "cannot determine the struct type of `update_field` from \
+                             the context (found `{}`); add a type annotation, e.g. \
+                             on an enclosing lambda parameter",
+                            expected_type.display(&self.type_display_context())
+                        ),
+                    );
+                }
                 self.new_error_exp()
             }
         } else {
@@ -5430,17 +5712,27 @@ impl ExpTranslator<'_, '_, '_> {
             // Remember whether this function has variance in function arguments
             let is_inline =
                 matches!(cand, AnyFunEntry::UserFun(f) if f.kind == FunctionKind::Inline);
+            let variance = self.type_variance_if_inline(is_inline);
 
+            if cand.is_equality() && self.mode == ExpTranslationMode::Impl {
+                if let Err(diag) = self.unify_function_equality_operands(
+                    variance,
+                    &arg_types[0],
+                    &arg_types[1],
+                    &params[0].1.instantiate(&instantiation),
+                ) {
+                    outruled.push((cand, None, diag));
+                    // Restore substitution and continue with next cand
+                    self.subs = saved_subs;
+                    continue;
+                }
+            }
             // Process arguments
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
                 let instantiated = params[i].1.instantiate(&instantiation);
-                let result = self.unify_types(
-                    self.type_variance_if_inline(is_inline),
-                    WideningOrder::LeftToRight,
-                    arg_ty,
-                    &instantiated,
-                );
+                let result =
+                    self.unify_types(variance, WideningOrder::LeftToRight, arg_ty, &instantiated);
                 if let Err(err) = result {
                     let arg_loc = if i < translated_args.len() {
                         Some(
@@ -5598,6 +5890,60 @@ impl ExpTranslator<'_, '_, '_> {
         }
     }
 
+    /// Function values are compared at identical types: `==` and `!=` do not widen abilities,
+    /// unlike other positions. An operand whose type is still open, such as a lambda without
+    /// declared abilities, is fixed to the other operand's type. Mutable references are compared
+    /// frozen. Binds the type parameter to the common type, and returns the diagnostic when the
+    /// operand types cannot be made identical.
+    fn unify_function_equality_operands(
+        &mut self,
+        variance: Variance,
+        lhs_ty: &Type,
+        rhs_ty: &Type,
+        param_ty: &Type,
+    ) -> Result<(), (String, Vec<String>, Vec<(Loc, String)>)> {
+        if !lhs_ty.skip_reference().is_function() && !rhs_ty.skip_reference().is_function() {
+            return Ok(());
+        }
+        let freeze = |ty: &Type| match ty {
+            Type::Reference(ReferenceKind::Mutable, inner) => {
+                Type::Reference(ReferenceKind::Immutable, inner.clone())
+            },
+            _ => ty.clone(),
+        };
+        let saved_subs = self.subs.clone();
+        let Ok(common_ty) = self.unify_types(
+            Variance::NoVariance,
+            WideningOrder::LeftToRight,
+            &freeze(lhs_ty),
+            &freeze(rhs_ty),
+        ) else {
+            self.subs = saved_subs;
+            let display_ctx = self.type_display_context();
+            return Err((
+                format!(
+                    "cannot compare `{}` with `{}`",
+                    self.subs.specialize(lhs_ty).display(&display_ctx),
+                    self.subs.specialize(rhs_ty).display(&display_ctx)
+                ),
+                vec![
+                    "function values are compared at identical types, including abilities"
+                        .to_string(),
+                ],
+                vec![],
+            ));
+        };
+        // If the parameter cannot take the common type, as for a reference and the `(T, T)`
+        // overload, the per-operand unification reports it.
+        if self
+            .unify_types(variance, WideningOrder::LeftToRight, &common_ty, param_ty)
+            .is_err()
+        {
+            self.subs = saved_subs;
+        }
+        Ok(())
+    }
+
     /// Adds conversions to the given arguments for the given resolved function entry. Currently
     /// the only supported conversion is from `&mut T` to `&T` and we treat with it in an ad-hoc
     /// manor.
@@ -5704,11 +6050,6 @@ impl ExpTranslator<'_, '_, '_> {
         args: Vec<Exp>,
         expected_type: &Type,
     ) -> ExpData {
-        if !self.test_language_version(loc, "receiver style function calls", LanguageVersion::V2_0)
-        {
-            let id = self.new_node_id_with_type_loc(&Type::Error, loc);
-            return ExpData::Invalid(id);
-        }
         let generics = generics
             .as_ref()
             .map(|tys| self.translate_types_with_loc(tys));
@@ -6529,11 +6870,15 @@ impl ExpTranslator<'_, '_, '_> {
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
             PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
             PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
+            PA::BehaviorKind::UnchangedOf => BehaviorKind::UnchangedOf,
+            PA::BehaviorKind::FoldsOf => BehaviorKind::FoldsOf,
         };
 
         // Translate the target expression and validate it has function type
         let fun_type_var = self.fresh_type_var();
+        let previous = std::mem::replace(&mut self.in_behavior_pred_target, true);
         let fun_exp_data = self.translate_exp(target, &fun_type_var);
+        self.in_behavior_pred_target = previous;
         let fun_exp = fun_exp_data.into_exp();
 
         // Extract function arg/result types. The type may be a concrete Type::Fun
@@ -6761,9 +7106,15 @@ impl ExpTranslator<'_, '_, '_> {
                 },
                 ExpData::Call(
                     id,
-                    Behavior(BehaviorKind::EnsuresOf | BehaviorKind::ResultOf, r),
+                    Behavior(
+                        BehaviorKind::EnsuresOf
+                        | BehaviorKind::ResultOf
+                        | BehaviorKind::UnchangedOf
+                        | BehaviorKind::FoldsOf,
+                        r,
+                    ),
                     _,
-                ) => (*id, r, "ensures_of/result_of"),
+                ) => (*id, r, "ensures_of/result_of/unchanged_of/folds_of"),
                 ExpData::Call(id, SpecFunction(mid, fid, r), _) => {
                     let is_two_state = env.get_module_opt(*mid).is_some_and(|m| {
                         m.get_spec_funs()
@@ -6874,6 +7225,11 @@ impl ExpTranslator<'_, '_, '_> {
         result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Exp> {
+        if matches!(kind, BehaviorKind::FoldsOf) {
+            // `folds_of` has its own argument layout, unrelated to the
+            // target's parameter list.
+            return self.translate_and_check_folds_of_args(loc, args, arg_ty);
+        }
         let minimum = self.compute_behavior_arg_types(arg_ty, result_ty, kind);
         let canonical = self.compute_behavior_arg_types_canonical(arg_ty, result_ty, kind);
         let expected_types: &[Type] =
@@ -6910,6 +7266,97 @@ impl ExpTranslator<'_, '_, '_> {
             return translated;
         }
 
+        let prev = std::mem::replace(&mut self.in_behavior_pred_arg, true);
+        let translated = args
+            .iter()
+            .zip(expected_types.iter())
+            .map(|(arg, expected_ty)| self.translate_exp(arg, expected_ty).into_exp())
+            .collect();
+        self.in_behavior_pred_arg = prev;
+        translated
+    }
+
+    /// Translates and type-checks the arguments of a `folds_of<f>(..)`
+    /// predicate. Two surface forms exist, dispatched on whether the first
+    /// argument is a literal lambda:
+    /// - element form `folds_of<f>(v, i)`: `f` must be unary and `v` a
+    ///   vector of `f`'s (reference-stripped) parameter type;
+    /// - general form `folds_of<f>(g, i)`: `g` is a literal index lambda
+    ///   `|j: u64| ..` producing `f`'s (reference-stripped) argument tuple
+    ///   for iteration `j`.
+    /// In both forms `i` is the `u64` iteration count.
+    fn translate_and_check_folds_of_args(
+        &mut self,
+        loc: &Loc,
+        args: &[EA::Exp],
+        arg_ty: &Type,
+    ) -> Vec<Exp> {
+        // Error recovery: translate the arguments without type expectation,
+        // as in the generic arity-error path above.
+        let translate_free = |this: &mut Self, args: &[EA::Exp]| -> Vec<Exp> {
+            let prev = std::mem::replace(&mut this.in_behavior_pred_arg, true);
+            let translated = args
+                .iter()
+                .map(|arg| this.translate_exp_free(arg).1.into_exp())
+                .collect();
+            this.in_behavior_pred_arg = prev;
+            translated
+        };
+        if args.len() != 2 {
+            self.error(
+                loc,
+                &format!(
+                    "expected 2 argument(s) for folds_of but {} were provided",
+                    args.len()
+                ),
+            );
+            return translate_free(self, args);
+        }
+        let param_tys: Vec<Type> = arg_ty
+            .clone()
+            .flatten()
+            .into_iter()
+            .map(|ty| ty.skip_reference().clone())
+            .collect();
+        let u64_ty = Type::new_prim(PrimitiveType::U64);
+        let first_ty = if let EA::Exp_::Lambda(sp!(_, lambda_params), ..) = &args[0].value {
+            // General form: literal index lambda `|j: u64| <argument tuple>`.
+            if lambda_params.len() != 1 {
+                self.error(
+                    &self.to_loc(&args[0].loc),
+                    &format!(
+                        "the index function of `folds_of` must take exactly one \
+                         `u64` index parameter, but this lambda takes {}",
+                        lambda_params.len()
+                    ),
+                );
+                return translate_free(self, args);
+            }
+            Type::Fun(
+                Box::new(u64_ty.clone()),
+                Box::new(Type::tuple(param_tys)),
+                AbilitySet::EMPTY,
+            )
+        } else {
+            // Element form: a vector of the unary target's element type.
+            match param_tys.as_slice() {
+                [elem_ty] => Type::Vector(Box::new(elem_ty.clone())),
+                _ => {
+                    self.error(
+                        loc,
+                        &format!(
+                            "the element form `folds_of<f>(v, i)` requires `f` to \
+                             take exactly one parameter, but it takes {}; use the \
+                             general form `folds_of<f>(|j| (..), i)` with a literal \
+                             index lambda instead",
+                            param_tys.len()
+                        ),
+                    );
+                    return translate_free(self, args);
+                },
+            }
+        };
+        let expected_types = [first_ty, u64_ty];
         let prev = std::mem::replace(&mut self.in_behavior_pred_arg, true);
         let translated = args
             .iter()
@@ -7067,5 +7514,167 @@ impl ExpTranslator<'_, '_, '_> {
                 None
             },
         }
+    }
+}
+
+// =================================================================================================
+// Match guard checking
+
+/// Variables a match guard must not modify, with the reason they are read-only.
+type GuardVars = BTreeMap<Symbol, GuardVarKind>;
+
+/// Why a variable is read-only inside a guard. Selects the error note.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GuardVarKind {
+    /// Bound by the arm's pattern.
+    PatternVar,
+    /// Its storage is part of the value being matched.
+    Matched,
+}
+
+/// How the value of a sub-expression is used inside a guard.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GuardUse {
+    /// Dereferenced, frozen, immutably borrowed, compared, or a part of it copied.
+    Read,
+    /// Target of a write, or a part of it mutably borrowed.
+    Write,
+    /// Mutably borrowed as a whole.
+    MutBorrow,
+    /// Passed on, stored, or otherwise consumed.
+    Consume,
+}
+
+impl GuardUse {
+    /// Access to a block, branch, or sequence result applies to a temporary. Borrowing or
+    /// writing that temporary consumes the result expression without borrowing its source.
+    fn of_result(self) -> GuardUse {
+        match self {
+            GuardUse::Write | GuardUse::MutBorrow => GuardUse::Consume,
+            GuardUse::Read | GuardUse::Consume => self,
+        }
+    }
+}
+
+/// How an operation relates its result to the storage of its arguments. This is the one
+/// place that classifies operations for the guard check; an operation added to `Operation`
+/// must be placed here.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ArgAccess {
+    /// The result holds the arguments themselves.
+    Tuple,
+    /// The result is the argument's storage, seen through an immutable reference.
+    Freeze,
+    /// The result is a reference to the argument's storage.
+    Borrow(ReferenceKind),
+    /// The result is a copy of the referenced value.
+    Deref,
+    /// The result is a copy of part of the argument; borrowing the selection borrows that part.
+    Select,
+    /// The arguments are only read: variant tests and comparisons.
+    Read,
+    /// The arguments are taken by value.
+    ByValue,
+}
+
+fn arg_access(oper: &Operation) -> ArgAccess {
+    match oper {
+        Operation::Tuple => ArgAccess::Tuple,
+        Operation::Freeze(_) => ArgAccess::Freeze,
+        Operation::Borrow(kind) => ArgAccess::Borrow(*kind),
+        Operation::Deref => ArgAccess::Deref,
+        Operation::Select(..) | Operation::SelectVariants(..) => ArgAccess::Select,
+        // Comparisons read through references; for values they need a copy, which the
+        // ability checker reports if the type has none.
+        Operation::TestVariants(..) | Operation::Eq | Operation::Neq => ArgAccess::Read,
+        // Calls receive references only when written explicitly, or through the freeze
+        // inserted for `&T` parameters. Constructors, operators, and storage builtins take
+        // values.
+        Operation::MoveFunction(..)
+        | Operation::Pack(..)
+        | Operation::Closure(..)
+        | Operation::Vector
+        | Operation::Add
+        | Operation::Sub
+        | Operation::Mul
+        | Operation::Mod
+        | Operation::Div
+        | Operation::BitOr
+        | Operation::BitAnd
+        | Operation::Xor
+        | Operation::Shl
+        | Operation::Shr
+        | Operation::And
+        | Operation::Or
+        | Operation::Lt
+        | Operation::Gt
+        | Operation::Le
+        | Operation::Ge
+        | Operation::Copy
+        | Operation::Move
+        | Operation::Not
+        | Operation::Cast
+        | Operation::Negate
+        | Operation::Exists(_)
+        | Operation::BorrowGlobal(_)
+        | Operation::MoveTo
+        | Operation::MoveFrom
+        | Operation::Abort(_) => ArgAccess::ByValue,
+        // Specification-only and compiler-internal operations do not occur in guards of
+        // implementation code (`NoOp` placeholders are resolved before the check runs).
+        Operation::SpecFunction(..)
+        | Operation::UpdateField(..)
+        | Operation::Behavior(..)
+        | Operation::Result(_)
+        | Operation::Index
+        | Operation::Slice
+        | Operation::Range
+        | Operation::Implies
+        | Operation::Iff
+        | Operation::Identical
+        | Operation::Len
+        | Operation::TypeValue
+        | Operation::TypeDomain
+        | Operation::ResourceDomain
+        | Operation::StateDomain
+        | Operation::Global(_)
+        | Operation::CanModify
+        | Operation::Old
+        | Operation::SaveStateAnchor(_)
+        | Operation::WithStateAnchor(_)
+        | Operation::FoldsCaptureAnchor(_)
+        | Operation::InlineCallSummary
+        | Operation::Trace(_)
+        | Operation::SpecPublish(_)
+        | Operation::SpecRemove(_)
+        | Operation::SpecUpdate(_)
+        | Operation::EmptyVec
+        | Operation::SingleVec
+        | Operation::UpdateVec
+        | Operation::ConcatVec
+        | Operation::ReverseVec
+        | Operation::IndexOfVec
+        | Operation::ContainsVec
+        | Operation::InRangeRange
+        | Operation::InRangeVec
+        | Operation::RangeVec
+        | Operation::MaxU8
+        | Operation::MaxU16
+        | Operation::MaxU32
+        | Operation::MaxU64
+        | Operation::MaxU128
+        | Operation::MaxU256
+        | Operation::Bv2Int
+        | Operation::Int2Bv
+        | Operation::AbortFlag
+        | Operation::AbortCode
+        | Operation::WellFormed
+        | Operation::BoxValue
+        | Operation::UnboxValue
+        | Operation::EmptyEventStore
+        | Operation::ExtendEventStore
+        | Operation::EventStoreIncludes
+        | Operation::EventStoreIncludedIn
+        | Operation::NoOp => ArgAccess::ByValue,
     }
 }

@@ -15,6 +15,6 @@ public fun Test::test($t0|_r: 0x42::Test::R) {
 
 [variant verification]
 public fun Test::test($t0|_r: 0x42::Test::R) {
-  0: assume And(WellFormed($t0), forall $elem: vector<0x42::Test::S>: select Test::R.s($t0): forall $elem: 0x42::Test::S: $elem: Gt(select Test::S.y($elem), 0))
+  0: assume And(WellFormed($t0), forall $elem: vector<0x42::Test::S>: select Test::R.s<0x42::Test::R>($t0): forall $elem: 0x42::Test::S: $elem: Gt(select Test::S.y($elem), 0))
   1: return ()
 }

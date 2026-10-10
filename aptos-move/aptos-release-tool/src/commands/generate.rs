@@ -1,9 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{bundle, config::BundleConfig, release, summary};
+use crate::{config::BundleConfig, release, summary};
 use anyhow::{Context, Result};
-use aptos_release_builder::{components::get_execution_hash, ExecutionMode};
+use aptos_governance_bundle as bundle;
+use aptos_release_builder::{components::compile_script_and_hash, ExecutionMode};
 use aptos_types::on_chain_config::GasScheduleV2;
 use chrono::Utc;
 use std::{fs, path::Path};
@@ -60,31 +61,25 @@ async fn build_bundle(
     fs::copy(release_config_path, bundle_path.join(bundle::CONFIG_YAML))
         .context("failed to copy config into bundle")?;
 
-    // 5. Build and write the manifest (with checksums computed last).
+    // 5. Build and write the manifest, once every other file is in place.
     println!("Building manifest...");
-    let source = bundle::read_source_info(core_path)?;
-    let mut manifest = bundle::BundleManifest {
-        format_version: bundle::BUNDLE_FORMAT_VERSION,
-        bundle: bundle::BundleSection {
+    let source = read_source_info(core_path)?;
+    bundle::BundleManifest::new(
+        bundle_path,
+        bundle::BundleSection {
             name: config.name.clone(),
             created_at: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         },
-        source: bundle::SourceSection {
+        bundle::SourceSection {
             branch: source.branch,
             commit: source.commit,
         },
-        integrity: bundle::IntegritySection {
-            digest: String::new(),
-        },
-        checksums: Default::default(),
-    };
-    manifest.checksums = bundle::compute_checksums(bundle_path)?;
-    manifest.integrity.digest = manifest.compute_digest();
-    manifest.write(bundle_path)?;
+    )?
+    .write(bundle_path)?;
 
     // 6. Verify integrity before declaring success.
     println!("Verifying bundle integrity...");
-    crate::commands::verify::run(bundle_path, false)?;
+    crate::commands::verify_bundle::run(bundle_path, false)?;
     Ok(())
 }
 
@@ -129,8 +124,10 @@ async fn materialize_gas(
     }))
 }
 
-/// Generate the proposal's multi-step governance scripts into `scripts/N-*.move`
-/// and its metadata into top-level `metadata.json`.
+/// Generate the proposal's multi-step governance scripts and its metadata:
+/// sources into `scripts/N-*.move` (stamped with their execution hashes, for
+/// auditing), compiled bytecode into `bytecode/N-*.mv` (the artifacts actually
+/// deployed), and the metadata into top-level `metadata.json`.
 async fn generate_scripts(config: &BundleConfig, bundle_path: &Path) -> Result<()> {
     let mut result: Vec<(String, String)> = vec![];
     for entry in config.update_sequence.iter().rev() {
@@ -141,14 +138,27 @@ async fn generate_scripts(config: &BundleConfig, bundle_path: &Path) -> Result<(
     result.reverse();
 
     let scripts_dir = bundle_path.join(bundle::SCRIPTS_DIR);
+    let bytecode_dir = bundle_path.join(bundle::BYTECODE_DIR);
     fs::create_dir_all(&scripts_dir)?;
+    fs::create_dir_all(&bytecode_dir)?;
     // Zero-pad the index so lexical order matches numeric step order at >= 10 scripts.
     let width = result.len().saturating_sub(1).to_string().len();
     for (idx, (script_name, script)) in result.iter().enumerate() {
-        let file_name = format!("{:0width$}-{}.move", idx, script_name, width = width);
-        let path = scripts_dir.join(&file_name);
-        fs::write(&path, prepend_script_hash(script_name, script))
-            .with_context(|| format!("failed to write {}", path.display()))?;
+        let file_stem = format!("{:0width$}-{}", idx, script_name, width = width);
+
+        // The stamped hash is the on-chain execution hash governance voters
+        // approve: the hash of the compiled bytecode.
+        let (blob, hash) = compile_script_and_hash(script)
+            .with_context(|| format!("failed to compile {}", file_stem))?;
+
+        let source_path = scripts_dir.join(format!("{}.move", file_stem));
+        let stamped = format!("// Script hash: {}\n{}", hash.to_hex(), script);
+        fs::write(&source_path, stamped)
+            .with_context(|| format!("failed to write {}", source_path.display()))?;
+
+        let bytecode_path = bytecode_dir.join(format!("{}.mv", file_stem));
+        fs::write(&bytecode_path, &blob)
+            .with_context(|| format!("failed to write {}", bytecode_path.display()))?;
     }
 
     let metadata_path = bundle_path.join(bundle::METADATA_JSON);
@@ -160,12 +170,29 @@ async fn generate_scripts(config: &BundleConfig, bundle_path: &Path) -> Result<(
     Ok(())
 }
 
-/// Prepend the script's on-chain execution hash as a comment (the hash
-/// governance voters approve).
-fn prepend_script_hash(script_name: &str, script: &str) -> String {
-    let single = [(script_name.to_string(), script.to_string())];
-    match get_execution_hash(&single) {
-        Some(hash) => format!("// Script hash: {}\n{}", hash, script),
-        None => script.to_string(),
-    }
+/// Git revision and branch the bundle is generated from, read from the working
+/// tree at `core_path`.
+struct SourceInfo {
+    commit: String,
+    branch: Option<String>,
+}
+
+/// Read the current commit and branch from the git repository containing
+/// `core_path`.
+fn read_source_info(core_path: &Path) -> Result<SourceInfo> {
+    let repo = git2::Repository::discover(core_path)
+        .with_context(|| format!("failed to open git repo at {}", core_path.display()))?;
+    let head = repo.head().context("failed to resolve git HEAD")?;
+    let commit = head
+        .peel_to_commit()
+        .context("failed to peel HEAD to a commit")?
+        .id()
+        .to_string();
+    // Only report an actual branch (a detached HEAD's shorthand is a commit hash).
+    let branch = if head.is_branch() {
+        head.shorthand().map(|s| s.to_string())
+    } else {
+        None
+    };
+    Ok(SourceInfo { commit, branch })
 }

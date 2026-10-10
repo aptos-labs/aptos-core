@@ -173,10 +173,80 @@ pub fn strip_ref(ref_ty: InternedType) -> Option<InternedType> {
     Some(*inner)
 }
 
+/// Whether a value of type `actual` may be used where `expected` is required.
+///
+/// - Identical types are assignable.
+/// - Two [`Type::Function`]s are assignable when their argument and result
+///   lists are identical and `expected`'s abilities are a subset of `actual`'s.
+/// - Two [`Type::ImmutRef`]s are assignable when their pointees are.
+/// - Nothing else is assignable; in particular, `&mut T` and `&T` are not.
+///
+/// # Preconditions
+///
+/// Both types must come from the same interner, and from the same
+/// type-parameter scope: a [`Type::TypeParam`] is interned by index alone, so
+/// parameters sharing an index across scopes are the same pointer.
+///
+/// Inherits safety contract of [`view_type`].
+///
+/// TODO(metering): unbounded recursion on reference nesting; same family as the
+/// `TODO(metering)` on [`is_closed_type`]. Depth is 1 in practice because
+/// nested references are not expressible.
+pub fn is_assignable(expected: InternedType, actual: InternedType) -> bool {
+    // Interning makes pointer equality structural equality, which settles every
+    // invariant constructor: below, only the two variant positions do work.
+    if expected == actual {
+        return true;
+    }
+    match view_type(expected) {
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => matches!(
+            view_type(actual),
+            Type::Function {
+                args: actual_args,
+                results: actual_results,
+                abilities: actual_abilities,
+            } if args == actual_args
+                && results == actual_results
+                && abilities.is_subset(*actual_abilities)
+        ),
+        Type::ImmutRef { inner } => matches!(
+            view_type(actual),
+            Type::ImmutRef { inner: actual_inner } if is_assignable(*inner, *actual_inner)
+        ),
+        // Invariant: pointer inequality above already decided these. Listed
+        // explicitly so a new `Type` variant forces a variance decision.
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::TypeParam { .. } => false,
+    }
+}
+
 /// Whether `ty` contains no [`Type::TypeParam`] node.
 ///
 /// Inherits safety contract of [`view_type`].
-/// TODO(metering): convert to non-recursive.
+/// TODO(metering): memoize by interned type and convert to non-recursive.
+/// The recursion has no cache and `.all()` short-circuits only on `false`,
+/// so a type whose interned tree shares subtypes is traversed exponentially.
 pub fn is_closed_type(ty: InternedType) -> bool {
     match view_type(ty) {
         Type::TypeParam { .. } => false,
@@ -305,34 +375,35 @@ pub fn intrinsic_slot_size_and_align(ty: &Type) -> Option<(Size, Alignment)> {
     })
 }
 
-impl Type {
-    /// The short kind word for this type (`"u64"`, `"vector"`, `"struct"`, ...).
-    /// Mirrors the legacy VM's `TypeTag::to_short_string`.
-    pub fn short_name(&self) -> &'static str {
-        match self {
-            Type::Bool => "bool",
-            Type::U8 => "u8",
-            Type::U16 => "u16",
-            Type::U32 => "u32",
-            Type::U64 => "u64",
-            Type::U128 => "u128",
-            Type::U256 => "u256",
-            Type::I8 => "i8",
-            Type::I16 => "i16",
-            Type::I32 => "i32",
-            Type::I64 => "i64",
-            Type::I128 => "i128",
-            Type::I256 => "i256",
-            Type::Address => "address",
-            Type::Signer => "signer",
-            Type::Vector { .. } => "vector",
-            Type::Nominal { .. } => "struct",
-            Type::Function { .. } => "function",
-            Type::ImmutRef { .. } | Type::MutRef { .. } => "reference",
-            Type::TypeParam { .. } => "type parameter",
-        }
+/// Whether `ty` is `signer` or `&signer`, the parameter shapes that fill from
+/// a transaction signer.
+pub fn is_signer_or_signer_immut_ref(ty: InternedType) -> bool {
+    match view_type(ty) {
+        Type::Signer => true,
+        Type::ImmutRef { inner } => matches!(view_type(*inner), Type::Signer),
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Nominal { .. }
+        | Type::Function { .. }
+        | Type::TypeParam { .. } => false,
     }
+}
 
+impl Type {
     /// True iff this is `Type::U64`. Used by the specializer to gate the
     /// u64-specialized micro-op fast paths.
     #[inline(always)]
@@ -389,9 +460,8 @@ pub const SIGNER_TY: InternedType = GlobalArenaPtr::from_static(&SIGNER);
 pub const EMPTY_TYPE_LIST: InternedTypeList =
     InternedTypeList(GlobalArenaPtr::from_static(&EMPTY_LIST));
 
-/// Writes a textual representation of an interned type. Nominals print
-/// just their name — IR variants that carry `ty_args` show them
-/// separately. Inherits the arena safety contract on [`view_type`].
+/// Writes a textual representation of an interned type. Inherits the arena
+/// safety contract on [`view_type`].
 pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result {
     match view_type(ty) {
         Type::Bool => write!(f, "bool"),
@@ -440,17 +510,21 @@ pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result
             }
             Ok(())
         },
-        Type::Function { args, results, .. } => {
+        Type::Function {
+            args,
+            results,
+            abilities,
+        } => {
             write!(f, "|")?;
             display_type_list(f, *args)?;
-            write!(f, "|")?;
+            write!(f, "|(")?;
             display_type_list(f, *results)?;
-            Ok(())
+            write!(f, "){}", abilities.display_postfix())
         },
     }
 }
 
-/// Renders an interned type to its textual representation (see [`display_type`]).
+/// Renders an interned type to a string (see [`display_type`]).
 //
 // TODO(metering): this traversal is unbounded; replace with a metered, depth-bounded
 // version.

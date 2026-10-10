@@ -1,0 +1,80 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun calls_locked(x: u64): u64 {
+        m::locked_helper(x)
+    }
+    private fun helper(x: u64): u64 {
+        x
+    }
+    public fun locked(x: u64): u64 {
+        m::helper(x)
+    }
+    private fun locked_helper(x: u64): u64 {
+        x
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun calls_locked(x: u64): u64 {
+        locked_helper(x)
+    }
+    fun helper(x: u64): u64 {
+        x
+    }
+    #[module_lock]
+    public fun locked(x: u64): u64 {
+        helper(x)
+    }
+    #[module_lock]
+    fun locked_helper(x: u64): u64 {
+        x
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    public fun calls_locked(x: u64): u64 {
+        m::locked_helper(x)
+    }
+    private fun helper(x: u64): u64 {
+        x
+    }
+    public fun locked(x: u64): u64 {
+        {
+          let (x: u64): (u64) = Tuple(x);
+          x
+        }
+    }
+    private fun locked_helper(x: u64): u64 {
+        x
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun calls_locked(l0: u64): u64
+    move_loc l0
+    call locked_helper
+    ret
+
+// Function definition at index 1
+fun helper(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 2
+#[module_lock, persistent] public fun locked(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 3
+#[module_lock] fun locked_helper(l0: u64): u64
+    move_loc l0
+    ret
+
+
+============ bytecode verification succeeded ========

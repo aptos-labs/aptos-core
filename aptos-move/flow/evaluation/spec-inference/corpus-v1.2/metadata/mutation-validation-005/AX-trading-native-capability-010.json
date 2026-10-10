@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AX-trading-native-capability-010/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-dbk3bn1o/package",
+            "--output",
+            "/tmp/move-inference-mutant-dbk3bn1o/unused.json"
+          ],
+          "duration_ms": 2490,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-trading-native-capability-010-denied-reads-registered",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-dbk3bn1o/package",
+            "--target",
+            "0x7::trading_native_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-dbk3bn1o/prover-report.json"
+          ],
+          "duration_ms": 5104,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-1jcfy7m_/package",
+            "--output",
+            "/tmp/move-inference-mutant-1jcfy7m_/unused.json"
+          ],
+          "duration_ms": 2453,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-trading-native-capability-010-register-does-nothing",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-1jcfy7m_/package",
+            "--target",
+            "0x7::trading_native_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-1jcfy7m_/prover-report.json"
+          ],
+          "duration_ms": 4873,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-y792cg8e/package",
+            "--output",
+            "/tmp/move-inference-mutant-y792cg8e/unused.json"
+          ],
+          "duration_ms": 2459,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-trading-native-capability-010-denied-exchanges-active",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-y792cg8e/package",
+            "--target",
+            "0x7::trading_native_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-y792cg8e/prover-report.json"
+          ],
+          "duration_ms": 5114,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::trading_native_capability"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AX-trading-native-capability-010/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-_dyzb7j2/package",
+            "--output",
+            "/tmp/move-inference-mutant-_dyzb7j2/unused.json"
+          ],
+          "duration_ms": 2515,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-trading-native-capability-010-deny-does-nothing",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-_dyzb7j2/package",
+            "--target",
+            "0x7::trading_native_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-_dyzb7j2/prover-report.json"
+          ],
+          "duration_ms": 4915,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-v5hlkdep/package",
+            "--output",
+            "/tmp/move-inference-mutant-v5hlkdep/unused.json"
+          ],
+          "duration_ms": 2411,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-trading-native-capability-010-reenable-does-nothing",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-v5hlkdep/package",
+            "--target",
+            "0x7::trading_native_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-v5hlkdep/prover-report.json"
+          ],
+          "duration_ms": 4781,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-1nn44kxk/package",
+            "--output",
+            "/tmp/move-inference-mutant-1nn44kxk/unused.json"
+          ],
+          "duration_ms": 2619,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AX-trading-native-capability-010-capability-for-framework",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-1nn44kxk/package",
+            "--target",
+            "0x7::trading_native_capability",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-1nn44kxk/prover-report.json"
+          ],
+          "duration_ms": 5021,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x7::trading_native_capability"
+  }
+}

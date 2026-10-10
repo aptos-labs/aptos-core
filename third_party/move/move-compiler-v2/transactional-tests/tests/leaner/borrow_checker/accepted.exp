@@ -1,0 +1,8 @@
+processed 4 tasks
+task 0 lines 3-38:  publish [import LeanerMove]
+task 1 lines 40-40:  run 0x0::LeanerBorrowAccepted::multiple_immutable
+return values: 14
+task 2 lines 42-42:  run 0x0::LeanerBorrowAccepted::disjoint_siblings
+return values: 30
+task 3 lines 44-44:  run 0x0::LeanerBorrowAccepted::child_then_parent
+return values: 10

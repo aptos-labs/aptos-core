@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/fixed_point_arithm.move:31:9: error: the specification clause `ensures result == 1` is not established
+tests/sources/functional/fixed_point_arithm.move:29:5: error: leaner verification failed: the automatic verification of `multiply_0_x_incorrect` failed; provide a proof: `verify multiply_0_x_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify multiply_0_x_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/fixed_point_arithm.move:47:9: error: the specification clause `ensures result == 1` is not established
+tests/sources/functional/fixed_point_arithm.move:45:5: error: leaner verification failed: the automatic verification of `multiply_x_0_incorrect` failed; provide a proof: `verify multiply_x_0_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify multiply_x_0_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/fixed_point_arithm.move:70:9: error: the specification clause `ensures result != x.value >> 32` is not established
+tests/sources/functional/fixed_point_arithm.move:67:5: error: leaner verification failed: the automatic verification of `multiply_1_x_incorrect` failed; provide a proof: `verify multiply_1_x_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify multiply_1_x_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/fixed_point_arithm.move:86:9: error: the specification clause `ensures result != x` is not established
+tests/sources/functional/fixed_point_arithm.move:84:5: error: leaner verification failed: the automatic verification of `multiply_x_1_incorrect` failed; provide a proof: `verify multiply_x_1_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify multiply_x_1_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/fixed_point_arithm.move:109:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/fixed_point_arithm.move:109:5: error: leaner verification failed: the automatic verification of `mul_div_incorrect` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify mul_div_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify mul_div_incorrect by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/fixed_point_arithm.move:144:9: error: the specification clause `ensures result != 10` is not established
+tests/sources/functional/fixed_point_arithm.move:142:5: error: leaner verification failed: the automatic verification of `mul_2_times_incorrect` failed; provide a proof: `verify mul_2_times_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify mul_2_times_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/fixed_point_arithm.move:152:9: error: the specification clause `ensures result != 10` is not established
+tests/sources/functional/fixed_point_arithm.move:150:5: error: leaner verification failed: the automatic verification of `mul_3_times_incorrect` failed; provide a proof: `verify mul_3_times_incorrect by …` in `tests/sources/functional/fixed_point_arithm.proof.lean` (`verify mul_3_times_incorrect by skip` shows the obligations it leaves)

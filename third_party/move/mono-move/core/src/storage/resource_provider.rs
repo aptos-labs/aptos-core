@@ -3,9 +3,13 @@
 
 //! Resource storage access for the runtime.
 
-use crate::{native::TableHandle, types::InternedType, ExecutionErrorKind, IntoExecutionError};
-use move_core_types::account_address::AccountAddress;
-use std::ptr::NonNull;
+use crate::{
+    native::TableHandle, struct_tag_of, types::InternedType, ExecutionErrorKind, IntoExecutionError,
+};
+use anyhow::anyhow;
+use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
+use std::{ptr::NonNull, sync::Arc};
 use thiserror::Error;
 
 /// Version of the read value (which can come from storage or from other
@@ -26,7 +30,8 @@ pub type Version = u64;
 /// The key is "in-memory" because it embeds interned, arena-backed data that
 /// must not outlive the current execution. It is not a stable, serializable
 /// storage key.
-#[derive(Clone, Eq, PartialEq, Hash)]
+// TODO(security): Debug derivation is not safe! Remove before production.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum InMemoryStorageKey {
     /// Every resource can be identified in storage by the address where it is
     /// published and its struct/enum type.
@@ -54,12 +59,12 @@ pub enum InMemoryStorageKey {
 impl InMemoryStorageKey {
     /// Builds a resource key from its publishing address and interned type.
     pub fn resource(address: AccountAddress, ty: InternedType) -> Self {
-        InMemoryStorageKey::Resource { address, ty }
+        Self::Resource { address, ty }
     }
 
     /// Builds a table item key from its handle, serialized key bytes, and stored value type.
     pub fn table_item(handle: TableHandle, key: Box<[u8]>, value_ty: InternedType) -> Self {
-        InMemoryStorageKey::TableItem {
+        Self::TableItem {
             handle,
             key,
             value_ty,
@@ -70,9 +75,29 @@ impl InMemoryStorageKey {
     /// resource, or the table handle for a table item.
     pub fn address(&self) -> AccountAddress {
         match self {
-            InMemoryStorageKey::Resource { address, .. } => *address,
-            InMemoryStorageKey::TableItem { handle, .. } => handle.address(),
+            Self::Resource { address, .. } => *address,
+            Self::TableItem { handle, .. } => handle.address(),
         }
+    }
+
+    /// The type of the value stored at this key.
+    pub fn value_ty(&self) -> InternedType {
+        match self {
+            Self::Resource { ty, .. } => *ty,
+            Self::TableItem { value_ty, .. } => *value_ty,
+        }
+    }
+
+    /// The own storage slot for a non-group-member key: a standalone resource or a
+    /// table item. Table items are never resource-group members, so they always
+    /// land here.
+    pub fn as_state_key(&self) -> anyhow::Result<StateKey> {
+        Ok(match self {
+            Self::Resource { address, ty } => StateKey::resource(address, &nominal_tag(*ty)?)?,
+            InMemoryStorageKey::TableItem { handle, key, .. } => {
+                StateKey::table_item(&AptosTableHandle(handle.address()), key)
+            },
+        })
     }
 }
 
@@ -80,6 +105,14 @@ impl From<&InMemoryStorageKey> for InMemoryStorageKey {
     fn from(key: &InMemoryStorageKey) -> Self {
         key.clone()
     }
+}
+
+/// The struct tag of a nominal type, for storage keys.
+//
+// TODO(perf): should be a cached method on the context, which would also let the
+// state-view providers stop open-coding it.
+pub fn nominal_tag(ty: InternedType) -> anyhow::Result<StructTag> {
+    struct_tag_of(ty).ok_or_else(|| anyhow!("resource type is not nominal"))
 }
 
 /// Errors a [`ResourceProvider`] can surface. Backends classify their
@@ -98,17 +131,26 @@ impl IntoExecutionError for ResourceProviderError {
     }
 }
 
+/// Marks an arena as safe to hand out pointers into: implementing it asserts
+/// that allocations never move and are never freed while the arena is alive.
+/// Implemented by a storage provider's cache arena and by another transaction's
+/// frozen heap.
+///
+/// A [`StorageRead::ExternalHeap`] holds an `Arc<dyn ReadPin>` on the arena its
+/// pointer points into, so that arena outlives the read.
+//
+// TODO(cleanup): give this a method (or supertrait) once read-set validation
+// needs to inspect the backing allocation.
+pub trait ReadPin {}
+
 /// Storage read returned to the VM. Every VM execution records reads of any
 /// value coming from global storage.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone)]
 pub enum StorageRead {
     /// Value does not exist at this key.
     DoesNotExist,
     /// Value is allocated in some other arena or cache. For example, it can be
     /// a cached DB read or a write from soe transaction at lower version.
-    // TODO(cleanup):
-    //   Figure out how to enforce compile-time guarantees here that owning
-    //   arena is alive.
     ExternalHeap {
         /// Just like any other VM value, the pointer points to the start of
         /// the value allocation. Value's header is at negative offset.
@@ -116,6 +158,8 @@ pub enum StorageRead {
         ptr: NonNull<u8>,
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
+        /// Keeps the arena `ptr` points into alive while this read is retained.
+        pin: Arc<dyn ReadPin>,
     },
 }
 
@@ -125,11 +169,17 @@ pub enum StorageRead {
 ///   - Block-STM,
 ///   - actual DB.
 pub trait ResourceProvider {
-    /// Returns the resource of a particular type at the specified address.
+    /// Returns the resource of a particular type at the specified address or
+    /// a resource group member (where the group is additionally identified by
+    /// an optional type, [`None`] means a regular resource).
     /// Returns [`StorageRead::DoesNotExist`] if the resource does not exist.
     /// Returns a [`ResourceProviderError`] if the backend cannot satisfy the
     /// read.
-    fn get_resource(&self, key: &InMemoryStorageKey) -> Result<StorageRead, ResourceProviderError>;
+    fn get_resource(
+        &self,
+        key: &InMemoryStorageKey,
+        group: Option<InternedType>,
+    ) -> Result<StorageRead, ResourceProviderError>;
 }
 
 /// Empty storage with no resources.
@@ -139,6 +189,7 @@ impl ResourceProvider for NoResourceProvider {
     fn get_resource(
         &self,
         _key: &InMemoryStorageKey,
+        _group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
         Ok(StorageRead::DoesNotExist)
     }

@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/References/OperandLoans.lean:43:4: error: the specification clause `ensures result == 5 + s.v` is not established
+LeanerE2ETests/Check/References/OperandLoans.lean:42:7: error: leaner verification failed: the automatic verification of `write_then_move_incorrect` failed; provide a proof: `verify write_then_move_incorrect by …` in the module (`verify write_then_move_incorrect by skip` shows the obligations it leaves)

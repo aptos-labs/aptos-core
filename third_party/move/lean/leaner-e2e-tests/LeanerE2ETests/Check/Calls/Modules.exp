@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Calls/Modules.lean:53:4: error: the specification clause `ensures result == x` is not established
+LeanerE2ETests/Check/Calls/Modules.lean:52:7: error: leaner verification failed: the automatic verification of `wrong` failed; provide a proof: `verify wrong by …` in the module (`verify wrong by skip` shows the obligations it leaves)

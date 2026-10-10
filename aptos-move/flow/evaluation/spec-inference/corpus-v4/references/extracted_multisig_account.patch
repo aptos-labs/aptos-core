@@ -1,0 +1,83 @@
+--- a/sources/framework/extracted_multisig_account.move
++++ b/sources/framework/extracted_multisig_account.move
+@@ -63,0 +64,11 @@ module aptos_framework::extracted_multisig_account {
++        } spec {
++            invariant multisig_account.last_executed_sequence_number + 1 <= i;
++            invariant i <= multisig_account.last_executed_sequence_number + 1 || i <= next_sequence_number;
++            invariant next_sequence_number == multisig_account.next_sequence_number;
++            invariant len(pending_transactions) == i - (multisig_account.last_executed_sequence_number + 1);
++            invariant forall k in 0..len(pending_transactions):
++                pending_transactions[k] == table::spec_get(
++                    multisig_account.transactions, multisig_account.last_executed_sequence_number + 1 + k
++                );
++            invariant forall s: u64 where multisig_account.last_executed_sequence_number < s && s < i:
++                table::spec_contains(multisig_account.transactions, s);
+@@ -96,0 +108,64 @@ module aptos_framework::extracted_multisig_account {
++
++    spec module {
++        /// The number of pending transactions, which is zero when the next
++        /// sequence number does not exceed the last executed one by more than one.
++        fun pending_count(account: MultisigAccount): num {
++            if (account.next_sequence_number > account.last_executed_sequence_number + 1) {
++                account.next_sequence_number - account.last_executed_sequence_number - 1
++            } else {
++                0
++            }
++        }
++    }
++
++    spec get_pending_transactions {
++        pragma opaque;
++        let account = global<MultisigAccount>(multisig_account);
++        aborts_if !exists<MultisigAccount>(multisig_account);
++        aborts_if account.last_executed_sequence_number + 1 > MAX_U64;
++        aborts_if exists s: u64 where account.last_executed_sequence_number < s && s < account.next_sequence_number:
++            !table::spec_contains(account.transactions, s);
++        ensures len(result) == pending_count(account);
++        ensures forall k in 0..len(result):
++            result[k] == table::spec_get(account.transactions, account.last_executed_sequence_number + 1 + k);
++    }
++
++    spec available_transaction_queue_capacity {
++        pragma opaque;
++        let account = global<MultisigAccount>(multisig_account);
++        aborts_if !exists<MultisigAccount>(multisig_account);
++        // Unlike the pending count above, the subtraction here does not saturate.
++        aborts_if account.next_sequence_number <= account.last_executed_sequence_number;
++        ensures result == (
++            if (account.next_sequence_number - account.last_executed_sequence_number - 1 > MAX_PENDING_TRANSACTIONS) {
++                0
++            } else {
++                MAX_PENDING_TRANSACTIONS - (account.next_sequence_number - account.last_executed_sequence_number - 1)
++            }
++        );
++    }
++
++    spec can_execute_with_timelock {
++        pragma opaque;
++        let lock = global<MultisigAccountTimeLock>(multisig_account);
++        let account = global<MultisigAccount>(multisig_account);
++        let created = table::spec_get(account.transactions, sequence_number).creation_time_secs;
++        let now = aptos_framework::timestamp::spec_now_seconds();
++        // The transaction is read, and its age computed, before the override
++        // threshold is consulted, so meeting the threshold does not avoid
++        // these aborts.
++        aborts_if exists<MultisigAccountTimeLock>(multisig_account) && (
++            !exists<MultisigAccount>(multisig_account)
++                || sequence_number == 0
++                || sequence_number >= account.next_sequence_number
++                || !table::spec_contains(account.transactions, sequence_number)
++                || !exists<aptos_framework::timestamp::CurrentTimeMicroseconds>(@aptos_framework)
++                || now < created
++        );
++        ensures !exists<MultisigAccountTimeLock>(multisig_account) ==> result;
++        ensures exists<MultisigAccountTimeLock>(multisig_account) ==> result == (
++            (std::option::spec_is_some(lock.override_threshold)
++                && num_approvals >= std::option::spec_borrow(lock.override_threshold))
++                || now - created >= lock.timelock_period
++        );
++    }
+--- a/sources/framework/extracted_multisig_account.spec.move
++++ b/sources/framework/extracted_multisig_account.spec.move
+@@ -8,0 +9 @@ spec aptos_framework::extracted_multisig_account {
++        pragma opaque;

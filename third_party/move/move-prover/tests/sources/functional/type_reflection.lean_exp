@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/type_reflection.move:40:5: error: `test_type_name_concrete` calls the native `0x2::type_info::type_name`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:53:5: error: `test_type_info_concrete` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:71:5: error: no denotation for `test_type_info_symbolic`: a literal of this type is not carried by the denotation
+tests/sources/functional/type_reflection.move:80:5: error: `test_type_info_ignores_type_param` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:88:5: error: `test_type_info_keeps_type_param` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:95:5: error: `test_type_info_can_abort` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:103:5: error: `test_type_info_aborts_if_partial` calls the native `0x2::type_info::type_name`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:114:5: error: `test_type_info_aborts_if_full` calls the native `0x2::type_info::type_name`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:121:5: error: `generic_type_info_verification_target` calls the native `0x2::type_info::type_of`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:151:5: error: `test_type_name_concrete_simple` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:158:5: error: `test_type_name_concrete_i8` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:165:5: error: `test_type_name_concrete_i16` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:172:5: error: `test_type_name_concrete_i32` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:179:5: error: `test_type_name_concrete_i64` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:186:5: error: `test_type_name_concrete_i128` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:193:5: error: `test_type_name_concrete_i256` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:200:5: error: `test_type_name_concrete_vector` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/type_reflection.move:207:5: error: `test_type_name_concrete_struct` calls the native `0x1::type_name::get`, which has neither a specification nor a prelude model; specify it

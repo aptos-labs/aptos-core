@@ -2,7 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::AptosVM;
-use aptos_crypto::HashValue;
 use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
@@ -11,9 +10,10 @@ use aptos_types::{
     transaction::{
         authenticator::AuthenticationProof,
         user_transaction_context::{TransactionIndexKind, UserTransactionContext},
+        validation::{MAX_MULTIPLIER_PERCENT, MIN_MULTIPLIER_PERCENT},
         AuxiliaryInfo, EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector,
-        SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
-        TransactionPayload, TransactionPayloadInner, TxnLimitsRequest,
+        SessionId, SignedTransaction, TransactionExecutable, TransactionExecutableRef,
+        TransactionExtraConfig, TransactionPayload, TransactionPayloadInner, TxnLimitsRequest,
     },
 };
 use move_core_types::vm_status::{StatusCode, VMStatus};
@@ -64,22 +64,12 @@ impl TransactionMetadata {
             txn.raw_txn_bytes_len()
         };
 
-        let (script_hash, is_approved_gov_script) =
-            if let Ok(TransactionExecutableRef::Script(s)) = txn.payload().executable_ref() {
-                let script_hash = HashValue::sha3_256_of(s.code()).to_vec();
-                let is_approved_gov_script = ApprovedExecutionHashes::fetch_config(resolver)
-                    .ok()
-                    .flatten()
-                    .is_some_and(|approved| {
-                        approved
-                            .entries
-                            .iter()
-                            .any(|(_, hash)| hash == &script_hash)
-                    });
-                (script_hash, is_approved_gov_script)
-            } else {
-                (vec![], false)
-            };
+        let script_hash = txn.payload().script_hash();
+        let is_approved_gov_script = !script_hash.is_empty()
+            && ApprovedExecutionHashes::fetch_config(resolver)
+                .ok()
+                .flatten()
+                .is_some_and(|approved| approved.contains_script_hash(&script_hash));
 
         let extra_config = txn.extra_config();
         let txn_limits_request = extra_config.txn_limits_request();
@@ -106,12 +96,6 @@ impl TransactionMetadata {
             // meter from operating with a 0, nonsensical, or overflowing limit. The
             // Move prologue additionally validates that the multiplier exists in the
             // on-chain config.
-            //
-            // INVARIANT: these bounds must match Move constants defined in
-            // transaction_limits.move.
-            const MIN_MULTIPLIER_PERCENT: u64 = 100; // 1x
-            const MAX_MULTIPLIER_PERCENT: u64 = 10000; // 100x
-
             let m = request.multipliers();
             if m.execution_multiplier_percent() <= MIN_MULTIPLIER_PERCENT
                 || MAX_MULTIPLIER_PERCENT < m.execution_multiplier_percent()
@@ -263,6 +247,46 @@ impl TransactionMetadata {
 
     pub fn replay_protector(&self) -> ReplayProtector {
         self.replay_protector
+    }
+
+    /// The session id of the transaction's payload session.
+    pub fn user_session_id(&self) -> SessionId {
+        SessionId::txn(
+            self.sender,
+            self.replay_protector(),
+            self.script_hash.clone(),
+            self.expiration_timestamp_secs,
+        )
+    }
+
+    /// The session id of the transaction's prologue session.
+    pub fn prologue_session_id(&self) -> SessionId {
+        SessionId::prologue(
+            self.sender,
+            self.replay_protector(),
+            self.script_hash.clone(),
+            self.expiration_timestamp_secs,
+        )
+    }
+
+    /// The session id of the transaction's abort-hook session.
+    pub fn run_on_abort_session_id(&self) -> SessionId {
+        SessionId::run_on_abort(
+            self.sender,
+            self.replay_protector(),
+            self.script_hash.clone(),
+            self.expiration_timestamp_secs,
+        )
+    }
+
+    /// The session id of the transaction's epilogue session.
+    pub fn epilogue_session_id(&self) -> SessionId {
+        SessionId::epilogue(
+            self.sender,
+            self.replay_protector(),
+            self.script_hash.clone(),
+            self.expiration_timestamp_secs,
+        )
     }
 
     pub fn is_orderless(&self) -> bool {

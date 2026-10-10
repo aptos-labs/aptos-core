@@ -1,12 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub use crate::stream_engine::SnapshotKind;
 use crate::{
     data_notification::NotificationId,
     data_stream::{DataStreamId, DataStreamListener},
     error::Error,
 };
-use aptos_storage_interface::StateKind;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use async_trait::async_trait;
 use futures::{
@@ -43,7 +43,7 @@ pub trait DataStreamingClient {
         &self,
         version: Version,
         start_index: Option<u64>,
-        state_kind: StateKind,
+        snapshot_kind: SnapshotKind,
     ) -> Result<DataStreamListener, Error>;
 
     /// Fetches all epoch ending ledger infos starting at `start_epoch`
@@ -215,7 +215,7 @@ pub struct GetAllEpochEndingLedgerInfosRequest {
 pub struct GetAllStatesRequest {
     pub version: Version,
     pub start_index: u64,
-    pub state_kind: StateKind,
+    pub snapshot_kind: SnapshotKind,
 }
 
 /// A client request for fetching all transactions with proofs.
@@ -341,13 +341,13 @@ impl DataStreamingClient for StreamingServiceClient {
         &self,
         version: u64,
         start_index: Option<u64>,
-        state_kind: StateKind,
+        snapshot_kind: SnapshotKind,
     ) -> Result<DataStreamListener, Error> {
         let start_index = start_index.unwrap_or(0);
         let client_request = StreamRequest::GetAllStates(GetAllStatesRequest {
             version,
             start_index,
-            state_kind,
+            snapshot_kind,
         });
         self.send_request_and_await_response(client_request).await
     }

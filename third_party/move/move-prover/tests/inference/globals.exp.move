@@ -128,9 +128,8 @@ module 0x42::globals {
     spec conditional_remove(cond: bool, addr: address): u64 {
         pragma opaque = true;
         modifies Counter[addr];
-        ensures [inferred] cond ==> result == old(Counter[addr]).value;
         ensures [inferred] cond ==> remove<Counter>(addr);
-        ensures [inferred] !cond ==> result == 0;
+        ensures [inferred] result == (if (cond) old(Counter[addr]).value else 0);
         aborts_if [inferred] cond && !exists<Counter>(addr);
     }
 

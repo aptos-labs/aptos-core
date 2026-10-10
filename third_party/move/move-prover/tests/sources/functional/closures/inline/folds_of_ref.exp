@@ -1,0 +1,36 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/inline/folds_of_ref.move:100:9
+    │
+100 │         ensures len(v) == 1 ==> result == 2; // error: the count of a singleton is 1
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:89: weighted_via_ref_wrong
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:90: weighted_via_ref_wrong
+    =         acc = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:91: weighted_via_ref_wrong
+    =         r = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:10: each_ref
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:89: weighted_via_ref_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:11: each_ref
+    =         i = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:12: each_ref
+    =         n = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:16: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:17: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:18: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:19: each_ref
+    =     enter loop, variable(s) i havocked and reassigned
+    =         i = <redacted>
+    =     loop invariant holds at current state
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:17: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:18: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:19: each_ref
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:13: each_ref
+    =         acc = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:96: weighted_via_ref_wrong
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:89: weighted_via_ref_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/inline/folds_of_ref.move:100: weighted_via_ref_wrong (spec)

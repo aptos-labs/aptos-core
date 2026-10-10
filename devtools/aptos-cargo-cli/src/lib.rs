@@ -3,14 +3,16 @@
 
 mod cargo;
 mod common;
+mod test_selection;
 
-use crate::common::PACKAGE_NAME_DELIMITER;
+use crate::common::package_name;
 use camino::Utf8PathBuf;
 use cargo::Cargo;
 use clap::{Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
-use log::{debug, trace};
+use log::trace;
+pub use test_selection::{Mode, PlanArgs};
 
 // Useful package name constants for targeted tests
 const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
@@ -87,6 +89,9 @@ pub enum AptosCargoCommand {
     TargetedFrameworkUpgradeTests(CommonArgs),
     TargetedUnitTests(CommonArgs),
     Test(CommonArgs),
+    TestPlan(PlanArgs),
+    /// List all E2E runner names accepted by subsystem configuration.
+    ListE2eTests(PlanArgs),
 }
 
 impl AptosCargoCommand {
@@ -116,6 +121,9 @@ impl AptosCargoCommand {
             AptosCargoCommand::TargetedFrameworkUpgradeTests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
+            AptosCargoCommand::TestPlan(_) | AptosCargoCommand::ListE2eTests(_) => {
+                unreachable!("test-plan has no Cargo pass-through arguments")
+            },
         }
     }
 
@@ -161,6 +169,10 @@ impl AptosCargoCommand {
 
     pub fn execute(&self, package_args: &SelectedPackageArgs) -> anyhow::Result<()> {
         match self {
+            AptosCargoCommand::ListE2eTests(args) => test_selection::list_e2e_tests(args.format),
+            AptosCargoCommand::TestPlan(args) => {
+                test_selection::plan(package_args)?.print(args.format)
+            },
             AptosCargoCommand::AffectedPackages(_) => {
                 // Calculate and display the affected packages
                 let affected_package_paths = package_args.compute_target_packages()?;
@@ -168,8 +180,8 @@ impl AptosCargoCommand {
             },
             AptosCargoCommand::ChangedFiles(_) => {
                 // Calculate and display the changed files
-                let (_, _, changed_files) = package_args.identify_changed_files()?;
-                output_changed_files(changed_files)
+                let base = package_args.identify_merge_base()?;
+                output_changed_files(package_args.compute_changed_files(&base)?)
             },
             AptosCargoCommand::CheckMergeBase(_) => {
                 // Check the merge base
@@ -183,11 +195,8 @@ impl AptosCargoCommand {
                 // Check if the affected packages contains the Aptos CLI
                 let mut cli_affected = false;
                 for package_path in affected_package_paths {
-                    // Extract the package name from the full path
-                    let package_name = get_package_name_from_path(&package_path);
-
                     // Check if the package is the Aptos CLI
-                    if package_name == APTOS_CLI_PACKAGE_NAME {
+                    if package_name(&package_path) == APTOS_CLI_PACKAGE_NAME {
                         cli_affected = true; // The Aptos CLI was affected
                         break;
                     }
@@ -278,27 +287,10 @@ impl AptosCargoCommand {
                 Ok(())
             },
             AptosCargoCommand::TargetedUnitTests(_) => {
-                // Run the targeted unit tests (if necessary).
-                // Start by calculating the affected packages.
-                let (direct_args, push_through_args, affected_package_paths) =
-                    self.get_args_and_affected_packages(package_args)?;
-
-                // Filter out the ignored packages
-                let mut packages_to_test = vec![];
-                for package_path in affected_package_paths {
-                    // Extract the package name from the full path
-                    let package_name = get_package_name_from_path(&package_path);
-
-                    // Only add the package if it is not in the ignore list
-                    if TARGETED_UNIT_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str()) {
-                        debug!(
-                            "Ignoring package when running targeted-unit-tests: {:?}",
-                            package_name
-                        );
-                    } else {
-                        packages_to_test.push(package_path); // Add the package to the list
-                    }
-                }
+                let (direct_args, push_through_args) = self.parse_args();
+                let plan = test_selection::plan(package_args)?;
+                plan.print(test_selection::PlanFormat::Text)?;
+                let packages_to_test = plan.execution_packages();
 
                 // Create and run the command if we found packages to test
                 if !packages_to_test.is_empty() {
@@ -380,42 +372,13 @@ fn detect_relevant_changes(
 
     // Check if the affected packages contain any of the relevant packages
     for package_path in affected_package_paths {
-        // Extract the package name from the full path
-        let package_name = get_package_name_from_path(&package_path);
-
         // Check if the package is a relevant package
-        if relevant_package_names.contains(&package_name.as_str()) {
+        if relevant_package_names.contains(&package_name(&package_path)) {
             return true; // A relevant package was changed
         }
     }
 
     false // No relevant changes detected
-}
-
-/// Returns the package name from the given package path
-fn get_package_name_from_path(package_path: &str) -> String {
-    // Verify the package path contains a package delimiter
-    if !package_path.contains(PACKAGE_NAME_DELIMITER) {
-        panic!(
-            "Package path missing delimiter ({}): {}",
-            PACKAGE_NAME_DELIMITER, package_path
-        );
-    }
-
-    // Next, split the package path on the delimiter
-    match package_path.split(PACKAGE_NAME_DELIMITER).last() {
-        Some(package_name) => {
-            if package_name.is_empty() {
-                panic!("Failed to extract package name from path: {}", package_path);
-            } else {
-                package_name.to_string()
-            }
-        },
-        None => panic!(
-            "Failed to split package path on delimiter ({}): {:}",
-            PACKAGE_NAME_DELIMITER, package_path
-        ),
-    }
 }
 
 /// Runs the targeted CLI tests
@@ -680,41 +643,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_package_name_from_path() {
-        // Create a fully qualified test package path
-        let package_name = "test-package-name".to_string();
-        let package_path = format!(
-            "file:///home/aptos-core/devtools/aptos-cargo-cli#{}",
-            package_name
+    fn test_package_name() {
+        assert_eq!(
+            package_name("file:///home/aptos-core/devtools/aptos-cargo-cli#test-package-name"),
+            "test-package-name"
         );
-
-        // Extract the package name from the path and check it
-        assert_eq!(get_package_name_from_path(&package_path), package_name);
-
-        // Create a relative test package path
-        let package_path = format!("#{}", package_name);
-
-        // Extract the package name from the path and check it
-        assert_eq!(get_package_name_from_path(&package_path), package_name);
-    }
-
-    #[test]
-    #[should_panic(expected = "Failed to extract package name from path")]
-    fn test_get_package_name_from_path_empty() {
-        // Create a test package path with an empty package name
-        let package_path = "file:///home/aptos-core/devtools/aptos-cargo-cli#";
-
-        // Extract the package name from the path (this should panic)
-        get_package_name_from_path(package_path);
-    }
-
-    #[test]
-    #[should_panic(expected = "Package path missing delimiter")]
-    fn test_get_package_name_from_path_missing_delimiter() {
-        // Create a test package path without a package name
-        let package_path = "file:///home/aptos-core/devtools/aptos-cargo-cli";
-
-        // Extract the package name from the path (this should panic)
-        get_package_name_from_path(package_path);
+        assert_eq!(package_name("#test-package-name"), "test-package-name");
+        assert_eq!(package_name("test-package-name"), "test-package-name");
     }
 }

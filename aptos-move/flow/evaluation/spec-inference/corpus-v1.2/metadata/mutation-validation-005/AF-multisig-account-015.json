@@ -1,0 +1,306 @@
+{
+  "mutants": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants/AF-multisig-account-015/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-hamwjyrm/package",
+            "--output",
+            "/tmp/move-inference-mutant-hamwjyrm/unused.json"
+          ],
+          "duration_ms": 4758,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-015-ignore-owner",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-hamwjyrm/package",
+            "--target",
+            "0x1::multisig_account::can_execute",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-hamwjyrm/prover-report.json"
+          ],
+          "duration_ms": 6397,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-arjhth7t/package",
+            "--output",
+            "/tmp/move-inference-mutant-arjhth7t/unused.json"
+          ],
+          "duration_ms": 3381,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-015-out-of-range-returns-false",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-arjhth7t/package",
+            "--target",
+            "0x1::multisig_account::can_execute",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-arjhth7t/prover-report.json"
+          ],
+          "duration_ms": 6234,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-7whfdg14/package",
+            "--output",
+            "/tmp/move-inference-mutant-7whfdg14/unused.json"
+          ],
+          "duration_ms": 2529,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-015-sequence-inequality",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-7whfdg14/package",
+            "--target",
+            "0x1::multisig_account::can_execute",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-7whfdg14/prover-report.json"
+          ],
+          "duration_ms": 6140,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::multisig_account::can_execute"
+  },
+  "mutants-scoring": {
+    "essential": 3,
+    "inconclusive": [],
+    "manifest": "/home/wrw/aptos-core/.worktrees/dev2/aptos-move/flow/evaluation/spec-inference/corpus-v1.2/mutants-scoring/AF-multisig-account-015/mutants.json",
+    "mutants": 3,
+    "not_essential": [],
+    "results": [
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-7ujxhcia/package",
+            "--output",
+            "/tmp/move-inference-mutant-7ujxhcia/unused.json"
+          ],
+          "duration_ms": 4311,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-015-owner-negated",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-7ujxhcia/package",
+            "--target",
+            "0x1::multisig_account::can_execute",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-7ujxhcia/prover-report.json"
+          ],
+          "duration_ms": 5786,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-909wr1sn/package",
+            "--output",
+            "/tmp/move-inference-mutant-909wr1sn/unused.json"
+          ],
+          "duration_ms": 3285,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-015-sequence-off-by-one",
+        "obligation_category": "normal-result",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-909wr1sn/package",
+            "--target",
+            "0x1::multisig_account::can_execute",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-909wr1sn/prover-report.json"
+          ],
+          "duration_ms": 5778,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: post-condition does not hold"
+        ]
+      },
+      {
+        "compile": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "check-package",
+            "--package",
+            "/tmp/move-inference-mutant-myvn87qa/package",
+            "--output",
+            "/tmp/move-inference-mutant-myvn87qa/unused.json"
+          ],
+          "duration_ms": 2506,
+          "infrastructure_error": null,
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "",
+          "timed_out": false
+        },
+        "killed": true,
+        "mutant_id": "AF-multisig-account-015-zero-sequence-returns-false",
+        "obligation_category": "abort",
+        "outcome": "killed",
+        "prover": {
+          "argv": [
+            "move-flow",
+            "experiment",
+            "prove",
+            "--package",
+            "/tmp/move-inference-mutant-myvn87qa/package",
+            "--target",
+            "0x1::multisig_account::can_execute",
+            "--timeout",
+            "40",
+            "--output",
+            "/tmp/move-inference-mutant-myvn87qa/prover-report.json"
+          ],
+          "duration_ms": 5695,
+          "infrastructure_error": null,
+          "returncode": 1,
+          "stderr": "Error: one or more targets did not verify\n",
+          "stdout": "",
+          "timed_out": false
+        },
+        "prover_errors": [
+          "error: function does not abort under this condition"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "target": "0x1::multisig_account::can_execute"
+  }
+}

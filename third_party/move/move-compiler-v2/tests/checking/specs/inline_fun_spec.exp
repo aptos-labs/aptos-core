@@ -1,24 +1,7 @@
-// -- Model dump before first bytecode pipeline
-module 0x42::M {
-    public inline fun f(): u64 {
-        42
-    }
-    spec {
-      aborts_if false;
-      ensures Eq<u64>(result0(), 42);
-    }
 
-} // end 0x42::M
-
-// -- Sourcified model before first bytecode pipeline
-module 0x42::M {
-    public inline fun f(): u64 {
-        42
-    }
-
-    spec f(): u64 {
-        aborts_if false;
-        ensures result == 42;
-    }
-
-}
+Diagnostics:
+error: function spec blocks are not supported for inline functions with function-typed parameters; those functions are verified at each application site
+   ┌─ tests/checking/specs/inline_fun_spec.move:15:10
+   │
+15 │     spec g {
+   │          ^

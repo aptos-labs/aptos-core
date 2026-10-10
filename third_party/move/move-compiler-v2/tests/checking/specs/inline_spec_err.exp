@@ -1,28 +1,19 @@
 
 Diagnostics:
 error: invalid old(..) expression in inline spec block
-  ┌─ tests/checking/specs/inline_spec_err.move:9:7
-  │
-9 │       assert old(a) == y;
-  │       ^^^^^^^^^^^^^^^^^^^
-  │       │          │
-  │       │          this expression is not a function parameter
-  │       only a function parameter is allowed in old(..) expressions in inline spec block
-
-error: invalid old(..) expression in inline spec block
-   ┌─ tests/checking/specs/inline_spec_err.move:10:7
-   │
-10 │       assert old(b) == 0;
-   │       ^^^^^^^^^^^^^^^^^^^
-   │       │          │
-   │       │          this expression is not a function parameter
-   │       only a function parameter is allowed in old(..) expressions in inline spec block
-
-error: invalid old(..) expression in inline spec block
    ┌─ tests/checking/specs/inline_spec_err.move:11:7
    │
-11 │       assert old(x != y);
+11 │       assert old(a) == y; // error: local under old
    │       ^^^^^^^^^^^^^^^^^^^
    │       │          │
-   │       │          this expression is not a function parameter
-   │       only a function parameter is allowed in old(..) expressions in inline spec block
+   │       │          this refers to a local variable, which has no value at function entry
+   │       only function parameters and global state can be used in old(..) in inline spec blocks
+
+error: invalid old(..) expression in inline spec block
+   ┌─ tests/checking/specs/inline_spec_err.move:12:7
+   │
+12 │       assert old(b) == 0; // error: local under old
+   │       ^^^^^^^^^^^^^^^^^^^
+   │       │          │
+   │       │          this refers to a local variable, which has no value at function entry
+   │       only function parameters and global state can be used in old(..) in inline spec blocks

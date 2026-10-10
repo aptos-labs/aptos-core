@@ -3,7 +3,7 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::tests::{compile_and_publish, execute_function_for_test};
+use crate::tests::{compile_and_publish_allowing_natives, execute_function_for_test};
 use claims::assert_ok;
 use move_binary_format::{
     errors::PartialVMResult, file_format::empty_module_with_dependencies_and_friends_at_addr,
@@ -54,7 +54,7 @@ fn test_failed_native() {
         "#,
         TEST_ADDR.to_hex(),
     );
-    compile_and_publish(&mut storage, code);
+    compile_and_publish_allowing_natives(&mut storage, code);
     let module_storage = storage.as_unsync_code_storage();
 
     let err = execute_function_for_test(
@@ -113,7 +113,7 @@ fn test_load_module_native_result(enable_lazy_loading: bool) {
         "#,
         TEST_ADDR.to_hex(),
     );
-    compile_and_publish(&mut storage, code_a);
+    compile_and_publish_allowing_natives(&mut storage, code_a);
 
     let mut add_module = |m: CompiledModule| {
         let mut blob = vec![];

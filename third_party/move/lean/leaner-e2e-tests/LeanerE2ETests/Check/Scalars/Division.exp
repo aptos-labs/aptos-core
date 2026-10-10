@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Scalars/Division.lean:52:4: error: the specification clause `ensures result < x` is not established
+LeanerE2ETests/Check/Scalars/Division.lean:51:7: error: leaner verification failed: the automatic verification of `divide_back_strictly` failed; provide a proof: `verify divide_back_strictly by …` in the module (`verify divide_back_strictly by skip` shows the obligations it leaves)

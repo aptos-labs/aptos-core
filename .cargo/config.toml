@@ -8,6 +8,7 @@ xclippy = [
   "-Wunexpected_cfgs",
   "-Dwarnings",
   "-Wclippy::all", # TODO: at some point we need to clean up all the exceptions listed below
+  "-Aclippy::chunks_exact_to_as_chunks",
   "-Aclippy::collapsible_if",
   "-Aclippy::collapsible_match",
   "-Aclippy::doc_lazy_continuation",
@@ -15,7 +16,8 @@ xclippy = [
   "-Aclippy::empty_line_after_doc_comments",
   "-Aclippy::enum-variant-names",
   "-Aclippy::large-enum-variant",
-  "-Aclippy::mutable-key-type",
+  "-Aclippy::manual_checked_ops",
+  "-Aclippy::question_mark",
   "-Aclippy::result-large-err",
   "-Aclippy::sliced-string-as-bytes",
   "-Aclippy::upper_case_acronyms",

@@ -1,0 +1,5 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/schema_exp.move:13:9: error: the specification clause `aborts_if c && false` is not established
+tests/sources/functional/schema_exp.move:29:5: error: leaner verification failed: the automatic verification of `bar_incorrect` failed; provide a proof: `verify bar_incorrect by …` in `tests/sources/functional/schema_exp.proof.lean` (`verify bar_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/schema_exp.move:47:9: error: the specification clause `ensures i > 10 ==> result == i + 2` is not established
+tests/sources/functional/schema_exp.move:56:5: error: leaner verification failed: the automatic verification of `baz_incorrect` failed; provide a proof: `verify baz_incorrect by …` in `tests/sources/functional/schema_exp.proof.lean` (`verify baz_incorrect by skip` shows the obligations it leaves)

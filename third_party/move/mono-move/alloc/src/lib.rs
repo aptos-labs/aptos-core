@@ -50,8 +50,12 @@
 //! During maintenance phase there is exclusive access to all arenas and data.
 //! Maintenance phase can reset or drop arenas, and free leaked pointers.
 
+mod align;
 mod global_arena;
 mod leaked;
+mod memory_region;
 
+pub use align::MAX_ALIGN;
 pub use global_arena::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 pub use leaked::{LeakedBoxPtr, VersionedLeakedBoxPtr};
+pub use memory_region::MemoryRegion;

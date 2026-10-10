@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/Specifications/Assumptions.lean:24:16: error: the assertion `x > y` does not hold
+LeanerE2ETests/Check/Specifications/Assumptions.lean:22:6: error: leaner verification failed: the automatic verification of `ordered_incorrect` failed; provide a proof: `verify ordered_incorrect by …` in the module (`verify ordered_incorrect by skip` shows the obligations it leaves)

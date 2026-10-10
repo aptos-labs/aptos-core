@@ -2,12 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    driver::DriverConfiguration,
+    driver::{DriverConfiguration, GenesisCommitter},
     error::Error,
     logging::{LogEntry, LogSchema},
     metadata_storage::MetadataStorageInterface,
     metrics,
     metrics::ExecutingComponent,
+    snapshot_chunk::SnapshotChunk,
     storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     utils,
     utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
@@ -18,15 +19,16 @@ use aptos_data_client::global_summary::GlobalDataSummary;
 use aptos_data_streaming_service::{
     data_notification::{DataNotification, DataPayload, NotificationId},
     data_stream::DataStreamListener,
-    streaming_client::{DataStreamingClient, NotificationAndFeedback, NotificationFeedback},
+    streaming_client::{
+        DataStreamingClient, NotificationAndFeedback, NotificationFeedback, SnapshotKind,
+    },
 };
 use aptos_logger::{prelude::*, sample::SampleRate};
-use aptos_storage_interface::{DbReader, StateKind};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
     waypoint::Waypoint,
 };
@@ -37,10 +39,14 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
 pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the genesis transaction
 
-// The snapshot stores synced during fast sync. They are peers (independent
-// stores at the same version); this is just the drive order, and the fast sync
-// is finalized once all of them are written.
-const FAST_SYNC_SNAPSHOT_KINDS: [StateKind; 2] = [StateKind::MainState, StateKind::Position];
+// The snapshot stores synced during fast sync, in drive order. They are peers
+// (independent stores at the same version), and the fast sync is finalized once
+// all of them are written, so this order carries no dependency between them.
+const FAST_SYNC_SNAPSHOT_KINDS: [SnapshotKind; 3] = [
+    SnapshotKind::MAIN_STATE,
+    SnapshotKind::HOT_STATE,
+    SnapshotKind::POSITION,
+];
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -237,7 +243,7 @@ impl VerifiedEpochStates {
     /// exists).
     pub fn next_epoch_ending_version(&self, version: Version) -> Option<Version> {
         // BTreeMap keys are iterated through in increasing key orders (i.e., versions)
-        for (epoch_ending_version, _) in self.new_epoch_ending_ledger_infos.iter() {
+        for epoch_ending_version in self.new_epoch_ending_ledger_infos.keys() {
             if *epoch_ending_version > version {
                 return Some(*epoch_ending_version);
             }
@@ -296,9 +302,9 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
     // The currently active data stream (provided by the data streaming service)
     active_data_stream: Option<DataStreamListener>,
 
-    // The snapshot kind of the active data stream, if it is a state-value
-    // snapshot stream (used to detect an empty tree on a clean end-of-stream).
-    active_snapshot_kind: Option<StateKind>,
+    // The snapshot kind of the active data stream, if it is a snapshot stream
+    // (used to detect an empty tree on a clean end-of-stream).
+    active_snapshot_kind: Option<SnapshotKind>,
 
     // The channel used to notify a listener of successful bootstrapping
     bootstrap_notifier_channel: Option<oneshot::Sender<Result<(), Error>>>,
@@ -323,6 +329,9 @@ pub struct Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient> {
 
     // The component used to sync native-position state values
     position_value_syncer: StateValueSyncer,
+
+    // The component used to sync hot state values
+    hot_state_value_syncer: StateValueSyncer,
 
     // The client through which to stream data from the Aptos network
     streaming_client: StreamingClient,
@@ -359,6 +368,7 @@ impl<
         Self {
             state_value_syncer: StateValueSyncer::new(),
             position_value_syncer: StateValueSyncer::new(),
+            hot_state_value_syncer: StateValueSyncer::new(),
             active_data_stream: None,
             active_snapshot_kind: None,
             bootstrap_notifier_channel: None,
@@ -386,9 +396,33 @@ impl<
 
     /// Marks bootstrapping as complete and notifies any listeners
     pub async fn bootstrapping_complete(&mut self) -> Result<(), Error> {
+        if self.is_bootstrapped() {
+            return Ok(());
+        }
+
+        self.reset_active_stream(None).await?;
+
+        // Chunks already handed to the storage synchronizer may still be in flight.
+        while self.storage_synchronizer.pending_storage_data() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
+                info!("Waiting for the storage synchronizer to handle pending data!")
+            );
+
+            // Yield to avoid starving the storage synchronizer threads.
+            tokio::task::yield_now().await;
+        }
+
+        if self.storage_synchronizer.pending_storage_data_error() {
+            return Err(Error::UnexpectedError(
+                "The storage synchronizer failed while draining pending data!".into(),
+            ));
+        }
+
+        self.storage_synchronizer.finish_chunk_executor();
+        self.bootstrapped = true;
         info!(LogSchema::new(LogEntry::Bootstrapper)
             .message("The node has successfully bootstrapped!"));
-        self.bootstrapped = true;
         self.notify_listeners_if_bootstrapped().await
     }
 
@@ -418,8 +452,6 @@ impl<
                     )));
                 }
             }
-            self.reset_active_stream(None).await?;
-            self.storage_synchronizer.finish_chunk_executor(); // The bootstrapper is now complete
         }
 
         Ok(())
@@ -479,14 +511,23 @@ impl<
                 .await;
         }
 
-        // Get the highest synced and known ledger info versions
-        let highest_synced_version = utils::fetch_pre_committed_version(self.storage.clone())?;
+        // Get the highest synced and known ledger info versions. A node that has
+        // never committed anything reports no version at all, which is the same
+        // starting point as genesis for the comparisons below, but not for
+        // deciding whether a snapshot can be restored into it.
+        let pre_committed_version = self.storage.get_pre_committed_version().map_err(|error| {
+            Error::StorageError(format!(
+                "Failed to get the pre-committed version: {error:?}"
+            ))
+        })?;
+        let nothing_committed = pre_committed_version.is_none();
+        let highest_synced_version = pre_committed_version.unwrap_or(GENESIS_TRANSACTION_VERSION);
         let highest_known_ledger_info = self.get_highest_known_ledger_info()?;
         let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
 
         // Check if we need to sync more data
         if self.get_bootstrapping_mode().is_fast_sync()
-            && highest_synced_version == GENESIS_TRANSACTION_VERSION
+            && nothing_committed
             && highest_known_ledger_version == GENESIS_TRANSACTION_VERSION
         {
             // The node is fast syncing and an epoch change isn't
@@ -515,6 +556,7 @@ impl<
         if self.get_bootstrapping_mode().is_fast_sync() {
             // We're fast syncing
             self.fetch_missing_state_snapshot_data(
+                nothing_committed,
                 highest_synced_version,
                 highest_known_ledger_info,
             )
@@ -527,25 +569,47 @@ impl<
     }
 
     /// Fetches all missing state snapshot data in order to bootstrap the node
+    ///
+    /// A snapshot restore writes the state as of the target version and leaves
+    /// anything already committed below it in place, where those older rows go
+    /// on satisfying reads for keys that were deleted before the target. Only a
+    /// node that has committed nothing at all can be restored into; one that
+    /// already holds data (genesis included) has to catch up by syncing
+    /// transactions forward instead.
     async fn fetch_missing_state_snapshot_data(
         &mut self,
+        nothing_committed: bool,
         highest_synced_version: Version,
         highest_known_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
-        if highest_synced_version == GENESIS_TRANSACTION_VERSION {
+        if nothing_committed {
             // We're fast syncing a new node. Resume against the already-pinned
             // target if a snapshot sync has started, otherwise target the highest
             // known ledger info. (All snapshot kinds sync to the same target.)
             let target = match self
                 .metadata_storage
-                .previous_snapshot_sync_target(StateKind::MainState)?
+                .previous_snapshot_sync_target(SnapshotKind::MAIN_STATE)?
             {
                 Some(target) => target,
                 None => highest_known_ledger_info,
             };
+            // The network has nothing beyond genesis, so there is no snapshot to
+            // sync to. Commit the local genesis blob rather than streaming a copy
+            // of it back from a peer.
+            if target.ledger_info().version() == GENESIS_TRANSACTION_VERSION
+                && let Some(commit_genesis) = self
+                    .driver_configuration
+                    .local_genesis
+                    .as_ref()
+                    .map(|local_genesis| local_genesis.commit.clone())
+            {
+                return self.bootstrap_from_local_genesis(commit_genesis).await;
+            }
             self.drive_snapshot_stages(target).await
         } else {
-            // This node has already synced some state. Ensure the node is not too far behind.
+            // This node has already committed data, so it cannot be restored
+            // into. Ensure it is not too far behind to catch up by syncing
+            // transactions forward.
             let highest_known_ledger_version = highest_known_ledger_info.ledger_info().version();
             let num_versions_behind = highest_known_ledger_version
                 .checked_sub(highest_synced_version)
@@ -577,6 +641,28 @@ impl<
         }
     }
 
+    /// Commits the local genesis blob and completes bootstrapping.
+    ///
+    /// Used when the fast-sync target is genesis itself. The commit is
+    /// idempotent, so a node that already holds genesis (e.g. restarted after a
+    /// previous run took this path) just proceeds to completion.
+    async fn bootstrap_from_local_genesis(
+        &mut self,
+        commit_genesis: GenesisCommitter,
+    ) -> Result<(), Error> {
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(
+            "The network advertises nothing beyond genesis. Committing local genesis instead of fast syncing to it."
+        ));
+
+        commit_genesis().map_err(|error| {
+            Error::UnexpectedError(format!(
+                "Failed to commit the local genesis blob! Error: {error:?}"
+            ))
+        })?;
+
+        self.bootstrapping_complete().await
+    }
+
     /// Attempts to fetch a data notification from the active stream
     async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
         let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
@@ -605,8 +691,14 @@ impl<
                 DataPayload::StateValuesWithProof(state_kind, state_value_chunk_with_proof) => {
                     self.process_state_values_payload(
                         data_notification.notification_id,
-                        state_value_chunk_with_proof,
-                        state_kind,
+                        SnapshotChunk::States(state_kind, state_value_chunk_with_proof),
+                    )
+                    .await?;
+                },
+                DataPayload::HotStateValuesWithProof(hot_state_value_chunk_with_proof) => {
+                    self.process_state_values_payload(
+                        data_notification.notification_id,
+                        SnapshotChunk::HotStates(hot_state_value_chunk_with_proof),
                     )
                     .await?;
                 },
@@ -663,7 +755,7 @@ impl<
     fn pin_ledger_info_to_sync(
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
-        kind: StateKind,
+        kind: SnapshotKind,
     ) -> Result<(), Error> {
         if let Some(ledger_info_to_sync) = &self.state_value_syncer(kind).ledger_info_to_sync {
             if ledger_info_to_sync != &target_ledger_info {
@@ -690,7 +782,7 @@ impl<
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
         existing_snapshot_progress: bool,
-        kind: StateKind,
+        kind: SnapshotKind,
     ) -> Result<(), Error> {
         // Initialize the target ledger info and verify it never changes
         self.pin_ledger_info_to_sync(target_ledger_info.clone(), kind)?;
@@ -919,29 +1011,30 @@ impl<
         }
     }
 
-    /// Verifies the start and end indices in the given state value chunk. The
-    /// `label` ("state" / "position") only flavors error messages.
+    /// Verifies the start and end indices in the given snapshot chunk.
     async fn verify_state_value_chunk_indices(
         &mut self,
         notification_id: NotificationId,
         expected_start_index: u64,
-        kind: StateKind,
-        state_value_chunk_with_proof: &StateValueChunkWithProof,
+        snapshot_chunk: &SnapshotChunk,
     ) -> Result<(), Error> {
+        let kind = snapshot_chunk.kind();
+        let first_index = snapshot_chunk.first_index();
+
         // Verify the payload start index is valid
-        if expected_start_index != state_value_chunk_with_proof.first_index {
+        if expected_start_index != first_index {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
             return Err(Error::VerificationError(format!(
                 "The start index of the {:?} values was invalid! Expected: {:?}, received: {:?}",
-                kind, expected_start_index, state_value_chunk_with_proof.first_index
+                kind, expected_start_index, first_index
             )));
         }
 
         // Verify the end index and number of state values is valid
-        let expected_num_state_values = state_value_chunk_with_proof
-            .last_index
-            .checked_sub(state_value_chunk_with_proof.first_index)
+        let expected_num_state_values = snapshot_chunk
+            .last_index()
+            .checked_sub(first_index)
             .and_then(|version| version.checked_add(1)) // expected_num_state_values = last_index - first_index + 1
             .ok_or_else(|| {
                 Error::IntegerOverflow(format!(
@@ -949,7 +1042,7 @@ impl<
                     kind
                 ))
             })?;
-        let num_state_values = state_value_chunk_with_proof.raw_values.len() as u64;
+        let num_state_values = snapshot_chunk.num_values() as u64;
         if expected_num_state_values != num_state_values {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
@@ -963,27 +1056,28 @@ impl<
     }
 
     /// Returns the state value syncer for the given snapshot kind.
-    fn state_value_syncer(&self, kind: StateKind) -> &StateValueSyncer {
+    fn state_value_syncer(&self, kind: SnapshotKind) -> &StateValueSyncer {
         match kind {
-            StateKind::MainState => &self.state_value_syncer,
-            StateKind::Position => &self.position_value_syncer,
+            SnapshotKind::MAIN_STATE => &self.state_value_syncer,
+            SnapshotKind::POSITION => &self.position_value_syncer,
+            SnapshotKind::HOT_STATE => &self.hot_state_value_syncer,
         }
     }
 
     /// Returns the mutable state value syncer for the given snapshot kind.
-    fn state_value_syncer_mut(&mut self, kind: StateKind) -> &mut StateValueSyncer {
+    fn state_value_syncer_mut(&mut self, kind: SnapshotKind) -> &mut StateValueSyncer {
         match kind {
-            StateKind::MainState => &mut self.state_value_syncer,
-            StateKind::Position => &mut self.position_value_syncer,
+            SnapshotKind::MAIN_STATE => &mut self.state_value_syncer,
+            SnapshotKind::POSITION => &mut self.position_value_syncer,
+            SnapshotKind::HOT_STATE => &mut self.hot_state_value_syncer,
         }
     }
 
-    /// The expected snapshot root for the given kind at the target version, read
-    /// from the target transaction info: main state's state checkpoint hash, or
-    /// the committed position state root (guaranteed present once the position
-    /// stage runs, per `snapshot_kind_applies_to_target`). All kinds share the
-    /// target version, so this is taken from the target output, not a storage read.
-    fn expected_snapshot_root(&mut self, kind: StateKind) -> Result<HashValue, Error> {
+    /// The snapshot root committed for the given kind by the target transaction
+    /// info: main state's state checkpoint hash, or the position/hot state root
+    /// (if committed). All kinds share the target version, so this is taken from
+    /// the target output, not a storage read.
+    fn committed_snapshot_root(&mut self, kind: SnapshotKind) -> Result<Option<HashValue>, Error> {
         let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
         let target_transaction_info = transaction_output_to_sync
             .get_output_list_with_proof()
@@ -993,31 +1087,31 @@ impl<
             .ok_or_else(|| {
                 Error::UnexpectedError("Target transaction info does not exist!".into())
             })?;
-        match kind {
-            StateKind::MainState => target_transaction_info
-                .ensure_state_checkpoint_hash()
-                .map_err(|error| {
-                    Error::UnexpectedError(format!(
-                        "State checkpoint must exist! Error: {:?}",
-                        error
-                    ))
-                }),
-            StateKind::Position => target_transaction_info
-                .position_state_checkpoint_hash()
-                .ok_or_else(|| Error::UnexpectedError("Missing position state root!".into())),
-        }
+        Ok(match kind {
+            SnapshotKind::MAIN_STATE => target_transaction_info.state_checkpoint_hash(),
+            SnapshotKind::POSITION => target_transaction_info.position_state_checkpoint_hash(),
+            SnapshotKind::HOT_STATE => target_transaction_info.hot_state_checkpoint_hash(),
+        })
     }
 
-    /// Verifies the chunk's root hash against the expected snapshot root for the
+    /// The expected snapshot root for the given kind at the target version
+    /// (guaranteed committed once the kind's stage runs, per
+    /// `snapshot_kind_applies_to_target`).
+    fn expected_snapshot_root(&mut self, kind: SnapshotKind) -> Result<HashValue, Error> {
+        self.committed_snapshot_root(kind)?
+            .ok_or_else(|| Error::UnexpectedError(format!("Missing {} root!", kind.label())))
+    }
+
+    /// Verifies the chunk's root hash against the expected snapshot root for its
     /// kind. Resets the stream and errors on a mismatch.
     async fn verify_state_value_chunk_root(
         &mut self,
         notification_id: NotificationId,
-        kind: StateKind,
-        state_value_chunk_with_proof: &StateValueChunkWithProof,
+        snapshot_chunk: &SnapshotChunk,
     ) -> Result<HashValue, Error> {
+        let kind = snapshot_chunk.kind();
         let expected_root_hash = self.expected_snapshot_root(kind)?;
-        let chunk_root_hash = state_value_chunk_with_proof.root_hash;
+        let chunk_root_hash = snapshot_chunk.root_hash();
         if chunk_root_hash != expected_root_hash {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
                 .await?;
@@ -1029,13 +1123,14 @@ impl<
         Ok(expected_root_hash)
     }
 
-    /// Process a single state value chunk with proof payload (of the given kind).
+    /// Process a single snapshot chunk with proof payload.
     async fn process_state_values_payload(
         &mut self,
         notification_id: NotificationId,
-        state_value_chunk_with_proof: StateValueChunkWithProof,
-        kind: StateKind,
+        snapshot_chunk: SnapshotChunk,
     ) -> Result<(), Error> {
+        let kind = snapshot_chunk.kind();
+
         // Verify that we're expecting state value payloads
         if self.should_fetch_epoch_ending_ledger_infos()
             || !self.get_bootstrapping_mode().is_fast_sync()
@@ -1061,7 +1156,7 @@ impl<
         // receiver, so a bad first chunk doesn't latch a receiver bound to the
         // wrong root.
         let expected_root_hash = self
-            .verify_state_value_chunk_root(notification_id, kind, &state_value_chunk_with_proof)
+            .verify_state_value_chunk_root(notification_id, &snapshot_chunk)
             .await?;
 
         // Verify the state values payload start and end indices
@@ -1069,8 +1164,7 @@ impl<
         self.verify_state_value_chunk_indices(
             notification_id,
             expected_start_index,
-            kind,
-            &state_value_chunk_with_proof,
+            &snapshot_chunk,
         )
         .await?;
 
@@ -1091,10 +1185,10 @@ impl<
         }
 
         // Process the state values chunk and proof
-        let last_state_value_index = state_value_chunk_with_proof.last_index;
+        let last_state_value_index = snapshot_chunk.last_index();
         if let Err(error) = self
             .storage_synchronizer
-            .save_state_values(notification_id, state_value_chunk_with_proof)
+            .save_state_values(notification_id, snapshot_chunk)
             .await
         {
             self.reset_stream(notification_id, NotificationFeedback::InvalidPayloadData)
@@ -1118,27 +1212,19 @@ impl<
     }
 
     /// Whether the given snapshot kind participates in the fast sync to this
-    /// target. Main state always does. Native-position only participates once the
-    /// target's `TransactionInfo` commits a position state root: until the
-    /// executor sets it there is no authenticated position state to sync, so the
+    /// target. Main state always does. Native-position and hot state only
+    /// participate once the target's `TransactionInfo` commits their root: until
+    /// the executor sets it there is no authenticated snapshot to sync, so the
     /// stage is skipped rather than trusting an unproved peer-supplied root.
     /// Requires the target transaction output to already be fetched.
-    fn snapshot_kind_applies_to_target(&mut self, kind: StateKind) -> Result<bool, Error> {
+    ///
+    /// TODO(HotState): a target that commits no hot root leaves the node with an
+    /// empty hot state, even if the network has one.
+    fn snapshot_kind_applies_to_target(&mut self, kind: SnapshotKind) -> Result<bool, Error> {
         match kind {
-            StateKind::MainState => Ok(true),
-            StateKind::Position => {
-                let transaction_output_to_sync = self.get_transaction_output_to_sync()?;
-                let target_transaction_info = transaction_output_to_sync
-                    .get_output_list_with_proof()
-                    .proof
-                    .transaction_infos
-                    .first()
-                    .ok_or_else(|| {
-                        Error::UnexpectedError("Target transaction info does not exist!".into())
-                    })?;
-                Ok(target_transaction_info
-                    .position_state_checkpoint_hash()
-                    .is_some())
+            SnapshotKind::MAIN_STATE => Ok(true),
+            SnapshotKind::POSITION | SnapshotKind::HOT_STATE => {
+                Ok(self.committed_snapshot_root(kind)?.is_some())
             },
         }
     }
@@ -1146,15 +1232,14 @@ impl<
     /// Drives the fast-sync snapshots to the target: fetches the target output
     /// once up front (needed for each kind's root check and the finalize), streams
     /// each not-yet-written applicable kind, then finalizes once all are written.
-    /// The kinds are peers driven one at a time only because the bootstrapper runs
-    /// a single data stream, not because of any ordering dependency.
+    /// The kinds are driven one at a time, in `FAST_SYNC_SNAPSHOT_KINDS` order.
     async fn drive_snapshot_stages(
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
     ) -> Result<(), Error> {
         // Pin the target (read by the output-verification path) and fetch the
         // target transaction output first, re-fetching it on resume.
-        self.pin_ledger_info_to_sync(target_ledger_info.clone(), StateKind::MainState)?;
+        self.pin_ledger_info_to_sync(target_ledger_info.clone(), SnapshotKind::MAIN_STATE)?;
         if self.state_value_syncer.transaction_output_to_sync.is_none() {
             let version = target_ledger_info.ledger_info().version();
             let data_stream = self
@@ -1672,6 +1757,8 @@ impl<
                 Error::UnexpectedError(format!("The {:?} ledger info to sync is missing!", kind))
             })?;
         if self.expected_snapshot_root(kind)? == *SPARSE_MERKLE_PLACEHOLDER_HASH {
+            // TODO(HotState): an empty hot snapshot should still write its (null)
+            // root node at the version, for later hot state updates to build on.
             self.metadata_storage.update_last_persisted_index(
                 &target_ledger_info,
                 0,

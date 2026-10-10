@@ -1,0 +1,3 @@
+Move prover returns: the Leaner Move verifier exited with exit status: 1:
+uncaught exception: tests/sources/functional/closures/inline/opaque_inline_body_fail.move: LIR-SEMANTIC-TARGET: call target `inc` does not resolve to a declared function at [492, 498)
+LIR-SEMANTIC-TARGET: call target `inc_trusted` does not resolve to a declared function at [940, 954)

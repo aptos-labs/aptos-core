@@ -88,18 +88,18 @@ module 0xc0ffee::m {
     }
     fun test_multi(p0: u8): u8 {
         let (_v0,_v1,_v2) = make_triple(p0);
-        let _v3 = _v0;
-        let _v4 = _v2;
-        let _v5 = &_v3;
-        let _v6 = &_v4;
+        let _v3 = _v2;
+        let _v4 = _v0;
+        let _v5 = &_v4;
+        let _v6 = &_v3;
         if (!((_v5 is V1) && (_v6 is V2) && _v1 == 1u8)) {
             if (!((_v5 is V2) && (_v6 is V1))) return 77u8;
-            let Data::V2{_0: _v7} = _v3;
-            let Data::V1{_0: _v8} = _v4;
+            let Data::V2{_0: _v7} = _v4;
+            let Data::V1{_0: _v8} = _v3;
             return _v7 + _v8 + 100u8
         };
-        let Data::V1{_0: _v9} = _v3;
-        let Data::V2{_0: _v10} = _v4;
+        let Data::V1{_0: _v9} = _v4;
+        let Data::V2{_0: _v10} = _v3;
         _v9 + _v10
     }
     fun test_block_expr(p0: u8): u8 {

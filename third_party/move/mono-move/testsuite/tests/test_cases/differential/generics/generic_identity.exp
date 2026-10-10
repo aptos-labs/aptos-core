@@ -20,8 +20,8 @@ fun call_identity_u64(r0): u64 {
     r0: u64
   code:
   L0:
-    0: [x0] := call identity<u64>, [r0]
-    1: ret [x0]
+    0: [x0] := call identity<u64>, [r0] @1
+    1: ret [x0] @2
 }
 
 fun identity(r0): _0 {
@@ -29,7 +29,7 @@ fun identity(r0): _0 {
     r0: _0
   code:
   L0:
-    0: ret [r0]
+    0: ret [r0] @1
 }
 === micro-ops ===
 // module 0x1::test
@@ -38,10 +38,10 @@ fun call_identity_u64() {
   frame_data_size: 8
   entry_gas: 90
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x1::test::identity<u64>
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Move8 [32] <- [0] @1
+    1: CallIndirect 0x1::test::identity<u64> @1
+    2: Move8 [0] <- [32] @2
+    3: Return @2
 }
 
 fun identity(): skipped (generic function not instantiated)

@@ -59,13 +59,13 @@ fun i128_lt(r0, r1): u64 {
     r2: u64
   code:
   L2:
-    0: br_ge L0, r0, r1
+    0: br_ge L0, r0, r1 @2
   L1:
-    1: r2 := ld_u64 1
-    2: ret [r2]
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
   L0:
-    3: r2 := ld_u64 2
-    4: ret [r2]
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
 }
 
 fun i64_ge(r0, r1): u64 {
@@ -75,13 +75,13 @@ fun i64_ge(r0, r1): u64 {
     r2: u64
   code:
   L2:
-    0: br_lt L0, r0, r1
+    0: br_lt L0, r0, r1 @2
   L1:
-    1: r2 := ld_u64 1
-    2: ret [r2]
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
   L0:
-    3: r2 := ld_u64 2
-    4: ret [r2]
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
 }
 
 fun i64_lt(r0, r1): u64 {
@@ -91,13 +91,13 @@ fun i64_lt(r0, r1): u64 {
     r2: u64
   code:
   L2:
-    0: br_ge L0, r0, r1
+    0: br_ge L0, r0, r1 @2
   L1:
-    1: r2 := ld_u64 1
-    2: ret [r2]
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
   L0:
-    3: r2 := ld_u64 2
-    4: ret [r2]
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
 }
 
 fun i8_lt(r0, r1): u64 {
@@ -107,13 +107,13 @@ fun i8_lt(r0, r1): u64 {
     r2: u64
   code:
   L2:
-    0: br_ge L0, r0, r1
+    0: br_ge L0, r0, r1 @2
   L1:
-    1: r2 := ld_u64 1
-    2: ret [r2]
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
   L0:
-    3: r2 := ld_u64 2
-    4: ret [r2]
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
 }
 === micro-ops ===
 // module 0x1::test
@@ -122,50 +122,50 @@ fun i128_lt() {
   frame_data_size: 40
   entry_gas: 3
   code:
-    0: JumpIntCmp @4 [0] >= i128 [16] gas_taken=56 gas_fallthrough=56
-    1: StoreImm8 [32] <- #1
-    2: Move8 [0] <- [32]
-    3: Return
-    4: StoreImm8 [32] <- #2
-    5: Move8 [0] <- [32]
-    6: Return
+    0: JumpIntCmp @4 [0] >= i128 [16] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [32] <- #1 @4
+    2: Move8 [0] <- [32] @5
+    3: Return @5
+    4: StoreImm8 [32] <- #2 @6
+    5: Move8 [0] <- [32] @7
+    6: Return @7
 }
 
 fun i64_ge() {
   frame_data_size: 24
   entry_gas: 3
   code:
-    0: JumpIntCmp @4 [0] < i64 [8] gas_taken=56 gas_fallthrough=56
-    1: StoreImm8 [16] <- #1
-    2: Move8 [0] <- [16]
-    3: Return
-    4: StoreImm8 [16] <- #2
-    5: Move8 [0] <- [16]
-    6: Return
+    0: JumpIntCmp @4 [0] < i64 [8] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
 }
 
 fun i64_lt() {
   frame_data_size: 24
   entry_gas: 3
   code:
-    0: JumpIntCmp @4 [0] >= i64 [8] gas_taken=56 gas_fallthrough=56
-    1: StoreImm8 [16] <- #1
-    2: Move8 [0] <- [16]
-    3: Return
-    4: StoreImm8 [16] <- #2
-    5: Move8 [0] <- [16]
-    6: Return
+    0: JumpIntCmp @4 [0] >= i64 [8] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
 }
 
 fun i8_lt() {
   frame_data_size: 16
   entry_gas: 3
   code:
-    0: JumpIntCmp @4 [0] >= i8 [1] gas_taken=56 gas_fallthrough=56
-    1: StoreImm8 [8] <- #1
-    2: Move8 [0] <- [8]
-    3: Return
-    4: StoreImm8 [8] <- #2
-    5: Move8 [0] <- [8]
-    6: Return
+    0: JumpIntCmp @4 [0] >= i8 [1] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [8] <- #1 @4
+    2: Move8 [0] <- [8] @5
+    3: Return @5
+    4: StoreImm8 [8] <- #2 @6
+    5: Move8 [0] <- [8] @7
+    6: Return @7
 }

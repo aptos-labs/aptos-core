@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 32,
+        "offset": 739,
+        "sha256": "c0d6fe8712dc9d5c0570f93924174712867fdb00e5f3930e538ff2f1c80e7514"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 2,
+        "to": "<"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_ethereum_derivable_account.move",
+      "mutant_id": "EA-scheme-041-max-length-exclusive",
+      "obligation_category": "abort",
+      "rationale": "A scheme of the maximum length is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 24,
+        "offset": 974,
+        "sha256": "b48e8804a5a3b8aa1a776eb475c89049d2ffa684b3029c4b25d89e5f79acc1e1"
+      },
+      "edit": {
+        "at": 19,
+        "kind": "substitute",
+        "length": 4,
+        "to": "0x38"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_ethereum_derivable_account.move",
+      "mutant_id": "EA-scheme-041-nine-rejected",
+      "obligation_category": "abort",
+      "rationale": "The digit nine is rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 9,
+        "offset": 1015,
+        "sha256": "04dea9c870a7736423e57b3a384bf84d693ec7cb4de43e9da64bdf57d3da2466"
+      },
+      "edit": {
+        "at": 5,
+        "kind": "substitute",
+        "length": 4,
+        "to": "0x2f"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_ethereum_derivable_account.move",
+      "mutant_id": "EA-scheme-041-minus-becomes-slash",
+      "obligation_category": "abort",
+      "rationale": "A slash is accepted in place of a minus.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "d5edf101fde30edada2f5087d0d0807f9285d5ef6d1ee4317187a8d4fee0aeab",
+  "task_id": "EA-scheme-041"
+}

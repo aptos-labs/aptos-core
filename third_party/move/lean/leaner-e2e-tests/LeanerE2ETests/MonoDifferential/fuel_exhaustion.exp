@@ -1,0 +1,4 @@
+step 0: 0x45::spinning::spin(10000)
+  mono:       returned 10000
+  LIR:        inconclusive (the LeanerIR interpreter ran out of fuel)
+  round trip: inconclusive (the LeanerIR interpreter ran out of fuel)

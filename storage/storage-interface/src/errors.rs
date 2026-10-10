@@ -17,6 +17,20 @@ pub enum AptosDbError {
     TooManyRequested(u64, u64),
     #[error("Missing state root node at version {0}, probably pruned.")]
     MissingRootError(u64),
+    /// A requested item falls below the pruner's retained window.
+    #[error("{data_type} at version {version} is pruned, min available version is {min_available_version}.")]
+    LedgerPruned {
+        data_type: String,
+        version: u64,
+        min_available_version: u64,
+    },
+    /// A requested event falls below the pruner's retained window. Events are keyed
+    /// by sequence number, so this is detected as a gap rather than by version.
+    #[error("Event at sequence number {requested_seq_num} is pruned, min available sequence number is {min_available_seq_num}.")]
+    EventPruned {
+        requested_seq_num: u64,
+        min_available_seq_num: u64,
+    },
     /// Other non-classified error.
     #[error("AptosDB Other Error: {0}")]
     Other(String),
@@ -69,7 +83,19 @@ impl From<AptosDbError> for StateViewError {
         match error {
             AptosDbError::NotFound(msg) => StateViewError::NotFound(msg),
             AptosDbError::Other(msg) => StateViewError::Other(msg),
-            _ => StateViewError::Other(format!("{}", error)),
+            // Listed explicitly rather than with a wildcard: these all collapse
+            // into an opaque string, so a new variant callers care about would
+            // otherwise be absorbed here silently.
+            AptosDbError::TooManyRequested(..)
+            | AptosDbError::MissingRootError(..)
+            | AptosDbError::LedgerPruned { .. }
+            | AptosDbError::EventPruned { .. }
+            | AptosDbError::RocksDbIncompleteResult(..)
+            | AptosDbError::OtherRocksDbError(..)
+            | AptosDbError::BcsError(..)
+            | AptosDbError::IoError(..)
+            | AptosDbError::RecvError(..)
+            | AptosDbError::ParseIntError(..) => StateViewError::Other(format!("{}", error)),
         }
     }
 }

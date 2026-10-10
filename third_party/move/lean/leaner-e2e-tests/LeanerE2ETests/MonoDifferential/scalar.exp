@@ -1,0 +1,9 @@
+step 0: 0x42::scalar::add(19, 23)
+  mono:       returned 42
+  LIR:        returned 42
+  round trip: returned 42
+
+step 1: 0x42::scalar::negate(42)
+  mono:       returned -42
+  LIR:        returned -42
+  round trip: returned -42

@@ -5,14 +5,6 @@ module 0xc0ffee::m {
         Inner2{ x: u64, y: u64 }
     }
 
-    fun consume(self: Inner): bool {
-        match (self) {
-            Inner1{x: _} => {}
-            Inner2{x: _, y:_ } => {}
-        };
-        true
-    }
-
     struct Box has drop {
         x: u64
     }
@@ -30,9 +22,12 @@ module 0xc0ffee::m {
         }
     }
 
-    public fun condition_requires_copy(o: Outer): Outer {
+    // The guard checker permits comparisons as reads. Guard evaluation binds
+    // `b` by reference, so comparing its value requires `Box` to have `copy`.
+    // This test must fail the copy-ability check.
+    public fun condition_compares_payload(o: Outer, other: Box): Outer {
         match (o) {
-            One{i} if consume(i) => Outer::One{i},
+            Two{i, b} if (b == other) => Outer::Two{i, b},
             o => o
         }
     }

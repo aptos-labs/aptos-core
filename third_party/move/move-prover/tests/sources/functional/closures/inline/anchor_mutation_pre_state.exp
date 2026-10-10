@@ -1,0 +1,28 @@
+Move prover returns: exiting with verification errors
+warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:13:52
+   │
+13 │     inline fun bump_other_then_apply(f: |u64| u64, a: address, b: address, x: u64): u64 {
+   │                                                    ^
+
+error: unknown assertion failed
+   ┌─ tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:17:13
+   │
+17 │             assert ensures_of<f>(x, res); // error: false for the `wrong_attached_claim` caller
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:37: wrong_attached_claim
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:42: wrong_attached_claim (spec)
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:43: wrong_attached_claim (spec)
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:44: wrong_attached_claim (spec)
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:37: wrong_attached_claim
+   =         a = <redacted>
+   =         b = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:13: bump_other_then_apply
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:14: bump_other_then_apply
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:44: wrong_attached_claim (spec)
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:38: wrong_attached_claim
+   =         res = <redacted>
+   =     at tests/sources/functional/closures/inline/anchor_mutation_pre_state.move:17: bump_other_then_apply

@@ -470,8 +470,10 @@ impl BufferItem {
                     return Ok(());
                 }
             },
+            // Match the whole LedgerInfo: a differing consensus_data_hash means the
+            // signature is over another message. Mirrors create_signature_aggregator.
             Self::Executed(executed) => {
-                if executed.commit_info == *target_commit_info {
+                if executed.partial_commit_proof.data() == vote.ledger_info() {
                     executed
                         .partial_commit_proof
                         .add_signature(author, signature);
@@ -479,7 +481,7 @@ impl BufferItem {
                 }
             },
             Self::Signed(signed) => {
-                if signed.partial_commit_proof.data().commit_info() == target_commit_info {
+                if signed.partial_commit_proof.data() == vote.ledger_info() {
                     signed.partial_commit_proof.add_signature(author, signature);
                     return Ok(());
                 }
@@ -541,7 +543,7 @@ mod test {
     use aptos_executor_types::state_compute_result::StateComputeResult;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
-        ledger_info::LedgerInfo,
+        ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     };
@@ -834,6 +836,142 @@ mod test {
                 assert_eq!(aggregated_item_inner.commit_proof, commit_proof);
             },
             _ => panic!("Expected aggregated item."),
+        }
+    }
+
+    /// A differing consensus_data_hash signs a different message, so it must not
+    /// enter our aggregator.
+    #[test]
+    fn test_reject_commit_vote_with_mismatched_consensus_data_hash() {
+        let (validator_signers, validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+
+        let honest_li = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(honest_li.clone(), AggregateSignature::empty());
+
+        // 4 honest votes; quorum is 5 of 7.
+        let honest_votes =
+            create_valid_commit_votes(validator_signers[0..4].to_vec(), honest_li.clone());
+        let mut ordered_item = BufferItem::new_ordered(
+            vec![pipelined_block.clone()],
+            ordered_proof.clone(),
+            HashMap::new(),
+        );
+        for vote in &honest_votes {
+            ordered_item.add_signature_if_matched(vote.clone()).unwrap();
+        }
+        let mut executed_item = ordered_item.advance_to_executed_or_aggregated(
+            vec![pipelined_block.clone()],
+            &validator_verifier,
+            None,
+            true,
+        );
+        assert!(executed_item.is_executed());
+
+        let attacker = &validator_signers[6];
+        // Any failed verification puts the author here, so this is always reachable.
+        validator_verifier.add_pessimistic_verify_set(attacker.author());
+
+        let poisoned_li = LedgerInfo::new(block_info.clone(), HashValue::random());
+        let poisoned_vote = CommitVote::new(attacker.author(), poisoned_li, attacker).unwrap();
+
+        // Valid over its own message, so this passes and sets the verified flag.
+        poisoned_vote
+            .verify(attacker.author(), &validator_verifier)
+            .expect("valid signature over its own ledger info");
+        assert!(poisoned_vote.signature_with_status().is_verified());
+
+        assert!(
+            executed_item
+                .add_signature_if_matched(poisoned_vote)
+                .is_err(),
+            "vote signed over a different LedgerInfo must be rejected"
+        );
+
+        // An honest fifth vote still reaches quorum and produces a valid certificate.
+        let fifth = create_valid_commit_votes(vec![validator_signers[4].clone()], honest_li);
+        executed_item
+            .add_signature_if_matched(fifth[0].clone())
+            .unwrap();
+        match executed_item.try_advance_to_aggregated(&validator_verifier) {
+            BufferItem::Aggregated(item) => {
+                validator_verifier
+                    .verify_multi_signatures(
+                        item.commit_proof.ledger_info(),
+                        item.commit_proof.signatures(),
+                    )
+                    .expect("aggregated certificate must verify against its own ledger info");
+            },
+            _ => panic!("Expected aggregated item."),
+        }
+    }
+
+    // A commit decision alone — without any local commit vote — aggregates an item that has
+    // already executed. This is the state machine half of the epoch manager fast path that
+    // hands an epoch change certificate to the buffer manager before tearing down the
+    // pipeline (`try_commit_epoch_ending_block_locally`).
+    #[test]
+    fn test_decision_aggregates_executed_item_without_local_votes() {
+        let (validator_signers, validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+        let ledger_info = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(ledger_info.clone(), AggregateSignature::empty());
+
+        // A quorum-signed decision for the same block (5 of 7, no local vote required).
+        let commit_proof = generate_ledger_info_with_sig(&validator_signers[0..5], ledger_info);
+        commit_proof
+            .verify_signatures(&validator_verifier)
+            .expect("decision must carry a valid quorum certificate");
+
+        // No votes at all, so execution leaves the item in the Executed state.
+        let ordered_item =
+            BufferItem::new_ordered(vec![pipelined_block.clone()], ordered_proof, HashMap::new());
+        let executed_item = ordered_item.advance_to_executed_or_aggregated(
+            vec![pipelined_block.clone()],
+            &validator_verifier,
+            None,
+            true,
+        );
+        assert!(executed_item.is_executed());
+
+        let aggregated_item =
+            executed_item.try_advance_to_aggregated_with_ledger_info(commit_proof.clone());
+        match aggregated_item {
+            BufferItem::Aggregated(item) => {
+                assert_eq!(item.commit_proof, commit_proof);
+                assert_eq!(item.executed_blocks, vec![pipelined_block]);
+            },
+            _ => panic!("Expected aggregated item."),
+        }
+    }
+
+    // A decision for a block that has not executed yet must not aggregate it: the proof is
+    // cached on the ordered item and applied when execution completes. This is the
+    // safe-degradation path of the same fast path — the block is committed with the cached
+    // proof if execution finishes in time, and aborted otherwise.
+    #[test]
+    fn test_decision_for_not_yet_executed_block_is_cached() {
+        let (validator_signers, _validator_verifier) = create_validators();
+        let pipelined_block = create_pipelined_block();
+        let block_info = pipelined_block.block_info();
+        let ledger_info = LedgerInfo::new(block_info.clone(), HashValue::zero());
+        let ordered_proof =
+            LedgerInfoWithSignatures::new(ledger_info.clone(), AggregateSignature::empty());
+        let commit_proof = generate_ledger_info_with_sig(&validator_signers[0..5], ledger_info);
+
+        let ordered_item =
+            BufferItem::new_ordered(vec![pipelined_block.clone()], ordered_proof, HashMap::new());
+        let result = ordered_item.try_advance_to_aggregated_with_ledger_info(commit_proof.clone());
+        match result {
+            BufferItem::Ordered(item) => {
+                assert_eq!(item.commit_proof, Some(commit_proof));
+                assert_eq!(item.ordered_blocks, vec![pipelined_block]);
+            },
+            _ => panic!("Expected ordered item with a cached commit proof."),
         }
     }
 }

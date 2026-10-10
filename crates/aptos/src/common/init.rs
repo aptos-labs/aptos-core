@@ -19,10 +19,16 @@ use crate::{
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
+use aptos_rest_client::AptosBaseUrl;
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
 use std::{collections::BTreeMap, str::FromStr};
+
+/// REST API URL for a public network, without a trailing slash.
+fn public_rest_url(base: AptosBaseUrl) -> String {
+    base.to_url().as_str().trim_end_matches('/').to_string()
+}
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -38,7 +44,7 @@ pub struct InitTool {
     #[clap(long)]
     pub network: Option<Network>,
 
-    /// URL to a fullnode on the network
+    /// URL to the REST API for the network
     #[clap(long)]
     pub rest_url: Option<Url>,
 
@@ -136,13 +142,11 @@ impl CliCommand<()> for InitTool {
         // Ensure that there is at least a REST URL set for the network
         match network {
             Network::Mainnet => {
-                profile_config.rest_url =
-                    Some("https://fullnode.mainnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some(public_rest_url(AptosBaseUrl::Mainnet));
                 profile_config.faucet_url = None;
             },
             Network::Testnet => {
-                profile_config.rest_url =
-                    Some("https://fullnode.testnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some(public_rest_url(AptosBaseUrl::Testnet));
                 // The faucet in testnet is only accessible with some kind of bypass.
                 // For regular users this can only really mean an auth token. So if
                 // there is no auth token set, we don't set the faucet URL. If the user
@@ -151,7 +155,7 @@ impl CliCommand<()> for InitTool {
                 profile_config.faucet_url = None;
             },
             Network::Devnet => {
-                profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some(public_rest_url(AptosBaseUrl::Devnet));
                 profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
             },
             Network::Local => {
@@ -451,3 +455,24 @@ impl InitTool {
 
 // Re-export from aptos-cli-common so existing `use crate::common::init::Network` paths work.
 pub use aptos_cli_common::Network;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn public_rest_urls_use_api_hostnames() {
+        assert_eq!(
+            public_rest_url(AptosBaseUrl::Mainnet),
+            "https://api.mainnet.aptoslabs.com"
+        );
+        assert_eq!(
+            public_rest_url(AptosBaseUrl::Testnet),
+            "https://api.testnet.aptoslabs.com"
+        );
+        assert_eq!(
+            public_rest_url(AptosBaseUrl::Devnet),
+            "https://api.devnet.aptoslabs.com"
+        );
+    }
+}

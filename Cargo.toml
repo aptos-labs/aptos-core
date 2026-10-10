@@ -16,6 +16,8 @@ members = [
     "aptos-move/aptos-gas-profiling",
     "aptos-move/aptos-gas-schedule",
     "aptos-move/aptos-gas-schedule-updator",
+    "aptos-move/aptos-governance-bundle",
+    "aptos-move/aptos-keyless-validation",
     "aptos-move/aptos-memory-usage-tracker",
     "aptos-move/aptos-native-interface",
     "aptos-move/aptos-release-builder",
@@ -210,8 +212,11 @@ members = [
     "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
+    "third_party/move/mono-move/aptos-state-view-providers",
+    "third_party/move/mono-move/aptos-transaction-executor",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/global-context",
+    "third_party/move/mono-move/lean-link",
     "third_party/move/mono-move/loader",
     "third_party/move/mono-move/natives",
     "third_party/move/mono-move/orchestrator",
@@ -240,6 +245,7 @@ members = [
     "third_party/move/move-model/bytecode",
     "third_party/move/move-model/bytecode-test-utils",
     "third_party/move/move-model/bytecode/ast-generator-tests",
+    "third_party/move/move-model/exchange",
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
@@ -247,6 +253,8 @@ members = [
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
+    "third_party/move/move-value-view",
+    "third_party/move/move-value-view-derive",
     "third_party/move/move-vm/integration-tests",
     "third_party/move/move-vm/metrics",
     "third_party/move/move-vm/profiler",
@@ -255,6 +263,7 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/shared-dsa",
+    "third_party/move/testing-infra/transactional-test-matrix",
     "third_party/move/testing-infra/transactional-test-runner",
     "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
@@ -303,7 +312,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.88"
+rust-version = "1.93"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -376,6 +385,7 @@ aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
+aptos-governance-bundle = { path = "aptos-move/aptos-governance-bundle" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
@@ -404,6 +414,7 @@ aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-keyless-common = { path = "keyless/common" }
 aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
 aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
+aptos-keyless-validation = { path = "aptos-move/aptos-keyless-validation" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
 aptos-localnet = { path = "crates/aptos-localnet" }
@@ -709,6 +720,7 @@ nalgebra = "0.32"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
+nix = { version = "0.29", features = ["signal"] }
 notify = "8.2.0"
 ntest = "0.9.3"
 num = "0.4.0"
@@ -902,8 +914,11 @@ aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/aptos-state-view-providers" }
+mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
+mono-move-lean-link = { path = "third_party/move/mono-move/lean-link" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }
 mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
@@ -922,12 +937,15 @@ move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytec
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
+move-value-view = { path = "third_party/move/move-value-view" }
+move-value-view-derive = { path = "third_party/move/move-value-view-derive" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-linter = { path = "third_party/move/tools/move-linter" }
 move-model = { path = "third_party/move/move-model" }
+move-model-exchange = { path = "third_party/move/move-model/exchange" }
 move-package = { path = "third_party/move/tools/move-package" }
 move-package-cache = { path = "third_party/move/tools/move-package-cache" }
 move-package-manifest = { path = "third_party/move/tools/move-package-manifest" }
@@ -941,6 +959,7 @@ move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
 move-stackless-bytecode-test-utils = { path = "third_party/move/move-model/bytecode-test-utils" }
 move-symbol-pool = { path = "third_party/move/move-symbol-pool" }
 move-table-extension = { path = "third_party/move/extensions/move-table-extension" }
+move-transactional-test-matrix = { path = "third_party/move/testing-infra/transactional-test-matrix" }
 move-transactional-test-runner = { path = "third_party/move/testing-infra/transactional-test-runner" }
 move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",

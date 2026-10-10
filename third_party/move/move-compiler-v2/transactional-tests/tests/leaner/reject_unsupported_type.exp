@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-8:  publish [import LeanerMove]
+Error: compilation errors:
+ error: Move bytecode has no unbounded or pointer-width integers
+  ┌─ TEMPFILE:6:19
+  │
+6 │   fun unsupported(_value : Nat) -> u64 := 1
+  │                   ^^^^^^^^^^^^
+
+
+exiting with Leaner elaboration errors

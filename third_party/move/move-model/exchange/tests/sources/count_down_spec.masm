@@ -1,0 +1,17 @@
+module 0x42::count_down
+
+fun count_down(x: u64): u64
+    requires x < 1000
+    ensures result == 0
+    invariant l1: x < 1000
+l1: copy_loc x
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc x
+    ld_u64 1
+    sub
+    st_loc x
+    BRANCH l1
+l2: move_loc x
+    ret

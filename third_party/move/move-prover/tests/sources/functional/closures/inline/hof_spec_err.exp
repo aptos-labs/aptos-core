@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: function spec blocks are not supported for inline functions with function-typed parameters; those functions are verified at each application site
+   ┌─ tests/sources/functional/closures/inline/hof_spec_err.move:17:10
+   │
+17 │     spec map { // error: specs on inline functions with function-typed parameters are not supported
+   │          ^^^

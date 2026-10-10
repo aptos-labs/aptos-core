@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 32,
+        "offset": 2052,
+        "sha256": "512501afe73672a9487fe7c416bdd4f45d73f2e7847912853d644a13d53fbeb2"
+      },
+      "edit": {
+        "at": 15,
+        "kind": "substitute",
+        "length": 2,
+        "to": ">"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-tiers-038-stake-strict",
+      "obligation_category": "abort",
+      "rationale": "Two tiers with the same stake are rejected.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 53,
+        "offset": 2105,
+        "sha256": "d7d36d9d653fb29ecd82f7b37d6b867db7faf7da7f440be622834e278128bf31"
+      },
+      "edit": {
+        "at": 27,
+        "kind": "substitute",
+        "length": 1,
+        "to": ">="
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-tiers-038-multiplier-nonstrict",
+      "obligation_category": "abort",
+      "rationale": "Two tiers with the same multiplier are accepted.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 44,
+        "offset": 1871,
+        "sha256": "d9f674305e98fe167923eaac30864208b9920af73bd434174b97c5dbe5e1e26a"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 9,
+        "to": "let i = 2"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-tiers-038-first-pair-skipped",
+      "obligation_category": "abort",
+      "rationale": "The first two tiers are never compared.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-tiers-038"
+}

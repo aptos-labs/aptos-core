@@ -1,0 +1,52 @@
+Move prover returns: exiting with compilation errors
+error: recursive lemma `no_measure` needs a `decreases` clause: it has no integer parameter to use as the default measure
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:13:9
+   │
+13 │ ╭         lemma no_measure(b: bool) { // error: needs a `decreases` clause
+14 │ │             ensures id(b) == b;
+15 │ │         } proof {
+16 │ │             apply no_measure(b);
+17 │ │         }
+   │ ╰─────────^
+
+error: at most one `decreases` clause per lemma
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:21:13
+   │
+21 │             decreases n; // error: at most one `decreases` clause
+   │             ^^^^^^^^^^^^
+
+error: lemma `pair_b` has a measure of 1 component(s), but its recursion group uses 2
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:39:9
+   │
+39 │ ╭         lemma pair_b(n: num, i: num) { // error: measure of 1 component, group uses 2
+40 │ │             decreases n;
+41 │ │             ensures true;
+42 │ │         } proof {
+   · │
+45 │ │             }
+46 │ │         }
+   │ ╰─────────^
+
+error: `forall ... apply` cannot apply a lemma from the same recursion group; use `apply` at a decreasing instance
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:52:13
+   │
+52 │             forall k: num {id(k > 0)} apply quantified_self(k); // error: same recursion group
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `decreases` components must be integers
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:56:23
+   │
+56 │             decreases id(true); // error: components must be integers
+   │                       ^^^^^^^^
+
+error: `decreases` requires at least one component
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:65:13
+   │
+65 │             decreases (); // error: requires at least one component
+   │             ^^^^^^^^^^^^^
+
+error: condition kind is not supported
+   ┌─ tests/sources/functional/proof/lemma_wf_errors.move:78:9
+   │
+78 │         decreases x; // error: not supported outside lemmas
+   │         ^^^^^^^^^^^^

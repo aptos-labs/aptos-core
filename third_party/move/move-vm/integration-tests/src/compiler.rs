@@ -10,6 +10,7 @@ use legacy_move_compiler::{
     shared::{known_attributes::KnownAttribute, NumericalAddress},
 };
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
 use std::{
     collections::BTreeMap,
@@ -24,6 +25,7 @@ fn compile_source_unit_v2(
     file_option: Option<PathBuf>,
     named_address_mapping: BTreeMap<String, NumericalAddress>,
     deps: Vec<String>,
+    allow_natives_anywhere: bool,
 ) -> Result<Vec<AnnotatedCompiledUnit>> {
     let dir = tempdir()?;
     let file_path = if let Some(file) = file_option {
@@ -34,7 +36,7 @@ fn compile_source_unit_v2(
         writeln!(file, "{}", s)?;
         path
     };
-    let options = move_compiler_v2::Options {
+    let mut options = move_compiler_v2::Options {
         sources: vec![file_path.to_str().unwrap().to_string()],
         dependencies: deps,
         named_address_mapping: named_address_mapping
@@ -45,6 +47,9 @@ fn compile_source_unit_v2(
         language_version: Some(LanguageVersion::latest_stable()),
         ..move_compiler_v2::Options::default()
     };
+    if allow_natives_anywhere {
+        options = options.set_experiment(Experiment::NATIVE_CHECK, false);
+    }
     let mut error_writer = Buffer::no_color();
     let result = {
         let mut emitter = options.error_emitter(&mut error_writer);
@@ -57,7 +62,25 @@ fn compile_source_unit_v2(
 }
 
 pub fn compile_units(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
-    compile_source_unit_v2(s, None, move_stdlib::move_stdlib_named_addresses(), vec![])
+    compile_source_unit_v2(
+        s,
+        None,
+        move_stdlib::move_stdlib_named_addresses(),
+        vec![],
+        false,
+    )
+}
+
+/// Like [`compile_units`], but allows native functions in modules at any address, for
+/// tests that register custom native tables.
+pub fn compile_units_allowing_natives(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
+    compile_source_unit_v2(
+        s,
+        None,
+        move_stdlib::move_stdlib_named_addresses(),
+        vec![],
+        true,
+    )
 }
 
 pub fn compile_units_with_stdlib(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> {
@@ -66,6 +89,7 @@ pub fn compile_units_with_stdlib(s: &str) -> Result<Vec<AnnotatedCompiledUnit>> 
         None,
         move_stdlib::move_stdlib_named_addresses(),
         move_stdlib::move_stdlib_files(),
+        false,
     )
 }
 
@@ -79,7 +103,8 @@ fn expect_modules(
 }
 
 pub fn compile_modules_in_file(path: &Path) -> Result<Vec<CompiledModule>> {
-    let units = compile_source_unit_v2("", Some(path.to_path_buf()), BTreeMap::new(), vec![])?;
+    let units =
+        compile_source_unit_v2("", Some(path.to_path_buf()), BTreeMap::new(), vec![], false)?;
     expect_modules(units).collect()
 }
 

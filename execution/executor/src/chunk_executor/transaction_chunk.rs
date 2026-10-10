@@ -11,7 +11,7 @@ use aptos_executor_types::execution_output::ExecutionOutput;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
-    state::LedgerState, state_view::cached_state_view::CachedStateView,
+    positions::PositionParent, state::LedgerState, state_view::cached_state_view::CachedStateView,
 };
 use aptos_types::{
     block_executor::transaction_slice_metadata::TransactionSliceMetadata,
@@ -44,6 +44,7 @@ pub trait TransactionChunk {
     fn into_output<V: VMBlockExecutor>(
         self,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput>;
 }
@@ -66,6 +67,7 @@ impl TransactionChunk for ChunkToExecute {
     fn into_output<V: VMBlockExecutor>(
         self,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         let ChunkToExecute {
@@ -105,6 +107,7 @@ impl TransactionChunk for ChunkToExecute {
                 .map(|info| AuxiliaryInfo::new(info, None))
                 .collect(),
             parent_state,
+            parent_positions,
             state_view,
             onchain_config,
             TransactionSliceMetadata::unknown(),
@@ -131,6 +134,7 @@ impl TransactionChunk for ChunkToApply {
     fn into_output<V: VMBlockExecutor>(
         self,
         parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
         let Self {
@@ -149,6 +153,7 @@ impl TransactionChunk for ChunkToApply {
                 .map(|info| AuxiliaryInfo::new(info, None))
                 .collect(),
             parent_state,
+            parent_positions,
             state_view,
             onchain_config,
         )

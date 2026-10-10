@@ -1,0 +1,6 @@
+LeanerE2ETests/Check/Storage/ModuleInvariantChecks.lean:24:4: error: the module invariant `invariant [global, suspendable] forall (addr : Address),
+      exists<R>(addr) <==> exists<S>(addr)` does not hold after a write of memory it reads
+LeanerE2ETests/Check/Storage/ModuleInvariantChecks.lean:28:13: error: leaner verification failed: the automatic verification of `publish_both` failed; provide a proof: `verify publish_both by …` in the module (`verify publish_both by skip` shows the obligations it leaves)
+LeanerE2ETests/Check/Storage/ModuleInvariantChecks.lean:24:4: error: the module invariant `invariant [global, suspendable] forall (addr : Address),
+      exists<R>(addr) <==> exists<S>(addr)` does not hold after a call that writes memory it reads
+LeanerE2ETests/Check/Storage/ModuleInvariantChecks.lean:60:13: error: leaner verification failed: the automatic verification of `publish_calls` failed; provide a proof: `verify publish_calls by …` in the module (`verify publish_calls by skip` shows the obligations it leaves)

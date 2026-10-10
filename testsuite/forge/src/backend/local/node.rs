@@ -7,9 +7,10 @@ use aptos_config::{
     config::{NodeConfig, SECURE_STORAGE_FILENAME},
     keys::ConfigKey,
 };
-use aptos_db::{
-    common::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME},
-    fast_sync_storage_wrapper::SECONDARY_DB_DIR,
+use aptos_db::common::{
+    HOT_STATE_KV_DB_FOLDER_NAME, HOT_STATE_MERKLE_DB_FOLDER_NAME, LEDGER_DB_FOLDER_NAME,
+    POSITION_DB_FOLDER_NAME, POSITION_MERKLE_DB_FOLDER_NAME, STATE_KV_DB_FOLDER_NAME,
+    STATE_MERKLE_DB_FOLDER_NAME,
 };
 use aptos_logger::{debug, error, info};
 use aptos_sdk::{
@@ -411,45 +412,36 @@ impl Node for LocalNode {
     async fn clear_storage(&self) -> Result<()> {
         // Remove all storage files (i.e., blockchain data, consensus data and state sync data)
         let node_config = self.config();
-        let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
-        let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
+        let storage_dir = node_config.storage.dir();
         let secure_storage_path = node_config.get_working_dir().join(SECURE_STORAGE_FILENAME);
-        let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
-        let secondary_db_path = node_config.storage.dir().join(SECONDARY_DB_DIR);
+        let db_paths = [
+            LEDGER_DB_FOLDER_NAME,
+            STATE_MERKLE_DB_FOLDER_NAME,
+            STATE_KV_DB_FOLDER_NAME,
+            HOT_STATE_MERKLE_DB_FOLDER_NAME,
+            HOT_STATE_KV_DB_FOLDER_NAME,
+            POSITION_DB_FOLDER_NAME,
+            POSITION_MERKLE_DB_FOLDER_NAME,
+            STATE_SYNC_DB_NAME,
+        ]
+        .map(|name| storage_dir.join(name));
 
         debug!(
-            "Deleting ledger, state, secure and state sync db paths ({:?}, {:?}, {:?}, {:?}, {:?}) for node {:?}",
-            ledger_db_path.as_path(),
-            state_db_path.as_path(),
-            secure_storage_path.as_path(),
-            state_sync_db_path.as_path(),
-            secondary_db_path.as_path(),
-            self.name
+            "Deleting db paths {:?} and secure storage {:?} for node {:?}",
+            db_paths, secure_storage_path, self.name
         );
 
-        // Verify the files exist
-        assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
-        assert!(state_sync_db_path.as_path().exists());
+        // Catch a wrong path, which would otherwise make this a silent no-op
+        assert!(storage_dir.join(LEDGER_DB_FOLDER_NAME).exists());
         if self.config.base.role.is_validator() {
-            assert!(secure_storage_path.as_path().exists());
+            assert!(secure_storage_path.exists());
         }
 
-        // Remove the primary DB files
-        fs::remove_dir_all(ledger_db_path)
-            .map_err(anyhow::Error::from)
-            .context("Failed to delete ledger_db_path")?;
-        fs::remove_dir_all(state_db_path)
-            .map_err(anyhow::Error::from)
-            .context("Failed to delete state_db_path")?;
-        fs::remove_dir_all(state_sync_db_path)
-            .map_err(anyhow::Error::from)
-            .context("Failed to delete state_sync_db_path")?;
-
-        // Remove the secondary DB files
-        if secondary_db_path.as_path().exists() {
-            fs::remove_dir_all(secondary_db_path)
-                .map_err(anyhow::Error::from)
-                .context("Failed to delete secondary_db_path")?;
+        for path in db_paths {
+            if path.exists() {
+                fs::remove_dir_all(&path)
+                    .with_context(|| format!("Failed to delete {:?}", path))?;
+            }
         }
 
         // Remove the secure storage file

@@ -1,0 +1,13 @@
+module 0x42::fields
+
+struct A has key
+  x: u64
+
+struct B has key
+  x: u64
+  y: u64
+
+fun f(a: address): u64
+    ensures exists<A>(a) ==> global<A>(a).x == global<B>(a).y
+    ld_u64 0
+    ret

@@ -515,7 +515,7 @@ pub(crate) enum CommitResult {
     None,
 }
 
-pub(crate) struct SchedulerV2 {
+pub struct SchedulerV2 {
     /// Total number of transactions in the block. This is immutable after scheduler creation.
     num_txns: TxnIndex,
     /// The number of worker threads that will be processing tasks from this scheduler. Immutable.

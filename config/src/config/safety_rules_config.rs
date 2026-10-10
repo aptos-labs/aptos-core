@@ -99,7 +99,7 @@ impl ConfigSanitizer for SafetyRulesConfig {
             if chain_id.is_mainnet() && !safety_rules_config.service.is_local() {
                 return Err(Error::ConfigSanitizerFailed(
                     sanitizer_name,
-                    format!("The safety rules service should be set to local in mainnet for optimal performance! Given config: {:?}", &safety_rules_config.service)
+                    format!("The safety rules service should be set to local in mainnet for optimal performance! Given config: {:?}", safety_rules_config.service)
                 ));
             }
 

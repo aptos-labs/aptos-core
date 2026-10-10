@@ -11,6 +11,8 @@ pub mod aptos_debug_natives;
 mod bytecode;
 mod commands;
 pub mod coverage;
+pub mod exchange;
+
 mod fmt;
 mod lint;
 pub mod local_simulation;

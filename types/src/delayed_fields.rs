@@ -7,16 +7,15 @@ use move_vm_types::delayed_values::{
     delayed_field_id::{DelayedFieldID, ExtractWidth},
     error::code_invariant_error,
 };
-use once_cell::sync::Lazy;
 
-static U64_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u64::MAX.to_string().len());
-static U128_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u128::MAX.to_string().len());
+pub const U64_MAX_DIGITS: usize = u64::MAX.ilog10() as usize + 1;
+pub const U128_MAX_DIGITS: usize = u128::MAX.ilog10() as usize + 1;
 
 pub fn calculate_width_for_constant_string(byte_len: usize) -> usize {
     // we need to be able to store it both raw, as well as when it is exchanged with u64 DelayedFieldID.
     // so the width needs to be larger of the two options
     (bcs_size_of_byte_array(byte_len) + 1) // 1 is for empty padding serialized length
-        .max(*U64_MAX_DIGITS + 2) // largest exchanged u64 DelayedFieldID is u64 max digits, plus 1 for each of the value and padding serialized length
+        .max(U64_MAX_DIGITS + 2) // largest exchanged u64 DelayedFieldID is u64 max digits, plus 1 for each of the value and padding serialized length
 }
 
 pub fn calculate_width_for_integer_embedded_string(
@@ -25,8 +24,8 @@ pub fn calculate_width_for_integer_embedded_string(
 ) -> PartialVMResult<usize> {
     // we need to translate byte width into string character width.
     let max_snapshot_string_width = match snapshot_id.extract_width() {
-        8 => *U64_MAX_DIGITS,
-        16 => *U128_MAX_DIGITS,
+        8 => U64_MAX_DIGITS,
+        16 => U128_MAX_DIGITS,
         x => {
             return Err(code_invariant_error(format!(
                 "unexpected width ({x}) for integer snapshot id: {snapshot_id:?}"

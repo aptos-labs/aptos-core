@@ -1,0 +1,31 @@
+% !TEX root = main.tex
+\Section{Introduction}
+\label{sec:intro}
+
+A roadblock to the adoption of program verification is the \emph{cost of specification}.
+The properties developers care about are high-level --- a call chain aborts only under stated preconditions, an entrypoint satisfies its postconditions, stored data respects an invariant --- but to prove any of them, the supporting functions need contracts of their own, and those are often boilerplate, as they restate what the code does.
+\emph{Specification inference} derives such contracts from the program, so that effort can go to the properties worth stating by hand.
+The classical engine for mechanical inference is Dijkstra's weakest-precondition transformation (\WP)~\cite{dijkstra1975wp}: propagated backward through a function, it yields the exact abort condition and the exact postcondition. However, it depends on loop invariants to provide an induction hypothesis~\cite{BL05}, and despite a long history of research~\cite{CousotHalbwachs78}, there is no complete technique for synthesizing them.
+
+This paper describes a novel combination of agentic specification inference, as studied, e.g., in~\cite{VeriStruct26,MSG25}, and weakest-precondition transformation.
+The agent conducts the inference, supplies loop invariants, and calls \WP and the verifier as tools.
+The approach is implemented for the Move smart contract language, which is similar to Rust. Move has strong verification support through the Move Prover (\MVP)~\cite{DillGPQXZ22,GrieskampEtAl26HO}.
+Move shares its reference semantics with safe Rust and is therefore amenable to reference elimination, which the Move Prover has applied since its beginning~\cite{DillGPQXZ22}.
+On reference-eliminated Move bytecode, we run classical \WP and map Move's references into the predicate calculus of the specification language.
+Moreover, \emph{behavioral predicates}~\cite{GrieskampEtAl26HO}, which let a specification refer to the contract of another function as a black box, make \WP fully modular.
+
+We evaluate the combination on a corpus of 26 inference problems.
+Twenty-four of them are extracted from public Move code of the Aptos framework that has no specification: a model may have seen the code during training, but it cannot recall a specification that was never written.
+We compare three tactics, one without the \WP tool and two with it, under two models of one family, the frontier model Sol~5.6 and the mid-tier model Terra~5.6, and check completeness with withheld mutants.
+Without the \WP tool, the agent already does well: it completes 99\% of its cells under the frontier model and 93\% under the mid-tier model.
+With \WP, completeness does not change measurably, but the cost drops by 11--21\%.
+The saving comes from the targets without loops, where \WP derives the complete contract and the hybrid tactics cost 36--60\% of the agent alone; on loop targets, where the agent still has to find the invariant, they cost 9--22\% more.
+The mid-tier model costs 53--59\% of the frontier model, close to the ratio of their prices, and falls behind it mainly on the one target whose contract needs a permutation argument proved with lemmas.
+
+\Paragraph{Contributions}
+The paper presents a novel combination of agentic and mechanical specification inference, integrated with the Move Prover, and a detailed empirical evaluation on real-world code, which shows that such a combination lowers the cost of specification inference where the mechanical analysis applies.
+In addition, we show that reference elimination in the style of the Move Prover is a good basis for specification inference.
+
+The Move Prover was developed for the Diem project and has \Anon{been maintained by Aptos Labs since 2022}{since been maintained by a blockchain company}; it has verified Diem's payment system and critical components of \Anon{the Aptos blockchain}{a public blockchain}~\cite{ParkZGXGCLC24,AptosFrameworkBook}.
+
+\endinput

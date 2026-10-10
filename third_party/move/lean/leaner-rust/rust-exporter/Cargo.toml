@@ -1,0 +1,20 @@
+[package]
+name = "leaner-rust-export"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Leaner Rustc Public extraction driver"
+license = "Apache-2.0"
+
+[features]
+default = []
+rustc-public = []
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[workspace]

@@ -1544,6 +1544,14 @@ pub static SECRET_SHARE_BAD_SHARES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static SECRET_SHARE_RECOVERY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_secret_share_recovery_count",
+        "Number of persisted secret shares served after an active-store miss."
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",

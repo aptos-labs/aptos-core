@@ -1,0 +1,76 @@
+Move prover returns: exiting with compilation errors
+warning: cannot derive `result_of` exactly for this lambda argument: the lambda mutates captured state; weakening condition; see https://github.com/aptos-labs/aptos-core/issues/20371
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:619:54
+    │
+619 │             invariant forall j in 0..i: result[j] == result_of<f>(self[j]);
+    │                                                      ^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/nested_map_ref.move:15:17
+    │
+ 15 │             let _ = v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭───────────────────'
+    │ │ ╭───────────────────────────'
+ 16 │ │ │             count = count + 1;
+ 17 │ │ │             *x
+ 18 │ │ │         } spec {
+ 19 │ │ │             aborts_if false;
+ 20 │ │ │             ensures result == x;
+ 21 │ │ │         }));
+    │ ╰─│───────────' from a call inlined at this callsite
+    │   ╰──────────' lambda argument
+
+error: `aborts_of` cannot constrain a lambda which writes the captured variable(s) `count`: the captures' values at an application are not expressible; use `folds_of` in a loop invariant to constrain the cumulative effect
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:620:42
+    │
+620 │             invariant forall j in 0..i: !aborts_of<f>(self[j]);
+    │                                          ^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/nested_map_ref.move:15:17
+    │
+ 15 │             let _ = v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭───────────────────'
+    │ │ ╭───────────────────────────'
+ 16 │ │ │             count = count + 1;
+ 17 │ │ │             *x
+ 18 │ │ │         } spec {
+ 19 │ │ │             aborts_if false;
+ 20 │ │ │             ensures result == x;
+ 21 │ │ │         }));
+    │ ╰─│───────────' from a call inlined at this callsite
+    │   ╰──────────' lambda argument
+
+error: `result_of` cannot constrain a lambda which writes the captured variable(s) `count`: the captures' values at an application are not expressible; use `folds_of` in a loop invariant to constrain the cumulative effect
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:913:21
+    │
+913 │                 vec(result_of<f>(v[end - 1]))
+    │                     ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/nested_map_ref.move:15:27
+    │
+ 15 │           let _ = v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭───────────────────────────'
+ 16 │ │             count = count + 1;
+ 17 │ │             *x
+ 18 │ │         } spec {
+ 19 │ │             aborts_if false;
+ 20 │ │             ensures result == x;
+ 21 │ │         }));
+    │ ╰──────────' lambda argument
+
+error: `aborts_of` cannot constrain a lambda which writes the captured variable(s) `count`: the captures' values at an application are not expressible; use `folds_of` in a loop invariant to constrain the cumulative effect
+    ┌─ ../../../aptos-move/framework/move-stdlib/sources/vector.move:923:24
+    │
+923 │                     || aborts_of<f>(v[end - 1])
+    │                        ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    ┌─ tests/sources/functional/closures/inline/nested_map_ref.move:15:27
+    │
+ 15 │           let _ = v.map_ref(|inner| inner.map_ref(|x| {
+    │ ╭───────────────────────────'
+ 16 │ │             count = count + 1;
+ 17 │ │             *x
+ 18 │ │         } spec {
+ 19 │ │             aborts_if false;
+ 20 │ │             ensures result == x;
+ 21 │ │         }));
+    │ ╰──────────' lambda argument

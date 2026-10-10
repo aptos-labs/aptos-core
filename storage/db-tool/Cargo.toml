@@ -15,7 +15,10 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-backup-cli = { workspace = true }
 aptos-block-executor = { workspace = true }
+aptos-build-info = { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-db = { workspace = true, features = ["db-debugger"] }
 aptos-db-indexer = { workspace = true }
 aptos-executor = { workspace = true }
@@ -29,8 +32,12 @@ aptos-vm-environment = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
 rayon = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

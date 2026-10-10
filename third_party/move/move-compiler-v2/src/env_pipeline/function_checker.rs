@@ -9,8 +9,7 @@ use move_binary_format::file_format::Visibility;
 use move_core_types::language_storage::{CONST, DOLLAR_SIGN_DELIMITER};
 use move_model::{
     ast::{ExpData, Operation, Pattern},
-    metadata::LanguageVersion,
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, StructId},
+    model::{FunId, FunctionEnv, GlobalEnv, NodeId, QualifiedId, StructId},
     ty::Type,
 };
 use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
@@ -160,6 +159,18 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
         );
     };
 
+    if let Some((msg, primary)) = call_access_error(caller, callee) {
+        report(&msg, &primary);
+    }
+}
+
+/// Why `caller` may not call `callee`, as a message and a label for the
+/// caller, or `None` if the call is allowed.
+pub(crate) fn call_access_error(
+    caller: &FunctionEnv,
+    callee: &FunctionEnv,
+) -> Option<(String, String)> {
+    let env = caller.module_env.env;
     let caller_desc = || {
         let caller_name = caller.get_full_name_with_address();
         if caller.is_inline() {
@@ -171,39 +182,37 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
 
     // 1. Callee is script → error
     if callee.module_env.is_script_module() {
-        report(
-            &format!(
+        return Some((
+            format!(
                 "script function `{}` cannot be called from Move code",
                 callee.get_name_str()
             ),
-            "script function",
-        );
-        return;
+            "script function".to_owned(),
+        ));
     }
 
     // Now: callee is not a script
     // 2. Same module → allowed
     if caller.module_env.get_id() == callee.module_env.get_id() {
-        return;
+        return None;
     }
 
     // Now: callee is not a script; cross-module
     // 3. Callee is public → allowed
     if callee.visibility() == Visibility::Public {
-        return;
+        return None;
     }
 
     // Now: callee is not a script; cross-module; callee is not public
     // 4. Caller is script → error (scripts can only call public functions)
     if caller.module_env.is_script_module() {
-        report(
-            &format!(
+        return Some((
+            format!(
                 "function `{}` cannot be called from a script because it is not public",
                 callee.get_full_name_with_address()
             ),
-            "called from a script",
-        );
-        return;
+            "called from a script".to_owned(),
+        ));
     }
 
     // Now: callee is not a script; cross-module; callee is not public; caller is not a script
@@ -211,20 +220,19 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
 
     // 5. Callee is private → error
     if callee.visibility() == Visibility::Private {
-        report(
-            &format!(
+        return Some((
+            format!(
                 "function `{callee_name}` is private to module `{}`",
                 callee.module_env.get_full_name_str()
             ),
-            &caller_desc(),
-        );
-        return;
+            caller_desc(),
+        ));
     }
 
     // Now: cross-module; callee is package or friend visible
     // 6. Caller is explicit friend → allowed
     if callee.module_env.has_friend(&caller.module_env.get_id()) {
-        return;
+        return None;
     }
 
     // Now: cross-module; callee is package or friend visible; caller is not a friend
@@ -232,35 +240,34 @@ fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTree
         // 7. Callee has package visibility → check address and package for more informative messages
         if callee.module_env.self_address() != caller.module_env.self_address() {
             // Now: different address
-            report(
-                &format!(
+            return Some((
+                format!(
                     "package function `{callee_name}` cannot be called from a different address"
                 ),
-                &caller_desc(),
-            );
-            return;
+                caller_desc(),
+            ));
         }
         // Now: same address; callee is from a dependency package
         let options = env
             .get_extension::<Options>()
             .expect("Options is available");
         if options.experiment_on(Experiment::UNSAFE_PACKAGE_VISIBILITY) {
-            return;
+            return None;
         }
-        report(
-            &format!("package function `{callee_name}` cannot be called from a different package"),
-            &caller_desc(),
-        );
+        Some((
+            format!("package function `{callee_name}` cannot be called from a different package"),
+            caller_desc(),
+        ))
     } else {
         // 8. Callee has friend but not package visibility
-        report(
-            &format!(
+        Some((
+            format!(
                 "friend function `{callee_name}` cannot be called from `{}` (not a friend of `{}`)",
                 caller.module_env.get_full_name_str(),
                 callee.module_env.get_full_name_str()
             ),
-            &caller_desc(),
-        );
+            caller_desc(),
+        ))
     }
 }
 
@@ -503,11 +510,16 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::Global(_)
             | Operation::CanModify
             | Operation::Old
+            | Operation::SaveStateAnchor(..)
+            | Operation::WithStateAnchor(..)
+            | Operation::FoldsCaptureAnchor(..)
+            | Operation::InlineCallSummary
             | Operation::Trace(_)
             | Operation::EmptyVec
             | Operation::SingleVec
             | Operation::UpdateVec
             | Operation::ConcatVec
+            | Operation::ReverseVec
             | Operation::IndexOfVec
             | Operation::ContainsVec
             | Operation::InRangeRange
@@ -791,175 +803,5 @@ fn visibility_description(vis: Visibility, has_package: bool) -> &'static str {
         Visibility::Friend if has_package => "package",
         Visibility::Friend => "friend",
         Visibility::Private => "private",
-    }
-}
-
-// ===============================================================================================
-// Function type parameter checks
-
-// Takes a list of function types, returns those which have a function type in their argument type
-fn identify_function_types_with_functions_in_args(func_types: Vec<Type>) -> Vec<Type> {
-    func_types
-        .into_iter()
-        .filter_map(|ty| {
-            if let Type::Fun(args, _, _) = &ty {
-                if args.as_ref().has_function() {
-                    Some(ty)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-// Takes a list of function-typed parameters, along with argument and result type
-// Returns a list of any parameters whose result type has a function value, along with that result type.
-fn identify_function_typed_params_with_functions_in_rets(
-    func_types: Vec<&Parameter>,
-) -> Vec<(&Parameter, &Type)> {
-    func_types
-        .iter()
-        .filter_map(|param| {
-            if let Type::Fun(_args, result, _) = &param.1 {
-                let rest_unboxed = result.as_ref();
-                if rest_unboxed.has_function() {
-                    Some((*param, rest_unboxed))
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-/// check that function parameters/results do not have function type unless allowed.
-pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
-    let options = env
-        .get_extension::<Options>()
-        .expect("Options is available");
-
-    let lambda_params_ok = options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_2);
-    let lambda_return_ok = lambda_params_ok;
-    if lambda_params_ok && lambda_return_ok {
-        return;
-    }
-
-    for caller_module in env.get_modules() {
-        if caller_module.is_target() {
-            for caller_func in caller_module.get_functions() {
-                if !lambda_params_ok || !lambda_return_ok {
-                    let caller_name = caller_func.get_full_name_str();
-                    let return_type = caller_func.get_result_type();
-                    let func_returns: Vec<_> = return_type
-                        .clone()
-                        .flatten()
-                        .into_iter()
-                        .filter(|t| t.is_function())
-                        .collect();
-                    let type_display_ctx = caller_func.get_type_display_ctx();
-                    if !func_returns.is_empty() {
-                        // (2) is there a function type result at the top level?  This is allowed
-                        // only for LAMBDA_IN_RETURNS
-                        if !lambda_return_ok && !func_returns.is_empty() {
-                            env.diag(
-                                Severity::Error,
-                                &caller_func.get_result_type_loc(),
-                                &format!("Functions may not return function-typed values, but function `{}` return type is the function type `{}`:",
-                                         &caller_name,
-                                         return_type.display(&type_display_ctx)),
-                            )
-                        }
-                        if !lambda_params_ok {
-                            // (3) is there *any* function type with function type in an arg? This
-                            // is allowed only for LAMBDA_IN_PARAMS
-                            let bad_returns =
-                                identify_function_types_with_functions_in_args(func_returns);
-                            if !bad_returns.is_empty() {
-                                env.diag(
-                                    Severity::Error,
-                                    &caller_func.get_result_type_loc(),
-                                    &format!("Non-inline functions may not take function-typed parameters, but function `{}` return type is `{}`, which has a function type taking a function parameter:",
-                                             &caller_name,
-                                             return_type.display(&type_display_ctx)),
-                                )
-                            }
-                        }
-                    }
-
-                    let parameters = caller_func.get_parameters_ref();
-                    let func_params: Vec<_> = parameters
-                        .iter()
-                        .filter(|param| matches!(param.1, Type::Fun(..)))
-                        .collect();
-                    if !func_params.is_empty() {
-                        // (1) is there a function type arg at the top level?  This is allowed for
-                        // inline or LAMBDA_IN_PARAMS
-                        if !caller_func.is_inline() && !lambda_params_ok {
-                            let reasons: Vec<(Loc, String)> = func_params
-                                .iter()
-                                .map(|param| {
-                                    (
-                                        param.2.clone(),
-                                        format!(
-                                            "Parameter `{}` has function-valued type `{}`.",
-                                            param.0.display(env.symbol_pool()),
-                                            param.1.display(&type_display_ctx)
-                                        ),
-                                    )
-                                })
-                                .collect();
-                            env.diag_with_labels(
-                                Severity::Error,
-                                &caller_func.get_id_loc(),
-                                &format!("Only inline functions may have function-typed parameters, but non-inline function `{}` has {}:",
-                                         caller_name,
-                                         if reasons.len() > 1 { "function parameters" } else { "a function parameter" },
-                                ),
-                                reasons,
-                            );
-                        }
-                        if !lambda_return_ok {
-                            // (4) is there *any* function type with function type in its result? This is
-                            // allowed only for LAMBDA_IN_RETURNS
-                            let bad_params =
-                                identify_function_typed_params_with_functions_in_rets(func_params);
-                            if !bad_params.is_empty() {
-                                let reasons: Vec<(Loc, String)> = bad_params
-                                    .iter()
-                                    .map(|(param, ty)| {
-                                        (
-                                            param.2.clone(),
-                                            format!(
-                                                "Parameter `{}` has type `{}`, which has function type `{}` as a function result type",
-                                                param.0.display(env.symbol_pool()),
-                                                param.1.display(&type_display_ctx),
-                                                ty.display(&type_display_ctx),
-                                            ),
-                                        )
-                                    })
-                                    .collect();
-                                env.diag_with_labels(
-                                    Severity::Error,
-                                    &caller_func.get_id_loc(),
-                                    &format!("Functions may not return function-typed values, but function `{}` has {} of function type with function-typed result:",
-                                             caller_name,
-                                             if reasons.len() > 1 { "parameters" } else { "a parameter" },
-                                    ),
-                                    reasons,
-                                );
-                            }
-                        }
-                    }
-                };
-            }
-        }
     }
 }

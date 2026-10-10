@@ -549,7 +549,6 @@ where
 /// Avoids the orphan rule to implement external [FunctionValueExtension] for any generic type that
 /// implements [ModuleStorage].
 pub struct FunctionValueExtensionAdapter<'a> {
-    #[allow(dead_code)]
     pub(crate) module_storage: &'a dyn ModuleStorage,
 }
 
@@ -570,7 +569,14 @@ impl FunctionValueExtension for FunctionValueExtensionAdapter<'_> {
         &self,
         data: SerializedFunctionData,
     ) -> PartialVMResult<Box<dyn AbstractFunction>> {
-        Ok(Box::new(LazyLoadedFunction::new_unresolved(data)))
+        let ty_args_pseudo_gas_cost = LazyLoadedFunction::compute_ty_args_pseudo_gas_cost(
+            self.module_storage.runtime_environment(),
+            &data.ty_args,
+        );
+        Ok(Box::new(LazyLoadedFunction::new_unresolved(
+            data,
+            ty_args_pseudo_gas_cost,
+        )))
     }
 
     fn get_serialization_data(

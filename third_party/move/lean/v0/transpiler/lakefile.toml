@@ -1,0 +1,27 @@
+# Move-to-Leaner transpiler: decodes XAST (the compiler-v2 typed AST exported
+# by `aptos move exchange --format ast`) and prints textual Leaner Move.  The
+# library depends on Lean core only; `move` is required so the elaboration
+# gate in the test suite can build generated modules against `Move`.
+name = "transpiler"
+defaultTargets = ["Transpiler", "transpile"]
+testDriver = "TranspilerTests"
+
+[[require]]
+name = "move"
+path = "../move"
+
+[[require]]
+name = "leaner-move"
+path = "../../leaner-move"
+
+[[lean_lib]]
+name = "Transpiler"
+
+[[lean_exe]]
+name = "transpile"
+root = "Main"
+
+# Decoder and printer baselines, and the generated modules built against `Move`.
+[[lean_lib]]
+name = "TranspilerTests"
+roots = ["Transpiler.Tests"]

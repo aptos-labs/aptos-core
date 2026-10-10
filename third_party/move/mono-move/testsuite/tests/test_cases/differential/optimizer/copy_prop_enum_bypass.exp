@@ -1,0 +1,53 @@
+=== stackless ===
+// module 0x42::copy_prop_enum_bypass
+
+fun bypass(r0): u64 {
+  slots: params(1), locals(3), temps(2), transfer(1)
+    r0: u64
+    r1: 0x42::copy_prop_enum_bypass::Holder
+    r2: 0x42::copy_prop_enum_bypass::Holder
+    r3: u64
+    r4: &0x42::copy_prop_enum_bypass::Holder
+    r5: u64
+  code:
+  L0:
+    0: [r1] := call make, [r0] @1
+    1: r2 := copy r1 @3
+    2: r4 := imm_borrow_loc r2 @5
+    3: r0 := read_variant_field Holder::V::n, r4 @6
+    4: [r3] := call set_payload, [r2] @10
+    5: r4 := imm_borrow_loc r1 @12
+    6: r5 := read_variant_field Holder::V::n, r4 @13
+    7: r5 := mul r5, #100 @16
+    8: r5 := add r5, r3 @18
+    9: r5 := add r5, r0 @20
+    10: ret [r5] @21
+}
+
+fun make(r0): Holder {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: 0x42::copy_prop_enum_bypass::Holder
+  code:
+  L0:
+    0: r1 := pack_variant 0x42::copy_prop_enum_bypass::Holder@0, [r0] @1
+    1: ret [r1] @2
+}
+
+fun set_payload(r0): u64 {
+  slots: params(1), locals(1), temps(3)
+    r0: 0x42::copy_prop_enum_bypass::Holder
+    r1: 0x42::copy_prop_enum_bypass::Holder
+    r2: u64
+    r3: &mut 0x42::copy_prop_enum_bypass::Holder
+    r4: &0x42::copy_prop_enum_bypass::Holder
+  code:
+  L0:
+    0: r1 := move r0 @0
+    1: r2 := ld_u64 99 @2
+    2: r3 := mut_borrow_loc r1 @3
+    3: write_variant_field Holder::V::n, r3, r2 @4
+    4: r4 := imm_borrow_loc r1 @6
+    5: r2 := read_variant_field Holder::V::n, r4 @7
+    6: ret [r2] @9
+}

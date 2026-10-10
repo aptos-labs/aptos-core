@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 54,
+        "offset": 6052,
+        "sha256": "5fc921a3bbf9d7c912feb2775000b97246d6692acd302dc5c38cc7df80a5835a"
+      },
+      "edit": {
+        "at": 24,
+        "kind": "substitute",
+        "length": 2,
+        "to": "||"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-reinsert-030-empty-side-indexed",
+      "obligation_category": "abort",
+      "rationale": "An empty side is indexed instead of receiving a first level.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 58,
+        "offset": 6119,
+        "sha256": "f12540af850729b903fc90290743a2a172c3068f6098aa4b4f9a92c71d83990b"
+      },
+      "edit": {
+        "at": 9,
+        "kind": "substitute",
+        "length": 2,
+        "to": "="
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-reinsert-030-merge-overwrites",
+      "obligation_category": "normal-result",
+      "rationale": "Merging replaces the first size instead of adding to it.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 30,
+        "offset": 6253,
+        "sha256": "0ae03d7e81433dbfd1ad2112d720e48f4e4d67a4a43df439c50f7d0726f07753"
+      },
+      "edit": {
+        "at": 7,
+        "kind": "substitute",
+        "length": 22,
+        "to": "push_back(other_price)"
+      },
+      "essential": true,
+      "file": "sources/trading/extracted_bulk_order_utils.move",
+      "mutant_id": "TR-reinsert-030-price-appended",
+      "obligation_category": "normal-result",
+      "rationale": "The new price goes to the back while its size goes to the front.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "edfb877ee10f48c2bfdd8c3ff4036817d5fc8bcf682649caeca0d410cdef3b7e",
+  "task_id": "TR-reinsert-030"
+}

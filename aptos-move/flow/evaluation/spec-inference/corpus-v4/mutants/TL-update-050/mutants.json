@@ -1,0 +1,102 @@
+{
+  "mutants": [
+    {
+      "anchor": {
+        "length": 67,
+        "offset": 4084,
+        "sha256": "f2fa940643cf59c2ddba1f1df190cc5fe9829a09385631817238ecd9f9bf97c5"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 67,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-update-050-no-signer-check",
+      "obligation_category": "abort",
+      "rationale": "Any signer may update the configuration.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 64,
+        "offset": 4276,
+        "sha256": "69ad5983eca2311d0eb5db8f2b671bcc05019fe8a92cf0c8f4f1ef1b1d25bbbd"
+      },
+      "edit": {
+        "at": 25,
+        "kind": "substitute",
+        "length": 13,
+        "to": "execution_min_stakes"
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-update-050-io-from-execution-stakes",
+      "obligation_category": "normal-result",
+      "rationale": "The IO tiers take the execution stakes.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    },
+    {
+      "anchor": {
+        "length": 40,
+        "offset": 4671,
+        "sha256": "f2746dfb57ae2ba264c8d8aa7124697cd9cca5c5532783c25aab99e39866f328"
+      },
+      "edit": {
+        "at": 0,
+        "kind": "substitute",
+        "length": 40,
+        "to": ""
+      },
+      "essential": true,
+      "file": "sources/framework/extracted_transaction_limits.move",
+      "mutant_id": "TL-update-050-io-not-updated",
+      "obligation_category": "normal-result",
+      "rationale": "An existing configuration keeps its old IO tiers.",
+      "reviews": [
+        {
+          "approved": true,
+          "basis": "authored before any round from the target source; shown to the agent only as obligation categories; validated as essential against the reference specification",
+          "reviewer": "Claude (agent), on behalf of wgrieskamp@gmail.com"
+        }
+      ],
+      "validated": {
+        "applies": true,
+        "compiles": true,
+        "inconclusive": false,
+        "killed_by_reference": true,
+        "outcome": "killed"
+      }
+    }
+  ],
+  "reference_sha256": "2ec6df825e180a92cc01e4ec6a67dc5ee6fecb716ed48e6faced2d387b667f73",
+  "task_id": "TL-update-050"
+}

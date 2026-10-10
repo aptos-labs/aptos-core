@@ -12,7 +12,7 @@ use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, Storage
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{db_ensure as ensure, Result};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use std::{path::Path, sync::Arc, time::Instant};
 use tokio::sync::watch::Sender;
@@ -256,6 +256,13 @@ impl AptosDB {
         );
         let mut ledger_batch = SchemaBatch::new();
         ledger_metadata_db.put_ledger_info(genesis_li, &mut ledger_batch)?;
-        ledger_metadata_db.write_schemas(ledger_batch)
+        ledger_metadata_db.write_schemas(ledger_batch)?;
+
+        // The cached latest ledger info is otherwise only populated when the DB
+        // is opened, so without this the DB reports no ledger info at all until
+        // the next restart.
+        ledger_metadata_db.set_latest_ledger_info(genesis_li.clone());
+
+        Ok(())
     }
 }

@@ -1791,51 +1791,49 @@ module aptos_framework::stake {
             );
         };
 
-        validator_set.active_validators.for_each_ref(
-            |obj| {
-                let vi: &ValidatorInfo = obj;
-                spec {
-                    assume len(validator_consensus_infos)
-                        == len(validator_set.active_validators)
-                            + len(validator_set.pending_inactive);
-                    assert vi.config.validator_index < len(validator_consensus_infos);
-                };
-                let vci = vector::borrow_mut(
-                    &mut validator_consensus_infos, vi.config.validator_index
-                );
-                *vci = validator_consensus_info::new(
-                    vi.addr, vi.config.consensus_pubkey, vi.voting_power
-                );
-                spec {
-                    assert len(validator_consensus_infos)
-                        == len(validator_set.active_validators)
-                            + len(validator_set.pending_inactive);
-                };
-            }
-        );
+        // TODO(#20391): restore `for_each_ref` when effectful HOF verification
+        // supports efficient caller-provided induction invariants.
+        for (i in 0..validator_set.active_validators.length()) {
+            let vi = validator_set.active_validators.borrow(i);
+            spec {
+                assume len(validator_consensus_infos)
+                    == len(validator_set.active_validators)
+                        + len(validator_set.pending_inactive);
+                assert vi.config.validator_index < len(validator_consensus_infos);
+            };
+            let vci = vector::borrow_mut(
+                &mut validator_consensus_infos, vi.config.validator_index
+            );
+            *vci = validator_consensus_info::new(
+                vi.addr, vi.config.consensus_pubkey, vi.voting_power
+            );
+            spec {
+                assert len(validator_consensus_infos)
+                    == len(validator_set.active_validators)
+                        + len(validator_set.pending_inactive);
+            };
+        };
 
-        validator_set.pending_inactive.for_each_ref(
-            |obj| {
-                let vi: &ValidatorInfo = obj;
-                spec {
-                    assume len(validator_consensus_infos)
-                        == len(validator_set.active_validators)
-                            + len(validator_set.pending_inactive);
-                    assert vi.config.validator_index < len(validator_consensus_infos);
-                };
-                let vci = vector::borrow_mut(
-                    &mut validator_consensus_infos, vi.config.validator_index
-                );
-                *vci = validator_consensus_info::new(
-                    vi.addr, vi.config.consensus_pubkey, vi.voting_power
-                );
-                spec {
-                    assert len(validator_consensus_infos)
-                        == len(validator_set.active_validators)
-                            + len(validator_set.pending_inactive);
-                };
-            }
-        );
+        for (i in 0..validator_set.pending_inactive.length()) {
+            let vi = validator_set.pending_inactive.borrow(i);
+            spec {
+                assume len(validator_consensus_infos)
+                    == len(validator_set.active_validators)
+                        + len(validator_set.pending_inactive);
+                assert vi.config.validator_index < len(validator_consensus_infos);
+            };
+            let vci = vector::borrow_mut(
+                &mut validator_consensus_infos, vi.config.validator_index
+            );
+            *vci = validator_consensus_info::new(
+                vi.addr, vi.config.consensus_pubkey, vi.voting_power
+            );
+            spec {
+                assert len(validator_consensus_infos)
+                    == len(validator_set.active_validators)
+                        + len(validator_set.pending_inactive);
+            };
+        };
 
         validator_consensus_infos
     }

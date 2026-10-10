@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:40:9
+   │
+40 │         ensures result == w + w; // error: off by w - 3
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:34: add_captured_local_wrong
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:39: add_captured_local_wrong (spec)
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:34: add_captured_local_wrong
+   =         w = <redacted>
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:14: apply
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:36: add_captured_local_wrong
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:17: apply
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:14: apply
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/inline/spec_fun_ctx_collision.move:40: add_captured_local_wrong (spec)

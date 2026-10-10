@@ -8,6 +8,7 @@
 compile_error!("Testing features shouldn't be compiled for production aptos-node");
 
 mod consensus;
+mod genesis_state;
 mod logger;
 mod network;
 mod services;
@@ -353,14 +354,14 @@ pub fn start_test_environment_node(
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test().id());
-    println!("\tREST API endpoint: http://{}", &config.api.address);
+    println!("\tREST API endpoint: http://{}", config.api.address);
     println!(
         "\tMetrics endpoint: http://{}:{}/metrics",
-        &config.inspection_service.address, &config.inspection_service.port
+        config.inspection_service.address, config.inspection_service.port
     );
     println!(
         "\tAptosnet fullnode network endpoint: {}",
-        &config.full_node_networks[0].listen_address
+        config.full_node_networks[0].listen_address
     );
     if config.indexer_grpc.enabled {
         println!(
@@ -736,8 +737,15 @@ pub fn setup_environment_and_start_node(
     }
 
     // Set up the storage database and any RocksDB checkpoints
-    let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
+    let (storage_handles, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
+    let storage::StorageHandles {
+        db: aptos_db,
+        db_rw,
+        internal_indexer_db: indexer_db_opt,
+        update_receiver,
+        local_genesis,
+    } = storage_handles;
 
     admin_service.set_aptos_db(db_rw.clone().into());
 
@@ -745,7 +753,7 @@ pub fn setup_environment_and_start_node(
     utils::set_aptos_vm_configurations(&node_config);
 
     // Obtain the chain_id from the DB
-    let chain_id = utils::fetch_chain_id(&db_rw)?;
+    let chain_id = utils::fetch_chain_id(&db_rw, &node_config)?;
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
@@ -810,6 +818,7 @@ pub fn setup_environment_and_start_node(
             &node_config,
             storage_service_network_interfaces,
             genesis_waypoint,
+            local_genesis,
             event_subscription_service,
             db_rw.clone(),
         )?;
@@ -867,6 +876,10 @@ pub fn setup_environment_and_start_node(
     debug!("Waiting until state sync is initialized!");
     state_sync_runtime.block_until_initialized();
     debug!("State sync initialization complete.");
+
+    // Start the backup service. It is only useful once the node holds data
+    // worth backing up, so it waits for bootstrapping to finish.
+    let backup_service = aptos_db.map(|db| storage::start_backup_service_for(&node_config, db));
 
     // Create the consensus observer and publisher (if enabled)
     let (consensus_observer_runtime, consensus_publisher_runtime, consensus_publisher) =

@@ -1474,7 +1474,7 @@ impl<'env> Docgen<'env> {
             self.gen_call_diagram(func_env.get_qualified_id(), true);
             self.begin_collapsed(&format!(
                 "Show all the functions that \"{}\" calls",
-                &func_name
+                func_name
             ));
             self.image(&format!(
                 "img/{}_forward_call_graph.svg",
@@ -1485,7 +1485,7 @@ impl<'env> Docgen<'env> {
             self.gen_call_diagram(func_env.get_qualified_id(), false);
             self.begin_collapsed(&format!(
                 "Show all the functions that call \"{}\"",
-                &func_name
+                func_name
             ));
             self.image(&format!(
                 "img/{}_backward_call_graph.svg",

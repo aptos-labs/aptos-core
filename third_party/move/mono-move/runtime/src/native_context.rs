@@ -10,29 +10,34 @@ use crate::{
     error::RuntimeError,
     global_storage::{EntryPtr, ResourceReadWriteSet},
     heap::{
-        alloc_or_gc, alloc_vec, deep_copy_or_gc, deserialize_or_gc, heap_alloc, is_heap_ptr,
-        realloc_vec, Heap, TopFrame,
+        alloc_or_gc, alloc_vec, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
+        heap_alloc, is_heap_ptr, realloc_vec, Heap, TopFrame,
     },
     memory::{
-        read_descriptor, read_obj_size, read_ptr, read_vec_len, write_enum_tag, write_ptr,
-        write_u64,
+        read_descriptor, read_obj_size, read_ptr, read_u64, read_vec_len, write_enum_tag,
+        write_ptr, write_u64,
     },
-    types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
+    types::{
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
+    },
 };
 use mono_move_core::{
-    interner::InternedModuleId,
+    interner::{view_module_id, InternedIdentifier, InternedModuleId},
     native::{
-        native_invariant_violation, Boxed, NativeABI, NativeContext, NativeContextFamily,
-        NativeExtension, NativeExtensions, NativeFunction, NativeRegistry, Opaque, Ref, RootPool,
-        TableHandle, VMValue, Vector,
+        native_invariant_violation, Boxed, Dispatch, NativeABI, NativeContext, NativeContextFamily,
+        NativeExtension, NativeExtensions, NativeFunction, NativeIdx, NativeName, NativeResolver,
+        Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
-    types::InternedType,
+    types::{view_name, view_type_list, InternedType, InternedTypeList},
     DescriptorId, DescriptorProvider, ExecutionErrorKind, Function, GasMeter, LayoutProvider,
-    ResourceProvider, VMResult, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
-    TRIVIAL_DESCRIPTOR_ID,
+    MicroOp, ObjectDescriptorInner, ResourceProvider, VMResult, ENUM_DATA_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
+use mono_move_global_context::ExecutionGuard;
 use move_core_types::account_address::AccountAddress;
+use shared_dsa::UnorderedMap;
 use std::{
     cell::{Cell, RefMut, UnsafeCell},
     cmp::Ordering,
@@ -63,11 +68,10 @@ pub struct ProductionNativeContext<'a> {
     abi: &'a NativeABI,
     /// Type arguments to the native.
     ty_args: &'a [InternedType],
-    /// Descriptor provider, used by any GC the native triggers while allocating.
-    desc_provider: &'a dyn DescriptorProvider,
-    /// Value layouts, used by natives that serialize, deserialize, or compare
-    /// values driven by their types.
-    layouts: &'a dyn LayoutProvider,
+    /// The worker's execution guard: object descriptors and value layouts for
+    /// natives driven by their types, and the memory regions any GC the native
+    /// triggers needs.
+    guard: &'a ExecutionGuard<'a>,
     /// Start of the native's slot region within the caller's frame. Args are
     /// read and returns written here, within the ABI-verified bounds.
     frame_ptr: *mut u8,
@@ -82,6 +86,9 @@ pub struct ProductionNativeContext<'a> {
     rws: UnsafeCell<&'a mut ResourceReadWriteSet>,
     /// Resource provider backing global-storage reads on a read-set cache miss.
     resource_provider: &'a dyn ResourceProvider,
+    /// Resolves a resource type's group container (returns [`None`] if not a
+    /// group member).
+    resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
     /// Per-transaction native extensions, shared across native calls. Accessed
     /// sharedly — each extension's own [`RefCell`](std::cell::RefCell) provides
     /// the interior mutability.
@@ -101,9 +108,9 @@ impl<'a> ProductionNativeContext<'a> {
         abi: &'a NativeABI,
         ty_args: &'a [InternedType],
         gas_meter: &'a mut GasMeter,
-        desc_provider: &'a dyn DescriptorProvider,
-        layouts: &'a dyn LayoutProvider,
+        guard: &'a ExecutionGuard<'a>,
         resource_provider: &'a dyn ResourceProvider,
+        resource_group_of: &'a dyn Fn(InternedType) -> VMResult<Option<InternedType>>,
         heap: &'a mut Heap,
         rws: &'a mut ResourceReadWriteSet,
         extensions: &'a NativeExtensions,
@@ -111,9 +118,9 @@ impl<'a> ProductionNativeContext<'a> {
         Self {
             abi,
             ty_args,
-            desc_provider,
-            layouts,
+            guard,
             resource_provider,
+            resource_group_of,
             frame_ptr,
             gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
@@ -121,6 +128,23 @@ impl<'a> ProductionNativeContext<'a> {
             extensions,
             pool: RootPool::new(),
             returns_started: Cell::new(false),
+        }
+    }
+
+    /// The caller of the Move function invoking this native, and its saved return PC.
+    fn caller_frame(&self) -> Option<(&Function, u64)> {
+        // SAFETY: native dispatch and Move calls write these metadata fields. The native's
+        // saved FP names its live caller frame, whose saved function is either null (entry)
+        // or an arena-owned function that remains alive throughout execution.
+        unsafe {
+            let caller_fp = read_ptr(
+                self.frame_ptr.sub(FRAME_METADATA_SIZE),
+                META_SAVED_FP_OFFSET,
+            );
+            let metadata = caller_fp.sub(FRAME_METADATA_SIZE);
+            let caller =
+                (read_ptr(metadata, META_SAVED_FUNC_PTR_OFFSET) as *const Function).as_ref()?;
+            Some((caller, read_u64(metadata, META_SAVED_PC_OFFSET)))
         }
     }
 }
@@ -251,7 +275,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn value_size(&self, ty: InternedType) -> VMResult<u32> {
-        self.layouts
+        self.guard
             .size_and_align(ty)
             .map(|(size, _)| size)
             .ok_or_else(|| {
@@ -301,21 +325,79 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn caller_module(&self) -> Option<InternedModuleId> {
-        // Walk two frames up: the native's metadata records its immediate
-        // caller's frame pointer, and that caller's metadata records *its*
-        // caller. A null saved-function pointer marks the entry frame, which
-        // has no caller.
-        unsafe {
-            let caller_fp = read_ptr(
-                self.frame_ptr.sub(FRAME_METADATA_SIZE),
-                META_SAVED_FP_OFFSET,
-            );
-            let caller_caller = read_ptr(
-                caller_fp.sub(FRAME_METADATA_SIZE),
-                META_SAVED_FUNC_PTR_OFFSET,
-            ) as *const Function;
-            caller_caller.as_ref().map(|f| f.module_id)
+        self.caller_frame().map(|(caller, _)| caller.module_id)
+    }
+
+    fn direct_caller_module(&self) -> Option<InternedModuleId> {
+        let (caller, return_pc) = self.caller_frame()?;
+        let call_pc = usize::try_from(return_pc.checked_sub(1)?).ok()?;
+        // CallIndirect is a statically named Move call resolved by the loader; function
+        // values use CallClosure. The saved return PC is one past the call micro-op.
+        if matches!(
+            caller.code.ops().get(call_pc),
+            Some(MicroOp::CallDirect { .. } | MicroOp::CallIndirect { .. })
+        ) {
+            Some(caller.module_id)
+        } else {
+            None
         }
+    }
+
+    fn new_byte_vector_vector<'a>(
+        &'a self,
+        items: &[&[u8]],
+    ) -> VMResult<Vector<'a, Vector<'a, u8>>> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "new_byte_vector_vector called after a return value was written".into(),
+            ));
+        }
+        if items.is_empty() {
+            // TODO(correctness): audit empty <=> null vector invariant
+            // SAFETY: passing `null` is always safe.
+            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
+            return Ok(Vector::from_handle(handle));
+        }
+
+        // Allocate the elements first. Each is rooted, so the GC that a later
+        // element's allocation may trigger relocates the earlier ones.
+        let inner = items
+            .iter()
+            .map(|bytes| self.new_byte_vector(bytes))
+            .collect::<VMResult<Vec<_>>>()?;
+
+        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
+        // through `&self` at once is sound — at most one `&mut` per field is
+        // live (see the type-level aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = alloc_vec(
+            heap,
+            self.guard,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            POINTER_VEC_DESCRIPTOR_ID,
+            8,
+            inner.len() as u64,
+        )?;
+        // `ptr` stays unrooted until `root_object` below, so a GC before the
+        // writes would relocate the object without updating `ptr` and the
+        // writes would land in from-space. The element pointers are read after
+        // `alloc_vec`, so they account for any relocation it caused.
+        //
+        // SAFETY: `ptr` is a fresh vector with room for `inner.len()` 8-byte
+        // elements, and nothing allocates between here and these writes.
+        unsafe {
+            write_u64(ptr, VEC_LENGTH_OFFSET, inner.len() as u64);
+            for (i, elem) in inner.iter().enumerate() {
+                write_ptr(ptr, VEC_DATA_OFFSET + i * 8, elem.ptr());
+            }
+        }
+        // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
+        Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
     }
 
     fn new_vector_no_pointers<'a>(
@@ -356,7 +438,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Pointer-free elements, so the vector uses the trivial descriptor.
         let ptr = alloc_vec(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -375,6 +457,189 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Root it so it survives later allocations and is GC-relocated.
         // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
         Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    fn new_vector<'a>(
+        &'a self,
+        descriptor: DescriptorId,
+        elem_size: u32,
+        count: u64,
+    ) -> VMResult<Vector<'a, Opaque>> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "new_vector called after a return value was written".into(),
+            ));
+        }
+        // The descriptor is what the GC traces the object by, so anything but a
+        // matching vector descriptor would walk the payload at the wrong
+        // offsets. `Trivial` is the pointer-free element case.
+        let desc = self
+            .guard
+            .descriptor(descriptor)
+            .ok_or_else(|| native_invariant_violation("new_vector: unknown descriptor".into()))?;
+        match desc.inner() {
+            ObjectDescriptorInner::Trivial => {},
+            ObjectDescriptorInner::Vector {
+                elem_size: stride, ..
+            } if *stride == elem_size => {},
+            ObjectDescriptorInner::Vector { .. }
+            | ObjectDescriptorInner::Struct { .. }
+            | ObjectDescriptorInner::Enum { .. }
+            | ObjectDescriptorInner::Closure
+            | ObjectDescriptorInner::CapturedData { .. } => {
+                return Err(native_invariant_violation(
+                    "new_vector: not a vector descriptor of this element size".into(),
+                ))
+            },
+        }
+        if count == 0 {
+            // TODO(correctness): audit empty <=> null vector invariant
+            // SAFETY: passing `null` is always safe.
+            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
+            return Ok(Vector::from_handle(handle));
+        }
+
+        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
+        // through `&self` at once is sound — at most one `&mut` per field is
+        // live (see the type-level aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        let ptr = alloc_vec(
+            heap,
+            self.guard,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            descriptor,
+            elem_size,
+            count,
+        )?;
+        // `heap_alloc` zeroes the whole object, so every element slot holds a
+        // null pointer: the vector is traceable at its full length before a
+        // single element has been written.
+        // SAFETY: `ptr` is a fresh vector with room for `count` elements.
+        unsafe { write_u64(ptr, VEC_LENGTH_OFFSET, count) };
+        // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
+        Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+    }
+
+    unsafe fn vector_write_elements_raw_test_only(
+        &self,
+        vector: &Vector<'_, Opaque>,
+        elem_size: u32,
+        data: &[u8],
+    ) -> VMResult<()> {
+        if self.returns_started.get() {
+            return Err(native_invariant_violation(
+                "vector_write_elements_raw_test_only called after a return value was written"
+                    .into(),
+            ));
+        }
+        if (vector.len() as usize).checked_mul(elem_size as usize) != Some(data.len()) {
+            return Err(native_invariant_violation(
+                "vector_write_elements_raw_test_only: data length must equal len * elem_size"
+                    .into(),
+            ));
+        }
+        let ptr = vector.ptr();
+        if ptr.is_null() {
+            return Ok(());
+        }
+
+        // SAFETY: `ptr` is a live object, so its header names its descriptor.
+        let descriptor = DescriptorId(unsafe { read_descriptor(ptr) });
+        let desc = self.guard.descriptor(descriptor).ok_or_else(|| {
+            native_invariant_violation(
+                "vector_write_elements_raw_test_only: unknown descriptor".into(),
+            )
+        })?;
+        let offsets = match desc.inner() {
+            // A pointer-free element type publishes as the trivial descriptor:
+            // nothing to patch, so the copy alone makes the value independent.
+            ObjectDescriptorInner::Trivial => &[][..],
+            ObjectDescriptorInner::Vector {
+                elem_size: stride,
+                elem_pointer_offsets,
+            } => {
+                if *stride != elem_size {
+                    return Err(native_invariant_violation(
+                        "vector_write_elements_raw_test_only: descriptor element size does not match".into(),
+                    ));
+                }
+                elem_pointer_offsets.as_slice()
+            },
+            ObjectDescriptorInner::Struct { .. }
+            | ObjectDescriptorInner::Enum { .. }
+            | ObjectDescriptorInner::Closure
+            | ObjectDescriptorInner::CapturedData { .. } => {
+                return Err(native_invariant_violation(
+                    "vector_write_elements_raw_test_only: not a vector descriptor".into(),
+                ))
+            },
+        };
+
+        // SAFETY: as above; the header records the object's total size.
+        let capacity = (unsafe { read_obj_size(ptr) } as usize)
+            .saturating_sub(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET);
+        if data.len() > capacity {
+            return Err(native_invariant_violation(
+                "vector_write_elements_raw_test_only: data does not fit the vector".into(),
+            ));
+        }
+
+        // SAFETY: `heap` and `rws` are distinct fields (see the aliasing rule).
+        let heap = unsafe { &mut **self.heap.get() };
+        let rws = unsafe { &mut **self.rws.get() };
+        // A heap-aliasing `data` would be invalidated by the GC the deep copies
+        // below may trigger.
+        if is_heap_ptr(heap, data.as_ptr()) {
+            return Err(native_invariant_violation(
+                "vector_write_elements_raw_test_only: data must not alias the VM heap".into(),
+            ));
+        }
+        // SAFETY: bounded by `capacity` above, and `data` does not alias the
+        // heap.
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len())
+        };
+
+        // The elements now share whatever objects `data` pointed at. Replace
+        // each shared pointer with a deep copy, as `MicroOp::DeepCopyHeapPtrs`
+        // does for a frame.
+        let mut slots = vec![];
+        let mut sources = vec![];
+        for index in 0..vector.len() as usize {
+            for &offset in offsets {
+                let at = VEC_DATA_OFFSET + index * elem_size as usize + offset as usize;
+                // SAFETY: the descriptor says this slot holds a heap pointer.
+                if let Some(src) = NonNull::new(unsafe { read_ptr(ptr, at) }) {
+                    slots.push(at);
+                    sources.push(src);
+                }
+            }
+        }
+        // SAFETY: by this function's contract every pointer in `data` is a live
+        // object, and the copy above did not change that.
+        let copies = unsafe {
+            deep_copy_batch_or_gc(
+                heap,
+                self.guard,
+                rws,
+                &self.pool,
+                self.extensions,
+                self.frame_ptr,
+                TopFrame::Native(self.abi),
+                &sources,
+            )
+        }?;
+        for (at, copy) in slots.into_iter().zip(copies) {
+            // SAFETY: the vector is rooted, so re-reading its base picks up any
+            // relocation the batch caused.
+            unsafe { write_ptr(vector.ptr(), at, copy.as_ptr()) };
+        }
+        Ok(())
     }
 
     unsafe fn vector_move_range(
@@ -441,7 +706,7 @@ impl NativeContext for ProductionNativeContext<'_> {
             let new_ptr = unsafe {
                 realloc_vec(
                     heap,
-                    self.desc_provider,
+                    self.guard,
                     rws,
                     &self.pool,
                     self.extensions,
@@ -496,34 +761,40 @@ impl NativeContext for ProductionNativeContext<'_> {
     unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        unsafe { crate::value_utils::serialize(self.layouts, base, ty) }
+        unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) }
     }
 
     unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_utils::serialized_size(self.layouts, base, ty) }
+        unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) }
     }
 
     fn bcs_deserialize_value(&self, ty: InternedType, bytes: &[u8]) -> VMResult<Option<Vec<u8>>> {
-        let layout = self.layouts.layout_by_ty(ty).ok_or_else(|| {
+        let layout = self.guard.layout_by_ty(ty).ok_or_else(|| {
             native_invariant_violation("bcs deserialize: no layout for type".into())
         })?;
-        let mut out = vec![0u8; layout.size as usize];
+        // `MemoryRegion` meets the alignment `deserialize` requires. Zeroed
+        // rather than left as is, because the copy below reads the padding the
+        // deserializer skips. `max(1)` because a region cannot be empty.
+        let size = layout.size as usize;
+        let region = self.guard.take_region(size.max(1));
+        let dst = region.as_ptr();
+        // SAFETY: the region is `size` writable bytes.
+        unsafe { std::ptr::write_bytes(dst, 0, size) };
         // SAFETY: heap and rws are distinct fields (see the type-level aliasing
         // rule), so reborrowing both through `&self` at once is sound.
         let heap = unsafe { &mut **self.heap.get() };
         let rws = unsafe { &mut **self.rws.get() };
         // `bytes` is off-heap (the native copied it), so it survives the GC the
         // retry may run.
-        // SAFETY: `out` is `layout.size` writable bytes.
+        // SAFETY: `dst` is `size` writable, correctly aligned bytes.
         let result = unsafe {
             deserialize_or_gc(
-                self.layouts,
                 heap,
+                self.guard,
                 ty,
                 bytes,
-                out.as_mut_ptr(),
-                self.desc_provider,
+                dst,
                 rws,
                 &self.pool,
                 self.extensions,
@@ -531,20 +802,29 @@ impl NativeContext for ProductionNativeContext<'_> {
                 TopFrame::Native(self.abi),
             )
         };
-        match result {
-            Ok(()) => Ok(Some(out)),
+        let out = match result {
+            // SAFETY: `deserialize_or_gc` initialized `size` bytes at `dst`.
+            Ok(()) => Ok(Some(
+                unsafe { std::slice::from_raw_parts(dst, size) }.to_vec(),
+            )),
             // Malformed input: the bytes are not a valid encoding of `ty`. Heap
             // exhaustion and missing layouts carry other kinds and still propagate.
             Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
             Err(e) => Err(e),
-        }
+        };
+        self.guard.return_region(region);
+        out
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
+        // Resolved before the `rws` reborrow; the resolver reads the module
+        // read-set, disjoint from the read-write set.
+        let group = (self.resource_group_of)(ty)?;
+
         // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
         let rws = unsafe { &mut **self.rws.get() };
         let key = InMemoryStorageKey::resource(address, ty);
-        Ok(rws.exists(self.resource_provider, &key)?)
+        Ok(rws.exists(self.resource_provider, &key, group)?)
     }
 
     fn bcs_serialize_arg(&self, i: usize, ty: InternedType) -> VMResult<Vec<u8>> {
@@ -563,13 +843,13 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn constant_serialized_size(&self, ty: InternedType) -> VMResult<Option<u64>> {
-        let size = crate::value_utils::fixed_serialized_size(self.layouts, ty)?;
+        let size = crate::value_conv::bcs::fixed_serialized_size(self.guard, ty)?;
         Ok(size.map(|n| n as u64))
     }
 
     unsafe fn compare(&self, a: *const u8, b: *const u8, ty: InternedType) -> VMResult<Ordering> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_utils::compare(self.layouts, a, b, ty) }
+        unsafe { crate::value_cmp::compare(self.guard, a, b, ty) }
     }
 
     unsafe fn new_enum<'a, V: VMValue<'a>>(
@@ -584,7 +864,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let rws = unsafe { &mut **self.rws.get() };
         let obj = alloc_or_gc(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -610,7 +890,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
-        Ok(rws.exists(self.resource_provider, &storage_key)?)
+        // Table items never belong to a resource group.
+        Ok(rws.exists(self.resource_provider, &storage_key, None)?)
     }
 
     fn table_borrow(
@@ -623,8 +904,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
+        // Table items never belong to a resource group.
         let ptr = if mutable {
-            match rws.try_borrow_global_mut(self.resource_provider, &storage_key) {
+            match rws.try_borrow_global_mut(self.resource_provider, &storage_key, None) {
                 Ok(EntryPtr::Writable(ptr)) => ptr,
                 Ok(EntryPtr::NonWritable(ptr)) => {
                     // Copy-on-write: an external or stale value must be copied
@@ -634,7 +916,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                     let copied = unsafe {
                         deep_copy_or_gc(
                             heap,
-                            self.desc_provider,
+                            self.guard,
                             rws,
                             &self.pool,
                             self.extensions,
@@ -650,7 +932,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 Err(e) => return Err(e.into()),
             }
         } else {
-            match rws.borrow_global(self.resource_provider, &storage_key) {
+            match rws.borrow_global(self.resource_provider, &storage_key, None) {
                 Ok(ptr) => ptr,
                 Err(RuntimeError::ResourceDoesNotExist { .. }) => return Ok(None),
                 Err(e) => return Err(e.into()),
@@ -686,7 +968,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // GC-safe.
         let obj = alloc_or_gc(
             heap,
-            self.desc_provider,
+            self.guard,
             rws,
             &self.pool,
             self.extensions,
@@ -717,7 +999,8 @@ impl NativeContext for ProductionNativeContext<'_> {
             .ok_or_else(|| native_invariant_violation("table_add: null boxed value".into()))?;
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
-        match rws.move_to(self.resource_provider, &storage_key, obj) {
+        // Table items never belong to a resource group.
+        match rws.move_to(self.resource_provider, &storage_key, None, obj) {
             Ok(()) => Ok(true),
             Err(RuntimeError::ResourceAlreadyExists { .. }) => Ok(false),
             Err(e) => Err(e.into()),
@@ -733,7 +1016,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         let storage_key = InMemoryStorageKey::table_item(*handle, key.into(), value_ty);
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         let rws = unsafe { &mut **self.rws.get() };
-        let ptr = match rws.try_move_from(self.resource_provider, &storage_key) {
+        // Table items never belong to a resource group.
+        let ptr = match rws.try_move_from(self.resource_provider, &storage_key, None) {
             Ok(EntryPtr::Writable(ptr)) => ptr,
             Ok(EntryPtr::NonWritable(ptr)) => {
                 // Copy-on-write: an external or older-epoch value must be copied
@@ -743,7 +1027,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 let copied = unsafe {
                     deep_copy_or_gc(
                         heap,
-                        self.desc_provider,
+                        self.guard,
                         rws,
                         &self.pool,
                         self.extensions,
@@ -777,8 +1061,118 @@ impl NativeContextFamily for ProductionContextFamily {
     type Of<'a> = ProductionNativeContext<'a>;
 }
 
-/// Shorthand for the [`NativeRegistry`] used by the production VM.
-pub type ProductionNativeRegistry = NativeRegistry<ProductionContextFamily>;
-
 /// Shorthand for the [`NativeFunction`] used by the production VM.
 pub type ProductionNativeFunction = NativeFunction<ProductionContextFamily>;
+
+/// The registry of native functions available. Stores a function table paired
+/// with a resolver that can map a native function (by its name) to its
+/// index in the table or actual implementation.
+//
+// TODO(cleanup): rename to `NativeRegistry`. There is a single registry, and
+// "production" is an overloaded, misused term.
+pub struct ProductionNativeRegistry {
+    funcs: Vec<ProductionNativeFunction>,
+    names: Vec<NativeName>,
+    by_name: UnorderedMap<NativeName, NativeIdx>,
+}
+
+impl ProductionNativeRegistry {
+    /// Builds a registry from native entries, placing each entry's function
+    /// pointer and name at the same [`NativeIdx`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if two entries are register under the same key.
+    pub fn with_natives(entries: Vec<(NativeName, ProductionNativeFunction)>) -> Self {
+        let mut funcs = Vec::with_capacity(entries.len());
+        let mut names = Vec::with_capacity(entries.len());
+        let mut by_name = UnorderedMap::with_capacity(entries.len());
+        for (position, (name, func)) in entries.into_iter().enumerate() {
+            let idx = NativeIdx(position as u32);
+            if by_name.insert(name, idx).is_some() {
+                panic!(
+                    "native `{}::{}` registered more than once",
+                    name.module, name.function
+                );
+            }
+            funcs.push(func);
+            names.push(name);
+        }
+        Self {
+            funcs,
+            names,
+            by_name,
+        }
+    }
+
+    /// A registry with no natives.
+    pub fn new() -> Self {
+        Self {
+            funcs: vec![],
+            names: vec![],
+            by_name: UnorderedMap::new(),
+        }
+    }
+
+    /// Number of registered natives.
+    pub fn len(&self) -> usize {
+        self.funcs.len()
+    }
+
+    /// Returns true if there are no registered native functions.
+    pub fn is_empty(&self) -> bool {
+        self.funcs.is_empty()
+    }
+
+    /// Returns the function pointer for a native, if one exists.
+    pub fn lookup_by_idx(&self, idx: NativeIdx) -> Option<ProductionNativeFunction> {
+        self.funcs.get(idx.0 as usize).copied()
+    }
+
+    /// Returns the name of the native registered at the specified index.
+    pub fn name_by_idx(&self, idx: NativeIdx) -> Option<&NativeName> {
+        self.names.get(idx.0 as usize)
+    }
+}
+
+impl Default for ProductionNativeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NativeResolver for ProductionNativeRegistry {
+    /// Resolves the native function's name to its registered index. If the
+    /// native is not registered, returns [`None`].
+    ///
+    /// When resolving generic natives, first checks if there is a native that
+    /// has already been instantiated (monomorphic). If such a native does not
+    /// exist, fallbacks to returning an index of the polymorphic implementation.
+    fn resolve(
+        &self,
+        module: InternedModuleId,
+        function: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<NativeIdx> {
+        let module_id = view_module_id(module);
+        let address = *module_id.address();
+        let module = view_name(module_id.name());
+        let function = view_name(function);
+
+        let query = NativeName {
+            address,
+            module,
+            function,
+            dispatch: Dispatch::Monomorphic(view_type_list(ty_args)),
+        };
+        if let Some(idx) = self.by_name.get(&query) {
+            return Some(*idx);
+        }
+        self.by_name
+            .get(&NativeName {
+                dispatch: Dispatch::Polymorphic,
+                ..query
+            })
+            .copied()
+    }
+}

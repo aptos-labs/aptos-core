@@ -10,7 +10,7 @@ use libtest_mimic::{Arguments, Trial};
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
 use move_model::metadata::LanguageVersion;
-use move_prover::{cli::Options, run_move_prover_v2};
+use move_prover::{cli::Options, leaner, run_move_prover_v2};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use once_cell::sync::OnceCell;
 use std::{
@@ -88,6 +88,19 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
             },
+            // Tests with the Lean-based Leaner verifier, whose messages differ
+            // from Boogie's. A function's verification gets a tight heartbeat
+            // budget; one needing more raises its own with `pragma heartbeats`.
+            Feature {
+                name: "lean",
+                flags: &["--lean", "--heartbeats=25"],
+                inclusion_mode: InclusionMode::Implicit,
+                enable_in_ci: false,
+                only_if_requested: true,
+                separate_baseline: true,
+                runner: |p| test_runner_for_feature(p, get_feature_by_name("lean")),
+                enabling_condition: |group, _| group == "unit",
+            },
         ]
     })
 }
@@ -129,26 +142,40 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
 
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
-    let no_tools = read_env_var("BOOGIE_EXE").is_empty()
-        || !options.backend.use_cvc5 && read_env_var("Z3_EXE").is_empty()
-        || options.backend.use_cvc5 && read_env_var("CVC5_EXE").is_empty();
-    let baseline_valid =
-        !no_tools || !extract_test_directives(path, "// no-boogie-test")?.is_empty();
-
-    if no_tools {
-        options.prover.generate_only = true;
-        if NOT_CONFIGURED_WARNED
-            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-            .is_ok()
-        {
-            warn!(
-                "Prover tools are not configured, verification tests will be skipped. \
-        See https://github.com/move-language/move/tree/main/language/move-prover/doc/user/install.md \
-        for instructions."
-            );
+    let baseline_valid = if options.lean {
+        if !leaner::verifier_available() {
+            if NOT_CONFIGURED_WARNED
+                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                warn!(
+                    "The Leaner Move verifier is not built, its tests will be skipped. Build it \
+            with `cd third_party/move/lean/leaner-move && lake build leaner-move`."
+                );
+            }
+            return Ok(());
         }
-    }
-    options.backend.check_tool_versions()?;
+        true
+    } else {
+        let no_tools = read_env_var("BOOGIE_EXE").is_empty()
+            || !options.backend.use_cvc5 && read_env_var("Z3_EXE").is_empty()
+            || options.backend.use_cvc5 && read_env_var("CVC5_EXE").is_empty();
+        if no_tools {
+            options.prover.generate_only = true;
+            if NOT_CONFIGURED_WARNED
+                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                warn!(
+                    "Prover tools are not configured, verification tests will be skipped. \
+            See https://github.com/move-language/move/tree/main/language/move-prover/doc/user/install.md \
+            for instructions."
+                );
+            }
+        }
+        options.backend.check_tool_versions()?;
+        !no_tools || !extract_test_directives(path, "// no-boogie-test")?.is_empty()
+    };
     options.prover.stable_test_output = true;
     options.backend.stable_test_output = true;
 
@@ -183,13 +210,19 @@ fn get_flags_and_baseline(
     // Determine the way how to configure tests based on directory of the path.
     let path_str = path.to_string_lossy();
 
-    let dep_flags = vec![
+    let use_aptos_stdlib = !extract_test_directives(path, "// use-aptos-stdlib")?.is_empty();
+    let mut dep_flags = if !use_aptos_stdlib {
         // stdlib is commonly required
-        "--dependency=../move-stdlib/sources",
-        "--dependency=../move-stdlib/nursery/sources",
-        // table extension is required
-        "--dependency=../extensions/move-table-extension/sources",
-    ];
+        vec![
+            "--dependency=../move-stdlib/sources",
+            "--dependency=../move-stdlib/nursery/sources",
+        ]
+    } else {
+        vec!["--dependency=../../../aptos-move/framework/move-stdlib/sources"]
+    };
+    if !use_aptos_stdlib {
+        dep_flags.push("--dependency=../extensions/move-table-extension/sources");
+    }
 
     let (base_flags, baseline_path) =
         if path_str.contains("diem-framework/") || path_str.contains("move-stdlib/") {
@@ -292,6 +325,10 @@ fn collect_enabled_tests(tests: &mut Vec<Trial>, group: &str, feature: &Feature,
 
 // Test entry point based on lbtest-mimic.
 fn main() {
+    // A panic in the Leaner verifier reaches its messages with Lean's
+    // backtrace, whose addresses differ between runs.
+    // SAFETY: no other thread exists yet.
+    unsafe { std::env::set_var("LEAN_BACKTRACE", "0") };
     let mut tests = vec![];
     for feature in get_features() {
         // Evaluate whether the user narrowed which feature to test.
