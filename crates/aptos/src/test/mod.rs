@@ -57,7 +57,7 @@ use aptos_move_cli::{
     EntryFunctionArguments, FrameworkPackageArgs, IncludedArtifacts, IncludedArtifactsArgs,
     InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions,
     OverrideSizeCheckOption, PublishPackage, RunFunction, RunScript, ScriptFunctionArguments,
-    TestPackage, TypeArgVec,
+    TestPackage, TypeArgVec, DEFAULT_CHUNK_PARALLELISM,
 };
 use aptos_rest_client::{
     aptos_api_types::{MoveStructTag, MoveType},
@@ -894,6 +894,7 @@ impl CliTestFramework {
                     large_packages_module_address: None,
                 },
                 chunk_size: CHUNK_SIZE_IN_BYTES,
+                chunk_parallelism: DEFAULT_CHUNK_PARALLELISM,
             },
             env: self.move_env(),
         }

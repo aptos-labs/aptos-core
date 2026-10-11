@@ -54,6 +54,7 @@ use move_core_types::{diag_writer::DiagWriter, vm_status::VMStatus};
 pub use move_types::{
     ArgWithTypeVec, ChunkedPublishOption, EntryFunctionArguments, LargePackagesModuleOption,
     MovePackageOptions, OverrideSizeCheckOption, ScriptFunctionArguments, TypeArgVec,
+    DEFAULT_CHUNK_PARALLELISM,
 };
 pub use package_hooks::register_package_hooks;
 pub use resource_account::{ResourceAccountSeed, SeedEncoding};
@@ -82,6 +83,22 @@ pub trait AptosContext: Send + Sync + 'static {
         options: &TransactionOptions,
         payload: TransactionPayload,
     ) -> CliTypedResult<TransactionSummary>;
+
+    /// Submit transactions that don't depend on each other, all from the sender of `options`, and
+    /// wait for them to be committed. Returns the outcome of every transaction that was submitted,
+    /// in order.
+    ///
+    /// The default implementation submits them one at a time, and stops at the first one that fails.
+    /// An implementation can send them without waiting for one to be committed before sending the
+    /// next, which is faster: the transactions of a sender are executed in the order of their
+    /// sequence numbers either way. Then the ones after a failed transaction may be submitted too.
+    async fn submit_transactions(
+        &self,
+        options: &TransactionOptions,
+        payloads: Vec<TransactionPayload>,
+    ) -> Vec<CliTypedResult<TransactionSummary>> {
+        submit_transactions_in_order(self, options, payloads).await
+    }
 
     /// Execute a view function.
     async fn view(
@@ -279,6 +296,41 @@ pub trait MoveDebugger: Send + Sync + 'static {
 
 type MoveDebuggerFactory =
     Box<dyn Fn(Client) -> anyhow::Result<Box<dyn MoveDebugger>> + Send + Sync>;
+
+/// Submits the transactions one at a time, and stops at the first one that fails: that is, whose
+/// submission returns an error, or whose summary says that it was not successful. This is what
+/// [`AptosContext::submit_transactions`] does by default.
+pub async fn submit_transactions_in_order<C: AptosContext + ?Sized>(
+    context: &C,
+    options: &TransactionOptions,
+    payloads: Vec<TransactionPayload>,
+) -> Vec<CliTypedResult<TransactionSummary>> {
+    let mut outcomes = Vec::with_capacity(payloads.len());
+    for payload in payloads {
+        let outcome = context.submit_transaction(options, payload).await;
+        let failed = outcome
+            .as_ref()
+            .map_or(true, |summary| summary.success == Some(false));
+        outcomes.push(outcome);
+        if failed {
+            break;
+        }
+    }
+    outcomes
+}
+
+/// Submit transactions that don't depend on each other via the registered [`AptosContext`], see
+/// [`AptosContext::submit_transactions`].
+///
+/// Returns an error if no `AptosContext` is registered (standalone mode).
+pub async fn dispatch_transactions(
+    payloads: Vec<TransactionPayload>,
+    txn_options_ref: &TransactionOptions,
+    env: &MoveEnv,
+) -> CliTypedResult<Vec<CliTypedResult<TransactionSummary>>> {
+    let ctx = env.aptos_context()?;
+    Ok(ctx.submit_transactions(txn_options_ref, payloads).await)
+}
 
 /// Submit a transaction via the registered [`AptosContext`].
 ///

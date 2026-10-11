@@ -967,4 +967,25 @@ pub struct ChunkedPublishOption {
     /// transaction to fail due to exceeding the execution gas limit.
     #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
     pub chunk_size: usize,
+
+    /// How many of the transactions that stage chunks are sent at the same time.
+    ///
+    /// The `large_packages` module has to stage chunks by position (it has `stage_chunks`). Then the
+    /// transactions don't depend on each other, so they are sent without waiting for the previous
+    /// ones to be committed, which is much faster than one at a time. The transaction that publishes
+    /// is sent when all the others are committed. Use 1 to send one transaction at a time, which is
+    /// always how the chunks are sent to earlier versions of the module, because they need the
+    /// chunks in order.
+    ///
+    /// If a transaction fails, the ones that were sent with it may still be committed. Running the
+    /// command again resumes the publish.
+    #[clap(long, default_value_t = DEFAULT_CHUNK_PARALLELISM, value_parser = clap::value_parser!(u16).range(1..=MAX_CHUNK_PARALLELISM as i64))]
+    pub chunk_parallelism: u16,
 }
+
+/// How many transactions that stage chunks are sent at the same time by default.
+pub const DEFAULT_CHUNK_PARALLELISM: u16 = 10;
+
+/// The most transactions that can be sent at the same time. A node keeps at most 100 transactions
+/// of an account that are waiting to be committed, by default.
+pub const MAX_CHUNK_PARALLELISM: u16 = 100;

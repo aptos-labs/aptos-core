@@ -4,7 +4,7 @@
 use crate::{
     bytecode::{Decompile, Disassemble},
     coverage::{CoverageCommon, SummaryCoverage},
-    dispatch_transaction, exchange,
+    dispatch_transaction, dispatch_transactions, exchange,
     fmt::Fmt,
     lint::LintPackage,
     local_simulation,
@@ -1130,6 +1130,9 @@ pub(crate) struct PackagePublicationData {
 /// The transactions of a chunked publish.
 pub(crate) struct ChunkedPublishPayloads {
     payloads: Vec<TransactionPayload>,
+    /// How many of the transactions that stage chunks are sent at the same time: more than one only
+    /// if the module stages chunks by position, because then they don't depend on each other.
+    parallelism: usize,
     large_packages_module: LargePackagesModule,
     /// Set if the module stages chunks by position, which is what makes it possible to resume a
     /// chunked publish that did not complete.
@@ -1203,7 +1206,7 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
                 .large_packages_module
                 .resolve(&self.txn_options)
                 .await?,
-            self.chunked_publish_option.chunk_size,
+            &self.chunked_publish_option,
         )?;
 
         let size = &chunked_publish_payloads
@@ -1364,8 +1367,9 @@ fn create_chunked_publish_payloads(
     publish_type: PublishType,
     object_address: Option<AccountAddress>,
     large_packages_module: LargePackagesModule,
-    chunk_size: usize,
+    chunked_publish_option: &ChunkedPublishOption,
 ) -> CliTypedResult<ChunkedPublishPayloads> {
+    let chunk_size = chunked_publish_option.chunk_size;
     let compiled_units = package.extract_code();
     let metadata = package.extract_metadata()?;
     let metadata_serialized = bcs::to_bytes(&metadata).expect("PackageMetadata has BCS");
@@ -1387,6 +1391,8 @@ fn create_chunked_publish_payloads(
                 chunk_size,
                 LargePackagesAbi::Append,
             ),
+            // These chunks have to be staged in order.
+            parallelism: 1,
             large_packages_module,
             resume: None,
         }),
@@ -1402,6 +1408,7 @@ fn create_chunked_publish_payloads(
             );
             Ok(ChunkedPublishPayloads {
                 payloads,
+                parallelism: usize::from(chunked_publish_option.chunk_parallelism),
                 large_packages_module,
                 resume: Some(ChunkedPublishResume {
                     chunks,
@@ -1560,7 +1567,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 PublishType::AccountDeploy,
                 None,
                 chunked_publish_large_packages_module.unwrap(),
-                self.chunked_publish_option.chunk_size,
+                &self.chunked_publish_option,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1591,14 +1598,15 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let result = if self.chunked_publish_option.chunked_publish {
-            let payloads = create_chunked_publish_payloads(
+            let chunked_payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectDeploy,
                 None,
                 chunked_publish_large_packages_module.unwrap(),
-                self.chunked_publish_option.chunk_size,
-            )?
-            .payloads;
+                &self.chunked_publish_option,
+            )?;
+            let parallelism = chunked_payloads.parallelism;
+            let payloads = chunked_payloads.payloads;
 
             let size = &payloads
                 .iter()
@@ -1609,7 +1617,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             println!("{}", message.bold());
 
             // The StagingArea was already cleared, before the object address was derived.
-            submit_chunk_transactions(payloads, &self.txn_options, &self.env).await
+            submit_chunk_transactions(payloads, parallelism, false, &self.txn_options, &self.env)
+                .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1707,7 +1716,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 large_packages_module,
-                self.chunked_publish_option.chunk_size,
+                &self.chunked_publish_option,
             )?;
 
             let size = &chunked_payloads
@@ -1811,7 +1820,7 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
                 PublishType::AccountDeploy,
                 None,
                 chunked_publish_large_packages_module.unwrap(),
-                self.chunked_publish_option.chunk_size,
+                &self.chunked_publish_option,
             )?
             .payloads;
             let staging_tx_count = (mock_payloads.len() - 1) as u64;
@@ -1842,14 +1851,15 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let mut result = if self.chunked_publish_option.chunked_publish {
-            let payloads = create_chunked_publish_payloads(
+            let chunked_payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::ObjectDeploy,
                 None,
                 chunked_publish_large_packages_module.unwrap(),
-                self.chunked_publish_option.chunk_size,
-            )?
-            .payloads;
+                &self.chunked_publish_option,
+            )?;
+            let parallelism = chunked_payloads.parallelism;
+            let payloads = chunked_payloads.payloads;
 
             let size = &payloads
                 .iter()
@@ -1860,7 +1870,8 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             println!("{}", message.bold());
 
             // The StagingArea was already cleared, before the object address was derived.
-            submit_chunk_transactions(payloads, &self.txn_options, &self.env).await
+            submit_chunk_transactions(payloads, parallelism, false, &self.txn_options, &self.env)
+                .await
         } else {
             let payload = create_package_publication_data(
                 package,
@@ -1966,7 +1977,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
                 PublishType::ObjectUpgrade,
                 Some(self.object_address),
                 large_packages_module,
-                self.chunked_publish_option.chunk_size,
+                &self.chunked_publish_option,
             )?;
 
             let size = &chunked_payloads
@@ -2033,9 +2044,12 @@ async fn submit_chunked_publish_transactions(
 ) -> CliTypedResult<TransactionSummary> {
     let ChunkedPublishPayloads {
         payloads,
+        parallelism,
         large_packages_module,
         resume,
     } = chunked_payloads;
+    // A chunked publish that stages chunks by position continues with the chunks that are staged.
+    let resumable = resume.is_some();
     let payloads = match resume {
         Some(resume) => {
             resume_or_clear_staging_area(
@@ -2052,7 +2066,7 @@ async fn submit_chunked_publish_transactions(
             payloads
         },
     };
-    submit_chunk_transactions(payloads, txn_options, env).await
+    submit_chunk_transactions(payloads, parallelism, resumable, txn_options, env).await
 }
 
 /// Picks the transactions of a chunked publish that stages chunks by position, given what the
@@ -2137,53 +2151,156 @@ async fn clear_stale_staging_area(
     Ok(())
 }
 
+/// Splits the transactions of a chunked publish into the ones that are sent at the same time.
+///
+/// With a `parallelism` above 1, the transactions that stage chunks are sent that many at a time,
+/// and the last transaction, which publishes the package, is on its own, because it has to be sent
+/// when the others are committed. Otherwise every transaction is on its own.
+pub(crate) fn chunk_windows(
+    mut payloads: Vec<TransactionPayload>,
+    parallelism: usize,
+) -> Vec<Vec<TransactionPayload>> {
+    if parallelism <= 1 {
+        return payloads.into_iter().map(|payload| vec![payload]).collect();
+    }
+
+    let publishing = payloads.pop();
+    let mut windows = vec![];
+    let mut staging = payloads.into_iter();
+    loop {
+        let window: Vec<TransactionPayload> = staging.by_ref().take(parallelism).collect();
+        if window.is_empty() {
+            break;
+        }
+        windows.push(window);
+    }
+    windows.extend(publishing.map(|payload| vec![payload]));
+    windows
+}
+
+/// Checks the outcome of transaction `number` of `total` of a chunked publish, and prints how it
+/// went. `numbered` is set when transactions are sent together, so that they are told apart.
+fn report_chunk_transaction(
+    outcome: CliTypedResult<TransactionSummary>,
+    number: usize,
+    total: usize,
+    numbered: bool,
+) -> CliTypedResult<TransactionSummary> {
+    let tx_summary = match outcome {
+        Ok(tx_summary) => tx_summary,
+        Err(error) => {
+            if numbered {
+                println!("Transaction {} of {} failed: {}\n", number, total, error);
+            }
+            return Err(error);
+        },
+    };
+
+    let tx_hash = tx_summary.transaction_hash.to_string();
+    let status = tx_summary.success.map_or_else(String::new, |success| {
+        if success {
+            "Success".to_string()
+        } else {
+            "Failed".to_string()
+        }
+    });
+    if numbered {
+        println!(
+            "Transaction {} executed: {} ({})\n",
+            number, status, tx_hash
+        );
+    } else {
+        println!("Transaction executed: {} ({})\n", status, tx_hash);
+    }
+
+    // Chain submission reports a failed transaction as an error, but simulation backends
+    // (e.g. `--session`) return it as a summary. Either way the remaining chunks can't succeed.
+    if tx_summary.success == Some(false) {
+        return Err(CliError::SimulationError(format!(
+            "{} (transaction {} of {}, {})",
+            tx_summary.vm_status.unwrap_or_default(),
+            number,
+            total,
+            tx_hash,
+        )));
+    }
+    Ok(tx_summary)
+}
+
 /// Submits the chunked publish transactions in order, stopping at the first one that fails.
+///
+/// With a `parallelism` above 1, the transactions that stage chunks are sent that many at a time,
+/// without waiting for each of them to be committed, which is possible because the chunks don't
+/// depend on each other. The transaction that publishes the package is sent when all of those are
+/// committed. If one of the transactions that are sent together fails, the others may still be
+/// committed. `resumable` is whether running the command again continues with the chunks that are
+/// staged, which is for what the caution says.
 async fn submit_chunk_transactions(
     payloads: Vec<TransactionPayload>,
+    parallelism: usize,
+    resumable: bool,
     txn_options: &TransactionOptions,
     env: &MoveEnv,
 ) -> CliTypedResult<TransactionSummary> {
     let mut publishing_result = Err(CliError::UnexpectedError(
         "No payload provided for batch transaction run".to_string(),
     ));
-    let payloads_length = payloads.len() as u64;
+    let payloads_length = payloads.len();
     let mut tx_hashes = vec![];
+    // The number of transactions that were submitted
+    let mut submitted = 0;
 
-    for (idx, payload) in payloads.into_iter().enumerate() {
-        println!("Transaction {} of {}", idx + 1, payloads_length);
-        let tx_summary = match dispatch_transaction(payload, txn_options, env).await {
-            Ok(tx_summary) => tx_summary,
-            Err(e) => {
-                print_incomplete_chunked_publish_caution();
-                return Err(e);
-            },
+    for window in chunk_windows(payloads, parallelism) {
+        let window_length = window.len();
+        let together = window_length > 1;
+        let mut outcomes = if together {
+            println!(
+                "Transactions {} to {} of {}",
+                submitted + 1,
+                submitted + window_length,
+                payloads_length
+            );
+            dispatch_transactions(window, txn_options, env).await?
+        } else {
+            println!("Transaction {} of {}", submitted + 1, payloads_length);
+            let payload = window
+                .into_iter()
+                .next()
+                .expect("a window has a transaction");
+            vec![dispatch_transaction(payload, txn_options, env).await]
         };
-
-        let tx_hash = tx_summary.transaction_hash.to_string();
-        let status = tx_summary.success.map_or_else(String::new, |success| {
-            if success {
-                "Success".to_string()
-            } else {
-                "Failed".to_string()
-            }
-        });
-        println!("Transaction executed: {} ({})\n", status, tx_hash);
-
-        // Chain submission reports a failed transaction as an error, but simulation backends
-        // (e.g. `--session`) return it as a summary. Either way the remaining chunks can't succeed.
-        if tx_summary.success == Some(false) {
-            print_incomplete_chunked_publish_caution();
-            return Err(CliError::SimulationError(format!(
-                "{} (transaction {} of {}, {})",
-                tx_summary.vm_status.unwrap_or_default(),
-                idx + 1,
-                payloads_length,
-                tx_hash,
+        if outcomes.len() < window_length && outcomes.iter().all(|outcome| outcome.is_ok()) {
+            outcomes.push(Err(CliError::UnexpectedError(
+                "Some of the transactions were not submitted".to_string(),
             )));
         }
 
-        tx_hashes.push(tx_hash);
-        publishing_result = Ok(tx_summary);
+        // Report all of them, to see which ones failed, but stop with the first failure.
+        let mut first_failure = None;
+        for (offset, outcome) in outcomes.into_iter().enumerate() {
+            let number = submitted + offset + 1;
+            match report_chunk_transaction(outcome, number, payloads_length, together) {
+                Ok(tx_summary) => {
+                    tx_hashes.push(tx_summary.transaction_hash.to_string());
+                    publishing_result = Ok(tx_summary);
+                },
+                Err(error) => {
+                    first_failure.get_or_insert(error);
+                },
+            }
+        }
+        if let Some(error) = first_failure {
+            if together {
+                println!(
+                    "{}",
+                    "Transactions that are sent together can be dropped without being executed, e.g. when the account can't pay for them after the transactions before them, or when the node is busy. The ones that were committed stay committed."
+                        .bold()
+                );
+            }
+            print_incomplete_chunked_publish_caution(resumable);
+            return Err(error);
+        }
+        submitted += window_length;
     }
 
     println!(
@@ -2202,12 +2319,21 @@ async fn submit_chunk_transactions(
     publishing_result
 }
 
-fn print_incomplete_chunked_publish_caution() {
+/// Tells what an incomplete chunked publish leaves behind, and what to do about it. `resumable` is
+/// whether running the command again continues with the chunks that are staged.
+fn print_incomplete_chunked_publish_caution(resumable: bool) {
+    let advice = if resumable {
+        "Run the command again to continue with the chunks that are staged, or clear them with `aptos move clear-staging-area`."
+    } else {
+        "The next chunked publish will offer to clear it first, or you can clear it now with `aptos move clear-staging-area`."
+    };
     println!(
         "{}",
-        "Caution: The chunked publish did not complete, so incomplete data may be left in the `StagingArea` resource under your account. \
-        \nThe next chunked publish will offer to clear it first, or you can clear it now with `aptos move clear-staging-area`."
-            .bold()
+        format!(
+            "Caution: The chunked publish did not complete, so incomplete data may be left in the `StagingArea` resource under your account. \n{}",
+            advice
+        )
+        .bold()
     );
 }
 
