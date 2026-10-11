@@ -4,8 +4,12 @@
 //! Chunked publish against a mocked chain. A local session holds the state that the CLI reads, such
 //! as a `StagingArea` left by an earlier chunked publish; transaction submission goes to the mock.
 
-use crate::{commands::chunk_windows, tests::common, AptosContext};
-use aptos_cli_common::{CliTypedResult, TransactionOptions, TransactionSummary};
+use crate::{
+    commands::{chunk_windows, mempool_conflict_hint},
+    tests::common,
+    AptosContext,
+};
+use aptos_cli_common::{CliError, CliTypedResult, TransactionOptions, TransactionSummary};
 use aptos_framework::{
     chunked_publish::chunk_key,
     natives::code::{PackageMetadata, PackageRegistry, UpgradePolicy},
@@ -782,4 +786,19 @@ fn chunk_windows_of_few_transactions() {
             .collect::<Vec<_>>(),
         vec![1, 1]
     );
+}
+
+#[test]
+fn mempool_conflicts_get_a_hint() {
+    let conflict = CliError::ApiError(
+        "API error: API error Error(InvalidTransactionUpdate): Transaction already in mempool with a different payload"
+            .to_string(),
+    );
+    assert!(mempool_conflict_hint(&conflict).is_some());
+
+    // Other failures don't.
+    assert!(
+        mempool_conflict_hint(&CliError::ApiError("Transaction expired".to_string())).is_none()
+    );
+    assert!(mempool_conflict_hint(&CliError::SimulationError("Out of gas".to_string())).is_none());
 }

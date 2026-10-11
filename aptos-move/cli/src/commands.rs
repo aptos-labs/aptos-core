@@ -2178,6 +2178,14 @@ pub(crate) fn chunk_windows(
     windows
 }
 
+/// Advice for a failed transaction that has the sequence number of one that is waiting in the
+/// mempool of the node, e.g. one that an earlier chunked publish sent before it was interrupted.
+pub(crate) fn mempool_conflict_hint(error: &CliError) -> Option<&'static str> {
+    error.to_string().contains("InvalidTransactionUpdate").then_some(
+        "A transaction with the same sequence number is waiting in the mempool of the node, for example from a chunked publish that was interrupted. It is committed or dropped within the expiration time of transactions (30 seconds by default). Then run the command again to resume.",
+    )
+}
+
 /// Checks the outcome of transaction `number` of `total` of a chunked publish, and prints how it
 /// went. `numbered` is set when transactions are sent together, so that they are told apart.
 fn report_chunk_transaction(
@@ -2277,6 +2285,7 @@ async fn submit_chunk_transactions(
 
         // Report all of them, to see which ones failed, but stop with the first failure.
         let mut first_failure = None;
+        let mut hint = None;
         for (offset, outcome) in outcomes.into_iter().enumerate() {
             let number = submitted + offset + 1;
             match report_chunk_transaction(outcome, number, payloads_length, together) {
@@ -2285,11 +2294,15 @@ async fn submit_chunk_transactions(
                     publishing_result = Ok(tx_summary);
                 },
                 Err(error) => {
+                    hint = hint.or_else(|| mempool_conflict_hint(&error));
                     first_failure.get_or_insert(error);
                 },
             }
         }
         if let Some(error) = first_failure {
+            if let Some(hint) = hint {
+                println!("{}", hint.bold());
+            }
             if together {
                 println!(
                     "{}",

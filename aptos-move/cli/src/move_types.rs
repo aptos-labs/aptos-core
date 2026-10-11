@@ -977,6 +977,10 @@ pub struct ChunkedPublishOption {
     /// always how the chunks are sent to earlier versions of the module, because they need the
     /// chunks in order.
     ///
+    /// A package with more of these transactions than this is sent in several groups, and each group
+    /// waits for the previous one to be committed, so a larger value can be faster for a big package:
+    /// all the transactions of a group are committed in the same block or the next ones.
+    ///
     /// If a transaction fails, the ones that were sent with it may still be committed. Running the
     /// command again resumes the publish.
     #[clap(long, default_value_t = DEFAULT_CHUNK_PARALLELISM, value_parser = clap::value_parser!(u16).range(1..=MAX_CHUNK_PARALLELISM as i64))]

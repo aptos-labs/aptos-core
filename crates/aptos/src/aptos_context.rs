@@ -9,8 +9,8 @@
 
 use aptos_cli_common::{
     explorer_transaction_link, format_txn_status, get_account_with_state, prompt_yes_with_override,
-    AccountType, CliError, CliTypedResult, Network, ReplayProtectionType, TransactionOptions,
-    TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
+    AccountType, CliError, CliTypedResult, Network, PromptOptions, ReplayProtectionType,
+    TransactionOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
 use aptos_global_constants::adjust_gas_headroom;
@@ -338,6 +338,8 @@ struct ChainSender<'a> {
     address: AccountAddress,
     chain_id: ChainId,
     gas_unit_price: u64,
+    /// When the transactions that are built now expire.
+    expiration_time_secs: u64,
 }
 
 /// The gas that a transaction is estimated to need.
@@ -346,14 +348,40 @@ struct GasEstimate {
     max_gas: u64,
 }
 
-impl ChainSender<'_> {
+/// The calls to a chain that submitting a group of transactions makes, and the signing. The group
+/// logic only knows this, which is what lets the order and the concurrency of the calls be tested
+/// without a node.
+#[async_trait]
+trait GroupChain {
     /// Simulates `payload` as the transaction of the sender with this sequence number, to estimate
     /// the gas that it needs. Fails if the simulation fails.
     async fn estimate_gas(
         &self,
         payload: TransactionPayload,
         sequence_number: u64,
-        expiration_time_secs: u64,
+    ) -> CliTypedResult<GasEstimate>;
+
+    /// Signs `payload` as the transaction of the sender with this sequence number.
+    fn sign(
+        &self,
+        payload: TransactionPayload,
+        sequence_number: u64,
+        max_gas: u64,
+    ) -> CliTypedResult<SignedTransaction>;
+
+    /// Submits a signed transaction, without waiting for it to be committed.
+    async fn submit(&self, transaction: &SignedTransaction) -> CliTypedResult<()>;
+
+    /// Waits for a transaction that was submitted to be committed.
+    async fn wait(&self, transaction: &SignedTransaction) -> CliTypedResult<TransactionSummary>;
+}
+
+#[async_trait]
+impl GroupChain for ChainSender<'_> {
+    async fn estimate_gas(
+        &self,
+        payload: TransactionPayload,
+        sequence_number: u64,
     ) -> CliTypedResult<GasEstimate> {
         let transaction_factory =
             TransactionFactory::new(self.chain_id).with_gas_unit_price(self.gas_unit_price);
@@ -361,7 +389,7 @@ impl ChainSender<'_> {
             .payload(payload)
             .sender(self.address)
             .sequence_number(sequence_number)
-            .expiration_timestamp_secs(expiration_time_secs);
+            .expiration_timestamp_secs(self.expiration_time_secs);
 
         let unsigned_transaction =
             if self.options.replay_protection_type == ReplayProtectionType::Nonce {
@@ -399,7 +427,6 @@ impl ChainSender<'_> {
         Ok(GasEstimate { gas_used, max_gas })
     }
 
-    /// Signs `payload` as the transaction of the sender with this sequence number.
     fn sign(
         &self,
         payload: TransactionPayload,
@@ -445,6 +472,23 @@ impl ChainSender<'_> {
             },
             Err(err) => Err(err),
         }
+    }
+
+    async fn submit(&self, transaction: &SignedTransaction) -> CliTypedResult<()> {
+        self.client
+            .submit_bcs(transaction)
+            .await
+            .map(|_| ())
+            .map_err(|err| CliError::ApiError(err.to_string()))
+    }
+
+    async fn wait(&self, transaction: &SignedTransaction) -> CliTypedResult<TransactionSummary> {
+        let response = self
+            .client
+            .wait_for_signed_transaction(transaction)
+            .await
+            .map_err(|err| CliError::ApiError(err.to_string()))?;
+        Ok(TransactionSummary::from(response.into_inner()))
     }
 }
 
@@ -526,6 +570,7 @@ async fn submit_to_chain(
         address: sender_address,
         chain_id: ChainId::new(state.chain_id),
         gas_unit_price,
+        expiration_time_secs,
     };
 
     // Determine max gas
@@ -541,7 +586,7 @@ async fn submit_to_chain(
         max_gas
     } else {
         let estimate = sender
-            .estimate_gas(payload.clone(), sequence_number, expiration_time_secs)
+            .estimate_gas(payload.clone(), sequence_number)
             .await?;
 
         let upper_cost_bound = estimate.max_gas * gas_unit_price;
@@ -606,29 +651,64 @@ async fn submit_many_to_chain(
         address: sender_address,
         chain_id: ChainId::new(state.chain_id),
         gas_unit_price,
+        expiration_time_secs,
     };
+    let settings = GroupSettings {
+        gas_unit_price,
+        ask_to_confirm_price,
+        max_gas: options.gas_options.max_gas,
+        prompt_options: options.prompt_options,
+        explorer_network: explorer_network(options),
+    };
+    submit_group(&sender, &settings, sequence_number, payloads).await
+}
+
+/// What `submit_group` needs to know from the command line.
+struct GroupSettings {
+    gas_unit_price: u64,
+    /// Whether the gas unit price was estimated, so that the user has to confirm it.
+    ask_to_confirm_price: bool,
+    /// The max gas of every transaction, if it was given. Otherwise it is estimated for each.
+    max_gas: Option<u64>,
+    prompt_options: PromptOptions,
+    /// The network that links to an explorer point to, if it is known.
+    explorer_network: Option<Network>,
+}
+
+/// The logic of `submit_many_to_chain`, apart from the calls to the chain: `payloads` are signed as
+/// the transactions with the sequence numbers from `sequence_number` on, all submitted at once, and
+/// waited for at once.
+async fn submit_group<C: GroupChain + Sync>(
+    chain: &C,
+    settings: &GroupSettings,
+    sequence_number: u64,
+    payloads: Vec<TransactionPayload>,
+) -> CliTypedResult<Vec<CliTypedResult<TransactionSummary>>> {
+    let gas_unit_price = settings.gas_unit_price;
 
     // The error that ends the list, because the transactions from there on can't be submitted
     let mut preparation_error = None;
     let mut payloads = payloads;
 
     // Determine max gas
-    let max_gas_amounts: Vec<u64> = if let Some(max_gas) = options.gas_options.max_gas {
-        if ask_to_confirm_price {
+    let max_gas_amounts: Vec<u64> = if let Some(max_gas) = settings.max_gas {
+        if settings.ask_to_confirm_price {
             let message = format!(
                 "Do you want to submit {} transactions for a maximum of {} Octas each at a gas unit price of {} Octas?",
                 payloads.len(),
                 max_gas * gas_unit_price,
                 gas_unit_price
             );
-            prompt_yes_with_override(&message, options.prompt_options)?;
+            prompt_yes_with_override(&message, settings.prompt_options)?;
         }
         vec![max_gas; payloads.len()]
     } else {
         // Simulate each as the next transaction of the account, against the state of the chain now
-        let estimates = join_all(payloads.iter().map(|payload| {
-            sender.estimate_gas(payload.clone(), sequence_number, expiration_time_secs)
-        }))
+        let estimates = join_all(
+            payloads
+                .iter()
+                .map(|payload| chain.estimate_gas(payload.clone(), sequence_number)),
+        )
         .await;
         let mut estimated = vec![];
         for estimate in estimates {
@@ -654,7 +734,7 @@ async fn submit_many_to_chain(
                 upper_cost_bound,
                 gas_unit_price
             );
-            prompt_yes_with_override(&message, options.prompt_options)?;
+            prompt_yes_with_override(&message, settings.prompt_options)?;
         }
         estimated.iter().map(|estimate| estimate.max_gas).collect()
     };
@@ -662,7 +742,7 @@ async fn submit_many_to_chain(
     // Sign them with consecutive sequence numbers
     let mut transactions = Vec::with_capacity(payloads.len());
     for (offset, (payload, max_gas)) in payloads.into_iter().zip(max_gas_amounts).enumerate() {
-        match sender.sign(payload, sequence_number + offset as u64, max_gas) {
+        match chain.sign(payload, sequence_number + offset as u64, max_gas) {
             Ok(transaction) => transactions.push(transaction),
             Err(error) => {
                 preparation_error = Some(error);
@@ -675,33 +755,428 @@ async fn submit_many_to_chain(
     let submissions = join_all(
         transactions
             .iter()
-            .map(|transaction| sender.client.submit_bcs(transaction)),
+            .map(|transaction| chain.submit(transaction)),
     )
     .await;
-    let network = explorer_network(options);
     for (transaction, submission) in transactions.iter().zip(&submissions) {
         if submission.is_ok() {
             eprintln!(
                 "Transaction submitted: {}",
-                explorer_transaction_link(transaction.clone().committed_hash(), network)
+                explorer_transaction_link(
+                    transaction.clone().committed_hash(),
+                    settings.explorer_network
+                )
             );
         }
     }
 
     // And wait for all of them
-    let client = &sender.client;
     let mut outcomes: Vec<CliTypedResult<TransactionSummary>> =
         join_all(transactions.iter().zip(submissions).map(
             |(transaction, submission)| async move {
-                submission.map_err(|err| CliError::ApiError(err.to_string()))?;
-                let response = client
-                    .wait_for_signed_transaction(transaction)
-                    .await
-                    .map_err(|err| CliError::ApiError(err.to_string()))?;
-                Ok(TransactionSummary::from(response.into_inner()))
+                submission?;
+                chain.wait(transaction).await
             },
         ))
         .await;
     outcomes.extend(preparation_error.map(Err));
     Ok(outcomes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
+    use aptos_keygen::KeyGen;
+    use aptos_types::transaction::{EntryFunction, RawTransaction};
+    use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+    use std::{sync::Mutex, time::Duration};
+    use tokio::{
+        sync::Barrier,
+        time::{sleep, timeout},
+    };
+
+    /// The sequence number of the first transaction of a group.
+    const FIRST: u64 = 7;
+
+    /// What goes wrong, if anything: estimating the gas fails for the payload with the index, and
+    /// the other steps fail for the transaction with the sequence number.
+    #[derive(Default)]
+    struct Failures {
+        estimate: Option<usize>,
+        sign: Option<u64>,
+        submit: Option<u64>,
+        wait: Option<u64>,
+    }
+
+    /// What a [`FakeChain`] was asked to do, in order.
+    #[derive(Default)]
+    struct Calls {
+        /// The index of the payloads that the gas was estimated for.
+        estimated: Vec<usize>,
+        /// The sequence number and the max gas of the transactions that were signed.
+        signed: Vec<(u64, u64)>,
+        /// The sequence numbers of the transactions that were submitted.
+        submitted: Vec<u64>,
+        /// The sequence numbers of the transactions that were committed, as they were.
+        committed: Vec<u64>,
+    }
+
+    struct FakeChain {
+        private_key: Ed25519PrivateKey,
+        failures: Failures,
+        calls: Mutex<Calls>,
+        /// A submission only completes when this many of them are in progress at the same time.
+        submit_barrier: Option<Barrier>,
+        /// The transactions with a lower sequence number take longer to be committed, so that they
+        /// are committed in the opposite order.
+        commit_in_reverse: bool,
+    }
+
+    impl FakeChain {
+        fn new() -> Self {
+            Self {
+                private_key: KeyGen::from_seed([0; 32]).generate_ed25519_private_key(),
+                failures: Failures::default(),
+                calls: Mutex::new(Calls::default()),
+                submit_barrier: None,
+                commit_in_reverse: false,
+            }
+        }
+
+        fn failing(failures: Failures) -> Self {
+            Self {
+                failures,
+                ..Self::new()
+            }
+        }
+
+        fn calls(&self) -> std::sync::MutexGuard<'_, Calls> {
+            self.calls.lock().unwrap()
+        }
+    }
+
+    #[async_trait]
+    impl GroupChain for FakeChain {
+        async fn estimate_gas(
+            &self,
+            payload: TransactionPayload,
+            _sequence_number: u64,
+        ) -> CliTypedResult<GasEstimate> {
+            let index = index_of(&payload);
+            self.calls().estimated.push(index);
+            if self.failures.estimate == Some(index) {
+                return Err(CliError::SimulationError(
+                    "the simulation failed".to_string(),
+                ));
+            }
+            Ok(GasEstimate {
+                gas_used: 1000 + index as u64,
+                max_gas: 2000 + index as u64,
+            })
+        }
+
+        fn sign(
+            &self,
+            payload: TransactionPayload,
+            sequence_number: u64,
+            max_gas: u64,
+        ) -> CliTypedResult<SignedTransaction> {
+            if self.failures.sign == Some(sequence_number) {
+                return Err(CliError::UnexpectedError("the signing failed".to_string()));
+            }
+            self.calls().signed.push((sequence_number, max_gas));
+            let transaction = RawTransaction::new(
+                AccountAddress::ONE,
+                sequence_number,
+                payload,
+                max_gas,
+                100,
+                u64::MAX,
+                ChainId::test(),
+            );
+            Ok(transaction
+                .sign(&self.private_key, self.private_key.public_key())
+                .unwrap()
+                .into_inner())
+        }
+
+        async fn submit(&self, transaction: &SignedTransaction) -> CliTypedResult<()> {
+            let sequence_number = transaction.sequence_number();
+            self.calls().submitted.push(sequence_number);
+            if let Some(barrier) = &self.submit_barrier {
+                barrier.wait().await;
+            }
+            if self.failures.submit == Some(sequence_number) {
+                return Err(CliError::ApiError("the submission failed".to_string()));
+            }
+            Ok(())
+        }
+
+        async fn wait(
+            &self,
+            transaction: &SignedTransaction,
+        ) -> CliTypedResult<TransactionSummary> {
+            let sequence_number = transaction.sequence_number();
+            if self.commit_in_reverse {
+                sleep(Duration::from_millis(20 * (FIRST + 10 - sequence_number))).await;
+            }
+            self.calls().committed.push(sequence_number);
+            if self.failures.wait == Some(sequence_number) {
+                return Err(CliError::ApiError("the transaction expired".to_string()));
+            }
+            Ok(summary(sequence_number))
+        }
+    }
+
+    /// Payloads that are told apart by the name of their function: `f0`, `f1`, ...
+    fn payloads(count: usize) -> Vec<TransactionPayload> {
+        (0..count)
+            .map(|index| {
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    ModuleId::new(AccountAddress::ONE, Identifier::new("m").unwrap()),
+                    Identifier::new(format!("f{}", index)).unwrap(),
+                    vec![],
+                    vec![],
+                ))
+            })
+            .collect()
+    }
+
+    fn index_of(payload: &TransactionPayload) -> usize {
+        let TransactionPayload::EntryFunction(entry_function) = payload else {
+            panic!("expected an entry function payload, got {:?}", payload);
+        };
+        entry_function.function().as_str()[1..].parse().unwrap()
+    }
+
+    fn summary(sequence_number: u64) -> TransactionSummary {
+        TransactionSummary {
+            transaction_hash: aptos_crypto::HashValue::zero().into(),
+            gas_used: None,
+            gas_unit_price: None,
+            pending: None,
+            sender: None,
+            sequence_number: Some(sequence_number),
+            replay_protector: None,
+            success: Some(true),
+            timestamp_us: None,
+            version: None,
+            vm_status: None,
+            deployed_object_address: None,
+            events: None,
+            changes: None,
+        }
+    }
+
+    fn settings(max_gas: Option<u64>) -> GroupSettings {
+        GroupSettings {
+            gas_unit_price: 100,
+            ask_to_confirm_price: false,
+            max_gas,
+            prompt_options: PromptOptions::yes(),
+            explorer_network: None,
+        }
+    }
+
+    /// The sequence numbers that the outcomes are for, with `None` for an error.
+    fn sequence_numbers(outcomes: &[CliTypedResult<TransactionSummary>]) -> Vec<Option<u64>> {
+        outcomes
+            .iter()
+            .map(|outcome| {
+                outcome
+                    .as_ref()
+                    .ok()
+                    .and_then(|summary| summary.sequence_number)
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn group_signs_with_consecutive_sequence_numbers() {
+        let chain = FakeChain::new();
+
+        let outcomes = submit_group(&chain, &settings(Some(5000)), FIRST, payloads(4))
+            .await
+            .unwrap();
+
+        assert_eq!(sequence_numbers(&outcomes), vec![
+            Some(7),
+            Some(8),
+            Some(9),
+            Some(10)
+        ]);
+        assert_eq!(chain.calls().signed, vec![
+            (7, 5000),
+            (8, 5000),
+            (9, 5000),
+            (10, 5000)
+        ]);
+        // The max gas was given, so there is nothing to estimate.
+        assert!(chain.calls().estimated.is_empty());
+        // The transactions are the payloads, in order: the one signed with 8 is the second.
+        assert_eq!(chain.calls().submitted, vec![7, 8, 9, 10]);
+    }
+
+    #[tokio::test]
+    async fn group_estimates_the_gas_of_every_transaction() {
+        let chain = FakeChain::new();
+
+        let outcomes = submit_group(&chain, &settings(None), FIRST, payloads(3))
+            .await
+            .unwrap();
+
+        assert_eq!(sequence_numbers(&outcomes), vec![Some(7), Some(8), Some(9)]);
+        assert_eq!(chain.calls().estimated, vec![0, 1, 2]);
+        // Each transaction is signed with the estimate for its payload.
+        assert_eq!(chain.calls().signed, vec![(7, 2000), (8, 2001), (9, 2002)]);
+    }
+
+    #[tokio::test]
+    async fn group_submits_all_transactions_at_the_same_time() {
+        // Every submission waits for the others, so they only complete if they are in progress
+        // together.
+        let chain = FakeChain {
+            submit_barrier: Some(Barrier::new(5)),
+            ..FakeChain::new()
+        };
+
+        let outcomes = timeout(
+            Duration::from_secs(10),
+            submit_group(&chain, &settings(Some(5000)), FIRST, payloads(5)),
+        )
+        .await
+        .expect("the transactions are submitted at the same time")
+        .unwrap();
+
+        assert_eq!(outcomes.len(), 5);
+        assert!(outcomes.iter().all(|outcome| outcome.is_ok()));
+    }
+
+    #[tokio::test]
+    async fn group_waits_for_all_transactions_at_the_same_time_and_keeps_their_order() {
+        let chain = FakeChain {
+            commit_in_reverse: true,
+            ..FakeChain::new()
+        };
+
+        let outcomes = submit_group(&chain, &settings(Some(5000)), FIRST, payloads(4))
+            .await
+            .unwrap();
+
+        // They were committed in the opposite order, which can only be if they were waited for at
+        // the same time, and the outcomes are in the order of the payloads nevertheless.
+        assert_eq!(chain.calls().committed, vec![10, 9, 8, 7]);
+        assert_eq!(sequence_numbers(&outcomes), vec![
+            Some(7),
+            Some(8),
+            Some(9),
+            Some(10)
+        ]);
+    }
+
+    #[tokio::test]
+    async fn group_stops_at_a_transaction_whose_gas_cannot_be_estimated() {
+        let chain = FakeChain::failing(Failures {
+            estimate: Some(2),
+            ..Failures::default()
+        });
+
+        let outcomes = submit_group(&chain, &settings(None), FIRST, payloads(5))
+            .await
+            .unwrap();
+
+        // The transactions before it are submitted, and its error ends the list.
+        assert_eq!(sequence_numbers(&outcomes), vec![Some(7), Some(8), None]);
+        assert!(matches!(outcomes[2], Err(CliError::SimulationError(_))));
+        assert_eq!(chain.calls().submitted, vec![7, 8]);
+        assert_eq!(chain.calls().signed.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn group_stops_at_a_transaction_that_cannot_be_signed() {
+        let chain = FakeChain::failing(Failures {
+            sign: Some(9),
+            ..Failures::default()
+        });
+
+        let outcomes = submit_group(&chain, &settings(Some(5000)), FIRST, payloads(5))
+            .await
+            .unwrap();
+
+        assert_eq!(sequence_numbers(&outcomes), vec![Some(7), Some(8), None]);
+        assert!(matches!(outcomes[2], Err(CliError::UnexpectedError(_))));
+        assert_eq!(chain.calls().submitted, vec![7, 8]);
+    }
+
+    #[tokio::test]
+    async fn group_reports_a_failed_submission_in_its_place() {
+        let chain = FakeChain::failing(Failures {
+            submit: Some(8),
+            ..Failures::default()
+        });
+
+        let outcomes = submit_group(&chain, &settings(Some(5000)), FIRST, payloads(4))
+            .await
+            .unwrap();
+
+        // The others were submitted and committed. The one that wasn't accepted isn't waited for.
+        assert_eq!(sequence_numbers(&outcomes), vec![
+            Some(7),
+            None,
+            Some(9),
+            Some(10)
+        ]);
+        assert!(matches!(outcomes[1], Err(CliError::ApiError(_))));
+        assert!(!chain.calls().committed.contains(&8));
+        assert_eq!(chain.calls().committed.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn group_reports_a_transaction_that_does_not_commit_in_its_place() {
+        let chain = FakeChain::failing(Failures {
+            wait: Some(9),
+            ..Failures::default()
+        });
+
+        let outcomes = submit_group(&chain, &settings(Some(5000)), FIRST, payloads(4))
+            .await
+            .unwrap();
+
+        assert_eq!(sequence_numbers(&outcomes), vec![
+            Some(7),
+            Some(8),
+            None,
+            Some(10)
+        ]);
+        assert!(matches!(outcomes[2], Err(CliError::ApiError(_))));
+    }
+
+    #[tokio::test]
+    async fn group_that_the_user_declines_submits_nothing() {
+        let chain = FakeChain::new();
+        let settings = GroupSettings {
+            // The gas unit price was estimated, so the user is asked.
+            ask_to_confirm_price: true,
+            prompt_options: PromptOptions::no(),
+            ..settings(Some(5000))
+        };
+
+        let result = submit_group(&chain, &settings, FIRST, payloads(3)).await;
+
+        assert!(matches!(result, Err(CliError::AbortedError)));
+        assert!(chain.calls().signed.is_empty());
+        assert!(chain.calls().submitted.is_empty());
+    }
+
+    #[tokio::test]
+    async fn group_without_transactions_has_no_outcomes() {
+        let chain = FakeChain::new();
+
+        let outcomes = submit_group(&chain, &settings(None), FIRST, vec![])
+            .await
+            .unwrap();
+
+        assert!(outcomes.is_empty());
+    }
 }
