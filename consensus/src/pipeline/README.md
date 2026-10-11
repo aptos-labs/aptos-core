@@ -135,15 +135,11 @@ Commit votes use reliable broadcast with:
 
 ### Backpressure
 
-Backpressure operates at two levels:
+The `BufferManager` accepts ordered blocks regardless of the gap to the committed round. A fixed intake limit can stall recovery when the first available commit proof targets a block beyond the limit: the proof stays cached, but its block cannot enter the buffer to commit the pending prefix.
 
-**1. BufferManager (block intake)**
+State sync and pre-commit are coordinated through `pre_commit_status`, which tracks pre-commit progress and pauses it when state sync is needed. The round manager separately applies `vote_back_pressure_limit` to the ordered-to-committed round gap.
 
-The `BufferManager` stops accepting new ordered blocks when the gap between the latest ordered round and the highest committed round exceeds `MAX_BACKLOG` (20 rounds). This is implemented as a `tokio::select!` guard on the block intake channel — when backpressure is active, the `block_rx.next()` branch is disabled, so consensus blocks waiting to enter the pipeline are queued until commits catch up.
-
-This was originally introduced to prevent state sync from receiving a ledger info older than the pre-committed version — if the buffer grew unboundedly, pre-commit could advance far ahead of the commit root, and a state sync trigger would conflict with already pre-committed state. This root cause has since been fixed by adding `pre_commit_status` to connect `sync_manager` and the pipeline (`413db84eeb`), which pauses pre-commit when state sync is needed. The backpressure remains as a general safety bound on buffer size.
-
-**2. ProposalGenerator (block size reduction)**
+**ProposalGenerator (block size reduction)**
 
 The `ProposalGenerator` applies finer-grained backpressure on proposals using two signals:
 

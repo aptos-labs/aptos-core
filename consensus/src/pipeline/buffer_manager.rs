@@ -82,15 +82,6 @@ pub struct OrderedBlocks {
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
-impl OrderedBlocks {
-    pub fn latest_round(&self) -> Round {
-        self.ordered_blocks
-            .last()
-            .expect("OrderedBlocks empty.")
-            .round()
-    }
-}
-
 pub type BufferItemRootType = Cursor;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -154,9 +145,7 @@ pub struct BufferManager {
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
-    back_pressure_enabled: bool,
     highest_committed_round: Round,
-    latest_round: Round,
 
     // Consensus publisher for downstream observers.
     consensus_observer_config: ConsensusObserverConfig,
@@ -197,7 +186,6 @@ impl BufferManager {
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
-        back_pressure_enabled: bool,
         highest_committed_round: Round,
         consensus_observer_config: ConsensusObserverConfig,
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
@@ -253,9 +241,7 @@ impl BufferManager {
             reset_flag,
             bounded_executor: executor,
             order_vote_enabled,
-            back_pressure_enabled,
             highest_committed_round,
-            latest_round: highest_committed_round,
             consensus_observer_config,
             consensus_publisher,
 
@@ -602,7 +588,6 @@ impl BufferManager {
             ResetSignal::Stop => self.stop = true,
             ResetSignal::TargetRound(round) => {
                 self.highest_committed_round = round;
-                self.latest_round = round;
 
                 let _ = self.drain_pending_commit_proof_till(round);
             },
@@ -921,12 +906,6 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
-    fn need_back_pressure(&self) -> bool {
-        const MAX_BACKLOG: Round = 20;
-
-        self.back_pressure_enabled && self.highest_committed_round + MAX_BACKLOG < self.latest_round
-    }
-
     pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
@@ -953,8 +932,9 @@ impl BufferManager {
         while !self.stop {
             // advancing the root will trigger sending requests to the pipeline
             ::tokio::select! {
-                Some(blocks) = self.block_rx.next(), if !self.need_back_pressure() => {
-                    self.latest_round = blocks.latest_round();
+                // Keep accepting ordered blocks so cached commit proofs can reach their
+                // matching buffer items and commit the pending prefix during recovery.
+                Some(blocks) = self.block_rx.next() => {
                     monitor!("buffer_manager_process_ordered", {
                     self.process_ordered_blocks(blocks).await;
                     if self.execution_root.is_none() {
@@ -1030,5 +1010,127 @@ fn reply_commit_msg(
     let response = ConsensusMsg::CommitMessage(Box::new(msg));
     if let Ok(bytes) = protocol.to_bytes(&response) {
         let _ = response_sender.send(Ok(bytes.into()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        pipeline::{
+            pipeline_phase::{PipelinePhase, StatelessPipeline},
+            tests::{
+                buffer_manager_tests::prepare_buffer_manager,
+                test_utils::prepare_executed_blocks_with_ledger_info,
+            },
+        },
+        test_utils::{consensus_runtime, timed_block_on},
+    };
+    use aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH;
+    use aptos_types::ledger_info::{generate_ledger_info_with_sig, LedgerInfo};
+    use async_trait::async_trait;
+
+    struct RecordingPersistence {
+        result_tx: Sender<(Vec<Round>, LedgerInfoWithSignatures)>,
+    }
+
+    #[async_trait]
+    impl StatelessPipeline for RecordingPersistence {
+        type Request = PersistingRequest;
+        type Response = ExecutorResult<Round>;
+
+        const NAME: &'static str = "recording_persistence";
+
+        async fn process(&self, request: PersistingRequest) -> Self::Response {
+            let rounds: Vec<_> = request.blocks.iter().map(|block| block.round()).collect();
+            let round = *rounds.last().unwrap();
+            self.result_tx
+                .clone()
+                .send((rounds, request.commit_ledger_info))
+                .await
+                .unwrap();
+            Ok(round)
+        }
+    }
+
+    #[test]
+    fn cached_commit_proof_beyond_twenty_rounds_dispatches_recovery_prefix() {
+        let runtime = consensus_runtime();
+        let (
+            mut manager,
+            mut block_tx,
+            _reset_tx,
+            _msg_tx,
+            _self_loop_rx,
+            _schedule_phase,
+            _execution_phase,
+            _signing_phase,
+            _persisting_phase,
+            _hash,
+            signers,
+            _result_rx,
+            _verifier,
+        ) = prepare_buffer_manager(BoundedExecutor::new(1, runtime.handle().clone()));
+
+        let (blocks, commit_proof, _) = prepare_executed_blocks_with_ledger_info(
+            &signers[0],
+            22,
+            *ACCUMULATOR_PLACEHOLDER_HASH,
+            HashValue::zero(),
+            None,
+            Some(aptos_consensus_types::block::block_test_utils::certificate_for_genesis()),
+            1,
+        );
+        // No earlier commit votes or decisions are available. Recovery must consume
+        // round 22 and use its cached proof to persist the whole prefix.
+        assert!(manager.try_add_pending_commit_proof(commit_proof.clone()));
+        let (schedule_tx, mut schedule_rx) = create_channel();
+        manager.execution_schedule_phase_tx = schedule_tx;
+        let (mut execution_tx, execution_rx) = create_channel();
+        manager.execution_wait_phase_rx = execution_rx;
+        let (persist_tx, persist_rx) = create_channel();
+        manager.persisting_phase_tx = persist_tx;
+        let (completion_tx, completion_rx) = create_channel();
+        manager.persisting_phase_rx = completion_rx;
+        let (result_tx, mut result_rx) = create_channel();
+        let persistence = PipelinePhase::new(
+            persist_rx,
+            Some(completion_tx),
+            Box::new(RecordingPersistence { result_tx }),
+            manager.reset_flag.clone(),
+        );
+        let manager_task = runtime.spawn(manager.start());
+        let persistence_task = runtime.spawn(persistence.start());
+
+        timed_block_on(&runtime, async move {
+            for block in blocks {
+                let ordered_proof = generate_ledger_info_with_sig(
+                    &signers,
+                    LedgerInfo::new(block.block_info(), HashValue::zero()),
+                );
+                block_tx
+                    .send(OrderedBlocks {
+                        ordered_blocks: vec![block.clone()],
+                        ordered_proof,
+                    })
+                    .await
+                    .unwrap();
+                // Supply already-computed pipeline results, without looping back votes.
+                // The old intake guard would stop scheduling at round 21.
+                let _request = schedule_rx.next().await.unwrap();
+                execution_tx
+                    .send(ExecutionResponse {
+                        block_id: block.id(),
+                        inner: Ok(vec![block]),
+                    })
+                    .await
+                    .unwrap();
+            }
+            let (rounds, proof) = result_rx.next().await.unwrap();
+            assert_eq!(rounds, (1..=22).collect::<Vec<_>>());
+            assert_eq!(proof, commit_proof);
+        });
+        manager_task.abort();
+        persistence_task.abort();
     }
 }
