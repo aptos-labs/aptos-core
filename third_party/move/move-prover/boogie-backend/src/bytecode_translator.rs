@@ -4310,6 +4310,63 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
+    /// Emits that an uninterpreted behavioral predicate gives equal answers on
+    /// equal Move values.
+    ///
+    /// Boogie applies an uninterpreted function to Boogie terms, but Move
+    /// equality is `$IsEqual`, which is extensional for vectors and the types
+    /// built on them (`Option`, `String`). Without this axiom, a callback
+    /// invoked with a value the program only knows to be *equal* to the one a
+    /// specification names (for example, an order rebuilt after a field update)
+    /// gets an unrelated abort or requires predicate, and the specification
+    /// cannot be proven. A Move function's behavior depends only on the values
+    /// it receives, so the axiom is sound for every predicate it is emitted for.
+    fn emit_predicate_congruence(&self, fun_name: &str, prefix_decls: &[String], params: &[Type]) {
+        if params.is_empty() {
+            return;
+        }
+        let prefix_args: Vec<String> = prefix_decls
+            .iter()
+            .map(|decl| {
+                decl.split(':')
+                    .next()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string()
+            })
+            .collect();
+        let mut decls = prefix_decls.to_vec();
+        let mut lhs_args = prefix_args.clone();
+        let mut rhs_args = prefix_args;
+        let mut equalities = vec![];
+        for (i, ty) in params.iter().enumerate() {
+            let ty = ty.skip_reference();
+            let boogie_ty = boogie_type(self.env, ty, false);
+            decls.push(format!("a{}: {}", i, boogie_ty));
+            decls.push(format!("b{}: {}", i, boogie_ty));
+            lhs_args.push(format!("a{}", i));
+            rhs_args.push(format!("b{}", i));
+            equalities.push(format!(
+                "{}(a{}, b{})",
+                boogie_equality_for_type(self.env, true, ty, false),
+                i,
+                i
+            ));
+        }
+        let lhs = format!("{}({})", fun_name, lhs_args.join(", "));
+        let rhs = format!("{}({})", fun_name, rhs_args.join(", "));
+        emitln!(
+            self.writer,
+            "axiom (forall {} :: {{{}, {}}} {} ==> ({} <==> {}));",
+            decls.join(", "),
+            lhs,
+            rhs,
+            equalities.join(" && "),
+            lhs,
+            rhs
+        );
+    }
+
     /// Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.
     /// These functions are called by the behavioral evaluators and connected to closures via assumptions.
     ///
@@ -4359,6 +4416,7 @@ impl<'env> BoogieTranslator<'env> {
                     fun_name,
                     input_param_decls.join(", ")
                 );
+                self.emit_predicate_congruence(&fun_name, &mem_param_decls, &params);
             }
 
             // Multi-output Skolem (declared returns + `&mut` post-states).
@@ -4590,6 +4648,9 @@ impl<'env> BoogieTranslator<'env> {
                     fun_name,
                     input_param_decls.join(", ")
                 );
+                let mut prefix_decls = mem_param_decls.clone();
+                prefix_decls.push("n: int".to_string());
+                self.emit_predicate_congruence(&fun_name, &prefix_decls, &params);
             }
 
             // Multi-output Skolem (declared returns + `&mut` post-states).
