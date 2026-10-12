@@ -15,8 +15,8 @@ theorem triangular_step (x : Int) (nonnegative : 0 ≤ x) :
   rw [polynomial, Int.add_mul_ediv_right _ _ (by decide)]
 
 verify sum by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals expose_names
   case ensures_1 =>
     have at_exit : i.val = n.val + 1 := by omega
@@ -50,8 +50,8 @@ theorem double_triangular (n : Int) :
   omega
 
 verify test_sum_twice by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case ensures_1 =>
     have twice := double_triangular n.val
     omega

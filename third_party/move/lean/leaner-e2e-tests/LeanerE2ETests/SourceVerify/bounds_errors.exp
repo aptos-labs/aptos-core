@@ -1,4 +1,0 @@
-LeanerE2ETests/SourceVerify/bounds_errors.spec.lean:17:3: error: the specification clause `ensures low <= result && result <= high` is not established
-LeanerE2ETests/SourceVerify/bounds_errors.spec.lean:16:6: error: leaner verification failed: the automatic verification of `clamp` failed; provide a proof: `verify clamp by …` in the module (`verify clamp by leaner_obligations` lists its obligations)
-LeanerE2ETests/SourceVerify/bounds_errors.spec.lean:21:3: error: the specification clause `ensures slot == floor` is not established
-LeanerE2ETests/SourceVerify/bounds_errors.spec.lean:19:6: error: leaner verification failed: the automatic verification of `raise` failed; provide a proof: `verify raise by …` in the module (`verify raise by leaner_obligations` lists its obligations)

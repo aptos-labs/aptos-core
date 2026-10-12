@@ -1,4 +1,4 @@
-# Move Prover tests under Leaner: problem registry
+# Move Prover tests under Verex: problem registry
 
 Status: 2026-10-07, with the Move Prover's `lean` test feature. C1, C3,
 C4, C5, C7, C9, C10, C13, C14, C15, and C19 are fixed, and V9, V17, and V19
@@ -17,7 +17,7 @@ modules it uses. A unit's type table holds
 every type its generic frames require (V14's second cause, fixed
 2026-10-03). A specification reads a field at its physical type where the
 consumer asks for it, as a vector element does, so V11, which followed from
-such a mismatch in `std::ascii`, no longer occurs. Intrinsic `vector` functions are read as LIR
+such a mismatch in `std::ascii`, no longer occurs. Intrinsic `vector` functions are read as VIR
 operations ([`source-verification.md`](source-verification.md), "Move
 vector intrinsics"). Matches and destructuring bindings over values are
 carried, and a value no pattern fits aborts with Move's incomplete-match
@@ -28,7 +28,7 @@ into the variant tests and field borrows Move's compiler emits for it, so the
 enum tests fail the functions the Prover fails.
 
 The Move Prover's unit tests (`third_party/move/move-prover/tests/sources`,
-437 files) run with the Leaner verifier through the test feature `lean`
+437 files) run with the Verex verifier through the test feature `lean`
 ([`source-verification.md`](source-verification.md), "From the Move
 Prover"). This registry lists every problem that run shows, read from the
 `.lean_exp` baselines beside the tests. Entries record symptoms. A cause is
@@ -53,7 +53,7 @@ Functions without a contract (2026-10-12): a function with a body that
 declares no contract and plays no map or table role claims no frame; it is
 verified for the invariants it writes, and its callers inline it.
 `lambda_captured_fun_loop::wrap2` verifies; the Prover fails the file on the
-lambda's inferred contract, which Leaner does not infer.
+lambda's inferred contract, which Verex does not infer.
 
 Callers of failed callees (2026-10-09, user decision): a callee used
 through its contract that has no theorem, its verification failed or not
@@ -403,7 +403,7 @@ unchanged 25k budget. No previously verified target remains regressed. Evidence:
 were refreshed first: 30 verified problems plus the expected AMM rejection,
 15,727,043,391 raw heartbeats (0.5148% lower than the preceding local run).
 
-The full 2026-10-06 resumed run discovers 437 files. All four Leaner packages build
+The full 2026-10-06 resumed run discovers 437 files. All four Verex packages build
 and pass their full suites, including the 123 Check fixtures, both cost
 gates, source verification, MonoVM, and differential tests. Logs:
 `/tmp/vector-resumed-<package>-{build,test}.log`.
@@ -484,7 +484,7 @@ The aggregate-projection follow-up passes both cost gates and six scoped Table
 registry baseline checks, after regenerating `table_option`'s changed diagnostic
 baseline. The official fixture still times out at 25000; it is not newly verified.
 Diagnostic source probes must set both `maxHeartbeats` and
-`leaner.verifyHeartbeats` to reproduce that budget. The new aggregate payload
+`verex.verifyHeartbeats` to reproduce that budget. The new aggregate payload
 source proof passes, and a false payload length bound is rejected. Logs:
 `/tmp/table-projections-check.log`, `/tmp/table-projections-option-recheck.log`.
 The preceding 437-test run remains the latest complete registry checkpoint.
@@ -521,7 +521,7 @@ it is being reconciled as previously rejected files reach verification.
 
 The latest regular benchmark was regenerated before its broad suites, with
 HTML generated against main CI run 37250691414 (`ea4ecc43e7`). The full run
-`/tmp/leaner-benchmark-table-routing.json` has 30 verified samples, one expected
+`/tmp/verex-benchmark-table-routing.json` has 30 verified samples, one expected
 AMM rejection, and no unexpected failures or timeouts. It uses 15,826,709,038
 raw heartbeats (−0.0012% from the returned-storage checkpoint). All four full
 suites and all 437 registry checks pass (`/tmp/table-routing-full-tests.log`),
@@ -564,13 +564,13 @@ A test file is verified alone, with the driver's dependencies: the Move
 standard library and its nursery, and `move-table-extension`
 (`std = 0x1`, `extensions = 0x2`), or the Aptos standard library under
 `// use-aptos-stdlib`; `// flag:` lines add options (`testsuite.rs`,
-`get_flags_and_baseline`). The Leaner path (`lib.rs`,
+`get_flags_and_baseline`). The Verex path (`lib.rs`,
 `run_move_prover_lean`) builds the model with them and exports the target
 file's modules with what they read. Of the flags, it honors the extra
 `--dependency` files (`script`, `script_incorrect`, `exists_only_memory*`)
 and, since 2026-10-08, `--verify-only`: a target function the scope leaves out
 is exported with `pragma verify = false`, one it names with
-`pragma verify = true` (`leaner.rs`, `apply_scope`), as the Prover's
+`pragma verify = true` (`verex.rs`, `apply_scope`), as the Prover's
 `should_verify` selects them (`verify_only_list` now matches the Prover). The
 Boogie options (`--vector-theory`, `--split-vcs-by-assert`, `--timeout`,
 `--trace`) have no counterpart; `--check-inconsistency` is G11.
@@ -583,7 +583,7 @@ every module whose rendered name is quoted, `std::string` among them.
 
 ### G1. Import diagnostics — returned as reports; precise locations still open
 
-`SourceVerify.verifySource` now returns LIR import/validation errors as error
+`SourceVerify.verifySource` now returns VIR import/validation errors as error
 reports rather than throwing an uncaught exception (2026-10-07). This lets
 the benchmark retain the failure and its measured frontend work, and lets
 the source baseline suite continue to subsequent fixtures. The report is
@@ -616,18 +616,18 @@ get a hand proof.
 
 The Move Prover rejects two uses of the invariant pragmas as inconsistent:
 delegating from a public function, and `disable_invariants_in_body` on a
-function whose invariants a caller already carries. Leaner resolves both
+function whose invariants a caller already carries. Verex resolves both
 soundly: a public function carries its invariants itself, and a function
 whose caller carries them carries none.
 
 Example (`functional/disable_inv.move`): the Prover rejects the module;
-Leaner reports `f1_incorrect`, a public function delegating its invariants,
+Verex reports `f1_incorrect`, a public function delegating its invariants,
 at its first write, and verifies the other functions.
 
 The Prover also rejects a public function called, at any depth, from a
 function with `disable_invariants_in_body` (`functional/disable_inv_indirect`):
 the public function assumes the invariants at entry, which the disabled body
-need not keep. Leaner verifies the module; a call in such a body does not
+need not keep. Verex verifies the module; a call in such a body does not
 give the callee's postcondition where the invariants are broken (a function
 breaking an invariant, calling a public reader whose postcondition holds by
 the invariant, and restoring it before its exit, fails its own
@@ -639,17 +639,17 @@ Tests: `functional/disable_inv.move`, `functional/disable_inv_indirect.move`.
 
 With `pragma unroll = N`, the Move Prover unrolls a loop N times and cuts
 the paths that iterate more often, so it checks the function only for runs
-within N iterations. Leaner does not mirror the cut (decided 2026-10-02): a
+within N iterations. Verex does not mirror the cut (decided 2026-10-02): a
 theorem states full correctness. It reads the pragma as a sound proof rule
 instead: up to N iterations and the final condition check are exposed, and a
 path that would iterate further must be unreachable. A function whose loop
 can run more often verifies only by a loop invariant. `math8::floor_log2`
 (`unroll = 2`) always runs three iterations, so the Prover's check of it is
-vacuous; Leaner does not accept it.
+vacuous; Verex does not accept it.
 
 Example (`functional/verify_vector.move`, `verify_contains_with_unroll`):
 the Prover verifies the assertion after the loop for vectors of at most
-three elements; Leaner reports `the assertion `!(∃ (x in v), x == e)`
+three elements; Verex reports `the assertion `!(∃ (x in v), x == e)`
 does not hold`.
 
 Tests: `functional/loop_unroll.move`, `functional/verify_vector.move`
@@ -661,13 +661,13 @@ Tests: `functional/loop_unroll.move`, `functional/verify_vector.move`
 
 With `--check-inconsistency`, the Move Prover reports a function whose
 verification holds only because something it assumes is inconsistent.
-Leaner states a function's in-body assumptions as a hypothesis of its
+Verex states a function's in-body assumptions as a hypothesis of its
 theorem ([`denotation.md`](denotation.md), "Assumption ledger") and
 does not check that the hypothesis can hold.
 
 Example (`functional/inconsistency.move`, `assume_false`): `spec { assume
 false; }` before a call that returns lets `ensures false` verify; the Prover
-reports `there is an inconsistent assumption in the function`, and Leaner
+reports `there is an inconsistent assumption in the function`, and Verex
 verifies the theorem, whose hypothesis holds only of a function no run of
 which returns or aborts.
 
@@ -703,7 +703,7 @@ execution failure; the two differ only for `aborts_with`.
 operations induce select the Move Prover's SMT bit-vector encoding. Under it the
 Prover wraps specification arithmetic over encoded values at their width, and a
 narrowing specification cast yields an unspecified value of the target type.
-Leaner treats the encoding as a backend choice (decided 2026-10-07):
+Verex treats the encoding as a backend choice (decided 2026-10-07):
 specification arithmetic stays mathematical, bitwise operations are exact on
 integers, and executable arithmetic is checked as always. The explicit
 conversions are modeled: `int2bv(e)` wraps `e` into its fixed-width result type,
@@ -712,7 +712,7 @@ Prover renders signed values as integers, so its signed `int2bv` does not wrap.)
 
 The two verifiers differ only where a specification's truth depends on that
 wrapping. With `pragma bv = b"0"` and `x == 255`, `ensures x + 1 > 255` verifies
-in Leaner and fails in the Prover; `ensures int2bv(x) + int2bv(1u8) == 0u8` is
+in Verex and fails in the Prover; `ensures int2bv(x) + int2bv(1u8) == 0u8` is
 the reverse. `SourceVerify/bv_encoding{,_false}.move` pin both directions;
 `bv_conversion{,_false}.move` pin the conversions, on which both agree.
 
@@ -722,7 +722,7 @@ cleanly. Of those, `functional/bv_cast.move` differs by the narrowing-cast rule
 `functional/bv_internal_invalid.move` and `functional/bv_internal_aggregate.move`
 concern its encoding only. An `int2bv` the compiler types at `num` (e.g.
 `int2bv(value + 1)`) wraps at `u64` (decided 2026-10-08), so
-`MoveToLeanerLang/constants.move` translates again. Open: one at a type
+`MoveToVerexSL/constants.move` translates again. Open: one at a type
 parameter has no width and is rejected (`functional/bv_signed_generic.move`).
 
 An `int2bv` of a literal, also seen through specification casts, is the
@@ -758,7 +758,7 @@ derived again from the function and is not guarded.
 
 The Prover's specification functions are total over the integers: for
 `spec fun successor(x: u8): num { x + 1 }`, `successor(300) == 301` verifies
-there and not in Leaner. Inside the domain the two agree.
+there and not in Verex. Inside the domain the two agree.
 
 Tests: `SourceVerify/spec_fun_domain{,_false}.move`.
 
@@ -766,12 +766,12 @@ Tests: `SourceVerify/spec_fun_domain{,_false}.move`.
 
 Some tests pin a failure of the Prover that is not a property of the
 program: a limit of its encoding, of its specification inference, or of the
-solver. Leaner proves these functions, which is the intended outcome: its
+solver. Verex proves these functions, which is the intended outcome: its
 behavioral predicates are defined from a function's meaning, not from an
 inferred contract, and its theorems do not depend on solver heuristics.
 
 - `proof/weight_too_large`: a `[weight = 1000]` axiom is never instantiated
-  by Z3; `id_num(0) == 0` unfolds in Leaner.
+  by Z3; `id_num(0) == 0` unfolds in Verex.
 - `closures/behavioral_underivable_body`: `result_of<sum_to>` of a function
   without a specification whose body loops.
 - `closures/lambda_funparam_memory_err`,
@@ -787,12 +787,12 @@ inferred contract, and its theorems do not depend on solver heuristics.
 
 ### G17. Diagnostics of the Prover not reported
 
-The Prover rejects some specifications Leaner reads without harm:
+The Prover rejects some specifications Verex reads without harm:
 `old(..)` of an expression that does not depend on state
-(`functional/old_param_err`; Leaner reads it as the expression), and a
+(`functional/old_param_err`; Verex reads it as the expression), and a
 function accessing a resource its `reads` clause does not cover
 (`functional/reads_check`). A function's `reads` clause is not used by
-Leaner: a caller takes the callee to read all memory, so the unchecked
+Verex: a caller takes the callee to read all memory, so the unchecked
 clause cannot be relied on.
 
 ## Rejected before verification
@@ -810,7 +810,7 @@ Messages:
 Example (`functional/ghost_field_intrinsic_map_data_inv.move`):
 
 ```text
-LIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_del`
+VIR-MOVE-INTRINSIC-ROLE-REQUIRED: Move map intrinsic is missing required role `map_spec_del`
 ```
 
 Tests: `functional/ghost_field_intrinsic_map_data_inv.move`, `functional/ghost_field_intrinsic_map_full.move`, `functional/ghost_field_iter_abort_native.move`, `functional/intrinsic_iter_abort_role.move`, `functional/intrinsic_iter_abort_sig_err.move`†, `functional/intrinsic_iter_abort_uninterp.move`, `functional/intrinsic_iter_role_err.move`†, `functional/intrinsic_iter_role_err2.move`†, `functional/intrinsic_iter_role_err3.move`†, `functional/intrinsic_iter_role_err4.move`†, `functional/intrinsic_iter_role_err5.move`†, `functional/intrinsic_iter_role_err6.move`†, `functional/intrinsic_iter_role_err7.move`†, `functional/intrinsic_iter_role_err8.move`†, `functional/intrinsic_map_conv_ghost_err.move`†, `functional/intrinsic_map_enum_err.move`†, `functional/intrinsic_map_field_access_err.move`†, `functional/intrinsic_map_invariant_err.move`†, `functional/intrinsic_map_mut_no_get_err.move`†, `functional/intrinsic_map_native_role_err.move`†, `functional/intrinsic_map_rank_pair_err.move`†, `functional/intrinsic_map_rank_sig_err.move`†, `functional/intrinsic_map_role_sig_err.move`†, `functional/intrinsic_map_spec_pack_err.move`†, `functional/intrinsic_map_update_field_err.move`†, `functional/intrinsic_validity_data_inv_err.move`†, `functional/verify_iterator_validity.move`.
@@ -834,7 +834,7 @@ Tests: `functional/ghost_field.move`, `functional/ghost_field_bp.move`, `functio
 Example (`functional/verify_custom_table.move`):
 
 ```text
-LIR-SEMANTIC-TYPE: in fun create_and_insert_fail2: equality primitive operand types differ at [7698, 7734)
+VIR-SEMANTIC-TYPE: in fun create_and_insert_fail2: equality primitive operand types differ at [7698, 7734)
 ```
 
 Tests: `functional/verify_custom_table.move`.
@@ -959,7 +959,7 @@ the non-compliant pricing function by 51%, but grew proof terms on the core
 cost gate; the final memory-context guard does not retain that pricing gain.
 Both cost gates now pass without baseline changes. `Scalars/Order::ordered3`
 introduces both comparison premises after guard fusion.
-The fresh full benchmark `/tmp/leaner-benchmark-returned-freeze-final.json`
+The fresh full benchmark `/tmp/verex-benchmark-returned-freeze-final.json`
 retains 28/32 passing samples and all previously proved targets. The HTML was
 regenerated against main before the full suites. The controller is
 `/tmp/short-circuit-final-validation.py`; all four suites and the 437-file
@@ -981,7 +981,7 @@ above (one pre-verification rejection now reaches verification).
 Example (`functional/uninterpreted_spec_fun_congruence.move`):
 
 ```text
-LIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3413, 3420)
+VIR-SEMANTIC-TARGET: in fun ghost_sensitive_function_is_not_move_congruent: selected field does not exist on every possible variant at [3413, 3420)
 ```
 
 Tests: `functional/uninterpreted_spec_fun_congruence.move`.
@@ -1011,23 +1011,23 @@ on non-linear control flow; validation rejects the unit.
 Example (`functional/state_labels/nonlinear_cfg_error.move`):
 
 ```text
-LIR-SEMANTIC-STATE-LABEL: in fun branching_with_labels: state label `S` is neither bound by a quantifier over the state domain nor defined by a state-change predicate
+VIR-SEMANTIC-STATE-LABEL: in fun branching_with_labels: state label `S` is neither bound by a quantifier over the state domain nor defined by a state-change predicate
 ```
 
 Tests: `functional/state_labels/nonlinear_cfg_error.move`.
 
 ## Errors during verification
 
-### V1. Rendering outside the LeanerLang parser
+### V1. Rendering outside the VerexSL parser
 
 12 tests, 12 messages (2026-10-05 refresh; generic axioms parse since
 2026-10-08).
 
 Messages:
 
-- 2 × `` condition kind `…` is outside the current LeanerLang parser ``
-- 3 × `this quantifier kind is outside the current LeanerLang parser`
-- 1 × `` in-body specification condition `…` with N properties and N auxiliary expressions is outside the current LeanerLang parser ``
+- 2 × `` condition kind `…` is outside the current VerexSL parser ``
+- 3 × `this quantifier kind is outside the current VerexSL parser`
+- 1 × `` in-body specification condition `…` with N properties and N auxiliary expressions is outside the current VerexSL parser ``
 
 Generic module invariants are carried since 2026-10-09 (Summary);
 `type_param_bug_121721` now stops at a quantifier kind.
@@ -1035,7 +1035,7 @@ Generic module invariants are carried since 2026-10-09 (Summary);
 Example (`functional/emits.move`):
 
 ```text
-condition kind `LeanerIR.ConditionKind.emits` is outside the current LeanerLang parser
+condition kind `VerexIR.ConditionKind.emits` is outside the current VerexSL parser
 ```
 
 Functional `update_field` is supported for ordinary structs and enum fields
@@ -1050,7 +1050,7 @@ Partial-variant enum updates are listed under V2, mutable-reference
 behavioral predicates under V20; `mono` now reaches its unsupported `emits`
 clause.
 
-A generic axiom (`axiom<T>`, LeanerLang `axiom {T} e`) is assumed at each
+A generic axiom (`axiom<T>`, VerexSL `axiom {T} e`) is assumed at each
 instantiation a verification applies a specification function of it at, as
 the Move Prover monomorphizes it: the applications in the function's body and
 contract, in its callees' contracts and in the specification functions these
@@ -1075,7 +1075,7 @@ Tests: `functional/choice.move`, `functional/emits.move`, `functional/loop_unrol
 Messages:
 
 - 2 × `a function value with type arguments is not carried in generated contracts`
-- 1 × `specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts`
+- 1 × `specification operation VerexIR.Operation.call (VerexIR.CallKind.invoke) is not supported in generated contracts`
 - 1 × `generated contracts currently expand specification functions with one result`
 - 2 × `a field update on an enum whose variants do not all carry the field is not supported yet`
 
@@ -1083,7 +1083,7 @@ The state-change predicates `publish`, `remove`, and `update` now translate
 in contracts, including labels they define (S2b of
 [`state-labels.md`](state-labels.md), 2026-10-05).
 
-An arbitrary value (`__leaner_arbitrary_…`, the value of a specification
+An arbitrary value (`__verex_arbitrary_…`, the value of a specification
 function's aborting call) takes no type arguments, so `abort_in_fun` verifies.
 A module the specifications read (an abort code's constant function) is
 exported with the module closure, so `bv_aborts` reaches verification; its
@@ -1098,7 +1098,7 @@ two of its functions exceed the budget.
 Example (`functional/closures/closure_in_spec_expr.move`):
 
 ```text
-specification operation LeanerIR.Operation.call (LeanerIR.CallKind.invoke) is not supported in generated contracts
+specification operation VerexIR.Operation.call (VerexIR.CallKind.invoke) is not supported in generated contracts
 ```
 
 Tests: `functional/closures/behavioral_soundness.move`, `functional/closures/closure_in_spec_expr.move`, `functional/spec_fun_tuple_errors.move`, `regression/enum_update_out_of_variant.move`.
@@ -1149,8 +1149,8 @@ Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/gho
 
 Messages:
 
-- 2 × `` LEANER-CALL-NAME: unknown function `…` ``
-- 3 × `LEANER-SPEC-ARITY: behavior predicate expects N value argument(s), got N`
+- 2 × `` VEREX-CALL-NAME: unknown function `…` ``
+- 3 × `VEREX-SPEC-ARITY: behavior predicate expects N value argument(s), got N`
 
 The constant-vector indexing error in `functional/consts.move` is fixed:
 its three valid functions verify, and its five invalid functions fail their
@@ -1230,7 +1230,7 @@ parameters are carried (2026-10-09; `AbortsOfMut`, `EnsuresOfMut`,
 "Behavioral predicates"): `lambda_spec_discarded_result`,
 `lambda_spec_loop_anchor` and `lambda_spec_two_state_specfun` verify (the
 Prover fails the inferred contract of the loop lambda in
-`lambda_spec_loop_anchor`; Leaner infers none). `lambda_spec_global_memory`
+`lambda_spec_loop_anchor`; Verex infers none). `lambda_spec_global_memory`
 verifies since a literal closure's run is read once for all conjuncts of a
 conjunction (19.8M heartbeats, [`perf-notes.md`](perf-notes.md)), and
 `bp_requires_aborts_labeled_mut` since a label's existential over
@@ -1297,7 +1297,7 @@ Tests: `functional/bitwise_error_2.move`.
 ### V25. Quantified nominal values with function fields need a validity domain
 
 MVP's quantified nominal domain ties each function-valued field to its owning
-struct instantiation. Leaner's native carrier is a field row; treating all
+struct instantiation. Verex's native carrier is a field row; treating all
 rows as valid lets a quantified `G<u64>` invariant constrain a closure taken
 from `G<bool>`. These quantifiers are explicitly rejected until the validity
 domain is represented. Expanding native-row quantifiers is not a sound parity
@@ -1357,7 +1357,7 @@ invariants of all other resources. Two MVP-positive targets remain:
 - `create_modifier_valid`: it packs `safe_increment`, which writes Counter,
   into a field with the implicit empty write frame. MVP's backend also treats
   undeclared field access as pure (`derive_struct_field_frame_access`), but its
-  fixture accepts this construction. Leaner checks the implicit frame at pack
+  fixture accepts this construction. Verex checks the implicit frame at pack
   time. This discrepancy needs a specification/validity decision rather than
   an unchecked proof shortcut.
 

@@ -138,8 +138,8 @@ pub struct Options {
     #[command(flatten)]
     #[serde(skip)]
     pub inference: InferenceOptions,
-    /// Verifies the one Move source file with the Lean-based Leaner verifier
-    /// instead of Boogie (see `leaner`); the rendering in Lean is written
+    /// Verifies the one Move source file with the Lean-based Verex verifier
+    /// instead of Boogie (see `verex`); the rendering in Lean is written
     /// beside the output path, with extension `lean`.
     #[arg(long)]
     #[serde(skip)]

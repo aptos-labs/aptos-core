@@ -6,4 +6,4 @@ warning: proof uses trusted assumption
    │         ^^^^^^^^^^^^^^^^^^^^^^
 
 tests/sources/functional/proof/lemma_shortcut.move:58:9: error: the specification clause `ensures x + 1 == x` is not established
-tests/sources/functional/proof/lemma_shortcut.move:57:10: error: leaner verification failed: the lemma `false_identity` is not established
+tests/sources/functional/proof/lemma_shortcut.move:57:10: error: verex verification failed: the lemma `false_identity` is not established

@@ -1,4 +1,4 @@
-# Leaner source verification — project plan
+# Verex source verification — project plan
 
 `spec f` / `verify f` translate a Move function's retained `fun` body directly
 into the relational `Move.Semantics.Spec` semantics and discharge the generated
@@ -68,9 +68,9 @@ so mutations of that instantiation discover and re-establish the invariant.
 ## Move language coverage
 
 The sections below this one are about the *verification translator*: which
-accepted Leaner programs `spec`/`verify` can handle.  This section is about
+accepted Verex programs `spec`/`verify` can handle.  This section is about
 the *language*: which features of Move on Aptos (per
-[the Move book](../../../../documentation/book/src/SUMMARY.md)) Leaner source
+[the Move book](../../../../documentation/book/src/SUMMARY.md)) Verex source
 cannot express at all, so neither the compiler nor the verifier sees them.
 Everything listed is rejected at the compilation boundary (Lean elaboration
 or "unsupported call … while compiling Move function"); nothing is silently
@@ -96,14 +96,14 @@ its caller, and the helper declaration itself is excluded from Move output.
 
 ### Specification language (deferred)
 
-Leaner contracts are their own surface (`spec f … where requires / modifies /
+Verex contracts are their own surface (`spec f … where requires / modifies /
 ensures / aborts_if`, data and global invariants), not the Move Prover's
-MSL.  MSL constructs without a Leaner counterpart: `spec fun` / `spec
+MSL.  MSL constructs without a Verex counterpart: `spec fun` / `spec
 schema` / `include` / `apply`, `pragma` other than the abort-semantics
 and summary pragmas (`aborts_if_is_partial`, `aborts_if_is_strict`, and
-`opaque` are Leaner clauses; `verify`, `intrinsic` are not), `aborts_with`, `emits`,
+`opaque` are Verex clauses; `verify`, `intrinsic` are not), `aborts_with`, `emits`,
 `let post`, `global` spec variables, and the Prover's quantifier/choice
-helpers (`forall`/`exists` are Lean's binders).  The Move-to-Leaner
+helpers (`forall`/`exists` are Lean's binders).  The Move-to-Verex
 transpiler (`third_party/move/lean/transpiler`) maps the rest of MSL onto
 this surface.
 
@@ -129,7 +129,7 @@ returned references, loops, and recursive SCCs use replayed fixpoint summaries.
 Compiler-side XIR tests additionally reject malformed control-flow targets,
 local and type indices, return arity, operation arity, resource references,
 and address constants. Transactional `reject_*` tests check that these errors
-reach command-line users. Positive Leaner transactional baselines are scanned
+reach command-line users. Positive Verex transactional baselines are scanned
 for compiler, bytecode-verifier, or linker failures so a broken fixture cannot
 be accepted as a successful regression baseline.
 

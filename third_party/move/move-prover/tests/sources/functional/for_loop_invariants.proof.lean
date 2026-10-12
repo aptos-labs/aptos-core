@@ -26,7 +26,7 @@ theorem triangular_bounds (i : Int) (lo : 0 ≤ i) (hi : i ≤ 1000) :
     Int.mul_le_mul_of_nonneg_left (by omega) lo
   omega
 
-@[lir_denote_norm] theorem triangular_div (i : Int) :
+@[vir_denote_norm] theorem triangular_div (i : Int) :
     (i * (i - 1)).tdiv 2 = (i * (i - 1)) / 2 := by
   apply Int.tdiv_eq_ediv_of_nonneg
   by_cases h : 0 ≤ i
@@ -34,16 +34,16 @@ theorem triangular_bounds (i : Int) (lo : 0 ≤ i) (hi : i ≤ 1000) :
   · exact Int.mul_nonneg_of_nonpos_of_nonpos (by omega) (by omega)
 
 verify sum_range by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first | omega |
     have bounded := triangular_bounds i.val (by omega) (by omega)
     have step := triangular_step i.val (by omega)
     simp only [triangular_div] at *
     first | omega | grind
 verify sum_from by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first | omega |
     have bounded := triangular_bounds i.val (by omega) (by omega)
     have lower := triangular_bounds a.val (by omega) (by omega)
@@ -51,8 +51,8 @@ verify sum_from by
     simp only [triangular_div] at *
     first | omega | grind
 verify sum_skip_first by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first | omega |
     have bounded := triangular_bounds i.val (by omega) (by omega)
     have step := triangular_step i.val (by omega)

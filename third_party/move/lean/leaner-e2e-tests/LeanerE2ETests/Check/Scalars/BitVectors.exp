@@ -1,4 +1,0 @@
-LeanerE2ETests/Check/Scalars/BitVectors.lean:50:4: error: the specification clause `ensures result == byte` is not established
-LeanerE2ETests/Check/Scalars/BitVectors.lean:47:7: error: leaner verification failed: the automatic verification of `toggled` failed; provide a proof: `verify toggled by …` in the module (`verify toggled by leaner_obligations` lists its obligations)
-LeanerE2ETests/Check/Scalars/BitVectors.lean:64:4: error: the specification clause `ensures result & (1 << bit % 8) % 256 != byte & (1 << bit % 8) % 256` is not established
-LeanerE2ETests/Check/Scalars/BitVectors.lean:63:7: error: leaner verification failed: the automatic verification of `toggled_without_bv` failed; provide a proof: `verify toggled_without_bv by …` in the module (`verify toggled_without_bv by leaner_obligations` lists its obligations)

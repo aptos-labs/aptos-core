@@ -3,7 +3,7 @@ tests/sources/functional/closures/inline/anchor_aliasing.move:31:5: error: the a
       14, global<R>(a).v == old(global<R>(a).v) + 1
     )
       && with_state_anchor!(15, global<R>(a).v == old(global<R>(a).v) + 1)` does not hold
-tests/sources/functional/closures/inline/anchor_aliasing.move:38:5: error: leaner verification failed: the automatic verification of `bump_twice_spec` failed; provide a proof: `verify bump_twice_spec by …` in `tests/sources/functional/closures/inline/anchor_aliasing.proof.lean` (`verify bump_twice_spec by leaner_obligations` lists its obligations)
+tests/sources/functional/closures/inline/anchor_aliasing.move:38:5: error: verex verification failed: the automatic verification of `bump_twice_spec` failed; provide a proof: `verify bump_twice_spec by …` in `tests/sources/functional/closures/inline/anchor_aliasing.proof.lean` (`verify bump_twice_spec by verex_obligations` lists its obligations)
 tests/sources/functional/closures/inline/anchor_aliasing.move:45:5: error: the assertion `with_state_anchor!(
       8,
       update<R>(
@@ -22,7 +22,7 @@ tests/sources/functional/closures/inline/anchor_aliasing.move:45:5: error: the a
           )
         )
       )` does not hold
-tests/sources/functional/closures/inline/anchor_aliasing.move:52:5: error: leaner verification failed: the automatic verification of `bump_twice_derived` failed; provide a proof: `verify bump_twice_derived by …` in `tests/sources/functional/closures/inline/anchor_aliasing.proof.lean` (`verify bump_twice_derived by leaner_obligations` lists its obligations)
+tests/sources/functional/closures/inline/anchor_aliasing.move:52:5: error: verex verification failed: the automatic verification of `bump_twice_derived` failed; provide a proof: `verify bump_twice_derived by …` in `tests/sources/functional/closures/inline/anchor_aliasing.proof.lean` (`verify bump_twice_derived by verex_obligations` lists its obligations)
 tests/sources/functional/closures/inline/anchor_aliasing.move:75:5: error: the assertion `with_state_anchor!(
       0,
       update<R>(
@@ -41,4 +41,4 @@ tests/sources/functional/closures/inline/anchor_aliasing.move:75:5: error: the a
           )
         )
       )` does not hold
-tests/sources/functional/closures/inline/anchor_aliasing.move:82:5: error: leaner verification failed: the automatic verification of `bump_disjoint_derived` failed; provide a proof: `verify bump_disjoint_derived by …` in `tests/sources/functional/closures/inline/anchor_aliasing.proof.lean` (`verify bump_disjoint_derived by leaner_obligations` lists its obligations)
+tests/sources/functional/closures/inline/anchor_aliasing.move:82:5: error: verex verification failed: the automatic verification of `bump_disjoint_derived` failed; provide a proof: `verify bump_disjoint_derived by …` in `tests/sources/functional/closures/inline/anchor_aliasing.proof.lean` (`verify bump_disjoint_derived by verex_obligations` lists its obligations)

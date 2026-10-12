@@ -1,10 +1,10 @@
 # Relocatable namespaces
 
-Status: R1 and R2 implemented (`LeanerIR.Relocate`, `LeanerIR.Validation.Link`,
-`LeanerLang.Modules`); R3 and R4 open. Open work is listed in
+Status: R1 and R2 implemented (`VerexIR.Relocate`, `VerexIR.Validation.Link`,
+`VerexSL.Modules`); R3 and R4 open. Open work is listed in
 [`roadmap.md`](roadmap.md), section 2.
 
-A validated LIR namespace should behave like a Lean `.olean`: produced and
+A validated VIR namespace should behave like a Lean `.olean`: produced and
 checked once, then included in any unit that uses it, with its validation
 results reused rather than recomputed, and eventually its theorems.
 Today a namespace cannot be moved between units: its IDs index tables the
@@ -15,7 +15,7 @@ that contains it.
 ## Why
 
 A Move module is verified by inlining the bodies of the modules it uses,
-as the Move Prover does. A module therefore needs the LIR of its
+as the Move Prover does. A module therefore needs the VIR of its
 dependencies. With unit-relative identities every importer must renumber
 each dependency, re-validate it, re-quote it, and re-derive every
 certificate about it: cost that grows with dependency size per importer,
@@ -40,7 +40,7 @@ by relocation, as a linker relocates object code:
    into another, interning every entry it uses and renumbering its IDs.
    Relocating into empty tables extracts a namespace from a unit;
    relocating into a unit's tables links it. The traversal is a `Remap`
-   class whose instances are derived for every LIR type, so no ID field is
+   class whose instances are derived for every VIR type, so no ID field is
    missed; a round trip (extract, link, print) is its check. Types are
    interned up to the locations of their type arguments, as the type table
    is location-free (`Ty.eraseLocs`): a type two namespaces write keeps the
@@ -60,11 +60,11 @@ by relocation, as a linker relocates object code:
 4. **Downstream code unchanged.** Validation, the semantics, the printer,
    and the proofs keep working on unit-numbered IDs.
 
-The LeanerLang registry holds each module's validated unit, the module at
-namespace 0 with the namespaces it reaches linked in. A `leaner module` that
+The VerexSL registry holds each module's validated unit, the module at
+namespace 0 with the namespaces it reaches linked in. A `verex module` that
 uses others (any prefix of one of its paths naming a registered module) is
 lowered against their interfaces, then links their namespaces, extracted
-from their own units, in place of those interfaces. LIR refers to another
+from their own units, in place of those interfaces. VIR refers to another
 namespace's declarations by name, so the interface need not list them in
 the order of the namespace that replaces it. The exchange format can carry
 relocatable namespaces the same way, so a frontend can ship a precompiled
@@ -85,7 +85,7 @@ Each milestone keeps the test matrix green.
   namespaces, extraction and linking with certificates relocated, the
   boundary check, and the round-trip test.
 - **R2: modules link modules (done).** The registry stores relocatable validated
-  namespaces; a `leaner module` links the ones it uses, and verification
+  namespaces; a `verex module` links the ones it uses, and verification
   inlines across modules. The Move standard library becomes verifiable
   module by module.
 - **R3: proof reuse (open).** A theorem about a namespace is stated about the unit
@@ -102,5 +102,5 @@ Each milestone keeps the test matrix green.
 
 - Separate compilation of cyclic namespace groups: Move forbids module
   cycles, and a Rust crate is one namespace.
-- Changing the surface language: LeanerLang source is unaffected, apart
+- Changing the surface language: VerexSL source is unaffected, apart
   from modules being able to call one another.

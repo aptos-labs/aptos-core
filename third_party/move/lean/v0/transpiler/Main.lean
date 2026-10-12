@@ -4,7 +4,7 @@
 import Transpiler
 
 /-!
-`lake exe transpile`: transpiles Move source into Leaner Move.
+`lake exe transpile`: transpiles Move source into Verex Move.
 
 ```
 transpile <package-dir> -o <out-dir>             a Move package (aptos move exchange --format ast)

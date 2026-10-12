@@ -250,7 +250,7 @@ such.
 - Added: the memory's update laws (read after write at the same or another
   type or key), the frame's resolution and transports at the runtime and
   induced frames, and a stage that reads memory as the leaf's case splits
-  fixed it (`leaner_memory_reads`), before a split and at a leaf,
+  fixed it (`verex_memory_reads`), before a split and at a leaf,
   so that a clause's read meets the program's.
 - Callee frames apply to memory reads directly.
 

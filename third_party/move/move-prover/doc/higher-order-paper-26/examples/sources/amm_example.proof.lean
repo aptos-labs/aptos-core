@@ -4,8 +4,8 @@
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
 verify constant_product by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals
     have bound : reserve_out.val * amount_in.val / (reserve_in.val + amount_in.val)
         ≤ reserve_out.val := by
@@ -47,10 +47,10 @@ theorem market_bounds (r o a e : Int) (hr : 0 ≤ r) (ho : 0 ≤ o)
     grind
 
 verify constant_product_with_fee by
-  leaner_obligations
-  all_goals leaner_paths
-  all_goals (repeat' leaner_split)
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals verex_paths
+  all_goals (repeat' verex_split)
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals
     have bound := effective_bound amount_in.val 9500 (by omega) (by omega) (by omega)
     have facts := market_bounds reserve_in.val reserve_out.val amount_in.val
@@ -61,7 +61,7 @@ verify constant_product_with_fee by
           Int.mul_le_mul_of_nonneg_right
             (show reserve_in.val ≤ reserve_in.val + amount_in.val by omega)
             (show 0 ≤ reserve_out.val by omega))
-      | (let fee : LeanerIR.SpecInt (.bits 64) false := by assumption
+      | (let fee : VerexIR.SpecInt (.bits 64) false := by assumption
          have feeBounds : 0 ≤ fee.val ∧ fee.val ≤ 10000 := by
            dsimp only [fee]
            omega
@@ -74,15 +74,15 @@ verify constant_product_with_fee by
          omega)
 
 verify constant_product_with_fee_non_compliant by
-  leaner_obligations
-  all_goals leaner_paths
-  all_goals (repeat' leaner_split)
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals verex_paths
+  all_goals (repeat' verex_split)
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   -- Abort branches can have an out-of-range fee. Discharge their abort
   -- condition before deriving the fee bounds needed by successful returns.
   all_goals (try (simp only [reduceCtorEq, false_or]; omega))
   all_goals
-    let fee : LeanerIR.SpecInt (.bits 64) false := by assumption
+    let fee : VerexIR.SpecInt (.bits 64) false := by assumption
     have feeBounds : 0 ≤ fee.val ∧ fee.val ≤ 10000 := by
       dsimp only [fee]
       omega
@@ -107,8 +107,8 @@ theorem ratio_monotone (r o a b : Int) (hr : 0 ≤ r) (ho : 0 ≤ o)
   grind
 
 verify create_constant_product_pool by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first
     | (have nonneg := Int.mul_nonneg
           (show 0 ≤ quantified_19 by omega) (show 0 ≤ quantified_20 by omega)
@@ -126,22 +126,22 @@ verify create_constant_product_pool by
        · have monotone := ratio_monotone quantified_13 quantified_14 quantified_15 quantified_16
            (by omega) (by omega) (by omega) (by omega) (by omega)
          grind)
-    | (leaner_memory_invariants
+    | (verex_memory_invariants
        all_goals try dsimp only [storedInvariant]
-       all_goals simp_all [lir_denote_norm, LeanerIR.Proofs.Denote.NTy.encode_function,
-         LeanerIR.Proofs.Obligation_iff, LeanerIR.Proofs.Denote.IntegerValueFits_unsigned_succ]
+       all_goals simp_all [vir_denote_norm, VerexIR.Proofs.Denote.NTy.encode_function,
+         VerexIR.Proofs.Obligation_iff, VerexIR.Proofs.Denote.IntegerValueFits_unsigned_succ]
        all_goals grind)
 
 -- Specialize the quantified pricing laws, then reduce its singleton result.
 verify swap by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
-  all_goals try clear leanerContinuation
-  all_goals simp_all [lir_denote_norm, LeanerIR.Proofs.Denote.NTy.encode_function]
-  all_goals grind [LeanerIR.packResults_single]
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+  all_goals try clear verexContinuation
+  all_goals simp_all [vir_denote_norm, VerexIR.Proofs.Denote.NTy.encode_function]
+  all_goals grind [VerexIR.packResults_single]
 
 -- Selecting a bounded fee preserves monotonicity of the effective input.
-open LeanerIR LeanerIR.Proofs.Denote in
+open VerexIR VerexIR.Proofs.Denote in
 theorem selected_fee_bounds (slot : Option (SpecInt (.bits 64) false × Unit)) :
     let raw := ((slot.map fun value => RuntimeValue.integer value.1.val).getD RuntimeValue.unit).asInt
     let fee := if slot.isSome = true ∧ raw ≤ 10000 then raw else 500
@@ -180,14 +180,14 @@ theorem fee_monotone (r o a b fee : Int) {q1 q2 : Int}
     exact ratio_monotone r o _ _ hr ho eff1 increasing (by omega)
 
 verify create_compliant_fee_pool by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals first
-    | (leaner_memory_invariants
+    | (verex_memory_invariants
        all_goals try dsimp only [storedInvariant]
-       all_goals simp_all [lir_denote_norm, LeanerIR.Proofs.Denote.NTy.encode_function,
-         LeanerIR.Proofs.Obligation_iff, LeanerIR.Proofs.Denote.IntegerValueFits_unsigned_succ])
-    | (try clear leanerContinuation
+       all_goals simp_all [vir_denote_norm, VerexIR.Proofs.Denote.NTy.encode_function,
+         VerexIR.Proofs.Obligation_iff, VerexIR.Proofs.Denote.IntegerValueFits_unsigned_succ])
+    | (try clear verexContinuation
        run_tac
          let goal ← Lean.Elab.Tactic.getMainGoal
          goal.withContext do

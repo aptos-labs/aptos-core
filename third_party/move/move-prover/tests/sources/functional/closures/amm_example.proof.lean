@@ -4,8 +4,8 @@
 -- The denominator contains the input, so division cannot exceed the output
 -- reserve; a positive input reserve makes that bound strict.
 verify constant_product by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals
     have bound : reserve_out.val * amount_in.val / (reserve_in.val + amount_in.val)
         ≤ reserve_out.val := by

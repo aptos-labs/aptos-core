@@ -4,8 +4,8 @@
 -- All quantified positions lie in the three-element result. Enumerate those
 -- positions, then let the kernel compute the literal vector reads.
 verify vector_of_proper_positives by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals simp only [List.nil_append, List.cons_append, List.length_cons, List.length_nil]
   · intro i lo hi
     have cases_i : i = 0 ∨ i = 1 ∨ i = 2 := by omega

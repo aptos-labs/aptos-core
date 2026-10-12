@@ -1,31 +1,31 @@
 # Handoff
 
 Authored proofs own the goal (2026-10-11, user decision D):
-- `verify f by …` gets `f`'s whole goal; `leaner_obligations` splits it into
-  leaves named by the clause they owe; `leaner_prepare`, `leaner_decide`,
-  `leaner_solve` decide them (source-verification.md, "Proofs"). No residual
-  mode; the automatic verification is `leaner_solve_goals`.
-- Every proof file starts with `leaner_obligations` and
-  `all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))`
+- `verify f by …` gets `f`'s whole goal; `verex_obligations` splits it into
+  leaves named by the clause they owe; `verex_prepare`, `verex_decide`,
+  `verex_solve` decide them (source-verification.md, "Proofs"). No residual
+  mode; the automatic verification is `verex_solve_goals`.
+- Every proof file starts with `verex_obligations` and
+  `all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))`
   before its former script; six `ordered_map` items use
-  `all_goals (try leaner_decide)`, one no prefix.
-- Leaner's tactics act on the main goal (`focusGoal`, macros
-  `leaner_focus (…)`): several set the goal list to their own goals, which
+  `all_goals (try verex_decide)`, one no prefix.
+- Verex's tactics act on the main goal (`focusGoal`, macros
+  `verex_focus (…)`): several set the goal list to their own goals, which
   dropped a sibling (Lean then names a `?_` far above it,
-  `post` of `wp_call`). All-goals by design: `leaner_bounded`,
-  `leaner_inheriting`, `leaner_settle`, `leaner_saturate_round`,
-  `leaner_canonical_families`, `leaner_timed`, the budget wrappers.
+  `post` of `wp_call`). All-goals by design: `verex_bounded`,
+  `verex_inheriting`, `verex_settle`, `verex_saturate_round`,
+  `verex_canonical_families`, `verex_timed`, the budget wrappers.
 - A handed-over leaf is one path and clause: the walk splits only conditionals
   of goals that still run program; five scripts split their obligations
-  (`repeat' leaner_split`). `leaner_on | clauses => tac | _ => tac` dispatches
+  (`repeat' verex_split`). `verex_on | clauses => tac | _ => tac` dispatches
   leaves by clause, alternatives without recovery. Benchmark −3.8%
   (perf-notes.md, "Leaves per path and clause").
 - One goal per clause (2026-10-11, user decision): the leaves owing a
   clause are combined into a conjunction over their paths (`combineLeaves`,
   binders built directly: `mkForallFVars` drops a `let`, `apply And.intro`
-  zeta-reduces one); `leaner_paths` takes it apart; `leaner_decide`,
-  `leaner_prepare`, `leaner_solve` do so first. Standard prefix:
-  `(leaner_prepare; all_goals try leaner_decide)`. Cost +1.3% on the
+  zeta-reduces one); `verex_paths` takes it apart; `verex_decide`,
+  `verex_prepare`, `verex_solve` do so first. Standard prefix:
+  `(verex_prepare; all_goals try verex_decide)`. Cost +1.3% on the
   authored problems. Rejected: preparing a path's context once before its
   clauses split — pure overhead with the full pipeline per leaf (+26%), and
   a trimmed leaf step misses the hypotheses a leaf introduces itself
@@ -120,8 +120,8 @@ Behavioral predicates of targets returning `&mut` (2026-10-10):
   triggers through continuations and loop back edges (`obligesBehavior`),
   its rule attempts fail strictly (a failed `decide` was elaborated as
   `sorry`), the bound case of `rangeInstanceCore` rewrites behavior facts by
-  the context and `result_of` reads (`leaner_simp_behaviors_by_context`,
-  `leaner_rewrite_results`). `assumesTyping`/`assumesTermination`
+  the context and `result_of` reads (`verex_simp_behaviors_by_context`,
+  `verex_rewrite_results`). `assumesTyping`/`assumesTermination`
   also read a verified body's loop invariants and assertions (`bodyReads`).
 - `discarded_mut_ref_result::run` verifies at 400k (99M heartbeats); the
   registry still reports its 25k budget. New Check fixtures
@@ -134,10 +134,10 @@ Mutable references no local holds (2026-10-09, evening):
 - A `&mut` a call or invocation returns that is discarded, matched by a
   wildcard, read through (`*f(x)`, `f(x).field`), or borrowed through
   (`&mut f(x).field`) lost its current value when it died: `settleLoans`
-  finds a dying borrow only in locals and globals. The LIR interpreter left
+  finds a dying borrow only in locals and globals. The VIR interpreter left
   the lender with a hole (`invalidDataOperation` reading it), and the
   denotation left its prophecy unconstrained, so `once(s) { increment(s) }`
-  did not verify. User decision: name such temporaries in LIR. Validation's
+  did not verify. User decision: name such temporaries in VIR. Validation's
   first raw pass, `holdMutableReferences` (`Validation/MutableTemporaries.lean`),
   binds them to `$held`/`$dropped` locals (operands before them bound
   first, so evaluation order is kept; a borrow through one starts at the
@@ -155,11 +155,11 @@ Mutable references no local holds (2026-10-09, evening):
 - `discarded_mut_ref_result::run` now writes the element back. The solver
   then decides a range invariant at the iteration's element: at the bound
   of `rangeInstanceCore`, the context's position invariants are
-  instantiated there and the lookups named (`leaner_instantiate_positions`,
-  `leaner_name_lookups`), which closes leaves 1 and 3; registry,
+  instantiated there and the lookups named (`verex_instantiate_positions`,
+  `verex_name_lookups`), which closes leaves 1 and 3; registry,
   suites unchanged, benchmark +0.000%. Left: `result_of` of a target
   returning `&mut` (user decision: results as values, loan independence
-  generalized to renamings). `verify f by leaner_obligations` hands over
+  generalized to renamings). `verify f by verex_obligations` hands over
   every leaf undecided: test solver changes on the automatic run.
 
 A literal closure's run per conjunction (2026-10-09, later):
@@ -268,8 +268,8 @@ Behaviors of capturing closures (2026-10-09, sixth checkpoint):
   closure's invocation is that of the function value naming its target at
   the woven arguments. The `_captured` forms (a weave with a capture, so
   the canonical closure is not rewritten again) feed the leaf decider
-  `leaner_woven_behaviors` (goal only, then the cheap deciders), in
-  `leaner_leaf_unfolded` after "function facts". A global rewrite
+  `verex_woven_behaviors` (goal only, then the cheap deciders), in
+  `verex_leaf_unfolded` after "function facts". A global rewrite
   would break facts keyed on the closure value (frames compare closures by
   definitional equality).
 - `behavioral_target_two_masks::pending` verifies. Fixture
@@ -293,7 +293,7 @@ Resume here (2026-10-09, suspended at the user's request):
     state label whose body states behavioral predicates is tried at each
     program point (`pointWitness?`, shared with `ledgerWitness`), each
     conjunct derived by `dispatchBehavior` and decided by
-    `leaner_leaf_cheap`. For `bp_requires_aborts_labeled_mut` the
+    `verex_leaf_cheap`. For `bp_requires_aborts_labeled_mut` the
     `requires_of` conjunct is decided at every point but `¬aborts_of` is
     not: `checked_inc` is inlined (no `Satisfies` theorem among the
     callees), so `dispatchBehavior` learns nothing from the introduced
@@ -323,9 +323,9 @@ Resume here (2026-10-09, suspended at the user's request):
   --language-version 2.4 -o <dir>/out.bpl <file>` from
   `third_party/move/move-prover`; isolate one target of the rendered
   `out.lean` with `scripts/isolate-target.py` (options
-  `leaner.stageLog="<file>"`, `leaner.solverProfile=true`,
-  `leaner.solverDebug=true`, `leaner.verifyHeartbeats=N`) and run it with
-  `lake env lean` from `leaner-move`. Debug output inside a solver step that
+  `verex.stageLog="<file>"`, `verex.solverProfile=true`,
+  `verex.solverDebug=true`, `verex.verifyHeartbeats=N`) and run it with
+  `lake env lean` from `verex-move`. Debug output inside a solver step that
   restores its state on failure must use `IO.println`: `logInfo` is rolled
   back with the state.
 
@@ -370,8 +370,8 @@ Behavioral predicates over `&mut` parameters (2026-10-09):
   `discarded_mut_ref_result` reach verification and exceed the budget;
   `lambda_captured_fun_loop`, `bp_requires_aborts_labeled_mut`,
   `closure_bp_post_sub_pre_only` fail as the Prover does, for the reasons in
-  V20; no other baseline changed. Suites (leaner-ir, leaner-move,
-  leaner-e2e-tests) pass with no baseline change.
+  V20; no other baseline changed. Suites (verex-ir, verex-move,
+  verex-e2e-tests) pass with no baseline change.
 - Benchmark against the generic-invariant checkpoint (15,407,968,920): same
   outcomes (30 verified, one expected AMM rejection), 15,455,143,337
   (+0.31%), spread thinly (calculator +0.67%, ordered_map +0.51%, Quicksort
@@ -388,7 +388,7 @@ Test driver parity, scripts, pipeline stages (2026-10-08):
   `target/ci/move-prover --lean --heartbeats=25 -o <dir>/out.bpl <file>`;
   the rendering lands at `<dir>/out.lean`.
 - `--verify-only` (and `aptos move prove --lean --only`) now select the
-  verified functions: `leaner::verify` takes the scope and exports a target
+  verified functions: `verex::verify` takes the scope and exports a target
   function with `pragma verify` as `should_verify` decides (`apply_scope`),
   in the specification's and the resolved pragmas alike (the verifier checks
   they agree). `verify_only_list` matches the Prover.
@@ -406,7 +406,7 @@ Test driver parity, scripts, pipeline stages (2026-10-08):
   (`intrinsic-maps.md`, stage 2), not a missing dependency.
 - The general pipeline's stages are timed permanently (`pipe-simp`,
   `pipe-omega`, `pipe-round`, `pipe-saturate`, `pipe-bv`, `pipe-grind`, …)
-  under `leaner.solverDebug`/`leaner.solverProfile`; see perf-notes.md.
+  under `verex.solverDebug`/`verex.solverProfile`; see perf-notes.md.
 - Benchmark against the generic-axiom checkpoint (15,376,387,648): same
   outcomes, 15,388,371,357 (+0.08%), all of it `string` (15.1M to 26.9M, its
   first verified target); every other problem within 0.01%, so the timed
@@ -455,7 +455,7 @@ Registry follow-up: axioms, bitwise, module closure (2026-10-08):
   specifications and spec-function bodies, so a module only an abort code
   names is exported (`bv_aborts` reaches verification and fails its clause,
   as in the Prover; exchange test in `aptos-move/cli/src/tests/exchange.rs`).
-- An arbitrary value (`__leaner_arbitrary_…`) takes no type arguments
+- An arbitrary value (`__verex_arbitrary_…`) takes no type arguments
   (`Contract.arbitraryValue`), so `abort_in_fun` verifies. Membership lowers
   its element at the projected specification type (`Lower`).
 - `int2bv` of a literal, also through specification casts, is the wrapped
@@ -473,7 +473,7 @@ Registry follow-up: axioms, bitwise, module closure (2026-10-08):
   `disable_feature_flags` still exceed the budget (bit clearing through a
   vector write needs bit-level reasoning).
 - Tests: `SourceVerify/module_axioms{,_false}.move`,
-  `SourceVerify/schema_equality.move`, leaner-move `Tests.BitVectorConversion`.
+  `SourceVerify/schema_equality.move`, verex-move `Tests.BitVectorConversion`.
   `Check/Scalars/BitVectors`' `contains_without_bv` now verifies without
   `pragma bv` (valid; it was marked as needing bv); `toggled_without_bv`
   takes its place as the leaf integer arithmetic does not decide.
@@ -498,7 +498,7 @@ Partial specification functions by declared types (2026-10-08, option A):
   from the declared types (option A) over a guard in the body (the earlier
   WIP commit e645c55f, superseded).
 - Importer: spec-function parameters keep fixed-width declared types
-  (`Encode.addSpecificationParameter`). LeanerLang reads such a parameter in
+  (`Encode.addSpecificationParameter`). VerexSL reads such a parameter in
   the body as `Int`, as contracts read function parameters (`Lower`), and the
   printer treats parameters as logical locals, so `x + 18446744073709551616`
   and `x < 2^64` re-elaborate canonically. Intrinsic map `num` role
@@ -516,7 +516,7 @@ Partial specification functions by declared types (2026-10-08, option A):
   with the typed-value bounds `typedBound?` (shared with `assertBounds`);
   bundle projections of an instance are reduced. See perf-notes.md.
 - Tests: `SourceVerify/spec_fun_domain{,_false}.move`,
-  `Check/Specifications/SpecFunctionDomain{s,Errors}.lean`, leaner-move
+  `Check/Specifications/SpecFunctionDomain{s,Errors}.lean`, verex-move
   `Tests.BitVectorConversion`. Full registry (440 files) against the pre-change
   baselines (8c71365a): no function regresses; `folds_of_callee_ensures` loses
   its family error; three files new from main (`verify_only_list`,
@@ -541,7 +541,7 @@ Bit-vector representation retired (2026-10-07, user decision, validated):
 - MVP's bv encoding (`pragma bv`/`bv_ret`/`bv_internal`, bitwise
   classification) is a backend hint, not semantics: spec arithmetic stays
   mathematical (G14 in `prover-test-problems.md`, `numeric-representation.md`).
-  `pragma bv` still selects Leaner's BitLift decisions. The package guard and
+  `pragma bv` still selects Verex's BitLift decisions. The package guard and
   the scalar classification/rewriting modules (`Frontend/NumericRepresentation*`,
   `Tests.NumericRepresentation`, `Tests.NumericLowering`) are deleted.
 - `int2bv(e)` is exact: `Frontend/BitVectorConversion.lean` lowers it to `e`
@@ -555,13 +555,13 @@ Bit-vector representation retired (2026-10-07, user decision, validated):
   (the registered difference, both directions); MVP verdicts were checked.
 - Validation (`/tmp/bv-integer-logs/`): all four suites and the registry pass;
   benchmark 30 verified + one expected AMM rejection, 15,083,357,067 raw
-  heartbeats (`/tmp/leaner-benchmark-bv-integer.json` = local JSON). Restored:
+  heartbeats (`/tmp/verex-benchmark-bv-integer.json` = local JSON). Restored:
   features, cmp, math_fixed, ristretto255, ed25519, ordered_map; the other
   problems are unchanged (+0.000%). 55 baselines changed against the pre-change
-  state (`all-changed-vs-pre-bv.json`): 26 MoveToLeanerLang translations no
+  state (`all-changed-vs-pre-bv.json`): 26 MoveToVerexSL translations no
   longer stop at the guard, ten registry files now verify cleanly, the rest
   reach verification.
-- Open (exposed, not caused, by the removal): `MoveToLeanerLang/constants.exp.lean`
+- Open (exposed, not caused, by the removal): `MoveToVerexSL/constants.exp.lean`
   is an error baseline because a width-less `int2bv(value + 1)` (XAST type `num`,
   width from the spec function's result) is rejected; it needs contextual width
   inference, as does generic `bv_signed_generic`. Registry gaps now visible:
@@ -572,12 +572,12 @@ Bit-vector representation retired (2026-10-07, user decision, validated):
 - Unused: XAST v10's `defaulted_num` marker is still decoded and tested.
 
 Unrolling resumed and validated (2026-10-07, evening):
-- Literal results are no longer SSA-named. The `lir_denote` simproc
+- Literal results are no longer SSA-named. The `vir_denote` simproc
   `namedLiteral` (`Denote/Types.lean`, with `forall_named_fits`) substitutes a
   checked-arithmetic result that normalizes to a fitting Int literal, so literal
   loop conditions decide during normalization. The ground 2×2 nested unroll
   falls from 64.5M to 7.7M solver heartbeats and verifies at 25k; it is now a
-  positive root of `LeanerLang/Tests/LoopUnroll.lean`, and `designs/repros/` is
+  positive root of `VerexSL/Tests/LoopUnroll.lean`, and `designs/repros/` is
   removed. `bug_15880` test1/test4 now fail as MVP expects instead of timing out.
 - The unroll exhaustion goal carries `Provenance.unrollBound`: "the bound
   `pragma unroll = N` of a loop is not established". Its first failure admits
@@ -594,7 +594,7 @@ Unrolling resumed and validated (2026-10-07, evening):
   `verify_vector`/`loop_unroll_false` updates. Benchmark: same outcomes (24
   verified, one expected rejection, six C17 import failures), 9,470,179,029 raw
   heartbeats (−0.482% vs 9,516,016,778; VectorOperations −16.2%), measured
-  JSON `/tmp/leaner-benchmark-unroll-literals.json` = local JSON, HTML refreshed.
+  JSON `/tmp/verex-benchmark-unroll-literals.json` = local JSON, HTML refreshed.
 - Cost gates were NOT refreshed. Their `.exp` drift (+3–8% on small targets,
   −42% `classify_primitive`) predates this work; the simproc measures 0% on
   every gate target, so recording it would name targets this change does not move.
@@ -613,23 +613,23 @@ The user requested suspension and a handoff for another agent. The overarching
 parity goal is incomplete. No commit was requested or made at this checkpoint;
 preserve the large existing worktree.
 
-Correction to the preceding checkpoint: Leaner preserved `pragma unroll = 4`
+Correction to the preceding checkpoint: Verex preserved `pragma unroll = 4`
 for `math_fixed8::pow_raw` but never consumed it. The old failure was under the
 ordinary invariant rule, not an already-unrolled proof. There is no authored
 invariant sufficient to prove the intended exponentiation relationship.
 
 Current implementation:
-- `leaner-ir/LeanerIR/Proofs/Denote/LoopUnroll.lean` proves three rules over the
+- `verex-ir/VerexIR/Proofs/Denote/LoopUnroll.lean` proves three rules over the
   actual `Spec.fix` semantics. `loopUnroll` wraps `fixApprox` with a separate
   proof allowance; its allowance does not change semantics. Entry quantifies
   all semantic fuel, each step consumes one proof allowance, and exhaustion
   requires `False`. All normal, abort, and undefined outcomes are preserved.
   `bound + 1` allows the final while-condition check.
-- `LeanerIR/Proofs/Denote/Solve.lean` exposes one unrolled iteration at a time.
-  `LeanerLang/Verify.lean` passes the owning declaration's nonnegative integer
+- `VerexIR/Proofs/Denote/Solve.lean` exposes one unrolled iteration at a time.
+  `VerexSL/Verify.lean` passes the owning declaration's nonnegative integer
   `unroll` pragma and its loop sites to the solver. Nested loops each receive
   that allowance. Ordinary invariant verification remains the default.
-- `LeanerLang/Tests/LoopUnroll.lean` covers bounded symbolic counting, zero
+- `VerexSL/Tests/LoopUnroll.lean` covers bounded symbolic counting, zero
   iterations, early return, and three kernel controls against losing normal,
   abort, or undefined outcomes at allowance zero. It is now registered in the
   IR test roots. Source counterparts are `SourceVerify/loop_unroll.move` and
@@ -654,12 +654,12 @@ experiment, not final performance measurements.
 MVP differential evidence: the positive source fixtures verify
 (`/tmp/loop_unroll-mvp.log`). MVP accepts the false `insufficient` postcondition
 when `unroll = 0` truncates its loop, while rejecting `incorrect` with a sufficient
-bound (`/tmp/loop_unroll_false-mvp.log`). Leaner's exhaustion rule deliberately
+bound (`/tmp/loop_unroll_false-mvp.log`). Verex's exhaustion rule deliberately
 requires unreachability instead. Check both negative roots individually, not
 just the source command's overall exit status.
 
 Focused validation at suspension:
-- `lake build LeanerLang.Tests.LoopUnroll`: PASS, 117 jobs, including all three
+- `lake build VerexSL.Tests.LoopUnroll`: PASS, 117 jobs, including all three
   positive roots and all three kernel soundness controls
   (`/tmp/loop-unroll-suspend-focused.log`).
 - Source-verification dependency build: PASS, 150 jobs
@@ -698,7 +698,7 @@ Reproduce the real registry export from `../move-prover`:
 ```
 The current CLI executable may predate unrolling. The existing exported
 `/tmp/bv-spec-math-fixed8.lean` can be checked against fresh library oleans from
-`leaner-ir` using `lake env lean -Dweak.leaner.verifyHeartbeats=25000 FILE`.
+`verex-ir` using `lake env lean -Dweak.verex.verifyHeartbeats=25000 FILE`.
 Use `ELAN_TOOLCHAIN=leanprover/lean4:v4.32.2` throughout; never build shared
 production oleans while their readers are running.
 
@@ -727,7 +727,7 @@ false clauses) agree with MVP: the three positives verify and both negatives
 are rejected. The nested positive initially exhausted 1,500,000 maxHeartbeats
 (about 1.5 billion raw heartbeats). Its leaf was concrete modular arithmetic,
 but omega expanded repeated remainder constraints before substituting `x = 255`.
-`leaner_ground_arithmetic` now rewrites only literal Int/Nat equalities
+`verex_ground_arithmetic` now rewrites only literal Int/Nat equalities
 in the target and invokes the existing closed-goal decision step before omega.
 Five focused positive/negative arithmetic tests pass, including the nested
 shape under 10,000 maxHeartbeats; no budget was raised.
@@ -763,7 +763,7 @@ path through move-prover with its test dependency flags instead.
 The benchmark/main HTML was regenerated before broad checks: 24 verified,
 one expected rejection, six import failures, 9,516,016,778 raw heartbeats
 (+0.069% from the previous local run). `local_benchmark.json` matches
-`/tmp/leaner-benchmark-bv-spec-calls-reports.json`; type_info remains absent.
+`/tmp/verex-benchmark-bv-spec-calls-reports.json`; type_info remains absent.
 Baseline changes are the new two-clause negative source fixture and math_fixed8's
 remaining timeout; the pre-run snapshot is `/tmp/bv-spec-calls-baselines-before.json`.
 Representation-guard registry files decrease from 27 to 26. The two baseline
@@ -798,7 +798,7 @@ The 70 representation checks and 25 lowering guards plus its universal kernel
 proof pass (`/tmp/bv-scalar-integration-build.log`).
 
 New `SourceVerify/bv_scalar_arithmetic.move`: all seven roots pass both MVP and
-Leaner (conversion, add/subtract/multiply wrapping, division/remainder by zero,
+Verex (conversion, add/subtract/multiply wrapping, division/remainder by zero,
 and checked executable multiplication that aborts). Native cost is 22,775,665
 verification heartbeats across seven roots (max 5,755,523), 30,269,461 total raw
 heartbeats (`/tmp/bv-scalar-arithmetic-cost.json`). All six earlier false
@@ -822,7 +822,7 @@ log `/tmp/bv-scalar-registry-final.log`, exit 0. No validation processes remain 
 The full benchmark and main HTML were regenerated before broad Lean checks:
 24 verified, one expected AMM rejection, six unchanged import failures,
 9,509,422,287 raw heartbeats. `local_benchmark.json` matches
-`/tmp/leaner-benchmark-bv-scalar-reports.json`; `type_info` remains absent.
+`/tmp/verex-benchmark-bv-scalar-reports.json`; `type_info` remains absent.
 The checkpoint's nine baseline changes are audited in
 `/tmp/bv-scalar-baseline-audit.json`, against the saved pre-run contents in
 `/tmp/bv-scalar-baselines-before.json`. All validation handles are terminal.
@@ -842,7 +842,7 @@ generated-expression/BitVec comparisons across all six Move widths, plus a
 kernel proof of the conversion identity for every integer. The earlier 66
 representation checks also pass (`/tmp/bv-lowering-tests.log`). A diagnostic
 generator `/tmp/RenderNumericLowering.lean` sends constructed lowered formulas
-through the real XAST→validated LIR→Leaner printer. Six resulting verification
+through the real XAST→validated VIR→Verex printer. Six resulting verification
 controls pass (wrapping, division/remainder by zero, narrowing bound and in-range
 cast, oversized shift); false wrapping and zero-on-narrowing-overflow controls
 fail their ensures clauses. Logs: `/tmp/bv-lowering-{good,false,DivisionZero,
@@ -887,7 +887,7 @@ representation analysis. This distinguishes `3` from `3u256` when both export
 at type `u256`, including schema-expanded expressions. Existing exchange
 baseline diffs contain only the version and literal markers. New owning
 fixtures are `move-model/exchange/tests/ast_sources/defaulted_num.move` and
-`leaner-move/Tests/Xast.lean`. All 59 exchange tests pass without updates;
+`verex-move/Tests/Xast.lean`. All 59 exchange tests pass without updates;
 Cargo check, package formatting and package Clippy with `--no-deps` pass.
 The repository `xclippy` alias is not package-scoped, and a dependency-inclusive
 Clippy attempt encountered existing `aptos-metrics-core` warnings; no unrelated
@@ -902,14 +902,14 @@ value on overflow, unlike modular `int2bv`. The new
 parameters: MVP proves the in-range round trip, result bounds and wrapping
 conversion, and rejects both false narrowing claims. Generated Boogie contains
 distinct arbitrary symbols for the two cast sites (`/tmp/bv-downcast.vc_0003.bpl`,
-`/tmp/bv-downcast-mvp.log`). The Leaner guard still rejects this unimplemented
+`/tmp/bv-downcast-mvp.log`). The Verex guard still rejects this unimplemented
 family; no new registry verification success is claimed for the metadata work.
 
 `/tmp/bv-literals-validation.py` completed with exit 0. It rebuilt the ci Move
 CLI and registry executable against v10, built Move/E2E, regenerated the full
 benchmark/main HTML first, refreshed the source baselines, then passed full
 Move/E2E suites and all 437 registry checks without updates (152.89s).
-`local_benchmark.json` matches `/tmp/leaner-benchmark-bv-literals-reports.json`:
+`local_benchmark.json` matches `/tmp/verex-benchmark-bv-literals-reports.json`:
 24 verified, one expected AMM rejection, six unchanged import failures,
 9,509,559,974 raw heartbeats. HTML still ranks expensive targets first and
 excludes `type_info`. No processes from this checkpoint remain live. General
@@ -923,7 +923,7 @@ and rejects the deliberately false contract of `f`, matching MVP. Four new
 positive roots cover explicit `bv`/`bv_ret`, a caller crossing the callee's
 width, mutable-reference updates and their caller. All four pass both backends.
 Inline specifications, concrete clauses and outgoing calls have independent
-negative fixtures: MVP rejects their false claims and Leaner rejects their
+negative fixtures: MVP rejects their false claims and Verex rejects their
 unsupported representation flow. Aggregates/generics and proof blocks also
 remain guarded; general representation analysis is still open.
 
@@ -945,7 +945,7 @@ down from 30; baseline agreement is not general MVP parity. Logs:
 No processes from this checkpoint remain live. Core/Rust were unchanged.
 
 The refreshed `local_benchmark.json` matches
-`/tmp/leaner-benchmark-bv-internal-reports.json`: 24 verified, one expected
+`/tmp/verex-benchmark-bv-internal-reports.json`: 24 verified, one expected
 AMM rejection, six unchanged import failures, 9,509,276,380 raw heartbeats.
 The generated HTML retains the most expensive targets first, compares with
 main, and excludes `type_info`. Coverage is unchanged from the seed-guard
@@ -953,10 +953,10 @@ checkpoint; its lower coverage than earlier runs is not a speed improvement.
 
 Representation-seed follow-up (2026-10-07, validated): the explicit
 wrapper guard was insufficient. MVP rejects `(x & 255) + 1 > 255` at `x = 255`,
-but Leaner accepted it; `pragma bv = b"0"` also made plain `x + 1 > 255` an
+but Verex accepted it; `pragma bv = b"0"` also made plain `x + 1 > 255` an
 incorrect acceptance. A bitwise operation in executable code can classify
 the returned value and change arithmetic in its postcondition as well.
-Evidence: `/tmp/bv-{implicit,pragma}-arithmetic-{mvp,leaner}.log` and
+Evidence: `/tmp/bv-{implicit,pragma}-arithmetic-{mvp,verex}.log` and
 `/tmp/bv-body-mvp.log`. All three have independent SourceVerify fixtures.
 
 `Frontend/NumericRepresentation.lean` now checks complete XAST declarations
@@ -975,9 +975,9 @@ below is historical.
 The refreshed JSON/HTML now reports 24 verified, one expected AMM rejection,
 and six import failures (`features`, `cmp`, `math_fixed`, `ristretto255`,
 `ed25519`, framework `ordered_map`), at 9,509,557,743 raw heartbeats. This is
-reduced coverage, not a speed improvement. The authored LeanerLang `OrderedMap`
+reduced coverage, not a speed improvement. The authored VerexSL `OrderedMap`
 still verifies. The registry refresh passes 437 files; 30 now stop at the
-representation boundary, including 10 with previously empty Leaner baselines
+representation boundary, including 10 with previously empty Verex baselines
 (`/tmp/bv-seeds-registry-audit.json`). Full Move and E2E suites pass, as does
 the ordinary 437-file registry recheck (169.68s). No baseline updates were
 enabled for those final checks. Logs: `/tmp/bv-seeds-{validation,move-tests,
@@ -992,13 +992,13 @@ and generated main-relative HTML were refreshed before the broad suites:
 (`features`, `ristretto255`, `ed25519`), totaling 13,664,061,946 raw heartbeats.
 The total excludes their former verification work and is not a performance
 improvement. `local_benchmark.json` matches
-`/tmp/leaner-benchmark-bv-guard-reports.json`; top expensive targets remain
+`/tmp/verex-benchmark-bv-guard-reports.json`; top expensive targets remain
 first and `type_info` is absent. Logs: `/tmp/bv-guard-{validation,benchmark,
 move-tests,e2e-tests,registry-check}.log`. Core/Rust are unchanged since the
 preceding full checkpoint. Restoring the affected samples with sound
 representation semantics remains open; baseline agreement is not MVP parity.
 
-LIR import failures now return source error reports instead of throwing,
+VIR import failures now return source error reports instead of throwing,
 so the benchmark records their frontend heartbeats and the source suite can
 continue. This also gives both independent overflow regressions their own
 generated `.exp` baseline. Errors currently anchor at input line 1; precise
@@ -1031,7 +1031,7 @@ the registered Table boundary checks above the previous pool checkpoint.
 
 Next frontend lead: `bv_signed_generic` is rejected because source `bv2int`
 and `int2bv` wrappers have the polymorphic signature `T -> T`, while the
-adapter maps them to numeric LIR conversion operations. Inspect the source
+adapter maps them to numeric VIR conversion operations. Inspect the source
 builtin signatures and the Boogie translator's instantiated representation
 rules before changing this boundary; numeric conversion and representation
 wrappers must not be conflated. The importer now rejects both source wrappers
@@ -1047,7 +1047,7 @@ instantiation need separate treatment; do not relax the numeric validator or
 erase source wrappers merely to get the generic fixture past validation.
 
 The stronger negative probe `/tmp/bv_wrapper_range.move` exposed an actual
-false acceptance: at `x = 255`, Leaner erased `int2bv` and proved
+false acceptance: at `x = 255`, Verex erased `int2bv` and proved
 `int2bv(((x as num) + 1) as u8) > 255`, which MVP rejects. The import guard
 now rejects that source (`/tmp/bv-wrapper-range-guard.log`, exit 1), and
 `SourceVerify/bv_representation_overflow.move` records the rejection.
@@ -1087,10 +1087,10 @@ the classification. `SourceVerify/bv_representation_signed_cast.move` retains
 the negative case independently. No signed-wrapper erasure was installed.
 The owning source suite passes with its generated baseline
 (`/tmp/bv-signed-cast-source-baselines.log`, exit 0). MVP rejects the fixture's
-postcondition, Leaner rejects the unsupported wrapper, and an unwrapped
-control verifies in Leaner with value 256. Logs:
-`/tmp/bv-signed-cast-fixture-{mvp,leaner}.log` and
-`/tmp/bv-signed-cast-control-leaner.log`. The measured benchmark and preceding
+postcondition, Verex rejects the unsupported wrapper, and an unwrapped
+control verifies in Verex with value 256. Logs:
+`/tmp/bv-signed-cast-fixture-{mvp,verex}.log` and
+`/tmp/bv-signed-cast-control-verex.log`. The measured benchmark and preceding
 full checkpoint are unchanged; this follow-up adds regression coverage only.
 
 Owned-value carrier follow-up (2026-10-07): `TableValueBoundary.Observed`
@@ -1143,7 +1143,7 @@ Native mutation/allocation dispatch and the logical carrier are still unconnecte
 no new registry pass is claimed. See the design's dependency-ordered integration
 steps and the existing full-checkpoint evidence below.
 
-Boundary validation: registered `LeanerIR.Tests.StateView` covers identity erasure
+Boundary validation: registered `VerexIR.Tests.StateView` covers identity erasure
 across states, impossibility of a handle-only codec, recovery at the final state,
 rejection of an old result at the new state, inconsistent inputs even for a bottom
 computation, undecodable successes, abort and undefined preservation, actual Table
@@ -1230,7 +1230,7 @@ position, normalizing only the new fact, then applying the range solver
 closes the four range-extension leaves. `simpByContext` requires `setGoals`
 after adding facts; omitting it produces a misleading "No goals to be solved".
 Nonnegative literal-list reads also connect spec `Int.tmod` to runtime `%`.
-Ground `Int.tmod`/`Int.tdiv` reductions are absent from lir_denote_norm;
+Ground `Int.tmod`/`Int.tdiv` reductions are absent from vir_denote_norm;
 adding their standard simprocs eliminates the last concrete-result arithmetic
 residual. The combined scratch proof succeeds at a diagnostic 100k but costs
 52,910,850 typed raw heartbeats; it still times out at native 25k. No count
@@ -1283,8 +1283,8 @@ state-label fixtures, and ArithmeticContext pass. Logs use
 `caller-cost`, and fixture names. The full checkpoint is **complete**, wrapper session 48800 exited 0.
 Benchmark: **30 verified + one expected rejection**, no timeouts,
 **15,696,214,192 raw heartbeats** (+19,472,285, +0.1242% versus the Boolean
-checkpoint). Framework ordered_map costs 4,135,557,520; LeanerLang OrderedMap
-costs 1,433,966,047. `/tmp/leaner-benchmark-aliasing-observations.json` matches
+checkpoint). Framework ordered_map costs 4,135,557,520; VerexSL OrderedMap
+costs 1,433,966,047. `/tmp/verex-benchmark-aliasing-observations.json` matches
 local JSON, and generated main-relative HTML excludes type_info. **All four
 builds and full suites pass**, including the registered MemoryEquality and
 ArithmeticContext regressions. The full registry matches **437/437**, without
@@ -1314,7 +1314,7 @@ Logs `/tmp/boolean-observation-{amm-native,intermediate-native,
 intermediate-refresh,state-labels}.log`. The regular benchmark and full registry recheck are complete (wrapper exit 0,
 session 97473). Benchmark: **30 verified + one expected rejection**, no timeouts,
 **15,676,741,907 raw heartbeats** (-1,200,444 against call-observation).
-`/tmp/leaner-benchmark-boolean-observation.json` matches local JSON; main-relative
+`/tmp/verex-benchmark-boolean-observation.json` matches local JSON; main-relative
 HTML is refreshed with no type_info. Full registry recheck: **437/437**, without
 refresh. Logs `/tmp/boolean-observation-{checkpoint,benchmark,registry-check}.log`.
 All four full suites passed immediately before these two small follow-ups;
@@ -1345,7 +1345,7 @@ times out on test_config_preserved, but its result equality remains unproved.
 Those reviewed diagnostics were refreshed by their owning runners.
 The regular benchmark is complete: **30 verified + one expected rejection**,
 no timeouts, **15,677,942,351 raw heartbeats** (+33,195,672, +0.2122% against
-invocation-reuse). `/tmp/leaner-benchmark-call-observation.json` matches local
+invocation-reuse). `/tmp/verex-benchmark-call-observation.json` matches local
 JSON; main-relative HTML is regenerated and excludes type_info. The periodic
 full-suite/437-registry checkpoint is running (session 49131) via
 `/tmp/call-observation-checkpoint.py`, log `/tmp/call-observation-checkpoint.log`.
@@ -1385,7 +1385,7 @@ matching EnsuresOf, ResultOf and StateOf facts; abortCases? recognizes direct
 positive/negative abort facts by reducible conversion (encodeFor abbreviates
 encode). Their regular benchmark completed with **30 verified + one expected
 AMM rejection**, no timeouts, **15,644,746,679 raw heartbeats** (-2,547,240
-against the witness checkpoint). `/tmp/leaner-benchmark-known-invocation.json`
+against the witness checkpoint). `/tmp/verex-benchmark-known-invocation.json`
 matches local JSON; main-relative HTML has no type_info entry. Logs:
 `/tmp/known-invocation-{checkpoint,benchmark}.log`. This benchmark predates the
 new call-observation attempt; the latest full suites also predate those guards.
@@ -1409,7 +1409,7 @@ state-label-directory recheck passes **30/30**. Logs:
 and `/tmp/state-label-witness-{DenotePerformance,CompositionPerformance}.log`.
 The regular benchmark passed: **30 verified + one expected AMM rejection**,
 no timeouts, **15,647,293,919 raw heartbeats** (+164,359, +0.00105% against
-the decoded-state checkpoint). `/tmp/leaner-benchmark-state-label-witness.json`
+the decoded-state checkpoint). `/tmp/verex-benchmark-state-label-witness.json`
 matches local JSON; generated HTML compares against main and excludes type_info.
 After that refresh, **all four builds and full suites pass**, and the full
 registry matches **437/437** baselines without refresh. The checkpoint wrapper
@@ -1421,7 +1421,7 @@ Next target scratch investigation (no production changes):
 `aborts_if_at_state_label::caller` has a valid diagnostic proof in
 `/tmp/NextAbortLabelSingle.lean` (exit 0; `/tmp/next-abort-label-single.log`).
 It disables leaf/residual solvers, then proves contradictions with omega and
-uses `simp_all [LeanerIR.packResults_single, Int.tdiv_eq_ediv_of_nonneg]` on
+uses `simp_all [VerexIR.packResults_single, Int.tdiv_eq_ediv_of_nonneg]` on
 remaining leaves. Nine residuals reduce to none. This uses a 500k diagnostic
 budget; the pre-script solver alone costs about 210M heartbeats, so it is not
 an accepted native fix or installed companion. Pure equality simplification
@@ -1445,7 +1445,7 @@ state-label-directory check matches **30/30** baselines
 **18,269,904 raw heartbeats / 11,428 objects**, plus 367,301 transport heartbeats
 (`/tmp/state-label-decoded-total.log`); the previous high-budget diagnostic still
 failed its clauses, so this is a proof-automation fix, not just a cost reduction.
-`LeanerLang/Tests/StateLabelDecoding.lean` is registered and passes three positive
+`VerexSL/Tests/StateLabelDecoding.lean` is registered and passes three positive
 proofs (including an opaque caller) plus two expected rejections (missing
 resource and overflowing update), all at 25k. Both cost gates and the existing
 DefinedStateLabels/InvocationStateLabels fixtures pass. Native build and logs:
@@ -1454,7 +1454,7 @@ DefinedStateLabels/InvocationStateLabels fixtures pass. Native build and logs:
 `/tmp/state-label-decoded-{defined,invocation}.log`.
 The regular benchmark completed successfully: **30 verified + one expected AMM
 rejection**, no timeouts, **15,647,129,560 raw heartbeats** (+199,877, +0.0013%
-against the restored-guard checkpoint). `/tmp/leaner-benchmark-state-label-decoded.json`
+against the restored-guard checkpoint). `/tmp/verex-benchmark-state-label-decoded.json`
 matches local JSON; main-relative HTML is regenerated with type_info absent.
 Logs: `/tmp/state-label-decoded-{checkpoint,benchmark}.log`. The native
 table_option recheck also passes. No new full-suite run was scheduled for this
@@ -1469,7 +1469,7 @@ Current checkpoint (2026-10-07): vector element quantifiers pass five positive
 proofs and two intended rejections at 25k. The runtime-value specialization
 preserves every benchmark target outcome: 30 verified problems and one expected
 rejection, at 15,744,282,692 raw heartbeats (+0.1096% over certified reads).
-`/tmp/leaner-benchmark-element-quantifiers-final.json` is byte-identical to
+`/tmp/verex-benchmark-element-quantifiers-final.json` is byte-identical to
 local JSON; generated HTML compares with main and omits retired type_info.
 All four full suites pass, including both cost gates and 130 Check fixtures
 (`/tmp/element-final-full-tests.log`). The full registry check matches 436/437
@@ -1506,7 +1506,7 @@ Do not transplant its larger diagnostic budget into acceptance settings.
 The full benchmark refresh preserves all outcomes: 30 verified and one expected
 AMM rejection, at 15,725,534,459 raw heartbeats (−18,748,233, or −0.1191%,
 from the element-quantifier checkpoint). The measured artifact
-`/tmp/leaner-benchmark-table-invariants.json` is byte-identical to local JSON;
+`/tmp/verex-benchmark-table-invariants.json` is byte-identical to local JSON;
 the driver regenerated main-relative HTML, with `type_info` absent. Capability
 falls from 283,915,114 to 237,395,590 heartbeats; framework ordered_map rises
 from 4,145,558,609 to 4,157,454,627, still fully verified. All four full suites pass after that refresh, including both cost gates and
@@ -1530,7 +1530,7 @@ rules and context equalities. The solver-only `table_option` diagnostic improves
 25k; its ordinary baseline check matches. Nine positive/two negative invariant
 checks and the identity guard pass with this change. The full benchmark is refreshed: 30 verified plus one expected AMM rejection,
 15,725,421,251 raw heartbeats (−113,208, or −0.00072%, locally).
-`/tmp/leaner-benchmark-snapshot-equality.json` is byte-identical to local JSON;
+`/tmp/verex-benchmark-snapshot-equality.json` is byte-identical to local JSON;
 the generated main-relative HTML excludes type_info. Both focused cost gates
 pass (`/tmp/snapshot-equality-DenotePerformance.log`,
 `/tmp/snapshot-equality-CompositionPerformance.log`); no post-change full-suite
@@ -1550,7 +1550,7 @@ proof objects; it still times out at the registry limit. The ordinary registry
 baseline check matches (`/tmp/call-range-guard-table-option-registry.log`).
 The full benchmark preserves 30 verified targets and one expected AMM rejection
 at **15,624,166,021** raw heartbeats, down 101,255,230 (0.6439%) from the snapshot
-checkpoint. `/tmp/leaner-benchmark-call-range-guard.json` is byte-identical to
+checkpoint. `/tmp/verex-benchmark-call-range-guard.json` is byte-identical to
 local JSON; HTML is regenerated against main and excludes type_info.
 All four package builds and full suites pass, and all 437 registry baseline
 checks match (`/tmp/call-range-checkpoint-full-tests.log`). No baseline refresh
@@ -1571,7 +1571,7 @@ checkpoint; proof objects remain 22,076. Its native registry timeout baseline
 still matches. The `verify_vector` registry check also matches unchanged
 (`/tmp/computed-index-vector-registry.log`). The subsequent regular benchmark preserves every outcome at
 15,646,803,818 raw heartbeats (+22,637,797, +0.1449%). The measured artifact
-`/tmp/leaner-benchmark-computed-index.json` matches local JSON; main-relative
+`/tmp/verex-benchmark-computed-index.json` matches local JSON; main-relative
 HTML is refreshed and excludes type_info. The all-suite result above predates
 this computed-index change.
 
@@ -1594,9 +1594,9 @@ TableSnapshots and the kernel-level snapshot/invariant tests pass. New lemmas
 use only standard Lean axioms (`/tmp/table-normalization-final-table-normalization-audit.log`).
 The first normalization benchmark completed but exposed a regression:
 framework ordered_map upsert/remove-or-none/iter-collect become much more
-expensive, and LeanerLang OrderedMap times out. The checkpoint script stopped
+expensive, and VerexSL OrderedMap times out. The checkpoint script stopped
 at its outcome assertion, so **no full suites ran for this batch**. Its honest
-measured data/report are `/tmp/leaner-benchmark-table-option-fixed.json` and
+measured data/report are `/tmp/verex-benchmark-table-option-fixed.json` and
 local JSON/HTML. The culprit is restricting call-range eligibility to context
 facts. In an isolated identical upsert source, restoring the original guard
 reduces typed work from 432,274,533 to 120,693,726 heartbeats (scratch overrides
@@ -1610,8 +1610,8 @@ as do both focused cost gates (`/tmp/table-restored-{DenotePerformance,Compositi
 The corrected regular benchmark passes: **30 verified and one expected AMM
 rejection, no timeouts**, at **15,646,929,683 raw heartbeats** (+125,865,
 +0.0008044% against the previous good computed-index checkpoint). Framework
-ordered_map costs 4,123,667,100; LeanerLang OrderedMap costs 1,433,690,178.
-`/tmp/leaner-benchmark-table-restored.json` matches local JSON; the generated
+ordered_map costs 4,123,667,100; VerexSL OrderedMap costs 1,433,690,178.
+`/tmp/verex-benchmark-table-restored.json` matches local JSON; the generated
 HTML compares against main and omits type_info. All four builds and **all four full suites pass**, and the full registry
 **matches 437/437 baselines without refresh** (`/tmp/table-restored-full-tests.log`,
 `/tmp/table-restored-registry-check.log`). The checkpoint process is terminal
@@ -1649,7 +1649,7 @@ an automation/performance lead, not an installed fix or registry success.
 All experiments are scratch only; the full-suite checkpoint above validates
 unchanged production sources.
 
-The preceding full benchmark is `/tmp/leaner-benchmark-certified-reads-final.json`: 30
+The preceding full benchmark is `/tmp/verex-benchmark-certified-reads-final.json`: 30
 verified problems, one expected AMM rejection, no unexpected failures/timeouts,
 and 15,727,043,391 raw heartbeats (−81,383,741, or −0.5148%, from vector ranges).
 Local JSON is byte-identical to the measured artifact. The driver regenerated
@@ -1740,7 +1740,7 @@ boundaries, and preserve the existing acceptance budgets.
    See `intrinsic-maps.md`, "Ownership of table contents". This permits reuse of
    owned-map reasoning, but Table view/native storage agreement, fresh allocation,
    old/labelled snapshots, and the registry's empty abstract map owners remain
-   unimplemented. Probe packages and logs: `/tmp/leaner-table-borrow-probe-*`.
+   unimplemented. Probe packages and logs: `/tmp/verex-table-borrow-probe-*`.
 3. S4: attribute the remaining `state_labels/` failures. Invocation labels now
    translate in `aborts_if_at_state_label::caller`, but its proof exceeds the
    runner's 25k heartbeat budget. Reduce preparation cost while retaining that limit.
@@ -1765,7 +1765,7 @@ boundaries, and preserve the existing acceptance budgets.
 
 - Element-wise vector preconditions now establish indexed-read properties.
   `forall_runtime_mem_map_iff` exposes the native element predicate before the existing
-  membership-to-position normalization. `leaner_instantiate_positions`
+  membership-to-position normalization. `verex_instantiate_positions`
   keeps non-position value binders universally quantified through
   `bindOpenPremises` instead of rejecting them. No guessed value or additional
   assumption is introduced. `ElementQuantifiers` proves reads from value and
@@ -1805,12 +1805,12 @@ boundaries, and preserve the existing acceptance budgets.
   and behavioral predicates. `AgreeUnnamed` preserves resources outside
   globals, Table contents, and allocation history. Loan independence shifts
   native contents and preserves allocation identities; `state_of` uniqueness
-  covers both stores. `LeanerIR`/`LeanerLang` build and focused Behavior tests
+  covers both stores. `VerexIR`/`VerexSL` build and focused Behavior tests
   pass (`/tmp/table-call-language-build.log`, `/tmp/table-call-behavior.log`).
   The strengthened uniqueness, loan-mirroring, and runtime-contract proofs
   use only Lean's standard logical axioms
   (`/tmp/table-call-agreement-audit.{lean,log}`).
-  Full benchmark `/tmp/leaner-benchmark-table-call.json` completed and the
+  Full benchmark `/tmp/verex-benchmark-table-call.json` completed and the
   driver regenerated local JSON/HTML against main: 30 verified, one expected
   AMM rejection, no unexpected failures/timeouts; 15,824,599,521 raw heartbeats
   (−136,422 from the preceding run, −0.00086%). All four suites passed the
@@ -1833,14 +1833,14 @@ boundaries, and preserve the existing acceptance budgets.
   Typed/skolem adapters, closure-frame automation, and the LooseFrame fixture
   carry the added result. No source specification or heartbeat budget changed.
   Core proofs build (`/tmp/returned-storage-core-build.log`) and new
-  `LeanerIR/Tests/ReturnedStorage.lean` checks pass
+  `VerexIR/Tests/ReturnedStorage.lean` checks pass
   (`/tmp/returned-storage-test.log`). Language and E2E builds pass
   (`/tmp/returned-storage-language-build.log`, `/tmp/returned-storage-e2e-build.log`).
   Nine focused checks pass, including closure frames, generics, returned refs,
   global borrows, and the new result-frame regression
   (`/tmp/returned-storage-focused.log`). The axiom audit uses only standard
   Lean logical axioms (`/tmp/returned-storage-audit.log`). Its full benchmark
-  `/tmp/leaner-benchmark-returned-storage.json` finished successfully: 30 verified,
+  `/tmp/verex-benchmark-returned-storage.json` finished successfully: 30 verified,
   one expected rejection, no unexpected failures/timeouts, 15,826,904,482 raw
   heartbeats (+0.0146% from the preceding checkpoint). Local JSON matches the
   measured artifact, and generator-produced HTML still compares against main
@@ -1869,7 +1869,7 @@ boundaries, and preserve the existing acceptance budgets.
   empty success log `/tmp/returned-global-pair.log`). The first-hole transfer
   helper alone is not evidence of a reachable multiple-field bug; keep the
   enclosing owner lifetime in reproductions. Tagged storage-loan routing was
-  prototyped in `/tmp/table-routing-checkpoint/leaner-ir` and installed after
+  prototyped in `/tmp/table-routing-checkpoint/verex-ir` and installed after
   all preceding readers finished. It replaces `globalLoans` by `storageLoans`
   with `.global`/`.table` targets; no artificial key encoding or heap scan.
   The isolated core/language build passes (`/tmp/table-routing-core3.log`),
@@ -1881,7 +1881,7 @@ boundaries, and preserve the existing acceptance budgets.
   audit contains only standard Lean axioms (`/tmp/table-routing-audit.log`).
   `/tmp/table-routing-validate.py` finished: Move/E2E executable builds and
   all 14 focused checks pass. Its full benchmark is
-  `/tmp/leaner-benchmark-table-routing.json`: 30 verified, one expected AMM
+  `/tmp/verex-benchmark-table-routing.json`: 30 verified, one expected AMM
   rejection, zero unexpected failures/timeouts, 15,826,709,038 raw heartbeats
   (−195,444 from returned-storage, −0.0012%). JSON exactly matches the measured
   artifact; generated HTML is still relative to main CI 37250691414
@@ -1928,7 +1928,7 @@ boundaries, and preserve the existing acceptance budgets.
   existing generic-resource negative. The proof audit uses only standard Lean
   axioms (`/tmp/table-contents-audit.log`). The capability companion's four
   resource constructors were migrated to the explicit `.value` kind.
-  The final full benchmark (`/tmp/leaner-benchmark-table-contents-final.json`)
+  The final full benchmark (`/tmp/verex-benchmark-table-contents-final.json`)
   is 30 verified plus the expected AMM rejection, no unexpected failures or
   timeouts, and 15,807,436,992 raw heartbeats (−19,272,046 / −0.122% from the
   previous Table-routing measurement). `local_benchmark.json` matches the
@@ -1968,13 +1968,13 @@ boundaries, and preserve the existing acceptance budgets.
   run is claimed; the full checkpoint above remains authoritative.
   **Next:** connect the specification aggregate's physical-only representation
   to the view that retains nested content snapshots per occurrence. In
-  `LeanerLang/Contract.lean`, inspect `Domain.aggregate`, `runtimeAggregateValue`
+  `VerexSL/Contract.lean`, inspect `Domain.aggregate`, `runtimeAggregateValue`
   and `mapSpecCall`. Preserve projections, lets, specification calls, quantifiers,
   old/labeled memories and functional updates; two snapshots of the same nested
   identity can coexist in one aggregate. Do not implement direct-handle reads
   as a shortcut for `table_contais_to_length`. Pure `spec_new` needs a logical
   identity policy; it cannot perform executable fresh allocation. Native models
-  are registered in `LeanerLang/Profile.lean`.
+  are registered in `VerexSL/Profile.lean`.
 
   `Denote/SnapshotValue.lean` now implements the separate logical carrier.
   Table nodes carry physical metadata and optional, recursively observed
@@ -2093,12 +2093,12 @@ boundaries, and preserve the existing acceptance budgets.
   normalization goal, and the two missing stored Option length invariants
   (`/tmp/table-option-projection-goals.log`). That probe uses the source verifier's
   default budget, not the registry budget. Pinning **both** `maxHeartbeats` and
-  `leaner.verifyHeartbeats` to 25000 reproduces the official `whnf` timeout
+  `verex.verifyHeartbeats` to 25000 reproduces the official `whnf` timeout
   (`/tmp/TableOptionRegistryBudget.lean`, `/tmp/table-option-registry-budget.log`).
   No additional whole registry fixture
   is claimed verified. The full benchmark/report refresh passes 30 problems plus
   the expected AMM rejection at 15,807,844,181 heartbeats (−0.0013% locally),
-  recorded in `/tmp/leaner-benchmark-table-projections.json` with generator-produced
+  recorded in `/tmp/verex-benchmark-table-projections.json` with generator-produced
   main-relative HTML. Both cost gates and five scoped registry checks pass after
   that refresh (`/tmp/table-projections-check.log`). The sixth, `table_option`,
   needed its changed diagnostic baseline regenerated by the owning runner; its
@@ -2147,7 +2147,7 @@ boundaries, and preserve the existing acceptance budgets.
   All three ordinary scoped checks pass. After the final benchmark/report,
   Move-package tests pass and the 437-file registry refresh changes only these
   three baselines, with no regression in previously verified targets. Logs:
-  `/tmp/opaque-inline-*.move-check.log`, `/tmp/opaque-inline-leaner-move-test.log`,
+  `/tmp/opaque-inline-*.move-check.log`, `/tmp/opaque-inline-verex-move-test.log`,
   `/tmp/opaque-inline-prover-refresh.log`, and
   `/tmp/opaque-inline-registry-audit.{json,log}`.
 
@@ -2169,7 +2169,7 @@ boundaries, and preserve the existing acceptance budgets.
   residual allowance exposed an extra `count_all` loop-invariant obligation;
   its companion now handles the earlier/current entry cases explicitly, and
   its ordinary baseline check passes (`/tmp/vector-residual-bp-check.log`).
-  Full benchmark `/tmp/leaner-benchmark-vector-residual.json` is complete:
+  Full benchmark `/tmp/verex-benchmark-vector-residual.json` is complete:
   30 verified, one expected rejection, no unexpected failures/timeouts,
   15,846,440,343 raw heartbeats (+0.0055% versus the first vector run).
   The driver regenerated the full local JSON/HTML against main before
@@ -2197,10 +2197,10 @@ boundaries, and preserve the existing acceptance budgets.
   diagnostic baseline, with no new companion. Logs:
   `/tmp/resume-vector-{build,mvp-update,generic-check,existing-check}.log`,
   `/tmp/resume-fallback-mvp.log`.
-- The first full benchmark `/tmp/leaner-benchmark-vector-resumed.json` found
-  authored proof regressions in Quicksort and LeanerLang OrderedMap. Their
+- The first full benchmark `/tmp/verex-benchmark-vector-resumed.json` found
+  authored proof regressions in Quicksort and VerexSL OrderedMap. Their
   proofs now use the certified swap/read form. Both verify in the native
-  follow-up `/tmp/leaner-benchmark-vector-examples.json`, whose generated
+  follow-up `/tmp/verex-benchmark-vector-examples.json`, whose generated
   report refresh preceded the broad tests. Quicksort costs 245M versus the
   checkpoint's 265M; OrderedMap remains about 1.44G.
 - All four full suites pass, including 123 Check fixtures and both cost gates:
@@ -2210,13 +2210,13 @@ boundaries, and preserve the existing acceptance budgets.
   two ordinary rejections instead of timeouts. Logs:
   `/tmp/vector-resumed-prover-refresh.log`,
   `/tmp/vector-resumed-registry-audit.{json,log}`.
-- Final full benchmark `/tmp/leaner-benchmark-vector-final.json` (same-stem
+- Final full benchmark `/tmp/verex-benchmark-vector-final.json` (same-stem
   log) is complete: 30 verified problems and the expected AMM rejection,
   no unexpected failures/timeouts. Total 15,845,571,410 heartbeats, down 1.18%
   against the checkpoint's same 31 problems (16,035,112,646). The script-generated
   local JSON and HTML show the complete suite against main, without intermediate
   runs. Pool is 22/22 at 3,188,968,055; Framework ordered_map is 29/29 at
-  4,157,613,974; Quicksort is 3/3 at 245,199,348 and LeanerLang OrderedMap
+  4,157,613,974; Quicksort is 3/3 at 245,199,348 and VerexSL OrderedMap
   17/17 at 1,441,120,989.
 - Performance follow-ups: simple-map `add_all` rises 159M→183M, features
   `apply_diff` 206M→223M, and ground `swap_remove_value` 36.6M→64.5M.
@@ -2259,11 +2259,11 @@ boundaries, and preserve the existing acceptance budgets.
   existing suppression rule remains unchanged. The valid two-increment
   regression passes at a 50M target budget, and a guarded negative still
   rejects a clause that omits second-invocation overflow.
-- Focused native benchmark `/tmp/leaner-benchmark-behavior-fixed.json` verifies
+- Focused native benchmark `/tmp/verex-benchmark-behavior-fixed.json` verifies
   20/20 behavior targets, zero errors. `add_two` costs 18,943,903 heartbeats;
   module total 125,588,922. The benchmark script regenerated the local JSON
   and HTML before broad testing. The fresh full run
-  `/tmp/leaner-benchmark-behavior-final.json` records 30 verified modules,
+  `/tmp/verex-benchmark-behavior-final.json` records 30 verified modules,
   one expected rejection (AMM), one existing failure (`type_info`), and zero
   timeouts. All measured work is 16,168,784,777 heartbeats (+0.017% versus
   the previous pool full run). Behavior verifies all 20 targets at 125,589,180
@@ -2284,7 +2284,7 @@ boundaries, and preserve the existing acceptance budgets.
   verify under the regular budget. Existing Move sources/specifications are
   unchanged. The new helpers are invoked explicitly by the companion; adding
   them to automatic search regressed option/simple-map and was discarded.
-- Previous pool full native benchmark: `/tmp/leaner-benchmark-pool-final.json`;
+- Previous pool full native benchmark: `/tmp/verex-benchmark-pool-final.json`;
   the new behavior runs replace it in the default generated report against main. Results: 29 verified, 1 expected
   rejection, 2 existing failures (`type_info`, `behavior`), zero timeouts.
   All measured work totals 16,166,103,625 heartbeats. Pool totals 3,393,032,305,
@@ -2306,7 +2306,7 @@ boundaries, and preserve the existing acceptance budgets.
   errors still prevent certifying the target. Ordinary vector/reflection
   solvers retain their original budgets; an unconditional cap regressed ACL
   and was discarded. The six valid AMM targets still verify.
-- Previous AMM baseline benchmark: `/tmp/leaner-benchmark-amm-final.json`;
+- Previous AMM baseline benchmark: `/tmp/verex-benchmark-amm-final.json`;
   the new pool run above replaces it in the default local report, which omits
   intermediate local runs.
   Results: 28 verified, 1 expected rejection, 2 unresolved rejections
@@ -2315,7 +2315,7 @@ boundaries, and preserve the existing acceptance budgets.
   totals 15,822,941,895 heartbeats; the 28 verified problems total 10,968,397,511
   (+0.22%). AMM totals 1,547,801,426; its negative constructor costs 185,036,096
   and reports all four invariants normally, including the no-abort invariant.
-- Validation after publishing benchmark data/HTML: `leaner-ir` full `lake test`
+- Validation after publishing benchmark data/HTML: `verex-ir` full `lake test`
   PASS (both cost gates included), Behavior and InvariantBehavior checks PASS,
   eight Python report tests PASS, and four native classification checks PASS
   (expected rejection, unexpected acceptance, timeout, unrelated frontend error).
@@ -2344,13 +2344,13 @@ boundaries, and preserve the existing acceptance budgets.
 - Cross-resource preparation drops from 28.437M to 20.974M raw heartbeats using
   existing call facts. Its short companion closes all six targets at 25k;
   higher-order callers retain the original fallback.
-- All four full Leaner suites passed immediately before the small final guard:
+- All four full Verex suites passed immediately before the small final guard:
   `/tmp/registry-prepared-behavior-<package>-{build,test}.log`. That full registry
   refresh passed all 437 baselines, with 119 clean, 4 warning-only, 50 preverification,
   232 verification, and 32 other diagnostic files. Baseline matches include
   intentional negatives and are not proof-success counts.
 - Final guard validation completed successfully; no validation processes remain.
-  Fresh data: `/tmp/leaner-benchmark-behavior-guard.json`; generated main-relative
+  Fresh data: `/tmp/verex-benchmark-behavior-guard.json`; generated main-relative
   report: `../local_benchmark.html`. Benchmark is 28/32, with no newly failed or
   missing targets relative to update-normalization. Framework ordered_map is
   29/29 at 4,145,490,348 total heartbeats; calculator 8/8 at 1,072,283,339;
@@ -2409,7 +2409,7 @@ boundaries, and preserve the existing acceptance budgets.
   Full suites and full registry above completed BEFORE the discarded experiment.
 
 - Latest installed follow-up: Contract.updateNominalField is now irreducible
-  during definitional reduction, with kernel-proved lir_denote_norm equations
+  during definitional reduction, with kernel-proved vir_denote_norm equations
   for optional reads, nominal inputs, and unit. This prevents irrelevant
   runtime-constructor splits on typed resource reads. Snapshot:
   `/tmp/update-normalization-before-Contract.lean`. Core and native builds pass:
@@ -2471,7 +2471,7 @@ boundaries, and preserve the existing acceptance budgets.
   and label obligations remain. The optional-read/updateField lemma experiment
   did not change those residuals and is scratch-only, not installed.
 - Completed controller `/tmp/closure-frames-validation.py`, session 27220, PID 676365:
-  fresh benchmark `/tmp/leaner-benchmark-closure-frames.json`, main-relative HTML,
+  fresh benchmark `/tmp/verex-benchmark-closure-frames.json`, main-relative HTML,
   target comparison against returned-freeze-final, then full 437-file baseline
   refresh. Logs `/tmp/closure-frames-{validation,benchmark,report,prover-refresh}.log`.
   No four-package full-suite repeat for this small follow-up; those passed just
@@ -2482,7 +2482,7 @@ boundaries, and preserve the existing acceptance budgets.
 
 - Latest verified checkpoint: `/tmp/returned-freeze-final-validation.py` exited
   successfully. All four full suites and the 437-file refresh PASS. Fresh full
-  benchmark `/tmp/leaner-benchmark-returned-freeze-final.json` has 28/32 with no
+  benchmark `/tmp/verex-benchmark-returned-freeze-final.json` has 28/32 with no
   newly failed or missing targets; main-relative HTML generated before suites.
   Framework ordered_map: 29/29, 4,145,487,311 heartbeats; calculator: 8/8,
   1,072,225,189; AMM: 2,860,062,743, six positives plus intended negative.
@@ -2519,7 +2519,7 @@ boundaries, and preserve the existing acceptance budgets.
   and four other positive loop targets still exceed 25k. See C16 in the registry.
   Snapshots: `/tmp/returned-freeze-before-{Encode,Lower}.lean`.
   Native build: `/tmp/returned-freeze-move-build6.log`.
-  First validation finished: fresh benchmark `/tmp/leaner-benchmark-returned-freeze.json`
+  First validation finished: fresh benchmark `/tmp/verex-benchmark-returned-freeze.json`
   retains 28/32 with no target regressions; main HTML generated before suites.
   IR, Move, and Rust full suites passed. E2E exposed a real smart_table rendering
   fixed-point regression: runtime freeze materialization had also affected logical
@@ -2548,7 +2548,7 @@ boundaries, and preserve the existing acceptance budgets.
   it was reverted (`/tmp/context-discharge-before-Close.lean`).
   Budget-unit correction: CLI `--heartbeats` / SourceVerify `heartbeats` are
   thousands of maxHeartbeats units. Use 25, not 25000, to match the registry.
-  Raw `-Dleaner.verifyHeartbeats=25000` is correct. The focused fixture driver
+  Raw `-Dverex.verifyHeartbeats=25000` is correct. The focused fixture driver
   was corrected and passes at the true 25k cap:
   `/tmp/returned-freeze-fixtures-true25k.log` (seven positives, two negatives).
   Earlier cross-resource scratch claims used the oversized CLI argument;
@@ -2589,7 +2589,7 @@ boundaries, and preserve the existing acceptance budgets.
   `/tmp/short-circuit-registry-amm.log`. The remaining fee/swap/constructor
   obligations still need work at 25k.
   The first benchmark/report completed with 28/32 and no target regressions:
-  `/tmp/leaner-benchmark-short-circuit.json`. AMM is 2.55G (previous 2.87G), with
+  `/tmp/verex-benchmark-short-circuit.json`. AMM is 2.55G (previous 2.87G), with
   six valid targets and the intended negative retained. Move/Rust suites passed;
   IR's cost gate caught proof-term growth on simple arithmetic, and E2E found
   `Scalars/Order::ordered3`'s authored proof depended on the old branch split.
@@ -2600,7 +2600,7 @@ boundaries, and preserve the existing acceptance budgets.
   231 verification / 32 other). Two changed diagnostics: shorter aborts_if
   residuals and bug_15044 now fails normally instead of timing out.
   The corrected final benchmark completed: 28/32, no newly failed targets,
-  `/tmp/leaner-benchmark-short-circuit-final.json`. HTML was generated against
+  `/tmp/verex-benchmark-short-circuit-final.json`. HTML was generated against
   main before the full suites. AMM is 2.86G versus 2.87G; constant_product is
   16.1M versus 26.8M (-39.8%). The earlier non-compliant-pricing improvement
   did not survive the memory-context restriction needed by the cost gate.
@@ -2654,7 +2654,7 @@ boundaries, and preserve the existing acceptance budgets.
   Move's full suite passed again after the interface guard. The first full
   benchmark exposed two AMM proof-script regressions hidden by unchanged sample
   status; both scripts now tolerate earlier invariant normalization. The final
-  full rerun `/tmp/leaner-benchmark-stored-frames-final.json` passed the target-level
+  full rerun `/tmp/verex-benchmark-stored-frames-final.json` passed the target-level
   regression comparison (`/tmp/stored-frames-final-status.log`), retaining 28/32
   passing samples and all six valid AMM targets. `local_benchmark.html` is
   regenerated against main, without intermediate runs. Framework ordered_map
@@ -2676,8 +2676,8 @@ boundaries, and preserve the existing acceptance budgets.
   data/HTML before the next broad suites.
 
 - Validated milestone (2026-10-06): fresh full benchmark
-  `/tmp/leaner-benchmark-registry-final.json`, HTML against main CI
-  `ea4ecc43e7`/run 37250691414, then all four full Leaner suites passed.
+  `/tmp/verex-benchmark-registry-final.json`, HTML against main CI
+  `ea4ecc43e7`/run 37250691414, then all four full Verex suites passed.
   Logs: `/tmp/registry-final-<package>-{build,test}.log`. All 120 Check
   fixtures and both cost gates passed. The 437-file registry refresh passed
   (`/tmp/registry-final-prover-refresh.log`), with counts in the registry.
@@ -2730,10 +2730,10 @@ boundaries, and preserve the existing acceptance budgets.
   contract code clauses. The two MVP abort fixtures now prove all 12 valid
   functions and reject all 15 intentionally invalid ones. The differential
   arithmetic-overflow fixture now matches MonoVM instead of reporting abort 300.
-  Fresh benchmark `/tmp/leaner-benchmark-registry-aborts.json` preserves all
+  Fresh benchmark `/tmp/verex-benchmark-registry-aborts.json` preserves all
   28 passing samples; their combined heartbeats decrease 1.5%, with calculator
   down 13.9%. HTML compares this run against main. All four full suites pass after report generation, including MonoVM and
-  differential checks (`/tmp/registry-aborts-leaner-e2e-tests-test5.log`).
+  differential checks (`/tmp/registry-aborts-verex-e2e-tests-test5.log`).
   The checks now distinguish arithmetic errors from explicit user aborts;
   three partial-code fixtures now cover their previously omitted abort
   boundaries. Existing negative proofs remain rejected. The full MVP
@@ -2749,7 +2749,7 @@ boundaries, and preserve the existing acceptance budgets.
   handles the opaque caller case without ProgramPoint witnesses. The new
   `FieldUpdate` Check fixture passes four proofs; the source fixture
   `field_update_labels` verifies the correct caller and rejects `caller_wrong`.
-  Fresh full benchmark `/tmp/leaner-benchmark-registry-field.json`: 28/32
+  Fresh full benchmark `/tmp/verex-benchmark-registry-field.json`: 28/32
   verified, preserving every previously passing problem; their combined
   heartbeat cost changes by +0.1%. Framework ordered_map keeps all 29 proofs
   at 4,128,189,059 heartbeats; calculator keeps all eight. The HTML was
@@ -2763,7 +2763,7 @@ boundaries, and preserve the existing acceptance budgets.
 - AMM/calculator follow-up: calculator now verifies in the regular native
   benchmark, including its callers. Its specification captures the old
   continuation before selecting the post-removal label; reading the removed
-  resource inside that label selected an absent value in Leaner's partial memory.
+  resource inside that label selected an absent value in Verex's partial memory.
   Stored function fields now carry the Move default read-only frame through
   construction, mutation, storage, removal, and invocation. The compiler and
   contract generator share the predicate deciding which declarations require
@@ -2775,7 +2775,7 @@ boundaries, and preserve the existing acceptance budgets.
   New positive and negative stored-field fixtures cover these boundaries.
   AMM's companion proves arithmetic pricing laws and valid construction/swap
   obligations; the intentionally non-compliant constructor must remain rejected.
-  Full benchmark `/tmp/leaner-benchmark-amm-calculator-complete.json`: **28/32
+  Full benchmark `/tmp/verex-benchmark-amm-calculator-complete.json`: **28/32
   verified**; calculator has zero errors, all six valid AMM targets pass, and
   ordered_map retains all 29 passing targets. The other failures remain
   `type_info`, `pool_u64`, and `behavior`. Generated HTML compares this one
@@ -2832,7 +2832,7 @@ boundaries, and preserve the existing acceptance budgets.
 - `mixed_callee_postcondition` and `bp_inline_derive` now verify. All 30 state-label
   Prover tests and the additional inline test match their reviewed baselines.
 - The design records the remaining `unmodified_memory_at_label::swap` gap: Boogie
-  retains a removed resource's contents, whereas Leaner's partial memory discards
+  retains a removed resource's contents, whereas Verex's partial memory discards
   them. Its negative `swap_wrong` fails as intended.
 - Validation: builds and full tests passed in all four packages, including
   all 113 Check fixtures, source verification, MonoVM, and differential tests.
@@ -2898,7 +2898,7 @@ boundaries, and preserve the existing acceptance budgets.
 - The element-quantifier/read-position gap now passes focused positive and
   negative source checks; the current increment above records the outstanding
   benchmark and registry validation.
-- `leaner_witness` decides the conjuncts reading the binder first, in the order
+- `verex_witness` decides the conjuncts reading the binder first, in the order
   `Array.qsort` leaves them; a stable order puts `verify_vector::verify_contains` over its
   budget, so the search depends on an incidental order.
 
@@ -2911,7 +2911,7 @@ boundaries, and preserve the existing acceptance budgets.
   normalization of the loop's unchanged-tail invariant is the next concrete
   performance lead (`/tmp/vector-ranges-foreach-debug.log`). No bit-vector
   conversion behavior was changed: the source's representation wrappers and
-  LIR's numeric conversion operations need a separate semantic treatment.
+  VIR's numeric conversion operations need a separate semantic treatment.
   The full benchmark/report refresh retains 30 verified problems and one
   expected AMM rejection at 15,808,427,132 heartbeats (+0.0037% locally),
   followed by both passing cost gates (`/tmp/vector-ranges-postcheck.log`).
@@ -2928,14 +2928,14 @@ boundaries, and preserve the existing acceptance budgets.
 - Prover tests, from `third_party/move/move-prover`: `MVP_TEST_FEATURE=lean cargo test`
   with one filter per run; `UPBL=1` regenerates the `.lean_exp` baselines. Read every
   changed baseline; an `-- error:` line is a regression unless intended.
-- Suites: `lake build && lake test` in `leaner-ir`, `leaner-move`, `leaner-e2e-tests`.
-  Never rebuild `leaner-ir` while a suite runs; iterate in a scratch copy.
-- A deliberate cost change: `UB=1 lake env lean LeanerLang/Tests/DenotePerformance.lean`
+- Suites: `lake build && lake test` in `verex-ir`, `verex-move`, `verex-e2e-tests`.
+  Never rebuild `verex-ir` while a suite runs; iterate in a scratch copy.
+- A deliberate cost change: `UB=1 lake env lean VerexSL/Tests/DenotePerformance.lean`
   after `lake build`; the diff names only the targets meant to move.
-- Benchmark: `python3 scripts/leaner-bench.py run --out <fresh.json>`, then
-  `python3 scripts/leaner-bench.py report --local <fresh.json> --branch main --html local_benchmark.html`.
+- Benchmark: `python3 scripts/verex-bench.py run --out <fresh.json>`, then
+  `python3 scripts/verex-bench.py report --local <fresh.json> --branch main --html local_benchmark.html`.
   Compare against main, not intermediate local runs.
 - A new capability gets a Check fixture and a roadmap or design row. A Check fixture never
   records an unsupported positive proof as an expected failure.
-- Debugging a target: `set_option leaner.solverDebug true` and
-  `verify f by leaner_obligations` show the leaf obligations.
+- Debugging a target: `set_option verex.solverDebug true` and
+  `verify f by verex_obligations` show the leaf obligations.

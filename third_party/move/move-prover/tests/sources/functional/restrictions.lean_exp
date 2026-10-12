@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/restrictions.move:1:1: error: LIR-SEMANTIC-TARGET: specification call target `f2` does not resolve to a declared function or specification function at [1426, 1430)
-LIR-SEMANTIC-TARGET: specification call target `f2` does not resolve to a declared function or specification function at [1434, 1438)
-LIR-SEMANTIC-TARGET: specification call target `f4` does not resolve to a declared function or specification function at [1456, 1460)
-LIR-SEMANTIC-TARGET: specification call target `f4` does not resolve to a declared function or specification function at [1464, 1468)
+tests/sources/functional/restrictions.move:1:1: error: VIR-SEMANTIC-TARGET: specification call target `f2` does not resolve to a declared function or specification function at [1426, 1430)
+VIR-SEMANTIC-TARGET: specification call target `f2` does not resolve to a declared function or specification function at [1434, 1438)
+VIR-SEMANTIC-TARGET: specification call target `f4` does not resolve to a declared function or specification function at [1456, 1460)
+VIR-SEMANTIC-TARGET: specification call target `f4` does not resolve to a declared function or specification function at [1464, 1468)

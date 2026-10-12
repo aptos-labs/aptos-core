@@ -4,8 +4,8 @@
 -- Five increasing unsigned integers have product zero, or at least
 -- 1 * 2 * 3 * 4 * 5 = 120. In either case their product cannot be 72.
 verify mul5 by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   by_cases zero : a.val = 0
   · simp [zero]
   have ha : 1 ≤ a.val := by omega

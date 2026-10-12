@@ -1,4 +1,0 @@
-LeanerE2ETests/SourceVerify/behavior_nominal_arguments.move:61:9: error: the specification clause `aborts_if false` is not established
-LeanerE2ETests/SourceVerify/behavior_nominal_arguments.move:59:5: error: leaner verification failed: the automatic verification of `stretch_any` failed; provide a proof: `verify stretch_any by …` in `LeanerE2ETests/SourceVerify/behavior_nominal_arguments.proof.lean` (`verify stretch_any by leaner_obligations` lists its obligations)
-LeanerE2ETests/SourceVerify/behavior_nominal_arguments.move:72:9: error: the specification clause `ensures p.left == old(p.left)` is not established
-LeanerE2ETests/SourceVerify/behavior_nominal_arguments.move:71:5: error: leaner verification failed: the automatic verification of `swap_wrong` failed; provide a proof: `verify swap_wrong by …` in `LeanerE2ETests/SourceVerify/behavior_nominal_arguments.proof.lean` (`verify swap_wrong by leaner_obligations` lists its obligations)

@@ -6,4 +6,4 @@ tests/sources/functional/state_labels/bp_with_state_labels.move:28:9: error: the
           old(((..S |~ global<R>(s.address))).v) + 1
         )
       )` is not established
-tests/sources/functional/state_labels/bp_with_state_labels.move:24:5: error: leaner verification failed: the automatic verification of `replace` failed; provide a proof: `verify replace by …` in `tests/sources/functional/state_labels/bp_with_state_labels.proof.lean` (`verify replace by leaner_obligations` lists its obligations)
+tests/sources/functional/state_labels/bp_with_state_labels.move:24:5: error: verex verification failed: the automatic verification of `replace` failed; provide a proof: `verify replace by …` in `tests/sources/functional/state_labels/bp_with_state_labels.proof.lean` (`verify replace by verex_obligations` lists its obligations)

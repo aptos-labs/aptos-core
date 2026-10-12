@@ -8,8 +8,8 @@ use crate::tests::common;
 /// function of the file verifies automatically.
 #[test]
 fn prove_lean_proof() {
-    if !move_prover::leaner::verifier_available() {
-        eprintln!("skipping prove --lean test: the Leaner Move verifier is not built");
+    if !move_prover::verex::verifier_available() {
+        eprintln!("skipping prove --lean test: the Verex Move verifier is not built");
         return;
     }
 
@@ -32,8 +32,8 @@ fn prove_lean_proof() {
     std::fs::write(
         pkg.path().join("sources/lean_proof.proof.lean"),
         "verify square_of_sum by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case aborts_if_1_3 =>
     have := Int.mul_nonneg ‹0 ≤ a.val + b.val› ‹0 ≤ a.val + b.val›
     omega

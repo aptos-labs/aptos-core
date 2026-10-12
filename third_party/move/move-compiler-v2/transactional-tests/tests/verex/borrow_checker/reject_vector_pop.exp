@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-17:  publish [import VerexMove]
+Error: compilation errors:
+ error: VIR-SEMANTIC-BORROW-CONFLICT: mutable reference use conflicts with an active shared loan
+   ┌─ TEMPFILE:13:6
+   │
+13 │     *vectorRef := rest
+   │      ^^^^^^^^^
+
+
+exiting with Verex elaboration errors

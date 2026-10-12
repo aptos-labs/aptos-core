@@ -4,22 +4,22 @@ tests/sources/functional/closures/inline/folds_of_consuming.move:47:5: error: (d
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_consuming.move:47:5: error: leaner verification failed: the automatic verification of `sum_literal` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_literal by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify sum_literal by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_consuming.move:47:5: error: verex verification failed: the automatic verification of `sum_literal` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_literal by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify sum_literal by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/folds_of_consuming.move:57:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_consuming.move:57:5: error: leaner verification failed: the automatic verification of `digits_forward` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify digits_forward by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify digits_forward by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_consuming.move:57:5: error: verex verification failed: the automatic verification of `digits_forward` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify digits_forward by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify digits_forward by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/folds_of_consuming.move:70:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_consuming.move:70:5: error: leaner verification failed: the automatic verification of `digits_reverse` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify digits_reverse by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify digits_reverse by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_consuming.move:70:5: error: verex verification failed: the automatic verification of `digits_reverse` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify digits_reverse by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify digits_reverse by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/folds_of_consuming.move:83:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_consuming.move:83:5: error: leaner verification failed: the automatic verification of `sum_noncopy` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_noncopy by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify sum_noncopy by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_consuming.move:83:5: error: verex verification failed: the automatic verification of `sum_noncopy` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_noncopy by …` in `tests/sources/functional/closures/inline/folds_of_consuming.proof.lean` (`verify sum_noncopy by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

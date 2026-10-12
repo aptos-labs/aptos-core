@@ -1,14 +1,14 @@
 # Lemmas and proof blocks
 
 Status: decided 2026-10-03 (user): Move `spec lemma` declarations and
-`proof { … }` blocks are translated into LeanerLang, not replaced by proof
+`proof { … }` blocks are translated into VerexSL, not replaced by proof
 files per test. L1–L4 implemented 2026-10-03 ([Milestones](#milestones)).
 
 ## Why
 
 The Move Prover (language 2.4) verifies lemmas and lets a specification
 carry a proof block that guides the solver. 33 of its unit tests use them.
-The exchange leaves lemmas out and drops proof blocks, so under Leaner a
+The exchange leaves lemmas out and drops proof blocks, so under Verex a
 function whose proof needs a lemma fails (`specialize_generic_caller`'s
 `count_all`), and the intended failures of the proof tests do not occur: a
 false lemma, an unmet lemma requirement, or a false proof assertion verifies
@@ -40,7 +40,7 @@ The Prover's translation (`move-model/src/spec_translator.rs`,
 
 ## Representation
 
-**Lemmas in LIR.** A namespace holds `lemmas : Array LemmaDecl`: name,
+**Lemmas in VIR.** A namespace holds `lemmas : Array LemmaDecl`: name,
 generics, parameters (a signature), locals, a contract of `requires`,
 `ensures`, and `decreases` conditions, and a proof: the guarded steps
 below, as one `SpecBlock`. Recursion groups are derived (strongly connected
@@ -61,14 +61,14 @@ one), and `calc` becomes one assertion per step. Kinds:
   `R[a] → E[a]`. Triggers and weights are solver hints and are not carried.
 - `split` (new): a case split, on a Boolean or an enum's variant. The
   Prover's guard on a split only limits where it splits; the split is
-  semantically no step, so Leaner splits unguarded.
+  semantically no step, so Verex splits unguarded.
 
-**Function proofs** need no new LIR structure: the Move frontend places the
+**Function proofs** need no new VIR structure: the Move frontend places the
 steps as in-body specification statements, at the start of the body and
 before each return, where the Prover places them. Before a return, the
 returned values are bound to locals that `result` denotes.
 
-**LeanerLang.** An item `spec lemma L<T>(params) where` with `requires`,
+**VerexSL.** An item `spec lemma L<T>(params) where` with `requires`,
 `ensures`, and `decreases` clauses, then `proof` and the steps, one per
 line: `assert e`, `assume e`, `apply φ`, `split e`. In a body, `spec apply
 φ` and `spec split e` join `spec assert` and `spec assume`.
@@ -146,7 +146,7 @@ recursive `apply` that does not decrease reports at the `apply`.
 | | Scope | Gate |
 |---|---|---|
 | L1 | Exchange: lemmas and proof blocks in XAST (version 7), as the model holds them; decoding. | The proof tests export. |
-| L2 | LIR `LemmaDecl`, `apply` and `split` conditions, `SpecOperation.lemma`; RawUnit schema, validation (instances only in `apply` positions, references resolve, arities); LeanerLang items and statements; printer. | The Move corpus round trip stays a fixed point. |
+| L2 | VIR `LemmaDecl`, `apply` and `split` conditions, `SpecOperation.lemma`; RawUnit schema, validation (instances only in `apply` positions, references resolve, arities); VerexSL items and statements; printer. | The Move corpus round trip stays a fixed point. |
 | L3 | Move frontend: lemmas, function proofs placed at entry and before returns, `let` substitution, `calc` steps. | The proof tests print. |
 | L4 | Verification: lemma theorems, recursion groups, `apply` and `split` sites, the trust ledger, messages. | Check fixture `Specifications/Lemmas`. |
 | L5 | Prover tests `proof/*`, `folds_of*`, `specialize_generic_caller`; registry. | Baselines read. |

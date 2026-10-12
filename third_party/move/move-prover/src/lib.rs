@@ -54,8 +54,8 @@ struct BoogieJob {
 
 pub mod cli;
 pub mod inference;
-pub mod leaner;
 pub mod package_prove;
+pub mod verex;
 
 // =================================================================================================
 // Prover API
@@ -105,7 +105,7 @@ pub fn run_inference_with_bytecode_dump<W: WriteColor>(
     inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }
 
-/// Verifies the one Move source file of `options` with the Leaner verifier.
+/// Verifies the one Move source file of `options` with the Verex verifier.
 /// It reads the typed AST, which stops after the checker and rewriters so
 /// that it keeps its source shape, and inlines dependency code, which the
 /// rewriters prepare for every module of a whole-program compilation.
@@ -140,7 +140,7 @@ fn run_move_prover_lean<W: WriteColor>(
         "exiting with model building errors",
     )?;
     let output = Path::new(&options.output_path).with_extension("lean");
-    leaner::verify(
+    verex::verify(
         &env,
         source,
         None,

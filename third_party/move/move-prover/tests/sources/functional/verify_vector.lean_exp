@@ -4,13 +4,13 @@ tests/sources/functional/verify_vector.move:116:5: error: (deterministic) timeou
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:116:5: error: leaner verification failed: the automatic verification of `verify_reverse` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_reverse by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_reverse by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:116:5: error: verex verification failed: the automatic verification of `verify_reverse` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_reverse by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_reverse by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:133:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:133:5: error: leaner verification failed: the automatic verification of `verify_reverse_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_reverse_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_reverse_with_unroll by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:133:5: error: verex verification failed: the automatic verification of `verify_reverse_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_reverse_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_reverse_with_unroll by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:157:17: error: the loop invariant `∀ (k in 0 .. other.length),
         other[k] == old(other)[old(other).length - 1 - k]` is not established at entry
 tests/sources/functional/verify_vector.move:165:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
@@ -18,34 +18,34 @@ tests/sources/functional/verify_vector.move:165:5: error: (deterministic) timeou
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:165:5: error: leaner verification failed: the automatic verification of `verify_append` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_append by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_append by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:165:5: error: verex verification failed: the automatic verification of `verify_append` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_append by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_append by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:179:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:179:5: error: leaner verification failed: the automatic verification of `verify_append_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_append_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_append_with_unroll by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:179:5: error: verex verification failed: the automatic verification of `verify_append_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_append_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_append_with_unroll by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:245:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:245:5: error: leaner verification failed: the automatic verification of `verify_index_of_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_index_of_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_index_of_with_unroll by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:245:5: error: verex verification failed: the automatic verification of `verify_index_of_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_index_of_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_index_of_with_unroll by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:300:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:300:5: error: leaner verification failed: the automatic verification of `verify_contains_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_contains_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_contains_with_unroll by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:300:5: error: verex verification failed: the automatic verification of `verify_contains_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_contains_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_contains_with_unroll by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:340:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:340:5: error: leaner verification failed: the automatic verification of `verify_remove` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_remove by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_remove by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:340:5: error: verex verification failed: the automatic verification of `verify_remove` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_remove by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_remove by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/verify_vector.move:361:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_vector.move:361:5: error: leaner verification failed: the automatic verification of `verify_remove_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_remove_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_remove_with_unroll by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/verify_vector.move:361:5: error: verex verification failed: the automatic verification of `verify_remove_with_unroll` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify verify_remove_with_unroll by …` in `tests/sources/functional/verify_vector.proof.lean` (`verify verify_remove_with_unroll by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

@@ -1,2 +1,0 @@
-LeanerE2ETests/SourceVerify/loop_closure_frame.move:49:9: error: the specification clause `ensures result == n * 2` is not established
-LeanerE2ETests/SourceVerify/loop_closure_frame.move:47:5: error: leaner verification failed: the automatic verification of `doubled_wrong` failed; provide a proof: `verify doubled_wrong by …` in `LeanerE2ETests/SourceVerify/loop_closure_frame.proof.lean` (`verify doubled_wrong by leaner_obligations` lists its obligations)

@@ -11,5 +11,5 @@ open scoped Move.Compiler
 
 /-! ## Tests -/
 
-#export_leaner_xir Tests.MovePrograms.Account.compiled to
+#export_verex_xir Tests.MovePrograms.Account.compiled to
   "Move/Tests/Compiler/Fixtures/Account.xir.json"

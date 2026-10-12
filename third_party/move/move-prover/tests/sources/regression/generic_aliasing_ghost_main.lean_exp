@@ -4,10 +4,10 @@ tests/sources/regression/generic_aliasing_ghost_main.move:56:5: error: (determin
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/generic_aliasing_ghost_main.move:56:5: error: leaner verification failed: the automatic verification of `f` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f by …` in the module (`verify f by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_ghost_main.move:56:5: error: verex verification failed: the automatic verification of `f` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f by …` in the module (`verify f by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/regression/generic_aliasing_ghost_main.move:102:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/generic_aliasing_ghost_main.move:102:5: error: leaner verification failed: the automatic verification of `f` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f by …` in the module (`verify f by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_ghost_main.move:102:5: error: verex verification failed: the automatic verification of `f` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f by …` in the module (`verify f by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

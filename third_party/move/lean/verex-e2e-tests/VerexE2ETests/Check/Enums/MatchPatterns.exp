@@ -1,0 +1,7 @@
+VerexE2ETests/Check/Enums/MatchPatterns.lean:54:4: error: the specification clause `ensures token is Done ==> result == 0` is not established
+VerexE2ETests/Check/Enums/MatchPatterns.lean:52:7: error: verex verification failed: the automatic verification of `weight_incorrect` failed; provide a proof: `verify weight_incorrect by …` in the module (`verify weight_incorrect by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Enums/MatchPatterns.lean:70:4: error: the specification clause `ensures result <= 10` is not established
+VerexE2ETests/Check/Enums/MatchPatterns.lean:69:7: error: verex verification failed: the automatic verification of `capped_incorrect` failed; provide a proof: `verify capped_incorrect by …` in the module (`verify capped_incorrect by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Enums/MatchPatterns.lean:113:4: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/Check/Enums/MatchPatterns.lean:113:4: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/Check/Enums/MatchPatterns.lean:112:7: error: verex verification failed: the automatic verification of `unpack_incorrect` failed; provide a proof: `verify unpack_incorrect by …` in the module (`verify unpack_incorrect by verex_obligations` lists its obligations)

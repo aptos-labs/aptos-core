@@ -9,12 +9,12 @@ pub mod env_pipeline;
 mod experiments;
 pub mod external_checks;
 pub mod file_format_generator;
-mod leaner;
 pub mod lint_common;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
+mod verex;
 pub mod xir;
 
 use crate::{
@@ -96,16 +96,16 @@ where
     logging::setup_logging(None);
     info!("Move Compiler v2");
 
-    // Leaner sources elaborate to versioned XIR in a child Lean process. Keep
+    // Verex sources elaborate to versioned XIR in a child Lean process. Keep
     // them out of the Move parser; they join the model after AST transforms.
-    let leaner_sources = leaner::extract_sources(&mut options)?;
-    let leaner_elaboration = leaner::elaborate_sources(&leaner_sources)?;
+    let verex_sources = verex::extract_sources(&mut options)?;
+    let verex_elaboration = verex::elaborate_sources(&verex_sources)?;
 
     // Run context check.
     let mut env = run_checker(options.clone())?;
     check_errors(&env, emitter, "context checking errors")?;
-    leaner::add_diagnostics(&mut env, &leaner_elaboration);
-    check_errors(&env, emitter, "Leaner elaboration errors")?;
+    verex::add_diagnostics(&mut env, &verex_elaboration);
+    check_errors(&env, emitter, "Verex elaboration errors")?;
 
     // Run a AST pipeline of checks and (non-optimization) transforms.
     env_check_and_transform_pipeline(&options).run(&mut env);
@@ -145,10 +145,9 @@ where
     // XIR already is stackless, so import it after all Move-AST transforms.
     // Check it in a separate holder: the regenerated Move targets have already
     // passed this pipeline, and rerunning it would duplicate their diagnostics.
-    if !leaner_elaboration.modules.is_empty() {
-        let mut xir_targets =
-            import_and_check_xir(&mut env, &options, &leaner_elaboration.modules)?;
-        check_errors(&env, emitter, "Leaner stackless-bytecode checks failed")?;
+    if !verex_elaboration.modules.is_empty() {
+        let mut xir_targets = import_and_check_xir(&mut env, &options, &verex_elaboration.modules)?;
+        check_errors(&env, emitter, "Verex stackless-bytecode checks failed")?;
         merge_xir_targets(&mut targets, &mut xir_targets);
         env.set_function_size_estimates(targets.compute_function_size_estimates());
     }
@@ -198,7 +197,7 @@ fn import_and_check_xir(
 ) -> anyhow::Result<FunctionTargetsHolder> {
     let first_module = env.get_module_count();
     let mut xir_targets = FunctionTargetsHolder::default();
-    leaner::import_sources(env, sources, &mut xir_targets)?;
+    verex::import_sources(env, sources, &mut xir_targets)?;
     let xir_files: BTreeSet<_> = (first_module..env.get_module_count())
         .map(|index| env.get_module(ModuleId::new(index)).get_loc().file_id())
         .collect();
@@ -256,9 +255,9 @@ pub fn run_move_compiler_for_analysis(
 /// Each pipeline phase checks for errors and returns early, so the caller
 /// always receives the model up to the first failing phase.
 pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<GlobalEnv> {
-    let leaner_sources = leaner::extract_sources(&mut options)?;
+    let verex_sources = verex::extract_sources(&mut options)?;
     anyhow::ensure!(
-        leaner_sources.is_empty(),
+        verex_sources.is_empty(),
         "analysis-only compiler APIs do not yet model Lean-authored modules; compile `.lean` sources with run_move_compiler"
     );
     options.whole_program = true;

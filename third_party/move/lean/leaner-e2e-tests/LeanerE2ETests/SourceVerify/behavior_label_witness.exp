@@ -1,3 +1,0 @@
-LeanerE2ETests/SourceVerify/behavior_label_witness.move:38:9: error: the specification clause `ensures ∃ (S : StateDomain),
-        !(S.. |~ aborts_of<function[Fn(&mut Counter) -> u64](checked_inc)>(c))` is not established
-LeanerE2ETests/SourceVerify/behavior_label_witness.move:36:5: error: leaner verification failed: the automatic verification of `reset_to_limit` failed; provide a proof: `verify reset_to_limit by …` in `LeanerE2ETests/SourceVerify/behavior_label_witness.proof.lean` (`verify reset_to_limit by leaner_obligations` lists its obligations)

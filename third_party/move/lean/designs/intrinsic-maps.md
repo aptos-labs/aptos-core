@@ -4,12 +4,12 @@ Status: 2026-09-30, stage 1 implemented: `ordered_map` verifies (its own
 iterator tests and a client module); `simple_map` and `pool_u64` in part.
 
 A Move structure marked `pragma intrinsic = map` binds roles of the Move
-Prover's map theory to functions of its module (`lir-design.md`, "Intrinsic
+Prover's map theory to functions of its module (`vir-design.md`, "Intrinsic
 declarations and role graphs"; the Move-profile registry in
-`leaner-move/LeanerMove/Intrinsics.lean` checks the 64 roles). This design
+`verex-move/VerexMove/Intrinsics.lean` checks the 64 roles). This design
 gives the roles their verification meaning. The authority for what each role
 guarantees is the Prover's `table_module` in
-`move-prover/boogie-backend/src/prelude/native.bpl`; where Leaner deviates,
+`move-prover/boogie-backend/src/prelude/native.bpl`; where Verex deviates,
 the deviation is named below.
 
 ## Equality and order
@@ -20,7 +20,7 @@ compares intrinsic maps by content (`$IsEqual` over length, key set, and
 values), which is coarser than what Move observes for a map whose physical
 order is visible (`SimpleMap`: runtime `==`, `keys`, `values`,
 `to_vec_pair`). An equality coarser than these observations is not a
-congruence, so Leaner does not adopt it for entries-layout maps.
+congruence, so Verex does not adopt it for entries-layout maps.
 
 For `Table`, specification equality compares allocation identity, represented
 by its handle (user decision, 2026-10-06). Distinct executions of `new`
@@ -41,8 +41,8 @@ content snapshot. State labels and inserted caller specifications must select
 the snapshot from their bound memory, without requiring a program point.
 
 The order is `std::cmp::compare`: `RuntimeValue.order`
-(`LeanerIR/Semantics/Runtime.lean`), a total order on runtime values whose
-laws are proved in `LeanerIR/Proofs/Order.lean` (oriented, transitive, a tie
+(`VerexIR/Semantics/Runtime.lean`), a total order on runtime values whose
+laws are proved in `VerexIR/Proofs/Order.lean` (oriented, transitive, a tie
 is equality). The native `cmp::compare` denotes it, as the Prover's per-type
 `$1_cmp_$compare` does (integers and addresses numerically, `false < true`,
 vectors and fields lexicographically, enum values by variant position, then
@@ -179,7 +179,7 @@ keeps `SimpleMap`'s order.
 ## Proofs
 
 The stage-2 foundation is implemented in
-`LeanerIR/Proofs/Maps/Table.lean`: a `Snapshot Identity` carries identity and
+`VerexIR/Proofs/Maps/Table.lean`: a `Snapshot Identity` carries identity and
 entries separately, and `SameIdentity` compares only identity. Update and
 removal reuse the entry-level map laws. Mutable entry reconciliation preserves
 identity, unrelated values, length, and key positions under the present-key
@@ -187,7 +187,7 @@ and validity premises. A monotone logical allocator proves freshness and
 non-reuse; its relation to actual native handles remains an agreement
 obligation, rather than an axiom in this library.
 
-`LeanerIR/Proofs/Denote/TableMemory.lean` reads an unbounded typed entry array from an
+`VerexIR/Proofs/Denote/TableMemory.lean` reads an unbounded typed entry array from an
 explicit memory at the handle, scoped by owner and key/value types. Its laws
 establish observation after a write, frames for distinct handles
 and owners (including phantom instances), and commutation of writes to distinct
@@ -339,7 +339,7 @@ native operations establish it. The existing runtime typing theorem continues
 to cover ordinary globals; native-content typing remains part of native
 agreement, not a newly proved runtime typing guarantee.
 
-The specification boundary is `LeanerLang/Contract.lean`. Table-bearing inputs
+The specification boundary is `VerexSL/Contract.lean`. Table-bearing inputs
 now use the separate logical carrier; ordinary inputs retain their existing
 domains. A Table snapshot must survive aggregate projection, specification lets,
 function arguments/results, quantification and functional updates. Pairing an
@@ -530,7 +530,7 @@ The solver keeps map values abstract: observations (`size`, `hasKey`,
 `valueAt`, `keyAt`, `rank`) are reduced by the laws over the operations, and
 never by evaluating a model's list, which would lose the laws' patterns. Where
 the Prover's SMT solver has map axioms, the solver adds their instances
-(`leaner_map_positions`) at the positions a leaf reads a map at,
+(`verex_map_positions`) at the positions a leaf reads a map at,
 deciding the positions by omega:
 
 - a key read at its scalar type and written back is the key, for a map whose

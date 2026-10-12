@@ -23,8 +23,8 @@ theorem swap_erase_last {α : Type} (xs : Array α) (i : Nat) (within : i < xs.s
     · simp [same, Nat.ne_of_lt hk, Ne.symm same]
 
 verify verify_swap_remove by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have within : i.val.toNat < v.values.size := by omega
   all_goals have last : ((v.values.size : Int) - 1).toNat = v.values.size - 1 := by omega
   case ensures_3 =>
@@ -43,8 +43,8 @@ verify verify_swap_remove by
     omega
 
 verify verify_model_swap_remove by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have within : i.val.toNat < v.values.size := by omega
   all_goals have last : ((v.values.size : Int) - 1).toNat = v.values.size - 1 := by omega
   case ensures_3 =>
@@ -64,8 +64,8 @@ verify verify_model_swap_remove by
 
 -- Instantiate the no-match prefix invariant at the observed element.
 verify verify_index_of by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case ensures_1_1 =>
     expose_names
     rintro ⟨x, ⟨j, low, high, read⟩, equal⟩
@@ -81,4 +81,4 @@ verify verify_index_of by
       rw [heq]
       simp only [Option.map_some, Option.getD_some]
       intro equal
-      exact symmetric ((LeanerIR.Proofs.Denote.Carriers.codec 0).encode_injective equal).symm
+      exact symmetric ((VerexIR.Proofs.Denote.Carriers.codec 0).encode_injective equal).symm

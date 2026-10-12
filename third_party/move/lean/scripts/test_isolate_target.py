@@ -13,7 +13,7 @@ spec.loader.exec_module(isolate_target)
 
 class IsolateTargetTest(unittest.TestCase):
     def test_missing_target_and_qualified_module(self):
-        source = "import LeanerLang\nleaner module 0x1::example where\n  fun f() -> Unit := ()"
+        source = "import VerexSL\nverex module 0x1::example where\n  fun f() -> Unit := ()"
         result = isolate_target.isolate(source.splitlines(), "0x1::example", "f", [])
         self.assertIn("fun f()", result)
         with self.assertRaisesRegex(ValueError, "module.*not found"):
@@ -22,8 +22,8 @@ class IsolateTargetTest(unittest.TestCase):
             isolate_target.isolate(source.splitlines(), "example", "missing", [])
 
     def test_assertion_only_and_authored_targets(self):
-        source = """import LeanerLang
-leaner module 0x1::example where
+        source = """import VerexSL
+verex module 0x1::example where
   fun selected() -> Unit := ()
   spec selected where
     aborts_if false
@@ -38,7 +38,7 @@ leaner module 0x1::example where
 
   verify selected by
     trivial
-leaner module 0x1::later where
+verex module 0x1::later where
   fun ignored() -> Unit := ()
 """
         result = isolate_target.isolate(source.splitlines(), "example", "selected", [])

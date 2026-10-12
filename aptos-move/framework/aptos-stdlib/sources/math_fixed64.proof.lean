@@ -36,8 +36,8 @@ theorem newton_quotient {y r : Int} (square : 0 < y → r * r ≤ y)
   exact Int.mul_lt_mul_of_pos_right (by omega) (by decide)
 
 verify sqrt by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case aborts_if_1_6 =>
     have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
     have := newton_quotient ‹_› ‹_› (by omega) (by omega) (by omega)

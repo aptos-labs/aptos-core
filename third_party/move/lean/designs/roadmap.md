@@ -13,7 +13,7 @@ describe the deprecated stack. Nothing is scheduled from them; they are
 mined for solutions, and all their verification fixtures are ported to the
 ledger below.
 
-## 1. Verification of validated LIR
+## 1. Verification of validated VIR
 
 Callers of failed callees (2026-10-09, user decision): a callee used
 through its contract without a theorem is assumed by its callers, as in the
@@ -23,7 +23,7 @@ fixture: `Check/Calls/FailedCallees.lean`.
 Behaviors of capturing closures (2026-10-09): at a leaf, `aborts_of` and
 `ensures_of` of a literal closure that captures values read as those of the
 function value naming its target at the woven arguments
-(`abortsOf_closureOf_captured`, `leaner_woven_behaviors`). New
+(`abortsOf_closureOf_captured`, `verex_woven_behaviors`). New
 fixture: `Check/Closures/WovenBehaviors.lean`.
 
 BCS serialization facts (2026-10-09): what the Prover's prelude states of
@@ -52,7 +52,7 @@ A closure's run per conjunction (2026-10-09): a literal closure's run is
 read once for all conjuncts of a conjunction, not once per conjunct.
 Benchmark −0.80%, same outcomes.
 
-Generic module invariants (2026-10-09): `invariant<T>` (LeanerLang
+Generic module invariants (2026-10-09): `invariant<T>` (VerexSL
 `invariant {T}`) is monomorphized as the Prover does, by unifying the memory
 it reads with a function's, with ghost type parameters for what a write
 leaves undetermined. New fixtures:
@@ -82,7 +82,7 @@ by their quoted spelling and silently verified nothing. The general
 pipeline's stages are timed (`pipe-…`). New fixture:
 `SourceVerify/script_false.move`.
 
-Generic module axioms (2026-10-08): `axiom<T>` (LeanerLang `axiom {T} e`) is
+Generic module axioms (2026-10-08): `axiom<T>` (VerexSL `axiom {T} e`) is
 assumed at the instantiations a verification applies, as the Prover
 monomorphizes it; `num` is a specification function's type argument of its
 own; a module's abort strictness holds for its functions. Four more registry
@@ -100,7 +100,7 @@ and a nonnegative shift's two remainders. `abort_in_fun`, `bitwise_operators`,
 `SourceVerify/schema_equality.move`.
 
 Partial specification functions (2026-10-08, user decisions): an `int2bv` the
-compiler types at `num` wraps at `u64`, so `MoveToLeanerLang/constants.move`
+compiler types at `num` wraps at `u64`, so `MoveToVerexSL/constants.move`
 translates again; one at a type parameter is still rejected. A specification
 function is defined where its parameters fit their declared fixed-width types
 and unspecified elsewhere (G15): the importer keeps the declared types, the
@@ -144,7 +144,7 @@ Closed scalar-package integration (2026-10-07): production import now connects
 classification, physical binding widths and mathematical rewriting across all
 owned/dependency scalar functions and their derived spec bodies. Unsupported
 declaration families and dynamic narrowing stay guarded. Seven new source
-controls pass both MVP and Leaner; the six false representation regressions now
+controls pass both MVP and Verex; the six false representation regressions now
 reach verification and fail their postconditions. Checked multiplication still
 aborts. Focused analysis/lowering checks and full Move/E2E suites pass. `test_bitvector`
 verifies again, and `bv_mul_overflow` rejects its false no-abort contract;
@@ -218,7 +218,7 @@ for XAST v10. General representation analysis and lowering remain open.
 Source bit-vector soundness correction (2026-10-07): the importer now rejects
 numeric bitwise operators, `bv`/`bv_ret` pragmas and `int2bv`/`bv2int` instead
 of erasing their representation semantics. MVP rejects
-the unsigned overflow claims that Leaner previously accepted. Both conversion
+the unsigned overflow claims that Verex previously accepted. Both conversion
 truncation and subsequent arithmetic wrapping need explicit modeling, including
 generic instantiation. This reopens `features` and affected importing modules;
 restoring them is a priority. See C17 in `prover-test-problems.md` and the
@@ -229,7 +229,7 @@ without updates (`/tmp/bv-seeds-validation.log`, exit 0). The measured benchmark
 has 24 verified, one expected rejection and six import failures at 9.510G raw
 heartbeats. This reflects reduced coverage, not a speed improvement. The
 affected modules are `features`, `cmp`, `math_fixed`, `ristretto255`, `ed25519`
-and framework `ordered_map`; authored LeanerLang `OrderedMap` still verifies.
+and framework `ordered_map`; authored VerexSL `OrderedMap` still verifies.
 Thirty registry files now stop at this boundary. See handoff.md.
 
 Preceding validation (2026-10-07): all four full suites and all 437 registry
@@ -242,7 +242,7 @@ claim of full MVP parity. See `/tmp/conditional-range-full-tests.log`.
 Design: [`denotation.md`](denotation.md), with the reference model of
 [`prophetic-references.md`](prophetic-references.md).
 
-Done: one `denote` of validated LIR into `Spec`, compiled per target and
+Done: one `denote` of validated VIR into `Spec`, compiled per target and
 certified by the kernel (D0–D6: control, loops with invariants, references
 as prophecies, storage and resource invariants, vectors, Move generics,
 recursion and cycles of calls). Calls follow the Move Prover: callees are
@@ -284,11 +284,11 @@ Open:
   position the context does not tell apart from a written one splits on
   the positions being equal, reads the written element or the array
   before the write in each case, and pins the variable the read position
-  offsets to the written one (`leaner_split_write`); a lookup into
+  offsets to the written one (`verex_split_write`); a lookup into
   an array with an element removed or inserted reads the array before
-  where omega places the position (`leaner_lookups_after_writes`).
+  where omega places the position (`verex_lookups_after_writes`).
   A quantified equation among the hypotheses rewrites the goal once at an
-  instance whose premises omega proves (`leaner_rewrite_instance`;
+  instance whose premises omega proves (`verex_rewrite_instance`;
   bounded, unlike rewriting with the equations as rules, which cycles).
   Existing call observations are tried before reconstructing behavioral facts:
   `aborts_if_at_state_label::caller` and `aliasing::remove_then_try_read` verify
@@ -319,20 +319,20 @@ Open:
   refresh is running (handoff.md).
   An existential is witnessed by the hypothesis stating its body, by a
   context variable, by a written position, or by a position a lookup fact
-  reads, its premises decided by the context (`leaner_witness`,
+  reads, its premises decided by the context (`verex_witness`,
   in the cheap deciders and the pipeline).
   The result of a vector search (`contains`, `index_of`) is split into
   "nothing" and "a position", the latter characterized by its bound, the
-  element there, and every element before it (`leaner_split_search`,
+  element there, and every element before it (`verex_split_search`,
   `findIndex?_eq_some_iff`); a lookup into an array with an element
   removed or inserted splits on which side of that position it reads
-  (`leaner_split_write`, at integer positions); an in-bounds lookup
+  (`verex_split_write`, at integer positions); an in-bounds lookup
   the context states nothing about names its element
-  (`leaner_name_lookups`); and, last, the hypotheses quantified
+  (`verex_name_lookups`); and, last, the hypotheses quantified
   over positions that read an array are instantiated at every position
   the context reads, bounds closed by a hypothesis or omega, the equations
   left as premises, and the instances rewritten by the context
-  (`leaner_instantiate_positions`, at most 64 instances per
+  (`verex_instantiate_positions`, at most 64 instances per
   hypothesis). Membership and search results normalize to one form, the
   position of the element (`mem_iff_exists_int_index`,
   `forall_imp_ne_iff`). `acl` verifies with this (its injectivity
@@ -375,7 +375,7 @@ Open:
 
   A leaf no decider closes costs most: each saturation round over a large
   context costs 8–18M heartbeats. A leaf therefore tries the prepared
-  deciders (`leaner_decide_prepared`: one normalization pass, then
+  deciders (`verex_decide_prepared`: one normalization pass, then
   the instance, lookup, and write-split deciders, and last core `grind`,
   whose congruence closure omega lacks) before the saturating
   pipeline, where its context holds a quantified hypothesis or a written
@@ -383,7 +383,7 @@ Open:
   target already left normal, up to the names of their free variables
   (`normalHypotheses`), and a loop step reduces the entry row's
   projections structurally before normalizing. Every target runs under a
-  budget (`leaner.verifyHeartbeats`, 1.5G heartbeats by default: about a
+  budget (`verex.verifyHeartbeats`, 1.5G heartbeats by default: about a
   minute), so a target that does not verify fails within it, and the
   failure asks for a proof in the source's proof file or a larger budget
   (`pragma heartbeats = N`; see `source-verification.md`, Proofs;
@@ -424,7 +424,7 @@ Open:
 - **Open (2026-09-29): natives without a specification.** The verifier now
   mirrors the Prover: a native with a Move specification uses it, one
   without uses the model the Boogie prelude gives it, registered by the
-  Move profile (`LeanerLang/Profile.lean`: `hash::sha2_256`, `sha3_256` as
+  Move profile (`VerexSL/Profile.lean`: `hash::sha2_256`, `sha3_256` as
   uninterpreted 32-byte functions), and any other is rejected. Still
   unmodelled and needed by `aptos-stdlib`: the `table` natives (`add_box`,
   `remove_box`, `borrow_box`, …; the prelude's `table_module`), on which
@@ -510,15 +510,15 @@ Open:
   quantification, future `final` contents and pure `spec_new` identity remain open.
 - **Closed (2026-09-30): discarded statement values.** A Move branch that
   discards a value (`v.remove(index);` in `capability::remove_element`,
-  `pool_u64::deduct_shares`) failed with LEANER-TYPE-MISMATCH. The exchange
-  and the LIR keep the source's unit; the canonical rendering writes the
-  branch as an `if` without `else`, whose branch value LeanerLang discards
+  `pool_u64::deduct_shares`) failed with VEREX-TYPE-MISMATCH. The exchange
+  and the VIR keep the source's unit; the canonical rendering writes the
+  branch as an `if` without `else`, whose branch value VerexSL discards
   where the `if` supplies none, but lowering checked that branch against
   the expected unit first. It now lowers such a branch without an expected
-  type (test `discarded_branches` in `LeanerLang/Tests/Frontend.lean`).
+  type (test `discarded_branches` in `VerexSL/Tests/Frontend.lean`).
 - **Closed (2026-09-30): `math128::sqrt` exceeded its budget in
   normalization.** `aptos_std::math128` now verifies completely, `sqrt`
-  included, in 9 s for the module (`leaner-move verify` of `aptos-stdlib`
+  included, in 9 s for the module (`verex-move verify` of `aptos-stdlib`
   with `--modules aptos_std::math128`). `ristretto255::scalar_invert`
   verifies in 50s.
 - **Closed (2026-09-29): opaque specification functions under generic
@@ -550,7 +550,7 @@ Design: [`relocatable-namespaces.md`](relocatable-namespaces.md).
 
 Done: R1 (relocation: namespaces carry their own tables and validation
 certificates, and a unit links them without re-validating) and R2
-(a `leaner module` links the registered modules it uses; verification
+(a `verex module` links the registered modules it uses; verification
 inlines across modules; a clause is reported in the file that authored
 it).
 
@@ -570,7 +570,7 @@ Open:
 Design: [`source-verification.md`](source-verification.md).
 
 The package verifies module by module; the baseline
-`leaner-e2e-tests/LeanerE2ETests/SourceVerify/MoveStdlib.exp` lists what
+`verex-e2e-tests/VerexE2ETests/SourceVerify/MoveStdlib.exp` lists what
 does not verify yet, and is absent while everything verifies. The former full
 verification claim is superseded by the source bit-vector soundness correction
 above (2026-10-07). Open:
@@ -581,37 +581,37 @@ above (2026-10-07). Open:
   both modules was within the default budget,
   `apply_diff`, `change_feature_flags_internal`, and
   `shift_left_for_verification_only` included: 59 s for the two modules
-  (`leaner-move verify` of the framework's `move-stdlib` with
+  (`verex-move verify` of the framework's `move-stdlib` with
   `--modules std::bit_vector,std::features`, 2026-09-30).
 - `acl` verifies (2026-09-28). The exchange maps `vector::contains`,
   `index_of`, and `remove` to the primitives the denotation states
   directly, as the Move Prover treats them, so their loops are not
   inlined and the search result is characterized rather than unrolled.
-  Since 2026-10-02 every intrinsic `vector` function with an LIR
+  Since 2026-10-02 every intrinsic `vector` function with an VIR
   counterpart is mapped so (source-verification.md, "Move vector
   intrinsics").
 - A residual obligation that no clause marker locates is reported at the
   module header, not at the function.
 - **Verification in the Move CLI.** `move prove --lean` (and `aptos move
-  prove --lean`) verifies a package with Leaner instead of Boogie: the
+  prove --lean`) verifies a package with Verex instead of Boogie: the
   framework's `ProverOptions::prove` exports the package's typed AST and
-  runs `leaner-move verify --export` on it, so a framework package is
+  runs `verex-move verify --export` on it, so a framework package is
   verified in place with the usual tool set, from the CLI and from the
   framework's prover tests alike (2026-09-28; see
   [`source-verification.md`](source-verification.md)), and
   `move_stdlib_lean_prover_tests` verifies the standard library in place.
   A function the automatic verification does not establish within its
-  budget is proved in the LeanerLang proof file beside its Move file
+  budget is proved in the VerexSL proof file beside its Move file
   (`foo.proof.lean`), whose `verify f by …` items and lemmas the driver
   splices into the module; the failure message names the file
   (2026-09-28). The e2e `verify` suite verifies the framework's
   `move-stdlib` in place (2026-09-30); the copy under
-  `MoveToLeanerLang/MoveStdlib` serves only the Move-to-LeanerLang
+  `MoveToVerexSL/MoveStdlib` serves only the Move-to-VerexSL
   baselines.
 
 ## 4. Shared checking
 
-Design: [`lir-design.md`](lir-design.md), Phases 1–2.
+Design: [`vir-design.md`](vir-design.md), Phases 1–2.
 
 Done: a single-run `validate` with authoritative name resolution,
 unification typing of executable and specification bodies, and the
@@ -682,13 +682,13 @@ M6 library models, M7 alignment proofs.
 
 ## 8. Surface and backends
 
-Designs: [`leaner-lang.md`](leaner-lang.md) and
-[`lir-design.md`](lir-design.md) Phases 4, 6, 7.
+Designs: [`verex-sl.md`](verex-sl.md) and
+[`vir-design.md`](vir-design.md) Phases 4, 6, 7.
 
-Done: validated LIR lowers to XIR, and compiler-v2 compiles `.lean`
+Done: validated VIR lowers to XIR, and compiler-v2 compiles `.lean`
 sources through it (2026-09-25).
 
-Open: the LeanerLang forms still stated as target language (`core.*`,
+Open: the VerexSL forms still stated as target language (`core.*`,
 `spec.*`, extension and dependency forms); retiring the NSIR bridge;
 corpus-wide semantic alpha-equivalence and source maps; a
 compiler-correctness theorem connecting source verification to the
@@ -701,7 +701,7 @@ Design: [`higher-order-functions.md`](higher-order-functions.md).
 Done, 2026-09-30: H1, closures at run time (masks, instantiations fixed at
 construction, capture validation, `invoke` in the borrow analysis, name
 ordering); H2, the Move path (closure construction in the exchange, the
-Move persistence rule, LeanerLang mask and generic-target spellings, XIR
+Move persistence rule, VerexSL mask and generic-target spellings, XIR
 lowering, MonoVM differential and compiler-v2 transactional fixtures); H3,
 the denotation (function values as closures, invocations of known closures
 verified through their targets' contracts, generic targets included).
@@ -757,7 +757,7 @@ State labels (`..S |~ …`, `exists S in *`) have their own design,
 state-change predicates or quantified over all memories, milestones S1–S4
 (round trip, contracts, the solver's witnesses, the rest of the
 `state_labels` directory). Done, 2026-10-05: S1, labels named in the
-exchange, bound at state-domain binders in LIR, spelled in LeanerLang
+exchange, bound at state-domain binders in VIR, spelled in VerexSL
 (`S |~`, `..S |~`, `S.. |~`, `S..T |~`, `∃ (S : StateDomain)`, `publish`,
 `remove`, `update`), validated; every `state_labels` test re-elaborates.
 S2a: quantified labels over memory bound in contracts as `Memory`
@@ -798,12 +798,12 @@ resource contents (`unmodified_memory_at_label::swap`, see the design), S4.
 
 | Gate | Result |
 |---|---|
-| `leaner-ir` build and `lake test`, with the `DenotePerformance` and `CompositionPerformance` cost gates | PASS |
-| `leaner-move`, `leaner-rust` builds and tests | PASS |
-| `leaner-e2e-tests` `lake test`: suites `move`, `rust`, `verify`, `check`, `monodiff` | PASS |
+| `verex-ir` build and `lake test`, with the `DenotePerformance` and `CompositionPerformance` cost gates | PASS |
+| `verex-move`, `verex-rust` builds and tests | PASS |
+| `verex-e2e-tests` `lake test`: suites `move`, `rust`, `verify`, `check`, `monodiff` | PASS |
 | Check fixtures | 122 of 122 pass exactly (2026-10-06) |
-| Move-to-LeanerLang corpus round trip | every module is a typed fixed point |
-| Move Prover unit tests, `MVP_TEST_FEATURE=lean` (not in CI) | Full 437-file baseline refresh passes (2026-10-06), after all four full Leaner suites: 119 without diagnostics, 4 with warnings only, 50 preverification rejections, 232 verification diagnostics, 32 other errors. Returned-reference freezing and quantifier scope fixes expose both C16 files; two previously blocked positives prove. Cross-resource labels prove 6/6 positives, bp_pure_callee::count_all proves with a companion at 25k, and anchor_mutation_pre_state’s valid derived claim now proves; intended negatives remain rejected. Fresh benchmark/main HTML precedes suites: 28/32, no newly failed targets. Logs: `/tmp/registry-prepared-behavior-<package>-{build,test}.log`, `/tmp/behavior-guard-prover-refresh.log`. The final small guard passed focused checks, both cost gates, a fresh benchmark, and the full registry refresh; the full suites passed immediately before it. Work paused at user request. Intentional negatives remain; see [`prover-test-problems.md`](prover-test-problems.md). |
+| Move-to-VerexSL corpus round trip | every module is a typed fixed point |
+| Move Prover unit tests, `MVP_TEST_FEATURE=lean` (not in CI) | Full 437-file baseline refresh passes (2026-10-06), after all four full Verex suites: 119 without diagnostics, 4 with warnings only, 50 preverification rejections, 232 verification diagnostics, 32 other errors. Returned-reference freezing and quantifier scope fixes expose both C16 files; two previously blocked positives prove. Cross-resource labels prove 6/6 positives, bp_pure_callee::count_all proves with a companion at 25k, and anchor_mutation_pre_state’s valid derived claim now proves; intended negatives remain rejected. Fresh benchmark/main HTML precedes suites: 28/32, no newly failed targets. Logs: `/tmp/registry-prepared-behavior-<package>-{build,test}.log`, `/tmp/behavior-guard-prover-refresh.log`. The final small guard passed focused checks, both cost gates, a fresh benchmark, and the full registry refresh; the full suites passed immediately before it. Work paused at user request. Intentional negatives remain; see [`prover-test-problems.md`](prover-test-problems.md). |
 
 The `verify` suite verifies the staged Move standard library; its baseline
 records what does not verify yet (section 3).
@@ -811,7 +811,7 @@ records what does not verify yet (section 3).
 ### Check ledger
 
 Each name is a `.lean` file under
-[`leaner-e2e-tests/LeanerE2ETests/Check/<Folder>/`](../leaner-e2e-tests/LeanerE2ETests/Check/).
+[`verex-e2e-tests/VerexE2ETests/Check/<Folder>/`](../verex-e2e-tests/VerexE2ETests/Check/).
 Every file passes: its whole output matches the adjacent `.exp` at the
 driver's caps (180k verification heartbeats per target). Notes name what
 a file covers beyond its title: intended negatives, authored proofs, and
@@ -835,12 +835,12 @@ files without `verify` targets.
 
 ### Conventions
 
-A Check file is LeanerLang source with contracts, theorems, authored
+A Check file is VerexSL source with contracts, theorems, authored
 proofs, and execution or diagnostic assertions. The driver discovers every
 `Check/**/*.lean`, runs each in its own Lean process at the driver's caps,
 and compares all diagnostics to the adjacent `.exp` (no `.exp` means empty
-output). Run it from `leaner-e2e-tests` with
-`LEANER_E2E_SUITE=check lake test`; `UB=1` regenerates baselines, and every
+output). Run it from `verex-e2e-tests` with
+`VEREX_E2E_SUITE=check lake test`; `UB=1` regenerates baselines, and every
 regenerated diff is reviewed.
 
 - A baseline records intended behavior. A negative case's expected
@@ -872,15 +872,15 @@ regenerated diff is reviewed.
   read.
 - **Security boundary.** Lean-source package discovery executes arbitrary
   host code at compile time; see the TODO in
-  [`lir-design.md`](lir-design.md#todo-secure-lean-source-discovery-and-elaboration).
+  [`vir-design.md`](vir-design.md#todo-secure-lean-source-discovery-and-elaboration).
   It must be fixed before Lean-source discovery is a production compiler
   feature.
 
 ## Deliberately not scheduled
 
-Phase 0 of [`lir-design.md`](lir-design.md) is a multi-party freeze with
+Phase 0 of [`vir-design.md`](vir-design.md) is a multi-party freeze with
 one owner on both sides: the "no construct unclassified" gate is mechanized
-by [`Capability.lean`](../leaner-ir/LeanerIR/Validation/Capability.lean),
+by [`Capability.lean`](../verex-ir/VerexIR/Validation/Capability.lean),
 and publishing RawUnit JSON v1 becomes work only when a consumer outside
 this repository depends on it.
 

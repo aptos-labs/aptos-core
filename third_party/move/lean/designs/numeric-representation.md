@@ -1,6 +1,6 @@
 # Move numeric representation
 
-Status: decided 2026-10-07. Leaner does not model the Move Prover's bit-vector
+Status: decided 2026-10-07. Verex does not model the Move Prover's bit-vector
 representation; see G14 in [`prover-test-problems.md`](prover-test-problems.md).
 
 ## Semantics
@@ -11,7 +11,7 @@ the bodies of `bv_internal` functions. The spec-language book introduces this
 encoding for efficiency. A side effect is that specification arithmetic over
 encoded values wraps at their width.
 
-Leaner keeps one semantics instead:
+Verex keeps one semantics instead:
 
 * Specification arithmetic is mathematical. Bitwise operations are exact on
   integers. Executable arithmetic is Move's checked arithmetic.
@@ -26,7 +26,7 @@ Leaner keeps one semantics instead:
 The importer lowers `int2bv` to its operand where that is in range and to a
 mathematical residue otherwise (`Frontend/BitVectorConversion.lean`, checked
 against `BitVec` at all twelve widths by `Tests.BitVectorConversion`). As in the
-Prover, `pragma bv`/`bv_ret` remain efficiency hints: they select Leaner's
+Prover, `pragma bv`/`bv_ret` remain efficiency hints: they select Verex's
 bit-vector decision procedure (`Denote/BitLift.lean`) for a function's leaves,
 which does not change their meaning. `bv_internal` is ignored.
 
@@ -34,7 +34,7 @@ which does not change their meaning. `bv_internal` is ignored.
 
 The verifiers differ only on specifications whose truth depends on the
 encoding's wrapping or on its unspecified narrowing casts.
-`SourceVerify/bv_encoding.move` holds claims Leaner proves and the Prover
+`SourceVerify/bv_encoding.move` holds claims Verex proves and the Prover
 rejects, `bv_encoding_false.move` the reverse; `bv_conversion{,_false}.move`
 hold the conversions, on which both agree.
 

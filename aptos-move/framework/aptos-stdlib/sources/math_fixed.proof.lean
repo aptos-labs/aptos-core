@@ -13,8 +13,8 @@ theorem sqrt_fits_u64 {r s : Int} (zero : s = 0 → r = 0) (square : 0 < s → r
     omega
 
 verify sqrt by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case aborts_if_1_3 =>
     have := sqrt_fits_u64 (r := result.val) ‹_› ‹_› (by omega) (by omega) (by omega)
     omega

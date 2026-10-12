@@ -3,7 +3,7 @@
 > **Historical (moved here 2026-09-08).** This document tracked the
 > normalization route and, from 2026-09-05, the native route that replaced
 > it; both are superseded by [`../denotation.md`](../denotation.md) (V5: one
-> denotation of validated LIR and one agreement proof). Kept for the pilot
+> denotation of validated VIR and one agreement proof). Kept for the pilot
 > measurement, the checkpoints, and the native cutover census; no longer
 > updated.
 
@@ -19,7 +19,7 @@ failed generation or auditing rolls back the published proof artifacts.
 
 The 8,201-line `RowScript.lean` generator and 1,080 lines of retiring route
 selection/emission in `Contract.lean` have been removed. Shared options live in
-`LeanerLang/Options.lean`. Acceptance fixtures and the composition benchmark now
+`VerexSL/Options.lean`. Acceptance fixtures and the composition benchmark now
 request native verification; changing their route does **not** make them migrated.
 The cutover census completed: **17/61 Check files pass; 44 fail**. Of the
 failures, 42 expose native implementation/proof gaps and two only differ in
@@ -55,7 +55,7 @@ frame-specific tuning is not the migration strategy.
 Removal exit criteria (not yet met):
 
 1. Every supported acceptance verification target must select `native` and pass
-   `#leaner_require_native`, including agreement and VC dependency checks. The
+   `#verex_require_native`, including agreement and VC dependency checks. The
    historical 60/61 mixed-route result is not a native-coverage count; the
    native-only cutover passed 17/61 files, now improved to 19/61.
 2. Complete the remaining consumers with fallback already disabled. Default
@@ -73,7 +73,7 @@ Removal exit criteria (not yet met):
    without raising budgets or refreshing baselines to hide regressions.
 
 The deprecated `move`, `move-model`, and `transpiler` packages remain read-only
-reference under `CLAUDE.md`; this removal concerns the active leaner verifier's
+reference under `CLAUDE.md`; this removal concerns the active verex verifier's
 retiring paths, not deleting those reference packages.
 
 First migration step (worktree): shared native conditional and comparison
@@ -83,7 +83,7 @@ verification, and `Language/ControlForms` moves `branch_effect`. Fifteen new
 native control-flow checks cover nested branches, local bindings, false
 contracts, and selected/unselected arithmetic aborts. They cost 1.5–6.3M raw
 heartbeats including all generated proof stages, under the unchanged 50M cap.
-The new `#leaner_require_native` command rejects legacy typed wrappers and
+The new `#verex_require_native` command rejects legacy typed wrappers and
 audits computation/VC dependencies; the existing four generic native proofs
 also use it. This is not complete migration of either source fixture or of the
 compatible runtime store/failure vocabulary. IR functional/native cost checks,
@@ -130,7 +130,7 @@ All generated stages cost 3.31–43.19M raw heartbeats per positive target under
 unchanged aggregate 50M gate; the four modular callers cost 4.06–4.81M.
 The acceptance edits select native for the remaining two `Language/Enums`
 targets, all six `Language/EnumPatterns` targets, and both verified
-`Language/PositionalStructs` targets, each with `#leaner_require_native`.
+`Language/PositionalStructs` targets, each with `#verex_require_native`.
 Integration validation of this payload step passes **60/61** Check files; only
 the existing `Language/Generics.choose` timeout remains. All three newly native
 enum/struct fixtures pass with their interpreter assertions. IR functional,
@@ -345,7 +345,7 @@ Performance regressions and the known `Generics.choose` timeout. This is histori
 evidence, not a passing native-only gate. No existing caps, baselines, or
 source-port counts were changed.
 
-Whole-file migration audits are now enforced by `#leaner_require_native_all`
+Whole-file migration audits are now enforced by `#verex_require_native_all`
 in the four fully migrated acceptance fixtures above (excluding Integers,
 whose reference target fails closed), and in native constant/bitwise/shift
 unit fixtures, plus the new native vector suite. The route regression rejects
@@ -499,7 +499,7 @@ excluded by the certificate, not silently discarded. The owned-local law
 passes one typed exit state into one continuation. Runtime frames remain only
 at execution agreement.
 
-The registered `LeanerIR.Tests.NativeLoop` covers arbitrary countdowns,
+The registered `VerexIR.Tests.NativeLoop` covers arbitrary countdowns,
 store-changing invariants, later abort payloads, undefined behavior, divergence,
 concrete local assignment/break, continue, and explicit outer-control rejection
 under 1M-heartbeat declaration caps. False invariants cannot erase executions.
@@ -735,14 +735,14 @@ the checkpoint sections below record the rollout and its performance gaps.
 
 The frame-free row route was built to remove the frame representation's
 20–50× cost, and it did. But it was built as *generated tactic scripts
-matched to body shapes*: `LeanerLang/RowScript.lean` holds 22 recognizers
+matched to body shapes*: `VerexSL/RowScript.lean` holds 22 recognizers
 and 20 script emitters, 6.8k lines, over ~200 hand-stated row laws, many
 one per slot layout (four `mutate_evaluate_rowFrame_*`, seven
 `exportFrameLoans_rowFrame_*`, bracket laws with a four-slot row written
 out). A plan covers the function it was written for and its neighbours;
 plans do not compose, so every ported v0 file costs a plan and the corpus
 is unbounded. v0 verified 176 targets, 99 automatically, with a 1.2k-line
-WP calculus and 0.5k lines of tactics. The leaner stack has 26k lines of
+WP calculus and 0.5k lines of tactics. The verex stack has 26k lines of
 verification code and 50 targets.
 
 There are two regressions, and the first draft of this design removed
@@ -750,14 +750,14 @@ only one of them.
 
 1. **Shape matching instead of composition.** Fixed by having one law per
    combinator and no recognizer. Any design does this.
-2. **Stepping instead of reduction.** The leaner denotation is
+2. **Stepping instead of reduction.** The verex denotation is
    *relational*: `ExprDenotation` is a `Prop` over frames, states, and
    controls. Verifying it means a tactic steps it — apply a law per node,
    receive an evaluator *equation* as a hypothesis, invert it by
    `injection` and `subst`, reduce a `match`, split, continue. That is
    proof-producing symbolic execution: a cost per step, a dependence on
-   the goal's syntax at every step, and the machinery of `leaner_row_drive`,
-   `leaner_row_head`, the inversion chains, and the hypothesis-naming
+   the goal's syntax at every step, and the machinery of `verex_row_drive`,
+   `verex_row_head`, the inversion chains, and the hypothesis-naming
    conventions the scripts spell out. v0 had none of it. Its `wp (program)
    post` was a term that *normalized*: `@[wp_norm]` iff-lemmas, one per
    combinator, rewritten by `simp`, with arithmetic such as
@@ -783,14 +783,14 @@ verify f  =  normalize ; close
 - A body denotes, besides its relation, as a **computation**: a `Spec`
   over a symbolic state — the row, the registries, the runtime state —
   returning a control. `Spec` and its `wp` exist (`Proofs/Spec.lean`,
-  `Proofs/Contract.lean`, the `lir_wp_norm` simp set); the typed contract
+  `Proofs/Contract.lean`, the `vir_wp_norm` simp set); the typed contract
   layer already speaks `wp`.
-- Every combinator has one **`wp` iff-lemma**, `@[lir_wp_norm]`, that
+- Every combinator has one **`wp` iff-lemma**, `@[vir_wp_norm]`, that
   rewrites `wp (C …) post` into `wp` of its parts, and every leaf
   operation has an **evaluation lemma** that reduces its closed evaluator
   on a literal row to a value or a throw with its side condition.
-- **Verification** is `simp only [lir_wp_norm, leaner_eval]` followed by
-  `leaner_certified_close!`. No drive, no plan, no inversion, no names.
+- **Verification** is `simp only [vir_wp_norm, verex_eval]` followed by
+  `verex_certified_close!`. No drive, no plan, no inversion, no names.
 - **Agreement** between the computation and the relation is one lemma per
   combinator, composed by the generator exactly as V1 composes the
   relation's agreement with the big-step semantics. The chain from
@@ -799,7 +799,7 @@ verify f  =  normalize ; close
 
 The generator therefore emits three things per function: the relation
 (unchanged), the computation, and the computation's agreement with the
-relation; and one tactic, `leaner_normalize`, for the theorem. A body the
+relation; and one tactic, `verex_normalize`, for the theorem. A body the
 normal form cannot finish leaves a residue at a program point, reported
 by the closer at the clause it could not establish — the same visibility
 as today, at the granularity of a combinator.
@@ -831,7 +831,7 @@ representation cheap and is kept.
 Each combinator's `wp` lemma is an iff in the form v0's were:
 
 ```lean
-@[lir_wp_norm] theorem wp_operation …
+@[vir_wp_norm] theorem wp_operation …
     wp (operation ev operands) post s ↔
       wp operands (fun values s' =>
         match evaluate ev values s' with
@@ -840,7 +840,7 @@ Each combinator's `wp` lemma is an iff in the form v0's were:
         | none => False) s
 ```
 
-and the evaluation lemmas (`leaner_eval`: the existing `*_evaluate` laws,
+and the evaluation lemmas (`verex_eval`: the existing `*_evaluate` laws,
 `readLocal?_rowFrame`, `set!` normalization, the family representation
 facts) reduce `evaluate ev values s'` on literal data so the `match`
 reduces. A checked operation leaves its range condition; a global read
@@ -862,7 +862,7 @@ without evaluating the suffix, which is the block rule.
   clauses as hypotheses. The contract is data: `Contract.runtime` over
   `typed` over the raw contract unfolds by simp to existentials and
   conjunctions, named by shape by the same pass that names the caller's
-  precondition (`leaner_native_cases`, `leaner_name_facts`). The recursive
+  precondition (`verex_native_cases`, `verex_name_facts`). The recursive
   call is the same lemma with the fact taken from the induction
   hypothesis; nothing else about recursion is special.
 - **The `&mut` write-back** is the prophecy pair in the state: the
@@ -898,7 +898,7 @@ variants), and the target that carried the original 51× finding
 The pilot builds exactly the combinators `withdraw` needs, their `wp`
 lemmas, their evaluation lemmas, their agreement with the relational
 combinators, the generator's emission of the computation for that body,
-and `leaner_normalize`; then runs `verify withdraw` through it with the
+and `verex_normalize`; then runs `verify withdraw` through it with the
 script disabled. `deposit`, `replace`, and `balance_of` share its
 combinators and are measured with it at no extra cost.
 
@@ -922,7 +922,7 @@ The pilot reports one table:
 `withdrawC`, its agreement and totality lemmas (3.2M heartbeats, 752
 objects, generated per function later), then in the theorem two `simp`
 passes over the `wp` lemmas with the ground-evaluation simprocs, the
-contract prefix, and `leaner_certified_close!` on the three residual
+contract prefix, and `verex_certified_close!` on the three residual
 obligations. The residue after normalization is v0's shape: the abort
 implication, the normal path with the final state as a keyed insert of
 the written resource, and the arithmetically impossible overflow branch.
@@ -932,7 +932,7 @@ The cost, unoptimized, splits as (heartbeats):
 
 | step | cost | note |
 |---|---|---|
-| prologue (`leaner_cases`, representation, present resource) | 3.3M | shared with the script |
+| prologue (`verex_cases`, representation, present resource) | 3.3M | shared with the script |
 | switch to the computation, entry facts | 2.1M | |
 | normalization, first pass (`wp` lemmas, reads) | 3.2M | |
 | normalization, second pass (evaluators, write-back, export) | 16.0M | 11.4M in the four ground evaluator runs: `endLoans?` twice at 4.3M, `mutateBorrow?` 1.8M, `exportFrameLoans` 1.0M |
@@ -972,25 +972,25 @@ and `balance_of` are measured.
 
 ### Build-out state (2026-09-03)
 
-The route is in the codebase and `leaner.route` now defaults to
+The route is in the codebase and `verex.route` now defaults to
 `normalize`. `verify` uses it for supported, non-recursive, non-generic
 trees and automatically retains the script route for the remaining
 categories.
 
 **Modules.**
 
-- `LeanerIR/Proofs/Tree.lean`: the body as a literal tree (`Tree`,
+- `VerexIR/Proofs/Tree.lean`: the body as a literal tree (`Tree`,
   `Operands`, `Statements`), `denote` (the relational combinators),
   `compute` (the `RowSpec` combinators), `supported`, and agreement and
   totality **proved once by mutual induction**; `wp_nativeFunction_tree`
   is the one-rewrite switch. The generator
-  (`LeanerLang/Denotation.lean`, one traversal `emitWith` over
+  (`VerexSL/Denotation.lean`, one traversal `emitWith` over
   `relationalBuilder`/`treeBuilder`) emits `<f>.denotationTree` beside
   the body and `denotationTree_denotes` by `rfl`; `Generated` carries
   `tree`/`treeDenotes`. No function carries an agreement proof.
-- `LeanerIR/Proofs/Normalize.lean`: the `lir_eval` set; `wp_evaluate`,
+- `VerexIR/Proofs/Normalize.lean`: the `vir_eval` set; `wp_evaluate`,
   `wp_ite_prop`, the checked add/sub/mul/div/mod and modular add/sub/mul
-  lemmas keyed on the primitive (`[lir_wp_norm high]`: they must beat the
+  lemmas keyed on the primitive (`[vir_wp_norm high]`: they must beat the
   generic `wp_evaluate`); ground-evaluation simprocs, one per evaluator
   head, unfolding the evaluator's own definition closure
   (`unfoldClosure`; the abstract `GlobalMap` and `globalLoanKeyIn?` stay
@@ -1000,38 +1000,38 @@ categories.
   equalities on loan ids by `omega` (negative results cached);
   constructor equations for the well-founded walkers (`collectPruned_*`,
   `findFirst_*`, `rewriteFirst_*`), the registry (`globalLoanKeyIn?_cons_ne`),
-  and the returned-borrow resolution; `leaner_normalize [facts]`, which
+  and the returned-borrow resolution; `verex_normalize [facts]`, which
   also reads every context fact about `initial` (equations, freshness,
   loan bounds and distinctness in both orientations). The outer simp no
   longer runs `omega` as a catch-all discharger; arithmetic is invoked by
   the keyed rules and closer that need it.
-- `LeanerIR/Proofs/Decode.lean`: `evaluateDecoding` — a twin's `decode?`
+- `VerexIR/Proofs/Decode.lean`: `evaluateDecoding` — a twin's `decode?`
   (or a codec's) evaluated on a literal, its range certificates proved
   from the context, returning the twin and the proof.
-- `LeanerIR/Proofs/Represent.lean`: `leaner_expose_resources [tree]`
+- `VerexIR/Proofs/Represent.lean`: `verex_expose_resources [tree]`
   (splits the typed contents at every keyed read of the tree into
   absent/present; a requires-side presence fact closes the absent case;
-  `leaner_certify!` destructures the twin; `leaner_split_bools`
-  enumerates Boolean fields), `leaner_represent_writes` (every
+  `verex_certify!` destructures the twin; `verex_split_bools`
+  enumerates Boolean fields), `verex_represent_writes` (every
   `insert`/insert-over-hole/`erase` of a nominal literal in the goal gets
   its `FamilyRepresentation` fact, stated in the goal's spelling),
-  `leaner_decode_results` (instantiates `∃ result, decode literal = some
-  result ∧ …`, codec results included), `leaner_close_normalized`.
-- `LeanerIR/Proofs/Certify.lean` (shared closer): `decodeLiteralTwins`
+  `verex_decode_results` (instantiates `∃ result, decode literal = some
+  result ∧ …`, codec results included), `verex_close_normalized`.
+- `VerexIR/Proofs/Certify.lean` (shared closer): `decodeLiteralTwins`
   before an equation's rows; literal-nominal rows in
-  `leaner_resolve_rows` (`resolveReturnedBorrows_singleBorrow`, the fill
+  `verex_resolve_rows` (`resolveReturnedBorrows_singleBorrow`, the fill
   laws in both spellings); the arithmetic leaf accepts a goal its own
   rewrite closes (`<;> omega`).
-- `verify` (`LeanerLang/Contract.lean`): on the route, for a supported,
+- `verify` (`VerexSL/Contract.lean`): on the route, for a supported,
   non-recursive, non-generic tree, one theorem shape — prologue, codec
-  unfolding (twin codecs included), `leaner_expose_resources [tree] <;>
-  (…)`, the switch, `leaner_normalize`, the contract prefix,
-  `leaner_close_normalized`, `leaner_report`. Everything else stays on
+  unfolding (twin codecs included), `verex_expose_resources [tree] <;>
+  (…)`, the switch, `verex_normalize`, the contract prefix,
+  `verex_close_normalized`, `verex_report`. Everything else stays on
   the script.
-- `leaner-e2e-tests/…/Check/Verification/Normalized.lean`: the storage
+- `verex-e2e-tests/…/Check/Verification/Normalized.lean`: the storage
   check under the route (CI coverage of the route).
 
-**Coverage.** `lake env lean -D leaner.route=normalize` over every
+**Coverage.** `lake env lean -D verex.route=normalize` over every
 positive `Check/Verification` file passes: Account, Callees, Calls,
 Corpus, Generics (script fallback), Increment, Loops (script fallback),
 Normalized, Prophecies, References, Rust, Storage, and Typed. The Aborts
@@ -1040,10 +1040,10 @@ negative exits nonzero and reproduces its expected diagnostics verbatim.
 **Completed follow-up work.** The broad `subst_vars` close was replaced
 by targeted substitution of decided Boolean variables. Profiling then
 found the remaining multiplicative cost in two places: every ground
-evaluator inherited the full ambient `lir_wp_norm` inventory, and the
+evaluator inherited the full ambient `vir_wp_norm` inventory, and the
 outer normalization simp ran `omega` after every unsuccessful side
 condition. Ground evaluation now uses only ordinary/local facts,
-`lir_eval`, and the evaluator's definition closure, and the catch-all
+`vir_eval`, and the evaluator's definition closure, and the catch-all
 arithmetic discharger is gone.
 
 `exportFrameLoans` now has a generic structural one-borrow equation. Its
@@ -1068,7 +1068,7 @@ after those no longer select the fallback, G4 can remove `RowScript.lean`
 and the per-layout laws.
 
 **Traps met (so the next hand does not meet them again).** Inside
-`namespace LeanerIR…` write `Lean.Expr`/`Lean.Name` (`LeanerIR.Expr`
+`namespace VerexIR…` write `Lean.Expr`/`Lean.Name` (`VerexIR.Expr`
 shadows). Values in goals may be `mdata`-wrapped: `consumeMData` before
 matching. `rootNamespace` is `_root_`: never `env.contains (rootNamespace ++ n)`.
 A tactic that creates goals inside a `(a; b)` block needs `all_goals` or
@@ -1076,7 +1076,7 @@ A tactic that creates goals inside a `(a; b)` block needs `all_goals` or
 `LoanDiscipline` past the closer's grammar: let the closer take the
 conjunction. The closer keys its frame hypothesis on
 `RuntimeValue.storageKey`: rewrite `globalKey` by `rfl`, never unfold
-`storageKey`. `set_option … in` is not accepted inside a `leaner module`
+`storageKey`. `set_option … in` is not accepted inside a `verex module`
 block. A `pkill -f` pattern that appears in the same shell command kills
 the shell.
 
@@ -1093,7 +1093,7 @@ because calls are the other axis on which the scripts fail to compose.
 ## Correctness gate
 
 Every `verify` target that verifies today — the 15 benchmark targets and
-every check under `leaner-e2e-tests/LeanerE2ETests/Check/` — verifies by
+every check under `verex-e2e-tests/VerexE2ETests/Check/` — verifies by
 normalization with the scripts *disabled*. The two intended negatives keep
 their diagnostics. No new `.exp` may appear. From then on a program shape
 is never a reason to add code; only a missing lemma is.
@@ -1110,7 +1110,7 @@ measured against them on the same targets before any script is deleted.
   `UB=1`, compared at the same 10% tolerance), so the whole corpus is
   gated, not fifteen curated targets.
 - **Two routes, one option.** During the migration the generator selects
-  the route by `leaner.route := script | normalize`; the driver runs the
+  the route by `verex.route := script | normalize`; the driver runs the
   corpus under both and prints the table above for every target.
 - **Baseline.** The scripts' numbers, recorded in the appendix at P0.
 - **Policy.** A regression is not a blocker; it is a number the milestone
@@ -1129,13 +1129,13 @@ is measured separately by the same instrument.
 
 | | Step | Correctness gate | Perf gate |
 |---|---|---|---|
-| P0 | Measurement: per-check `.perf` records, `leaner.route`, the baseline table in the appendix | suites unchanged | baseline recorded |
-| P1 | Pilot: `withdraw` by normalization — its combinators, `wp` and evaluation lemmas, agreement, emission, `leaner_normalize` | `withdraw`, `deposit`, `replace`, `balance_of` with the script disabled | the pilot table; decision |
+| P0 | Measurement: per-check `.perf` records, `verex.route`, the baseline table in the appendix | suites unchanged | baseline recorded |
+| P1 | Pilot: `withdraw` by normalization — its combinators, `wp` and evaluation lemmas, agreement, emission, `verex_normalize` | `withdraw`, `deposit`, `replace`, `balance_of` with the script disabled | the pilot table; decision |
 | P2 | Second pilot: the call pair, `wp_call`, contracts as data, the slot-parametric `endLoan` | `bump_twice`, `take_and_bump`, `bump` | table |
 | G1 | The scalar subset in full: every remaining combinator, loops as `withInvariant` | `Increment`, `Corpus`, `Loops`, `Rust`, `Aborts` | table |
 | G2 | Calls in full, recursion, returned references | `Calls`, `Callees`, `References`, `Prophecies`, `Typed`, `Generics` | table |
 | G3 | Storage in full: take, publish, contains, whole and focused brackets | `Storage`, `Account` | table |
-| G4 | Delete `RowScript.lean`, the drive, and the per-layout laws; `verify` emits `leaner_normalize` only | whole corpus, scripts gone | final table; `Performance.exp` moved once with review |
+| G4 | Delete `RowScript.lean`, the drive, and the per-layout laws; `verify` emits `verex_normalize` only | whole corpus, scripts gone | final table; `Performance.exp` moved once with review |
 
 Each milestone lands only with its gate met and its table in the
 appendix. Ledger ports resume after G4, and from then on a port that
@@ -1171,7 +1171,7 @@ targets (from `Performance.exp`) and for every check target.
 
 ## Composition implementation checkpoint (2026-09-04, in progress)
 
-The opt-in `leaner.route "compose"` consumes a proved callee summary at
+The opt-in `verex.route "compose"` consumes a proved callee summary at
 `wpFunction`, rather than unfolding the callee implementation. The current
 scope is supported monomorphic, nonrecursive caller trees with exact abort
 conditions. The normalizer retains the caller continuation at the call
@@ -1210,7 +1210,7 @@ Live-loan retirement still uses the runtime evaluator; general scoped
 lifetime rules and broader call coverage remain unfinished. No existing
 performance or failure baseline has been relaxed for this work.
 
-`LeanerLang.Tests.CompositionPerformance` adds a fixed one/two/four-call
+`VerexSL.Tests.CompositionPerformance` adds a fixed one/two/four-call
 scaling gate beside an untouched mutable parameter. Its initial passing
 measurements are 21.5M / 29.9M / 48.6M typed heartbeats and 21,679 / 29,443 /
 44,182 proof objects. The new benchmark enforces the same 50M cap itself;
@@ -1263,14 +1263,14 @@ for reads, moves at arbitrary local slots, operand sequencing, pure calls,
 and function entry/export. Calls consume a callee agreement certificate;
 the loan-free exit obligation is explicit, not inferred from a generic type.
 
-The opt-in `leaner.route = "native"` consumes `computation`,
+The opt-in `verex.route = "native"` consumes `computation`,
 `computationVerified`, and `computationRepresents` artifacts. Missing
 artifacts fail with row fallback disabled. It also rejects reuse of a theorem
-already proved by another route. `#leaner_prepare` exposes the generated
+already proved by another route. `#verex_prepare` exposes the generated
 execution denotation and authored contract without first verifying the
 function through the old route.
 
-`LeanerLang.Tests.NativeComputation` is an end-to-end **explicit-artifact
+`VerexSL.Tests.NativeComputation` is an end-to-end **explicit-artifact
 pilot**, not yet an automatic native-body generator. Its generic `carry` and
 concrete `carry_u64` have native computations and modular native proofs, with
 separate exact agreement and public source-semantics transport. A dependency
@@ -1297,15 +1297,15 @@ these steps.
 Validation at this checkpoint: all three new test targets pass; fresh Move
 and Rust package suites pass; `GenericScalarCalls` (10 checks) and
 `GenericStorage` (7 checks) pass the unchanged 50M cap. The full IR suite
-fails only `LeanerLang.Tests.Performance` on its existing cost regressions.
+fails only `VerexSL.Tests.Performance` on its existing cost regressions.
 
 ## Automatic native forwarding checkpoint (2026-09-05)
 
-`LeanerLang/Computation.lean` now generates the native body, reusable native
+`VerexSL/Computation.lean` now generates the native body, reusable native
 summary, and exact execution certificate for one-parameter value forwarding:
 reads/moves, generic-to-generic calls, and generic or non-generic scalar
 callers. The original `Performance.lean` `carry` and `carry_u64` targets now
-select `leaner.route = "native"`; they no longer run frame/row VCs or require
+select `verex.route = "native"`; they no longer run frame/row VCs or require
 handwritten pilot artifacts. Unsupported bodies still fail closed.
 
 The native summary retains the authored contract and adds an exact native
@@ -1571,7 +1571,7 @@ baselines. Native operand/local-call cost gates still pass after these changes.
 Two issues must not be hidden by proof automation: v0 vectors carry a length
 bound absent from today's native `Array` representation, and v0's signed
 remainder contract omits the `MIN_INT % -1` abort present in both the actual
-Move VM and current Leaner execution. Kernel boundary tests pin the latter;
+Move VM and current Verex execution. Kernel boundary tests pin the latter;
 the user approved matching the VM, and the new signed source port corrects
 its remainder abort clause accordingly. All six verifies and twelve boundary
 execution assertions pass under the unchanged cap. Execution semantics,
@@ -1616,7 +1616,7 @@ and ten assertions. It exposed a real discrepancy: mutable pattern payloads
 were represented as data selections through mutable references, which the
 execution-preparation validator correctly rejects. Lowering now introduces
 one place reborrow per mutable payload binder and reuses that binding for
-reads and writes. All ten execution assertions pass. Raw LIR's partial
+reads and writes. All ten execution assertions pass. Raw VIR's partial
 field projections require explicit absent-variant guards in this port.
 
 This is not a completed enum-reference checkpoint. Corrected lowering
@@ -1687,7 +1687,7 @@ remain unchanged.
 ## Returned-reference composition checkpoint (2026-09-05)
 
 All twelve checks in the existing `Verification/References` fixture now pass
-the unchanged driver cap through `leaner.route "compose"`. Callee contracts
+the unchanged driver cap through `verex.route "compose"`. Callee contracts
 are consumed once; the caller does not re-verify an instantiated callee body.
 The shared boundary handles mapped mutable results, sibling constraints from
 resolved exports, global-loan registry summaries, and arbitrary ordered

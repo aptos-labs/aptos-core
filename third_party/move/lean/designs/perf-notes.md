@@ -11,9 +11,9 @@ roadmap, not here.
 
 ## Where the time went (2026-09-27 round)
 
-The work happened on branch `wrwg/leaner-check-speed` (commits `c14bdd0e`
+The work happened on branch `wrwg/verex-check-speed` (commits `c14bdd0e`
 through `be7b87ea`). The Check fixtures below are the 76 files under
-`leaner-e2e-tests/LeanerE2ETests/Check`. Times are summed per file, with
+`verex-e2e-tests/VerexE2ETests/Check`. Times are summed per file, with
 four files running at once on four cores.
 
 | Step | Check suite total | Kernel (type checking) |
@@ -34,7 +34,7 @@ and 86s after them. Its kernel time went from 68s to 47s to 31s.
 Concrete modular arithmetic (2026-10-07): nested bitvector specification helpers
 can leave repeated remainder operations in a leaf even when a precondition fixes
 every input. Sending that expression directly to omega introduces unnecessary
-quotient/remainder constraints. `leaner_ground_arithmetic` first rewrites
+quotient/remainder constraints. `verex_ground_arithmetic` first rewrites
 the target using only Int/Nat equalities to literals, then uses the existing
 closed-goal decision tactic. It does not rewrite the full context or admit
 symbolic equalities as rules. The source and cost evidence is recorded in the
@@ -46,13 +46,13 @@ heartbeats, and a kernel stall shows up as time inside whichever `simp`
 first waits for a certificate. Use all four instruments below.
 
 1. **Wall time and exactness per fixture.** Run every Check file from
-   `leaner-e2e-tests`. Use the driver caps
-   (`-DmaxHeartbeats=180000 -Dweak.leaner.verifyHeartbeats=180000`), run
+   `verex-e2e-tests`. Use the driver caps
+   (`-DmaxHeartbeats=180000 -Dweak.verex.verifyHeartbeats=180000`), run
    four files at once with `xargs -P 4`, and compare each output with its
    `.exp` file; a missing `.exp` means the output must be empty. Any
    difference in output is a regression, even when a change is meant only
    to be faster.
-2. **Solver heartbeats by stage.** Add `-Dweak.leaner.solverDebug=true`.
+2. **Solver heartbeats by stage.** Add `-Dweak.verex.solverDebug=true`.
    Every target then prints a line of the form
    `solver: <N>k … bind ×k Nk; exit …; leaf …`. Sum each stage across the
    suite and compare two runs stage by stage.
@@ -66,7 +66,7 @@ first waits for a certificate. Use all four instruments below.
    Certificates the first verify has to wait for show up as the `addDecl`
    time of an auxiliary such as `_simp_2`.
 4. **Kernel unfolds of one certificate.** Paste this command into a copy
-   of a fixture (below `import LeanerE2ETests.CheckSupport`). Then add
+   of a fixture (below `import VerexE2ETests.CheckSupport`). Then add
    `#kdiag <theorem>` before the fixture's final `end` for each
    certificate, for example
    `«0x42».returned_mut_refs.borrow_first_after_break.compiled_eq`:
@@ -96,18 +96,18 @@ first waits for a certificate. Use all four instruments below.
    <target> -o <out> [--option name=value]` keeps one target of a module
    file verified: every other specification block of the module gets
    `pragma verify = false`, the modules after it are dropped, and the
-   options (`leaner.certifyDebug=true` for residual goals,
-   `leaner.solverDebug=true` for the solver's steps, `leaner.stageLog=…`)
+   options (`verex.certifyDebug=true` for residual goals,
+   `verex.solverDebug=true` for the solver's steps, `verex.stageLog=…`)
    are set after the import. A package's module extract then runs one
    target in seconds rather than the whole module.
-6. **A leaf's solver steps.** Under `leaner.solverDebug`, every leaf prints
+6. **A leaf's solver steps.** Under `verex.solverDebug`, every leaf prints
    its steps with their heartbeats (`cheap: 95k, failed: …`). Sum them by
    step over a run to find the step that dominates (a single `cheap` call
    of 1.7G heartbeats once pointed at the bound collector). To see the
    state a step leaves, print the goal and its hypotheses under the same
    option at the end of that step; a residual printed by `certifyDebug` is
    the leaf's state before its deciders, not after. The goals `solverDebug`
-   prints cost heartbeats themselves; `-Dleaner.solverProfile=true` instead
+   prints cost heartbeats themselves; `-Dverex.solverProfile=true` instead
    prints, per target, the solver's stages and, per step label, its runs and
    the heartbeats of its succeeding and of its failing runs, with no goal
    printed. The general pipeline (`pipeline`, `range pipeline`) reports its
@@ -118,11 +118,11 @@ first waits for a certificate. Use all four instruments below.
    `bitwise_features::contains` leaves were `pipe-saturate` and `pipe-bv`).
    The cheap decider's steps are `c-assumption`, `c-witness`, `c-ground`,
    `c-omega`, `c-decide`, and a witness candidate's premise deciders
-   `wp-instance`, `wp-simp`, `wp-context`. Under `leaner.solverDebug` the
+   `wp-instance`, `wp-simp`, `wp-context`. Under `verex.solverDebug` the
    bind stage logs each action with the heartbeats of its rule, its fold,
    and its normalization (`bind <action>: rule …k, fold …k, normalize …k`).
-7. **The benchmark problems.** `scripts/leaner-bench.py run [--only …]`
-   builds `leaner-bench`, measures the standard problems natively, by
+7. **The benchmark problems.** `scripts/verex-bench.py run [--only …]`
+   builds `verex-bench`, measures the standard problems natively, by
    phase, records the run in the local history, and prints each problem's
    change in wall time and heartbeats against the previous local run of the
    branch (`verification-benchmarks.md`, "Local use").
@@ -133,14 +133,14 @@ so they are enough in practice.
 
 Before committing a change, run everything that `CLAUDE.md` lists:
 - the Check suite, with exact output;
-- `leaner-ir` `lake test`, including the `DenotePerformance` and
+- `verex-ir` `lake test`, including the `DenotePerformance` and
   `CompositionPerformance` gates, re-recorded only for a deliberate cost
   change and with the diff reviewed;
-- the stdlib verify baseline (`LEANER_E2E_SUITE=verify`);
-- `leaner-move` and `leaner-rust` `lake test`.
+- the stdlib verify baseline (`VEREX_E2E_SUITE=verify`);
+- `verex-move` and `verex-rust` `lake test`.
 
 Run nothing else in parallel with a timing comparison. Never rebuild
-`leaner-ir` while a suite run is reading its `.olean` files.
+`verex-ir` while a suite run is reading its `.olean` files.
 
 `UB=1 lake test` accepts every output, a new failure included, and the
 suite still passes. After such a run, `scripts/exp-error-delta.sh` lists
@@ -169,7 +169,7 @@ ones; any it lists that the change did not mean to touch is a regression.
 - **Unfolding a big recursive definition leaves the kernel to redo it.**
   `simp` unfolding `Term.denote` records no proof steps, so the kernel
   re-reduces its 61-way matcher, some 27k nodes. Rewriting with the
-  equation lemmas (`lir_denote_equations`) makes each step an instance the
+  equation lemmas (`vir_denote_equations`) makes each step an instance the
   kernel only checks. The `call` equation has an index
   (`ResultShape.bodyType`) that does not match at reducible transparency,
   so plain unfolding stays as the fallback.
@@ -191,12 +191,12 @@ ones; any it lists that the change did not mean to touch is a regression.
   only copy a value, stay unnamed, so a cast operand and the specification
   meet at one atom. Array positions are compared by value: after a
   leaf's normalization a position reading a name is replaced by its
-  definition (`leaner_unname_positions`), so a write at a named
+  definition (`verex_unname_positions`), so a write at a named
   position meets a read at the computed one. A residual leaf handed to an
-  authored proof has the names replaced again (`leaner_unname`). Cost on the benchmark:
+  authored proof has the names replaced again (`verex_unname`). Cost on the benchmark:
   +1.7% in total, +4–7% on functions of one operation; `math128::sqrt`
   from over 1.5B heartbeats to 5 s.
-- **Rewriting with hypotheses must terminate.** `leaner_simp_all` admits
+- **Rewriting with hypotheses must terminate.** `verex_simp_all` admits
   an equation as a rewrite rule only if its right side reaches no left side
   of an admitted equation that leads back to its own (ground rules without
   such a cycle terminate); a floor's `result = self >> 64` with a branch's
@@ -212,7 +212,7 @@ ones; any it lists that the change did not mean to touch is a regression.
 |---|---|
 | `dsimp := false` in the normalizer | 8 fixtures stopped verifying |
 | `index := false` for the normalization simp set | slower |
-| Precompiling `LeanerIR` (`precompileModules`) | no gain; cross-library dynlib load error |
+| Precompiling `VerexIR` (`precompileModules`) | no gain; cross-library dynlib load error |
 | Equation lemmas without the unfolding fallback | `break_with_returned_pair` fails (the `call` index mismatch above) |
 | A per-view table of native types in `CompileNamespace`, so `compiled_eq` would stop re-deriving types | 1% fewer unfolds in `compiled_eq`, same time; the Check suite went from 621s to 633s, because the view certificate derives every type, including unused ones |
 
@@ -256,8 +256,8 @@ Quantifier automation of roadmap §1 landed for the standard library
 `apply_diff` verify); what remains is cost. Three targets verify only above
 the 180M budget: `shift_left_for_verification_only` 209M,
 `change_feature_flags_internal` 318M, `apply_diff` 264M. Their profiles
-(`-Dweak.leaner.solverDebug=true`; every solver step prints its heartbeats,
-and a `leaner_timed` label prints even when the step fails) are
+(`-Dweak.verex.solverDebug=true`; every solver step prints its heartbeats,
+and a `verex_timed` label prints even when the step fails) are
 dominated by leaves (100–150M: `prepare` 1.5–2M each, of which the two
 normalization passes are most), then the loop steps (40–57M) and binds.
 Leads, in order:
@@ -268,7 +268,7 @@ Leads, in order:
 - `prepare`'s renormalization runs whether the substitutions changed
   anything or not;
 - `written` (the deciders over a prepared leaf) costs 0.5–0.7M when it
-  succeeds, mostly `leaner_lookups_after_writes` and the split.
+  succeeds, mostly `verex_lookups_after_writes` and the split.
 
 Lessons that cost days: a `perm` lemma (`bitwiseAnd_comm`) in a
 normalization set makes simp order operands with `acLt`, which reduces the
@@ -277,7 +277,7 @@ lemma whose side condition is arithmetic (`eraseIdxIfInBounds_of_lt`,
 `insertIdxIfInBounds_of_le`) must not be in a set simp discharges by
 recursive simp — they are applied with `disch := omega` at leaves; a
 discharger spelled `assumption` compares at default transparency and
-unfolds the arithmetic of every hypothesis (`leaner_assumption`
+unfolds the arithmetic of every hypothesis (`verex_assumption`
 instead). To find a hang: the solver's debug prints go to stdout and the
 messages to the message log, so their order in one file is not preserved;
 `=== solver start/end` bracket each target's stdout, an unfinished bracket
@@ -287,7 +287,7 @@ is the hanging target, and its last `→ head` line names the stage.
 are `remove`'s invariant after the removal (49M) and its `ensures` (17M):
 the removal splits the two quantified positions against the removed one,
 and the branches where the positions shift are decided by instantiating the
-injectivity invariant at every read position (`leaner_instantiate_positions`,
+injectivity invariant at every read position (`verex_instantiate_positions`,
 20–30 instances a leaf). Asserting the instances costs little (omega on the
 bounds, 1.5M for 30); rewriting them by the context is 10M (a third of a
 million each, the hypotheses as rewrite rules over the encoded-element
@@ -330,7 +330,7 @@ after its instances.
 2–3× what they did before it.** `apply_diff` was 264M and is 714M;
 `change_feature_flags_internal` 318M → 391M; `shift_left_for_verification_only`
 209M → 284M. Measured on `apply_diff` (`featuresB`: the module with every
-other spec `pragma verify = false`, `set_option leaner.verifyHeartbeats
+other spec `pragma verify = false`, `set_option verex.verifyHeartbeats
 800000`, debug on): loops ×15 197M → 115M after the stage cache below,
 leaves ×82 230M, exits ×208 86M, binds ×395 71M. Ruled out by A/B: the
 membership translation of vector quantifiers (index form: same cost), the
@@ -350,20 +350,20 @@ callee) enlarged. Two general fixes landed from this analysis:
   `List.toList_toArray` and `boundedVector_decode?_map_encode` remove the
   conditions it was asked most);
 - the loop step's `simp at *` passes skip the hypotheses a stage already
-  left normal (`leaner_normalize_context_stage`, its own cache):
+  left normal (`verex_normalize_context_stage`, its own cache):
   loops 197M → 115M.
 The `solver` summary now names its target (`solver <decl>: …`), and
 `=== solver start <decl>` brackets its stdout.
 
 Next: roadmap §3's "Verification in the Move CLI".
 
-Method: build a scratch LeanerLang file from the rendered module
-(`leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib/sources/*.exp.lean`,
-or the modules of the generated file `leaner-move verify <package>
+Method: build a scratch VerexSL file from the rendered module
+(`verex-e2e-tests/VerexE2ETests/MoveToVerexSL/MoveStdlib/sources/*.exp.lean`,
+or the modules of the generated file `verex-move verify <package>
 --output` writes, which links the used modules), and run it with `lake env
-lean` from `leaner-e2e-tests`; `pragma verify = false` on the other
+lean` from `verex-e2e-tests`; `pragma verify = false` on the other
 functions narrows it to one target. `verify f by all_goals (trace_state;
-sorry)` shows the prepared leaves; `set_option leaner.verifyHeartbeats` in
+sorry)` shows the prepared leaves; `set_option verex.verifyHeartbeats` in
 the file raises the budget. Validate every step as in "How to measure",
 including the stdlib baseline (`UB=1`, diff reviewed).
 
@@ -493,15 +493,15 @@ only at its end), every module command cost time superlinear in the size of
 the file after it — 0.3s in a 10 KB file, 13s at 344 KB, 40s at 548 KB —
 and the same module followed by 566 KB of line comments cost 89s, while a
 plain `def` in that position cost seconds. The cost was the comment
-scanner of the namespace command (`LeanerLang/Comments.lean`): it rebuilt
+scanner of the namespace command (`VerexSL/Comments.lean`): it rebuilt
 prefix strings of the whole file per comment and re-encoded the whole
 source per trailing comment, quadratic in the file, twice per module. It is
 now one linear pass over byte positions; the module commands of the package
-file elaborate in under a second each (`leaner.stageLog`, below).
+file elaborate in under a second each (`verex.stageLog`, below).
 
 ### Stage log
 
-`set_option leaner.stageLog "<file>"` makes the verifier append a
+`set_option verex.stageLog "<file>"` makes the verifier append a
 timestamped line to that file at every stage of a module (unit, interfaces,
 validated, linked) and of a target (semantics; compiled and contracts;
 callees and certificates; theorem start and done). It is the way to time a
@@ -588,7 +588,7 @@ in the kernel (160k `List.get` steps per frame). It reads the lifetimes'
 kinds through an index published once per namespace (`lifetimeKinds_<i>`):
 one frame check went from 18 s to 2.6 s.
 
-**Variant splits at leaves.** `leaner_subst_vars` splits a leaf on
+**Variant splits at leaves.** `verex_subst_vars` splits a leaf on
 the enum locals it tests and renormalized the whole context of every case:
 in `iter_walk_mut`, 8 cases at ~3.6M heartbeats each, ~29M per split and
 417M of the target's 1.13G. Only the hypotheses the cases reintroduce
@@ -602,14 +602,14 @@ shared, exponential as a tree: one leaf of `rotate_slice_values`
 its budget. Walked once per shared subterm (`sitesWhere`), the whole
 fixture verifies in 9 s.
 
-**Reading a profile.** Under `lake env lean`, LeanerLang's elaborator
-runs in the interpreter (7.8 s of the client's 21 s); the `leaner-move`
+**Reading a profile.** Under `lake env lean`, VerexSL's elaborator
+runs in the interpreter (7.8 s of the client's 21 s); the `verex-move`
 executable runs it natively. A synchronous `addDecl` waits for the kernel
 checks queued before it, so a small theorem can report the queue's time:
 a two-field decoder lemma showed 6.5 s. `-Dtrace.profiler=true
 -Dtrace.profiler.threshold=300` names the declarations the kernel actually
 spends on; `#kdiag` (above) rechecks one alone (the decoder lemma: 4 ms).
-Under `leaner.solverDebug`, `leaner_timed` renders a failing step's
+Under `verex.solverDebug`, `verex_timed` renders a failing step's
 message, which holds the whole goal: ~3.6M heartbeats per failure, outside
 the solver's stage totals. Wrap a step that fails often only to count it.
 
@@ -624,19 +624,19 @@ Where the time still goes (`ordered_map` 82 s, with the client 113 s):
   importer re-checks them for the linked unit. Removed since: the
   semantics reads the validated unit (below).
 - `iter_walk_mut` 28 s: two leaves of the loop step fall through to
-  `leaner_pipeline`, 134M and 150M heartbeats. Timed by stage over
-  the four leaves that reach it: `leaner_saturate` 109M, the
-  saturation rounds 91M, the final `leaner_bounds; omega` 71M,
-  `leaner_simp_all` after the split 42M. The goal reads the map after
+  `verex_pipeline`, 134M and 150M heartbeats. Timed by stage over
+  the four leaves that reach it: `verex_saturate` 109M, the
+  saturation rounds 91M, the final `verex_bounds; omega` 71M,
+  `verex_simp_all` after the split 42M. The goal reads the map after
   `iter_borrow_mut` wrote 7 at position `count`, at a position `i` below
   `count + 1`, and follows from the loop invariant at `i < count` and the
   write at `i = count`; no step reads through the write and instantiates
   the invariant, so saturation does it generically. Next: a positional
   split of a written map in the map-positions pass (position equal to the
   written one or not, the other case read in the map before the write), as
-  `leaner_split_write` does for arrays, leaving the invariant's
-  instance to `leaner_instance`.
-- The map-positions pass (`leaner_map_positions`, a contextual simp
+  `verex_split_write` does for arrays, leaving the invariant's
+  instance to `verex_instance`.
+- The map-positions pass (`verex_map_positions`, a contextual simp
   with the context's facts as rules, and its generated facts) costs 2–20M
   heartbeats per leaf where keys are read (110M in `iter_walk_mut`).
 - The other tests take at most 7 s each.
@@ -692,11 +692,11 @@ and `MAX < result.val * c / s` in the context of the goal
 `MAX < lookup.asInt * c / s`, and its three undecided leaves cost 870M of
 the target's 931M heartbeats. Core `grind` (congruence closure with linear
 integer arithmetic) is now the last of the prepared deciders
-(`leaner_decide_written`): it closes each of those leaves in about
+(`verex_decide_written`): it closes each of those leaves in about
 3M, and `balance` verifies in 137M. On a raw leaf, before `prepare`, it
 closed none of them at 2–4M each, so it runs only on the prepared form.
 
-`aptos-stdlib` as one package run (`leaner-move verify`, its dependencies
+`aptos-stdlib` as one package run (`verex-move verify`, its dependencies
 read whole), with and without it, concurrently on one machine: the
 verification phase 173 s to 127 s, one target more verified (`balance`),
 the same failures otherwise; certification (~215 s) is unchanged. The
@@ -705,7 +705,7 @@ being closed before it; the `ordered_map` file takes 202 s instead of
 187 s, from leaves where it fails before the pipeline closes them.
 
 `grind` is also the last decider of a case the write split leaves
-(`leaner_decide_split`), and the map laws are its lemmas, as the
+(`verex_decide_split`), and the map laws are its lemmas, as the
 SMT solver's map axioms are the Prover's: `hasKey`, `valueAt`, and `size`
 over `update`, `remove`, and `empty` (`grind =`), validity preserved by
 them, and a present key's rank below the size (`Maps.lean`). With them
@@ -717,7 +717,7 @@ package run then reaches `buy_in`, which exceeds its budget in `whnf`.
 A failing `grind` cost up to 91M heartbeats per attempt, and the write
 split tries it in every case it leaves: `deduct_shares` spent 1.1G in
 them. `grind` now runs within the 20M of an attempt
-(`leaner_grind`), after clearing the callees' contracts, which the
+(`verex_grind`), after clearing the callees' contracts, which the
 call rule has consumed and which `grind` would instantiate as theorems, and
 the continuations bound in the context. Its cost on a large leaf is its
 preprocessing (17M on a `deduct_shares` leaf, the same under every search
@@ -730,7 +730,7 @@ encoded scalar) are lemmas too. `ordered_map` takes 189 s again and
 (verification 142 s).
 
 A leaf without a quantified hypothesis or a written vector is prepared
-too when it observes a map, and decided by `grind` (`leaner_observes_map`);
+too when it observes a map, and decided by `grind` (`verex_observes_map`);
 any other still goes to the pipeline, as `prepare` and a failing `grind`
 before it cost the storage targets of the gate up to 26%. With the law that
 an ordered removal shifts the keys after the removed one
@@ -761,7 +761,7 @@ it. The `ordered_map` file takes 220 s.
 Against the local run of 2026-10-03 the benchmark's verified problems cost
 4.9% more heartbeats, concentrated on a few targets. Snapshots of four
 intermediate commits, built and run on the same problems, attributed them;
-the solver's step profile (`leaner.solverDebug`, through `LEANER_OPTIONS`
+the solver's step profile (`verex.solverDebug`, through `VEREX_OPTIONS`
 for a package problem) located the cost within a target.
 
 - Division facts (`757379d637`): at every quotient or remainder with a
@@ -886,7 +886,7 @@ them were removed.
 
 Validation for these frontend and IR changes passed all four package suites,
 including 114 Check fixtures and both performance gates without baseline changes.
-The Move-to-Leaner state-label baseline was updated through its owning driver
+The Move-to-Verex state-label baseline was updated through its owning driver
 for three parenthesization changes, then the full end-to-end suite passed.
 Both Python isolation tests pass.
 
@@ -947,12 +947,12 @@ lower-bound rank/gap and mutable iteration, the seven most expensive failing
 targets account for roughly 9.5G heartbeats.
 
 Profiling `ground_enum_123` with an authored proof identified `omega` in
-`leaner_decide_residual`: a leaf costs roughly 9M to prepare and 508M
+`verex_decide_residual`: a leaf costs roughly 9M to prepare and 508M
 in that decider; the next decider consumes the remaining budget. The prepared
 map-position facts contain conditional ordering relations. These automatic
 attempts now use the existing 20M speculative-attempt bound, leaving the
 residual for the authored proof. The individual residual deciders have timing
-labels, so their costs are visible in `leaner.solverProfile`/`solverDebug`.
+labels, so their costs are visible in `verex.solverProfile`/`solverDebug`.
 The target's overall budget is unchanged.
 
 The companion adds proofs for the literal duplicate-key constructor, front/back
@@ -983,7 +983,7 @@ three 1.5G timeouts are `test_verify_remove_or_none`,
 `test_verify_enumeration_view`, and `test_verify_pop_rank`. The symbolic
 lower-bound rank/gap and mutable-walk targets still cost roughly 1.185G,
 1.078G, and 1.252G. These dominate the remaining work. In the enumeration
-caller, `leaner_map_positions` itself times out during simplification;
+caller, `verex_map_positions` itself times out during simplification;
 a proved literal bulk-constructor rule alone did not fix it. Iterator-payload
 and parameter-transport normalization alone did not close the lower-bound
 proof either. These experiments were not retained. The benchmark driver
@@ -1005,7 +1005,7 @@ caller's integer index. In the residual, omega could assign a negative value
 to the encoded read while respecting nonnegativity of the actual u64 index.
 
 Two normalization omissions caused this. `variantPayload_inl/inr` were not in
-`lir_denote_norm`, and `canonicalFamilies` handled carriers and codecs but not
+`vir_denote_norm`, and `canonicalFamilies` handled carriers and codecs but not
 `NTy.encode` or `HList.encode`. A concrete row encoded under a generic callee's
 instantiated family did not match the row-encoding simp rules when its value
 was spelled in the caller's family. Canonicalize these encodings by definitional
@@ -1120,10 +1120,10 @@ run caught two diagnostic regressions (`LoopInvariantErrors` and `vault_errors`)
 from overly broad obligation-marker normalization. Restricting it to abort
 continuations fixed the diagnostics without updating baselines. After the final
 module benchmark and report generation, **all four full suites passed**:
-`leaner-ir`, `leaner-move`, `leaner-rust`, and `leaner-e2e-tests`, including 115
+`verex-ir`, `verex-move`, `verex-rust`, and `verex-e2e-tests`, including 115
 Check fixtures, source verification, MonoVM, differential tests, and both
 performance gates. Logs are `/tmp/ordered-final-<package>-test.log`. This is a
-complete Leaner test-matrix run, not a new aggregate run of all 32 benchmark
+complete Verex test-matrix run, not a new aggregate run of all 32 benchmark
 samples or all Move Prover registry tests.
 
 ### AMM and calculator proof failures (2026-10-05)
@@ -1147,7 +1147,7 @@ controls compiler checkpoints and generated contracts. Explicit field writes
 receiving the default empty frame.
 
 Calculator also read `old(State[addr])` inside the state selected after
-`move_from`: Leaner's partial memory has no value there. Its specification
+`move_from`: Verex's partial memory has no value there. Its specification
 now binds the entry-state continuation before selecting that label. The
 companion proof normalizes enum payloads, closure masks, and stored invariants.
 No implementation behavior changes. State labels remain expressions over
@@ -1182,7 +1182,7 @@ of packing and field replacement with a memory-writing closure. The complete
 benchmark refresh and broad-suite validation follow the scoped run.
 
 The final full 32-problem run
-`/tmp/leaner-benchmark-amm-calculator-complete.json` confirms **28/32 verified**,
+`/tmp/verex-benchmark-amm-calculator-complete.json` confirms **28/32 verified**,
 up from 27 before this increment. Calculator totals **1,242,871,952**
 heartbeats with zero errors; AMM totals **2,865,859,391**, with only its
 intentional negative constructor failed. Aptos Framework `ordered_map`
@@ -1193,7 +1193,7 @@ this complete run against the `main` CI baseline (`ea4ecc43e7`, run
 before starting the four full Lake suites.
 
 Validation complete: all four package builds and full Lake suites pass
-(`leaner-ir`, `leaner-move`, `leaner-rust`, `leaner-e2e-tests`), including
+(`verex-ir`, `verex-move`, `verex-rust`, `verex-e2e-tests`), including
 118 Check fixtures, source verification, MonoVM/differential checks, and both
 performance gates. No existing baseline was regenerated. The new
 `StoredFrameErrors.exp` was generated through the owning baseline helper and
@@ -1204,10 +1204,10 @@ reviewed for its four intended diagnostics. Logs are
 ### Suite-total investigation (2026-10-06)
 
 The suite chart previously summed only completely verified problems
-(`suite_value` in `scripts/leaner-bench.py`). Its rise did not measure a fixed workload. The
+(`suite_value` in `scripts/verex-bench.py`). Its rise did not measure a fixed workload. The
 latest cached main run, 37398209356 (`b30c5bae4e`, October 6), has 23 passing
 problems and 4,791,718,157 counted heartbeats. The validated local run
-`/tmp/leaner-benchmark-behavior-guard.json` has 28 and 10,944,358,307.
+`/tmp/verex-benchmark-behavior-guard.json` has 28 and 10,944,358,307.
 Five newly passing problems contribute 6,178,478,596: framework ordered_map
 4,145,490,348; calculator 1,072,283,339; ristretto255 448,278,510; capability
 303,178,134; simple_map 209,248,265. The 23 problems passing in both runs
@@ -1297,7 +1297,7 @@ measurements, including rejected attempts. The default local report contains
 the latest measurement against main, with intermediate runs retained only
 for explicit history comparisons.
 
-The fresh regular native benchmark (`/tmp/leaner-benchmark-amm-final.json`)
+The fresh regular native benchmark (`/tmp/verex-benchmark-amm-final.json`)
 records the constructor at 185,036,096 heartbeats (87.7% lower), with all six
 positive AMM targets still verified. AMM's total falls from 2,862,902,197 to
 1,547,801,426. Results are 28 verified, one expected rejection, two unresolved
@@ -1332,7 +1332,7 @@ finite-cardinality lemma rules out the missing-search branch. A second lemma
 preserves coverage when the matching vector element and map key are removed,
 including the intermediate write that ends the mutable borrow. All premises
 are discharged from the leaf; the helper deliberately fails without the
-cardinality premise. The proofs live in `LeanerIR/Proofs/Denote/MapCoverage.lean`
+cardinality premise. The proofs live in `VerexIR/Proofs/Denote/MapCoverage.lean`
 and the pool's adjacent `pool_u64.proof.lean` companion.
 
 Adding these strategies to automatic search regressed `option::from_vec`,
@@ -1340,7 +1340,7 @@ Adding these strategies to automatic search regressed `option::from_vec`,
 The companion invokes the strategies only for the two pool targets. Native
 regression checks restore option/simple-map verification and bit-vector cost
 (377M rather than 723M). The scoped native run
-`/tmp/leaner-benchmark-pool-scoped.json` verifies all 22 pool targets, with no
+`/tmp/verex-benchmark-pool-scoped.json` verifies all 22 pool targets, with no
 errors or timeout, under the unchanged regular budget. `buy_in` costs
 854,176,924 heartbeats versus its previous 1,500,719,364 timeout;
 `deduct_shares` costs 763,747,941 versus its previous 763,008,081 rejection.
@@ -1351,7 +1351,7 @@ these two formerly skipped proofs now run. Preparation profiles (618M buy-in,
 use the complete native target measurements for comparisons.
 
 
-The subsequent fresh full native run, `/tmp/leaner-benchmark-pool-final.json`,
+The subsequent fresh full native run, `/tmp/verex-benchmark-pool-final.json`,
 records 29 verified modules, one expected rejection, two existing failures
 (`type_info`, `behavior`), and no timeout. All measured work is
 16,166,103,625 heartbeats, versus 15,822,941,895 before the pool follow-up.
@@ -1360,7 +1360,7 @@ are 854,318,280 (`buy_in`), 763,749,746 (`deduct_shares`), 632,868,911
 (`redeem_shares`) and 307,052,384 (`transfer_shares`). The script regenerated
 the full local JSON and HTML against main before the core suite started.
 
-Validation at this batch boundary passes: the full `leaner-ir` core suite
+Validation at this batch boundary passes: the full `verex-ir` core suite
 (135 jobs, including both performance gates and scalar/coverage regressions),
 eight Python report/outcome tests, and the focused native pool/option/
 simple-map/bit-vector benchmark. Core log: `/tmp/pool-final-core-tests.log`.
@@ -1402,10 +1402,10 @@ regressions3}.log`. The rebuilt native executable verifies 20/20 behavior target
 errors. `add_two` costs 18,943,903 raw heartbeats, versus 16,654,950 for its
 previous failed attempt. Module work is 125,588,922 versus 122,971,215.
 The script regenerated benchmark data and HTML against main before broader
-testing. Data: `/tmp/leaner-benchmark-behavior-fixed.json`.
+testing. Data: `/tmp/verex-benchmark-behavior-fixed.json`.
 
 
-The fresh full regular benchmark, `/tmp/leaner-benchmark-behavior-final.json`,
+The fresh full regular benchmark, `/tmp/verex-benchmark-behavior-final.json`,
 verifies 30/32 modules, with AMM's intended negative classified as expected
 rejection and only the existing `type_info` failure unresolved. There are no
 timeouts or newly failed problems. All measured work is 16,168,784,777 raw
@@ -1414,7 +1414,7 @@ Behavior verifies 20/20 targets at 125,589,180 total; `add_two` costs 18,944,093
 The complete local data and HTML were regenerated against main before the
 full core suite started. Native tools were rebuilt before both measurements.
 
-Validation passes: the full `leaner-ir` core suite (135 jobs, including both
+Validation passes: the full `verex-ir` core suite (135 jobs, including both
 cost gates and the positive/negative nested-behavior checks), plus eight
 Python benchmark outcome/report tests. Core log:
 `/tmp/behavior-final-core-tests.log`. No broader registry/parity goal was resumed.
@@ -1472,9 +1472,9 @@ specific residuals but the same failed functions. Logs:
 The first full benchmark exposed authored proofs tied to the old optional
 swap reads and removal result. Quicksort now proves lookup/count laws for
 `swapIfInBounds`; OrderedMap rewrites the removed entry by its earlier lookup.
-The native follow-up verifies both (`/tmp/leaner-benchmark-vector-examples.json`):
+The native follow-up verifies both (`/tmp/verex-benchmark-vector-examples.json`):
 Quicksort is 245M versus 265M at the checkpoint; OrderedMap remains about 1.44G.
-The complete final benchmark `/tmp/leaner-benchmark-vector-final.json` records
+The complete final benchmark `/tmp/verex-benchmark-vector-final.json` records
 30 verified problems and the expected AMM rejection, with no unexpected failures
 or timeouts. Its 15,845,571,410 total heartbeats are 1.18% below the checkpoint
 on the same 31 problems (16,035,112,646). The owning script regenerated the full
@@ -1516,7 +1516,7 @@ the unchanged 25M limit. The official scoped refresh accepts it. Logs:
 `/tmp/vector-index-mvp-update.log`,
 `/tmp/verify-model-swap-remove-production.log`, and
 `/tmp/verify-index-profile.log`. The complete benchmark
-`/tmp/leaner-benchmark-vector-residual.json` verifies 30 problems with one
+`/tmp/verex-benchmark-vector-residual.json` verifies 30 problems with one
 expected AMM rejection and no unexpected failures/timeouts. Total cost is
 15,846,440,343 raw heartbeats (+0.0055% against the first vector run). The
 script regenerated local JSON/HTML against main before broad validation.
@@ -1549,7 +1549,7 @@ consecutive product's evenness and costs 5.093M. All positive targets prove;
 the wrong doubled-result postcondition still fails. Logs:
 `/tmp/opaque-inline-*.move-check.log`, `/tmp/opaque-sum-profile.log`, and
 `/tmp/opaque-twice-profile.log`. The fresh full benchmark
-`/tmp/leaner-benchmark-opaque-inline.json` is complete: 30 verified and one
+`/tmp/verex-benchmark-opaque-inline.json` is complete: 30 verified and one
 expected rejection, no unexpected failures/timeouts, 15,846,650,541 raw
 heartbeats. The generated local report compares with main. The Move package
 tests pass after that report refresh. All 437 registry baseline checks pass;
@@ -1572,7 +1572,7 @@ unchanged 25M limit. Both official `verify_vector` and `bp_pure_callee` ordinary
 baseline checks pass. Logs: `/tmp/literal-swap-ground-production.log`,
 `/tmp/literal-swap-vector-check.log`, `/tmp/literal-swap-bp-check.log`.
 Native benchmark and CLI builds pass; the full benchmark
-`/tmp/leaner-benchmark-literal-swap.json` is complete: 30 verified problems,
+`/tmp/verex-benchmark-literal-swap.json` is complete: 30 verified problems,
 one expected AMM rejection, no unexpected failures/timeouts, and
 15,825,019,985 raw heartbeats. The owning driver regenerated the full local
 JSON/HTML against main before broad tests. All four full package suites pass,
@@ -1597,10 +1597,10 @@ none of those experimental budget, carrier or broad-read changes is installed.
 
 ### Table snapshot contract integration (2026-10-06)
 
-The full benchmark `/tmp/leaner-benchmark-snapshot-routing.json` retains 30
+The full benchmark `/tmp/verex-benchmark-snapshot-routing.json` retains 30
 verified samples and one expected AMM rejection, with no unexpected failures
 or timeouts. It measures 15,807,887,568 raw heartbeats, +450,576 (+0.0029%) from
-`/tmp/leaner-benchmark-table-contents-final.json`. Framework ordered_map verifies
+`/tmp/verex-benchmark-table-contents-final.json`. Framework ordered_map verifies
 all 29 targets at 4,158,157,741 heartbeats; pool_u64 verifies all 22 at
 3,189,643,146. Calculator verifies all eight at 1,066,759,897. The benchmark
 generator refreshed `local_benchmark.json` and main-relative HTML before broad
@@ -1612,11 +1612,11 @@ and regenerating seven changed Table baselines, all 437 registry checks pass
 
 ### Table shared-read contracts (2026-10-06)
 
-The full benchmark `/tmp/leaner-benchmark-table-reads.json` retains 30 verified
+The full benchmark `/tmp/verex-benchmark-table-reads.json` retains 30 verified
 problems and the expected AMM rejection, with no unexpected failures/timeouts.
 It uses 15,808,054,447 raw heartbeats, +166,879 (+0.0011%) from snapshot-routing.
 Framework `ordered_map` verifies 29/29 at 4,158,162,148; `pool_u64` verifies 22/22
-at 3,189,774,048; calculator verifies 8/8 at 1,066,777,655. The separate LeanerLang
+at 3,189,774,048; calculator verifies 8/8 at 1,066,777,655. The separate VerexSL
 `OrderedMap` sample uses 1,438,458,701. Local JSON is byte-identical to the artifact,
 and the driver generated HTML relative to main CI 37250691414 (`ea4ecc43e7`).
 Full suites and the registry check were started only after that report refresh.
@@ -1635,7 +1635,7 @@ in `intrinsic-maps.md` under shared Table read contracts.
 
 ### Table aggregate observation normalization (2026-10-06)
 
-The full benchmark `/tmp/leaner-benchmark-table-projections.json` retains 30
+The full benchmark `/tmp/verex-benchmark-table-projections.json` retains 30
 verified problems and one expected AMM rejection, with no unexpected failures.
 Its 15,807,844,181 raw heartbeats are 210,266 lower (−0.0013%) than shared reads.
 Framework `ordered_map` verifies 29/29 at 4,157,996,222; `pool_u64` verifies 22/22
@@ -1655,7 +1655,7 @@ The last complete broad-suite checkpoint remains the preceding shared-read run.
 
 ### Vector index ranges (2026-10-06)
 
-`/tmp/leaner-benchmark-vector-ranges.json` retains all target outcomes: 30
+`/tmp/verex-benchmark-vector-ranges.json` retains all target outcomes: 30
 verified problems and one expected AMM rejection, no unexpected failures or
 timeouts. Total raw heartbeats are 15,808,427,132, up 582,951 (+0.0037%) from
 the preceding local run. The driver refreshed identical local JSON and generated
@@ -1669,7 +1669,7 @@ now reaches proof search, but even a positive-only diagnostic times out at
 25k. The debug/profile probes show roughly 7.6M raw heartbeats for loop setup,
 then exhaustion while normalizing the unchanged-tail invariant after a mutable
 element write, before the authored tactic runs. No timed `p-clear` stage is
-reported for that leaf; inspect the preceding `leaner_unname` and
+reported for that leaf; inspect the preceding `verex_unname` and
 carrier normalization rather than assuming the arithmetic solver is responsible.
 Probes: `/tmp/VectorRangesForeach{Positive,Debug,Profile}.lean` and
 `/tmp/vector-ranges-foreach-{positive,debug,profile}.log`.
@@ -1677,7 +1677,7 @@ Probes: `/tmp/VectorRangesForeach{Positive,Debug,Profile}.lean` and
 ### Certified reads and continuation aliases (2026-10-06)
 
 Unused saved-continuation aliases kept their entire definition chain alive
-through leaf simplification. `leaner_clear_computations` now recognizes
+through leaf simplification. `verex_clear_computations` now recognizes
 these aliases in context order and tries to clear them in reverse, retaining
 every definition still needed by a hypothesis or goal. `ContinuationCleanup`
 checks both removal and preservation.
@@ -1699,7 +1699,7 @@ nested and must not be summed as independent costs. Profile artifacts:
 `/tmp/foreach-auto-diagnostic.log`, `/tmp/certified-read-foreach-profile.log`;
 focused checks: `/tmp/certified-read-focused.log`.
 
-The full native benchmark `/tmp/leaner-benchmark-certified-reads-final.json`
+The full native benchmark `/tmp/verex-benchmark-certified-reads-final.json`
 retains all target outcomes: 30 verified problems and one expected AMM rejection.
 It measures 15,727,043,391 raw heartbeats, down 81,383,741 (0.5148%) from vector
 ranges. Comparator falls 21.0% to 120,907,579, bit_vector 3.2% to 364,856,646,
@@ -1734,7 +1734,7 @@ universal binder and dependent read equation rather than rejecting the binder.
 pass (`/tmp/element-quantifiers-focused.log`). The ordinary positive-only
 `foreach` probe still times out at 25k.
 
-The full native benchmark `/tmp/leaner-benchmark-element-quantifiers.json`
+The full native benchmark `/tmp/verex-benchmark-element-quantifiers.json`
 preserves all target outcomes: 30 verified problems and one expected AMM
 rejection. Its 15,834,183,512 raw heartbeats are +107,140,121 (+0.6813%) over the
 certified-read checkpoint. The report is generated against main, omits type_info,
@@ -1752,7 +1752,7 @@ registry checks exposed one real authored-proof regression in
 `invariants_with_quant`: its literal-element clause now leaves an extra goal.
 The companion explicitly enumerates its three positions, simplifies the reads,
 and passes against the unchanged baseline (`/tmp/element-final-literal-vector-recheck.log`).
-The final full benchmark `/tmp/leaner-benchmark-element-quantifiers-final.json`
+The final full benchmark `/tmp/verex-benchmark-element-quantifiers-final.json`
 measures 15,744,282,692 raw heartbeats: 89,900,820 below the wider rule, and
 17,239,301 (+0.1096%) above certified reads. All target outcomes remain unchanged
 (30 verified problems and one expected rejection). Framework ordered_map costs
@@ -1813,7 +1813,7 @@ heartbeats. This is −18,748,233 (−0.1191%) from the element-quantifier check
 Capability improves 283,915,114 → 237,395,590; framework ordered_map changes
 4,145,558,609 → 4,157,454,627; pool_u64 changes
 3,196,518,381 → 3,201,625,758. No target outcome changes. Local JSON is identical
-to `/tmp/leaner-benchmark-table-invariants.json`, and the generator refreshed HTML
+to `/tmp/verex-benchmark-table-invariants.json`, and the generator refreshed HTML
 against main with retired type_info absent. All four full suites pass, including
 both cost gates and 131 Check fixtures (`/tmp/table-invariants-full-tests.log`).
 The full registry matches 435/437 baselines. Its two differences are fewer
@@ -1825,9 +1825,9 @@ A new diagnostic profile after the length-only safety restriction reproduces
 
 ## Snapshot equality follow-up (2026-10-07)
 
-The focused snapshot-identity solver now uses `lir_denote_norm` and the
-context equalities directly. It no longer unfolds the broader `lir_denote`
-and `lir_denote_eval` rule sets or runs a separate scalar-equality pass.
+The focused snapshot-identity solver now uses `vir_denote_norm` and the
+context equalities directly. It no longer unfolds the broader `vir_denote`
+and `vir_denote_eval` rule sets or runs a separate scalar-equality pass.
 The installed generated-source diagnostic falls from **25,986k to 24,867k**
 raw heartbeats in `solveGoals` (`/tmp/table-option-normalization-profile.log`).
 This is **not the full theorem cost**: the surrounding theorem elaboration
@@ -1848,7 +1848,7 @@ checkpoint immediately precedes this two-line solver change; it has not been
 rerun after it. The regular benchmark has completed (`/tmp/snapshot-equality-benchmark.log`):
 30 verified plus one expected AMM rejection, **15,725,421,251** raw heartbeats,
 a local decrease of 113,208 (−0.00072%). Outcomes are unchanged. Local JSON is
-byte-identical to `/tmp/leaner-benchmark-snapshot-equality.json`; the generator
+byte-identical to `/tmp/verex-benchmark-snapshot-equality.json`; the generator
 refreshed HTML against main with type_info absent. Both focused cost gates pass after that refresh:
 `/tmp/snapshot-equality-DenotePerformance.log` and
 `/tmp/snapshot-equality-CompositionPerformance.log`.
@@ -1891,7 +1891,7 @@ down from 29,139,877, with unchanged 22,076 proof objects. Solver-only cost is
 The full regular benchmark completes before broad tests: **30 verified plus
 one expected AMM rejection**, **15,624,166,021** raw heartbeats, a decrease of
 101,255,230 (0.6439%). The measured artifact is
-`/tmp/leaner-benchmark-call-range-guard.json`; local JSON matches and generated
+`/tmp/verex-benchmark-call-range-guard.json`; local JSON matches and generated
 HTML compares with main. All four builds and full suites pass; all 437 registry baselines match
 (`/tmp/call-range-checkpoint-full-tests.log`). No diagnostic baseline refresh
 was needed.
@@ -1934,7 +1934,7 @@ benchmark is pending; the four-full-suite result above predates this increment.
 The computed-index benchmark completes with 30 verified problems and one
 expected AMM rejection at **15,646,803,818** raw heartbeats (+22,637,797,
 +0.1449%). The driver refreshed main-relative HTML; local JSON matches
-`/tmp/leaner-benchmark-computed-index.json`. Focused registry checks for
+`/tmp/verex-benchmark-computed-index.json`. Focused registry checks for
 table_option and verify_vector match their unchanged baselines.
 
 Further isolated Table experiments, all at a diagnostic budget:
@@ -1963,7 +1963,7 @@ was refreshed for this intermediate state.
 
 Restoring the original unknown-snapshot rule and adding a pre-rule only for a
 known aggregate restores all TableStoredInvariants cases. Scratch table_option
-also passes with both maxHeartbeats and leaner.verifyHeartbeats set to 25000
+also passes with both maxHeartbeats and verex.verifyHeartbeats set to 25000
 (`/tmp/table-option-aggregate-field-budget.log`), despite its recorded whole
 sample being 25,479,304 raw heartbeats: that sample includes work outside the
 local proof-budget scope. Use the actual unchanged-budget native check for
@@ -1993,7 +1993,7 @@ The first normalization benchmark reveals a guard regression: framework
 `test_verify_upsert` rises 114,337,592 → 423,982,783 heartbeats,
 `test_verify_remove_or_none` rises 63,126,801 → 268,615,937, and
 `test_verify_iter_collect_symbolic` rises 180,692,547 → 223,094,867.
-LeanerLang OrderedMap times out. The measured report records these outcomes;
+VerexSL OrderedMap times out. The measured report records these outcomes;
 the checkpoint assertion stops before the full suites.
 An identical isolated upsert source costs 432,274,533 with the context-only
 guard and 120,693,726 with the original guard (scratch override overhead is
@@ -2007,8 +2007,8 @@ table_option check and both focused cost gates pass. The corrected regular
 benchmark restores 30 verified problems plus one expected AMM rejection, with
 no timeouts. Total: 15,646,929,683 raw heartbeats, +125,865 (+0.0008044%)
 against the previous good computed-index run. Framework ordered_map returns
-to 4,123,667,100; LeanerLang OrderedMap to 1,433,690,178.
-`/tmp/leaner-benchmark-table-restored.json` matches local JSON and the generated
+to 4,123,667,100; VerexSL OrderedMap to 1,433,690,178.
+`/tmp/verex-benchmark-table-restored.json` matches local JSON and the generated
 HTML compares against main. All four builds and full suites pass, and all 437 registry baselines match
 without refresh (`/tmp/table-restored-full-tests.log`). Final Table measurement
 with the restored guard: 26,045,418 typed raw heartbeats / 21,500 proof objects,
@@ -2033,7 +2033,7 @@ an opaque caller with no callee program points, and missing-resource/overflow
 rejections. Both cost gates and both focused existing label fixtures pass.
 The regular benchmark passes: 30 verified + one expected rejection, no timeouts,
 15,647,129,560 raw heartbeats (+199,877, +0.0013% against restored-guard).
-`/tmp/leaner-benchmark-state-label-decoded.json` matches local JSON; HTML is
+`/tmp/verex-benchmark-state-label-decoded.json` matches local JSON; HTML is
 regenerated against main with type_info absent. Full suites were last run at
 the preceding restored-guard checkpoint.
 
@@ -2236,7 +2236,7 @@ computation cleanup to `Comp` aliases costs 47,967,311
 
 ## Pool performance attribution (2026-10-07)
 
-The current regular measurement (`/tmp/leaner-benchmark-fold-product.work/pool_u64.json`)
+The current regular measurement (`/tmp/verex-benchmark-fold-product.work/pool_u64.json`)
 verifies all 22 functions at 3,185,090,652 total raw heartbeats: verification
 2,929,430,533 (92%), certification 225,676,539. The largest targets are buy_in
 847,944,044; redeem_shares 629,034,382; deduct_shares 571,115,483; transfer_shares
@@ -2300,7 +2300,7 @@ The corrected complete benchmark preserves 30 verified + one expected AMM
 rejection at **15,061,197,787 total raw heartbeats**, down 4.03% from the preceding
 15,694,278,677 checkpoint. Pool falls 7.68% to 2,940,369,701; native buy_in is
 729,515,623 and deduct_shares 445,113,352. Ordered_map is 4,031,232,214 and AMM
-1,293,879,404. `/tmp/leaner-benchmark-pool-final.json` matches local_benchmark.json;
+1,293,879,404. `/tmp/verex-benchmark-pool-final.json` matches local_benchmark.json;
 main-relative HTML is regenerated with the global ranking first and no type_info.
 All four package builds and full suites pass; all 437 registry baselines match
 without refresh (146.59s). Both cost gates pass. The subsequent redeem_shares
@@ -2352,8 +2352,8 @@ and the five targets and the lemma verify again at 25k.
 
 `bitwise_features::contains` compares `v & m` from the code with `m & v`
 from its specification, which `omega` reads as two atoms; the pipeline closed
-the leaf only through `leaner_bv`, about 20M heartbeats each for two
-leaves. `bitwiseAnd_comm` (with `Or`/`Xor` variants) as `lir_denote_norm`
+the leaf only through `verex_bv`, about 20M heartbeats each for two
+leaves. `bitwiseAnd_comm` (with `Or`/`Xor` variants) as `vir_denote_norm`
 simp lemmas, which simp applies by its ordered rewriting, decides the leaf
 after the first saturation round but doubled
 `features::change_feature_flags_for_next_epoch` (76.4M to 147.1M) and cost
@@ -2408,7 +2408,7 @@ authored proof sees loses the facts derived again
 
 ## Behaviors of capturing closures at a leaf (2026-10-09)
 
-`leaner_woven_behaviors` reads `aborts_of`/`ensures_of` of a closure
+`verex_woven_behaviors` reads `aborts_of`/`ensures_of` of a closure
 that captures values as the target's at the woven arguments. A first version
 rewrote the whole context, scanning every hypothesis of every leaf, and
 handed the leaf back to the full pipeline: `amm` went from 1.29G to 2.60G
@@ -2468,7 +2468,7 @@ value `MAX + 1`), and the invariant's normalization they would save is
 ~3.5M per loop.
 
 The leaf's early range step decides the bound by the context normalized
-(`leaner_range_instance`), as the prepared leaf would, rather than
+(`verex_range_instance`), as the prepared leaf would, rather than
 failing on the context as stated and paying the preparation after it:
 V20 `run` 69.8M → 65.0M (48.2M without the behavioral conjunct), and
 `sum_values`, `sum_values_three_levels`, and `sum_values_through_inline` of
@@ -2481,7 +2481,7 @@ only the structure around their clauses, the contents of the `Obligation`
 markers, which are normal already (the assumed one unwraps them, where a
 clause that is a conjunction reassociates; the hypothesis's premise
 curries), 3.0M → 1.5M on V20; a full normalization after it makes no
-progress. And `splitOnce`, on every leaf goal, tried `leaner_split`,
+progress. And `splitOnce`, on every leaf goal, tried `verex_split`,
 which normalized the whole context once a substitution changed the goal,
 then found nothing to split: it now normalizes the goal first and pays for
 the context only where the normalized goal has a conditional or match
@@ -2509,8 +2509,8 @@ attempts ~3M), binds 4.5M, splits 2.9M, exits, inlining, and recursion
 3.9M. Most of it is normalization of encoded clause values.
 
 At a range bound the context route normalizes as the prepared leaf does
-(`leaner_normalize_context`, which skips hypotheses known normal),
-not by `simp only [lir_denote_norm] at *` over the whole context: the
+(`verex_normalize_context`, which skips hypotheses known normal),
+not by `simp only [vir_denote_norm] at *` over the whole context: the
 failing attempt on V20's two bound leaves 1.3M → 0.8M each, `run` 50.0M →
 48.9M (39.0M without the behavioral conjunct); the benchmark −0.01%.
 
@@ -2540,8 +2540,8 @@ benchmark −0.17%.
 
 ## Leaf recipes and speculative attempts (2026-10-10)
 
-A profile of the benchmark and the registry together (`leaner.solverProfile`
-through `LEANER_OPTIONS`; the registry through a `LEANER_MOVE_EXE` wrapper
+A profile of the benchmark and the registry together (`verex.solverProfile`
+through `VEREX_OPTIONS`; the registry through a `VEREX_MOVE_EXE` wrapper
 that sets it and diverts the profile lines from the relayed output) gives
 each leaf recipe's runs, successes and failure cost. Five recipes closed
 leaves of one registry test each; `function facts` closed 64 targets and
@@ -2591,7 +2591,7 @@ failed 182 times for 122M, often at its 3M budget. Dropping it loses
 `aborts_if_at_state_label::caller`, and gating the path on an arithmetic
 goal loses it too: the path rewrites `result_of` by the call's facts. The
 alternative now runs over the solver's normal form (`simp_all only
-[lir_denote_norm, …]`).
+[vir_denote_norm, …]`).
 
 Rejected: removing `encodeOuterFamily` breaks two authored proofs of
 `ordered_map.proof.lean`; generalizing it to every type, like
@@ -2615,40 +2615,40 @@ listings without one-value locals; benchmark 14,706,324,441 →
 
 ## Authored proofs own the goal (2026-10-11)
 
-`verify f by …` now receives `f`'s whole goal, which `leaner_obligations`
+`verify f by …` now receives `f`'s whole goal, which `verex_obligations`
 splits into leaves named by the clause they owe ("Proofs" in
 `source-verification.md`). Each proof file was migrated by the prefix
-`leaner_obligations` and `all_goals (first | leaner_decide | (leaner_prepare;
-try leaner_decide))` before its former script, which used to receive the
+`verex_obligations` and `all_goals (first | verex_decide | (verex_prepare;
+try verex_decide))` before its former script, which used to receive the
 leaves the automatic verification left.
 
 `pool_u64::deduct_shares` then failed with "don't know how to synthesize
 placeholder for argument `post`". Lean reports every `?_` whose value
 depends on an unassigned metavariable, so the message named a call's
-continuation; the dropped goal was a leaf far below it. `leaner_prepare`
-split the leaf in two, and the range-instance step of `leaner_decide`
+continuation; the dropped goal was a leaf far below it. `verex_prepare`
+split the leaf in two, and the range-instance step of `verex_decide`
 cleared the goal list after closing the first. Many tactics set the goal
 list to their own goals, which is safe only on a single goal, as the solver
 runs them. Every main-goal tactic now runs on the main goal and keeps the
-others (`focusGoal`; macros `leaner_focus (…)`). Without goals it runs the
+others (`focusGoal`; macros `verex_focus (…)`). Without goals it runs the
 tactic on none: plain `focus` throws there, which broke `first | done | …`
 after a step had closed the leaf. The combinators that act on each goal
-(`leaner_bounded`, `leaner_inheriting`, `leaner_settle`,
-`leaner_saturate_round`, `leaner_canonical_families`) are unchanged. The
+(`verex_bounded`, `verex_inheriting`, `verex_settle`,
+`verex_saturate_round`, `verex_canonical_families`) are unchanged. The
 focusing costs nothing measurable.
 
 The prefix costs where a script expects prepared leaves: `buy_in` +19M,
 `deduct_shares` +11M, `calculator::process` +8M,
 `constant_product_with_fee` +5.6M, `Quicksort` +3.4M per target. Without
-`leaner_prepare` (`all_goals (try leaner_decide)`) six `ordered_map` targets
+`verex_prepare` (`all_goals (try verex_decide)`) six `ordered_map` targets
 verify for 92M less, and `test_verify_borrow_back_key` needs no prefix;
 elsewhere both variants leave leaves the scripts need prepared. A per-leaf
 order for `buy_in` (decide, then the script unprepared, then prepare) costs
 823–968M against 783M: `omega` and `grind` failing on the unprepared leaves,
-and `leaner_prepare` itself splits some leaves.
+and `verex_prepare` itself splits some leaves.
 
 Suites pass; registry and e2e baselines change only in the hint
-(`verify f by leaner_obligations` lists its obligations). Benchmark
+(`verify f by verex_obligations` lists its obligations). Benchmark
 14,503,643,204 → 14,469,394,162 heartbeats (−0.24%), same outcomes;
 `ordered_map` −2.1%, `behavior` −4.6%, `Quicksort` +3.2%, `capability`
 +1.4%, `pool_u64` +1.0%.
@@ -2656,7 +2656,7 @@ Suites pass; registry and e2e baselines change only in the hint
 ## Leaves per path and clause (2026-10-11)
 
 In an authored proof the scripts cost 79% of the target (3.5G of 4.5G over
-26 targets); `leaner_obligations` and its setup cost the rest. A probe that
+26 targets); `verex_obligations` and its setup cost the rest. A probe that
 timed each candidate tactic on each leaf put the per-leaf minimum of
 `buy_in` at 517M against 697M: its leaves are expensive and many (108).
 Each abort point owes the disjunction of the abort conditions, and the walk
@@ -2665,15 +2665,15 @@ three leaves per point; `process` has 195 leaves over three goals.
 
 The walk splits a conditional of a goal that still runs program; in hand-over
 mode an obligation keeps its own conditionals, one leaf per path and clause,
-and the proof splits them where it needs to (`leaner_split`). Splitting no
+and the proof splits them where it needs to (`verex_split`). Splitting no
 obligation conditional in automatic mode too breaks 19 targets, whose cheap
 deciders do not split; deciding an obligation whole before splitting it gains
 nothing there (+0.33%). Five scripts that expected split leaves gained
-`all_goals (repeat' leaner_split)` (capability `acquire`, `acquire_linear`,
+`all_goals (repeat' verex_split)` (capability `acquire`, `acquire_linear`,
 ordered_map `test_verify_upsert`, after their prefix; amm
 `constant_product_with_fee` and `_non_compliant`, before it).
 
-`leaner_on` dispatches leaves by clause (`source-verification.md`); per-clause
+`verex_on` dispatches leaves by clause (`source-verification.md`); per-clause
 scripts from the probe would save about 0.3G more on the three largest
 targets, but two unmarked leaves of `process` need the script twice.
 
@@ -2691,23 +2691,23 @@ and cost of the leaves. Two changes were tried at the user's request.
 A clause owed on several paths is now one goal, the conjunction of its
 paths, each leaf quantified over the locals its path introduced beyond the
 leaves' common context (`combineLeaves`), and each leaf proved by its part.
-`leaner_paths` takes the goal apart again, which `leaner_decide`,
-`leaner_prepare` and `leaner_solve` do first. Three traps: `mkForallFVars`
+`verex_paths` takes the goal apart again, which `verex_decide`,
+`verex_prepare` and `verex_solve` do first. Three traps: `mkForallFVars`
 drops a `let` local even with `usedLetOnly := false`, so the binders are
 built directly; `apply And.intro` unifies the conjunction and zeta-reduces a
 `let` binder away, so the conjunction is split by its statement; the
 solver's definitional substitution leaves a hypothesis reading a local
 declared after it, so the common context stops at the first such
 declaration and a path's locals are ordered by dependency. A script's
-`(leaner_prepare; try leaner_decide)` decided only the first path goal; the
-standard prefix is `(leaner_prepare; all_goals try leaner_decide)`. Cost
+`(verex_prepare; try verex_decide)` decided only the first path goal; the
+standard prefix is `(verex_prepare; all_goals try verex_decide)`. Cost
 over the seven authored problems 9,205M → 9,321M (+1.3%); `buy_in` +66M,
 `process` +27M, `enumeration_view` −38M, `pop_rank` −40M. Suites, registry
 and e2e baselines unchanged but for the earlier items; benchmark
 13,923,922,991 → 14,043,566,204 heartbeats (+0.9%), same outcomes.
 
 Rejected: preparing a path's context once, before its clauses split into
-leaves (`leaner_unname`, the context stages of `leaner_prepare_leaf` over
+leaves (`verex_unname`, the context stages of `verex_prepare_leaf` over
 the hypotheses, a `ContextPrepared` marker). With the full pipeline per
 leaf afterwards it is pure overhead, +26% on the authored problems: the
 `normalForms` and `normalHypotheses` caches already share the hypotheses'
@@ -2716,5 +2716,5 @@ normalization misses the hypotheses the walk introduces after the path end,
 a clause's own premises (an existential in `lower_bound_loop`, a tuple
 equation in `constant_product`, `0 - num_shares.val = 0` in
 `deduct_shares`); restricting the hypothesis stages to those still left
-`deduct_shares` undecided. `leaner_map_positions` reads the goal and strips
+`deduct_shares` undecided. `verex_map_positions` reads the goal and strips
 its clause markers, so it cannot run on a path's conjunction.

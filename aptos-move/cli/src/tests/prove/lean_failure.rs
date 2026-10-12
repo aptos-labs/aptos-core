@@ -7,8 +7,8 @@ use crate::tests::common;
 /// clause in the Move source.
 #[test]
 fn prove_lean_failure() {
-    if !move_prover::leaner::verifier_available() {
-        eprintln!("skipping prove --lean test: the Leaner Move verifier is not built");
+    if !move_prover::verex::verifier_available() {
+        eprintln!("skipping prove --lean test: the Verex Move verifier is not built");
         return;
     }
 

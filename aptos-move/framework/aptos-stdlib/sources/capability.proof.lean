@@ -3,35 +3,35 @@
 
 -- Transport of a concrete address is the identity, including when partially
 -- applied under an array map in a generic vector search.
-open LeanerIR.Proofs.Denote in
-@[lir_denote_norm] theorem address_transport [Carriers] (θ : TypeArgs) :
+open VerexIR.Proofs.Denote in
+@[vir_denote_norm] theorem address_transport [Carriers] (θ : TypeArgs) :
     NTy.toSkolem θ .address = id := rfl
 
 -- Generic helper calls also transport their parameter values by identity.
-open LeanerIR.Proofs.Denote in
-@[lir_denote_norm] theorem parameter_transport [Carriers] (θ : TypeArgs) (index : Nat) :
+open VerexIR.Proofs.Denote in
+@[vir_denote_norm] theorem parameter_transport [Carriers] (θ : TypeArgs) (index : Nat) :
     NTy.toSkolem θ (.param index) = id := rfl
 
 verify acquire by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
-  all_goals (repeat' leaner_split)
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+  all_goals (repeat' verex_split)
   all_goals simp_all
   all_goals grind
 
 verify acquire_linear by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
-  all_goals (repeat' leaner_split)
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+  all_goals (repeat' verex_split)
   all_goals simp_all
   all_goals grind
 
 -- Instantiating a phantom parameter cannot merge two different resource
 -- declarations. A write to one therefore preserves every slot of the other.
-open LeanerIR.Proofs.Denote in
+open VerexIR.Proofs.Denote in
 theorem set_distinct_struct {unit} [Θ : Skolems unit]
-    (memory : Memory unit) {h k : LeanerIR.StructHandle}
-    (a b f g xs ys : NRow) (key otherKey : LeanerIR.StorageKey)
+    (memory : Memory unit) {h k : VerexIR.StructHandle}
+    (a b f g xs ys : NRow) (key otherKey : VerexIR.StorageKey)
     (value : Option ((⟨Θ.resolve (.struct h a f), xs, .value⟩ : ResourceType).carrier unit))
     (different : k ≠ h) :
     memory.set ⟨Θ.resolve (.struct h a f), xs, .value⟩ key value
@@ -44,16 +44,16 @@ theorem set_distinct_struct {unit} [Θ : Skolems unit]
   exact different same
 
 verify delegate by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals try simp (disch := decide) [set_distinct_struct,
-    LeanerIR.Proofs.Denote.Skolems.ofRuntime_toRuntime] at *
+    VerexIR.Proofs.Denote.Skolems.ofRuntime_toRuntime] at *
   all_goals grind
 
 verify revoke by
-  leaner_obligations
-  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals try simp (disch := decide) [set_distinct_struct,
-    LeanerIR.Proofs.Denote.findIndex?_eq_some_iff,
-    LeanerIR.Proofs.Denote.findIndex?_eq_none_iff] at *
+    VerexIR.Proofs.Denote.findIndex?_eq_some_iff,
+    VerexIR.Proofs.Denote.findIndex?_eq_none_iff] at *
   all_goals grind

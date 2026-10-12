@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
-"""Isolate one verification target of a LeanerLang module file.
+"""Isolate one verification target of a VerexSL module file.
 
 Every other function of the target's module gets
 `pragma verify = false`, the modules after it are dropped, and the given
-options are set after `import LeanerLang`, so one target can be timed or
+options are set after `import VerexSL`, so one target can be timed or
 debugged on its own:
 
   scripts/isolate-target.py extract.lean ordered_map test_verify_lower_bound_rank_symbolic \\
-      -o one.lean --option leaner.certifyDebug=true
+      -o one.lean --option verex.certifyDebug=true
 
-Run the result from the package that builds `LeanerLang`, for example
-`(cd leaner-ir && lake env lean ../one.lean)`.
+Run the result from the package that builds `VerexSL`, for example
+`(cd verex-ir && lake env lean ../one.lean)`.
 """
 
 import argparse
@@ -31,13 +31,13 @@ def isolate(lines, module, target, options):
     skipping_proof = False
     identifier = r"(?:«[^»]+»|\w+)"
     for line in lines:
-        if line.startswith("leaner module "):
+        if line.startswith("verex module "):
             if seen_module:
                 break
             in_module = line.split()[2].split("::")[-1] == module
             seen_module = in_module
             current = None
-        if line.startswith("set_option leaner.stageLog"):
+        if line.startswith("set_option verex.stageLog"):
             continue
         if in_module:
             proof = re.match(rf"  verify ({identifier})(?=\s|$)", line)
@@ -73,7 +73,7 @@ def isolate(lines, module, target, options):
             out.extend([f"  spec {function} where", "    pragma verify = false", ""])
     text = "\n".join(out) + "\n"
     settings = "".join(f"set_option {name} {value}\n" for name, value in options)
-    return text.replace("import LeanerLang\n", "import LeanerLang\n" + settings, 1)
+    return text.replace("import VerexSL\n", "import VerexSL\n" + settings, 1)
 
 
 def main():
@@ -83,7 +83,7 @@ def main():
     parser.add_argument("target", help="the function whose specification stays verified")
     parser.add_argument("-o", "--output", required=True)
     parser.add_argument("--option", action="append", default=[],
-                        help="name=value, set after `import LeanerLang`")
+                        help="name=value, set after `import VerexSL`")
     arguments = parser.parse_args()
     options = []
     for option in arguments.option:

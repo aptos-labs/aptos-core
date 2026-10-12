@@ -43,7 +43,7 @@ Nothing a proof can use about types:
 ## Phases
 
 1. **Static typing (this document's subject).** Semantic types; a
-   declarative typing relation over validated LIR; a total checker proved
+   declarative typing relation over validated VIR; a total checker proved
    sound against it, run by `prepareExecution`, whose result carries the
    proof; inferred instantiations stored; instantiation closure, arena
    uniqueness, and table/identity checks. Reviewed before Phase 2.
@@ -141,7 +141,7 @@ the unit's types and names. `prepareExecution` runs it, and the
 `ExecutableUnit` it returns carries `typed : checkUnit unit
 targetPointerWidth = true`: a theorem quantifying over a prepared unit gets
 the facts without kernel evaluation. A refused unit is not prepared
-(`LIR-STATIC-TYPE`, naming each failing node with its type and its
+(`VIR-STATIC-TYPE`, naming each failing node with its type and its
 operands'), and verification refuses to state theorems about it, which
 would be vacuous (`ensureUnitDefinition`).
 
@@ -160,7 +160,7 @@ Rules worth noting:
   subslice of a vector of static length has a static length.
 - Data operations select through a reference of either kind.
 
-Tests: `LeanerIR/Tests/StaticTyping.lean`. Every Check fixture's units,
+Tests: `VerexIR/Tests/StaticTyping.lean`. Every Check fixture's units,
 the suites' units, and the Rust exporter's are accepted.
 
 ### Instantiation (done)
@@ -199,7 +199,7 @@ across namespaces.
 
 ### Tests
 
-Assertion tests in `LeanerIR/Tests/` for the semantic-type lemmas'
+Assertion tests in `VerexIR/Tests/` for the semantic-type lemmas'
 examples, the checker on accepted and rejected units (each rule's failure
 with its diagnostic), and the four suites unchanged except for units the
 new checks reject, each analysed (a frontend omitting an instantiation is
@@ -414,7 +414,7 @@ theorem as follows, in this order:
    is typed by its target's rows computed over the unit (`closureTypes?`,
    `ClosureTypedAt.ofClosureOf`). Memory stays typed through the function's own global
    operations: a stored value's typing is decided over the unit
-   (`GlobalsTyped.insertSlot`, `leaner_has_type`), and a removal keeps it
+   (`GlobalsTyped.insertSlot`, `verex_has_type`), and a removal keeps it
    (done for scalars and structures of them). After a call, memory is the
    callee's exit, which preservation types but which may hold a loan's
    hole; a callee with a loan-free interface leaving none needs either a

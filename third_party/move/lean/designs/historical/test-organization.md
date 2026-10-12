@@ -5,7 +5,7 @@ of [the roadmap](../roadmap.md#tests); kept for its per-file notes.
 
 Updated 2026-09-24 (denotation route, [`denotation.md`](denotation.md)). This is the ledger of the acceptance
 fixtures under
-[`leaner-e2e-tests/LeanerE2ETests/Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/):
+[`verex-e2e-tests/VerexE2ETests/Check/`](../verex-e2e-tests/VerexE2ETests/Check/):
 which pass exactly, which do not, and why. Chronology and the mappings of
 the original v0 cases live in
 [the history archive](test-organization-history.md), not here.
@@ -19,11 +19,11 @@ fails, however many targets it proves.
 
 | Gate | Result | Note |
 |---|---|---|
-| `leaner-ir` build | PASS | `LeanerLang` and the `Denote` modules. |
-| `DenotePerformance` gate | PASS (re-baselined 2026-09-24 for the loop step) | The loop targets cost 23–27% less since the iteration's context is normalized and substituted once (2026-09-24); the scalar and storage targets moved within ±5%. Every transport costs 8% more (about 313k heartbeats) since the skolem family (D3); ground evaluation (`lir_denote_eval`) and the array-literal simprocs cost the typed targets 0–3% more. |
-| `leaner-ir` `lake test` | PASS (2026-09-24) | Every root passes. `CompositionPerformance` re-baselined 2026-09-24: the typed targets cost 5–9% more and the transports 8% (24k heartbeats each, three proof objects) since the 2026-09-24 closer changes; the cause of the transport growth is not identified (it is not the normal-form additions, the cast form of vector lengths, or the leaf's alternative order). `four_times` is at 12.8M heartbeats (48M before D5). |
-| `leaner-move`, `leaner-rust` builds | PASS | |
-| `leaner-e2e-tests` `lake test` | PASS (2026-09-24) | All five suites (`move`, `rust`, `check`, `monovm`, `monodiff`). |
+| `verex-ir` build | PASS | `VerexSL` and the `Denote` modules. |
+| `DenotePerformance` gate | PASS (re-baselined 2026-09-24 for the loop step) | The loop targets cost 23–27% less since the iteration's context is normalized and substituted once (2026-09-24); the scalar and storage targets moved within ±5%. Every transport costs 8% more (about 313k heartbeats) since the skolem family (D3); ground evaluation (`vir_denote_eval`) and the array-literal simprocs cost the typed targets 0–3% more. |
+| `verex-ir` `lake test` | PASS (2026-09-24) | Every root passes. `CompositionPerformance` re-baselined 2026-09-24: the typed targets cost 5–9% more and the transports 8% (24k heartbeats each, three proof objects) since the 2026-09-24 closer changes; the cause of the transport growth is not identified (it is not the normal-form additions, the cast form of vector lengths, or the leaf's alternative order). `four_times` is at 12.8M heartbeats (48M before D5). |
+| `verex-move`, `verex-rust` builds | PASS | |
+| `verex-e2e-tests` `lake test` | PASS (2026-09-24) | All five suites (`move`, `rust`, `check`, `monovm`, `monodiff`). |
 
 
 ## Per-file status
@@ -168,7 +168,7 @@ not make it pass if its positive control fails.
 | `Account` | PASS | |
 | `Corpus` | PASS | |
 | `OrderedMap` | PASS | Since 2026-09-24: v0's nine proof-carrying targets over a generic sorted-vector map with increasing keys as its data invariant. `empty`, `lower_bound`, `length`, `borrow_key_at` close automatically; the recursive binary search, `contains`, `borrow`, `add`, and `remove` through lemmas over arrays (search window, presence and absence at the lower bound, sortedness and shape after insertion or removal). v0's eight execution scenarios run at `u64` and `Bool` keys; `borrow_key_at` and `borrow` return a reborrow through a local holding a reborrow of the parameter. |
-| `Quicksort` | PASS | Since 2026-09-24: v0's three proof-carrying targets. The generic Lomuto `partition` (quantified loop invariants over the structural order, the working range's frame and counts) and the generic recursive `quick_sort_range` (sortedness, frame, and counts of the range) through authored proofs; `quick_sort` automatically. The permutation is stated by counts, a recursive `spec fun`; the count lemmas (split, congruence, membership) go through its unfolding theorem, and the recursive sort's three residual goals are composition lemmas over arrays. v0's five execution cases run through concrete wrappers. `partition` costs 277M heartbeats (`set_option leaner.verifyHeartbeats 400000`; 2026-09-25, after the closer's residual deciders stopped unfolding at default transparency). |
+| `Quicksort` | PASS | Since 2026-09-24: v0's three proof-carrying targets. The generic Lomuto `partition` (quantified loop invariants over the structural order, the working range's frame and counts) and the generic recursive `quick_sort_range` (sortedness, frame, and counts of the range) through authored proofs; `quick_sort` automatically. The permutation is stated by counts, a recursive `spec fun`; the count lemmas (split, congruence, membership) go through its unfolding theorem, and the recursive sort's three residual goals are composition lemmas over arrays. v0's five execution cases run through concrete wrappers. `partition` costs 277M heartbeats (`set_option verex.verifyHeartbeats 400000`; 2026-09-25, after the closer's residual deciders stopped unfolding at default transparency). |
 
 ### Missing v0 fixtures
 
@@ -176,7 +176,7 @@ None: every v0 verification fixture is ported.
 
 ## Move corpus round trip
 
-The Move-to-LeanerLang corpus (`leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/`,
+The Move-to-VerexSL corpus (`verex-e2e-tests/VerexE2ETests/MoveToVerexSL/`,
 94 modules) was red on `main` from the 2026-09-09 squash until 2026-09-22
 (Lean CI was off): six modules failed re-import because a nested block's
 value printed as `return e`, eight lost their fixed point on element
@@ -186,20 +186,20 @@ enclosing loop is re-lowered as a `while`) and `loops` (`break 'outer` from an
 inner Move loop: "nonlocal break targets an unlabeled loop").
 
 Rules the fixes settled: the Move frontend emits the same
-`checkVectorIndex` binding around every element borrow the LeanerLang
-lowering does (an out-of-range LIR index place resolves to nothing, so the
+`checkVectorIndex` binding around every element borrow the VerexSL
+lowering does (an out-of-range VIR index place resolves to nothing, so the
 check is the abort), and lowers `&&`/`||` as the short-circuit conditional
 in executable code; the text printer elides that binding and its `$t`
 index temporary back into `&v[i]`, `v[i]`, and `v[i] := x`.
 
 ## Conventions and rules
 
-A Check file is LeanerLang source with contracts, theorems, authored
+A Check file is VerexSL source with contracts, theorems, authored
 proofs, and execution or diagnostic assertions. The driver discovers every
 `Check/**/*.lean`, runs each in its own Lean process at the driver's caps,
 and compares all diagnostics to the adjacent `.exp` (absence of `.exp`
-means empty output). Run it from `leaner-e2e-tests` with
-`LEANER_E2E_SUITE=check lake test`; `UB=1` regenerates baselines and every
+means empty output). Run it from `verex-e2e-tests` with
+`VEREX_E2E_SUITE=check lake test`; `UB=1` regenerates baselines and every
 regenerated diff is reviewed.
 
 - A baseline records intended behavior. A negative case's expected

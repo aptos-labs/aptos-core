@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/lambda_variant_field_access.move:31:9: error: the specification clause `ensures result` is not established
-tests/sources/regression/lambda_variant_field_access.move:28:5: error: leaner verification failed: the automatic verification of `two` failed; provide a proof: `verify two by …` in the module (`verify two by leaner_obligations` lists its obligations)
+tests/sources/regression/lambda_variant_field_access.move:28:5: error: verex verification failed: the automatic verification of `two` failed; provide a proof: `verify two by …` in the module (`verify two by verex_obligations` lists its obligations)
 tests/sources/regression/lambda_variant_field_access.move:82:9: error: the specification clause `ensures e == old(e)` is not established
-tests/sources/regression/lambda_variant_field_access.move:79:5: error: leaner verification failed: the automatic verification of `write_ss_unchanged` failed; provide a proof: `verify write_ss_unchanged by …` in the module (`verify write_ss_unchanged by leaner_obligations` lists its obligations)
+tests/sources/regression/lambda_variant_field_access.move:79:5: error: verex verification failed: the automatic verification of `write_ss_unchanged` failed; provide a proof: `verify write_ss_unchanged by …` in the module (`verify write_ss_unchanged by verex_obligations` lists its obligations)

@@ -4,23 +4,23 @@ tests/sources/functional/closures/inline/folds_of.move:74:5: error: (determinist
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of.move:74:5: error: leaner verification failed: the automatic verification of `sum` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify sum by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of.move:74:5: error: verex verification failed: the automatic verification of `sum` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify sum by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/folds_of.move:109:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of.move:109:5: error: leaner verification failed: the automatic verification of `sum_without_abilities` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_without_abilities by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify sum_without_abilities by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of.move:109:5: error: verex verification failed: the automatic verification of `sum_without_abilities` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_without_abilities by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify sum_without_abilities by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/folds_of.move:123:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of.move:123:5: error: leaner verification failed: the automatic verification of `accumulate_into_parameter` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify accumulate_into_parameter by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify accumulate_into_parameter by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of.move:123:5: error: verex verification failed: the automatic verification of `accumulate_into_parameter` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify accumulate_into_parameter by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify accumulate_into_parameter by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/closures/inline/folds_of.move:181:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established
 tests/sources/functional/closures/inline/folds_of.move:179:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of.move:179:5: error: leaner verification failed: the automatic verification of `sum_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_wrong by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify sum_wrong by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of.move:179:5: error: verex verification failed: the automatic verification of `sum_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_wrong by …` in `tests/sources/functional/closures/inline/folds_of.proof.lean` (`verify sum_wrong by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

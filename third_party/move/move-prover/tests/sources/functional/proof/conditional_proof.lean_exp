@@ -12,4 +12,4 @@ warning: proof uses trusted assumption
    │             ^^^^^^^^^^^^^^^^^^^^^^
 
 tests/sources/functional/proof/conditional_proof.move:64:9: error: the requirement of the lemma applied at `positive_bound(x)` does not hold
-tests/sources/functional/proof/conditional_proof.move:61:5: error: leaner verification failed: the automatic verification of `maybe_zero` failed; provide a proof: `verify maybe_zero by …` in `tests/sources/functional/proof/conditional_proof.proof.lean` (`verify maybe_zero by leaner_obligations` lists its obligations)
+tests/sources/functional/proof/conditional_proof.move:61:5: error: verex verification failed: the automatic verification of `maybe_zero` failed; provide a proof: `verify maybe_zero by …` in `tests/sources/functional/proof/conditional_proof.proof.lean` (`verify maybe_zero by verex_obligations` lists its obligations)

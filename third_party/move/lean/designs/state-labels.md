@@ -14,13 +14,13 @@ spec inc_twice {
 }
 ```
 
-This design carries labels end to end: the exchange, LIR, LeanerLang,
+This design carries labels end to end: the exchange, VIR, VerexSL,
 contracts, and the solver. It completes the state-label part of H4d in
 [`higher-order-functions.md`](higher-order-functions.md) ("Behavioral
 predicates and state labels"), whose sketch it follows: a contract is a
 proposition over states, so a label is a state variable. Every test of
 `move-prover/tests/sources/functional/state_labels/` (29) fails today, 18 of
-them in the LeanerLang parser (registry entries V1, V20, and one message of
+them in the VerexSL parser (registry entries V1, V20, and one message of
 V2 in [`prover-test-problems.md`](prover-test-problems.md)).
 
 ## Semantics, as the Move Prover defines them
@@ -70,7 +70,7 @@ same: the dump adds `"label": n` to a quantifier binder of type
 a per-module table `labels: [{id, name}]` so a defined (free) label is
 spelled by its source name too. XAST version 9.
 
-**LIR.** `MemoryRange` and the labeled operations exist (`behavior`,
+**VIR.** `MemoryRange` and the labeled operations exist (`behavior`,
 `functionCall`, `lemma`, `publish`, `remove`, `update`, and `global` with
 an optional label; `exists` gains the same label, which the exchange
 exports already). A `QuantifierBinder` over the `stateDomain` domain gains the
@@ -83,7 +83,7 @@ body, as the Prover's tests do), and that a state-domain binder binds a
 label. Label numbers stay
 function-local, as the model keeps them.
 
-**LeanerLang.** The numeric forms `@n |~`, `@n.. |~`, `..@n |~`,
+**VerexSL.** The numeric forms `@n |~`, `@n.. |~`, `..@n |~`,
 `@n..@m |~` already exist for behavioral calls. Labels become names:
 
 ```
@@ -145,14 +145,14 @@ splits at call boundaries.
 
 ## Milestones
 
-- **S1 — round trip.** Done 2026-10-05. Exchange label names (XAST 9), LIR binder labels and
-  validation, LeanerLang names for labels and the labeled forms for
+- **S1 — round trip.** Done 2026-10-05. Exchange label names (XAST 9), VIR binder labels and
+  validation, VerexSL names for labels and the labeled forms for
   specification-function calls, state-change predicates, and one-state
   reads, printer and lowering. Gate: every `state_labels` test re-elaborates;
   the 18 parser rejections become verification outcomes; the e2e corpus
   unchanged (no module of it uses labels), plus the round-trip fixture
-  `MoveToLeanerLang/state_labels.move`. Labels are names (`NameId`s) in
-  LIR; a labeled `exists` is `SpecOperation.exists`. A Check fixture waits
+  `MoveToVerexSL/state_labels.move`. Labels are names (`NameId`s) in
+  VIR; a labeled `exists` is `SpecOperation.exists`. A Check fixture waits
   for S2: a Check baseline never records an unsupported proof.
 - **S2 — contracts.** Labels bound in `Contract.lean`: quantified labels
   as `Memory unit` binders, defined labels by their defining predicates,
@@ -222,7 +222,7 @@ splits at call boundaries.
     ledger beside the goal would not survive (a substitution renames the
     values). Points are kept for a target whose contract binds a label
     (`Contract.contractBindsStateLabel`, the `labeled` flag of
-    `leaner_solve_goals`); other targets pay nothing. `leaner_witness`
+    `verex_solve_goals`); other targets pay nothing. `verex_witness`
     tries the points first for a label's existential: the point's state for
     a `Memory` binder, the encodings of its locals in the binder's domain
     (`RuntimeValue`, `Int`, …; a reference by its referent's current value)
@@ -271,7 +271,7 @@ splits at call boundaries.
 - `unmodified_memory_at_label::swap` reads `old(Resource[addr])` under the
   pre-label of a publication, after that label's removal of `Resource`.
   Boogie's `$ResourceRemove` clears the domain bit but retains the contents;
-  Leaner's `Memory` has `Option` slots and removal writes `none`, whose
+  Verex's `Memory` has `Option` slots and removal writes `none`, whose
   specification read is the default value. The positive `swap` clause
   therefore remains unproved. `swap_wrong` fails its intended clause.
   This is a difference in reads of absent resources, not a missing label

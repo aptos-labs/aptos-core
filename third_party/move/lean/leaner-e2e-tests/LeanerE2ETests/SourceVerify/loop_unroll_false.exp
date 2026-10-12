@@ -1,4 +1,0 @@
-LeanerE2ETests/SourceVerify/loop_unroll_false.move:11:5: error: the bound `pragma unroll = 0` of a loop is not established
-LeanerE2ETests/SourceVerify/loop_unroll_false.move:11:5: error: leaner verification failed: the automatic verification of `insufficient` failed; provide a proof: `verify insufficient by …` in `LeanerE2ETests/SourceVerify/loop_unroll_false.proof.lean` (`verify insufficient by leaner_obligations` lists its obligations)
-LeanerE2ETests/SourceVerify/loop_unroll_false.move:25:9: error: the specification clause `ensures result == 4` is not established
-LeanerE2ETests/SourceVerify/loop_unroll_false.move:23:5: error: leaner verification failed: the automatic verification of `incorrect` failed; provide a proof: `verify incorrect by …` in `LeanerE2ETests/SourceVerify/loop_unroll_false.proof.lean` (`verify incorrect by leaner_obligations` lists its obligations)

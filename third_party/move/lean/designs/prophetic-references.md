@@ -1,9 +1,9 @@
-# Prophetic reference semantics for validated LIR
+# Prophetic reference semantics for validated VIR
 
 Status: P1–P7 implemented; the verifier carries the model as D5 of
 [`denotation.md`](denotation.md). This document is the master
 plan for replacing the concrete heap/generation reference model of validated
-LIR with a prophecy-based ownership model, run uniformly by the interpreter,
+VIR with a prophecy-based ownership model, run uniformly by the interpreter,
 the big-step relational semantics, and the verifier. Its milestone register
 supersedes the M5 reference bullets of
 [`elaboration-design.md`](elaboration-design.md).
@@ -267,10 +267,10 @@ remains for what elimination rejects).
 | `Semantics/Typing.lean` | Preservation for borrow/deref/mutate/endLoan replaces the deferred pointer cases; store typing shrinks to frame + globals. |
 | `Proofs/WP.lean` | Reference arms of `wpExpr_place` become dedicated prophecy rules; `wpExprStep` gains the `endLoan` arm. |
 | `Proofs/Contract.lean` + new `Proofs/Mutation.lean` | Port V0 `Mutation`, `mutationWP`, `withMutation`-style scoped rules, prophecy-elimination simp lemmas (already present), and the derived vector-element/global borrow rules. |
-| `LeanerLang/Contract.lean` | `&mut` parameters/results in generated contracts translate to (current, prophecy) binder pairs; `old(x)` is the parameter's entry value, the prophecy is its exit value. |
+| `VerexSL/Contract.lean` | `&mut` parameters/results in generated contracts translate to (current, prophecy) binder pairs; `old(x)` is the parameter's entry value, the prophecy is its exit value. |
 | Frame clause | Back to `final = initial`: no released heap slots to trim, `finalizeFunctionState` loses its heap pass. |
 
-Paths are relative to `leaner-ir/LeanerIR/`. `Proofs/WP.lean` was later
+Paths are relative to `verex-ir/VerexIR/`. `Proofs/WP.lean` was later
 removed with the pre-denotation routes, and `Proofs/Mutation.lean` was not
 needed.
 
@@ -341,35 +341,35 @@ needed.
   (`final.pending = initial.pending.push (loan, final_value)`), and a
   caller's wp reasoning resolves it by `applyPending` substituting the
   callee's exported finals into the caller's holes. What P3 delivered is
-  the machinery that makes this run under `leaner_wp`:
+  the machinery that makes this run under `verex_wp`:
   - the loan-bookkeeping walkers became total — `rewriteFirst`/
     `findFirst`/`collectPruned` as mutual value/list well-founded
     recursions with precise first-match semantics, fueled
     `resolvePlace?`/`bindPattern` (arena-size fuel is exact on acyclic
     arenas), structural projection walkers;
   - a reduction/simp division of labor: whnf cannot unfold well-founded
-    recursion, so `leaner_reduce` keeps the walker heads folded (arguments
-    still reduce) and their registered `lir_data_norm` equations — plus
+    recursion, so `verex_reduce` keeps the walker heads folded (arguments
+    still reduce) and their registered `vir_data_norm` equations — plus
     the `List.findIdx?`/`List.findSome?` stepping lemmas — execute them in
     the simp phase; the equations are shape-conditional, so they never
     unfold against symbolic values;
   - the introduction step peels constructor-wrapped operand equations by
     injection before substituting (and re-locates the hypothesis after
-    `changeLocalDecl` rebinds its id); a progress-failing `leaner_reduce!`
+    `changeLocalDecl` rebinds its id); a progress-failing `verex_reduce!`
     branch resumes ground reduction after substitutions;
   - normal-form seals ending reduce/simp oscillation: array literals
     (`List.toArray`), numerals (`OfNat.ofNat`, `Int.ofNat`), and the
     definitional connectives (`Not`, `Ne`, order notations) stay in simp
     normal form.
-  Gate met: `LeanerLang/Tests/Verification.lean` (now
+  Gate met: `VerexSL/Tests/Verification.lean` (now
   `Check/References/Prophecies.lean`) verified `replace`
-  (`&mut u64` parameter) end-to-end through `leaner_wp` in seconds, sorry-
-  free, with the contract phrased as a pending export.  (`leaner_wp` and
+  (`&mut u64` parameter) end-to-end through `verex_wp` in seconds, sorry-
+  free, with the contract phrased as a pending export.  (`verex_wp` and
   that hand proof were retired with the frame route on 2026-09-02; the
   same functions verify through the generated row route as the check
   `Check/References/Prophecies.lean`.)
 - **DONE — P4: Verification layer.** 2026-08-28. Contract generation in
-  `LeanerLang/Contract.lean` covers reference parameters: a `&mut T`
+  `VerexSL/Contract.lean` covers reference parameters: a `&mut T`
   parameter contributes a loan binder and an entry/exit value pair — in a
   one-state clause the bare name is the entry value; in `ensures` the
   bare name is the exit value and `spec.old` reaches the entry — with the
@@ -379,8 +379,8 @@ needed.
   parameter is a loan binder plus one unchanging value. The
   `verify` command materializes the unit and generated contract
   and proves `SatisfiesFunction` by the scripted symbolic execution
-  (`leaner_cases` destructs the precondition tracking hypotheses by
-  name across substitutions; `leaner_wp!` feeds every hypothesis to the
+  (`verex_cases` destructs the precondition tracking hypotheses by
+  name across substitutions; `verex_wp!` feeds every hypothesis to the
   simp phases; a final `simp_all [and_assoc]` introduces the ensures
   witnesses). Semantics-side enablers: `holeWithin`/`holeInFrame`/
   `holeInGlobals` name the visibility scans, `fillVisibleHole` guards
@@ -390,7 +390,7 @@ needed.
   so a symbolic frame never exposes a search. V0's `Mutation`/
   `mutationWP` vocabulary was not needed: ownership passing plus pending
   exports carries the same content through the one judgment. Gate met:
-  `LeanerLang/Tests/Verification.lean` (now `Check/References/Prophecies.lean`)
+  `VerexSL/Tests/Verification.lean` (now `Check/References/Prophecies.lean`)
   proves the generated contracts of
   `replace` (`&mut`), `swap_in` (`&mut` with `old`), and `observe`
   (`&`), sorry-free. Reference-typed results and multiple `&mut` parameters
@@ -407,14 +407,14 @@ needed.
   types at every type, so only a loan-typing environment tying each
   hole's position to its loan's referent can carry it; that environment
   belongs to the deferred M2 stage-5 evaluator induction and is recorded
-  in `lir-design.md`'s register, together with the dead-residue caveat
+  in `vir-design.md`'s register, together with the dead-residue caveat
   (`endLoan`/freeze leave placeholder values where consumed borrows
   rested). The old heap-generation pointer-width typing obligation closed
   with the heap's removal; `targetPointerWidth` survives only as the
   `usize`/`isize` width resolver. Register updates landed:
   `elaboration-design.md` reads the one-semantics model (no
   prophecy-refinement obligation, no heap in runtime state),
-  `lir-design.md` gained the prophetic-residue row (loan-typing
+  `vir-design.md` gained the prophetic-residue row (loan-typing
   environment, non-lexical death, two-phase/interior mutability), and
   `rust-mir-design.md`'s reference section points here with the two Rust
   requirements discharged by construction.

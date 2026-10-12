@@ -24,4 +24,4 @@ warning: cannot derive `ensures_of` exactly for this lambda argument: per-applic
    │   ╰────────────────────────────────────────────────' lambda argument
 
 tests/sources/functional/closures/inline/two_state_spec_fun.move:30:13: error: the assertion `with_state_anchor!(0, spec_delta(a) == 3 && res == x)` does not hold
-tests/sources/functional/closures/inline/two_state_spec_fun.move:54:5: error: leaner verification failed: the automatic verification of `delta_false` failed; provide a proof: `verify delta_false by …` in `tests/sources/functional/closures/inline/two_state_spec_fun.proof.lean` (`verify delta_false by leaner_obligations` lists its obligations)
+tests/sources/functional/closures/inline/two_state_spec_fun.move:54:5: error: verex verification failed: the automatic verification of `delta_false` failed; provide a proof: `verify delta_false by …` in `tests/sources/functional/closures/inline/two_state_spec_fun.proof.lean` (`verify delta_false by verex_obligations` lists its obligations)

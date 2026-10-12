@@ -7,7 +7,7 @@ Move function values (language 2.2) are closures: a function, a mask saying
 which of its parameters are bound, and the bound values. Their
 specifications (language 2.4) use behavioral predicates (`requires_of`,
 `aborts_of`, `ensures_of`, `result_of`) and state labels. This design carries
-them through LIR, execution, the denotation, and verification, and connects
+them through VIR, execution, the denotation, and verification, and connects
 them to Move sources, Move bytecode, and Rust function pointers.
 
 Sources: the Move Book (`functions.md`, "Function Values";
@@ -47,24 +47,24 @@ What the stack had before H1:
 
 | Layer | Present | Missing |
 |---|---|---|
-| LIR | `Ty.function` with abilities; `CallKind.closure`, `invoke`; `RuntimeValue.closure handle captures`; behavioral predicates as `SpecOperation.behavior kind range` | capture mask (captures are a parameter prefix); the closure's type instantiation |
+| VIR | `Ty.function` with abilities; `CallKind.closure`, `invoke`; `RuntimeValue.closure handle captures`; behavioral predicates as `SpecOperation.behavior kind range` | capture mask (captures are a parameter prefix); the closure's type instantiation |
 | Validation | target, arity, and capture types checked; the function type's abilities ignored | reference captures, abilities, persistence; `invoke` in the borrow analysis |
 | Runtime | big-step rules, interpreter, soundness/completeness | `invoke` runs under the caller's type instantiation and registers no returned loan; closures ordered by handle index |
 | Denotation | direct calls; `propheticMeaning` defined for any handle | no function `NTy`; closures and `invoke` are `notCarried` |
-| Contracts | LeanerLang parses predicates and `@n` labels | contracts reject behavioral predicates |
-| LeanerLang | `Fn(..) -> R has ..`, `function[F](target, captures)`, `invoke(f, args)` | masks, generic targets, `f(x)` application |
+| Contracts | VerexSL parses predicates and `@n` labels | contracts reject behavioral predicates |
+| VerexSL | `Fn(..) -> R has ..`, `function[F](target, captures)`, `invoke(f, args)` | masks, generic targets, `f(x)` application |
 | Move frontend | function types, `invoke`, predicates in the exchange | closure construction: the producer skips the function, and `Encode.lean` drops the skip without a diagnostic |
 | XIR | — | function types, `PackClosure`, `CallClosure` |
 | Rust | function pointers (non-capturing) | capturing closures, `Fn*` traits |
 | Tests | `Tests/Closures.lean`, `Tests/Generics.lean` | Check, SourceVerify, and MonoVM differential fixtures |
 
-## LIR
+## VIR
 
 **Masks.** `CallKind.closure` gains the mask, a bit set over the target's
 parameters as in Move; a prefix is the mask with the low `n` bits set. The
 alternative, adapter functions that reorder parameters, would add functions
-the source does not have and break the LeanerLang round trip. `compose` and
-`extract` are defined once in `LeanerIR` and used by validation, the
+the source does not have and break the VerexSL round trip. `compose` and
+`extract` are defined once in `VerexIR` and used by validation, the
 runtime, and the denotation.
 
 **Instantiation.** A closure of a generic target fixes its type arguments at
@@ -79,8 +79,8 @@ caller's.
 - the function type's abilities are within those the captures and the
   target allow (above); Move's persistence rule is a Move profile rule
   (`ProfileSchema.storableTarget`, defined once as
-  `LeanerLang.moveStorableTarget` over both spellings of the modifiers and
-  used by the LeanerLang and Move registries, `LIR-CLOSURE-STORE`);
+  `VerexSL.moveStorableTarget` over both spellings of the modifiers and
+  used by the VerexSL and Move registries, `VIR-CLOSURE-STORE`);
 - `invoke` requires the operand's function type, arity, and argument types
   (exists), and consumes a non-`copy` function value;
 - the borrow analysis treats `invoke` as a call: reference arguments are lent
@@ -250,7 +250,7 @@ run.
 precondition, but a caller needs the target's precondition to use the
 target's verified contract. The table maps each target of the module's
 closures to its `requires` over runtime arguments, each parameter read from
-its argument (`buildDeclaredRequires`), with one `lir_denote_norm` equation
+its argument (`buildDeclaredRequires`), with one `vir_denote_norm` equation
 per target; a precondition stating a behavioral predicate would read the
 table itself and is rejected. A verified target's theorem (`Satisfies`)
 then yields what the Prover asserts as compliance: under `requires_of`,
@@ -313,7 +313,7 @@ the function value naming its target at the woven arguments
 (`abortsOf_closureOf_captured`): the invocation depends on the closure and
 its arguments only through the target and the woven row. The rewrite is of
 the leaf's goal, decided by the cheap deciders after it
-(`leaner_woven_behaviors`); the context keeps the closures as built,
+(`verex_woven_behaviors`); the context keeps the closures as built,
 where frames and contracts name them. A
 contract reads a
 `&mut` input at the invocation's
@@ -372,7 +372,7 @@ from the target's body, an obligation over every argument and typed memory
 from its code. The Move frontend reads an invocation of such a parameter as
 writing no global memory, so a higher-order function's frame is closed.
 
-`modifies_of<f>(a) R[a]` (2026-10-03) reaches LIR as a parameter frame
+`modifies_of<f>(a) R[a]` (2026-10-03) reaches VIR as a parameter frame
 (XAST 6, RawUnit JSON 1.3): the theorem then assumes `FramedAt`, the closed
 frame but for the targets with the formals bound to an invocation's
 arguments, and a caller establishes it the same two ways, a target's frame
@@ -410,7 +410,7 @@ interface rejection and preservation of owned frames have frontend guards.
 **State labels.** A contract is a Lean proposition over states, so a label is
 a state variable: `..S |~ ensures_of<f>(x, y)` makes `S` the post-state of the
 application, and a label quantified by `exists S in *` or `forall S in *`, or
-left free in a clause, is a bound `RuntimeState`. LeanerLang's `@n` anchors
+left free in a clause, is a bound `RuntimeState`. VerexSL's `@n` anchors
 already number them; `Contract.lean` binds them. The Prover's flattening of
 intermediate states for SMT is not needed.
 
@@ -423,7 +423,7 @@ assumes, so a caller of a higher-order function uses the target's contract as
 it would for a direct call. Generic higher-order functions need nothing
 further: the carrier does not depend on type parameters.
 
-## LeanerLang
+## VerexSL
 
 Existing forms stay canonical: `Fn(A, B) -> R has copy, drop`,
 `function[F](target, captures…)`, `invoke(f, args…)`, the predicates, and
@@ -433,7 +433,7 @@ Existing forms stay canonical: `Fn(A, B) -> R has copy, drop`,
   parameter; `_` marks a parameter supplied at invocation, and a prefix needs
   none;
 - generic targets: `function[Fn(T) -> T](f::<T>, …)`, replacing
-  `LEANER-CLOSURE-GENERICS`;
+  `VEREX-CLOSURE-GENERICS`;
 - `f(x)` for a function-typed local, printed back as `f(x)`;
 - `modifies_of<f>(a: address) R[a]` in a specification, for the frame above.
 
@@ -454,13 +454,13 @@ Lambdas stay out; lifted Move lambdas arrive as ordinary functions.
   (`{"function": [[params], [results], [abilities]]}`) and the operations
   `closure`/`closure_inst` (target, mask, type arguments; the captures are
   the operands) and `invoke` (the function value last, as in stackless
-  bytecode; LIR passes it first). compiler-v2 loads them as stackless
+  bytecode; VIR passes it first). compiler-v2 loads them as stackless
   `Closure` and `Invoke`; a closure's target is a used, not a called,
   function of its creator.
 
 ## Rust
 
-Function pointers already reach LIR as closures without captures. Capturing
+Function pointers already reach VIR as closures without captures. Capturing
 closures take their environment by reference (`Fn`, `FnMut`) or by value
 (`FnOnce`); the reference cases need captured references, which the
 prophetic model can express but this design excludes. They are a later
@@ -469,15 +469,15 @@ traits are.
 
 ## Tests
 
-- **LIR:** `compose`/`extract`; generic closures keep their instantiation;
+- **VIR:** `compose`/`extract`; generic closures keep their instantiation;
   reference captures and excess abilities rejected; `invoke` lends and
   returns references; closures ordered by name.
 - **MonoVM differential** (Move sources): masks in every position, generic
   closures, closures as struct fields, equality, aborts inside a closure,
   `&mut` arguments through `invoke`. The harness has no global state and no
   `std::cmp`, so closures in resources are exercised through XIR on MoveVM
-  (compiler-v2's `leaner/closures.lean`) and the order by the LIR tests.
-- **Check fixtures** (LeanerLang): a known closure through a higher-order
+  (compiler-v2's `verex/closures.lean`) and the order by the VIR tests.
+- **Check fixtures** (VerexSL): a known closure through a higher-order
   function; a higher-order function verified against `requires_of`,
   `aborts_of`, `ensures_of`, `result_of`; `&mut` arguments; a generic
   higher-order function; a stored closure; state labels over two calls;
@@ -491,13 +491,13 @@ traits are.
 1. **H1 — closures at run time.** Done: masks (`ClosureMask`, RawUnit JSON
    1.2), instantiations fixed at construction, validation (mask, reference
    captures, capture abilities), `invoke` as a call in the borrow analysis,
-   name ordering (`ValueOrders`), the interpreter and its proofs, LIR tests.
+   name ordering (`ValueOrders`), the interpreter and its proofs, VIR tests.
 2. **H2 — Move path.** Done: closure construction in the exchange (XAST 5),
    the silent-drop fix, the Move persistence rule for `store`, the
-   LeanerLang mask and generic-target spellings, XIR 7 lowering, the MonoVM
+   VerexSL mask and generic-target spellings, XIR 7 lowering, the MonoVM
    differential fixture `MonoDifferential/closures.move` (masks, a generic
    target, struct fields, a higher-order function, aborts, `&mut` arguments,
-   equality), and compiler-v2's transactional `leaner/closures.lean`
+   equality), and compiler-v2's transactional `verex/closures.lean`
    (the same through XIR on MoveVM, and a closure stored in a resource).
 3. **H3 — denotation.** Done: the function `NTy` over `ClosureValue`,
    `Term.closure`, `Term.closureGeneric`, `Term.invoke`, `closureMeaning`,
@@ -516,7 +516,7 @@ traits are.
      a predicate takes the executable unit as its last parameter, and one
      stating `requires_of` the table after it; theorems instantiate them at
      the unit they quantify and at the module's table
-     (`LeanerLang/Tests/Behavior.lean`). Without state labels a predicate
+     (`VerexSL/Tests/Behavior.lean`). Without state labels a predicate
      reads the function's entry state, and in `ensures` relates it to the
      exit state; labels and mutable reference parameters are rejected
      until H4d.
@@ -529,7 +529,7 @@ traits are.
    - **H4c:** the solver's rule for an invocation of an unknown closure as
      the predicates, the dispatch of a literal closure to its target's
      theorem, and the closed-world theorem. The dispatch is done
-     (2026-10-01, "Literal closures" above, `LeanerLang/Tests/Behavior.lean`);
+     (2026-10-01, "Literal closures" above, `VerexSL/Tests/Behavior.lean`);
      the rule for an unknown closure needs H4b, since its `wp` excludes the
      undefined outcome.
    - **H4d:** state labels, parameter frames, `&mut` arguments, and the
@@ -811,7 +811,7 @@ the readings to agree.
 
 ## Non-goals
 
-- Lambdas in LeanerLang.
+- Lambdas in VerexSL.
 - Captured references, for Move and Rust alike.
 - `reads_of`: a meaning is exact, so reads need no declaration to be sound;
   what it adds, independence of the result from other memory, can follow.

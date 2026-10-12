@@ -11,29 +11,29 @@ is measured by the check ledger, and open work is listed, in
 
 ## Status (checkpoint 2026-09-27)
 
-Implemented in `leaner-ir`: D0–D6 are done; builds, the `DenotePerformance`
+Implemented in `verex-ir`: D0–D6 are done; builds, the `DenotePerformance`
 gate, and the check ledger (76 of 76 files exact) are as recorded in
 [`roadmap.md`](roadmap.md#tests). The agreement theorem is **assumed**, by the user's
 decision, until its induction is done.
 
 ### Modules
 
-- `LeanerIR/Proofs/Denote/`: `Types` (native carriers, rows, codecs, the
+- `VerexIR/Proofs/Denote/`: `Types` (native carriers, rows, codecs, the
   state operations and their wp rules), `Term` (typed terms and
   `Term.denote`), `Compile` (`compileFunction`, structural on fuel),
   `Agreement` (the named axioms `compileFunction_agrees` and
   `compileFunction_least_cycle`, and the transport
-  to `SatisfiesFunction`), `Solve` (the solver, the `lir_denote` and
-  `lir_denote_norm` simp sets, the state-fact and leaf tactics), `BitLift`
+  to `SatisfiesFunction`), `Solve` (the solver, the `vir_denote` and
+  `vir_denote_norm` simp sets, the state-fact and leaf tactics), `BitLift`
 (the restatement of a leaf over bit vectors under `pragma bv`).
-- `LeanerLang/Verify.lean` owns `verify` (in a module and at top level),
+- `VerexSL/Verify.lean` owns `verify` (in a module and at top level),
   which audits each target's artifacts (the denotation route, approved
   axioms only). Per target it publishes the quoted term,
   the kernel `rfl` certificate of its compilation, `typedVerified` over the
   denotation, and `verified` over the big-step meaning; per struct twin it
   generates the two bridge theorems (`erase_eq_encode`, `decode?_fields`).
   `Contract.lean` keeps the clause translator and preparation.
-- Gate: `LeanerLang/Tests/DenotePerformance.{lean,exp}` records heartbeats
+- Gate: `VerexSL/Tests/DenotePerformance.{lean,exp}` records heartbeats
   and proof objects per target (straight-line 1.7–6M, loops about 20M,
   the three-variant `match` with a matching contract 35M). The e2e check
   driver caps a target at 180k verification heartbeats.
@@ -144,7 +144,7 @@ and range patterns over characters.
   contract. A leaf instantiates `f.spec.unfold` once at each application it
   holds, as a solver instantiates a definitional axiom at its trigger terms,
   and keeps the instances whose guards the context decides
-  (`leaner_unfold_specs`, again after `prepare`); `grind` relates the
+  (`verex_unfold_specs`, again after `prepare`); `grind` relates the
   applications by congruence. A proof needing induction is authored, with
   lemmas about `f.spec` that are items of the module (see module items
   below). A Boolean
@@ -185,11 +185,11 @@ and range patterns over characters.
   declaration position (each validated namespace caches the unit's variant
   orders), kinds and spellings breaking the remaining ties. It is proved a
   total order for every assignment of variant positions
-  (`LeanerIR/Proofs/Order.lean`), so a proof at a type parameter compares
+  (`VerexIR/Proofs/Order.lean`), so a proof at a type parameter compares
   encodings and uses the laws. Operands are values or shared references;
   a shared reference is its value.
 - A module elaborates in three passes, so nothing among its items needs to
-  precede its use: its Leaner items are registered and its recursive
+  precede its use: its Verex items are registered and its recursive
   specification functions defined; its `theorem` items (optionally under
   `open … in`) are elaborated in source order in the module's namespace
   (`«0x42».m`, where `f.spec` lives); its verification targets follow. A
@@ -206,25 +206,25 @@ and range patterns over characters.
   top-level `verify path` remains for a `#guard_msgs` rejection and for a
   module declared in another file; its bare name must be declared by
   exactly one registered module.
-- `verify f by tactics` proves `f`'s goal by the tactics. `leaner_obligations`
+- `verify f by tactics` proves `f`'s goal by the tactics. `verex_obligations`
   runs the solver's walk without deciding a leaf: every leaf stays a goal,
   tagged by what it owes — the clause its obligation marker names, numbered
   by kind in source order (`ensures_2`, `aborts_if_1`, `invariant_1_step`,
   `modifies_1`), or its origin (`requires_of_g` for a callee's precondition)
   — and suffixed `_1`, `_2`, … where several leaves owe one clause. The
   automatic verification is the same walk with every leaf decided as it is
-  reached (`leaner_solve_goals`): `leaner_obligations` followed by
-  `leaner_solve` on every leaf. A proof chooses its deciders:
-  `leaner_prepare` normalizes a leaf once (split, substituted, bounded, the
+  reached (`verex_solve_goals`): `verex_obligations` followed by
+  `verex_solve` on every leaf. A proof chooses its deciders:
+  `verex_prepare` normalizes a leaf once (split, substituted, bounded, the
   goal and every hypothesis in normal form, a conditional whose condition
   omega decides taking its branch, an element lookup with a provable bound
-  becoming the element, the obligation wrapper removed), `leaner_decide`
-  runs the bounded deciders, `leaner_solve` the automatic leaf. The loop's locals
+  becoming the element, the obligation wrapper removed), `verex_decide`
+  runs the bounded deciders, `verex_solve` the automatic leaf. The loop's locals
   and the quantified variables keep their source names; hypotheses are
   anonymous and an authored proof selects one by its shape
   (`‹∀ i : Int, lo.val ≤ i → … › k h`), binding it with `have` so the
   shape is refined by the arguments rather than by the goal. A leaf's
-  cost report (`leaner.solverDebug`) shows what each stage spent.
+  cost report (`verex.solverDebug`) shows what each stage spent.
 
 - A function without a body runs as the runtime implements it: the big-step
   rule `EvalFunction.native` and the interpreter share one fixed but unknown
@@ -261,14 +261,14 @@ and range patterns over characters.
 
 - The normalization names only simp sets. Ground evaluation (literal
   arithmetic, comparisons, `Int`/`Nat` casts, string equality, decided
-  `dite`) is the set `lir_denote_eval`, so the guards of an operation at
+  `dite`) is the set `vir_denote_eval`, so the guards of an operation at
   literal arguments are decided before its result is built. Array literals
   are updated at literal positions by simprocs over `setIfInBounds`,
   `swapIfInBounds`, `extract`, and `reverseRange`; `contains` and
   `indexOf` unfold `findIndex?` over the literal's size.
 
 - A field selection whose operand is a mutable reference has no executable
-  meaning (validation rejects it for execution), so the LeanerLang lowering
+  meaning (validation rejects it for execution), so the VerexSL lowering
   never emits one: a field read through `&mut` selects from the
   dereferenced referent, a field borrow or assignment through `&mut` is a
   place rooted at the dereferenced local, and a write through a computed
@@ -284,7 +284,7 @@ and range patterns over characters.
   `decode?_fields` literal bridge has one lemma per combination of the
   variants its enum-typed fields can hold. The solver splits twin-typed
   locals (a struct into its fields, an enum into its variants, licensed by
-  the `leaner_twin` tag) once nothing else destructures, so native views
+  the `verex_twin` tag) once nothing else destructures, so native views
   and erasures reach constructor forms; native decoding of enum literals
   proceeds variant by variant (`NTy.decode?_enum_cons_nominal`) through
   injections declared at the folded carrier type.
@@ -353,7 +353,7 @@ and range patterns over characters.
   The certificate the elaborator adds is `check … = true` by `Eq.refl`; the
   solver-facing theorem composes it with the soundness theorem and
   `frameInstantiation_of_view`. Module:
-  `LeanerIR/Validation/InstantiationCertificate.lean`. Every generated
+  `VerexIR/Validation/InstantiationCertificate.lean`. Every generated
   theorem is elaborated with `Elab.async` off: an asynchronous proof that
   fails is committed as `sorry` and reported at the module's end, which the
   artifact audit catches only after the target has been counted as verified.
@@ -409,8 +409,8 @@ and range patterns over characters.
   invariant extended by one iteration) splits on the one range premise
   omega does not prove: where it holds the goal is the hypothesis's
   instance, where it fails omega pins the position to the bound and the
-  normalized context decides it (`leaner_range_instance`, tried
-  after `leaner_instance` in the residual deciders and the
+  normalized context decides it (`verex_range_instance`, tried
+  after `verex_instance` in the residual deciders and the
   budgeted retry). `ResultShape.bodyType` is reducible, like
   `ResultShape.carrier`: a callee's result type reaches instance
   arguments, which simp matches at instance transparency only
@@ -441,7 +441,7 @@ and range patterns over characters.
   benchmark −25%).
 - The equation lemmas of `Term.denote` (some seventy cases in a mutual
   structural recursion) are realized under the package's default heartbeat
-  budget, which no `set_option` in the file reaches; the `LeanerIR`
+  budget, which no `set_option` in the file reaches; the `VerexIR`
   library raises that default in `lakefile.toml`. Verification caps are
   unaffected: the check driver and the cost gate set theirs explicitly.
 - Inventories are simp sets, never explicit lists (0.8M heartbeats per
@@ -454,13 +454,13 @@ and range patterns over characters.
 - Lean 4.32's `simp_all` drops a hypothesis it modified in two rounds
   (its earlier form stays in the rule set and rewrites the hypothesis's
   own conjuncts to `True`); the solver uses a vendored copy with the
-  bookkeeping corrected (`leaner_simp_all`,
-  [`Denote/SimpAll.lean`](../leaner-ir/LeanerIR/Proofs/Denote/SimpAll.lean)).
+  bookkeeping corrected (`verex_simp_all`,
+  [`Denote/SimpAll.lean`](../verex-ir/VerexIR/Proofs/Denote/SimpAll.lean)).
 - A callee's post `encode x = literal` is read as `decode? literal = some
   x` (a fact the leaf adds), so the literal names the value; the leaf
   runs without error recovery, since `all_goals` under recovery logs a
   failing alternative and aborts instead of letting `first` move on.
-- The general leaf is one pipeline (`leaner_pipeline`), each
+- The general leaf is one pipeline (`verex_pipeline`), each
   stage over the previous stage's goals; a round collects facts, splits
   and substitutes, then rewrites, so what a substitution exposes is
   rewritten before the next decision; state facts are retried after every
@@ -479,11 +479,11 @@ and range patterns over characters.
   contract fixes to a few literal values (a lower bound over a literal
   vector), the traversal decides it there, once for every leaf after it:
   pinned, or split on its values with the cases closed whose instantiated
-  facts the normalization refutes (`leaner_call_result_cases`). A
+  facts the normalization refutes (`verex_call_result_cases`). A
   leaf whose positions range over a few literal values, such as a
   quantified goal's binders, is decided value by value
-  (`leaner_split_range`), the hypotheses quantified over a literal
-  range expanded into their instances (`leaner_expand_ranges`). The
+  (`verex_split_range`), the hypotheses quantified over a literal
+  range expanded into their instances (`verex_expand_ranges`). The
   normalization evaluates what these leave: lists updated at positions
   not known literally, integer and boolean order, literal comparisons, and
   transport round trips. The discharger proves a side condition from the
@@ -495,7 +495,7 @@ and range patterns over characters.
   variant names. Aggregate arguments are introduced destructured, one goal
   per variant. `do`-notation never appears in a denotation definition.
 
-Assumption ledger: `LeanerIR.Proofs.Denote.compileFunction_agrees` is an
+Assumption ledger: `VerexIR.Proofs.Denote.compileFunction_agrees` is an
 axiom; every `verified` theorem names it under `#print axioms`. A member
 of a cycle of calls, a function calling itself included, also names
 `compileFunction_least_cycle` (D6). A function selecting `pragma bv` may
@@ -523,8 +523,8 @@ Open work is listed in [`roadmap.md`](roadmap.md), sections 1–3.
 ## What does not change
 
 - **`BigStep` is the authority.** A `verify f` theorem is a theorem about
-  the big-step relation of validated LIR, connected by proof, never by
-  assumption. The elaborated LeanerLang term is produced by frontends and
+  the big-step relation of validated VIR, connected by proof, never by
+  assumption. The elaborated VerexSL term is produced by frontends and
   a metaprogram, so a theorem only about the elaborator's output would have
   an unfalsifiable trust root; that is why v2 rejected shallow-as-authority,
   and it still holds.
@@ -533,7 +533,7 @@ Open work is listed in [`roadmap.md`](roadmap.md), sections 1–3.
   [`prophetic-references.md`](prophetic-references.md). The interpreter
   stays the executable form and the MonoVM differential anchor; its
   soundness and fuel completeness are unchanged.
-- **Vacuity.** A bare `verify` success is meaningful only over LIR every
+- **Vacuity.** A bare `verify` success is meaningful only over VIR every
   node of which has executable semantics. Preparation rejects the rest.
 - **The three claims** in [`../CLAUDE.md`](../CLAUDE.md) stay separate:
   source verification, lowering to bytecode, and the unproved
@@ -618,7 +618,7 @@ measured number.
    unfolded term.
 
 8. **Precomputed inventories, stable keys.** Every simp inventory a proof
-   uses is a registered simp set (`lir_denote`, `lir_denote_norm`),
+   uses is a registered simp set (`vir_denote`, `vir_denote_norm`),
    never a long explicit list: `simp only [list]` re-elaborates every
    entry per call, and that cost was a constant 0.8M heartbeats per
    target when the normal-form list grew. The types that key rewrite
@@ -640,7 +640,7 @@ routes had partly recovered and must not lose again.
 
 ## What went wrong
 
-v2 asked for a single generic denotation of validated LIR into `Spec`,
+v2 asked for a single generic denotation of validated VIR into `Spec`,
 connected to `BigStep` by one agreement theorem proved by induction (V5).
 Per-target emitted agreement proofs were the interim "acceptable second
 place" until V5 landed. V5 was carried, never scoped, and never attempted;
@@ -649,10 +649,10 @@ normalize/compose, native), and each re-did the same three things per
 construct:
 
 1. a native combinator, generated per target by a shape-matching
-   metaprogram (`LeanerLang/Native*.lean`);
+   metaprogram (`VerexSL/Native*.lean`);
 2. an agreement law connecting it to the frame model
    (`Proofs/*Agreement.lean`, assembled per target into
-   `computationRepresents` by `LeanerLang/Computation.lean`);
+   `computationRepresents` by `VerexSL/Computation.lean`);
 3. solver support for the goal shape the new combinator produces
    (`Proofs/Certify.lean`, which rejects a goal it does not recognize —
    `0 < args.item.val`, closed by `omega` — as an unsupported shape).
@@ -684,10 +684,10 @@ denote_agrees : ∀ unit function arguments,
   `Proofs/Fuel.lean`, or over a tree reified once from the arena by a
   checked function — D0 decides which. Not by well-founded recursion,
   which does not reduce, so that the kernel and `simp` can unfold it on
-  concrete data. Every LIR construct is one case. `Proofs/Tree.lean`
+  concrete data. Every VIR construct is one case. `Proofs/Tree.lean`
   (since removed) was not this: it is the literal tree the current generator emits *per
   target* and its once-proved induction only connects that tree's two
-  readings; the tree's relation to the LIR body is still proved per target
+  readings; the tree's relation to the VIR body is still proved per target
   from the combinator lemmas. V5 moves that per-target step into the
   definition of `denote`. Calls consume the callee's meaning; recursive
   cycles are least fixed points (D6); loops are fixed points under their
@@ -696,7 +696,7 @@ denote_agrees : ∀ unit function arguments,
   [`prophetic-references.md`](prophetic-references.md). `denote` is a
   relation, not an executable; it need not choose results.
 - `denote_agrees` is proved **once**, by induction on the fuel or the tree
-  against `BigStep.EvalFunction`, one case per construct. It is the LIR metatheory v2 wanted and the reason a bare
+  against `BigStep.EvalFunction`, one case per construct. It is the VIR metatheory v2 wanted and the reason a bare
   `verify` success is meaningful: the vacuity hazard recorded in v2 cannot
   arise from the denotation, only from preparation admitting a node without
   executable semantics, which it must keep rejecting.
@@ -952,7 +952,7 @@ big-step derivations are finite.
   term with a free family is never kept by the normalizer's whnf cache,
   which cost 12–84% per target when every proof ran over a free family.
 - Terms carry calls with type arguments as `Term.callGeneric` (the
-  callee's own signature, the arguments `θ` in the caller's types, the LIR
+  callee's own signature, the arguments `θ` in the caller's types, the VIR
   type uses). `Term.denote` takes `Meanings`: the closed meaning of a call,
   and of a generic call at `Skolems.instantiate θ`, whose frame
   instantiation is `callTypeInstantiation` of the caller's.
@@ -1051,7 +1051,7 @@ restated over the current ones.
 | D1 | **DONE 2026-09-08**; recursion 2026-09-23 (D6) | Control: branches, enum matches with payloads, structured loops with invariants, recursion. | `Control/LoopVerification`, `LoopInvariants`, `Calls`, `Callees`, the recursive `Corpus` targets, `Control/Loops`, `Enums`, `EnumPatterns`, `ControlForms` pass. |
 | D2 | **DONE 2026-09-23**: references, storage, resource invariants, loops over live borrows, and vectors carried (`Account`, `Storage`, `GlobalInv` at the driver cap, `GlobalBorrows`, `Loans`, `LoopInvariants` pass); returned references by D5, recursion by D6 | Storage and references: typed global family, scoped borrows, prophecies, returned references. | `Account`, `GlobalBorrows`, `GlobalInv`, `References`, `Loans`, `Prophecies`, `Storage` pass. |
 | D3 | **DONE 2026-09-23** for Move generics (D3a, D3b); aliasing instances and the Rust profile open | Generics (V4, carried) and the Rust profile denotations. | `Generics/Generics`, `Generics/GenericFunctions`, `GenericScalarCalls`, Rust-profile fixtures pass. |
-| D4 | **DONE 2026-09-21** except the axiom | Retirement: the per-target `computationRepresents` generation, the `LeanerLang/Native*` generators, the `Proofs/*Agreement.lean` modules, and `Certify.lean` are deleted (78 modules, 45 test roots, 43k lines); `Contract.lean` keeps only the clause translator, preparation, and the cost commands. | Full Check audit at the unchanged caps; `DenotePerformance.exp` unchanged; the `leaner-ir` suite is red only on `Frontend` (`replace`, a mutable enum payload place) and `CompositionPerformance` (its own 50k cap). |
+| D4 | **DONE 2026-09-21** except the axiom | Retirement: the per-target `computationRepresents` generation, the `VerexSL/Native*` generators, the `Proofs/*Agreement.lean` modules, and `Certify.lean` are deleted (78 modules, 45 test roots, 43k lines); `Contract.lean` keeps only the clause translator, preparation, and the cost commands. | Full Check audit at the unchanged caps; `DenotePerformance.exp` unchanged; the `verex-ir` suite is red only on `Frontend` (`replace`, a mutable enum payload place) and `CompositionPerformance` (its own 50k cap). |
 | D5 | **DONE 2026-09-23** | References as prophecies: a `&mut` is a prophecy pair, returned references included. | `References`, `ReturnedMutRefs`, `ReturnedMutRefErrors`, `Freeze` pass. |
 | D6 | **DONE 2026-09-25** | Recursion and cycles of calls, generic members included, by one fixed point per cycle. | `Callees`, `Calls`, `GenericCycles`, `ReturnedMutRefs` pass. |
 
@@ -1061,7 +1061,7 @@ more than the agreement proofs it replaces, stop and report before D1.
 
 ## Working discipline
 
-- No new `Proofs/*Agreement.lean` module, no new `LeanerLang/Native*`
+- No new `Proofs/*Agreement.lean` module, no new `VerexSL/Native*`
   generator, and no new `Certify.lean` shape case. A construct `denote`
   does not carry is a negative check naming it, as today.
 - No further ports onto the retired routes; a fixture is promoted only by

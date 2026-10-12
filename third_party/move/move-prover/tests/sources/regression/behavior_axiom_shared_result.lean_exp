@@ -1,3 +1,3 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/behavior_axiom_shared_result.move:24:9: error: the specification clause `ensures result == 0` is not established
-tests/sources/regression/behavior_axiom_shared_result.move:23:5: error: leaner verification failed: the automatic verification of `shared_result` failed; provide a proof: `verify shared_result by …` in `tests/sources/regression/behavior_axiom_shared_result.proof.lean` (`verify shared_result by leaner_obligations` lists its obligations)
+tests/sources/regression/behavior_axiom_shared_result.move:23:5: error: verex verification failed: the automatic verification of `shared_result` failed; provide a proof: `verify shared_result by …` in `tests/sources/regression/behavior_axiom_shared_result.proof.lean` (`verify shared_result by verex_obligations` lists its obligations)
