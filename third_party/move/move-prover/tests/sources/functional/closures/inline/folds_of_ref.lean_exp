@@ -1,13 +1,38 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: verex verification failed: the automatic verification of `weighted_via_ref` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify weighted_via_ref by …` in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean` (`verify weighted_via_ref by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: verex verification failed: the automatic verification of `weighted_via_ref_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify weighted_via_ref_wrong by …` in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean` (`verify weighted_via_ref_wrong by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/folds_of_ref.move:41:55: error: the loop invariant `r == «spec_fold$lambda$0»(v, with_state_anchor!(3, old(r)), i)
+        && (∀ (_j_4 in 0 .. i),
+          !(«spec_fold$lambda$0»(v, with_state_anchor!(3, old(r)), _j_4).total
+            + «spec_fold$lambda$0»(v, with_state_anchor!(3, old(r)), _j_4).count
+            > MAX_U64
+            || «spec_fold$lambda$0»(
+              v, with_state_anchor!(3, old(r)), _j_4
+            ).total
+              + «spec_fold$lambda$0»(
+                v, with_state_anchor!(3, old(r)), _j_4
+              ).count
+              + v[_j_4]
+              > MAX_U64
+            || «spec_fold$lambda$0»(
+              v, with_state_anchor!(3, old(r)), _j_4
+            ).count
+              > 18446744073709551614))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_ref.move:50:5: error: verex verification failed: the automatic verification of `weighted_via_ref` failed; provide a proof: `verify weighted_via_ref by …` in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean` (`verify weighted_via_ref by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_ref.move:100:9: error: the specification clause `ensures v.length == 1 ==> result == 2` is not established
+tests/sources/functional/closures/inline/folds_of_ref.move:89:5: error: the loop invariant `r == «spec_fold$lambda$0»(v, with_state_anchor!(7, old(r)), i)
+        && (∀ (_j_8 in 0 .. i),
+          !(«spec_fold$lambda$0»(v, with_state_anchor!(7, old(r)), _j_8).total
+            + «spec_fold$lambda$0»(v, with_state_anchor!(7, old(r)), _j_8).count
+            > MAX_U64
+            || «spec_fold$lambda$0»(
+              v, with_state_anchor!(7, old(r)), _j_8
+            ).total
+              + «spec_fold$lambda$0»(
+                v, with_state_anchor!(7, old(r)), _j_8
+              ).count
+              + v[_j_8]
+              > MAX_U64
+            || «spec_fold$lambda$0»(
+              v, with_state_anchor!(7, old(r)), _j_8
+            ).count
+              > 18446744073709551614))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_ref.move:98:5: error: verex verification failed: the automatic verification of `weighted_via_ref_wrong` failed; provide a proof: `verify weighted_via_ref_wrong by …` in `tests/sources/functional/closures/inline/folds_of_ref.proof.lean` (`verify weighted_via_ref_wrong by verex_obligations` lists its obligations)

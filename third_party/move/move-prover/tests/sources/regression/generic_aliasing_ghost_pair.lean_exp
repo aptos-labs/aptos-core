@@ -1,13 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/generic_aliasing_ghost_pair.move:25:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/generic_aliasing_ghost_pair.move:25:5: error: verex verification failed: the automatic verification of `concrete` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify concrete by …` in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean` (`verify concrete by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/regression/generic_aliasing_ghost_pair.move:36:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/generic_aliasing_ghost_pair.move:36:5: error: verex verification failed: the automatic verification of `declared` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify declared by …` in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean` (`verify declared by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` does not hold after a write of memory it reads
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the specification clause `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` is not established
+tests/sources/regression/generic_aliasing_ghost_pair.move:25:5: error: verex verification failed: the automatic verification of `concrete` failed; provide a proof: `verify concrete by …` in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean` (`verify concrete by verex_obligations` lists its obligations)
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` does not hold after a write of memory it reads
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the specification clause `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` is not established
+tests/sources/regression/generic_aliasing_ghost_pair.move:36:5: error: verex verification failed: the automatic verification of `declared` failed; provide a proof: `verify declared by …` in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean` (`verify declared by verex_obligations` lists its obligations)

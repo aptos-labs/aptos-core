@@ -1,12 +1,8 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/generic_aliasing_write_routes.move:21:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:19:5: error: verex verification failed: the automatic verification of `read_sees_write` failed; provide a proof: `verify read_sees_write by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify read_sees_write by verex_obligations` lists its obligations)
-tests/sources/regression/generic_aliasing_write_routes.move:30:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/generic_aliasing_write_routes.move:30:5: error: verex verification failed: the automatic verification of `two_reads_one_write` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify two_reads_one_write by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify two_reads_one_write by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/generic_aliasing_write_routes.move:33:9: error: the specification clause `ensures result == true` is not established
+tests/sources/regression/generic_aliasing_write_routes.move:30:5: error: verex verification failed: the automatic verification of `two_reads_one_write` failed; provide a proof: `verify two_reads_one_write by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify two_reads_one_write by verex_obligations` lists its obligations)
 tests/sources/regression/generic_aliasing_write_routes.move:50:9: error: the specification clause `ensures result == true` is not established
 tests/sources/regression/generic_aliasing_write_routes.move:47:5: error: verex verification failed: the automatic verification of `callee_writes` failed; provide a proof: `verify callee_writes by …` in `tests/sources/regression/generic_aliasing_write_routes.proof.lean` (`verify callee_writes by verex_obligations` lists its obligations)
 tests/sources/regression/generic_aliasing_write_routes.move:66:5: error: the continuation after `remove_r` is not established

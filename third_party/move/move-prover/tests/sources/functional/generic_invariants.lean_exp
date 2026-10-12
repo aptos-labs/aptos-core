@@ -1,25 +1,41 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/generic_invariants.move:30:1: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_u64_bool` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify 0x2::S::publish_u64_bool by …` in the module (`verify 0x2::S::publish_u64_bool by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/generic_invariants.move:30:1: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_u64_y` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify 0x2::S::publish_u64_y by …` in the module (`verify 0x2::S::publish_u64_y by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/generic_invariants.move:30:1: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_x_bool` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify 0x2::S::publish_x_bool by …` in the module (`verify 0x2::S::publish_x_bool by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/generic_invariants.move:30:1: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_x_y` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify 0x2::S::publish_x_y by …` in the module (`verify 0x2::S::publish_x_y by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/generic_invariants.move:49:5: error: the module invariant `invariant {X} {Y} exists<Storage<X, Y> >(@0x25)
+        && exists<Storage<X, Y> >(@0x26)
+        ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:44:5: error: the module invariant `invariant {X} exists<Storage<X, Bool> >(@0x24)
+        ==> global<Storage<X, Bool> >(@0x24).y` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)
+        ==> global<Storage<u64, Y> >(@0x23).x > 0` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
+        ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_u64_bool` failed; provide a proof: `verify 0x2::S::publish_u64_bool by …` in the module (`verify 0x2::S::publish_u64_bool by verex_obligations` lists its obligations)
+tests/sources/functional/generic_invariants.move:49:5: error: the module invariant `invariant {X} {Y} exists<Storage<X, Y> >(@0x25)
+        && exists<Storage<X, Y> >(@0x26)
+        ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:44:5: error: the module invariant `invariant {X} exists<Storage<X, Bool> >(@0x24)
+        ==> global<Storage<X, Bool> >(@0x24).y` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)
+        ==> global<Storage<u64, Y> >(@0x23).x > 0` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
+        ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_u64_y` failed; provide a proof: `verify 0x2::S::publish_u64_y by …` in the module (`verify 0x2::S::publish_u64_y by verex_obligations` lists its obligations)
+tests/sources/functional/generic_invariants.move:49:5: error: the module invariant `invariant {X} {Y} exists<Storage<X, Y> >(@0x25)
+        && exists<Storage<X, Y> >(@0x26)
+        ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:44:5: error: the module invariant `invariant {X} exists<Storage<X, Bool> >(@0x24)
+        ==> global<Storage<X, Bool> >(@0x24).y` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)
+        ==> global<Storage<u64, Y> >(@0x23).x > 0` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
+        ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_x_bool` failed; provide a proof: `verify 0x2::S::publish_x_bool by …` in the module (`verify 0x2::S::publish_x_bool by verex_obligations` lists its obligations)
+tests/sources/functional/generic_invariants.move:49:5: error: the module invariant `invariant {X} {Y} exists<Storage<X, Y> >(@0x25)
+        && exists<Storage<X, Y> >(@0x26)
+        ==> global<Storage<X, Y> >(@0x25) == global<Storage<X, Y> >(@0x26)` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:44:5: error: the module invariant `invariant {X} exists<Storage<X, Bool> >(@0x24)
+        ==> global<Storage<X, Bool> >(@0x24).y` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)
+        ==> global<Storage<u64, Y> >(@0x23).x > 0` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
+        ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
+tests/sources/functional/generic_invariants.move:30:1: error: verex verification failed: the automatic verification of `0x2::S::publish_x_y` failed; provide a proof: `verify 0x2::S::publish_x_y by …` in the module (`verify 0x2::S::publish_x_y by verex_obligations` lists its obligations)

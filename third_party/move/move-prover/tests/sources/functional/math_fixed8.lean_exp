@@ -1,13 +1,9 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/math_fixed8.move:47:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
+tests/sources/functional/math_fixed8.move:47:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/math_fixed8.move:47:5: error: verex verification failed: the automatic verification of `pow_raw` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify pow_raw by …` in `tests/sources/functional/math_fixed8.proof.lean` (`verify pow_raw by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/math_fixed8.move:79:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/math_fixed8.move:79:5: error: verex verification failed: the automatic verification of `exp_raw` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify exp_raw by …` in `tests/sources/functional/math_fixed8.proof.lean` (`verify exp_raw by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/math_fixed8.move:47:5: error: verex verification failed: the automatic verification of `pow_raw` exceeded its budget of 1000000 maxHeartbeats; provide a proof: `verify pow_raw by …` in `tests/sources/functional/math_fixed8.proof.lean` (`verify pow_raw by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/math_fixed8.move:82:9: error: the specification clause `aborts_if x / LN2 > 3` is not established
+tests/sources/functional/math_fixed8.move:79:5: error: verex verification failed: the automatic verification of `exp_raw` failed; provide a proof: `verify exp_raw by …` in `tests/sources/functional/math_fixed8.proof.lean` (`verify exp_raw by verex_obligations` lists its obligations)

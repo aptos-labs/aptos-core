@@ -74,6 +74,18 @@ fn find_lake() -> Option<PathBuf> {
     candidate.is_file().then_some(candidate)
 }
 
+/// What a run of the verifier is asked besides its sources.
+#[derive(Clone, Debug, Default)]
+pub struct Settings {
+    /// The heartbeat budget of a function without `pragma heartbeats`, in
+    /// thousands of Lean `maxHeartbeats` units; the verifier's own default
+    /// when absent.
+    pub heartbeats: Option<u64>,
+    /// Verify every function automatically, its authored proof and `pragma
+    /// verify = manual` ignored: whether a proof is still needed.
+    pub ignore_proofs: bool,
+}
+
 /// Resolves how to run the verifier.
 ///
 /// `VEREX_MOVE_EXE` names the executable and is run as is, so its caller
@@ -235,7 +247,8 @@ fn apply_scope(
 /// typed-AST exchange format, the verifier reads the export, verifies those
 /// modules (the functions an exclusive `scope` selects, `apply_scope`) with
 /// the others linked as dependencies, each function within
-/// `heartbeats` unless its `pragma heartbeats` says otherwise, writes their
+/// `settings.heartbeats` unless its `pragma heartbeats` says otherwise (every
+/// function automatically with `settings.ignore_proofs`), writes their
 /// VerexSL rendering to `output`, and reports its messages, one per line in
 /// the Move sources' coordinates, to `writer`. Fails when the verifier
 /// reports an error. Logs the time since `start_time` spent building the
@@ -245,7 +258,7 @@ pub fn verify(
     source: &Path,
     filter: Option<&str>,
     scope: &VerificationScope,
-    heartbeats: Option<u64>,
+    settings: &Settings,
     output: &Path,
     writer: &mut impl Write,
     start_time: Instant,
@@ -290,8 +303,11 @@ pub fn verify(
     if let Some(filter) = filter {
         command.arg("--filter").arg(filter);
     }
-    if let Some(heartbeats) = heartbeats {
+    if let Some(heartbeats) = settings.heartbeats {
         command.arg("--heartbeats").arg(heartbeats.to_string());
+    }
+    if settings.ignore_proofs {
+        command.arg("--ignore-proofs");
     }
     let export_duration = now.elapsed();
     let now = Instant::now();

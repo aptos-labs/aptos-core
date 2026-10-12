@@ -1,13 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/mut_ref.move:106:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/mut_ref.move:106:5: error: verex verification failed: the automatic verification of `call_return_ref_different_path_vec2` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify call_return_ref_different_path_vec2 by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec2 by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/mut_ref.move:125:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/mut_ref.move:125:5: error: verex verification failed: the automatic verification of `call_return_ref_different_path_vec2_incorrect` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify call_return_ref_different_path_vec2_incorrect by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec2_incorrect by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/mut_ref.move:8:14: error: the data invariant `invariant value > 0` does not hold where a mutation ends
+tests/sources/functional/mut_ref.move:106:5: error: verex verification failed: the automatic verification of `call_return_ref_different_path_vec2` failed; provide a proof: `verify call_return_ref_different_path_vec2 by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec2 by verex_obligations` lists its obligations)
+tests/sources/functional/mut_ref.move:8:14: error: the data invariant `invariant value > 0` does not hold where a mutation ends
+tests/sources/functional/mut_ref.move:125:5: error: verex verification failed: the automatic verification of `call_return_ref_different_path_vec2_incorrect` failed; provide a proof: `verify call_return_ref_different_path_vec2_incorrect by …` in `tests/sources/functional/mut_ref.proof.lean` (`verify call_return_ref_different_path_vec2_incorrect by verex_obligations` lists its obligations)

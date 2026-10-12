@@ -622,11 +622,7 @@ invariantHolds✝ : True
 tests/sources/functional/type_dependent_code.move:27:9: error: the specification clause `aborts_if exists<S<T1> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:28:9: error: the specification clause `aborts_if exists<S<T2> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:26:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by verex_obligations` lists its obligations)
-tests/sources/functional/type_dependent_code.move:49:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/type_dependent_code.move:49:5: error: verex verification failed: the automatic verification of `test1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test1 by …` in the module (`verify test1 by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/type_dependent_code.move:50:9: error: the specification clause `ensures global<S<u8> >(account.address).x == 0` is not established
+tests/sources/functional/type_dependent_code.move:49:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by verex_obligations` lists its obligations)
 tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
 tests/sources/functional/type_dependent_code.move:65:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by verex_obligations` lists its obligations)

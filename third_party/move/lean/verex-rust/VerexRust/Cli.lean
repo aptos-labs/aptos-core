@@ -15,7 +15,7 @@ private def usage : String :=
       [--output <unit.raw.json>] [--features <a,b>] \
       [--no-default-features] [--target <triple>]\n\
     verex-rust verify <source.rs> [--spec <specs.lean>] [--output <generated.lean>] \
-      [-- <additional rustc arguments>]"
+      [--ignore-proofs] [-- <additional rustc arguments>]"
 
 private structure Options where
   request : ImportRequest
@@ -87,6 +87,8 @@ private structure VerifyOptions where
   specFile : Option System.FilePath := none
   output : Option System.FilePath := none
   rustcArgs : Array String := #[]
+  /-- Every function is verified automatically, its authored proof ignored. -/
+  ignoreProofs : Bool := false
 
 private partial def parseVerifyOptions (options : VerifyOptions) :
     List String → Except String VerifyOptions
@@ -97,6 +99,7 @@ private partial def parseVerifyOptions (options : VerifyOptions) :
   | "--output" :: path :: rest => do
       if options.output.isSome then throw "--output may be specified only once"
       parseVerifyOptions { options with output := some path } rest
+  | "--ignore-proofs" :: rest => parseVerifyOptions { options with ignoreProofs := true } rest
   | "--" :: rest => pure { options with rustcArgs := rest.toArray }
   | argument :: _ => throw s!"unknown verify argument `{argument}`"
 
@@ -107,7 +110,7 @@ private def verifySource (options : VerifyOptions) : IO UInt32 := do
   let output := options.output.getD (options.source.addExtension "lean")
   let environment ← VerexSL.Perf.withPhase .load VerexSL.SourceVerify.importVerexSL
   let reports ← SourceVerify.verifyFile environment options.source options.specFile output
-    options.rustcArgs
+    options.rustcArgs options.ignoreProofs
   for report in reports do IO.println report.render
   IO.println s!"verex-rust: generated {output}"
   -- The wall time per phase is a report on the run, not one of its messages.

@@ -145,7 +145,10 @@ fn run_move_prover_lean<W: WriteColor>(
         source,
         None,
         &options.prover.verify_scope,
-        options.heartbeats,
+        &verex::Settings {
+            heartbeats: options.heartbeats,
+            ignore_proofs: options.ignore_proofs,
+        },
         &output,
         error_writer,
         start_time,

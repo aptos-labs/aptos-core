@@ -1,14 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/fold_symbolic.move:74:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/fold_symbolic.move:74:5: error: verex verification failed: the automatic verification of `sum` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum by …` in `tests/sources/functional/closures/inline/fold_symbolic.proof.lean` (`verify sum by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/fold_symbolic.move:75:9: error: the specification clause `aborts_if spec_sum(v, v.length) > MAX_U64` is not established
+tests/sources/functional/closures/inline/fold_symbolic.move:74:5: error: verex verification failed: the automatic verification of `sum` failed; provide a proof: `verify sum by …` in `tests/sources/functional/closures/inline/fold_symbolic.proof.lean` (`verify sum by verex_obligations` lists its obligations)
 tests/sources/functional/closures/inline/fold_symbolic.move:103:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established
-tests/sources/functional/closures/inline/fold_symbolic.move:101:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/fold_symbolic.move:101:5: error: verex verification failed: the automatic verification of `sum_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify sum_wrong by …` in `tests/sources/functional/closures/inline/fold_symbolic.proof.lean` (`verify sum_wrong by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/fold_symbolic.move:101:5: error: verex verification failed: the automatic verification of `sum_wrong` failed; provide a proof: `verify sum_wrong by …` in `tests/sources/functional/closures/inline/fold_symbolic.proof.lean` (`verify sum_wrong by verex_obligations` lists its obligations)

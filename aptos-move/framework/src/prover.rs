@@ -148,6 +148,12 @@ pub struct ProverOptions {
     /// overrides it. Ignored by the Boogie backend.
     #[clap(long)]
     pub heartbeats: Option<u64>,
+
+    /// With `--lean`, verify every function automatically, ignoring its
+    /// authored proof (`foo.proof.lean`) and `pragma verify = manual`:
+    /// whether a proof is still needed. Ignored by the Boogie backend.
+    #[clap(long)]
+    pub ignore_proofs: bool,
 }
 
 impl ProverOptions {
@@ -238,7 +244,10 @@ impl ProverOptions {
         }
         model.check_errors("in compilation")?;
         let filter = self.filter.clone();
-        let heartbeats = self.heartbeats;
+        let settings = move_prover::verex::Settings {
+            heartbeats: self.heartbeats,
+            ignore_proofs: self.ignore_proofs,
+        };
         let mut options = self.convert_options(package_path)?;
         if for_test {
             options.setup_logging_for_test();
@@ -252,7 +261,7 @@ impl ProverOptions {
                 package_path,
                 filter.as_deref(),
                 &options.prover.verify_scope,
-                heartbeats,
+                &settings,
                 &output,
                 writer,
                 now,

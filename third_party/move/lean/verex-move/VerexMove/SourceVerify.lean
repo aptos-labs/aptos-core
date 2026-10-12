@@ -120,14 +120,15 @@ dependencies are read from that existing `move exchange --format ast` export
 instead of being exported here, as the Move CLI's `prove --lean` and the Move
 Prover's `--lean` hand them over; `filter`
 narrows the verified modules to those whose source file name contains it;
-`heartbeats` is the budget of a function without `pragma heartbeats`. With
+`heartbeats` is the budget of a function without `pragma heartbeats`;
+`ignoreProofs` verifies every function automatically. With
 `modules`, a package directory is exported with only the named modules and
 what verifying them reads, and the named modules are verified. `dev` exports
 a package directory in dev mode. -/
 def verifySource (environment : Lean.Environment) (source output : System.FilePath)
     (exported : Option System.FilePath := none) (filter : Option String := none)
     (renderOnly : Bool := false) (heartbeats : Option Nat := none)
-    (modules : Array String := #[]) (dev : Bool := false) :
+    (modules : Array String := #[]) (dev : Bool := false) (ignoreProofs : Bool := false) :
     IO (Array Report) := do
   let prepared ← VerexSL.Perf.withPhase .frontend do
     let package ← match exported with
@@ -155,7 +156,7 @@ def verifySource (environment : Lean.Environment) (source output : System.FilePa
         file := source.toString, line := 1, column := 1
         severity := .error, text := message }]
   | .ok (unit, companions, omitted) =>
-      let reports ← run environment { unit, companions, output, renderOnly, heartbeats }
+      let reports ← run environment { unit, companions, output, renderOnly, heartbeats, ignoreProofs }
       return (if renderOnly then #[] else omitted) ++ reports
 
 end VerexMove.SourceVerify

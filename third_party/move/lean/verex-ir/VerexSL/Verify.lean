@@ -3512,6 +3512,8 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     (cycle : Array (FunctionHandle × String)) (family : Bool := false) :
     CommandElabM (Array (FunctionHandle × String) × Array (FunctionHandle × String) ×
       Array Name) := do
+  let ignoring := verex.ignoreProofs.get (← getOptions)
+  let script? := if ignoring then none else script?
   let namespaceName := pathName segments
   let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
     | throwErrorAt reference s!"unknown Verex namespace `{namespaceName}`"
@@ -3536,7 +3538,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     -- A colliding name alone is not evidence of a denotation proof.
     withRef reference <| requireNativeArtifacts base (selectsBitVectors declaration)
     return (#[], #[], #[])
-  if script?.isNone && requiresAuthoredProof declaration then
+  if script?.isNone && requiresAuthoredProof declaration && !ignoring then
     throwErrorAt reference m!"verex verification failed: `{function}` sets \
       `pragma verify = manual`; {proofRequest ns function}"
   let compiledIdent := rootIdent (compiledName segments function)
@@ -4293,11 +4295,15 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     Perf.withPhase .verification <|
       Perf.measure s!"{namespaceName}::{function} typed" (base ++ `typedVerified)
         (elabCommand typedCommand)
-    stageLog s!"{function}: theorem done, {((← IO.getNumHeartbeats) - heartbeatsBefore) / 1000000}M heartbeats"
-    if countErrors (← get).messages > errorsBefore then
-      let logged := (← get).messages.reportedPlusUnreported.toList.drop loggedBefore
-      let overBudget := logged.any fun message =>
-        message.data.hasTag (· == `runtime.maxHeartbeats)
+    let used := (← IO.getNumHeartbeats) - heartbeatsBefore
+    let failed := countErrors (← get).messages > errorsBefore
+    let logged := (← get).messages.reportedPlusUnreported.toList.drop loggedBefore
+    let overBudget := logged.any fun message =>
+      message.data.hasTag (· == `runtime.maxHeartbeats)
+    let outcome := if !failed then "verified" else if overBudget then "budget" else "failed"
+    stageLog s!"{function}: theorem done, {used} heartbeats, {outcome}, \
+      {if script?.isSome then "authored" else "automatic"}"
+    if failed then
       throwErrorAt reference (failureMessage ns function script?.isSome overBudget budgetValue)
     -- A member of a cycle concludes with the whole cycle.
     unless cycle.isEmpty do return (natives, assumptionDeps, trustDeps)

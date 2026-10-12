@@ -9,9 +9,17 @@ verify fails within it rather than searching without bound; the default
 is the check driver's cap, which every checked target meets, and a target
 that needs more raises it for itself. -/
 register_option verex.verifyHeartbeats : Nat := {
-  defValue := 1500000
+  defValue := 1000000
   descr := "heartbeat budget of the automatic verification of one function (thousands); \
-    about a minute of elaboration, past which a proof is asked for"
+    about thirty seconds of elaboration, past which a proof is asked for"
+}
+
+/-- Verify every function automatically, its authored proof and `pragma verify =
+manual` ignored: whether a proof is still needed. -/
+register_option verex.ignoreProofs : Bool := {
+  defValue := false
+  descr := "verify every function automatically, ignoring its authored proof and \
+    `pragma verify = manual`"
 }
 
 /-- Skip the `verify` items: set, or unset in the language server, where

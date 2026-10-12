@@ -49,6 +49,9 @@ structure Request where
   heartbeats` sets it, in thousands of `maxHeartbeats` units; the default of
   `verex.verifyHeartbeats` without one. -/
   heartbeats : Option Nat := none
+  /-- Verify every function automatically, its authored proof ignored
+  (`verex.ignoreProofs`). -/
+  ignoreProofs : Bool := false
 
 /-- A message in the coordinates of the file it is attributed to; lines and
 columns count from one. -/
@@ -424,6 +427,7 @@ def run (environment : Environment) (request : Request) : IO (Array Report) := d
   let options := match request.heartbeats with
     | some heartbeats => verex.verifyHeartbeats.set {} (heartbeats * 1000)
     | none => {}
+  let options := if request.ignoreProofs then verex.ignoreProofs.set options true else options
   let options ← environmentOptions options
   let (elaborated, messages) ← elaborate environment generated generatedName options
   -- Each elaborated namespace aligns with the source namespace at its path.

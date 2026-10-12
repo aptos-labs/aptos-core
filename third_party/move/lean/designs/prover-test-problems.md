@@ -49,6 +49,16 @@ relative to `tests/sources`.
 
 ## Summary
 
+Budget (2026-10-12): the registry runs with the verifier's default budget,
+1000 thousand `maxHeartbeats` (about thirty seconds), instead of 25
+thousand. Nineteen functions that exhausted the old budget verify, and five
+tests verify completely; four functions still exceed the budget
+(`bitwise_features::disable_feature_flags`, `folds_of_wrapper_mut::set_both`,
+`math8::sqrt`, `math_fixed8::pow_raw`), and the others fail within it at
+the clause they do not establish. Among those that verify is V20's
+`discarded_mut_ref_result::run`, at 43.5M heartbeats. "Functions left
+unproved" is updated accordingly.
+
 Functions without a contract (2026-10-12): a function with a body that
 declares no contract and plays no map or table role claims no frame; it is
 verified for the invariants it writes, and its callers inline it.
@@ -121,7 +131,7 @@ then proved over every frame. `uninst_global_invariant` and
 `write_back_local_type_inst` verifies. `generic_invariants`,
 `generic_aliasing_ghost_main` and `generic_aliasing_ghost_pair` fail as the
 Prover does, by exhausting the budget on the failing aliasing cases;
-`generic_aliasing_ghost_params` exceeds it on two positive functions.
+`generic_aliasing_ghost_params` verifies within the default budget (2026-10-12).
 
 Callee preconditions (2026-10-09): a caller owes the `requires` of a callee
 whose body it inlines and which it calls directly, where the callee starts,
@@ -1242,35 +1252,15 @@ is read at struct and enum arguments the normalization has unfolded to
 their variant (`nativeOf?`); `two` and `write_ss_unchanged` fail as the
 Prover does. What remains:
 
-- `discarded_mut_ref_result` exceeds the budget: `run` verifies at 400k
-  (43.5M heartbeats against the 25M a 25k budget allows). The call to
-  `increment`, a target returning `&mut S`, discards that result: validation
-  holds it in a local of its own (`holdMutableReferences`,
-  [`prophetic-references.md`](prophetic-references.md), "Unheld results"),
-  so the element written back is the incremented one. `ensures_of<increment>(x,
-  result_of<increment>(x), y)` at the new element holds since the call is a
-  run of the function value naming its target where the returned reference
-  is settled (`wp_named_mut_typed`), `result_of` reads the returned
-  reference as its value at return and is unique
-  (`resultOfMut_eq_of_ensuresOfMut`, loan independence for lent starts),
-  and the solver rewrites the run's facts into the element's terms at the
-  iteration's bound ([`higher-order-functions.md`](higher-order-functions.md),
-  "Behavioral predicates"). `!aborts_of`, inlined by the Prover to
-  `v[j].value != MAX_U64`, and the element equality hold since the solver
-  decides a range invariant at the iteration's element. Its loop no longer
-  leaves its memory open (`state = initialState`): the frame of a loop
-  ignores its specification blocks and the function values they build. The
-  Prover verifies it.
 - `closure_bp_post_sub_pre_only`: invoking an unseen function value with
   `&mut` parameters leaves a residual obligation (its rule needs the H4b
   typing of lent arguments); the Prover fails the clause too.
 
 Messages:
 
-- 1 × `(deterministic) timeout at whnf, maximum number of heartbeats (25000) has been reached`
 - 1 × `verification failed with a residual obligation`
 
-Tests: `functional/closures/inline/discarded_mut_ref_result.move`, `functional/state_labels/closure_bp_post_sub_pre_only.move`.
+Tests: `functional/state_labels/closure_bp_post_sub_pre_only.move`.
 
 The invocation-label increment moves `aborting_result_definition` to its
 intended no-abort clause failures. `aborts_if_at_state_label::caller` now
@@ -1390,46 +1380,39 @@ with the same type or prophecy value would be unsound.
 
 | Test | Functions |
 |---|---|
-| `functional/bitwise_features.move` | `set` (budget), `disable_feature_flags` (budget) |
-| `functional/bug-17117.move` | `get_s_error` (budget), `get_s_no_error` (budget), `test_input_param_as_mut_ref` |
-| `functional/bug_15044.move` | `compare_u8_vector` (budget) |
+| `functional/bitwise_features.move` | `set`, `disable_feature_flags` (budget) |
+| `functional/bug-17117.move` | `test_input_param_as_mut_ref` |
+| `functional/bug_15044.move` | `compare_u8_vector` |
 | `functional/bug_15880.move` | `test2` |
-| `functional/closures/amm_example.move` | `constant_product_with_fee` (budget), `constant_product_with_fee_non_compliant` (budget), `swap` (budget), `create_constant_product_pool` (budget), `create_compliant_fee_pool` (budget) |
-| `functional/closures/behavioral_predicates_examples.move` | `contains_test_not_found` (budget), `contains_opaque_test_not_found`, `index_test_found` (budget), `index_opaque_test_found`, `reduce_test_ok` (budget), `reduce_opaque_test_ok` |
-| `functional/closures/inline/bp_forwarding.move` | `set_values` (budget), `all_values_bounded` (budget) |
-| `functional/closures/inline/fold_symbolic.move` | `sum` (budget) |
-| `functional/closures/inline/folds_of_collect.move` | `fold_is_prefix` (lemma), `collect` (budget) |
-| `functional/closures/inline/folds_of_consuming.move` | `sum_literal` (budget), `digits_forward` (budget), `digits_reverse` (budget), `sum_noncopy` (budget) |
-| `functional/closures/inline/folds_of_wrapper.move` | `sum_kv` (budget), `collect_keys` (budget), `sum_values_both` (budget) |
-| `functional/closures/inline/folds_of_wrapper_mut.move` | `mirror_keys` (budget), `set_both` (budget) |
-| `functional/closures/inline/result_of_attached_state_ok.move` | `map_add_global` (budget), `map_add_global_bare` (budget) |
-| `functional/closures/inline/vector_hofs_fold.move` | `count_even_concrete` (budget) |
-| `functional/closures/inline/vector_hofs_for_each.move` | `find_value` (budget), `increment_all` (budget), `scale_all` (budget), `increment_all_inferred` (budget), `clamp_all_inferred` (budget), `clamp_all` (budget) |
-| `functional/closures/inline/vector_hofs_mut_receiver.move` | `bump_field` (budget), `bump_resource` (budget) |
+| `functional/closures/amm_example.move` | `constant_product_with_fee`, `constant_product_with_fee_non_compliant`, `swap`, `create_constant_product_pool`, `create_compliant_fee_pool` |
+| `functional/closures/behavioral_predicates_examples.move` | `contains_test_not_found`, `contains_opaque_test_not_found`, `index_test_found`, `index_opaque_test_found`, `reduce_test_ok`, `reduce_opaque_test_ok` |
+| `functional/closures/inline/bp_forwarding.move` | `set_values` |
+| `functional/closures/inline/fold_symbolic.move` | `sum` |
+| `functional/closures/inline/folds_of_collect.move` | `fold_is_prefix` (lemma), `collect` |
+| `functional/closures/inline/folds_of_consuming.move` | `sum_literal`, `digits_forward`, `digits_reverse`, `sum_noncopy` |
+| `functional/closures/inline/folds_of_wrapper_mut.move` | `mirror_keys`, `set_both` (budget) |
+| `functional/closures/inline/result_of_attached_state_ok.move` | `map_add_global`, `map_add_global_bare` |
+| `functional/closures/inline/vector_hofs_for_each.move` | `find_value` |
 | `functional/closures/stored_fun_values.move` | `use_any_modifier`, `create_modifier_valid` (V26 semantic gaps) |
-| `functional/inline_fun.move` | `test_filter` (budget) |
-| `functional/loops_with_memory_ops.move` | `nested_loop1` (budget) |
-| `functional/math8.move` | `pow` (budget), `floor_log2` (budget), `sqrt` (budget) |
-| `functional/math_fixed8.move` | `pow_raw` (budget), `exp_raw` (budget) |
-| `functional/mut_ref.move` | `call_return_ref_different_path_vec2` (budget) |
-| `functional/nested_loop_inv.move` | `assert_no_duplicate` (budget) |
-| `functional/specs_in_fun_ref.move` | `simple7`: in-body assertion reads emptied reference slot after move (not a timeout) |
+| `functional/inline_fun.move` | `test_filter` |
+| `functional/math8.move` | `pow`, `floor_log2`, `sqrt` (budget) |
+| `functional/math_fixed8.move` | `pow_raw` (budget), `exp_raw` |
+| `functional/mut_ref.move` | `call_return_ref_different_path_vec2` |
+| `functional/specs_in_fun_ref.move` | `simple7` |
 | `functional/state_labels/unmodified_memory_at_label.move` | `swap` (a read after removal; Boogie retains absent resource contents) |
-| `functional/verify_vector.move` | `verify_reverse` (budget), `verify_reverse_with_unroll` (budget), `verify_append` (budget), `verify_append_with_unroll` (budget), `verify_index_of_with_unroll` (budget), `verify_contains_with_unroll` (budget), `verify_remove` (budget), `verify_remove_with_unroll` (budget) |
+| `functional/verify_vector.move` | `verify_reverse`, `verify_reverse_with_unroll`, `verify_append`, `verify_append_with_unroll`, `verify_index_of_with_unroll`, `verify_contains_with_unroll`, `verify_remove`, `verify_remove_with_unroll` |
 | `regression/behavior_axiom_target_field.move` | `same_type_quantified`, `fun_inst` (unsupported quantified field-validity domain; V25) |
-| `regression/generic_aliasing_all_partitions.move` | `true_in_every_case` (budget), `never_alias` (budget) |
-| `regression/generic_aliasing_ghost_params.move` | `seven_writes` (budget), `nine_writes_generic` (budget) |
-| `regression/performance_200511.move` | `fresh_guid` (budget), `new_event_handle_impl` (budget) |
-| `regression/vector_theory_boogie_array_intern.move` | `f1` (budget) |
-| `regression/vector_theory_smt_seq.move` | `f1` (budget) |
+| `regression/generic_aliasing_all_partitions.move` | `true_in_every_case`, `never_alias` |
+| `regression/performance_200511.move` | `fresh_guid`, `new_event_handle_impl` |
+| `regression/vector_theory_boogie_array_intern.move` | `f1` |
+| `regression/vector_theory_smt_seq.move` | `f1` |
 
 The functions are marked as follows:
 
 - No mark: the automatic verification failed within its budget.
-- (budget): the function exceeds the 25 thousand `maxHeartbeats` budget.
-  Of the tests that reached verification in the first run of this
-  registry, such functions also fail with an unlimited budget; the tests
-  admitted by later fixes were not run without one.
+- (budget): the function exceeds the default budget of 1000 thousand
+  `maxHeartbeats` (about thirty seconds), which the registry runs with
+  since 2026-10-12 (before: 25 thousand).
 - (lemma): a `spec lemma` whose theorem is not established
   ([`lemmas.md`](lemmas.md)).
 

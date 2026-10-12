@@ -89,11 +89,11 @@ fn get_features() -> &'static [Feature] {
                 enabling_condition: |group, _| group == "unit",
             },
             // Tests with the Lean-based Verex verifier, whose messages differ
-            // from Boogie's. A function's verification gets a tight heartbeat
-            // budget; one needing more raises its own with `pragma heartbeats`.
+            // from Boogie's. A function's verification gets the verifier's
+            // default heartbeat budget, as on the command line.
             Feature {
                 name: "lean",
-                flags: &["--lean", "--heartbeats=25"],
+                flags: &["--lean"],
                 inclusion_mode: InclusionMode::Implicit,
                 enable_in_ci: false,
                 only_if_requested: true,

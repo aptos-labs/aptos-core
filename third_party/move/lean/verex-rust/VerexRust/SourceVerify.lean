@@ -33,12 +33,12 @@ def specsFor (unit : VerexIR.Validation.ValidatedUnit) (source : System.FilePath
 VerexSL rendering to `output`. -/
 def verifyFile (environment : Lean.Environment) (source : System.FilePath)
     (specFile : Option System.FilePath) (output : System.FilePath)
-    (rustcArgs : Array String := #[]) : IO (Array Report) := do
+    (rustcArgs : Array String := #[]) (ignoreProofs : Bool := false) : IO (Array Report) := do
   let (unit, companions) ← VerexSL.Perf.withPhase .frontend do
     let unit ← IO.FS.withTempDir fun directory =>
       return (← Driver.importRustFile {
         source, output := directory / "unit.raw.json", rustcArgs }).unit
     pure (unit, ← specsFor unit source specFile)
-  run environment { unit, companions, output }
+  run environment { unit, companions, output, ignoreProofs }
 
 end VerexIR.Rust.SourceVerify

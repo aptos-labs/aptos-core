@@ -1,16 +1,8 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/behavior_axiom_target_field.move:40:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/behavior_axiom_target_field.move:40:5: error: verex verification failed: the automatic verification of `g_lower` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify g_lower by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify g_lower by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/regression/behavior_axiom_target_field.move:48:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/behavior_axiom_target_field.move:48:5: error: verex verification failed: the automatic verification of `f_upper` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify f_upper by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify f_upper by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/behavior_axiom_target_field.move:41:9: error: the specification clause `ensures result >= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:40:5: error: verex verification failed: the automatic verification of `g_lower` failed; provide a proof: `verify g_lower by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify g_lower by verex_obligations` lists its obligations)
+tests/sources/regression/behavior_axiom_target_field.move:49:9: error: the specification clause `ensures result <= 5` is not established
+tests/sources/regression/behavior_axiom_target_field.move:48:5: error: verex verification failed: the automatic verification of `f_upper` failed; provide a proof: `verify f_upper by …` in `tests/sources/regression/behavior_axiom_target_field.proof.lean` (`verify f_upper by verex_obligations` lists its obligations)
 tests/sources/regression/behavior_axiom_target_field.move:7:1: error: quantification over nominal values containing function fields requires a field-validity domain, which is not carried yet
 tests/sources/regression/behavior_axiom_target_field.move:7:1: error: quantification over nominal values containing function fields requires a field-validity domain, which is not carried yet
 tests/sources/regression/behavior_axiom_target_field.move:117:9: error: the specification clause `ensures result == 0` is not established

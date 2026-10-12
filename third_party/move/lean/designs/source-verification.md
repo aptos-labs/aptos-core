@@ -159,8 +159,8 @@ MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite [<path part>]
 ```
 
 Its baselines are `foo.lean_exp` beside `foo.move` (`UPBL=1` updates them).
-Each function's verification gets a tight budget (`--heartbeats=25` in the
-feature's flags); a function that verifies but needs more raises its own
+Each function's verification gets the default budget, as on the command
+line; a function that verifies but needs more raises its own
 with `pragma heartbeats`, and a function the automation does not prove, where
 the Prover reads a Move `proof` block or proves nonlinear arithmetic, is
 proved in `foo.proof.lean`. The tests are skipped where the verifier is not
@@ -267,7 +267,7 @@ the two to do and where:
 
 ```text
 foo.move:12:5: error: verex verification failed: the automatic verification
-of `f` exceeded its budget of 1500000 maxHeartbeats; provide a proof:
+of `f` exceeded its budget of 1000000 maxHeartbeats; provide a proof:
 `verify f by …` in `sources/foo.proof.lean` (`verify f by verex_obligations`
 lists its obligations), or raise the budget with `pragma heartbeats = N`,
 in thousands of maxHeartbeats
@@ -395,11 +395,17 @@ baseline `MoveStdlib.exp` lists what does not verify yet.
 ## Budgets
 
 Every target runs within a heartbeat budget (`verex.verifyHeartbeats`, in
-`maxHeartbeats` units, 1500000 by default: about a minute at the 25M
-heartbeats a second the elaborator sustains). `prove --lean --heartbeats N`
+`maxHeartbeats` units, 1000000 by default: about thirty seconds at the 32M
+heartbeats a second the elaborator sustains on a current machine). `prove --lean --heartbeats N`
 and `verex-move verify --heartbeats N` set the default for a run; a target
 that needs more raises it for itself with `pragma heartbeats = N;` in its
 Move spec block (a pragma the Move model accepts on functions and modules;
 the Move Prover ignores it) or `pragma heartbeats = N` in VerexSL, or gets
 a proof (above). `N` counts thousands of `maxHeartbeats` units: the default
-is `1500`. The standard library needs neither.
+is `1000`. The standard library needs neither.
+
+`verify --ignore-proofs` (`prove --lean --ignore-proofs`, `verex.ignoreProofs`)
+verifies every function automatically, its authored proof and `pragma verify
+= manual` ignored: it tells whether a proof is still needed. The stage log
+(`verex.stageLog`) records each target's heartbeats, its outcome (`verified`,
+`failed`, `budget`) and whether its proof was authored.

@@ -1,13 +1,13 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/performance_200511.move:45:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/performance_200511.move:45:5: error: verex verification failed: the automatic verification of `fresh_guid` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify fresh_guid by …` in `tests/sources/regression/performance_200511.proof.lean` (`verify fresh_guid by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/regression/performance_200511.move:53:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/regression/performance_200511.move:53:5: error: verex verification failed: the automatic verification of `new_event_handle_impl` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify new_event_handle_impl by …` in `tests/sources/regression/performance_200511.proof.lean` (`verify new_event_handle_impl by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/regression/performance_200511.move:47:9: error: the specification clause `ensures eq_append(
+        result, serialize(old(counter.counter)), serialize(
+          sender
+        )
+      )` is not established
+tests/sources/regression/performance_200511.move:45:5: error: verex verification failed: the automatic verification of `fresh_guid` failed; provide a proof: `verify fresh_guid by …` in `tests/sources/regression/performance_200511.proof.lean` (`verify fresh_guid by verex_obligations` lists its obligations)
+tests/sources/regression/performance_200511.move:55:9: error: the specification clause `ensures eq_append(
+        result.guid, serialize(
+          old(counter.counter)
+        ), serialize(sender)
+      )` is not established
+tests/sources/regression/performance_200511.move:53:5: error: verex verification failed: the automatic verification of `new_event_handle_impl` failed; provide a proof: `verify new_event_handle_impl by …` in `tests/sources/regression/performance_200511.proof.lean` (`verify new_event_handle_impl by verex_obligations` lists its obligations)

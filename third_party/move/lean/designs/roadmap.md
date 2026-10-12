@@ -384,8 +384,8 @@ Open:
   target already left normal, up to the names of their free variables
   (`normalHypotheses`), and a loop step reduces the entry row's
   projections structurally before normalizing. Every target runs under a
-  budget (`verex.verifyHeartbeats`, 1.5G heartbeats by default: about a
-  minute), so a target that does not verify fails within it, and the
+  budget (`verex.verifyHeartbeats`, 1G heartbeats by default since
+  2026-10-12: about thirty seconds), so a target that does not verify fails within it, and the
   failure asks for a proof in the source's proof file or a larger budget
   (`pragma heartbeats = N`; see `source-verification.md`, Proofs;
   2026-09-28). The costliest standard-library targets verify within the

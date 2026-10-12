@@ -19,7 +19,7 @@ open VerexSL.SourceVerify
 private def usage : String :=
   "usage: verex-move verify <source.move | package directory> [--output <generated.lean>] \
    [--export <xast directory>] [--filter <file name part>] [--modules <a::m>,...] \
-   [--heartbeats <thousands>] [--render-only] [--dev]"
+   [--heartbeats <thousands>] [--ignore-proofs] [--render-only] [--dev]"
 
 private def fail (message : String) : IO α := throw <| IO.userError s!"{message}\n{usage}"
 
@@ -42,6 +42,8 @@ private structure VerifyOptions where
   /-- The package is compiled in dev mode, with its `[dev-addresses]` and
   `[dev-dependencies]`. -/
   dev : Bool := false
+  /-- Every function is verified automatically, its authored proof ignored. -/
+  ignoreProofs : Bool := false
 
 private partial def parseOptions : List String → VerifyOptions → IO VerifyOptions
   | [], options => pure options
@@ -56,6 +58,7 @@ private partial def parseOptions : List String → VerifyOptions → IO VerifyOp
       else parseOptions rest { options with filter := some part }
   | "--render-only" :: rest, options => parseOptions rest { options with renderOnly := true }
   | "--dev" :: rest, options => parseOptions rest { options with dev := true }
+  | "--ignore-proofs" :: rest, options => parseOptions rest { options with ignoreProofs := true }
   | "--modules" :: names :: rest, options =>
       if !options.modules.isEmpty then fail "--modules may be specified only once"
       else parseOptions rest { options with modules := (names.splitOn ",").toArray }
@@ -77,7 +80,7 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
   let environment ← VerexSL.Perf.withPhase .load importVerexSL
   let reports ← VerexMove.SourceVerify.verifySource environment source output
     options.exported options.filter options.renderOnly options.heartbeats options.modules
-    options.dev
+    options.dev options.ignoreProofs
   for report in reports do IO.println report.render
   -- The rendering and the wall time per phase are reports on the run, not
   -- its messages.

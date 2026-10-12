@@ -150,6 +150,12 @@ pub struct Options {
     #[arg(long, value_name = "THOUSANDS", overrides_with = "heartbeats")]
     #[serde(skip)]
     pub heartbeats: Option<u64>,
+    /// With `--lean`, verifies every function automatically, ignoring its
+    /// authored proof (`foo.proof.lean`) and `pragma verify = manual`:
+    /// whether a proof is still needed.
+    #[arg(long)]
+    #[serde(skip)]
+    pub ignore_proofs: bool,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the prover.
@@ -184,6 +190,7 @@ impl Default for Options {
             inference: InferenceOptions::default(),
             lean: false,
             heartbeats: None,
+            ignore_proofs: false,
         }
     }
 }
