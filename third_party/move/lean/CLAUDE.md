@@ -122,6 +122,9 @@ older source-specific work those packages own.
 - [`designs/source-verification.md`](designs/source-verification.md): the
   `verex-move verify` / `verex-rust verify` commands, Rust `.spec.lean`
   files, Move frames, and how messages map back to the original sources.
+- [`designs/proof-file-editing.md`](designs/proof-file-editing.md): options
+  for opening `.proof.lean` / `.spec.lean` companions in the editor with a
+  working InfoView (workspace, prelude, module context); no decision yet.
 - [`designs/lemmas.md`](designs/lemmas.md): Move `spec lemma`s and `proof`
   blocks translated: VIR lemmas and proof steps (`apply`, `split`), lemma
   theorems by well-founded recursion, and `apply` sites in the solver.
