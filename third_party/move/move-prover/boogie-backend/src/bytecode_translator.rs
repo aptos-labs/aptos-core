@@ -4320,9 +4320,18 @@ impl<'env> BoogieTranslator<'env> {
     /// specification names (for example, an order rebuilt after a field update)
     /// gets an unrelated abort or requires predicate, and the specification
     /// cannot be proven. A Move function's behavior depends only on the values
-    /// it receives, so the axiom is sound for every predicate it is emitted for.
+    /// it receives, so the axiom is sound wherever equality covers everything
+    /// a specification can read; it is not emitted when an argument carries a
+    /// ghost field.
     fn emit_predicate_congruence(&self, fun_name: &str, prefix_decls: &[String], params: &[Type]) {
-        if params.is_empty() {
+        // `$IsEqual` ignores ghost fields, but a requires or aborts
+        // specification can read them, so values equal as Move values may
+        // still get different answers.
+        if params.is_empty()
+            || params
+                .iter()
+                .any(|ty| type_has_ghost_transitively(self.env, ty.skip_reference()))
+        {
             return;
         }
         let prefix_args: Vec<String> = prefix_decls

@@ -74,4 +74,22 @@ module 0x42::behavioral_congruence {
     spec field_dropped_id {
         aborts_if aborts_of<cb.f>(x);
     }
+
+    // A ghost field is excluded from equality but readable by a specification, so a
+    // callback's abort condition may differ on Move-equal values: must fail.
+    struct Tagged has copy, drop, store {
+        n: u64
+    }
+    spec Tagged {
+        ghost g: u64;
+    }
+
+    struct TaggedCallbacks has copy, drop, store {
+        f: |Tagged| has copy + drop + store
+    }
+
+    fun ghost_divergent(_cb: &TaggedCallbacks, _a: Tagged, _b: Tagged) {}
+    spec ghost_divergent {
+        ensures _a == _b ==> (aborts_of<_cb.f>(_a) <==> aborts_of<_cb.f>(_b));
+    }
 }

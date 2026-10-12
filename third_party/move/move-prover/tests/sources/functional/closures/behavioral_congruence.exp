@@ -58,3 +58,15 @@ error: abort not covered by any of the `aborts_if` clauses
    =         x = <redacted>
    =     at tests/sources/functional/closures/behavioral_congruence.move:72: field_dropped_id
    =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_congruence.move:93:9
+   │
+93 │         ensures _a == _b ==> (aborts_of<_cb.f>(_a) <==> aborts_of<_cb.f>(_b));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_congruence.move:91: ghost_divergent
+   =         _cb = <redacted>
+   =         _a = <redacted>
+   =         _b = <redacted>
+   =     at tests/sources/functional/closures/behavioral_congruence.move:93: ghost_divergent (spec)
