@@ -4,7 +4,8 @@
 // be *equal* to the one a specification names (rebuilt field by field, or returned by an
 // opaque function) must still be matched to that specification's `aborts_of`.
 //
-// The negative cases pass a genuinely different value and must keep failing.
+// The negative cases must keep failing: two pass a genuinely different value, and one claims
+// agreement on values that differ only in a ghost field, which equality ignores.
 module 0x42::behavioral_congruence {
     use std::option::{Self, Option};
     use std::string::String;
