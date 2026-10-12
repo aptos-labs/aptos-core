@@ -27,6 +27,7 @@ private def symbol : Xast.Exp :=
 private partial def evaluate (input : Int) : Xast.Exp → Except String Int
   | .mk _ _ (.value (.number value) _ _) => pure value
   | .mk _ _ (.«local» "x") => pure input
+  | .mk _ _ (.param 0) => pure input
   | .mk _ _ (.call .cast _ [value] _) => evaluate input value
   | .mk _ _ (.ite condition yes no) => do
       evaluate input (if (← holds input condition) then yes else no)
@@ -77,7 +78,14 @@ private def agreesWithBitVec (type : Xast.Ty) (bits : Nat) (signed : Bool) : Boo
   | _ => false
 #guard (int2bv (.typeParam 0) symbol).toOption.isNone
 
--- A parameter of the result type is already in range.
+-- A `num` parameter is unbounded: its conversion wraps at `u64` as any `num`
+-- operand's does.
+#guard [0, 2 ^ 64 - 1, 2 ^ 64, -1, 5 * 2 ^ 64 + 3].all fun input =>
+  match int2bv .num (.mk .num ⟨0, 0, 0⟩ (.param 0)) with
+  | .ok converted => (evaluate input converted).toOption == some ((BitVec.ofInt 64 input).toNat : Int)
+  | _ => false
+
+-- A parameter of a fixed-width result type is already in range.
 #guard match int2bv .u8 (.mk .u8 ⟨0, 0, 0⟩ (.param 0)) with
   | .ok (.mk .u8 _ (.param 0)) => true
   | _ => false

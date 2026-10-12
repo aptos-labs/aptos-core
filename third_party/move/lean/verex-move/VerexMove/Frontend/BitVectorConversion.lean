@@ -71,8 +71,10 @@ def int2bv (type : Ty) (value : Exp) : Except String Exp := do
   let some (bits, signed) := conversionWidth? type
     | throw "`int2bv` at a type parameter has no width"
   let loc := value.loc
-  -- A parameter holds a value of its type.
-  if value.ty == type && value.node matches .param _ then return value
+  -- A parameter of a fixed-width type holds a value in range; a `num` one is
+  -- unbounded and wraps as every `num` operand does.
+  if value.ty == type && (fixedWidth? type).isSome && value.node matches .param _ then
+    return value
   let wrapped := match constant? value with
     | some constant => number loc (wrap bits signed constant)
     | none =>
