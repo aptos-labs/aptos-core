@@ -47,7 +47,9 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final => final = initialState✝ ∧ y.val < x.val)
-      (fun failure => VerexIR.Proofs.Obligation "aborts_if.lean" 1562 1578 (x.val ≤ y.val)) state
+      (fun failure =>
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 1562 1578 (x.val ≤ y.val))
+      state
 a✝ : y.val ≤ x.val
 ⊢ y.val < x.val
 tests/sources/functional/aborts_if.move:67:5: error: verex verification failed: the automatic verification of `abort6_incorrect` failed; provide a proof: `verify abort6_incorrect by …` in `tests/sources/functional/aborts_if.proof.lean` (`verify abort6_incorrect by verex_obligations` lists its obligations)
@@ -69,8 +71,8 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final => final = initialState✝ ∧ ¬(x.val < y.val ∨ x.val = y.val))
       (fun failure =>
-        VerexIR.Proofs.Obligation "aborts_if.lean" 2072 2087 (x.val < y.val) ∨
-          VerexIR.Proofs.Obligation "aborts_if.lean" 2092 2108 (x.val = y.val))
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2072 2087 (x.val < y.val) ∨
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2092 2108 (x.val = y.val))
       state
 a✝ : y.val ≤ x.val
 ⊢ ¬(x.val < y.val ∨ x.val = y.val)
@@ -94,8 +96,8 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
       (fun failure =>
-        VerexIR.Proofs.Obligation "aborts_if.lean" 2655 2669 True ∨
-          VerexIR.Proofs.Obligation "aborts_if.lean" 2674 2689 (0 < x.val))
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2655 2669 True ∨
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2674 2689 (0 < x.val))
       state
 a✝ : ¬x.val = 0
 ⊢ False

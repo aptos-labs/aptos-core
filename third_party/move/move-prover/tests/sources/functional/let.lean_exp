@@ -22,15 +22,19 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final =>
         (¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val) →
-            VerexIR.Proofs.Obligation "let.lean" 2016 2034 (a_final.val = a.val.tdiv (a.val + b.val))) ∧
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 2016 2034
+              (a_final.val = a.val.tdiv (a.val + b.val))) ∧
           (¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val) →
-              VerexIR.Proofs.Obligation "let.lean" 2039 2059 (b_final.val = a.val * b.val)) ∧
+              VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 2039 2059
+                (b_final.val = a.val * b.val)) ∧
             final = initialState✝ ∧
               ¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val))
       (fun failure =>
-        (VerexIR.Proofs.Obligation "let.lean" 1931 1949 ¬a.val + b.val = 0 ∨
-            VerexIR.Proofs.Obligation "let.lean" 1954 1978 (18446744073709551615 ≤ a.val + b.val)) ∨
-          VerexIR.Proofs.Obligation "let.lean" 1983 2011 (18446744073709551615 ≤ a.val * b.val))
+        (VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 1931 1949 ¬a.val + b.val = 0 ∨
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 1954 1978
+              (18446744073709551615 ≤ a.val + b.val)) ∨
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/let.move.lean" 1983 2011
+            (18446744073709551615 ≤ a.val * b.val))
       state
 named✝¹ : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
 a✝⁹ : named✝¹.val = a.val + b.val

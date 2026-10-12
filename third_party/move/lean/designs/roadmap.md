@@ -602,10 +602,12 @@ above (2026-10-07). Open:
   [`source-verification.md`](source-verification.md)), and
   `move_stdlib_lean_prover_tests` verifies the standard library in place.
   A function the automatic verification does not establish within its
-  budget is proved in the VerexSL proof file beside its Move file
-  (`foo.proof.lean`), whose `verify f by …` items and lemmas the driver
-  splices into the module; the failure message names the file
-  (2026-09-28). The e2e `verify` suite verifies the framework's
+  budget is proved in the proof file beside its Move file
+  (`foo.proof.lean`); the failure message names the file (2026-09-28). The
+  proof file is a Lean file whose header loads its module's context: the
+  driver elaborates it after registering the module, the editor after
+  loading the module from its rendering (2026-10-12,
+  [`proof-file-editing.md`](proof-file-editing.md), P1–P3). The e2e `verify` suite verifies the framework's
   `move-stdlib` in place (2026-09-30); the copy under
   `MoveToVerexSL/MoveStdlib` serves only the Move-to-VerexSL
   baselines.

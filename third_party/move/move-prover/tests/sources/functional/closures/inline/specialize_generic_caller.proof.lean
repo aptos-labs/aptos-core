@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "specialize_generic_caller.move"
+verex proofs where
+
 open VerexIR.Proofs.Denote
 
 -- Inlining count_all does not import its proof block. Instantiate its proved

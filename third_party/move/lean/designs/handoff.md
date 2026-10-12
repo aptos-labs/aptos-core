@@ -107,11 +107,10 @@ costs.
 
 ## Open findings not yet in a design
 
-- Ensure the InfoView works on the standalone proofs of `.move` and `.rs`
-  sources (`foo.proof.lean` beside `foo.move`, `foo.spec.lean` beside
-  `foo.rs`): opening one in the editor shows the goals of its `verify … by`
-  steps (user request, 2026-10-12). Options in `proof-file-editing.md`;
-  user decision pending.
+- The InfoView works on Move proof files since 2026-10-12
+  (`proof-file-editing.md`, P1–P3). Rust `.spec.lean` files (P4: contracts
+  attached after registration, or an explicit deferral) and renderings as
+  importable Lake modules (P5) are open.
 - With its `verify` items skipped, the editor still re-elaborates a module's
   registration on every edit (`OrderedMap.lean`: 7–8 s, measured 2026-10-11).
 - `bug_15880::test2` fails unattributed: its failing asserts (`v == 4`,

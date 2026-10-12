@@ -1,4 +1,4 @@
-VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:12:43: error: incorrect final counter value
+VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:17:43: error: incorrect final counter value
 case ensures_3
 executable✝ : Validation.ExecutableUnit unit
 nativesTyped : NativesTyped executable✝
@@ -270,4 +270,4 @@ x :
                 (StorageKey.address addr))).getD
           RuntimeValue.unit).asInt +
       2
-VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:9:8: error: verex verification failed: the proof of `wrong_final_value` does not establish its specification
+VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:14:8: error: verex verification failed: the proof of `wrong_final_value` does not establish its specification

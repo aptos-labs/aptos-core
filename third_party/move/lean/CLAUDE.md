@@ -122,9 +122,11 @@ older source-specific work those packages own.
 - [`designs/source-verification.md`](designs/source-verification.md): the
   `verex-move verify` / `verex-rust verify` commands, Rust `.spec.lean`
   files, Move frames, and how messages map back to the original sources.
-- [`designs/proof-file-editing.md`](designs/proof-file-editing.md): options
-  for opening `.proof.lean` / `.spec.lean` companions in the editor with a
-  working InfoView (workspace, prelude, module context); no decision yet.
+- [`designs/proof-file-editing.md`](designs/proof-file-editing.md): Move
+  proof files as Lean files whose header (`verex proofs for`, `verex proofs
+  where`) loads their module's context from its rendering, so they open in
+  the editor with a working InfoView; options weighed, P1–P3 done, Rust
+  specification files and importable renderings open.
 - [`designs/lemmas.md`](designs/lemmas.md): Move `spec lemma`s and `proof`
   blocks translated: VIR lemmas and proof steps (`apply`, `split`), lemma
   theorems by well-founded recursion, and `apply` sites in the solver.
@@ -247,9 +249,12 @@ The reverse direction verifies a Move package in place from the Move CLI:
 exports the package and runs the built `verex-move` executable through
 `lake env`; see `designs/source-verification.md` ("From the Move CLI").
 A function the automatic verification does not establish within its budget
-is proved in the VerexSL proof file beside its Move file
-(`foo.proof.lean`: `verify f by …` items and their lemmas), which the
-failure message names; see the design's "Proofs". The commands, flags, and
+is proved in the proof file beside its Move file (`foo.proof.lean`: its
+header, then `verify f by …` items and their lemmas), which the failure
+message names; see the design's "Proofs". A package's rendering goes to
+`build/verex-verify.lean`, a single Move file's to `build/verex/` of its
+package or, outside packages, to `.verex/` beside it, where the proof file's
+header finds it in the editor. The commands, flags, and
 pragmas are summarized in [`README.md`](README.md) ("Verifying sources").
 
 ## Build and test

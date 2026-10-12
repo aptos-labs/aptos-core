@@ -140,7 +140,7 @@ pub struct Options {
     pub inference: InferenceOptions,
     /// Verifies the one Move source file with the Lean-based Verex verifier
     /// instead of Boogie (see `verex`); the rendering in Lean is written
-    /// beside the output path, with extension `lean`.
+    /// where the source's proof file finds it.
     #[arg(long)]
     #[serde(skip)]
     pub lean: bool,

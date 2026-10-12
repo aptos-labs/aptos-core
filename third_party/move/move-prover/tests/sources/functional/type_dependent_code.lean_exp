@@ -52,7 +52,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                   (VerexIR.StorageKey.address account)).isSome =
               true))
       (fun failure =>
-        VerexIR.Proofs.Obligation "type_dependent_code.lean" 361 401
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
             ((initialState✝
                   {
                     type :=
@@ -68,7 +68,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                         VerexIR.Proofs.Denote.NRow.nil }
                   (VerexIR.StorageKey.address account)).isSome =
               true) ∨
-          VerexIR.Proofs.Obligation "type_dependent_code.lean" 406 447
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
             ((initialState✝
                   {
                     type :=
@@ -116,7 +116,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
             env)
         verexContinuation✝¹
         (fun failure =>
-          VerexIR.Proofs.Obligation "type_dependent_code.lean" 361 401
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
               ((initialState✝
                     {
                       type :=
@@ -132,7 +132,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                           VerexIR.Proofs.Denote.NRow.nil }
                     (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            VerexIR.Proofs.Obligation "type_dependent_code.lean" 406 447
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
               ((initialState✝
                     {
                       type :=
@@ -215,7 +215,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
             (VerexIR.Proofs.Denote.Term.lit ()) env)
         verexContinuation✝¹
         (fun failure =>
-          VerexIR.Proofs.Obligation "type_dependent_code.lean" 361 401
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
               ((initialState✝
                     {
                       type :=
@@ -231,7 +231,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
                           VerexIR.Proofs.Denote.NRow.nil }
                     (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            VerexIR.Proofs.Obligation "type_dependent_code.lean" 406 447
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
               ((initialState✝
                     {
                       type :=
@@ -364,7 +364,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                   (VerexIR.StorageKey.address account)).isSome =
               true))
       (fun failure =>
-        VerexIR.Proofs.Obligation "type_dependent_code.lean" 1002 1043
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
             ((initialState✝
                   {
                     type :=
@@ -380,7 +380,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                         VerexIR.Proofs.Denote.NRow.nil }
                   (VerexIR.StorageKey.address account)).isSome =
               true) ∨
-          VerexIR.Proofs.Obligation "type_dependent_code.lean" 1048 1089
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
             ((initialState✝
                   {
                     type :=
@@ -430,7 +430,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
             env)
         verexContinuation✝¹
         (fun failure =>
-          VerexIR.Proofs.Obligation "type_dependent_code.lean" 1002 1043
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
               ((initialState✝
                     {
                       type :=
@@ -446,7 +446,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                           VerexIR.Proofs.Denote.NRow.nil }
                     (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            VerexIR.Proofs.Obligation "type_dependent_code.lean" 1048 1089
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
               ((initialState✝
                     {
                       type :=
@@ -530,7 +530,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
             (VerexIR.Proofs.Denote.Term.lit ()) env)
         verexContinuation✝¹
         (fun failure =>
-          VerexIR.Proofs.Obligation "type_dependent_code.lean" 1002 1043
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
               ((initialState✝
                     {
                       type :=
@@ -546,7 +546,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
                           VerexIR.Proofs.Denote.NRow.nil }
                     (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            VerexIR.Proofs.Obligation "type_dependent_code.lean" 1048 1089
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
               ((initialState✝
                     {
                       type :=

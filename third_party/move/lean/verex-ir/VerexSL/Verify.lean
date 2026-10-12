@@ -3501,6 +3501,66 @@ private def verifyLemmas (unit : ValidatedUnit) (segments : Array String)
       logErrorAt reference m!"verex verification failed: the lemma {spelled} is not \
         established: {error.toMessageData}"
 
+/-- The file syntax was parsed from, where a module's items and its proof
+file's are verified together. -/
+structure ParsedFile where
+  name : String
+  map : FileMap
+  /-- The file being elaborated, the document, rather than another. -/
+  document : Bool := false
+  /-- Whether info trees are kept of the file's syntax: the document's, as
+  where its elaboration began; never another file's, whose positions the
+  document does not have. -/
+  infoTrees : Bool := false
+
+/-- Whether syntax of `file?`, `none` for the command's own file, is the
+document's. -/
+def ParsedFile.isDocument : Option ParsedFile → Bool
+  | some file => file.document
+  | none => true
+
+/-- Run `act` with the positions of `file`, or of the command's own file:
+a message at syntax lands in the file the syntax was parsed from. -/
+def inParsedFile (file? : Option ParsedFile) (act : CommandElabM α) : CommandElabM α :=
+  match file? with
+  | some file =>
+      withReader (fun context => { context with fileName := file.name, fileMap := file.map })
+        (withEnableInfoTree file.infoTrees act)
+  | none => act
+
+/-- Report every message about another file logged since the log held
+`since` messages at `ref` instead, opened by its own position, unless
+`verex.relocateMessages` is off: a document shows messages at its own
+positions only. -/
+def relocateForeignMessages (ref : Syntax) (since : Nat := 0) : CommandElabM Unit := do
+  unless verex.relocateMessages.get (← getOptions) do return
+  let fileName ← getFileName
+  let fileMap ← getFileMap
+  let some start := ref.getPos? | return
+  let pos := fileMap.toPosition start
+  let endPos := ref.getTailPos?.map fileMap.toPosition
+  modify fun state =>
+    let messages := state.messages.unreported.toArray
+    let since := if since ≤ messages.size then since else 0
+    let relocated := messages.extract since |>.map fun message =>
+      if message.fileName == fileName then message
+      else { message with
+        fileName, pos, endPos
+        data := m!"{message.fileName}:{message.pos.line}:{message.pos.column + 1}: " ++
+          message.data }
+    let unreported := (messages.extract 0 since ++ relocated).toPArray'
+    { state with messages := { state.messages with unreported } }
+
+/-- How many messages the log holds that are not reported yet. -/
+def unreportedCount : CommandElabM Nat := do
+  return (← get).messages.unreported.size
+
+/-- An authored proof, and the file it was written in where that is not the
+command's own. -/
+structure AuthoredScript where
+  tactic : TSyntax ``Lean.Parser.Tactic.tacticSeq
+  file : Option ParsedFile := none
+
 /-- Verify one function through its denotation.  A member of a cycle of
 calls is proved over a meaning for each member satisfying its contract,
 standing for the calls to them: at the runtime family, or, when `family`
@@ -3508,7 +3568,7 @@ holds, at every skolem family and type instantiation.  Its typed theorem
 alone is elaborated, and the natives it assumes returned, for `verifyCycle`
 to conclude. -/
 private def verifyMember (reference : Syntax) (segments : Array String) (function : String)
-    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
+    (script? : Option AuthoredScript) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
     (cycle : Array (FunctionHandle × String)) (family : Bool := false) :
     CommandElabM (Array (FunctionHandle × String) × Array (FunctionHandle × String) ×
       Array Name) := do
@@ -4226,7 +4286,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     -- goal, which sees `VerexIR` and the module's `open` items opened.
     let (automaticTactic, scriptTactic) ← match script? with
       | some script =>
-          let authored := Id.run <| script.raw.replaceM fun stx =>
+          let authored := Id.run <| script.tactic.raw.replaceM fun stx =>
             pure <| if stx.isOfKind ``VerexIR.Proofs.Denote.verexObligations &&
                 stx[1].getNumArgs == 0 then
               some obligationsTactic.raw
@@ -4265,7 +4325,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
                 $bodyIdent (VerexIR.Proofs.Denote.initialEnv $paramsTerm $localsTerm args))
               (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $mutablesTerm $shapeTerm))
             $contract))
-    let typedCommand ← withRef (script?.map (·.raw) |>.getD reference) do `(command|
+    let typedCommand ← withRef (script?.map (·.tactic.raw) |>.getD reference) do `(command|
       set_option Elab.async false in
       set_option maxHeartbeats $budget:num in
       theorem $(mkIdent typedVerified)
@@ -4294,7 +4354,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     let heartbeatsBefore ← IO.getNumHeartbeats
     Perf.withPhase .verification <|
       Perf.measure s!"{namespaceName}::{function} typed" (base ++ `typedVerified)
-        (elabCommand typedCommand)
+        (inParsedFile (script?.bind (·.file)) (elabCommand typedCommand))
     let used := (← IO.getNumHeartbeats) - heartbeatsBefore
     let failed := countErrors (← get).messages > errorsBefore
     let logged := (← get).messages.reportedPlusUnreported.toList.drop loggedBefore
@@ -4423,7 +4483,7 @@ standing vacuous; with one, every member at every skolem family and type
 instantiation, the runtime slots standing vacuous. -/
 private def verifyCycle (reference : Syntax) (segments : Array String)
     (members : Array (FunctionHandle × String))
-    (scripts : String → Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl)) :
+    (scripts : String → Option AuthoredScript) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl)) :
     CommandElabM Unit := do
   let namespaceName := pathName segments
   let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
@@ -4635,8 +4695,8 @@ its cycle of calls, if any, whose authored proofs `scripts` gives.  The
 members are reported to `covering` before they are verified, succeeding or
 failing together. -/
 def verifyFunction (reference : Syntax) (segments : Array String) (function : String)
-    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none)
-    (scripts : String → Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := fun _ => none)
+    (script? : Option AuthoredScript := none)
+    (scripts : String → Option AuthoredScript := fun _ => none)
     (covering : Array String → CommandElabM Unit := fun _ => pure ())
     (opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := #[]) :
     CommandElabM Unit := do
@@ -4713,9 +4773,23 @@ def skippedInEditor (reference : Syntax) (function : String) : CommandElabM Unit
 /-- What a module's theorems see opened, as its authored proofs do. -/
 def authoredOpens : List OpenDecl := [.simple `VerexIR []]
 
+/-- The module a proof file's header selected: in a proof file, `verify`
+items follow `verex proofs where`. -/
+private initialize selectedExtension : EnvExtension (Option Name) ←
+  registerEnvExtension (pure none)
+
+/-- Select the module whose proofs the file being elaborated holds. -/
+def selectProofModule (environment : Environment) (name : Name) : Environment :=
+  selectedExtension.setState environment (some name)
+
+def selectedProofModule? (environment : Environment) : Option Name :=
+  selectedExtension.getState environment
+
 @[command_elab verexVerifyCommand]
 def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
   let some pathSyntax := stx[1]? | throwErrorAt stx "expected a path"
+  if (selectedProofModule? (← getEnv)).isSome then
+    throwErrorAt stx "in a proof file, `verify` items follow `verex proofs where`"
   let segments := pathSegments pathSyntax
   -- A module path may lead with a Move address alias; a namespace
   -- registered at the path as written takes precedence.
@@ -4725,7 +4799,7 @@ def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
       (VerexSL.registeredUnit? (← getEnv) (pathName canonical)).isSome then
     canonical.push segments.back!
   else segments
-  let script := scriptOfOptional (stx[2]?.getD .missing)
+  let script := (scriptOfOptional (stx[2]?.getD .missing)).map ({ tactic := · })
   let function := segments.back!
   if skipVerify (← getOptions) && !demandedVerify stx then
     skippedInEditor pathSyntax function
@@ -4754,6 +4828,11 @@ private structure VerificationTarget where
   script : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)
   /-- A `verify!` item: verified in the editor as well. -/
   demanded : Bool
+  /-- The file of `reference` and `script`, where not the command's own. -/
+  file : Option ParsedFile := none
+
+private def VerificationTarget.authored? (target : VerificationTarget) : Option AuthoredScript :=
+  target.script.map ({ tactic := ·, file := target.file })
 
 /-- The specified functions a function's proof uses through their verified
 theorems: its callees with a specification, found through the unspecified
@@ -4825,18 +4904,22 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
           let some (_, ns, _, declaration) := findFunction? unit key | continue
           unless automaticVerificationDisabled unit callee.namespaceId ns declaration do
             verifyInOrder unit segments opens targets visited covered
-              ⟨key, target.reference, none, false⟩
+              ⟨key, target.reference, none, false, target.file⟩
     -- An authored proof sees the module's theorems by their short names.
     let moduleNamespace := pathName segments
     let openModule (scope : Scope) := { scope with
       openDecls := .simple moduleNamespace [] :: scope.openDecls }
     -- A member of a cycle verified from another member is not entered again.
     if (← covered.get).contains target.function then return
+    -- The editor explains a skip at an item of its document.
     if skipVerify (← getOptions) && !target.demanded then
-      skippedInEditor target.reference target.function
+      if ParsedFile.isDocument target.file then
+        inParsedFile target.file (skippedInEditor target.reference target.function)
       return
-    let scripts (name : String) := (targets.find? (·.function == name)).bind (·.script)
+    let scripts (name : String) := (targets.find? (·.function == name)).bind (·.authored?)
     let covering (names : Array String) : CommandElabM Unit := covered.modify (· ++ names)
+    let since ← unreportedCount
+    inParsedFile target.file do
     let measuring ← Perf.measuring.get
     let errorsBefore ← if measuring then do pure (countErrors (← get).messages) else pure 0
     let messagesBefore ← if measuring then do
@@ -4845,7 +4928,8 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
     try
       if targets.any (·.script.isSome) then
         withScope openModule
-          (verifyFunction target.reference segments target.function target.script scripts covering opens)
+          (verifyFunction target.reference segments target.function target.authored? scripts
+            covering opens)
       else verifyFunction target.reference segments target.function none scripts covering opens
     catch error =>
       -- A failure without a position of its own, such as a translation's, is
@@ -4865,6 +4949,7 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
         target := s!"{moduleNamespace}::{target.function}"
         status := if errors == 0 then "verified" else if timedOut then "timeout" else "rejected"
         errors })
+    if ParsedFile.isDocument target.file then relocateForeignMessages target.reference since
   finally
     modifyEnv (inProgressTargets.modifyState · (·.erase target.function))
 
@@ -4959,39 +5044,80 @@ private def invariantRelatedModules (environment : Environment) (unit : Validate
     unless changed do break
   return related
 
-/-- Elaborate a Verex namespace command, then its theorems in its namespace,
-then, with that namespace open, its `verify` items and its specified
-functions without one, in source order. This registration shadows
-the plain namespace elaborator. -/
-@[command_elab verexNamespaceCommand, command_elab verexMoveModuleCommand,
-  command_elab verexRustNamespaceCommand]
-def elaborateNamespaceWithVerification : CommandElab := fun stx =>
-    Perf.withPhase .certification do
-  VerexSL.elaborateNamespaceWith invariantRelatedModules stx
-  stageLog "module elaborated"
-  -- Its module is registered at its canonical path.
-  let stx ← match VerexSL.canonicalMoveCommand (← getEnv) stx with
-    | .ok (canonical, _) => pure canonical
-    | .error (location, message) => throwErrorAt location message
-  let some pathSyntax := stx.getArgs.find? (·.isOfKind ``verexPathSyntax)
-    | throwErrorAt stx "a Verex namespace requires a path"
-  -- A recursive specification function is a definition of the module.
+/-- The modules whose verification a module command defers: none, all, or
+those whose `proof_file` pragma names one of the files. -/
+inductive Deferral where
+  | none
+  | all
+  | proofFiles (files : Array String)
+  deriving Inhabited
+
+/-- A module registered with its verification deferred: its command, its
+Move addresses canonical, the file the command was parsed from, and its
+`proof_file` pragma, the file whose `verex proofs where` verifies it. -/
+structure DeferredModule where
+  name : Name
+  command : Syntax
+  file : ParsedFile
+  proofFile : Option String
+  /-- Whether a `verex proofs where` has run its verification. -/
+  verified : Bool := false
+
+private initialize deferralExtension : EnvExtension Deferral ←
+  registerEnvExtension (pure .none)
+
+private initialize deferredExtension : EnvExtension (NameMap DeferredModule) ←
+  registerEnvExtension (pure {})
+
+/-- Which module commands of what is elaborated next defer their
+verification. -/
+def setDeferral (environment : Environment) (deferral : Deferral) : Environment :=
+  deferralExtension.setState environment deferral
+
+def getDeferral (environment : Environment) : Deferral :=
+  deferralExtension.getState environment
+
+/-- The modules registered with their verification deferred, by namespace. -/
+def deferredModules (environment : Environment) : NameMap DeferredModule :=
+  deferredExtension.getState environment
+
+/-- Record that a deferred module's verification has run. -/
+def markVerified (environment : Environment) (name : Name) : Environment :=
+  deferredExtension.modifyState environment fun modules =>
+    match modules.find? name with
+    | some module => modules.insert name { module with verified := true }
+    | none => modules
+
+/-- The items of a module and of its proof file's `verex proofs where`
+command, each with the file it was parsed from where not the command's own. -/
+private structure ItemSource where
+  stx : Syntax
+  file : Option ParsedFile := none
+
+/-- Verify a registered module from the items of `sources`, its command's
+then its proof file's: its theorems in its namespace, then, with that
+namespace open, its lemmas, its `verify` items, and its specified functions
+without one, in source order. -/
+private def verifyModuleItems (pathSyntax : Syntax) (sources : Array ItemSource) :
+    CommandElabM Unit := do
+  let some module := sources[0]? | return
   let segments := pathSegments pathSyntax
-  if let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments) then
-    unless (recursiveSpecFunctions unit).isEmpty do
-      let twins ← SpecTypes.ensureSpecTypes segments unit
-      liftTermElabM (ensureSpecFunctionDefinitions unit twins)
   let moduleNamespace := pathName segments
   -- The module's theorems and authored proofs see `VerexIR` and the
   -- namespaces of its `open` items opened.
-  let opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := (VerexSL.openItems stx).map (⟨·[1]!⟩)
-  let theoremOpens := authoredOpens ++ (← opens.toList.flatMapM elabOpenDecl)
-  let theorems := VerexSL.theoremItems stx
+  let opens := sources.flatMap fun source =>
+    (VerexSL.openItems source.stx).map fun item =>
+      ((⟨item[1]!⟩ : TSyntax ``Lean.Parser.Command.openDecl), source.file)
+  let elaborated ← opens.toList.flatMapM fun (decl, file) => inParsedFile file (elabOpenDecl decl)
+  let theoremOpens := authoredOpens ++ elaborated
+  let theorems := sources.flatMap fun source =>
+    (VerexSL.theoremItems source.stx).map (·, source.file)
   unless theorems.isEmpty do
     withModuleNamespace moduleNamespace <| Perf.withPhase .verification do
       modifyScope fun scope => { scope with openDecls := theoremOpens ++ scope.openDecls }
-      for theoremCommand in theorems do elabCommand theoremCommand
-  let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments) | return
+      for (theoremCommand, file) in theorems do inParsedFile file (elabCommand theoremCommand)
+  let opens := opens.map (·.1)
+  let some unit := VerexSL.registeredUnit? (← getEnv) moduleNamespace | return
   -- The module's lemmas, and those its functions apply, before its functions.
   let ownLemmas := (unit.namespaces.toList.zipIdx.filter fun (ns, _) =>
       (unit.tables.namespaces[ns.identity.index]?.map (·.segments)) == some segments).flatMap
@@ -5001,22 +5127,23 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
     ns.functions.toList.flatMap fun declaration => (functionLemmas ns declaration).toList
   let roots := (ownLemmas ++ appliedByFunctions).foldl (init := #[]) fun roots lemma =>
     if roots.contains lemma then roots else roots.push lemma
-  let lemmaItems := (lemmaItemsOf stx).filterMap fun item => do
+  let lemmaItems := (lemmaItemsOf module.stx).filterMap fun item => do
     let identifier ← item.getArgs.find? (·.isIdent)
     pure (identifier.getId.toString (escape := false), identifier)
-  verifyLemmas unit segments roots lemmaItems pathSyntax
-  let items := VerexSL.verificationItems stx
-  let explicit := items.filterMap fun item =>
+  inParsedFile module.file (verifyLemmas unit segments roots lemmaItems pathSyntax)
+  let items := sources.flatMap fun source =>
+    (VerexSL.verificationItems source.stx).map (·, source.file)
+  let explicit := items.filterMap fun (item, _) =>
     if item.isOfKind ``verexVerifyItem then item[1]?.map (·.getId.toString (escape := false))
     else none
   -- The explicit `verify` items, and the specified functions with a body
   -- that no explicit item names and whose specification does not set
   -- `pragma verify = false`, in source order.
-  let targets : Array VerificationTarget := items.filterMap fun item =>
+  let targets : Array VerificationTarget := items.filterMap fun (item, file) =>
     if item.isOfKind ``verexVerifyItem then
       item[1]?.map fun identifier =>
         ⟨identifier.getId.toString (escape := false), identifier,
-          scriptOfOptional (item[2]?.getD .missing), demandedVerify item⟩
+          scriptOfOptional (item[2]?.getD .missing), demandedVerify item, file⟩
     else do
       let identifier ← item.getArgs.find? (·.isIdent)
       let function := identifier.getId.toString (escape := false)
@@ -5024,13 +5151,13 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
       let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
       if declaration.body == .absent || statesNothing declaration.contract ||
           automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration then none
-      some ⟨function, identifier, none, false⟩
+      some ⟨function, identifier, none, false, file⟩
   -- A function without a specification is verified against its loop
   -- invariants, its in-body assertions, the preconditions of the functions
   -- it calls, the data invariants of the values it takes, returns,
   -- constructs, and mutates, and the invariants of the memory it writes.
   let named := targets.map (·.function)
-  let targets := targets ++ (functionItems stx).filterMap fun item => do
+  let targets := targets ++ (functionItems module.stx).filterMap fun item => do
     let identifier ← firstIdentifier? item[4]
     let function := identifier.getId.toString (escape := false)
     if named.contains function then none
@@ -5043,7 +5170,7 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
           callsRequiring unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ ||
           Contract.owesMemoryInvariants unit ⟨namespaceIndex⟩ declaration) then
       none
-    some ⟨function, identifier, none, false⟩
+    some ⟨function, identifier, none, false, module.file⟩
   -- A function of a module this file registered before, which writes memory
   -- an invariant of this module reads, is verified against it here.
   let inFile := (moduleUnits (← getEnv)).map (·.1)
@@ -5055,14 +5182,66 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
         if declaration.body == .absent ||
             automaticVerificationDisabled unit ⟨index⟩ ns declaration ||
             !Contract.owesInvariantsOf unit ⟨0⟩ ⟨index⟩ declaration then none
-        else some ⟨functionKey unit ⟨⟨index⟩, ⟨functionIndex⟩⟩, pathSyntax, none, false⟩
+        else some ⟨functionKey unit ⟨⟨index⟩, ⟨functionIndex⟩⟩, pathSyntax, none, false,
+          module.file⟩
   let targets := targets ++ writers
   if targets.isEmpty then return
   let visited ← IO.mkRef (#[] : Array String)
   let covered ← IO.mkRef (#[] : Array String)
-  stageLog s!"module {pathName segments}: verification start"
+  stageLog s!"module {moduleNamespace}: verification start"
   for target in targets do verifyInOrder unit segments opens targets visited covered target
-  stageLog s!"module {pathName segments}: verification done"
+  stageLog s!"module {moduleNamespace}: verification done"
+
+/-- The path of a module command. -/
+private def modulePath (stx : Syntax) : CommandElabM Syntax := do
+  let some pathSyntax := stx.getArgs.find? (·.isOfKind ``verexPathSyntax)
+    | throwErrorAt stx "a Verex namespace requires a path"
+  return pathSyntax
+
+/-- Verify a deferred module from its command's items and those of `proofs`,
+its proof file's `verex proofs where` command, elaborated in this command's
+file. -/
+def verifyDeferredModule (module : DeferredModule) (proofs : Syntax) : CommandElabM Unit :=
+    Perf.withPhase .certification do
+  let file : ParsedFile := module.file
+  let document : ParsedFile := { name := ← getFileName, map := ← getFileMap, document := true
+                                 infoTrees := (← getInfoState).enabled }
+  let pathSyntax ← inParsedFile file (modulePath module.command)
+  verifyModuleItems pathSyntax #[{ stx := module.command, file }, { stx := proofs, file := document }]
+  modifyEnv (markVerified · module.name)
+
+/-- Elaborate a Verex namespace command and register its module, then verify
+it (`verifyModuleItems`), unless its verification is deferred to its proof
+file. This registration shadows the plain namespace elaborator. -/
+@[command_elab verexNamespaceCommand, command_elab verexMoveModuleCommand,
+  command_elab verexRustNamespaceCommand]
+def elaborateNamespaceWithVerification : CommandElab := fun stx =>
+    Perf.withPhase .certification do
+  VerexSL.elaborateNamespaceWith invariantRelatedModules stx
+  stageLog "module elaborated"
+  -- Its module is registered at its canonical path.
+  let stx ← match VerexSL.canonicalMoveCommand (← getEnv) stx with
+    | .ok (canonical, _) => pure canonical
+    | .error (location, message) => throwErrorAt location message
+  let pathSyntax ← modulePath stx
+  -- A recursive specification function is a definition of the module.
+  let segments := pathSegments pathSyntax
+  let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments) | return
+  unless (recursiveSpecFunctions unit).isEmpty do
+    let twins ← SpecTypes.ensureSpecTypes segments unit
+    liftTermElabM (ensureSpecFunctionDefinitions unit twins)
+  let proofFile := unit.namespaces[0]? >>= proofFile?
+  let deferred := match getDeferral (← getEnv), proofFile with
+    | .all, _ => true
+    | .proofFiles files, some file => files.contains file
+    | _, _ => false
+  if deferred then
+    let name := pathName segments
+    let module : DeferredModule :=
+      { name, command := stx, file := { name := ← getFileName, map := ← getFileMap }, proofFile }
+    modifyEnv (deferredExtension.modifyState · (·.insert name module))
+    return
+  verifyModuleItems pathSyntax #[{ stx }]
 
 
 /-- The `verify` item or command at `cursor` within `stx`. -/

@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "capability.move"
+verex proofs where
+
 open VerexIR.Proofs.Denote
 
 -- Transport of a concrete address is the identity, including when partially

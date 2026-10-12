@@ -81,7 +81,7 @@ private unsafe def elaborateFile (path : System.FilePath) : IO (Array Message) :
 
 /-- Verify a Move package's modules or a Rust file through its frontend. -/
 private def verifySource (request : Request) : IO (Array Message) := do
-  let environment ← Perf.withPhase .load SourceVerify.importVerexSL
+  let environment ← Perf.withPhase .load VerexMove.SourceVerify.importEnvironment
   IO.FS.withTempDir fun directory => do
     let output := directory / "rendering.lean"
     let reports ← match request.kind with

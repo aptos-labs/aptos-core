@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "pool_u64.move"
+verex proofs where
+
 -- Relate the shares computed in the pre-state to the summaries at the
 -- add_shares call after the pool totals have changed.
 verify buy_in by
