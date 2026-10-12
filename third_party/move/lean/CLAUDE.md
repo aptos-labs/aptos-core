@@ -154,8 +154,9 @@ Executed or superseded designs move to
 `certifying-execution.md`, `generic-route.md`, and
 `verification-perf-audit.md`, all replaced by `denotation.md`;
 `test-organization.md` and `test-organization-history.md`, the earlier
-check ledger, replaced by the roadmap's test ledger); they are reference
-only and are not updated.
+check ledger, replaced by the roadmap's test ledger; `handoff-2026-10.md`,
+the handoff's session notes to 2026-10-11); they are reference only and are
+not updated.
 
 ### Verex Move source and verification (deprecated packages)
 

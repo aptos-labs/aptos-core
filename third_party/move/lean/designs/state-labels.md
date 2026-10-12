@@ -195,8 +195,8 @@ splits at call boundaries.
     projections through opaque contracts, and function-valued parameters;
     `InvocationStateLabelErrors` rejects an always-aborting call's false
     no-abort claim. The Prover's `aborting_result_definition` now fails its
-    intended clauses; `aborts_if_at_state_label::caller` reaches verification
-    but exceeds its 25k heartbeat budget.
+    intended clauses; `aborts_if_at_state_label::caller` verifies within its
+    25k heartbeat budget (since 2026-10-07).
     Functional `update_field` values are now carried in label definitions.
     Lowering `old(e)` switches to the range's pre-state before lowering `e`;
     an old-only read in a definition of `..S` must not introduce a dependency

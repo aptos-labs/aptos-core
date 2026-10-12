@@ -239,7 +239,7 @@ all 437 registry baseline checks without refresh. It includes the product-fold
 endpoint guard below. The benchmark preserves 30 verified + one expected AMM
 rejection at 15,061,197,787 raw heartbeats (4.03% below the preceding full run);
 measured JSON and main-relative HTML are refreshed before the suites. See
-`/tmp/pool-final-checkpoint.log` (exit 0) and handoff.md. Matching registry
+`/tmp/pool-final-checkpoint.log` (exit 0) and `historical/handoff-2026-10.md`. Matching registry
 baselines does not mean all registry specifications are verified: the remaining
 unsupported constructs, intended rejections and timeouts below remain open.
 
@@ -288,7 +288,7 @@ verifies using only the labeled contract (11.577M typed heartbeats); a wrong
 update remains rejected. The owning runner removed the obsolete baseline;
 both cost gates and all focused label checks pass. The refreshed benchmark
 retains 30 verified + one expected rejection at 15,696,214,192 raw heartbeats.
-All four full suites and all 437 registry checks subsequently pass (handoff.md).
+All four full suites and all 437 registry checks subsequently pass (`historical/handoff-2026-10.md`).
 
 `intermediate_states::test_config_preserved` now verifies at native 25k
 (2026-10-07), with 8.794M typed raw heartbeats. Conditional equalities for
@@ -301,7 +301,7 @@ original baseline again after restricting call-observation eligibility to
 direct facts. All four full suites passed just before these follow-ups;
 the subsequent benchmark preserves 30 verified + one expected rejection at
 15,676,741,907 raw heartbeats, and the full registry matches 437/437 baselines
-(handoff.md).
+(`historical/handoff-2026-10.md`).
 
 `aborts_if_at_state_label::caller` and `aliasing::remove_then_try_read` now
 verify at the native 25k limit (2026-10-07). A bounded attempt consumes existing
@@ -310,7 +310,7 @@ first target uses 20.251M typed raw heartbeats; the registered fixture covers
 an opaque caller and an intended false-postcondition rejection. Both cost
 gates and decoding/witness fixtures pass. At that checkpoint test_config_preserved
 stopped timing out but still left its result equality; the follow-up above
-resolves it. Owning-runner baselines are refreshed (handoff.md).
+resolves it. Owning-runner baselines are refreshed (`historical/handoff-2026-10.md`).
 
 `spec_fun_old_param_labeled_with_memory` now verifies at the native 25k limit
 (2026-10-07). Constructive/context witnesses precede the program-point search,
@@ -649,8 +649,8 @@ vacuous; Verex does not accept it.
 
 Example (`functional/verify_vector.move`, `verify_contains_with_unroll`):
 the Prover verifies the assertion after the loop for vectors of at most
-three elements; Verex reports `the assertion `!(∃ (x in v), x == e)`
-does not hold`.
+three elements; Verex exhausts its 25k budget before the loop's exhausted
+bound is reported, since each iteration's return path is taken first.
 
 Tests: `functional/loop_unroll.move`, `functional/verify_vector.move`
 (`verify_append_with_unroll`, `verify_contains_with_unroll`,
@@ -1243,7 +1243,7 @@ their variant (`nativeOf?`); `two` and `write_ss_unchanged` fail as the
 Prover does. What remains:
 
 - `discarded_mut_ref_result` exceeds the budget: `run` verifies at 400k
-  (99M heartbeats against the 25M a 25k budget allows). The call to
+  (43.5M heartbeats against the 25M a 25k budget allows). The call to
   `increment`, a target returning `&mut S`, discards that result: validation
   holds it in a local of its own (`holdMutableReferences`,
   [`prophetic-references.md`](prophetic-references.md), "Unheld results"),
@@ -1392,7 +1392,7 @@ with the same type or prophecy value would be unsound.
 |---|---|
 | `functional/bitwise_features.move` | `set` (budget), `disable_feature_flags` (budget) |
 | `functional/bug-17117.move` | `get_s_error` (budget), `get_s_no_error` (budget), `test_input_param_as_mut_ref` |
-| `functional/bug_15044.move` | `compare_u8_vector` |
+| `functional/bug_15044.move` | `compare_u8_vector` (budget) |
 | `functional/bug_15880.move` | `test2` |
 | `functional/closures/amm_example.move` | `constant_product_with_fee` (budget), `constant_product_with_fee_non_compliant` (budget), `swap` (budget), `create_constant_product_pool` (budget), `create_compliant_fee_pool` (budget) |
 | `functional/closures/behavioral_predicates_examples.move` | `contains_test_not_found` (budget), `contains_opaque_test_not_found`, `index_test_found` (budget), `index_opaque_test_found`, `reduce_test_ok` (budget), `reduce_opaque_test_ok` |
@@ -1415,7 +1415,7 @@ with the same type or prophecy value would be unsound.
 | `functional/nested_loop_inv.move` | `assert_no_duplicate` (budget) |
 | `functional/specs_in_fun_ref.move` | `simple7`: in-body assertion reads emptied reference slot after move (not a timeout) |
 | `functional/state_labels/unmodified_memory_at_label.move` | `swap` (a read after removal; Boogie retains absent resource contents) |
-| `functional/verify_vector.move` | `verify_reverse` (budget), `verify_reverse_with_unroll` (budget), `verify_append` (budget), `verify_append_with_unroll`, `verify_index_of_with_unroll`, `verify_contains_with_unroll`, `verify_remove` (budget), `verify_remove_with_unroll` (budget) |
+| `functional/verify_vector.move` | `verify_reverse` (budget), `verify_reverse_with_unroll` (budget), `verify_append` (budget), `verify_append_with_unroll` (budget), `verify_index_of_with_unroll` (budget), `verify_contains_with_unroll` (budget), `verify_remove` (budget), `verify_remove_with_unroll` (budget) |
 | `regression/behavior_axiom_target_field.move` | `same_type_quantified`, `fun_inst` (unsupported quantified field-validity domain; V25) |
 | `regression/generic_aliasing_all_partitions.move` | `true_in_every_case` (budget), `never_alias` (budget) |
 | `regression/generic_aliasing_ghost_params.move` | `seven_writes` (budget), `nine_writes_generic` (budget) |

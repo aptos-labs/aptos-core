@@ -38,7 +38,7 @@ quotient/remainder constraints. `verex_ground_arithmetic` first rewrites
 the target using only Int/Nat equalities to literals, then uses the existing
 closed-goal decision tactic. It does not rewrite the full context or admit
 symbolic equalities as rules. The source and cost evidence is recorded in the
-roadmap/handoff; `ArithmeticContext` includes false-claim and unresolved-input
+roadmap and `historical/handoff-2026-10.md`; `ArithmeticContext` includes false-claim and unresolved-input
 controls as well as a low-budget nested-modular regression.
 
 Heartbeats do not show the largest cost: the kernel checks without
@@ -215,6 +215,11 @@ ones; any it lists that the change did not mean to touch is a regression.
 | Precompiling `VerexIR` (`precompileModules`) | no gain; cross-library dynlib load error |
 | Equation lemmas without the unfolding fallback | `break_with_returned_pair` fails (the `call` index mismatch above) |
 | A per-view table of native types in `CompileNamespace`, so `compiled_eq` would stop re-deriving types | 1% fewer unfolds in `compiled_eq`, same time; the Check suite went from 621s to 633s, because the view certificate derives every type, including unused ones |
+| Behavior dispatch (2026-10-06, derivation 7.8M of 28.4M): a sibling proof cache, deriving before the split, a 500k bare `simp`, no derivation for manual proofs, a 1.5M sub-budget | the cache saves 0.18M; deriving first is slower; the bare `simp` times out; skipping derivation breaks higher-order callers; 1.5M narrowly misses (2M kept) |
+| Batching forall introductions in `Solve.splitOnce` | splits 79 → 12, cost 28.44M → 28.38M |
+| `StateOf` and `RuntimeValue.asBool` irreducible, with a Boolean-read lemma | no effect |
+| An arithmetic-only normalization discharger | no gain |
+| An unconditional prefix formula for `vector_hofs_fold::count_even_concrete` | still times out |
 
 ## Where the cost is now
 
@@ -2058,7 +2063,7 @@ StateLabels retains byte-identical intended-negative diagnostics. The regular
 benchmark retains 30 verified + one expected rejection, no timeouts, at
 15,647,293,919 raw heartbeats (+164,359, +0.00105%). Main-relative JSON/HTML
 were refreshed before the broad checkpoint: all four builds/full suites and
-437/437 registry baseline checks pass (handoff.md).
+437/437 registry baseline checks pass (`historical/handoff-2026-10.md`).
 Scratch-only alternatives: contradictory-branch checks cost more; moving the
 point search only after arithmetic synthesis gives 27.735M; the fully delayed
 scratch version gives 24.670M (native production measurement above is authoritative).
@@ -2104,7 +2109,7 @@ opaque caller, and a rejected false postcondition. Both cost gates and existing
 decoding/witness fixtures pass. The regular benchmark retains 30 verified + one
 expected rejection at 15,677,942,351 raw heartbeats (+33,195,672, +0.2122%).
 Measured JSON and main-relative HTML refreshed before broad suites; those suites
-are running (handoff.md).
+are running (`historical/handoff-2026-10.md`).
 
 
 ### Shared Boolean observations and direct-call eligibility (2026-10-07)
@@ -2151,7 +2156,7 @@ update is still rejected. Both cost gates, all five label fixtures, and the
 two conditional-cycle regressions pass. The regular benchmark preserves 30
 verified + one expected rejection at 15,696,214,192 raw heartbeats (+0.1242%).
 Main-relative HTML is regenerated. All four full suites and all 437 registry
-baseline checks subsequently pass; see handoff.md and `/tmp/aliasing-observations-*`.
+baseline checks subsequently pass; see `historical/handoff-2026-10.md` and `/tmp/aliasing-observations-*`.
 
 ## Optional integer reads and sum folds (2026-10-07)
 

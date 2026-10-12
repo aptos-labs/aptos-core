@@ -120,18 +120,19 @@ before arithmetic search fixes a nested-spec-call timeout: 763,888 raw heartbeat
 instead of exhausting approximately 1.5G. All four full Lean suites pass,
 including performance gates. `math_fixed8` gets past import but still exhausts
 the registry's proof budget; the then-ignored unroll pragma is corrected in the
-focused checkpoint described in the handoff, with performance still open. Representation
+focused checkpoint described in `historical/handoff-2026-10.md`, with performance still open. Representation
 guards decrease from 27 to 26. The benchmark/main HTML was refreshed first:
 24 verified, one expected rejection, six import failures, 9,516,016,778 raw
 heartbeats. All 437 normal registry checks pass after recording the newly exposed
 math_fixed8 timeout; this is not a claim that its three functions verify.
-The remaining obligation-preparation issue is recorded in the handoff.
+The remaining obligation-preparation issue is recorded in `historical/handoff-2026-10.md`.
 The Move Prover's bit-vector representation is no longer modeled (user
 decision 2026-10-07, G14): spec arithmetic stays mathematical and `int2bv` is
 exact. The representation guard is gone and all six affected benchmark modules
 verify again (30 verified, one expected rejection). Width-less `int2bv`
-(contextual width) and several newly exposed registry gaps are open; see the
-handoff.
+reads `num` as `u64` since 2026-10-08; at a type parameter it awaits a decision
+(see the handoff), and the registry gaps it exposed are in
+`prover-test-problems.md`.
 
 The subsequent checkpoint adds sound bounded unrolling. Literal arithmetic
 results are no longer named, so ground nested unrolling verifies at 25k; an
@@ -230,7 +231,7 @@ has 24 verified, one expected rejection and six import failures at 9.510G raw
 heartbeats. This reflects reduced coverage, not a speed improvement. The
 affected modules are `features`, `cmp`, `math_fixed`, `ristretto255`, `ed25519`
 and framework `ordered_map`; authored VerexSL `OrderedMap` still verifies.
-Thirty registry files now stop at this boundary. See handoff.md.
+Thirty registry files now stop at this boundary. See `historical/handoff-2026-10.md`.
 
 Preceding validation (2026-10-07): all four full suites and all 437 registry
 baseline checks pass after the conditional-range change. That benchmark had
@@ -308,7 +309,7 @@ Open:
   facts but cannot drive recursive simplification. Focused cost/label checks
   pass. The refreshed benchmark preserves 30 verified + one expected rejection
   at 15,696,214,192 raw heartbeats (+0.1242%). All four full suites and all 437
-  registry baseline checks subsequently pass (handoff.md).
+  registry baseline checks subsequently pass (`historical/handoff-2026-10.md`).
   Optional certified integer reads now normalize with their actual fallback.
   LiteralOptionalReads covers signed/unsigned and symbolic values. The native
   vector_hofs_fold sum_concrete, sum_inferred, and sum_scaled verify at 25k
@@ -316,7 +317,7 @@ Open:
   The following range-bound congruence fix also verifies product_concrete
   (23.961M whole typed heartbeats); even-count remains open. Positive and
   missing-premise regressions and both cost gates pass; its benchmark/registry
-  refresh is running (handoff.md).
+  refresh is running (`historical/handoff-2026-10.md`).
   An existential is witnessed by the hypothesis stating its body, by a
   context variable, by a written position, or by a position a lookup fact
   reads, its premises decided by the context (`verex_witness`,
@@ -490,7 +491,7 @@ Open:
   (−11.9749%), with 21,500 proof objects instead of 22,076. The diagnostic sample
   includes work outside the local proof-budget scope. Both cost gates, all
   Table invariant positives/rejections, the identity guard, call-range cases,
-  TableReads and TableSnapshots pass (`handoff.md`). The field optimization is
+  TableReads and TableSnapshots pass (`historical/handoff-2026-10.md`). The field optimization is
   restricted to known aggregates so generic observations retain their old form.
   The first normalization benchmark exposed an ordered_map/OrderedMap
   regression, so the checkpoint correctly stopped before broad suites. The
@@ -500,7 +501,7 @@ Open:
   15,646,929,683 heartbeats. Main-relative JSON/HTML are refreshed first. All
   four builds and full suites pass; all 437 registry baselines match without
   refresh. Final Table theorem cost with the guard restored is 26,045,418
-  raw heartbeats and 21,500 objects; native 25k verification passes (`handoff.md`).
+  raw heartbeats and 21,500 objects; native 25k verification passes (`historical/handoff-2026-10.md`).
   The preceding call-range checkpoint passes all four full suites and all
   437 registry baselines. The subsequent computed-index benchmark preserves
   30 verified problems plus one expected AMM rejection at 15,646,803,818
@@ -781,14 +782,14 @@ missing-resource rejection and overflowing-update rejection. All 30 labeled
 registry baselines and both cost gates pass. The regular benchmark passes with
 30 verified + one expected rejection at 15,647,129,560 heartbeats (+0.0013%).
 Main-relative JSON/HTML are refreshed; the prior checkpoint is the latest
-full-suite validation (`handoff.md`).
+full-suite validation (`historical/handoff-2026-10.md`).
 The witness-search follow-up verifies `spec_fun_old_param_labeled_with_memory`
 at 25k (24.132M typed heartbeats, down from 30.912M). Constructive/context
 witnesses precede program points; `StateLabelWitnesses`, all 30 state-label
 registry checks and both cost gates pass. The benchmark retains 30 verified
 + one expected rejection at 15,647,293,919 heartbeats (+0.00105%). Main-relative
 JSON/HTML were refreshed before all four builds/full suites and 437/437
-registry checks passed (`handoff.md`).
+registry checks passed (`historical/handoff-2026-10.md`).
 Open: the proof budget of `aborts_if_at_state_label::caller`, reads of removed
 resource contents (`unmodified_memory_at_label::swap`, see the design), S4.
 
