@@ -4,8 +4,9 @@
 import LeanerE2ETests.CheckSupport
 
 /-! Control and expression forms: early exits, conditions, branches and
-matches with effects, compound locals, and ranges. Arithmetic failures carry
-the VM's computed payload. -/
+matches with effects, compound locals, and ranges. Ordinary Move arithmetic
+raises a VM error (specification code -1); explicit checked-abort operations
+retain their computed abort payload. -/
 
 leaner module 0x42::control_forms where
   struct Box has Copy, Drop, Store where
@@ -51,7 +52,7 @@ leaner module 0x42::control_forms where
     if value + 1 < 2 then 1 else 0
   spec arithmetic_condition where
     ensures result == if value == 0 then 1 else 0
-    aborts_if value + 1 > MAX_U64 with value + 1
+    aborts_if value + 1 > MAX_U64 with -1
 
   fun explicit_arithmetic_condition(value : u64) -> u64 :=
     if core.prim.checkedAddAbort(value, 1) < 2 then 1 else 0
@@ -71,7 +72,7 @@ leaner module 0x42::control_forms where
   fun embedded(value : u64) -> Box := new Box { value := value + 1 }
   spec embedded where
     ensures result.value == value + 1
-    aborts_if value + 1 > MAX_U64 with value + 1
+    aborts_if value + 1 > MAX_U64 with -1
 
   fun short_circuit_and(value : u64) -> u64 :=
     if value == 0 && value + 1 == 2 then 1 else 0
@@ -89,7 +90,7 @@ leaner module 0x42::control_forms where
     core.prim.logicalAnd(false, value + 1 == 0)
   spec eager_core_and where
     ensures result == false
-    aborts_if value + 1 > MAX_U64 with value + 1
+    aborts_if value + 1 > MAX_U64 with -1
 
   -- ## Branches and matches with effects
 
@@ -97,7 +98,7 @@ leaner module 0x42::control_forms where
     if flag then value + 1 else 0
   spec branch_effect where
     ensures result == if flag then value + 1 else 0
-    aborts_if flag && value + 1 > MAX_U64 with value + 1
+    aborts_if flag && value + 1 > MAX_U64 with -1
 
   fun match_effect(flag : Bool, value : u64) -> u64 :=
     match flag with
@@ -105,7 +106,7 @@ leaner module 0x42::control_forms where
       | false => 0
   spec match_effect where
     ensures result == if flag then value + 1 else 0
-    aborts_if flag && value + 1 > MAX_U64 with value + 1
+    aborts_if flag && value + 1 > MAX_U64 with -1
 
   fun match_two(left : Bool, right : Bool) -> u64 :=
     match (left, right) with
@@ -225,7 +226,7 @@ run_cmd do
     ⟨"short_circuit_and", #[.integer 18446744073709551615], .returned #[.integer 0], {}⟩,
     ⟨"branch_effect", #[.bool false, .integer 18446744073709551615], .returned #[.integer 0], {}⟩,
     ⟨"branch_effect", #[.bool true, .integer 5], .returned #[.integer 6], {}⟩,
-    ⟨"branch_effect", #[.bool true, .integer 18446744073709551615], .threw .abort #[.integer 18446744073709551616], {}⟩,
+    ⟨"branch_effect", #[.bool true, .integer 18446744073709551615], .threw LeanerIR.moveArithmeticError #[.integer 18446744073709551616], {}⟩,
     ⟨"match_effect", #[.bool false, .integer 18446744073709551615], .returned #[.integer 0], {}⟩,
     ⟨"match_effect", #[.bool true, .integer 5], .returned #[.integer 6], {}⟩,
     ⟨"match_two", #[.bool true, .bool true], .returned #[.integer 2], {}⟩,
@@ -247,9 +248,9 @@ run_cmd do
     ⟨"compound_reference", #[], .returned #[.integer 5], {}⟩,
     ⟨"range_empty", #[], .returned #[.integer 0], {}⟩,
     ⟨"range_once_runtime", #[], .returned #[.integer 4], {}⟩,
-    ⟨"index_arithmetic", #[.integer 18446744073709551615], .threw .abort #[.integer 18446744073709551616], {}⟩,
+    ⟨"index_arithmetic", #[.integer 18446744073709551615], .threw LeanerIR.moveArithmeticError #[.integer 18446744073709551616], {}⟩,
     ⟨"short_circuit_or", #[.integer 18446744073709551615], .returned #[.bool true], {}⟩,
     ⟨"short_circuit_or", #[.integer 1], .returned #[.bool true], {}⟩,
     ⟨"short_circuit_or", #[.integer 0], .returned #[.bool false], {}⟩,
     ⟨"eager_core_and", #[.integer 0], .returned #[.bool false], {}⟩,
-    ⟨"eager_core_and", #[.integer 18446744073709551615], .threw .abort #[.integer 18446744073709551616], {}⟩]
+    ⟨"eager_core_and", #[.integer 18446744073709551615], .threw LeanerIR.moveArithmeticError #[.integer 18446744073709551616], {}⟩]

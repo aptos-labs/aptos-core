@@ -511,7 +511,9 @@ mutual
     let kind ← strField j "kind"
     let node ← ctx s!"`{kind}` node" do
       match kind with
-      | "value" => return .value (← fieldWith j "value" decodeValue) (← optFieldWith j "constant" str)
+      | "value" =>
+          return .value (← fieldWith j "value" decodeValue)
+            (← optFieldWith j "constant" str) ((← optFieldWith j "defaulted_num" bool).getD false)
       | "local" => .local <$> strField j "name"
       | "param" => .param <$> natField j "index"
       | "call" =>

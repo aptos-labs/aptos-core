@@ -54,6 +54,8 @@ leaner module 0x42::recursive_spec where
           split <;> omega
 
   verify first_is by
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
     intro first
     refine count_first _ _ _ _ rfl (by omega) ?_
     simp [LeanerIR.RuntimeValue.field, ‹values.values[0]? = some _›, first]

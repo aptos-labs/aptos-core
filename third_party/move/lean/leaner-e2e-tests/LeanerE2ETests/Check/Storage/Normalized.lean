@@ -7,7 +7,7 @@ import LeanerLang
 # Storage verification on the generic route
 
 The storage contracts of `Storage.lean`, verified by normalization: the
-generated body tree computed by `leaner_normalize`, the resources exposed
+generated body tree computed by normalization, the resources exposed
 and the writes represented from the context, and the certified closing
 over the normal form — one theorem shape for every body, with no plan and
 no per-shape law.  The module is the same; only the route differs.

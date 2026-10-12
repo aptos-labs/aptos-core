@@ -13,6 +13,8 @@ theorem sqrt_fits_u64 {r s : Int} (zero : s = 0 → r = 0) (square : 0 < s → r
     omega
 
 verify sqrt by
-  case leaf_1 =>
+  leaner_obligations
+  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  case aborts_if_1_3 =>
     have := sqrt_fits_u64 (r := result.val) ‹_› ‹_› (by omega) (by omega) (by omega)
     omega

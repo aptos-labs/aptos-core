@@ -127,7 +127,7 @@ leaner module std::bit_vector where
     aborts_if bit_index >= self.length() with EINDEX
     ensures result == self.bit_field[bit_index]
 
-  spec fun spec_is_index_set(self : BitVector, bit_index : Int) : Bool :=
+  spec fun spec_is_index_set(self : BitVector, bit_index : u64) : Bool :=
     if bit_index >= self.length() then false else self.bit_field[bit_index]
 
   /--

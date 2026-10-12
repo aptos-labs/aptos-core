@@ -68,12 +68,19 @@ leaner module 0x99::calls where
     ensures global<Counter>(addr).value == old(global<Counter>(addr).value) + amount
     aborts_if old(global<Counter>(addr).value) + amount > MAX_U64
 
+  -- A caller owes the preconditions of the functions it calls.
   public entry fun add_twice(addr : Address, amount : u64) -> Unit :=
     add_to(addr, twice(amount))
+  spec add_twice where
+    requires exists<Counter>(addr)
+    modifies global<Counter>(addr)
 
   public entry fun add_twice_then_one(addr : Address, amount : u64) -> Unit := do
     add_twice(addr, amount)
     add_to(addr, 1)
+  spec add_twice_then_one where
+    requires exists<Counter>(addr)
+    modifies global<Counter>(addr)
 
   public fun read_counter(addr : Address) -> u64 := Counter[addr].value
   spec read_counter where
@@ -82,6 +89,8 @@ leaner module 0x99::calls where
     aborts_if false
 
   public fun forwarded_read(addr : Address) -> u64 := read_counter(addr)
+  spec forwarded_read where
+    requires exists<Counter>(addr)
 
 /-! ## Recursive helpers
 

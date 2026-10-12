@@ -1,11 +1,10 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ModifiesSchemaTest.move:2:1: error: verification failed with a residual obligation:
+tests/sources/functional/ModifiesSchemaTest.move:33:5: error: verification failed with a residual obligation:
 case h_2.continues.left.isTrue
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
 prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
 addr1 addr2 : LeanerIR.Proofs.Denote.NTy.address.carrier
-snd✝² : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 initialState✝ : LeanerIR.Proofs.Denote.Memory unit
 assumed permitted : True
 leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
@@ -129,7 +128,6 @@ x✝² :
         LeanerIR.Proofs.Denote.NRow.nil))
 invariantHolds✝¹ : True
 fst✝¹ : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
-snd✝¹ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 heq✝¹ :
   initialState✝
       {
@@ -140,7 +138,8 @@ heq✝¹ :
               LeanerIR.Proofs.Denote.NRow.nil),
         arguments := LeanerIR.Proofs.Denote.NRow.nil }
       (LeanerIR.StorageKey.address addr1) =
-    some (fst✝¹, snd✝¹)
+    some (fst✝¹, PUnit.unit)
+snd_eq✝¹ : (fst✝¹, PUnit.unit).snd = PUnit.unit
 leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
       (LeanerIR.Proofs.Denote.NRow.cons
@@ -198,7 +197,7 @@ leanerAnchor :
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               LeanerIR.Proofs.Denote.NRow.nil),
         arguments := LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, snd✝¹)))
+      (LeanerIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, PUnit.unit)))
 leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.address
       (LeanerIR.Proofs.Denote.NRow.cons
@@ -247,9 +246,8 @@ x✝¹ :
         LeanerIR.Proofs.Denote.NRow.nil))
 invariantHolds✝ : True
 fst✝ : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
-snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 heq✝ :
-  (if addr2 = addr1 then some ({ val := 2, fits := ⋯ }, snd✝¹)
+  (if addr2 = addr1 then some ({ val := 2, fits := ⋯ }, PUnit.unit)
     else
       initialState✝
         {
@@ -260,11 +258,12 @@ heq✝ :
                 LeanerIR.Proofs.Denote.NRow.nil),
           arguments := LeanerIR.Proofs.Denote.NRow.nil }
         (LeanerIR.StorageKey.address addr2)) =
-    some (fst✝, snd✝)
+    some (fst✝, PUnit.unit)
+snd_eq✝ : (fst✝, PUnit.unit).snd = PUnit.unit
 key : LeanerIR.StorageKey
 x✝ : ¬key = LeanerIR.StorageKey.address addr1
 h✝ : key = LeanerIR.StorageKey.address addr2
-⊢ some ({ val := 2, fits := ⋯ }, snd✝) =
+⊢ some ({ val := 2, fits := ⋯ }, PUnit.unit) =
     initialState✝
       {
         type :=
@@ -274,4 +273,4 @@ h✝ : key = LeanerIR.StorageKey.address addr2
               LeanerIR.Proofs.Denote.NRow.nil),
         arguments := LeanerIR.Proofs.Denote.NRow.nil }
       key
-tests/sources/functional/ModifiesSchemaTest.move:33:5: error: leaner verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof: `verify mutate_at_wrapper2 by …` in `tests/sources/functional/ModifiesSchemaTest.proof.lean` (`verify mutate_at_wrapper2 by skip` shows the obligations it leaves)
+tests/sources/functional/ModifiesSchemaTest.move:33:5: error: leaner verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof: `verify mutate_at_wrapper2 by …` in `tests/sources/functional/ModifiesSchemaTest.proof.lean` (`verify mutate_at_wrapper2 by leaner_obligations` lists its obligations)

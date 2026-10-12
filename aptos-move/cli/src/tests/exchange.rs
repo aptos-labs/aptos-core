@@ -447,7 +447,8 @@ module 0x42::count_down {
 fn module_selection_reads_code_types_and_invariants() {
     // `a` calls `b` by its qualified name, without a `use`; mentions `c`'s
     // struct in a signature; `d` constrains `c`'s memory by a global
-    // invariant; nothing reaches `unrelated`.
+    // invariant; `a`'s specification calls `e`'s function; nothing reaches
+    // `unrelated`.
     let source = r#"
 module 0x42::b {
     public fun f(): u64 { 1 }
@@ -460,9 +461,15 @@ module 0x42::d {
         invariant forall addr: address: exists<0x42::c::R>(addr) ==> exists<0x42::c::R>(@0x42);
     }
 }
+module 0x42::e {
+    public fun code(): u64 { 3 }
+}
 module 0x42::a {
     public fun g(): u64 { 0x42::b::f() }
     public fun h(_r: &0x42::c::R) {}
+    spec g {
+        aborts_if false with 0x42::e::code();
+    }
 }
 module 0x42::unrelated {
     public fun k(): u64 { 2 }
@@ -480,7 +487,7 @@ module 0x42::unrelated {
         .into_iter()
         .map(|id| env.get_module(id).get_full_name_str())
         .collect();
-    let expected: BTreeSet<String> = ["0x42::a", "0x42::b", "0x42::c", "0x42::d"]
+    let expected: BTreeSet<String> = ["0x42::a", "0x42::b", "0x42::c", "0x42::d", "0x42::e"]
         .into_iter()
         .map(String::from)
         .collect();

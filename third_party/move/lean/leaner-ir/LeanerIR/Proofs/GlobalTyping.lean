@@ -707,7 +707,7 @@ semantic type a type identifier resolves to is one its native type reads
 as, and the native type is closed and holds no reference; where it states a
 function type, the unit's readings agree. -/
 def ResourcesTyped (unit : ValidatedUnit) : Prop :=
-  ∀ namespaceId typeId resource, resourceOf unit namespaceId typeId = some resource →
+  ∀ namespaceId typeId resource, runtimeResourceOf unit namespaceId typeId = some resource →
     ∃ ns type, unit.namespaces[namespaceId.index]? = some ns ∧
       Resolves ns.tables #[] typeId type ∧ resource.type.TypedAs unit type ∧
       resource.type.paramFree = true ∧ resource.type.refFree = true ∧
@@ -717,7 +717,7 @@ def ResourcesTyped (unit : ValidatedUnit) : Prop :=
 given whether the unit's readings agree. -/
 def resourceTypedCheck (unit : ValidatedUnit) (agree : Bool) (namespaceId : NamespaceId)
     (ns : ValidatedNamespace) (typeId : TypeId) : Bool :=
-  match resourceOf unit namespaceId typeId with
+  match runtimeResourceOf unit namespaceId typeId with
   | none => true
   | some resource =>
       resource.type.paramFree && resource.type.refFree && (resource.type.closureFree || agree) &&
@@ -736,10 +736,10 @@ def resourcesTypedCheck (unit : ValidatedUnit) : Bool :=
         resourceTypedCheck unit (typesAgreeCheck unit) ⟨index⟩ ns ⟨typeIndex⟩
 
 /-- A type identifier outside its namespace's table denotes no resource. -/
-theorem resourceOf_beyond {unit : ValidatedUnit} {namespaceId : NamespaceId} {ns : ValidatedNamespace}
+theorem runtimeResourceOf_beyond {unit : ValidatedUnit} {namespaceId : NamespaceId} {ns : ValidatedNamespace}
     (namespace_eq : unit.namespaces[namespaceId.index]? = some ns) {typeId : TypeId}
-    (beyond : ns.tables.types.size ≤ typeId.index) : resourceOf unit namespaceId typeId = none := by
-  simp [resourceOf, unitTypes, namespace_eq, Array.getElem?_eq_none beyond]
+    (beyond : ns.tables.types.size ≤ typeId.index) : runtimeResourceOf unit namespaceId typeId = none := by
+  simp [runtimeResourceOf, resourceOf, unitTypes, namespace_eq, Array.getElem?_eq_none beyond]
 
 theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedCheck unit = true) :
     ResourcesTyped unit := by
@@ -747,7 +747,7 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
   have namespaceAt : ∃ ns, unit.namespaces[namespaceIndex]? = some ns := by
     cases namespace_eq : unit.namespaces[namespaceIndex]? with
     | some ns => exact ⟨ns, rfl⟩
-    | none => simp [resourceOf, unitTypes, namespace_eq] at named
+    | none => simp [runtimeResourceOf, resourceOf, unitTypes, namespace_eq] at named
   obtain ⟨ns, namespace_eq⟩ := namespaceAt
   have inNamespaces : namespaceIndex < unit.namespaces.size := by
     rcases Nat.lt_or_ge namespaceIndex unit.namespaces.size with inside | beyond
@@ -756,7 +756,7 @@ theorem ResourcesTyped.ofCheck {unit : ValidatedUnit} (check : resourcesTypedChe
   have inTable : typeIndex < ns.tables.types.size := by
     rcases Nat.lt_or_ge typeIndex ns.tables.types.size with inside | beyond
     · exact inside
-    · rw [resourceOf_beyond (namespaceId := ⟨namespaceIndex⟩) namespace_eq
+    · rw [runtimeResourceOf_beyond (namespaceId := ⟨namespaceIndex⟩) namespace_eq
         (typeId := ⟨typeIndex⟩) beyond] at named
       cases named
   have checked := List.all_eq_true.mp check namespaceIndex (List.mem_range.mpr inNamespaces)

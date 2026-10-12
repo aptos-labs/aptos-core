@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/references.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/references.move:75:5: error: verification failed with a residual obligation:
 case right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -40,4 +40,4 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultSh
 a✝¹ : value.val = 10
 a✝ : value = value✝
 ⊢ False
-tests/sources/functional/references.move:75:5: error: leaner verification failed: the automatic verification of `mut_ref_incorrect` failed; provide a proof: `verify mut_ref_incorrect by …` in `tests/sources/functional/references.proof.lean` (`verify mut_ref_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/references.move:75:5: error: leaner verification failed: the automatic verification of `mut_ref_incorrect` failed; provide a proof: `verify mut_ref_incorrect by …` in `tests/sources/functional/references.proof.lean` (`verify mut_ref_incorrect by leaner_obligations` lists its obligations)

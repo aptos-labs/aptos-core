@@ -81,7 +81,10 @@ private def verifySource (source : System.FilePath) (options : VerifyOptions) : 
   for report in reports do IO.println report.render
   -- The rendering and the wall time per phase are reports on the run, not
   -- its messages.
-  IO.eprintln s!"leaner-move: generated {output}"
+  -- Import errors return reports before a rendering is written. Report its
+  -- path as generated only on success; an existing file may be from an older run.
+  unless reports.any (·.severity == .error) do
+    IO.eprintln s!"leaner-move: generated {output}"
   IO.eprintln s!"leaner-move: {← LeanerLang.Perf.phaseSummary ((← IO.monoNanosNow) - start)}"
   pure <| if reports.any (·.severity == .error) then 1 else 0
 

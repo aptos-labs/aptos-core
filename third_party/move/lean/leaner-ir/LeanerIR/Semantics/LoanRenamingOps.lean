@@ -6,8 +6,8 @@ import LeanerIR.Semantics.LoanRenaming
 /-!
 # Operations commute with renaming loans
 
-Each runtime operation applied to a frame and state with their loans raised
-by an offset is the operation applied to the originals, raised
+Each runtime operation applied to a frame and state with their loans
+renamed injectively is the operation applied to the originals, renamed
 (`designs/static-typing.md`, "Loan independence").
 -/
 
@@ -15,69 +15,69 @@ namespace LeanerIR
 
 open SemanticOperations
 
-variable {offset : Nat}
+variable {ρ : Nat → Nat}
 
 /-! ## Global memory -/
 
-@[simp] theorem GlobalMap.shift_entries (offset : Nat) (globals : GlobalMap) :
-    (globals.shift offset).entries =
-      globals.entries.map fun slot => { slot with value := slot.value.shift offset } := rfl
+@[simp] theorem GlobalMap.rename_entries (ρ : Nat → Nat) (globals : GlobalMap) :
+    (globals.rename ρ).entries =
+      globals.entries.map fun slot => { slot with value := slot.value.rename ρ } := rfl
 
-theorem GlobalMap.lookup_shift (globals : GlobalMap) (key : GlobalKey) :
-    (globals.shift offset).lookup key = (globals.lookup key).map (·.shift offset) := by
+theorem GlobalMap.lookup_rename (globals : GlobalMap) (key : GlobalKey) :
+    (globals.rename ρ).lookup key = (globals.lookup key).map (·.rename ρ) := by
   unfold GlobalMap.lookup
-  simp only [GlobalMap.shift_entries, Array.find?_map, Option.map_map]
+  simp only [GlobalMap.rename_entries, Array.find?_map, Option.map_map]
   rfl
 
-theorem GlobalMap.erase_shift (globals : GlobalMap) (key : GlobalKey) :
-    (globals.erase key).shift offset = (globals.shift offset).erase key := by
-  unfold GlobalMap.erase GlobalMap.shift
+theorem GlobalMap.erase_rename (globals : GlobalMap) (key : GlobalKey) :
+    (globals.erase key).rename ρ = (globals.rename ρ).erase key := by
+  unfold GlobalMap.erase GlobalMap.rename
   simp only [GlobalMap.mk.injEq]
   rw [Array.filter_map]
   rfl
 
-private theorem insertSlot_map (offset : Nat) (slot : GlobalSlot) :
+private theorem insertSlot_map (ρ : Nat → Nat) (slot : GlobalSlot) :
     (entries : List GlobalSlot) →
     (GlobalMap.insertSlot slot entries).map
-        (fun slot => ({ slot with value := slot.value.shift offset } : GlobalSlot)) =
-      GlobalMap.insertSlot { slot with value := slot.value.shift offset }
-        (entries.map fun slot => { slot with value := slot.value.shift offset })
+        (fun slot => ({ slot with value := slot.value.rename ρ } : GlobalSlot)) =
+      GlobalMap.insertSlot { slot with value := slot.value.rename ρ }
+        (entries.map fun slot => { slot with value := slot.value.rename ρ })
   | [] => rfl
   | head :: rest => by
       simp only [List.map_cons, GlobalMap.insertSlot]
       by_cases less : slot.key.rank < head.key.rank
       · simp only [less, ↓reduceIte, List.map_cons]
-      · simp only [less, ↓reduceIte, List.map_cons, insertSlot_map offset slot rest]
+      · simp only [less, ↓reduceIte, List.map_cons, insertSlot_map ρ slot rest]
 
-theorem GlobalMap.insert_shift (globals : GlobalMap) (key : GlobalKey) (value : RuntimeValue) :
-    (globals.insert key value).shift offset = (globals.shift offset).insert key (value.shift offset) := by
+theorem GlobalMap.insert_rename (globals : GlobalMap) (key : GlobalKey) (value : RuntimeValue) :
+    (globals.insert key value).rename ρ = (globals.rename ρ).insert key (value.rename ρ) := by
   unfold GlobalMap.insert
-  rw [← GlobalMap.erase_shift]
-  simp only [GlobalMap.shift, List.map_toArray, GlobalMap.mk.injEq, Array.toList_map]
+  rw [← GlobalMap.erase_rename]
+  simp only [GlobalMap.rename, List.map_toArray, GlobalMap.mk.injEq, Array.toList_map]
   rw [insertSlot_map]
 
 /-! ## Reads and writes -/
 
-theorem readLocal?_shift (frame : RuntimeFrame) (localId : LocalId) :
-    readLocal? (frame.shift offset) localId = (readLocal? frame localId).map (·.shift offset) := by
+theorem readLocal?_rename (frame : RuntimeFrame) (localId : LocalId) :
+    readLocal? (frame.rename ρ) localId = (readLocal? frame localId).map (·.rename ρ) := by
   unfold readLocal?
-  simp only [RuntimeFrame.shift, Array.getElem?_map]
+  simp only [RuntimeFrame.rename, Array.getElem?_map]
   cases frame.locals[localId.index]? with
   | none => rfl
   | some slot => cases slot <;> rfl
 
-theorem readProjections?_shift :
+theorem readProjections?_rename :
     ∀ (projections : List RuntimeProjection) (value : RuntimeValue),
-      readProjections? (value.shift offset) projections =
-        (readProjections? value projections).map (·.shift offset)
+      readProjections? (value.rename ρ) projections =
+        (readProjections? value projections).map (·.rename ρ)
   | [], value => rfl
   | .field index :: rest, value => by
       cases value <;> simp [readProjections?, Array.getElem?_map]
       rename_i fields
-      cases fields[index]? <;> simp [readProjections?_shift rest]
+      cases fields[index]? <;> simp [readProjections?_rename rest]
   | .index index :: rest, value => by
       cases value <;> simp [readProjections?, Array.getElem?_map]
-      all_goals (rename_i elements; cases elements[index]? <;> simp [readProjections?_shift rest])
+      all_goals (rename_i elements; cases elements[index]? <;> simp [readProjections?_rename rest])
   | .subslice start stop fromEnd :: rest, value => by
       cases value <;> simp [readProjections?]
       rename_i elements
@@ -85,7 +85,7 @@ theorem readProjections?_shift :
       | none => rfl
       | some bounds =>
           simp only [Option.bind_some]
-          rw [← Array.map_extract, ← RuntimeValue.shift_vector, readProjections?_shift rest]
+          rw [← Array.map_extract, ← RuntimeValue.rename_vector, readProjections?_rename rest]
           rfl
   | .downcast variant :: rest, value => by
       cases value <;> simp [readProjections?]
@@ -95,15 +95,15 @@ theorem readProjections?_shift :
       | some actual =>
           simp only
           split
-          · rw [← RuntimeValue.shift_nominal, readProjections?_shift rest]
+          · rw [← RuntimeValue.rename_nominal, readProjections?_rename rest]
           · rfl
   | .deref :: rest, value => by
-      cases value <;> simp [readProjections?, readProjections?_shift rest]
+      cases value <;> simp [readProjections?, readProjections?_rename rest]
 
-theorem writeProjections?_shift :
+theorem writeProjections?_rename :
     ∀ (projections : List RuntimeProjection) (value replacement : RuntimeValue),
-      writeProjections? (value.shift offset) projections (replacement.shift offset) =
-        (writeProjections? value projections replacement).map (·.shift offset)
+      writeProjections? (value.rename ρ) projections (replacement.rename ρ) =
+        (writeProjections? value projections replacement).map (·.rename ρ)
   | [], value, replacement => rfl
   | .field index :: rest, value, replacement => by
       cases value <;> simp [writeProjections?, Array.getElem?_map]
@@ -112,7 +112,7 @@ theorem writeProjections?_shift :
       | none => rfl
       | some field =>
           simp only [Option.map_some, Option.bind_some, Function.comp_apply]
-          rw [writeProjections?_shift rest]
+          rw [writeProjections?_rename rest]
           cases writeProjections? field rest replacement <;> simp [Array.map_setIfInBounds]
   | .index index :: rest, value, replacement => by
       cases value <;> simp [writeProjections?, Array.getElem?_map]
@@ -122,7 +122,7 @@ theorem writeProjections?_shift :
         | none => rfl
         | some element =>
             simp only [Option.map_some, Option.bind_some, Function.comp_apply]
-            rw [writeProjections?_shift rest]
+            rw [writeProjections?_rename rest]
             cases writeProjections? element rest replacement <;> simp [Array.map_setIfInBounds]
   | .subslice start stop fromEnd :: rest, value, replacement => by
       cases value <;> simp [writeProjections?]
@@ -132,7 +132,7 @@ theorem writeProjections?_shift :
       | some bounds =>
           obtain ⟨first, last⟩ := bounds
           simp only [Option.bind_some]
-          rw [← Array.map_extract, ← RuntimeValue.shift_vector, writeProjections?_shift rest]
+          rw [← Array.map_extract, ← RuntimeValue.rename_vector, writeProjections?_rename rest]
           simp only [Function.comp_apply]
           cases writeProjections? (.vector (elements.extract first last)) rest replacement with
           | none => rfl
@@ -146,84 +146,84 @@ theorem writeProjections?_shift :
       | some actual =>
           simp only
           split
-          · rw [← RuntimeValue.shift_nominal, writeProjections?_shift rest]
+          · rw [← RuntimeValue.rename_nominal, writeProjections?_rename rest]
           · rfl
   | .deref :: rest, value, replacement => by
       cases value <;> simp [writeProjections?]
       rename_i loan current
-      rw [writeProjections?_shift rest]
+      rw [writeProjections?_rename rest]
       cases writeProjections? current rest replacement <;> simp
 
-@[simp] theorem RuntimeFrame.shift_locals (frame : RuntimeFrame) :
-    (frame.shift offset).locals = frame.locals.map (Option.map (·.shift offset)) := rfl
+@[simp] theorem RuntimeFrame.rename_locals (frame : RuntimeFrame) :
+    (frame.rename ρ).locals = frame.locals.map (Option.map (·.rename ρ)) := rfl
 
-@[simp] theorem RuntimeFrame.shift_typeInstantiation (frame : RuntimeFrame) :
-    (frame.shift offset).typeInstantiation = frame.typeInstantiation := rfl
+@[simp] theorem RuntimeFrame.rename_typeInstantiation (frame : RuntimeFrame) :
+    (frame.rename ρ).typeInstantiation = frame.typeInstantiation := rfl
 
-theorem RuntimeFrame.shift_setLocal (frame : RuntimeFrame) (index : Nat)
+theorem RuntimeFrame.rename_setLocal (frame : RuntimeFrame) (index : Nat)
     (value : Option RuntimeValue) :
-    ({ frame with locals := frame.locals.set! index value } : RuntimeFrame).shift offset =
-      { frame.shift offset with
-        locals := (frame.shift offset).locals.set! index (value.map (·.shift offset)) } := by
-  simp [RuntimeFrame.shift, Array.set!_eq_setIfInBounds, Array.map_setIfInBounds]
+    ({ frame with locals := frame.locals.set! index value } : RuntimeFrame).rename ρ =
+      { frame.rename ρ with
+        locals := (frame.rename ρ).locals.set! index (value.map (·.rename ρ)) } := by
+  simp [RuntimeFrame.rename, Array.set!_eq_setIfInBounds, Array.map_setIfInBounds]
 
 section Roots
 
 variable {frame : RuntimeFrame} {state state₂ : RuntimeState}
-  (globals_eq : state₂.globals = state.globals.shift offset)
+  (globals_eq : state₂.globals = state.globals.rename ρ)
 include globals_eq
 
-theorem readRoot?_shift (root : RuntimePlaceRoot) :
-    readRoot? (frame.shift offset) state₂ root = (readRoot? frame state root).map (·.shift offset) := by
+theorem readRoot?_rename (root : RuntimePlaceRoot) :
+    readRoot? (frame.rename ρ) state₂ root = (readRoot? frame state root).map (·.rename ρ) := by
   cases root with
-  | «local» localId => exact readLocal?_shift frame localId
-  | global key => simp only [readRoot?, globals_eq, GlobalMap.lookup_shift]
+  | «local» localId => exact readLocal?_rename frame localId
+  | global key => simp only [readRoot?, globals_eq, GlobalMap.lookup_rename]
 
-theorem readRuntimePlace?_shift (place : RuntimePlace) :
-    readRuntimePlace? (frame.shift offset) state₂ place =
-      (readRuntimePlace? frame state place).map (·.shift offset) := by
+theorem readRuntimePlace?_rename (place : RuntimePlace) :
+    readRuntimePlace? (frame.rename ρ) state₂ place =
+      (readRuntimePlace? frame state place).map (·.rename ρ) := by
   unfold readRuntimePlace?
-  rw [readRoot?_shift globals_eq]
+  rw [readRoot?_rename globals_eq]
   cases readRoot? frame state place.root with
   | none => rfl
-  | some root => simp [readProjections?_shift]
+  | some root => simp [readProjections?_rename]
 
-theorem writeRoot?_shift (root : RuntimePlaceRoot) (value : RuntimeValue) :
-    writeRoot? (frame.shift offset) state₂ root (value.shift offset) =
+theorem writeRoot?_rename (root : RuntimePlaceRoot) (value : RuntimeValue) :
+    writeRoot? (frame.rename ρ) state₂ root (value.rename ρ) =
       (writeRoot? frame state root value).map fun written =>
-        (written.1.shift offset, { state₂ with globals := written.2.globals.shift offset }) := by
+        (written.1.rename ρ, { state₂ with globals := written.2.globals.rename ρ }) := by
   cases root with
   | «local» localId =>
-      simp only [writeRoot?, RuntimeFrame.shift_locals, Array.size_map]
+      simp only [writeRoot?, RuntimeFrame.rename_locals, Array.size_map]
       split
       · rfl
-      · simp only [Option.map_some, RuntimeFrame.shift_setLocal, ← globals_eq]
+      · simp only [Option.map_some, RuntimeFrame.rename_setLocal, ← globals_eq]
         rfl
   | global key =>
-      simp only [writeRoot?, globals_eq, GlobalMap.lookup_shift, Option.bind_eq_bind]
+      simp only [writeRoot?, globals_eq, GlobalMap.lookup_rename, Option.bind_eq_bind]
       cases state.globals.lookup key with
       | none => rfl
-      | some _ => simp [GlobalMap.insert_shift]
+      | some _ => simp [GlobalMap.insert_rename]
 
-theorem writeRuntimePlace?_shift (place : RuntimePlace) (value : RuntimeValue) :
-    writeRuntimePlace? (frame.shift offset) state₂ place (value.shift offset) =
+theorem writeRuntimePlace?_rename (place : RuntimePlace) (value : RuntimeValue) :
+    writeRuntimePlace? (frame.rename ρ) state₂ place (value.rename ρ) =
       (writeRuntimePlace? frame state place value).map fun written =>
-        (written.1.shift offset, { state₂ with globals := written.2.globals.shift offset }) := by
+        (written.1.rename ρ, { state₂ with globals := written.2.globals.rename ρ }) := by
   unfold writeRuntimePlace?
   split
   · rfl
   split
-  · exact writeRoot?_shift globals_eq place.root value
+  · exact writeRoot?_rename globals_eq place.root value
   · simp only [Option.bind_eq_bind]
-    rw [readRoot?_shift globals_eq]
+    rw [readRoot?_rename globals_eq]
     cases readRoot? frame state place.root with
     | none => rfl
     | some root =>
         simp only [Option.map_some, Option.bind_some]
-        rw [writeProjections?_shift]
+        rw [writeProjections?_rename]
         cases writeProjections? root place.projections.toList value with
         | none => rfl
-        | some updated => exact writeRoot?_shift globals_eq place.root updated
+        | some updated => exact writeRoot?_rename globals_eq place.root updated
 
 end Roots
 
@@ -264,18 +264,18 @@ theorem writeRuntimePlace?_globals {frame frame' : RuntimeFrame} {state state' :
 A resolved place holds no loan, and resolution reads values only for their
 shapes and integer indices, which shifts keep. -/
 
-theorem resolvePlaceFuel?_shift (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
+theorem resolvePlaceFuel?_rename (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
     {frame : RuntimeFrame} {state state₂ : RuntimeState}
-    (globals_eq : state₂.globals = state.globals.shift offset) :
+    (globals_eq : state₂.globals = state.globals.rename ρ) :
     ∀ fuel : Nat,
-      (∀ placeId, resolvePlaceFuel? unit ns (frame.shift offset) state₂ fuel placeId =
+      (∀ placeId, resolvePlaceFuel? unit ns (frame.rename ρ) state₂ fuel placeId =
         resolvePlaceFuel? unit ns frame state fuel placeId) ∧
-      (∀ expressionId, simpleIndexFuel? unit ns (frame.shift offset) state₂ fuel expressionId =
+      (∀ expressionId, simpleIndexFuel? unit ns (frame.rename ρ) state₂ fuel expressionId =
         simpleIndexFuel? unit ns frame state fuel expressionId)
   | 0 => ⟨fun _ => by simp [resolvePlaceFuel?], fun _ => by simp [simpleIndexFuel?]⟩
   | fuel + 1 => by
-      obtain ⟨places, indices⟩ := resolvePlaceFuel?_shift unit ns (frame := frame) globals_eq fuel
-      have read := fun place => readRuntimePlace?_shift (frame := frame) globals_eq place
+      obtain ⟨places, indices⟩ := resolvePlaceFuel?_rename unit ns (frame := frame) globals_eq fuel
+      have read := fun place => readRuntimePlace?_rename (frame := frame) globals_eq place
       constructor
       · intro placeId
         simp only [resolvePlaceFuel?, Option.bind_eq_bind]
@@ -284,7 +284,7 @@ theorem resolvePlaceFuel?_shift (unit : Validation.ValidatedUnit) (ns : Validati
         | some place =>
             simp only [Option.bind_some]
             cases place with
-            | localVar localId => simp [RuntimeFrame.shift_locals]
+            | localVar localId => simp [RuntimeFrame.rename_locals]
             | deref base =>
                 simp only [places]
                 split
@@ -340,7 +340,7 @@ theorem resolvePlaceFuel?_shift (unit : Validation.ValidatedUnit) (ns : Validati
             cases form with
             | literal value => rfl
             | «local» localId | copyLocal localId =>
-                simp only [readLocal?_shift]
+                simp only [readLocal?_rename]
                 cases readLocal? frame localId with
                 | none => rfl
                 | some value => cases value <;> simp
@@ -354,24 +354,24 @@ theorem resolvePlaceFuel?_shift (unit : Validation.ValidatedUnit) (ns : Validati
                     | none => rfl
                     | some value => cases value <;> simp
 
-theorem resolvePlace?_shift (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
+theorem resolvePlace?_rename (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
     {frame : RuntimeFrame} {state state₂ : RuntimeState}
-    (globals_eq : state₂.globals = state.globals.shift offset) (placeId : PlaceId) :
-    resolvePlace? unit ns (frame.shift offset) state₂ placeId =
+    (globals_eq : state₂.globals = state.globals.rename ρ) (placeId : PlaceId) :
+    resolvePlace? unit ns (frame.rename ρ) state₂ placeId =
       resolvePlace? unit ns frame state placeId :=
-  (resolvePlaceFuel?_shift unit ns globals_eq _).1 placeId
+  (resolvePlaceFuel?_rename unit ns globals_eq _).1 placeId
 
 /-- Whether a place mismatches a variant reads shapes only, which shifts keep. -/
-theorem placeVariantMismatchFuel?_shift (unit : Validation.ValidatedUnit)
+theorem placeVariantMismatchFuel?_rename (unit : Validation.ValidatedUnit)
     (ns : Validation.ValidatedNamespace) {frame : RuntimeFrame} {state state₂ : RuntimeState}
-    (globals_eq : state₂.globals = state.globals.shift offset) :
-    ∀ fuel placeId, placeVariantMismatchFuel? unit ns (frame.shift offset) state₂ fuel placeId =
+    (globals_eq : state₂.globals = state.globals.rename ρ) :
+    ∀ fuel placeId, placeVariantMismatchFuel? unit ns (frame.rename ρ) state₂ fuel placeId =
       placeVariantMismatchFuel? unit ns frame state fuel placeId
   | 0, _ => rfl
   | fuel + 1, placeId => by
-      have ih := placeVariantMismatchFuel?_shift unit ns (frame := frame) globals_eq fuel
-      have resolve := (resolvePlaceFuel?_shift unit ns (frame := frame) globals_eq fuel).1
-      have read := fun place => readRuntimePlace?_shift (frame := frame) globals_eq place
+      have ih := placeVariantMismatchFuel?_rename unit ns (frame := frame) globals_eq fuel
+      have resolve := (resolvePlaceFuel?_rename unit ns (frame := frame) globals_eq fuel).1
+      have read := fun place => readRuntimePlace?_rename (frame := frame) globals_eq place
       simp only [placeVariantMismatchFuel?]
       cases ns.places[placeId.index]? with
       | none => rfl
@@ -407,11 +407,11 @@ theorem placeVariantMismatchFuel?_shift (unit : Validation.ValidatedUnit)
           | index base _ => simp only [resolve, ih]
           | subslice base _ _ _ => simp only [resolve, ih]
 
-theorem variantMismatch?_shift (unit : Validation.ValidatedUnit)
+theorem variantMismatch?_rename (unit : Validation.ValidatedUnit)
     (ns : Validation.ValidatedNamespace) (operation : Operation) (arguments : Array RuntimeValue)
     {frame : RuntimeFrame} {state state₂ : RuntimeState}
-    (globals_eq : state₂.globals = state.globals.shift offset) :
-    variantMismatch? unit ns operation (arguments.map (·.shift offset)) (frame.shift offset)
+    (globals_eq : state₂.globals = state.globals.rename ρ) :
+    variantMismatch? unit ns operation (arguments.map (·.rename ρ)) (frame.rename ρ)
         state₂ = variantMismatch? unit ns operation arguments frame state := by
   cases operation with
   | data kind =>
@@ -424,10 +424,10 @@ theorem variantMismatch?_shift (unit : Validation.ValidatedUnit)
             rename_i source variant values
             cases variant <;> cases resolveStruct? unit ns.identity reference <;> rfl
           · simp only [List.map_cons]
-            cases a <;> simp only [RuntimeValue.shift]
+            cases a <;> simp only [RuntimeValue.rename]
       | _ => rfl
   | copy place | read place | move place | borrow _ place | write place | drop place =>
-      simp only [variantMismatch?, placeVariantMismatchFuel?_shift unit ns globals_eq]
+      simp only [variantMismatch?, placeVariantMismatchFuel?_rename unit ns globals_eq]
   | _ => rfl
 
 /-! ## Constants -/
@@ -486,13 +486,13 @@ theorem constValue?_plain : ∀ (fuel : Nat) (literal : ConstValue), sizeOf lite
 
 /-! ## Patterns -/
 
-theorem bindPatternRow_shift
+theorem bindPatternRow_rename
     {bind bind' : PatternId → RuntimeValue → RuntimeFrame → Option RuntimeFrame}
-    (commutes : ∀ pattern value frame, bind' pattern (value.shift offset) (frame.shift offset) =
-      (bind pattern value frame).map (·.shift offset)) :
+    (commutes : ∀ pattern value frame, bind' pattern (value.rename ρ) (frame.rename ρ) =
+      (bind pattern value frame).map (·.rename ρ)) :
     ∀ (patterns : List PatternId) (values : List RuntimeValue) (frame : RuntimeFrame),
-      bindPatternRow bind' patterns (values.map (·.shift offset)) (frame.shift offset) =
-        (bindPatternRow bind patterns values frame).map (·.shift offset)
+      bindPatternRow bind' patterns (values.map (·.rename ρ)) (frame.rename ρ) =
+        (bindPatternRow bind patterns values frame).map (·.rename ρ)
   | [], [], frame => rfl
   | [], _ :: _, _ => rfl
   | _ :: _, [], _ => rfl
@@ -500,19 +500,19 @@ theorem bindPatternRow_shift
       simp only [List.map_cons, bindPatternRow, Option.bind_eq_bind, commutes]
       cases bind pattern value frame with
       | none => rfl
-      | some bound => exact bindPatternRow_shift commutes patterns values bound
+      | some bound => exact bindPatternRow_rename commutes patterns values bound
 
-theorem bindPatternFuel_shift (unit : Validation.ValidatedUnit)
+theorem bindPatternFuel_rename (injective : Function.Injective ρ) (unit : Validation.ValidatedUnit)
     (ns : Validation.ValidatedNamespace) :
     ∀ (fuel : Nat) (frame : RuntimeFrame) (patternId : PatternId) (value : RuntimeValue),
-      bindPatternFuel unit ns (frame.shift offset) fuel patternId (value.shift offset) =
-        (bindPatternFuel unit ns frame fuel patternId value).map (·.shift offset)
+      bindPatternFuel unit ns (frame.rename ρ) fuel patternId (value.rename ρ) =
+        (bindPatternFuel unit ns frame fuel patternId value).map (·.rename ρ)
   | 0, _, _, _ => rfl
   | fuel + 1, frame, patternId, value => by
-      have row := bindPatternRow_shift (offset := offset)
+      have row := bindPatternRow_rename (ρ := ρ)
         (bind := fun pattern value frame => bindPatternFuel unit ns frame fuel pattern value)
         (bind' := fun pattern value frame => bindPatternFuel unit ns frame fuel pattern value)
-        (fun pattern value frame => bindPatternFuel_shift unit ns fuel frame pattern value)
+        (fun pattern value frame => bindPatternFuel_rename injective unit ns fuel frame pattern value)
       simp only [bindPatternFuel, Option.bind_eq_bind]
       cases ns.patterns[patternId.index]? with
       | none => rfl
@@ -522,16 +522,16 @@ theorem bindPatternFuel_shift (unit : Validation.ValidatedUnit)
           cases kind <;> dsimp only
           case wildcard => rfl
           case «variable» localId =>
-              simp only [RuntimeFrame.shift_locals, Array.size_map]
+              simp only [RuntimeFrame.rename_locals, Array.size_map]
               split
-              · simp [RuntimeFrame.shift, Array.map_setIfInBounds, pure]
+              · simp [RuntimeFrame.rename, Array.map_setIfInBounds, pure]
               · rfl
           case tuple elements =>
-              cases value <;> simp only [RuntimeValue.shift_tuple, RuntimeValue.shift_unit, RuntimeValue.shift_bool,
-                RuntimeValue.shift_character, RuntimeValue.shift_integer, RuntimeValue.shift_address,
-                RuntimeValue.shift_signer, RuntimeValue.shift_string, RuntimeValue.shift_bytes,
-                RuntimeValue.shift_vector, RuntimeValue.shift_nominal, RuntimeValue.shift_closure,
-                RuntimeValue.shift_borrow, RuntimeValue.shift_loanHole] <;> try rfl
+              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
+                RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
+                RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
+                RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
+                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
               case tuple values =>
                 simp only [Array.size_map]
                 split
@@ -543,22 +543,22 @@ theorem bindPatternFuel_shift (unit : Validation.ValidatedUnit)
               | some expected =>
                   have plain := constValue?_plain _ literal (Nat.le_refl _) expected_eq
                   simp only [Option.bind_some]
-                  rw [← RuntimeValue.shift_of_plain offset plain, RuntimeValue.shift_beq,
-                    RuntimeValue.shift_of_plain offset plain]
+                  rw [← RuntimeValue.rename_of_plain ρ plain, RuntimeValue.rename_beq injective,
+                    RuntimeValue.rename_of_plain ρ plain]
                   split <;> rfl
           case range lower upper inclusive =>
-              cases value <;> simp only [RuntimeValue.shift_tuple, RuntimeValue.shift_unit, RuntimeValue.shift_bool,
-                RuntimeValue.shift_character, RuntimeValue.shift_integer, RuntimeValue.shift_address,
-                RuntimeValue.shift_signer, RuntimeValue.shift_string, RuntimeValue.shift_bytes,
-                RuntimeValue.shift_vector, RuntimeValue.shift_nominal, RuntimeValue.shift_closure,
-                RuntimeValue.shift_borrow, RuntimeValue.shift_loanHole] <;> try rfl
+              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
+                RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
+                RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
+                RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
+                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
               all_goals (repeat' split) <;> simp_all
           case constructor name spelled variant fields =>
-              cases value <;> simp only [RuntimeValue.shift_tuple, RuntimeValue.shift_unit, RuntimeValue.shift_bool,
-                RuntimeValue.shift_character, RuntimeValue.shift_integer, RuntimeValue.shift_address,
-                RuntimeValue.shift_signer, RuntimeValue.shift_string, RuntimeValue.shift_bytes,
-                RuntimeValue.shift_vector, RuntimeValue.shift_nominal, RuntimeValue.shift_closure,
-                RuntimeValue.shift_borrow, RuntimeValue.shift_loanHole] <;> try rfl
+              cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit, RuntimeValue.rename_bool,
+                RuntimeValue.rename_character, RuntimeValue.rename_integer, RuntimeValue.rename_address,
+                RuntimeValue.rename_signer, RuntimeValue.rename_string, RuntimeValue.rename_bytes,
+                RuntimeValue.rename_vector, RuntimeValue.rename_nominal, RuntimeValue.rename_closure,
+                RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
               case nominal source actualVariant values =>
                 cases resolveNominal? unit ns name with
                 | none => rfl
@@ -570,20 +570,22 @@ theorem bindPatternFuel_shift (unit : Validation.ValidatedUnit)
                     · simp only [mismatch, Bool.false_eq_true, if_false, Array.toList_map]
                       exact row fields.toList values.toList frame
 
-theorem bindPattern_shift (unit : Validation.ValidatedUnit) (ns : Validation.ValidatedNamespace)
+theorem bindPattern_rename (injective : Function.Injective ρ) (unit : Validation.ValidatedUnit)
+    (ns : Validation.ValidatedNamespace)
     (frame : RuntimeFrame) (patternId : PatternId) (value : RuntimeValue) :
-    bindPattern unit ns (frame.shift offset) patternId (value.shift offset) =
-      (bindPattern unit ns frame patternId value).map (·.shift offset) :=
-  bindPatternFuel_shift unit ns _ frame patternId value
+    bindPattern unit ns (frame.rename ρ) patternId (value.rename ρ) =
+      (bindPattern unit ns frame patternId value).map (·.rename ρ) :=
+  bindPatternFuel_rename injective unit ns _ frame patternId value
 
-theorem bindPattern_above {unit : Validation.ValidatedUnit} {ns : Validation.ValidatedNamespace}
-    {frontier : Nat} {frame frame' : RuntimeFrame} (frame_above : frame.Above frontier)
-    {value : RuntimeValue} (value_above : value.Above frontier) {patternId : PatternId}
-    (bind : bindPattern unit ns frame patternId value = some frame') : frame'.Above frontier := by
-  rw [← RuntimeFrame.shift_unshift frame_above,
-    ← RuntimeValue.shift_unshift frontier value value_above, bindPattern_shift] at bind
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp bind
-  exact RuntimeFrame.above_shift_self frontier base
+theorem bindPattern_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {unit : Validation.ValidatedUnit} {ns : Validation.ValidatedNamespace}
+    {frame frame' : RuntimeFrame} (frame_within : frame.Within inside)
+    {value : RuntimeValue} (value_within : value.Within inside) {patternId : PatternId}
+    (bind : bindPattern unit ns frame patternId value = some frame') : frame'.Within inside := by
+  rw [← base.rename_inverse_frame frame_within, ← base.rename_inverse value value_within,
+    bindPattern_rename base.injective] at bind
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp bind
+  exact base.within_frame original
 
 /-! ## Loan bookkeeping -/
 
@@ -603,246 +605,266 @@ theorem Array.findRev?_map' {α β : Type} (p : β → Bool) (f : α → β) (va
     (values.map f).findRev? p = (values.findRev? (p ∘ f)).map f := by
   simp only [Array.findRev?_eq_find?_reverse, ← Array.map_reverse, Array.find?_map]
 
-@[simp] theorem RuntimeFrame.shift_activeLoans (frame : RuntimeFrame) :
-    (frame.shift offset).activeLoans =
-      frame.activeLoans.map fun entry => (entry.1, entry.2 + offset) := rfl
+@[simp] theorem RuntimeFrame.rename_activeLoans (frame : RuntimeFrame) :
+    (frame.rename ρ).activeLoans =
+      frame.activeLoans.map fun entry => (entry.1, ρ entry.2) := rfl
 
-@[simp] theorem RuntimeFrame.shift_loanLocations (frame : RuntimeFrame) :
-    (frame.shift offset).loanLocations = frame.loanLocations.map (shiftEntry offset) := rfl
+@[simp] theorem RuntimeFrame.rename_loanLocations (frame : RuntimeFrame) :
+    (frame.rename ρ).loanLocations = frame.loanLocations.map (renameEntry ρ) := rfl
 
-theorem localLoanPlace?_shift (frame : RuntimeFrame) (loan : Nat) :
-    localLoanPlace? (frame.shift offset) (loan + offset) = localLoanPlace? frame loan := by
+theorem localLoanPlace?_rename (injective : Function.Injective ρ) (frame : RuntimeFrame) (loan : Nat) :
+    localLoanPlace? (frame.rename ρ) (ρ loan) = localLoanPlace? frame loan := by
   unfold localLoanPlace?
-  rw [RuntimeFrame.shift_loanLocations, Array.findRev?_map']
-  have same : ((fun entry : Nat × RuntimePlace => entry.1 == loan + offset) ∘ shiftEntry offset) =
+  rw [RuntimeFrame.rename_loanLocations, Array.findRev?_map']
+  have same : ((fun entry : Nat × RuntimePlace => entry.1 == ρ loan) ∘ renameEntry ρ) =
       fun entry => entry.1 == loan := by
-    funext entry; simp [Nat.add_beq_add]
+    funext entry; simp [injective.beq_eq]
   rw [same]
   cases frame.loanLocations.findRev? (·.1 == loan) <;> rfl
 
-theorem holeWithin_shift (loan : Nat) (value : RuntimeValue) :
-    holeWithin (loan + offset) (value.shift offset) = holeWithin loan value := by
+theorem holeWithin_rename (injective : Function.Injective ρ) (loan : Nat) (value : RuntimeValue) :
+    holeWithin (ρ loan) (value.rename ρ) = holeWithin loan value := by
   unfold holeWithin
-  rw [findFirst_shift (g := holeMark? loan) (φ := id) (fun value => holeMark?_shift loan value)]
+  rw [findFirst_rename (g := holeMark? loan) (φ := id) (fun value => holeMark?_rename injective loan value)]
   simp
 
-theorem holeInFrame_shift (frame : RuntimeFrame) (loan : Nat) :
-    holeInFrame (frame.shift offset) (loan + offset) = holeInFrame frame loan := by
+theorem holeInFrame_rename (injective : Function.Injective ρ) (frame : RuntimeFrame) (loan : Nat) :
+    holeInFrame (frame.rename ρ) (ρ loan) = holeInFrame frame loan := by
   unfold holeInFrame
-  rw [RuntimeFrame.shift_locals, Array.toList_map, indexOfFrom_map]
+  rw [RuntimeFrame.rename_locals, Array.toList_map, indexOfFrom_map]
   congr 2
   funext slot
-  cases slot <;> simp [holeWithin_shift]
+  cases slot <;> simp [holeWithin_rename injective]
 
-theorem fillHole?_shift (loan : Nat) (replacement value : RuntimeValue) :
-    fillHole? (loan + offset) (replacement.shift offset) (value.shift offset) =
-      (fillHole? loan replacement value).map (·.shift offset) :=
-  rewriteFirst_shift (fun value => holeFill?_shift loan replacement value) value
+theorem fillHole?_rename (injective : Function.Injective ρ) (loan : Nat) (replacement value : RuntimeValue) :
+    fillHole? (ρ loan) (replacement.rename ρ) (value.rename ρ) =
+      (fillHole? loan replacement value).map (·.rename ρ) :=
+  rewriteFirst_rename (fun value => holeFill?_rename injective loan replacement value) value
 
-theorem transferredLoan?_shift (replacement : RuntimeValue) :
-    transferredLoan? (replacement.shift offset) = (transferredLoan? replacement).map (· + offset) :=
-  findFirst_shift (fun value => anyHole?_shift value) replacement
+theorem transferredLoan?_rename (replacement : RuntimeValue) :
+    transferredLoan? (replacement.rename ρ) = (transferredLoan? replacement).map ρ :=
+  findFirst_rename (fun value => anyHole?_rename value) replacement
 
-theorem transferActiveLoan_shift (activeLoans : Array (ExprId × Nat)) (loan : Nat)
+theorem transferActiveLoan_rename (injective : Function.Injective ρ) (activeLoans : Array (ExprId × Nat)) (loan : Nat)
     (replacement : RuntimeValue) :
-    transferActiveLoan (activeLoans.map fun entry => (entry.1, entry.2 + offset)) (loan + offset)
-        (replacement.shift offset) =
+    transferActiveLoan (activeLoans.map fun entry => (entry.1, ρ entry.2)) (ρ loan)
+        (replacement.rename ρ) =
       (transferActiveLoan activeLoans loan replacement).map fun entry =>
-        (entry.1, entry.2 + offset) := by
+        (entry.1, ρ entry.2) := by
   unfold transferActiveLoan
-  rw [transferredLoan?_shift, Array.findRev?_map', Array.filter_map]
-  have keep : ((fun entry : ExprId × Nat => entry.2 != loan + offset) ∘
-      fun entry : ExprId × Nat => (entry.1, entry.2 + offset)) = fun entry => entry.2 != loan := by
-    funext entry; simp [bne, Nat.add_beq_add]
-  have found : ((fun entry : ExprId × Nat => entry.2 == loan + offset) ∘
-      fun entry : ExprId × Nat => (entry.1, entry.2 + offset)) = fun entry => entry.2 == loan := by
-    funext entry; simp [Nat.add_beq_add]
+  rw [transferredLoan?_rename, Array.findRev?_map', Array.filter_map]
+  have keep : ((fun entry : ExprId × Nat => entry.2 != ρ loan) ∘
+      fun entry : ExprId × Nat => (entry.1, ρ entry.2)) = fun entry => entry.2 != loan := by
+    funext entry; simp [bne, injective.beq_eq]
+  have found : ((fun entry : ExprId × Nat => entry.2 == ρ loan) ∘
+      fun entry : ExprId × Nat => (entry.1, ρ entry.2)) = fun entry => entry.2 == loan := by
+    funext entry; simp [injective.beq_eq]
   rw [keep, found]
   cases transferredLoan? replacement <;> cases activeLoans.findRev? (·.2 == loan) <;>
     simp [Array.map_push]
 
-theorem transferLoanLocation_shift (loanLocations : Array (Nat × RuntimePlace)) (loan : Nat)
+theorem transferLoanLocation_rename (injective : Function.Injective ρ) (loanLocations : Array (Nat × RuntimePlace)) (loan : Nat)
     (replacement : RuntimeValue) :
-    transferLoanLocation (loanLocations.map (shiftEntry offset)) (loan + offset)
-        (replacement.shift offset) =
-      (transferLoanLocation loanLocations loan replacement).map (shiftEntry offset) := by
+    transferLoanLocation (loanLocations.map (renameEntry ρ)) (ρ loan)
+        (replacement.rename ρ) =
+      (transferLoanLocation loanLocations loan replacement).map (renameEntry ρ) := by
   unfold transferLoanLocation
-  rw [transferredLoan?_shift, Array.findRev?_map', Array.filter_map]
-  have keep : ((fun entry : Nat × RuntimePlace => entry.1 != loan + offset) ∘
-      shiftEntry offset) = fun entry => entry.1 != loan := by
-    funext entry; simp [bne, Nat.add_beq_add]
-  have found : ((fun entry : Nat × RuntimePlace => entry.1 == loan + offset) ∘
-      shiftEntry offset) = fun entry => entry.1 == loan := by
-    funext entry; simp [Nat.add_beq_add]
+  rw [transferredLoan?_rename, Array.findRev?_map', Array.filter_map]
+  have keep : ((fun entry : Nat × RuntimePlace => entry.1 != ρ loan) ∘
+      renameEntry ρ) = fun entry => entry.1 != loan := by
+    funext entry; simp [bne, injective.beq_eq]
+  have found : ((fun entry : Nat × RuntimePlace => entry.1 == ρ loan) ∘
+      renameEntry ρ) = fun entry => entry.1 == loan := by
+    funext entry; simp [injective.beq_eq]
   rw [keep, found]
   cases transferredLoan? replacement <;> cases loanLocations.findRev? (·.1 == loan) <;>
-    simp [Array.map_push, shiftEntry]
+    simp [Array.map_push, renameEntry]
 
 /-! ## The loan registry -/
 
 section Registry
 
-variable {frontier : Nat}
+variable {inside : Nat → Prop}
 
-theorem globalLoanKeyIn?_append (first second : List (Nat × GlobalKey)) (loan : Nat) :
-    globalLoanKeyIn? (first ++ second) loan =
-      (globalLoanKeyIn? first loan).or (globalLoanKeyIn? second loan) := by
-  unfold globalLoanKeyIn?
+theorem storageLoanTargetIn?_append (first second : List (Nat × LoanTarget)) (loan : Nat) :
+    storageLoanTargetIn? (first ++ second) loan =
+      (storageLoanTargetIn? first loan).or (storageLoanTargetIn? second loan) := by
+  unfold storageLoanTargetIn?
   rw [List.find?_append]
   cases first.find? (·.1 == loan) <;> rfl
 
-theorem globalLoanKeyIn?_below {junk : List (Nat × GlobalKey)} {bound loan : Nat}
-    (below : ∀ entry ∈ junk, entry.1 < bound) (above : bound ≤ loan) :
-    globalLoanKeyIn? junk loan = none := by
-  unfold globalLoanKeyIn?
+theorem storageLoanTargetIn?_outside {junk : List (Nat × LoanTarget)} {loan : Nat}
+    (outside : ∀ entry ∈ junk, entry.1 ≠ loan) :
+    storageLoanTargetIn? junk loan = none := by
+  unfold storageLoanTargetIn?
   rw [Option.map_eq_none_iff, List.find?_eq_none]
   intro entry member
-  have := below entry member
-  simp only [beq_iff_eq]
-  omega
+  simpa only [beq_iff_eq] using outside entry member
 
-theorem globalLoanKeyIn?_map_shift (minted : List (Nat × GlobalKey)) (loan : Nat) :
-    globalLoanKeyIn? (minted.map (shiftEntry offset)) (loan + offset) =
-      globalLoanKeyIn? minted loan := by
-  unfold globalLoanKeyIn?
+theorem storageLoanTargetIn?_map_rename (injective : Function.Injective ρ)
+    (held : List (Nat × LoanTarget)) (loan : Nat) :
+    storageLoanTargetIn? (held.map (renameEntry ρ)) (ρ loan) =
+      storageLoanTargetIn? held loan := by
+  unfold storageLoanTargetIn?
   rw [List.find?_map, Option.map_map]
-  have same : ((fun entry : Nat × GlobalKey => entry.1 == loan + offset) ∘ shiftEntry offset) =
+  have same : ((fun entry : Nat × LoanTarget => entry.1 == ρ loan) ∘ renameEntry ρ) =
       fun entry => entry.1 == loan := by
-    funext entry; simp [Nat.add_beq_add]
+    funext entry; simp [injective.beq_eq]
   rw [same]
   rfl
 
-theorem RegistryShifted.lookup {registry registry' : List (Nat × GlobalKey)}
-    (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
-    (above : frontier ≤ loan) :
-    globalLoanKeyIn? registry' (loan + offset) = globalLoanKeyIn? registry loan := by
-  obtain ⟨minted, junk, junk', rfl, rfl, -, below, below'⟩ := shifted
-  rw [globalLoanKeyIn?_append, globalLoanKeyIn?_append, globalLoanKeyIn?_map_shift,
-    globalLoanKeyIn?_below below above, globalLoanKeyIn?_below below' (by omega)]
+/-- The junk of a first run's registry holds no loan the run holds. -/
+theorem RegistryRenamed.junk_free {junk : List (Nat × LoanTarget)}
+    (outside : ∀ entry ∈ junk, ¬inside entry.1) {loan : Nat} (within : inside loan) :
+    storageLoanTargetIn? junk loan = none :=
+  storageLoanTargetIn?_outside fun entry member same => outside entry member (same ▸ within)
 
-theorem removeGlobalLoan_append_free (minted junk : List (Nat × GlobalKey)) {loan : Nat}
-    (free : globalLoanKeyIn? junk loan = none) :
-    removeGlobalLoan (minted ++ junk) loan = removeGlobalLoan minted loan ++ junk := by
-  induction minted with
-  | nil => simp [removeGlobalLoan_of_free junk loan free, removeGlobalLoan]
+/-- The junk of a second run's registry holds no renaming of a loan the
+first holds. -/
+theorem RegistryRenamed.junk_free' {junk' : List (Nat × LoanTarget)}
+    (outside : ∀ entry ∈ junk', ∀ loan, inside loan → ρ loan ≠ entry.1) {loan : Nat}
+    (within : inside loan) : storageLoanTargetIn? junk' (ρ loan) = none :=
+  storageLoanTargetIn?_outside fun entry member same => outside entry member loan within same.symm
+
+theorem RegistryRenamed.lookup (injective : Function.Injective ρ)
+    {registry registry' : List (Nat × LoanTarget)}
+    (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
+    (within : inside loan) :
+    storageLoanTargetIn? registry' (ρ loan) = storageLoanTargetIn? registry loan := by
+  obtain ⟨held, junk, junk', rfl, rfl, -, outside, outside'⟩ := shifted
+  rw [storageLoanTargetIn?_append, storageLoanTargetIn?_append,
+    storageLoanTargetIn?_map_rename injective, RegistryRenamed.junk_free outside within,
+    RegistryRenamed.junk_free' outside' within]
+
+theorem removeStorageLoan_append_free (held junk : List (Nat × LoanTarget)) {loan : Nat}
+    (free : storageLoanTargetIn? junk loan = none) :
+    removeStorageLoan (held ++ junk) loan = removeStorageLoan held loan ++ junk := by
+  induction held with
+  | nil => simp [removeStorageLoan_of_free junk loan free, removeStorageLoan]
   | cons entry rest ih =>
-      simp only [List.cons_append, removeGlobalLoan]
+      simp only [List.cons_append, removeStorageLoan]
       split <;> simp [ih]
 
-theorem removeGlobalLoan_map_shift (minted : List (Nat × GlobalKey)) (loan : Nat) :
-    removeGlobalLoan (minted.map (shiftEntry offset)) (loan + offset) =
-      (removeGlobalLoan minted loan).map (shiftEntry offset) := by
-  induction minted with
+theorem removeStorageLoan_map_rename (injective : Function.Injective ρ)
+    (held : List (Nat × LoanTarget)) (loan : Nat) :
+    removeStorageLoan (held.map (renameEntry ρ)) (ρ loan) =
+      (removeStorageLoan held loan).map (renameEntry ρ) := by
+  induction held with
   | nil => rfl
   | cons entry rest ih =>
-      simp only [List.map_cons, removeGlobalLoan, shiftEntry, Nat.add_beq_add]
-      split <;> simp [ih, shiftEntry]
+      simp only [List.map_cons, removeStorageLoan, renameEntry, injective.beq_eq]
+      split <;> simp [ih, renameEntry]
 
-theorem removeGlobalLoan_sublist (registry : List (Nat × GlobalKey)) (loan : Nat) :
-    ∀ entry ∈ removeGlobalLoan registry loan, entry ∈ registry := by
+theorem removeStorageLoan_sublist (registry : List (Nat × LoanTarget)) (loan : Nat) :
+    ∀ entry ∈ removeStorageLoan registry loan, entry ∈ registry := by
   induction registry with
-  | nil => simp [removeGlobalLoan]
+  | nil => simp [removeStorageLoan]
   | cons head rest ih =>
       intro entry member
-      simp only [removeGlobalLoan] at member
+      simp only [removeStorageLoan] at member
       split at member
       · exact List.mem_cons_of_mem _ member
       · rcases List.mem_cons.mp member with rfl | member
         · exact List.mem_cons_self
         · exact List.mem_cons_of_mem _ (ih entry member)
 
-theorem RegistryShifted.remove {registry registry' : List (Nat × GlobalKey)}
-    (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
-    (above : frontier ≤ loan) :
-    RegistryShifted offset frontier (removeGlobalLoan registry loan)
-      (removeGlobalLoan registry' (loan + offset)) := by
-  obtain ⟨minted, junk, junk', rfl, rfl, minted_above, below, below'⟩ := shifted
-  refine ⟨removeGlobalLoan minted loan, junk, junk',
-    removeGlobalLoan_append_free minted junk (globalLoanKeyIn?_below below above), ?_,
-    fun entry member => minted_above entry (removeGlobalLoan_sublist minted loan entry member),
-    below, below'⟩
-  rw [removeGlobalLoan_append_free _ junk' (globalLoanKeyIn?_below below' (by omega)),
-    removeGlobalLoan_map_shift]
+theorem RegistryRenamed.remove (injective : Function.Injective ρ)
+    {registry registry' : List (Nat × LoanTarget)}
+    (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
+    (within : inside loan) :
+    RegistryRenamed ρ inside (removeStorageLoan registry loan)
+      (removeStorageLoan registry' (ρ loan)) := by
+  obtain ⟨held, junk, junk', rfl, rfl, held_within, outside, outside'⟩ := shifted
+  refine ⟨removeStorageLoan held loan, junk, junk',
+    removeStorageLoan_append_free held junk (RegistryRenamed.junk_free outside within),
+    ?_, fun entry member => held_within entry (removeStorageLoan_sublist held loan entry member),
+    outside, outside'⟩
+  rw [removeStorageLoan_append_free _ junk' (RegistryRenamed.junk_free' outside' within),
+    removeStorageLoan_map_rename injective]
 
-theorem RegistryShifted.cons {registry registry' : List (Nat × GlobalKey)}
-    (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
-    (above : frontier ≤ loan) (key : GlobalKey) :
-    RegistryShifted offset frontier ((loan, key) :: registry) ((loan + offset, key) :: registry') := by
-  obtain ⟨minted, junk, junk', rfl, rfl, minted_above, below, below'⟩ := shifted
-  refine ⟨(loan, key) :: minted, junk, junk', rfl, rfl, ?_, below, below'⟩
+theorem RegistryRenamed.cons {registry registry' : List (Nat × LoanTarget)}
+    (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
+    (within : inside loan) (key : LoanTarget) :
+    RegistryRenamed ρ inside ((loan, key) :: registry) ((ρ loan, key) :: registry') := by
+  obtain ⟨held, junk, junk', rfl, rfl, held_within, outside, outside'⟩ := shifted
+  refine ⟨(loan, key) :: held, junk, junk', rfl, rfl, ?_, outside, outside'⟩
   intro entry member
   rcases List.mem_cons.mp member with rfl | member
-  · exact above
-  · exact minted_above entry member
+  · exact within
+  · exact held_within entry member
 
-theorem transferredLoan?_above {value : RuntimeValue} (above : value.Above frontier)
-    {loan : Nat} (found : transferredLoan? value = some loan) : frontier ≤ loan := by
-  rw [← RuntimeValue.shift_unshift frontier value above, transferredLoan?_shift] at found
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp found
-  omega
+theorem transferredLoan?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {value : RuntimeValue} (within : value.Within inside)
+    {loan : Nat} (found : transferredLoan? value = some loan) : inside loan := by
+  rw [← base.rename_inverse value within, transferredLoan?_rename] at found
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp found
+  exact base.image original
 
-theorem fillHole?_above {loan : Nat} {replacement value result : RuntimeValue}
-    (loan_above : frontier ≤ loan) (replacement_above : replacement.Above frontier)
-    (value_above : value.Above frontier)
-    (filled : fillHole? loan replacement value = some result) : result.Above frontier := by
-  rw [← RuntimeValue.shift_unshift frontier value value_above,
-    ← RuntimeValue.shift_unshift frontier replacement replacement_above,
-    ← Nat.sub_add_cancel loan_above, fillHole?_shift] at filled
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp filled
-  exact RuntimeValue.above_shift_self frontier base
+theorem fillHole?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {loan : Nat} {replacement value result : RuntimeValue}
+    (loan_within : inside loan) (replacement_within : replacement.Within inside)
+    (value_within : value.Within inside)
+    (filled : fillHole? loan replacement value = some result) : result.Within inside := by
+  rw [← base.rename_inverse value value_within,
+    ← base.rename_inverse replacement replacement_within,
+    ← base.inverse loan loan_within, fillHole?_rename base.injective] at filled
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp filled
+  exact base.within original
 
-theorem RegistryShifted.transfer {registry registry' : List (Nat × GlobalKey)}
-    (shifted : RegistryShifted offset frontier registry registry') {loan : Nat}
-    (above : frontier ≤ loan) (key : GlobalKey) {replacement : RuntimeValue}
-    (replacement_above : replacement.Above frontier) :
-    RegistryShifted offset frontier (transferGlobalLoan registry loan key replacement)
-      (transferGlobalLoan registry' (loan + offset) key (replacement.shift offset)) := by
-  unfold transferGlobalLoan
-  simp only [transferredLoan?_shift]
+theorem RegistryRenamed.transfer (injective : Function.Injective ρ) {β γ : Nat → Nat}
+    (base : LoanBase β γ inside) {registry registry' : List (Nat × LoanTarget)}
+    (shifted : RegistryRenamed ρ inside registry registry') {loan : Nat}
+    (within : inside loan) (key : LoanTarget) {replacement : RuntimeValue}
+    (replacement_within : replacement.Within inside) :
+    RegistryRenamed ρ inside (transferStorageLoan registry loan key replacement)
+      (transferStorageLoan registry' (ρ loan) key (replacement.rename ρ)) := by
+  unfold transferStorageLoan
+  simp only [transferredLoan?_rename]
   cases found : transferredLoan? replacement with
-  | none => exact shifted.remove above
+  | none => exact shifted.remove injective within
   | some transferred =>
-      exact (shifted.remove above).cons (transferredLoan?_above replacement_above found) key
+      exact (shifted.remove injective within).cons
+        (transferredLoan?_within base replacement_within found) key
 
 end Registry
 
-theorem RuntimeFrame.shift_withLoans (frame : RuntimeFrame) (activeLoans : Array (ExprId × Nat))
+theorem RuntimeFrame.rename_withLoans (frame : RuntimeFrame) (activeLoans : Array (ExprId × Nat))
     (loanLocations : Array (Nat × RuntimePlace)) :
-    ({ frame with activeLoans, loanLocations } : RuntimeFrame).shift offset =
-      { frame.shift offset with
-        activeLoans := activeLoans.map fun entry => (entry.1, entry.2 + offset)
-        loanLocations := loanLocations.map (shiftEntry offset) } := rfl
+    ({ frame with activeLoans, loanLocations } : RuntimeFrame).rename ρ =
+      { frame.rename ρ with
+        activeLoans := activeLoans.map fun entry => (entry.1, ρ entry.2)
+        loanLocations := loanLocations.map (renameEntry ρ) } := rfl
 
-theorem fillLocalLoanHole?_shift {frame : RuntimeFrame} {state state₂ : RuntimeState}
-    (globals_eq : state₂.globals = state.globals.shift offset) (loan : Nat)
+theorem fillLocalLoanHole?_rename (injective : Function.Injective ρ) {frame : RuntimeFrame}
+    {state state₂ : RuntimeState} (globals_eq : state₂.globals = state.globals.rename ρ) (loan : Nat)
     (replacement : RuntimeValue) :
-    fillLocalLoanHole? (frame.shift offset) state₂ (loan + offset) (replacement.shift offset) =
+    fillLocalLoanHole? (frame.rename ρ) state₂ (ρ loan) (replacement.rename ρ) =
       (fillLocalLoanHole? frame state loan replacement).map fun resolved =>
-        (resolved.1.shift offset, state₂) := by
+        (resolved.1.rename ρ, state₂) := by
   unfold fillLocalLoanHole?
   simp only [Option.bind_eq_bind]
-  rw [localLoanPlace?_shift]
+  rw [localLoanPlace?_rename injective]
   cases localLoanPlace? frame loan with
   | none => rfl
   | some place =>
       simp only [Option.bind_some]
-      rw [readRuntimePlace?_shift globals_eq]
+      rw [readRuntimePlace?_rename globals_eq]
       cases readRuntimePlace? frame state place with
       | none => rfl
       | some value =>
           simp only [Option.map_some, Option.bind_some]
-          rw [fillHole?_shift]
+          rw [fillHole?_rename injective]
           cases fillHole? loan replacement value with
           | none => rfl
           | some filled =>
               simp only [Option.map_some, Option.bind_some]
-              rw [writeRuntimePlace?_shift globals_eq]
+              rw [writeRuntimePlace?_rename globals_eq]
               cases writeRuntimePlace? frame state place filled with
               | none => rfl
               | some written =>
-                  simp only [Option.map_some, Option.bind_some, RuntimeFrame.shift_activeLoans,
-                    RuntimeFrame.shift_loanLocations, transferActiveLoan_shift,
-                    transferLoanLocation_shift, RuntimeFrame.shift_withLoans]
+                  simp only [Option.map_some, Option.bind_some, RuntimeFrame.rename_activeLoans,
+                    RuntimeFrame.rename_loanLocations, transferActiveLoan_rename injective,
+                    transferLoanLocation_rename injective, RuntimeFrame.rename_withLoans]
 
 /-! ## States -/
 
@@ -859,28 +881,30 @@ theorem Array.extract_push_size {α : Type} (values : Array α) (value : α) {st
 
 section States
 
-variable {frontier inert inert' : Nat} {state state₂ : RuntimeState}
+variable {offset frontier inert inert' : Nat} {inside : Nat → Prop} {state state₂ : RuntimeState}
 
-theorem StateShifted.withGlobals (shifted : StateShifted offset frontier inert inert' state state₂)
-    (globals : GlobalMap) (above : ∀ slot ∈ globals.entries, slot.value.Above frontier) :
-    StateShifted offset frontier inert inert' { state with globals }
-      { state₂ with globals := globals.shift offset } :=
-  { shifted with globals := rfl, globalsAbove := above }
+theorem StateRenamed.withGlobals (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (globals : GlobalMap) (above : ∀ slot ∈ globals.entries, slot.value.Within inside) :
+    StateRenamed ρ offset frontier inside inert inert' { state with globals }
+      { state₂ with globals := globals.rename ρ } :=
+  { shifted with globals := rfl, globalsWithin := above }
 
-theorem StateShifted.withRegistry (shifted : StateShifted offset frontier inert inert' state state₂)
-    {registry registry' : List (Nat × GlobalKey)}
-    (related : RegistryShifted offset frontier registry registry') :
-    StateShifted offset frontier inert inert' { state with globalLoans := registry }
-      { state₂ with globalLoans := registry' } :=
+theorem StateRenamed.withRegistry (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    {registry registry' : List (Nat × LoanTarget)}
+    (related : RegistryRenamed ρ inside registry registry') :
+    StateRenamed ρ offset frontier inside inert inert' { state with storageLoans := registry }
+      { state₂ with storageLoans := registry' } :=
   { shifted with registry := related }
 
-theorem StateShifted.push (shifted : StateShifted offset frontier inert inert' state state₂)
-    {loan : Nat} (above : frontier ≤ loan) {value : RuntimeValue}
-    (value_above : value.Above frontier) :
-    StateShifted offset frontier inert inert'
+theorem StateRenamed.push (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    {loan : Nat} (within : inside loan) {value : RuntimeValue}
+    (value_within : value.Within inside) :
+    StateRenamed ρ offset frontier inside inert inert'
       { state with pending := state.pending.push (loan, value) }
-      { state₂ with pending := state₂.pending.push (loan + offset, value.shift offset) } where
+      { state₂ with pending := state₂.pending.push (ρ loan, value.rename ρ) } where
+  renames := shifted.renames
   globals := shifted.globals
+  tables := shifted.tables
   nextLoan := shifted.nextLoan
   frontier_le := shifted.frontier_le
   inert_le := by simp only [Array.size_push]; exact Nat.le_succ_of_le shifted.inert_le
@@ -890,152 +914,193 @@ theorem StateShifted.push (shifted : StateShifted offset frontier inert inert' s
     rw [Array.extract_push_size _ _ shifted.inert_le', Array.extract_push_size _ _ shifted.inert_le,
       shifted.pending, Array.map_push]
   registry := shifted.registry
-  globalsAbove := shifted.globalsAbove
-  pendingAbove := by
+  globalsWithin := shifted.globalsWithin
+  tablesWithin := shifted.tablesWithin
+  pendingWithin := by
     simp only
     rw [Array.extract_push_size _ _ shifted.inert_le]
     intro entry member
     rcases Array.mem_push.mp member with member | rfl
-    · exact shifted.pendingAbove entry member
-    · exact ⟨above, value_above⟩
+    · exact shifted.pendingWithin entry member
+    · exact ⟨within, value_within⟩
 
-theorem StateShifted.lookup (shifted : StateShifted offset frontier inert inert' state state₂)
-    {loan : Nat} (above : frontier ≤ loan) :
-    globalLoanKey? state₂ (loan + offset) = globalLoanKey? state loan :=
-  shifted.registry.lookup above
+theorem StateRenamed.lookup (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    {loan : Nat} (within : inside loan) :
+    storageLoanTarget? state₂ (ρ loan) = storageLoanTarget? state loan :=
+  shifted.registry.lookup shifted.renames.injective within
 
-theorem StateShifted.slot_above (shifted : StateShifted offset frontier inert inert' state state₂)
+theorem StateRenamed.slot_within (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
     {key : GlobalKey} {value : RuntimeValue} (lookup_eq : state.globals.lookup key = some value) :
-    value.Above frontier := by
+    value.Within inside := by
   unfold GlobalMap.lookup at lookup_eq
   obtain ⟨slot, found, rfl⟩ := Option.map_eq_some_iff.mp lookup_eq
-  exact shifted.globalsAbove slot (Array.mem_of_find?_eq_some found)
+  exact shifted.globalsWithin slot (Array.mem_of_find?_eq_some found)
 
-theorem GlobalMap.insert_above {globals : GlobalMap} {key : GlobalKey} {value : RuntimeValue}
-    (above : ∀ slot ∈ globals.entries, slot.value.Above frontier)
-    (value_above : value.Above frontier) :
-    ∀ slot ∈ (globals.insert key value).entries, slot.value.Above frontier := by
+theorem GlobalMap.insert_within {globals : GlobalMap} {key : GlobalKey} {value : RuntimeValue}
+    (above : ∀ slot ∈ globals.entries, slot.value.Within inside)
+    (value_within : value.Within inside) :
+    ∀ slot ∈ (globals.insert key value).entries, slot.value.Within inside := by
   intro slot member
   rcases GlobalMap.mem_insert.mp member with ⟨member, -⟩ | rfl
   · exact above slot member
-  · exact value_above
+  · exact value_within
 
-theorem RuntimeFrame.Above.setLocal {frame : RuntimeFrame} (above : frame.Above frontier)
-    (index : Nat) {value : RuntimeValue} (value_above : value.Above frontier) :
-    ({ frame with locals := frame.locals.set! index (some value) } : RuntimeFrame).Above frontier where
+theorem StateRenamed.loanValue (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (target : LoanTarget) :
+    state₂.loanValue? target = (state.loanValue? target).map (·.rename ρ) := by
+  cases target with
+  | global key => simp [shifted.globals, GlobalMap.lookup_rename]
+  | table key => simp [shifted.tables, NativeTableStorage.rename, GlobalMap.lookup_rename]
+
+theorem StateRenamed.loanValue_within
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    {target : LoanTarget} {value : RuntimeValue}
+    (found : state.loanValue? target = some value) : value.Within inside := by
+  cases target with
+  | global key => exact shifted.slot_within found
+  | table key =>
+      change state.tables.contents.lookup key = some value at found
+      unfold GlobalMap.lookup at found
+      obtain ⟨slot, located, rfl⟩ := Option.map_eq_some_iff.mp found
+      exact shifted.tablesWithin slot (Array.mem_of_find?_eq_some located)
+
+theorem StateRenamed.writeLoanValue
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (target : LoanTarget) {value : RuntimeValue} (value_within : value.Within inside) :
+    StateRenamed ρ offset frontier inside inert inert' (state.writeLoanValue target value)
+      (state₂.writeLoanValue target (value.rename ρ)) := by
+  cases target with
+  | global key =>
+      simp only [RuntimeState.writeLoanValue_global]
+      exact { shifted with
+        globals := by simp [shifted.globals, GlobalMap.insert_rename]
+        globalsWithin := GlobalMap.insert_within shifted.globalsWithin value_within }
+  | table key =>
+      simp only [RuntimeState.writeLoanValue_table]
+      exact { shifted with
+        tables := by simp [shifted.tables, NativeTableStorage.rename, GlobalMap.insert_rename]
+        tablesWithin := GlobalMap.insert_within shifted.tablesWithin value_within }
+
+theorem RuntimeFrame.Within.setLocal {frame : RuntimeFrame} (above : frame.Within inside)
+    (index : Nat) {value : RuntimeValue} (value_within : value.Within inside) :
+    ({ frame with locals := frame.locals.set! index (some value) } : RuntimeFrame).Within inside where
   locals slot member stored stored_eq := by
     simp only [Array.set!_eq_setIfInBounds] at member
     rcases Array.mem_or_eq_of_mem_setIfInBounds member with member | rfl
     · exact above.locals slot member stored stored_eq
-    · cases stored_eq; exact value_above
+    · cases stored_eq; exact value_within
   activeLoans := above.activeLoans
   loanLocations := above.loanLocations
 
-theorem RuntimeFrame.Above.slot {frame : RuntimeFrame} (above : frame.Above frontier)
+theorem RuntimeFrame.Within.slot {frame : RuntimeFrame} (above : frame.Within inside)
     {index : Nat} {value : RuntimeValue} (slot_eq : frame.locals[index]? = some (some value)) :
-    value.Above frontier :=
+    value.Within inside :=
   above.locals _ (Array.mem_of_getElem? slot_eq) value rfl
 
-theorem holeSlot_shift (loan : Nat) :
-    ((fun slot : Option RuntimeValue => (slot.map (holeWithin (loan + offset))).getD false) ∘
-        Option.map (·.shift offset)) =
+theorem holeSlot_rename (injective : Function.Injective ρ) (loan : Nat) :
+    ((fun slot : Option RuntimeValue => (slot.map (holeWithin (ρ loan))).getD false) ∘
+        Option.map (·.rename ρ)) =
       fun slot => (slot.map (holeWithin loan)).getD false := by
-  funext slot; cases slot <;> simp [holeWithin_shift]
+  funext slot; cases slot <;> simp [holeWithin_rename injective]
 
-theorem fillVisibleHole_shift {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) {loan : Nat} (above : frontier ≤ loan)
-    {replacement : RuntimeValue} (replacement_above : replacement.Above frontier) :
-    ∃ state₂', fillVisibleHole (frame.shift offset) state₂ (loan + offset)
-        (replacement.shift offset) =
-      ((fillVisibleHole frame state loan replacement).1.shift offset, state₂',
+theorem fillVisibleHole_rename {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) {loan : Nat} (within : inside loan)
+    {replacement : RuntimeValue} (replacement_within : replacement.Within inside) :
+    ∃ state₂', fillVisibleHole (frame.rename ρ) state₂ (ρ loan)
+        (replacement.rename ρ) =
+      ((fillVisibleHole frame state loan replacement).1.rename ρ, state₂',
         (fillVisibleHole frame state loan replacement).2.2) ∧
-      StateShifted offset frontier inert inert' (fillVisibleHole frame state loan replacement).2.1
+      StateRenamed ρ offset frontier inside inert inert' (fillVisibleHole frame state loan replacement).2.1
         state₂' ∧
-      (fillVisibleHole frame state loan replacement).1.Above frontier := by
+      (fillVisibleHole frame state loan replacement).1.Within inside := by
+  have injective := shifted.renames.injective
+  obtain ⟨β, γ, base⟩ := shifted.renames.base
   unfold fillVisibleHole
-  rw [holeInFrame_shift]
+  rw [holeInFrame_rename injective]
   split
-  · rw [RuntimeFrame.shift_locals, Array.toList_map, indexOfFrom_map, holeSlot_shift]
+  · rw [RuntimeFrame.rename_locals, Array.toList_map, indexOfFrom_map, holeSlot_rename injective]
     cases indexOfFrom (fun slot => (slot.map (holeWithin loan)).getD false)
         frame.locals.toList 0 with
-    | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+    | none => exact ⟨state₂, rfl, shifted, frame_within⟩
     | some index =>
         simp only [Array.getElem?_map]
         cases slot_eq : frame.locals[index]? with
-        | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+        | none => exact ⟨state₂, rfl, shifted, frame_within⟩
         | some slot =>
             cases slot with
-            | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+            | none => exact ⟨state₂, rfl, shifted, frame_within⟩
             | some value =>
-                simp only [Option.map_some, Option.bind_some, fillHole?_shift]
+                simp only [Option.map_some, Option.bind_some, fillHole?_rename injective]
                 cases fill_eq : fillHole? loan replacement value with
-                | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+                | none => exact ⟨state₂, rfl, shifted, frame_within⟩
                 | some filled =>
-                    refine ⟨state₂, ?_, shifted, frame_above.setLocal index
-                      (fillHole?_above above replacement_above (frame_above.slot slot_eq) fill_eq)⟩
-                    simp [RuntimeFrame.shift, Array.map_setIfInBounds]
-  · rw [shifted.lookup above]
-    cases globalLoanKey? state loan with
-    | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+                    refine ⟨state₂, ?_, shifted, frame_within.setLocal index
+                      (fillHole?_within base within replacement_within (frame_within.slot slot_eq)
+                        fill_eq)⟩
+                    simp [RuntimeFrame.rename, Array.map_setIfInBounds]
+  · rw [shifted.lookup within]
+    cases storageLoanTarget? state loan with
+    | none => exact ⟨state₂, rfl, shifted, frame_within⟩
     | some key =>
-        simp only [shifted.globals, GlobalMap.lookup_shift]
-        cases lookup_eq : state.globals.lookup key with
-        | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+        simp only [shifted.loanValue key]
+        cases lookup_eq : state.loanValue? key with
+        | none => exact ⟨state₂, rfl, shifted, frame_within⟩
         | some value =>
-            simp only [Option.map_some, Option.bind_some, fillHole?_shift]
+            simp only [Option.map_some, Option.bind_some, fillHole?_rename injective]
             cases fill_eq : fillHole? loan replacement value with
-            | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+            | none => exact ⟨state₂, rfl, shifted, frame_within⟩
             | some filled =>
-                refine ⟨{ state₂ with
-                    globals := (state.globals.insert key filled).shift offset
-                    globalLoans := transferGlobalLoan state₂.globalLoans (loan + offset) key
-                      (replacement.shift offset) },
-                  by simp [GlobalMap.insert_shift], ?_, frame_above⟩
-                exact (shifted.withGlobals _ (GlobalMap.insert_above shifted.globalsAbove
-                  (fillHole?_above above replacement_above (shifted.slot_above lookup_eq) fill_eq))
-                  ).withRegistry (shifted.registry.transfer above key replacement_above)
+                refine ⟨{ state₂.writeLoanValue key (filled.rename ρ) with
+                    storageLoans := transferStorageLoan state₂.storageLoans (ρ loan) key
+                      (replacement.rename ρ) }, rfl, ?_, frame_within⟩
+                exact (shifted.writeLoanValue key
+                  (fillHole?_within base within replacement_within
+                    (shifted.loanValue_within lookup_eq) fill_eq)).withRegistry
+                  (shifted.registry.transfer injective base within key replacement_within)
 
-theorem applyWriteBack_shift {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) {loan : Nat} (above : frontier ≤ loan)
-    {current : RuntimeValue} (current_above : current.Above frontier) :
-    ∃ state₂', applyWriteBack (frame.shift offset) state₂ (loan + offset) (current.shift offset) =
-      ((applyWriteBack frame state loan current).1.shift offset, state₂') ∧
-      StateShifted offset frontier inert inert' (applyWriteBack frame state loan current).2 state₂' ∧
-      (applyWriteBack frame state loan current).1.Above frontier := by
-  obtain ⟨state₂', fill_eq, filled, filled_above⟩ :=
-    fillVisibleHole_shift shifted frame_above above current_above
+theorem applyWriteBack_rename {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) {loan : Nat} (within : inside loan)
+    {current : RuntimeValue} (current_within : current.Within inside) :
+    ∃ state₂', applyWriteBack (frame.rename ρ) state₂ (ρ loan) (current.rename ρ) =
+      ((applyWriteBack frame state loan current).1.rename ρ, state₂') ∧
+      StateRenamed ρ offset frontier inside inert inert' (applyWriteBack frame state loan current).2 state₂' ∧
+      (applyWriteBack frame state loan current).1.Within inside := by
+  obtain ⟨state₂', fill_eq, filled, filled_within⟩ :=
+    fillVisibleHole_rename shifted frame_within within current_within
   unfold applyWriteBack
   rw [fill_eq]
   simp only
   split
-  · exact ⟨state₂', rfl, filled, filled_above⟩
-  · exact ⟨_, rfl, filled.push above current_above, filled_above⟩
+  · exact ⟨state₂', rfl, filled, filled_within⟩
+  · exact ⟨_, rfl, filled.push within current_within, filled_within⟩
 
-/-- A rewrite by a matcher that commutes with shifts keeps values above a
-frontier its loan is at or beyond. -/
-theorem rewriteFirst_above_of_shift {matcher : Nat → RuntimeValue → Option RuntimeValue}
-    (commutes : ∀ offset loan value, matcher (loan + offset) (value.shift offset) =
-      (matcher loan value).map (·.shift offset))
-    {loan : Nat} (above : frontier ≤ loan) {value result : RuntimeValue}
-    (value_above : value.Above frontier) (rewrite : rewriteFirst (matcher loan) value = some result) :
-    result.Above frontier := by
-  rw [← RuntimeValue.shift_unshift frontier value value_above, ← Nat.sub_add_cancel above,
-    rewriteFirst_shift (commutes frontier (loan - frontier))] at rewrite
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp rewrite
-  exact RuntimeValue.above_shift_self frontier base
+/-- A rewrite by a matcher that commutes with injective renamings keeps
+values among the loans an enumeration admits, its loan among them. -/
+theorem rewriteFirst_within_of_rename {matcher : Nat → RuntimeValue → Option RuntimeValue}
+    (commutes : ∀ σ : Nat → Nat, Function.Injective σ → ∀ loan value,
+      matcher (σ loan) (value.rename σ) = (matcher loan value).map (·.rename σ))
+    {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {loan : Nat} (within : inside loan) {value result : RuntimeValue}
+    (value_within : value.Within inside) (rewrite : rewriteFirst (matcher loan) value = some result) :
+    result.Within inside := by
+  rw [← base.rename_inverse value value_within, ← base.inverse loan within,
+    rewriteFirst_rename (commutes β base.injective (γ loan))] at rewrite
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp rewrite
+  exact base.within original
 
-theorem findFirst_above_of_shift {matcher : Nat → RuntimeValue → Option RuntimeValue}
-    (commutes : ∀ offset loan value, matcher (loan + offset) (value.shift offset) =
-      (matcher loan value).map (·.shift offset))
-    {loan : Nat} (above : frontier ≤ loan) {value result : RuntimeValue}
-    (value_above : value.Above frontier) (query : findFirst (matcher loan) value = some result) :
-    result.Above frontier := by
-  rw [← RuntimeValue.shift_unshift frontier value value_above, ← Nat.sub_add_cancel above,
-    findFirst_shift (commutes frontier (loan - frontier))] at query
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp query
-  exact RuntimeValue.above_shift_self frontier base
+theorem findFirst_within_of_rename {matcher : Nat → RuntimeValue → Option RuntimeValue}
+    (commutes : ∀ σ : Nat → Nat, Function.Injective σ → ∀ loan value,
+      matcher (σ loan) (value.rename σ) = (matcher loan value).map (·.rename σ))
+    {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {loan : Nat} (within : inside loan) {value result : RuntimeValue}
+    (value_within : value.Within inside) (query : findFirst (matcher loan) value = some result) :
+    result.Within inside := by
+  rw [← base.rename_inverse value value_within, ← base.inverse loan within,
+    findFirst_rename (commutes β base.injective (γ loan))] at query
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp query
+  exact base.within original
 
 theorem Array.findSome?_map_result {α β γ : Type} (values : Array α) (find : α → Option β)
     (f : β → γ) :
@@ -1047,35 +1112,37 @@ theorem Array.findSome?_map_result {α β γ : Type} (values : Array α) (find :
       simp only [List.findSome?_cons]
       cases find head <;> simp [ih]
 
-theorem findBorrowValue?_shift {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂) (loan : Nat) :
-    findBorrowValue? (frame.shift offset) state₂ (loan + offset) =
-      (findBorrowValue? frame state loan).map (·.shift offset) := by
+theorem findBorrowValue?_rename {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂) (loan : Nat) :
+    findBorrowValue? (frame.rename ρ) state₂ (ρ loan) =
+      (findBorrowValue? frame state loan).map (·.rename ρ) := by
   unfold findBorrowValue?
-  have node := fun value => borrowCurrent?_shift (offset := offset) loan value
-  simp only [RuntimeFrame.shift_locals, Array.findSome?_map, shifted.globals,
-    GlobalMap.shift_entries]
+  have node := fun value => borrowCurrent?_rename shifted.renames.injective loan value
+  simp only [RuntimeFrame.rename_locals, Array.findSome?_map, shifted.globals,
+    GlobalMap.rename_entries]
   have locals : ((fun slot : Option RuntimeValue =>
-        slot.bind fun value => findFirst (borrowCurrent? (loan + offset)) value) ∘
-          Option.map fun value => value.shift offset) =
+        slot.bind fun value => findFirst (borrowCurrent? (ρ loan)) value) ∘
+          Option.map fun value => value.rename ρ) =
       fun slot => (slot.bind fun value => findFirst (borrowCurrent? loan) value).map
-        (·.shift offset) := by
-    funext slot; cases slot <;> simp [findFirst_shift node]
-  have globals : ((fun slot : GlobalSlot => findFirst (borrowCurrent? (loan + offset)) slot.value) ∘
-        fun slot : GlobalSlot => { slot with value := slot.value.shift offset }) =
-      fun slot => (findFirst (borrowCurrent? loan) slot.value).map (·.shift offset) := by
-    funext slot; simp [findFirst_shift node]
+        (·.rename ρ) := by
+    funext slot; cases slot <;> simp [findFirst_rename node]
+  have globals : ((fun slot : GlobalSlot => findFirst (borrowCurrent? (ρ loan)) slot.value) ∘
+        fun slot : GlobalSlot => { slot with value := slot.value.rename ρ }) =
+      fun slot => (findFirst (borrowCurrent? loan) slot.value).map (·.rename ρ) := by
+    funext slot; simp [findFirst_rename node]
   rw [locals, globals, Array.findSome?_map_result, Array.findSome?_map_result]
   cases frame.locals.findSome? (fun slot => slot.bind fun value =>
     findFirst (borrowCurrent? loan) value) <;> rfl
 
-theorem findBorrowValue?_above {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) {loan : Nat} (above : frontier ≤ loan)
+theorem findBorrowValue?_within {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) {loan : Nat} (within : inside loan)
     {current : RuntimeValue} (found : findBorrowValue? frame state loan = some current) :
-    current.Above frontier := by
+    current.Within inside := by
+  obtain ⟨β, γ, base⟩ := shifted.renames.base
   unfold findBorrowValue? at found
-  have commutes := fun offset loan value => borrowCurrent?_shift (offset := offset) loan value
+  have commutes := fun (σ : Nat → Nat) (injective : Function.Injective σ) loan value =>
+    borrowCurrent?_rename injective loan value
   simp only at found
   split at found
   · rename_i result result_eq
@@ -1085,102 +1152,104 @@ theorem findBorrowValue?_above {frame : RuntimeFrame}
     cases slot with
     | none => cases found
     | some value =>
-        exact findFirst_above_of_shift commutes above
-          (frame_above.locals _ member value rfl) found
+        exact findFirst_within_of_rename commutes base within
+          (frame_within.locals _ member value rfl) found
   · obtain ⟨slot, member, found⟩ := Array.exists_of_findSome?_eq_some found
-    exact findFirst_above_of_shift commutes above (shifted.globalsAbove slot member) found
+    exact findFirst_within_of_rename commutes base within (shifted.globalsWithin slot member) found
 
-theorem clearBorrowValue_shift {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) {loan : Nat} (above : frontier ≤ loan) :
-    ∃ state₂', clearBorrowValue (frame.shift offset) state₂ (loan + offset) =
-      ((clearBorrowValue frame state loan).1.shift offset, state₂') ∧
-      StateShifted offset frontier inert inert' (clearBorrowValue frame state loan).2 state₂' ∧
-      (clearBorrowValue frame state loan).1.Above frontier := by
-  have commutes := fun offset loan value => borrowClear?_shift (offset := offset) loan value
-  have node := fun value => borrowClear?_shift (offset := offset) loan value
+theorem clearBorrowValue_rename {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) {loan : Nat} (within : inside loan) :
+    ∃ state₂', clearBorrowValue (frame.rename ρ) state₂ (ρ loan) =
+      ((clearBorrowValue frame state loan).1.rename ρ, state₂') ∧
+      StateRenamed ρ offset frontier inside inert inert' (clearBorrowValue frame state loan).2 state₂' ∧
+      (clearBorrowValue frame state loan).1.Within inside := by
+  obtain ⟨β, γ, base⟩ := shifted.renames.base
+  have commutes := fun (σ : Nat → Nat) (injective : Function.Injective σ) loan value =>
+    borrowClear?_rename injective loan value
+  have node := fun value => borrowClear?_rename shifted.renames.injective loan value
   unfold clearBorrowValue
   simp only
   have locals : ((fun slot : Option RuntimeValue =>
-        (slot.bind fun value => rewriteFirst (borrowClear? (loan + offset)) value).isSome) ∘
-          Option.map fun value => value.shift offset) =
+        (slot.bind fun value => rewriteFirst (borrowClear? (ρ loan)) value).isSome) ∘
+          Option.map fun value => value.rename ρ) =
       fun slot => (slot.bind fun value => rewriteFirst (borrowClear? loan) value).isSome := by
-    funext slot; cases slot <;> simp [rewriteFirst_shift node]
-  rw [RuntimeFrame.shift_locals, Array.toList_map, indexOfFrom_map, locals]
+    funext slot; cases slot <;> simp [rewriteFirst_rename node]
+  rw [RuntimeFrame.rename_locals, Array.toList_map, indexOfFrom_map, locals]
   cases indexOfFrom (fun slot => (slot.bind fun value =>
       rewriteFirst (borrowClear? loan) value).isSome) frame.locals.toList 0 with
   | some index =>
       simp only [Array.getElem?_map]
       cases slot_eq : frame.locals[index]? with
-      | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+      | none => exact ⟨state₂, rfl, shifted, frame_within⟩
       | some slot =>
           cases slot with
-          | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+          | none => exact ⟨state₂, rfl, shifted, frame_within⟩
           | some value =>
-              simp only [Option.map_some, Option.bind_some, rewriteFirst_shift node]
+              simp only [Option.map_some, Option.bind_some, rewriteFirst_rename node]
               cases clear_eq : rewriteFirst (borrowClear? loan) value with
-              | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+              | none => exact ⟨state₂, rfl, shifted, frame_within⟩
               | some updated =>
-                  refine ⟨state₂, by simp [RuntimeFrame.shift, Array.map_setIfInBounds], shifted,
-                    frame_above.setLocal index (rewriteFirst_above_of_shift commutes above
-                      (frame_above.slot slot_eq) clear_eq)⟩
+                  refine ⟨state₂, by simp [RuntimeFrame.rename, Array.map_setIfInBounds], shifted,
+                    frame_within.setLocal index (rewriteFirst_within_of_rename commutes base within
+                      (frame_within.slot slot_eq) clear_eq)⟩
   | none =>
       have globals : ((fun slot : GlobalSlot =>
-            (rewriteFirst (borrowClear? (loan + offset)) slot.value).isSome) ∘
-              fun slot : GlobalSlot => { slot with value := slot.value.shift offset }) =
+            (rewriteFirst (borrowClear? (ρ loan)) slot.value).isSome) ∘
+              fun slot : GlobalSlot => { slot with value := slot.value.rename ρ }) =
           fun slot => (rewriteFirst (borrowClear? loan) slot.value).isSome := by
-        funext slot; simp [rewriteFirst_shift node]
-      rw [shifted.globals, GlobalMap.shift_entries, Array.toList_map, indexOfFrom_map, globals]
+        funext slot; simp [rewriteFirst_rename node]
+      rw [shifted.globals, GlobalMap.rename_entries, Array.toList_map, indexOfFrom_map, globals]
       cases indexOfFrom (fun slot : GlobalSlot =>
           (rewriteFirst (borrowClear? loan) slot.value).isSome) state.globals.entries.toList 0 with
-      | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+      | none => exact ⟨state₂, rfl, shifted, frame_within⟩
       | some index =>
           simp only [Array.getElem?_map]
           cases slot_eq : state.globals.entries[index]? with
-          | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+          | none => exact ⟨state₂, rfl, shifted, frame_within⟩
           | some slot =>
-              simp only [Option.map_some, Option.bind_some, rewriteFirst_shift node]
+              simp only [Option.map_some, Option.bind_some, rewriteFirst_rename node]
               cases clear_eq : rewriteFirst (borrowClear? loan) slot.value with
-              | none => exact ⟨state₂, rfl, shifted, frame_above⟩
+              | none => exact ⟨state₂, rfl, shifted, frame_within⟩
               | some updated =>
                   refine ⟨{ state₂ with
                       globals := (⟨state.globals.entries.set! index { slot with value := updated }⟩ :
-                        GlobalMap).shift offset },
-                    by simp [GlobalMap.shift, Array.map_setIfInBounds], ?_, frame_above⟩
+                        GlobalMap).rename ρ },
+                    by simp [GlobalMap.rename, Array.map_setIfInBounds], ?_, frame_within⟩
                   refine shifted.withGlobals _ fun slot' member => ?_
                   simp only [Array.set!_eq_setIfInBounds] at member
                   rcases Array.mem_or_eq_of_mem_setIfInBounds member with member | rfl
-                  · exact shifted.globalsAbove slot' member
-                  · exact rewriteFirst_above_of_shift commutes above
-                      (shifted.globalsAbove slot (Array.mem_of_getElem? slot_eq)) clear_eq
+                  · exact shifted.globalsWithin slot' member
+                  · exact rewriteFirst_within_of_rename commutes base within
+                      (shifted.globalsWithin slot (Array.mem_of_getElem? slot_eq)) clear_eq
 
 /-- A frame and state of a second run mirroring those of a first. -/
-def Mirrors (offset frontier inert inert' : Nat) (first second : RuntimeFrame × RuntimeState) :
-    Prop :=
-  second.1 = first.1.shift offset ∧
-    StateShifted offset frontier inert inert' first.2 second.2 ∧ first.1.Above frontier
+def Mirrors (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat → Prop) (inert inert' : Nat)
+    (first second : RuntimeFrame × RuntimeState) : Prop :=
+  second.1 = first.1.rename ρ ∧
+    StateRenamed ρ offset frontier inside inert inert' first.2 second.2 ∧ first.1.Within inside
 
-theorem settleLoans_shift {loans : Array LoanId} {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) :
-    Mirrors offset frontier inert inert' (settleLoans loans frame state)
-      (settleLoans loans (frame.shift offset) state₂) := by
+theorem settleLoans_rename {loans : Array LoanId} {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) :
+    Mirrors ρ offset frontier inside inert inert' (settleLoans loans frame state)
+      (settleLoans loans (frame.rename ρ) state₂) := by
   unfold settleLoans
   rw [← Array.foldr_toList, ← Array.foldr_toList]
   induction loans.toList with
-  | nil => exact ⟨rfl, shifted, frame_above⟩
+  | nil => exact ⟨rfl, shifted, frame_within⟩
   | cons lexical rest ih =>
       simp only [List.foldr_cons]
       obtain ⟨same, related, above⟩ := ih
       generalize List.foldr _ (frame, state) rest = first at same related above
-      generalize List.foldr _ (frame.shift offset, state₂) rest = second at same related above
+      generalize List.foldr _ (frame.rename ρ, state₂) rest = second at same related above
       obtain ⟨current₁, state₁⟩ := first
       obtain ⟨current₂, state₂'⟩ := second
       simp only at same related above
       subst same
-      simp only [RuntimeFrame.shift_activeLoans, Array.find?_map]
+      simp only [RuntimeFrame.rename_activeLoans, Array.find?_map]
       have site : ((fun entry : ExprId × Nat => entry.1 == ⟨lexical.index⟩) ∘
-          fun entry : ExprId × Nat => (entry.1, entry.2 + offset)) =
+          fun entry : ExprId × Nat => (entry.1, ρ entry.2)) =
           fun entry => entry.1 == ⟨lexical.index⟩ := by
         funext entry; rfl
       rw [site]
@@ -1188,100 +1257,101 @@ theorem settleLoans_shift {loans : Array LoanId} {frame : RuntimeFrame}
       | none => exact ⟨rfl, related, above⟩
       | some entry =>
           obtain ⟨lexical', loanInstance⟩ := entry
-          have instance_above : frontier ≤ loanInstance :=
+          have instance_within : inside loanInstance :=
             above.activeLoans _ (Array.mem_of_find?_eq_some found)
           simp only [Option.map_some]
-          have filtered : RuntimeFrame.mk (current₁.shift offset).locals
+          have filtered : RuntimeFrame.mk (current₁.rename ρ).locals
               (Array.filter (fun entry => entry.fst != { index := lexical.index })
-                (current₁.shift offset).activeLoans)
-              (current₁.shift offset).loanLocations (current₁.shift offset).typeInstantiation =
+                (current₁.rename ρ).activeLoans)
+              (current₁.rename ρ).loanLocations (current₁.rename ρ).typeInstantiation =
               (RuntimeFrame.mk current₁.locals
                 (current₁.activeLoans.filter (fun entry => entry.fst != { index := lexical.index }))
-                current₁.loanLocations current₁.typeInstantiation).shift offset := by
-            simp only [RuntimeFrame.shift, Array.filter_map]
+                current₁.loanLocations current₁.typeInstantiation).rename ρ := by
+            simp only [RuntimeFrame.rename, Array.filter_map]
             rfl
-          have filtered_above : ({ current₁ with
+          have filtered_within : ({ current₁ with
               activeLoans := (current₁.activeLoans.filter (·.1 != ⟨lexical.index⟩)) } :
-              RuntimeFrame).Above frontier :=
+              RuntimeFrame).Within inside :=
             { locals := above.locals
               activeLoans := fun entry member => above.activeLoans entry (Array.mem_filter.mp member).1
               loanLocations := above.loanLocations }
-          rw [← RuntimeFrame.shift_activeLoans, filtered, findBorrowValue?_shift related]
+          rw [← RuntimeFrame.rename_activeLoans, filtered, findBorrowValue?_rename related]
           cases borrow_eq : findBorrowValue? { current₁ with
               activeLoans := (current₁.activeLoans.filter (·.1 != ⟨lexical.index⟩)) }
               state₁ loanInstance with
-          | none => exact ⟨rfl, related, filtered_above⟩
+          | none => exact ⟨rfl, related, filtered_within⟩
           | some currentValue =>
-              have current_above := findBorrowValue?_above related filtered_above instance_above
+              have current_within := findBorrowValue?_within related filtered_within instance_within
                 borrow_eq
-              obtain ⟨cleared₂, clear_eq, cleared, cleared_above⟩ :=
-                clearBorrowValue_shift related filtered_above instance_above
+              obtain ⟨cleared₂, clear_eq, cleared, cleared_within⟩ :=
+                clearBorrowValue_rename related filtered_within instance_within
               simp only [Option.map_some, clear_eq]
-              obtain ⟨written₂, write_eq, written, written_above⟩ :=
-                applyWriteBack_shift cleared cleared_above instance_above current_above
+              obtain ⟨written₂, write_eq, written, written_within⟩ :=
+                applyWriteBack_rename cleared cleared_within instance_within current_within
               rw [write_eq]
-              exact ⟨rfl, written, written_above⟩
+              exact ⟨rfl, written, written_within⟩
 
-theorem settleAfter_shift {loans : Array LoanId} {control : Control} {frame : RuntimeFrame}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) :
-    Mirrors offset frontier inert inert' (settleAfter loans control frame state)
-      (settleAfter loans (control.shift offset) (frame.shift offset) state₂) := by
-  cases control <;> simp only [settleAfter, Control.shift]
-  · exact settleLoans_shift shifted frame_above
-  all_goals exact ⟨rfl, shifted, frame_above⟩
+theorem settleAfter_rename {loans : Array LoanId} {control : Control} {frame : RuntimeFrame}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) :
+    Mirrors ρ offset frontier inside inert inert' (settleAfter loans control frame state)
+      (settleAfter loans (control.rename ρ) (frame.rename ρ) state₂) := by
+  cases control <;> simp only [settleAfter, Control.rename]
+  · exact settleLoans_rename shifted frame_within
+  all_goals exact ⟨rfl, shifted, frame_within⟩
 
 end States
 
 /-- A write from a frame and state above a frontier, of a value above it,
 leaves them above it, and a second run's write mirrors it. -/
-theorem writeRuntimePlace?_mirror {frontier inert inert' : Nat} {frame frame' : RuntimeFrame}
+theorem writeRuntimePlace?_mirror {offset frontier inert inert' : Nat} {inside : Nat → Prop}
+    {frame frame' : RuntimeFrame}
     {state state' state₂ : RuntimeState}
-    (shifted : StateShifted offset frontier inert inert' state state₂)
-    (frame_above : frame.Above frontier) {place : RuntimePlace} {value : RuntimeValue}
-    (value_above : value.Above frontier)
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (frame_within : frame.Within inside) {place : RuntimePlace} {value : RuntimeValue}
+    (value_within : value.Within inside)
     (write : writeRuntimePlace? frame state place value = some (frame', state')) :
-    ∃ state₂', writeRuntimePlace? (frame.shift offset) state₂ place (value.shift offset) =
-        some (frame'.shift offset, state₂') ∧
-      StateShifted offset frontier inert inert' state' state₂' ∧ frame'.Above frontier := by
+    ∃ state₂', writeRuntimePlace? (frame.rename ρ) state₂ place (value.rename ρ) =
+        some (frame'.rename ρ, state₂') ∧
+      StateRenamed ρ offset frontier inside inert inert' state' state₂' ∧ frame'.Within inside := by
+  obtain ⟨β, γ, base⟩ := shifted.renames.base
   have base_eq : state.globals =
-      ({ state with globals := state.globals.unshift frontier } : RuntimeState).globals.shift
-        frontier := (GlobalMap.shift_unshift shifted.globalsAbove).symm
-  have base := writeRuntimePlace?_shift (offset := frontier) (frame := frame.unshift frontier)
-    base_eq place (value.unshift frontier)
-  rw [RuntimeFrame.shift_unshift frame_above,
-    RuntimeValue.shift_unshift frontier value value_above, write] at base
-  obtain ⟨written, -, written_eq⟩ := Option.map_eq_some_iff.mp base.symm
+      ({ state with globals := state.globals.rename γ } : RuntimeState).globals.rename β :=
+    (base.rename_inverse_globals shifted.globalsWithin).symm
+  have based := writeRuntimePlace?_rename (ρ := β) (frame := frame.rename γ)
+    base_eq place (value.rename γ)
+  rw [base.rename_inverse_frame frame_within, base.rename_inverse value value_within, write] at based
+  obtain ⟨written, -, written_eq⟩ := Option.map_eq_some_iff.mp based.symm
   simp only [Prod.mk.injEq] at written_eq
   obtain ⟨frame_eq, state_eq⟩ := written_eq
-  have globals_above : ∀ slot ∈ state'.globals.entries, slot.value.Above frontier := by
+  have globals_within : ∀ slot ∈ state'.globals.entries, slot.value.Within inside := by
     rw [← state_eq]
-    exact GlobalMap.above_shift_self frontier _
-  refine ⟨{ state₂ with globals := state'.globals.shift offset }, ?_, ?_, ?_⟩
-  · rw [writeRuntimePlace?_shift shifted.globals, write]
+    exact base.within_globals _
+  refine ⟨{ state₂ with globals := state'.globals.rename ρ }, ?_, ?_, ?_⟩
+  · rw [writeRuntimePlace?_rename shifted.globals, write]
     rfl
   · rw [writeRuntimePlace?_globals write]
-    exact shifted.withGlobals _ globals_above
+    exact shifted.withGlobals _ globals_within
   · rw [← frame_eq]
-    exact RuntimeFrame.above_shift_self frontier _
+    exact base.within_frame _
 
 /-! ## Write-backs across calls -/
 
-theorem applyPendingWriteBack_shift {frame : RuntimeFrame} {state state₂ : RuntimeState}
-    (globals_eq : state₂.globals = state.globals.shift offset) (loan : Nat)
+theorem applyPendingWriteBack_rename (injective : Function.Injective ρ) {frame : RuntimeFrame}
+    {state state₂ : RuntimeState} (globals_eq : state₂.globals = state.globals.rename ρ) (loan : Nat)
     (current : RuntimeValue) :
-    (applyPendingWriteBack (frame.shift offset) state₂ (loan + offset) (current.shift offset)).1 =
-        (applyPendingWriteBack frame state loan current).1.shift offset ∧
+    (applyPendingWriteBack (frame.rename ρ) state₂ (ρ loan) (current.rename ρ)).1 =
+        (applyPendingWriteBack frame state loan current).1.rename ρ ∧
       (((applyPendingWriteBack frame state loan current).2 = state ∧
-          (applyPendingWriteBack (frame.shift offset) state₂ (loan + offset)
-            (current.shift offset)).2 = state₂) ∨
+          (applyPendingWriteBack (frame.rename ρ) state₂ (ρ loan)
+            (current.rename ρ)).2 = state₂) ∨
         ((applyPendingWriteBack frame state loan current).2 =
             { state with pending := state.pending.push (loan, current) } ∧
-          (applyPendingWriteBack (frame.shift offset) state₂ (loan + offset)
-            (current.shift offset)).2 =
-            { state₂ with pending := state₂.pending.push (loan + offset, current.shift offset) })) := by
+          (applyPendingWriteBack (frame.rename ρ) state₂ (ρ loan)
+            (current.rename ρ)).2 =
+            { state₂ with pending := state₂.pending.push (ρ loan, current.rename ρ) })) := by
   unfold applyPendingWriteBack
-  rw [fillLocalLoanHole?_shift globals_eq]
+  rw [fillLocalLoanHole?_rename injective globals_eq]
   cases local_eq : fillLocalLoanHole? frame state loan current with
   | some resolved =>
       obtain ⟨resolvedFrame, resolvedState⟩ := resolved
@@ -1295,9 +1365,9 @@ theorem applyPendingWriteBack_shift {frame : RuntimeFrame} {state state₂ : Run
       exact ⟨rfl, .inl ⟨rfl, rfl⟩⟩
   | none =>
       simp only [Option.map_none]
-      rw [holeInFrame_shift]
+      rw [holeInFrame_rename injective]
       split
-      · rw [RuntimeFrame.shift_locals, Array.toList_map, indexOfFrom_map, holeSlot_shift]
+      · rw [RuntimeFrame.rename_locals, Array.toList_map, indexOfFrom_map, holeSlot_rename injective]
         cases indexOfFrom (fun slot => (slot.map (holeWithin loan)).getD false)
             frame.locals.toList 0 with
         | none => exact ⟨rfl, .inr ⟨rfl, rfl⟩⟩
@@ -1309,15 +1379,15 @@ theorem applyPendingWriteBack_shift {frame : RuntimeFrame} {state state₂ : Run
                 cases slot with
                 | none => exact ⟨rfl, .inr ⟨rfl, rfl⟩⟩
                 | some value =>
-                    simp only [Option.map_some, Option.bind_some, fillHole?_shift]
+                    simp only [Option.map_some, Option.bind_some, fillHole?_rename injective]
                     cases fillHole? loan current value with
                     | none => exact ⟨rfl, .inr ⟨rfl, rfl⟩⟩
                     | some filled =>
                         refine ⟨?_, .inl ⟨rfl, rfl⟩⟩
-                        simp only [Option.map_some, RuntimeFrame.shift_activeLoans,
-                          RuntimeFrame.shift_loanLocations, transferActiveLoan_shift,
-                          transferLoanLocation_shift]
-                        simp [RuntimeFrame.shift, Array.map_setIfInBounds]
+                        simp only [Option.map_some, RuntimeFrame.rename_activeLoans,
+                          RuntimeFrame.rename_loanLocations, transferActiveLoan_rename injective,
+                          transferLoanLocation_rename injective]
+                        simp [RuntimeFrame.rename, Array.map_setIfInBounds]
       · exact ⟨rfl, .inr ⟨rfl, rfl⟩⟩
 
 theorem Array.extract_from {α : Type} (values : Array α) {start start' : Nat}
@@ -1342,65 +1412,70 @@ section Calls
 
 variable {frontier inert inert' : Nat}
 
-theorem StateShifted.pending_from {state state₂ : RuntimeState}
-    (shifted : StateShifted offset frontier inert inert' state state₂) {start start' : Nat}
+theorem StateRenamed.pending_from {state state₂ : RuntimeState}
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂) {start start' : Nat}
     (le : inert ≤ start) (le' : inert' ≤ start') (same : start - inert = start' - inert') :
     state₂.pending.extract start' state₂.pending.size =
       (state.pending.extract start state.pending.size).map fun entry =>
-        (entry.1 + offset, entry.2.shift offset) := by
+        (ρ entry.1, entry.2.rename ρ) := by
   have sizes := congrArg Array.size shifted.pending
   simp only [Array.size_extract, Array.size_map, Nat.min_self] at sizes
   rw [Array.extract_from _ le', shifted.pending, Array.extract_from _ le, ← Array.map_extract]
   congr 1
   rw [same, sizes]
 
-theorem StateShifted.restart {state state₂ arguments arguments₂ : RuntimeState}
-    (final : StateShifted offset frontier inert inert' state state₂)
-    (calling : StateShifted offset frontier inert inert' arguments arguments₂) :
-    StateShifted offset frontier inert inert' { state with pending := arguments.pending }
+theorem StateRenamed.restart {state state₂ arguments arguments₂ : RuntimeState}
+    (final : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    (calling : StateRenamed ρ offset frontier inside inert inert' arguments arguments₂) :
+    StateRenamed ρ offset frontier inside inert inert' { state with pending := arguments.pending }
       { state₂ with pending := arguments₂.pending } where
+  renames := final.renames
   globals := final.globals
+  tables := final.tables
   nextLoan := final.nextLoan
   frontier_le := final.frontier_le
   inert_le := calling.inert_le
   inert_le' := calling.inert_le'
   pending := calling.pending
   registry := final.registry
-  globalsAbove := final.globalsAbove
-  pendingAbove := calling.pendingAbove
+  globalsWithin := final.globalsWithin
+  tablesWithin := final.tablesWithin
+  pendingWithin := calling.pendingWithin
 
 theorem applyPendingWriteBack_mirror {first second : RuntimeFrame × RuntimeState}
-    (mirrors : Mirrors offset frontier inert inert' first second) {loan : Nat}
-    (above : frontier ≤ loan) {current : RuntimeValue} (current_above : current.Above frontier) :
-    Mirrors offset frontier inert inert'
+    (mirrors : Mirrors ρ offset frontier inside inert inert' first second) {loan : Nat}
+    (within : inside loan) {current : RuntimeValue} (current_within : current.Within inside) :
+    Mirrors ρ offset frontier inside inert inert'
       (applyPendingWriteBack first.1 first.2 loan current)
-      (applyPendingWriteBack second.1 second.2 (loan + offset) (current.shift offset)) := by
+      (applyPendingWriteBack second.1 second.2 (ρ loan) (current.rename ρ)) := by
   obtain ⟨frame, state⟩ := first
   obtain ⟨frame₂, state₂⟩ := second
-  obtain ⟨rfl, shifted, frame_above⟩ := mirrors
-  obtain ⟨frame_eq, states⟩ := applyPendingWriteBack_shift (frame := frame) shifted.globals loan current
+  obtain ⟨rfl, shifted, frame_within⟩ := mirrors
+  obtain ⟨frame_eq, states⟩ :=
+    applyPendingWriteBack_rename shifted.renames.injective (frame := frame) shifted.globals loan current
+  obtain ⟨β, γ, base⟩ := shifted.renames.base
   have base_eq : state.globals =
-      ({ state with globals := state.globals.unshift frontier } : RuntimeState).globals.shift
-        frontier := (GlobalMap.shift_unshift shifted.globalsAbove).symm
-  have base := (applyPendingWriteBack_shift (offset := frontier) (frame := frame.unshift frontier)
-    base_eq (loan - frontier) (current.unshift frontier)).1
-  rw [RuntimeFrame.shift_unshift frame_above, Nat.sub_add_cancel above,
-    RuntimeValue.shift_unshift frontier current current_above] at base
-  refine ⟨frame_eq, ?_, base ▸ RuntimeFrame.above_shift_self frontier _⟩
+      ({ state with globals := state.globals.rename γ } : RuntimeState).globals.rename β :=
+    (base.rename_inverse_globals shifted.globalsWithin).symm
+  have based := (applyPendingWriteBack_rename base.injective (frame := frame.rename γ)
+    base_eq (γ loan) (current.rename γ)).1
+  rw [base.rename_inverse_frame frame_within, base.inverse loan within,
+    base.rename_inverse current current_within] at based
+  refine ⟨frame_eq, ?_, based ▸ base.within_frame _⟩
   rcases states with ⟨first_eq, second_eq⟩ | ⟨first_eq, second_eq⟩
   · simp only at first_eq second_eq ⊢
     rw [first_eq, second_eq]
     exact shifted
   · simp only at first_eq second_eq ⊢
     rw [first_eq, second_eq]
-    exact shifted.push above current_above
+    exact shifted.push within current_within
 
 theorem applyPendingFrom_mirror {frame : RuntimeFrame}
-    {arguments arguments₂ state state₂ : RuntimeState} (frame_above : frame.Above frontier)
-    (calling : StateShifted offset frontier inert inert' arguments arguments₂)
-    (final : StateShifted offset frontier inert inert' state state₂) :
-    Mirrors offset frontier inert inert' (applyPendingFrom arguments.pending frame state)
-      (applyPendingFrom arguments₂.pending (frame.shift offset) state₂) := by
+    {arguments arguments₂ state state₂ : RuntimeState} (frame_within : frame.Within inside)
+    (calling : StateRenamed ρ offset frontier inside inert inert' arguments arguments₂)
+    (final : StateRenamed ρ offset frontier inside inert inert' state state₂) :
+    Mirrors ρ offset frontier inside inert inert' (applyPendingFrom arguments.pending frame state)
+      (applyPendingFrom arguments₂.pending (frame.rename ρ) state₂) := by
   have sizes := congrArg Array.size calling.pending
   simp only [Array.size_extract, Array.size_map, Nat.min_self] at sizes
   have calling_le := calling.inert_le
@@ -1408,25 +1483,25 @@ theorem applyPendingFrom_mirror {frame : RuntimeFrame}
   unfold applyPendingFrom
   rw [final.pending_from calling_le calling_le' (by omega), Array.foldl_map]
   have entries : ∀ entry ∈ state.pending.extract arguments.pending.size state.pending.size,
-      frontier ≤ entry.1 ∧ entry.2.Above frontier := fun entry member =>
-    final.pendingAbove entry (Array.mem_extract_of_start_le member calling_le)
+      inside entry.1 ∧ entry.2.Within inside := fun entry member =>
+    final.pendingWithin entry (Array.mem_extract_of_start_le member calling_le)
   rw [← Array.foldl_toList, ← Array.foldl_toList]
-  have start : Mirrors offset frontier inert inert' (frame, { state with pending := arguments.pending })
-      (frame.shift offset, { state₂ with pending := arguments₂.pending }) :=
-    ⟨rfl, final.restart calling, frame_above⟩
+  have start : Mirrors ρ offset frontier inside inert inert' (frame, { state with pending := arguments.pending })
+      (frame.rename ρ, { state₂ with pending := arguments₂.pending }) :=
+    ⟨rfl, final.restart calling, frame_within⟩
   have entries' : ∀ entry ∈ (state.pending.extract arguments.pending.size
-      state.pending.size).toList, frontier ≤ entry.1 ∧ entry.2.Above frontier :=
+      state.pending.size).toList, inside entry.1 ∧ entry.2.Within inside :=
     fun entry member => entries entry (Array.mem_def.mpr member)
   clear entries
   generalize (state.pending.extract arguments.pending.size state.pending.size).toList = list
     at entries'
   suffices fold : ∀ (list : List (Nat × RuntimeValue)) (first second : RuntimeFrame × RuntimeState),
-      (∀ entry ∈ list, frontier ≤ entry.1 ∧ entry.2.Above frontier) →
-      Mirrors offset frontier inert inert' first second →
-      Mirrors offset frontier inert inert'
+      (∀ entry ∈ list, inside entry.1 ∧ entry.2.Within inside) →
+      Mirrors ρ offset frontier inside inert inert' first second →
+      Mirrors ρ offset frontier inside inert inert'
         (list.foldl (fun pair entry => applyPendingWriteBack pair.1 pair.2 entry.1 entry.2) first)
         (list.foldl (fun pair entry =>
-          applyPendingWriteBack pair.1 pair.2 (entry.1 + offset) (entry.2.shift offset)) second) by
+          applyPendingWriteBack pair.1 pair.2 (ρ entry.1) (entry.2.rename ρ)) second) by
     exact fold list _ _ entries' start
   intro list
   induction list with
@@ -1437,30 +1512,30 @@ theorem applyPendingFrom_mirror {frame : RuntimeFrame}
       exact ih _ _ (fun entry member => entries entry (by simp [member]))
         (applyPendingWriteBack_mirror mirrors (entries head (by simp)).1 (entries head (by simp)).2)
 
-theorem borrowEntry?_shift (value : RuntimeValue) :
-    borrowEntry? (value.shift offset) =
-      (borrowEntry? value).map (Option.map fun entry => (entry.1 + offset, entry.2.shift offset)) := by
+theorem borrowEntry?_rename (value : RuntimeValue) :
+    borrowEntry? (value.rename ρ) =
+      (borrowEntry? value).map (Option.map fun entry => (ρ entry.1, entry.2.rename ρ)) := by
   cases value <;> simp [borrowEntry?]
 
-theorem outermostBorrows_shift (value : RuntimeValue) :
-    outermostBorrows (value.shift offset) =
-      (outermostBorrows value).map fun entry => (entry.1 + offset, entry.2.shift offset) := by
+theorem outermostBorrows_rename (value : RuntimeValue) :
+    outermostBorrows (value.rename ρ) =
+      (outermostBorrows value).map fun entry => (ρ entry.1, entry.2.rename ρ) := by
   unfold outermostBorrows
-  rw [collectPruned_shift (fun value => borrowEntry?_shift value)]
+  rw [collectPruned_rename (fun value => borrowEntry?_rename value)]
   apply Array.ext'
   simp [List.filterMap_map, List.map_filterMap]
 
-theorem returnedBorrows_shift (results : Array RuntimeValue) :
-    (results.map (·.shift offset)).foldl (init := #[]) (fun found result =>
+theorem returnedBorrows_rename (results : Array RuntimeValue) :
+    (results.map (·.rename ρ)).foldl (init := #[]) (fun found result =>
         found ++ outermostBorrows result) =
       (results.foldl (init := #[]) fun found result => found ++ outermostBorrows result).map
-        fun entry => (entry.1 + offset, entry.2.shift offset) := by
+        fun entry => (ρ entry.1, entry.2.rename ρ) := by
   rw [Array.foldl_map, ← Array.foldl_toList, ← Array.foldl_toList]
   suffices general : ∀ (list : List RuntimeValue) (start : Array (Nat × RuntimeValue)),
-      list.foldl (fun found result => found ++ outermostBorrows (result.shift offset))
-          (start.map fun entry => (entry.1 + offset, entry.2.shift offset)) =
+      list.foldl (fun found result => found ++ outermostBorrows (result.rename ρ))
+          (start.map fun entry => (ρ entry.1, entry.2.rename ρ)) =
         (list.foldl (fun found result => found ++ outermostBorrows result) start).map
-          fun entry => (entry.1 + offset, entry.2.shift offset) by
+          fun entry => (ρ entry.1, entry.2.rename ρ) by
     simpa using general results.toList #[]
   intro list
   induction list with
@@ -1468,22 +1543,22 @@ theorem returnedBorrows_shift (results : Array RuntimeValue) :
   | cons head tail ih =>
       intro start
       simp only [List.foldl_cons]
-      rw [outermostBorrows_shift head, ← Array.map_append, ih]
+      rw [outermostBorrows_rename head, ← Array.map_append, ih]
 
-theorem registerReturnedLoan_shift (lexical : Option Nat) (results : Array RuntimeValue)
+theorem registerReturnedLoan_rename (lexical : Option Nat) (results : Array RuntimeValue)
     (frame : RuntimeFrame) :
-    registerReturnedLoan lexical (results.map (·.shift offset)) (frame.shift offset) =
-      (registerReturnedLoan lexical results frame).shift offset := by
+    registerReturnedLoan lexical (results.map (·.rename ρ)) (frame.rename ρ) =
+      (registerReturnedLoan lexical results frame).rename ρ := by
   cases lexical with
   | none => rfl
   | some lexical =>
       unfold registerReturnedLoan
-      simp only [returnedBorrows_shift, Array.getElem?_map]
+      simp only [returnedBorrows_rename, Array.getElem?_map]
       cases (results.foldl (init := #[]) fun found result =>
           found ++ outermostBorrows result)[0]? with
       | none => rfl
       | some entry =>
-          simp only [Option.map_some, RuntimeFrame.shift]
+          simp only [Option.map_some, RuntimeFrame.rename]
           rw [Array.filter_map, Array.map_push]
           rfl
 
@@ -1492,44 +1567,45 @@ theorem packResults_single (value : RuntimeValue) : packResults #[value] = value
 theorem packResults_many (first second : RuntimeValue) (rest : List RuntimeValue) :
     packResults (first :: second :: rest).toArray = .tuple (first :: second :: rest).toArray := rfl
 
-theorem packResults_shift (results : Array RuntimeValue) :
-    packResults (results.map (·.shift offset)) = (packResults results).shift offset := by
+theorem packResults_rename (results : Array RuntimeValue) :
+    packResults (results.map (·.rename ρ)) = (packResults results).rename ρ := by
   rcases results with ⟨_ | ⟨first, _ | ⟨second, rest⟩⟩⟩
-  · rw [List.map_toArray, List.map_nil, packResults_nil, RuntimeValue.shift_unit]
+  · rw [List.map_toArray, List.map_nil, packResults_nil, RuntimeValue.rename_unit]
   · rw [List.map_toArray, List.map_cons, List.map_nil, packResults_single, packResults_single]
   · rw [List.map_toArray, List.map_cons, List.map_cons, packResults_many, packResults_many,
-      RuntimeValue.shift_tuple, List.map_toArray]
+      RuntimeValue.rename_tuple, List.map_toArray]
     rfl
 
-theorem Array.shift_unshift_all {frontier : Nat} {values : Array RuntimeValue}
-    (above : ∀ value ∈ values, value.Above frontier) :
-    (values.map (·.unshift frontier)).map (·.shift frontier) = values := by
+theorem Array.rename_inverse_all {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {values : Array RuntimeValue} (within : ∀ value ∈ values, value.Within inside) :
+    (values.map (·.rename γ)).map (·.rename β) = values := by
   rw [Array.map_map]
   conv => rhs; rw [← Array.map_id values]
-  exact Array.map_congr_left fun value member =>
-    RuntimeValue.shift_unshift frontier value (above value member)
+  exact Array.map_congr_left fun value member => base.rename_inverse value (within value member)
 
-theorem packResults_above {results : Array RuntimeValue}
-    (above : ∀ value ∈ results, value.Above frontier) : (packResults results).Above frontier := by
-  rw [← Array.shift_unshift_all above, packResults_shift]
-  exact RuntimeValue.above_shift_self frontier _
+theorem packResults_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {results : Array RuntimeValue} (within : ∀ value ∈ results, value.Within inside) :
+    (packResults results).Within inside := by
+  rw [← Array.rename_inverse_all base within, packResults_rename]
+  exact base.within _
 
-theorem registerReturnedLoan_above {lexical : Option Nat} {results : Array RuntimeValue}
-    {frame : RuntimeFrame} (frame_above : frame.Above frontier)
-    (above : ∀ value ∈ results, value.Above frontier) :
-    (registerReturnedLoan lexical results frame).Above frontier := by
-  rw [← Array.shift_unshift_all above, ← RuntimeFrame.shift_unshift frame_above,
-    registerReturnedLoan_shift]
-  exact RuntimeFrame.above_shift_self frontier _
+theorem registerReturnedLoan_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {lexical : Option Nat} {results : Array RuntimeValue}
+    {frame : RuntimeFrame} (frame_within : frame.Within inside)
+    (within : ∀ value ∈ results, value.Within inside) :
+    (registerReturnedLoan lexical results frame).Within inside := by
+  rw [← Array.rename_inverse_all base within, ← base.rename_inverse_frame frame_within,
+    registerReturnedLoan_rename]
+  exact base.within_frame _
 
 end Calls
 
 /-! ## Data and closures -/
 
-theorem constructNominal?_shift (unit : Validation.ValidatedUnit) (sourceNamespace : NamespaceId)
+theorem constructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) (variant : Option String) (fields : Array RuntimeValue) :
-    constructNominal? unit sourceNamespace reference variant (fields.map (·.shift offset)) =
-      (constructNominal? unit sourceNamespace reference variant fields).map (·.shift offset) := by
+    constructNominal? unit sourceNamespace reference variant (fields.map (·.rename ρ)) =
+      (constructNominal? unit sourceNamespace reference variant fields).map (·.rename ρ) := by
   unfold constructNominal?
   simp only [Option.bind_eq_bind, Array.size_map]
   cases resolveStruct? unit sourceNamespace reference with
@@ -1542,17 +1618,17 @@ theorem constructNominal?_shift (unit : Validation.ValidatedUnit) (sourceNamespa
           simp only [Option.bind_some]
           split <;> simp [pure]
 
-theorem destructNominal?_shift (unit : Validation.ValidatedUnit) (sourceNamespace : NamespaceId)
+theorem destructNominal?_rename (unit : Validation.ValidatedUnit) (sourceNamespace : NamespaceId)
     (reference : QualifiedRef) (variant : Option String) (value : RuntimeValue) :
-    destructNominal? unit sourceNamespace reference variant (value.shift offset) =
+    destructNominal? unit sourceNamespace reference variant (value.rename ρ) =
       (destructNominal? unit sourceNamespace reference variant value).map
-        (·.map (·.shift offset)) := by
+        (·.map (·.rename ρ)) := by
   unfold destructNominal?
-  cases value <;> simp only [RuntimeValue.shift_tuple, RuntimeValue.shift_unit,
-    RuntimeValue.shift_bool, RuntimeValue.shift_character, RuntimeValue.shift_integer,
-    RuntimeValue.shift_address, RuntimeValue.shift_signer, RuntimeValue.shift_string,
-    RuntimeValue.shift_bytes, RuntimeValue.shift_vector, RuntimeValue.shift_nominal,
-    RuntimeValue.shift_closure, RuntimeValue.shift_borrow, RuntimeValue.shift_loanHole] <;> try rfl
+  cases value <;> simp only [RuntimeValue.rename_tuple, RuntimeValue.rename_unit,
+    RuntimeValue.rename_bool, RuntimeValue.rename_character, RuntimeValue.rename_integer,
+    RuntimeValue.rename_address, RuntimeValue.rename_signer, RuntimeValue.rename_string,
+    RuntimeValue.rename_bytes, RuntimeValue.rename_vector, RuntimeValue.rename_nominal,
+    RuntimeValue.rename_closure, RuntimeValue.rename_borrow, RuntimeValue.rename_loanHole] <;> try rfl
   case nominal source actualVariant fields =>
     simp only [Option.bind_eq_bind, Array.size_map]
     cases resolveStruct? unit sourceNamespace reference with
@@ -1603,13 +1679,13 @@ theorem List.mapM_congr_of_mem {α β : Type} {f g : α → Option β} :
       simp only [List.mapM_cons, same x (by simp),
         List.mapM_congr_of_mem (xs := xs) (fun y member => same y (List.mem_cons_of_mem _ member))]
 
-theorem toConst?_shift :
+theorem toConst?_rename :
     ∀ (fuel : Nat) (value : RuntimeValue), sizeOf value ≤ fuel →
-      RuntimeValue.toConst? (value.shift offset) = RuntimeValue.toConst? value
+      RuntimeValue.toConst? (value.rename ρ) = RuntimeValue.toConst? value
   | 0, value, small => by cases value <;> simp at small
   | fuel + 1, value, small => by
       have elements : ∀ (elements : Array RuntimeValue), sizeOf elements ≤ fuel + 1 →
-          (elements.map (·.shift offset)).attach.mapM
+          (elements.map (·.rename ρ)).attach.mapM
               (fun ⟨element, _⟩ => RuntimeValue.toConst? element) =
             elements.attach.mapM (fun ⟨element, _⟩ => RuntimeValue.toConst? element) := by
         intro elements size
@@ -1622,55 +1698,57 @@ theorem toConst?_shift :
         intro element member
         have := List.sizeOf_lt_of_mem member
         cases elements
-        exact toConst?_shift fuel element (by simp at size this; omega)
+        exact toConst?_rename fuel element (by simp at size this; omega)
       cases value with
       | vector values =>
-          rw [RuntimeValue.shift_vector]
+          rw [RuntimeValue.rename_vector]
           simp only [RuntimeValue.toConst?]
           rw [elements values (by simp at small; omega)]
       | tuple values =>
-          rw [RuntimeValue.shift_tuple]
+          rw [RuntimeValue.rename_tuple]
           simp only [RuntimeValue.toConst?]
           rw [elements values (by simp at small; omega)]
       | nominal | closure | borrow | loanHole => simp [RuntimeValue.toConst?]
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp [RuntimeValue.toConst?]
 
-theorem evaluateProfileOperation?_shift {unit : Validation.ValidatedUnit}
+theorem evaluateProfileOperation?_rename {unit : Validation.ValidatedUnit}
     (executable : Validation.ExecutableUnit unit)
     (ns : Validation.ValidatedNamespace) (resultType : TypeId) (operation : ProfileValue)
     (arguments : Array RuntimeValue) :
-    evaluateProfileOperation? executable ns resultType operation (arguments.map (·.shift offset)) =
+    evaluateProfileOperation? executable ns resultType operation (arguments.map (·.rename ρ)) =
       evaluateProfileOperation? executable ns resultType operation arguments := by
   unfold evaluateProfileOperation?
-  have closed : (arguments.map (·.shift offset)).mapM RuntimeValue.toConst? =
+  have closed : (arguments.map (·.rename ρ)).mapM RuntimeValue.toConst? =
       arguments.mapM RuntimeValue.toConst? := by
     rw [Array.mapM_eq_mapM_toList, Array.mapM_eq_mapM_toList, Array.toList_map, List.mapM_map]
     congr 1
     exact List.mapM_congr_of_mem fun value _ =>
-      toConst?_shift (offset := offset) _ value (Nat.le_refl _)
+      toConst?_rename (ρ := ρ) _ value (Nat.le_refl _)
   simp only [closed]
 
-theorem constructNominal?_above {frontier : Nat} {unit : Validation.ValidatedUnit}
+theorem constructNominal?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {unit : Validation.ValidatedUnit}
     {sourceNamespace : NamespaceId} {reference : QualifiedRef} {variant : Option String}
     {fields : Array RuntimeValue} {value : RuntimeValue}
-    (above : ∀ field ∈ fields, field.Above frontier)
+    (within : ∀ field ∈ fields, field.Within inside)
     (construct : constructNominal? unit sourceNamespace reference variant fields = some value) :
-    value.Above frontier := by
-  rw [← Array.shift_unshift_all above, constructNominal?_shift] at construct
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp construct
-  exact RuntimeValue.above_shift_self frontier base
+    value.Within inside := by
+  rw [← Array.rename_inverse_all base within, constructNominal?_rename] at construct
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp construct
+  exact base.within original
 
-theorem destructNominal?_above {frontier : Nat} {unit : Validation.ValidatedUnit}
+theorem destructNominal?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {unit : Validation.ValidatedUnit}
     {sourceNamespace : NamespaceId} {reference : QualifiedRef} {variant : Option String}
-    {value : RuntimeValue} {fields : Array RuntimeValue} (above : value.Above frontier)
+    {value : RuntimeValue} {fields : Array RuntimeValue} (within : value.Within inside)
     (destruct : destructNominal? unit sourceNamespace reference variant value = some fields) :
-    ∀ field ∈ fields, field.Above frontier := by
-  rw [← RuntimeValue.shift_unshift frontier value above, destructNominal?_shift] at destruct
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp destruct
+    ∀ field ∈ fields, field.Within inside := by
+  rw [← base.rename_inverse value within, destructNominal?_rename] at destruct
+  obtain ⟨renamed, -, rfl⟩ := Option.map_eq_some_iff.mp destruct
   intro field member
   obtain ⟨original, -, rfl⟩ := Array.mem_map.mp member
-  exact RuntimeValue.above_shift_self frontier original
+  exact base.within original
 
 theorem ClosureMask.compose_go_mem {α : Type} :
     ∀ (fuel mask : Nat) (captures supplied composed : List α),

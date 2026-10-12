@@ -107,6 +107,7 @@ def normalizeLeanOutcome
       | .returned values => .returned (values.map normalizeRuntimeValue)
       | .threw kind arguments =>
           match kind, arguments.toList with
+          | LeanerIR.moveArithmeticError, _ => .failed "InvalidOperation" "arithmetic error"
           | .abort, [.integer code] => .aborted code
           | .abort, _ => .error "abort throw carried no single integer code"
           | other, _ => .error s!"unexpected throw kind {repr other}"

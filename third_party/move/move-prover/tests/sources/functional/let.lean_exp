@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/let.move:3:1: error: verification failed with a residual obligation:
+tests/sources/functional/let.move:74:5: error: verification failed with a residual obligation:
 case left.right.left.left.right.right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -52,4 +52,4 @@ x : named = b_final
 tests/sources/functional/let.move:77:9: error: the specification clause `aborts_if sum != 0` is not established
 tests/sources/functional/let.move:78:9: error: the specification clause `aborts_if sum >= MAX_U64` is not established
 tests/sources/functional/let.move:79:9: error: the specification clause `aborts_if product >= MAX_U64` is not established
-tests/sources/functional/let.move:74:5: error: leaner verification failed: the automatic verification of `spec_let_with_abort_incorrect` failed; provide a proof: `verify spec_let_with_abort_incorrect by …` in `tests/sources/functional/let.proof.lean` (`verify spec_let_with_abort_incorrect by skip` shows the obligations it leaves)
+tests/sources/functional/let.move:74:5: error: leaner verification failed: the automatic verification of `spec_let_with_abort_incorrect` failed; provide a proof: `verify spec_let_with_abort_incorrect by …` in `tests/sources/functional/let.proof.lean` (`verify spec_let_with_abort_incorrect by leaner_obligations` lists its obligations)

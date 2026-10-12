@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/behavioral_derived_body.move:1:1: error: LIR-SEMANTIC-TYPE: in fun bump_wrong: data operation operand is not its nominal target type or supported reference at [1439, 1460)

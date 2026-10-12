@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/type_dependent_code.move:10:5: error: verification failed with a residual obligation:
 case h_2.continues
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -11,7 +11,6 @@ frame✝ :
     typeInstantiation✝
 account : LeanerIR.Proofs.Denote.NTy.signer.carrier
 x : (LeanerIR.Proofs.Denote.NTy.param 0).carrier
-snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 initialState✝ : LeanerIR.Proofs.Denote.Memory unit
 assumed permitted : True
 leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
@@ -313,8 +312,8 @@ invariantHolds✝ : True
     none
 tests/sources/functional/type_dependent_code.move:11:9: error: the specification clause `aborts_if exists<S<X> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:12:9: error: the specification clause `aborts_if exists<S<u8> >(account.address)` is not established
-tests/sources/functional/type_dependent_code.move:10:5: error: leaner verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves)
-tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/type_dependent_code.move:10:5: error: leaner verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by leaner_obligations` lists its obligations)
+tests/sources/functional/type_dependent_code.move:26:5: error: verification failed with a residual obligation:
 case h_2.continues
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
@@ -327,7 +326,6 @@ frame✝ :
 account : LeanerIR.Proofs.Denote.NTy.signer.carrier
 t1 : (LeanerIR.Proofs.Denote.NTy.param 0).carrier
 t2 : (LeanerIR.Proofs.Denote.NTy.param 1).carrier
-snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 initialState✝ : LeanerIR.Proofs.Denote.Memory unit
 assumed permitted : True
 leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
@@ -627,12 +625,12 @@ invariantHolds✝ : True
     none
 tests/sources/functional/type_dependent_code.move:27:9: error: the specification clause `aborts_if exists<S<T1> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:28:9: error: the specification clause `aborts_if exists<S<T2> >(account.address)` is not established
-tests/sources/functional/type_dependent_code.move:26:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by skip` shows the obligations it leaves)
+tests/sources/functional/type_dependent_code.move:26:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by leaner_obligations` lists its obligations)
 tests/sources/functional/type_dependent_code.move:49:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/type_dependent_code.move:49:5: error: leaner verification failed: the automatic verification of `test1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/type_dependent_code.move:49:5: error: leaner verification failed: the automatic verification of `test1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test1 by …` in the module (`verify test1 by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
 tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
-tests/sources/functional/type_dependent_code.move:65:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by skip` shows the obligations it leaves)
+tests/sources/functional/type_dependent_code.move:65:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by leaner_obligations` lists its obligations)

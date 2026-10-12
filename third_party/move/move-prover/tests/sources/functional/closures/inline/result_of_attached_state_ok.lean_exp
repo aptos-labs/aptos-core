@@ -1,12 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:7:1: error: verification failed with a residual obligation:
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: verification failed with a residual obligation:
 case step.some.some.some.some.right.right.right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
 prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
 initialState✝ : LeanerIR.Proofs.Denote.Memory unit
 a : LeanerIR.Proofs.Denote.NTy.address.carrier
-snd✝¹ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 assumed permitted : True
 recursive✝ :
   LeanerIR.Proofs.Denote.HEnv
@@ -16,8 +15,8 @@ recursive✝ :
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                       (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                         LeanerIR.Proofs.Denote.NRow.nil))))))))) →
     LeanerIR.Proofs.Denote.Comp unit
@@ -29,14 +28,13 @@ recursive✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil)))))))))
         Unit)
 state✝ : LeanerIR.Proofs.Denote.Memory unit
 fst✝ : Option (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
-snd✝ : LeanerIR.Proofs.Denote.HEnv LeanerIR.Proofs.Denote.NRow.nil
 v result : (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier
 i : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
 left✝² : ↑result.values.size = i.val
@@ -44,11 +42,8 @@ right✝ :
   ∀ (j : Int),
     0 ≤ j →
       j < i.val →
-        ((Option.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode
-                  result.values[j.toNat]?).getD
-              LeanerIR.RuntimeValue.unit).asInt =
-          ((Option.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values[j.toNat]?).getD
-                LeanerIR.RuntimeValue.unit).asInt +
+        (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+          (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
             ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
                     (initialState✝
                       {
@@ -61,8 +56,8 @@ right✝ :
                       (LeanerIR.StorageKey.address a))).getD
                 LeanerIR.RuntimeValue.unit).asInt
 this✝ :
-  LeanerIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 1 } } (v, a, snd✝¹)
-    initialState✝
+  LeanerIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 1 } }
+    (v, a, PUnit.unit) initialState✝
 leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow
     (LeanerIR.Proofs.Denote.ResultShape.one (LeanerIR.Proofs.Denote.NTy.int 64 false).vector)
     (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
@@ -71,8 +66,8 @@ leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier →
@@ -85,8 +80,8 @@ leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -99,8 +94,8 @@ leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -116,8 +111,8 @@ loopHypothesis✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil))))))))))
     (state : LeanerIR.Proofs.Denote.Memory unit),
@@ -125,7 +120,7 @@ loopHypothesis✝ :
       env.snd.fst = some a →
         env.snd.snd.fst = some v →
           env.snd.snd.snd.snd.snd.fst = some (LeanerIR.Proofs.Denote.vectorLength v) →
-            env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+            env.snd.snd.snd.snd.snd.snd.fst = none →
               env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
                 (env.snd.snd.fst.elim False fun v =>
                     env.snd.snd.snd.fst.elim False fun result =>
@@ -141,16 +136,8 @@ loopHypothesis✝ :
                                   (∀ (j : Int),
                                     0 ≤ j →
                                       j < i.val →
-                                        ((Option.map
-                                                  (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64)
-                                                      false).encode
-                                                  result.values[j.toNat]?).getD
-                                              LeanerIR.RuntimeValue.unit).asInt =
-                                          ((Option.map
-                                                    (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64)
-                                                        false).encode
-                                                    v.values[j.toNat]?).getD
-                                                LeanerIR.RuntimeValue.unit).asInt +
+                                        (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+                                          (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
                                             ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
                                                     (initialState✝
                                                       {
@@ -175,8 +162,8 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -188,13 +175,12 @@ tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: leaner verification failed: the automatic verification of `map_add_global` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify map_add_global by …` in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean` (`verify map_add_global by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:7:1: error: verification failed with a residual obligation:
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:52:5: error: leaner verification failed: the automatic verification of `map_add_global` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify map_add_global by …` in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean` (`verify map_add_global by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: verification failed with a residual obligation:
 case step.some.some.some.some.some.right.right.right
 registry✝ : LeanerIR.Validation.SemanticsRegistry
 executable✝ : LeanerIR.Validation.ExecutableUnit unit
 prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-snd✝¹ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
 initialState✝ : LeanerIR.Proofs.Denote.Memory unit
 assumed permitted : True
 recursive✝ :
@@ -205,8 +191,8 @@ recursive✝ :
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                       (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                         LeanerIR.Proofs.Denote.NRow.nil))))))))) →
     LeanerIR.Proofs.Denote.Comp unit
@@ -218,14 +204,13 @@ recursive✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil)))))))))
         Unit)
 state✝ : LeanerIR.Proofs.Denote.Memory unit
 fst✝ : Option (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
-snd✝ : LeanerIR.Proofs.Denote.HEnv LeanerIR.Proofs.Denote.NRow.nil
 a : LeanerIR.Proofs.Denote.NTy.address.carrier
 v result : (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier
 i : (LeanerIR.Proofs.Denote.NTy.int 64 false).carrier
@@ -234,11 +219,8 @@ right✝ :
   ∀ (j : Int),
     0 ≤ j →
       j < i.val →
-        ((Option.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode
-                  result.values[j.toNat]?).getD
-              LeanerIR.RuntimeValue.unit).asInt =
-          ((Option.map (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64) false).encode v.values[j.toNat]?).getD
-                LeanerIR.RuntimeValue.unit).asInt +
+        (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+          (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
             ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
                     (state✝
                       {
@@ -258,8 +240,8 @@ leanerContinuation✝² : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     (LeanerIR.Proofs.Denote.NTy.int 64 false).vector.carrier →
@@ -272,8 +254,8 @@ leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -286,8 +268,8 @@ leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -303,8 +285,8 @@ loopHypothesis✝ :
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
                 (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                   (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                    (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                      (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                         (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                           LeanerIR.Proofs.Denote.NRow.nil))))))))))
     (state : LeanerIR.Proofs.Denote.Memory unit),
@@ -312,7 +294,7 @@ loopHypothesis✝ :
       env.snd.fst = some a →
         env.snd.snd.fst = some v →
           env.snd.snd.snd.snd.snd.fst = some (LeanerIR.Proofs.Denote.vectorLength v) →
-            env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+            env.snd.snd.snd.snd.snd.snd.fst = none →
               env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
                 (env.snd.fst.elim False fun a =>
                     env.snd.snd.fst.elim False fun v =>
@@ -330,16 +312,8 @@ loopHypothesis✝ :
                                     (∀ (j : Int),
                                       0 ≤ j →
                                         j < i.val →
-                                          ((Option.map
-                                                    (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64)
-                                                        false).encode
-                                                    result.values[j.toNat]?).getD
-                                                LeanerIR.RuntimeValue.unit).asInt =
-                                            ((Option.map
-                                                      (LeanerIR.Proofs.Codec.specInt (LeanerIR.IntWidth.bits 64)
-                                                          false).encode
-                                                      v.values[j.toNat]?).getD
-                                                  LeanerIR.RuntimeValue.unit).asInt +
+                                          (result.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+                                            (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val +
                                               ((Option.map (fun value => LeanerIR.RuntimeValue.integer value.fst.val)
                                                       (state
                                                         {
@@ -364,8 +338,8 @@ leanerContinuation : LeanerIR.Proofs.Denote.Flow
           (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false).vector
             (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
               (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
-                  (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
+                  (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 64 false)
                     (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.unit
                       LeanerIR.Proofs.Denote.NRow.nil)))))))))
     LeanerIR.Proofs.Denote.NTy.unit.carrier →
@@ -377,4 +351,4 @@ tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: 
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: leaner verification failed: the automatic verification of `map_add_global_bare` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify map_add_global_bare by …` in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean` (`verify map_add_global_bare by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/result_of_attached_state_ok.move:64:5: error: leaner verification failed: the automatic verification of `map_add_global_bare` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify map_add_global_bare by …` in `tests/sources/functional/closures/inline/result_of_attached_state_ok.proof.lean` (`verify map_add_global_bare by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

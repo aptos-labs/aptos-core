@@ -14,6 +14,27 @@ register_option leaner.verifyHeartbeats : Nat := {
     about a minute of elaboration, past which a proof is asked for"
 }
 
+/-- Skip the `verify` items: set, or unset in the language server, where
+every change to an open file would run them again; `lake test` and the
+command line check them. A `verify! f` item runs regardless; the code action
+"Verify `f` here" marks one. -/
+register_option leaner.skip_verify : Bool := {
+  defValue := false
+  descr := "skip the `verify` items but the `verify!` ones; unset, skipped in the language \
+    server only"
+}
+
+/-- Whether the `verify` items are skipped: `leaner.skip_verify` where set;
+unset, in the language server, which the command line tells apart by
+`internal.cmdlineSnapshots`. A driver that elaborates in process
+(`processCommands`) looks like the server and sets the option off itself. The
+packages' `moreServerOptions` would set the option for the server, once Lake
+passes them to library modules (leanprover/lean4#15626). -/
+def skipVerify (options : Lean.Options) : Bool :=
+  match options.find `leaner.skip_verify with
+  | some (.ofBool skip) => skip
+  | _ => !Lean.internal.cmdlineSnapshots.get options
+
 register_option leaner.stageLog : String := {
   defValue := ""
   descr := "path of a file the verifier appends a timestamped line to at every stage of a \

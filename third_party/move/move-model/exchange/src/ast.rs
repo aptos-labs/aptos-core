@@ -59,14 +59,15 @@
 //! fields (`modifies_of`, `reads_of`); version 7 added lemmas and proof
 //! blocks; version 8 names the variant of each field a variant field
 //! selection reads; version 9 names the module's state labels and ties a
-//! state-domain quantifier binder to the label it binds.
+//! state-domain quantifier binder to the label it binds; version 10 preserves
+//! which numeric literals received the specification-mode default type.
 
 use serde::{Deserialize, Serialize};
 
 /// Schema identifier of an XAST module document.
 pub const XAST_SCHEMA: &str = "move-xast-module";
 /// Current version of the XAST format.
-pub const XAST_VERSION: u64 = 9;
+pub const XAST_VERSION: u64 = 10;
 
 /// Index into [`XastModule::types`].
 pub type TypeId = usize;
@@ -740,6 +741,12 @@ pub enum ExpNode {
         /// producer recovers the name from the source span (an identifier
         /// naming a module constant of equal value).
         constant: Option<String>,
+        /// The compiler assigned this numeric literal its specification-mode
+        /// default type because no context determined its width. This source
+        /// fact distinguishes an adaptable literal from an explicit suffix;
+        /// it does not select a verifier's numeric representation.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        defaulted_num: bool,
     },
     /// A local variable (introduced by a `let`, a pattern, or a quantifier).
     Local {
@@ -1130,6 +1137,7 @@ mod tests {
             node: ExpNode::Value {
                 value: Value::Number("5".to_string()),
                 constant: None,
+                defaulted_num: false,
             },
         };
         assert_eq!(

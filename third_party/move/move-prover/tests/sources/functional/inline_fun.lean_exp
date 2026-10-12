@@ -4,4 +4,4 @@ tests/sources/functional/inline_fun.move:26:5: error: (deterministic) timeout at
 Note: Use `set_option maxHeartbeats <num>` to set the limit.
 
 Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/inline_fun.move:26:5: error: leaner verification failed: the automatic verification of `test_filter` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test_filter by …` in `tests/sources/functional/inline_fun.proof.lean` (`verify test_filter by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/inline_fun.move:26:5: error: leaner verification failed: the automatic verification of `test_filter` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test_filter by …` in `tests/sources/functional/inline_fun.proof.lean` (`verify test_filter by leaner_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

@@ -109,8 +109,10 @@ MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite
 ```
 
 A function the automatic verification leaves open is proved in a proof
-file beside its Move file; the failure message names the file, and
-`verify f by skip` shows the obligations left:
+file beside its Move file; the failure message names the file.
+`leaner_obligations` splits the function's goal into its obligations, each
+named by the clause it owes, which `leaner_decide` and `leaner_prepare`, or
+any Lean tactics, then prove:
 
 ```move
 spec square_of_sum {
@@ -123,9 +125,13 @@ spec square_of_sum {
 ```lean
 -- proofs.proof.lean, beside proofs.move
 verify square_of_sum by
-  case leaf_1 => …
-  case leaf_2 => …
+  leaner_obligations
+  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  case ensures_1 => …
 ```
 
 The Move Prover reads `verify = manual` as true and ignores `heartbeats`.
+In the editor, `verify` items are skipped (`leaner.skip_verify`, on by
+default in the language server only); `verify! f`, marked by the code action "Verify `f` here",
+runs.
 Details: [`designs/source-verification.md`](designs/source-verification.md).

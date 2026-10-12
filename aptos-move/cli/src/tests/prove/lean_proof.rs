@@ -32,10 +32,12 @@ fn prove_lean_proof() {
     std::fs::write(
         pkg.path().join("sources/lean_proof.proof.lean"),
         "verify square_of_sum by
-  case leaf_1 =>
+  leaner_obligations
+  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  case aborts_if_1_3 =>
     have := Int.mul_nonneg ‹0 ≤ a.val + b.val› ‹0 ≤ a.val + b.val›
     omega
-  case leaf_2 =>
+  case ensures_1 =>
     rw [Int.add_mul, Int.mul_add, Int.mul_add, Int.mul_comm b.val a.val, Int.mul_assoc]
     omega
 ",

@@ -20,6 +20,8 @@ leaner module 0x4b::forged where
     ensures result == 2
 
   verify one by
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
     have unsat := Std.Tactic.BVDecide.Reflect.unsat_of_verifyBVExpr_eq_true _ _
       forged._native.bv_decide.ax_1
     have : False := absurd (unsat (Lean.RArray.leaf { bv := 0#0 })) (by simp)

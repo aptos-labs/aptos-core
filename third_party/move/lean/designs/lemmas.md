@@ -87,8 +87,8 @@ theorem L.lemma (p₁ : D₁) … (pₙ : Dₙ) (h : L.requires (p₁, …, pₙ
 `L.requires` states the integer parameters' bounds by their types first:
 an `apply` with an argument out of range owes them, where the Prover would
 assume what it never proved. The proof introduces the hypothesis and runs
-the steps as cuts, each owed obligation discharged by the closer on a goal
-without a body; then the closer proves `L.ensures`. A recursion group is
+the steps as cuts, each owed obligation discharged by the solver on a goal
+without a body; then the solver proves `L.ensures`. A recursion group is
 one `mutual` block whose theorems recurse by well-founded recursion on the
 measure (`termination_by`, each component as the natural number
 `(m + 1).toNat`, which descends exactly when the Prover's condition holds).
@@ -104,7 +104,7 @@ them as terms.
 definitions at the instance's bundle: `LemmaApplication (L.requires b)
 (L.ensures b)`, which is the premise, outside quantifiers, and
 `LemmaInstance (L.requires b) (L.ensures b)`, the implication, under one.
-Where a formula is owed (at an `apply` site, or a lemma's step), the closer
+Where a formula is owed (at an `apply` site, or a lemma's step), the solver
 introduces the premises and binders, reduces each `LemmaApplication` to its
 premise, an obligation reported as the lemma's requirement, and proves each
 `LemmaInstance` by the lemma theorem. Where it then holds, each
@@ -115,7 +115,7 @@ recursion group is the recursive reference.
 **An `apply` site in a function** is an assertion site: the compiler gives
 `apply` and `split` conditions a site as it gives assertions one (no step).
 What follows assumes the facts. A `split` site on a Boolean owes `e ∨ ¬e`
-and what follows splits on it; on an enum it is no step, since the closer
+and what follows splits on it; on an enum it is no step, since the solver
 splits a match on the value where the body or a clause has one.
 
 **Trust.** An `assume` in a function's proof is an in-body assumption: the
@@ -133,7 +133,7 @@ taken on trust, assumes nothing and is no step.
 theorem whose proof fails over `sorry`, so only the theorems verified
 without an error are marked established. An application of it gives
 only its premise, and an instance of it under a quantifier is owed as its
-implication, which the closer may still prove. The functions applying it
+implication, which the solver may still prove. The functions applying it
 are verified with what remains, and the lemma's failure is reported once,
 at the lemma.
 

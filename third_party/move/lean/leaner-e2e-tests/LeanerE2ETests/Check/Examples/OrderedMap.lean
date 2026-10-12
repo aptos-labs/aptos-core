@@ -100,7 +100,9 @@ leaner module 0x42::ordered_map where
     exact atMiddle (Std.TransCmp.lt_trans (sorted middle i h0 (by omega) hsize) lt)
 
   verify lower_bound_loop by
-    case leaf_1 =>
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+    case requires_of_lower_bound_loop_1 =>
       apply search_above (order := LeanerIR.RuntimeValue.order _) (i := i) (high := high.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -108,7 +110,7 @@ leaner module 0x42::ordered_map where
         | omega
         | infer_instance
         | (rw [‹(_ : Array _)[_]? = some _›]; assumption)
-    case leaf_2 =>
+    case requires_of_lower_bound_loop_7 =>
       apply search_below (order := LeanerIR.RuntimeValue.order _) (i := i) (low := low.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -197,13 +199,15 @@ leaner module 0x42::ordered_map where
       exact absurd h (above index (Int.le_refl _) hi)
 
   verify contains by
-    case leaf_1 =>
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+    case ensures_1_1 =>
       apply absent_past_end (order := LeanerIR.RuntimeValue.order _)
       all_goals first
         | assumption
         | omega
         | infer_instance
-    case leaf_2 =>
+    case ensures_1_2 =>
       rw [← (LeanerIR.Proofs.Codec.encode_injective _).eq_iff]
       apply present_at_bound (order := LeanerIR.RuntimeValue.order _)
       all_goals first
@@ -291,6 +295,8 @@ leaner module 0x42::ordered_map where
       exact above index (Int.le_refl _) hi step
 
   verify borrow by
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
     all_goals first
       | (apply absent_past (order := LeanerIR.RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
@@ -405,6 +411,8 @@ leaner module 0x42::ordered_map where
     · rw [entryAt_insert entry xs i e h hi k (by omega), if_neg (by omega), if_neg (by omega)]
 
   verify add by
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
     all_goals first
       | (apply absent_past (order := LeanerIR.RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
@@ -488,6 +496,8 @@ leaner module 0x42::ordered_map where
     · rw [entryAt_erase entry xs i h k (by omega), if_neg (by omega)]
 
   verify remove by
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
     all_goals first
       | (apply absent_past (order := LeanerIR.RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
@@ -497,6 +507,7 @@ leaner module 0x42::ordered_map where
              exact ‹¬_ = _› (LeanerIR.Proofs.Codec.encode_injective _ same)))
       | (apply sorted_erase <;> first | assumption | omega)
       | (have found := ‹(_ : Array _)[_]? = some _›
+         rw [(Array.getElem_of_getElem? found).choose_spec]
          apply erase_at _ _ _ _ _ _ _ _ found <;> first | assumption | omega)
 
   -- ## Scenarios

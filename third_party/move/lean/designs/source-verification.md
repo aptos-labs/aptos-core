@@ -9,6 +9,29 @@ A Move or Rust file is verified by compiling it to LeanerLang and verifying
 that rendering; every message is reported in the coordinates of the file it
 came from.
 
+Move LIR import/validation failures return error reports before rendering,
+so callers can record the rejection and continue other files. These reports
+currently use the input path at line 1; any embedded byte ranges still need
+mapping to their precise source locations. Source numeric bitwise operators,
+`bv`/`bv_ret` pragmas and `int2bv`/`bv2int` wrappers are rejected before LIR
+encoding until their representation propagation is modeled. Conversion and
+subsequent arithmetic can wrap even when the exported expression has type
+`num`. Classification can also propagate from executable code into a contract,
+or from a signed wrapper into a later unsigned cast.
+
+Opaque `bv_internal` functions with scalar bodies are an exception: their
+ordinary contracts and callers stay in integer representation, while their
+executable operations retain Move semantics. Calls from the body, aggregate
+or generic values, inline specifications, concrete clauses and proof blocks
+still require representation analysis and are rejected. The scalar regression
+includes mutable-reference updates and callers. Specification casts implicitly
+read reference operands, including their distinct current and `old` values.
+
+The producer and consumer use XAST version 10, which preserves whether the
+compiler defaulted a specification numeric literal's type. Representation
+analysis needs that fact to adapt unsuffixed literals without silently changing
+explicit widths; see [`numeric-representation.md`](numeric-representation.md).
+
 ```text
 foo.move ─ compiler-v2 XAST ─┐
                              ├─ validated LIR ─ LeanerLang rendering ─ elaboration ─ messages
@@ -41,8 +64,8 @@ nothing. `--dev` compiles a package directory in dev mode, with its
 `[dev-addresses]` and `[dev-dependencies]`. `LEANER_OPTIONS=name=value,…`
 sets Lean options for the verification a command or the benchmark runs, for
 debugging: a value `true` or `false` is a Bool, a numeral a Nat, anything
-else a String (for example `LEANER_OPTIONS=leaner.denoteDebug=true` prints
-the closer's steps).
+else a String (for example `LEANER_OPTIONS=leaner.solverDebug=true` prints
+the solver's steps).
 Each command writes the rendering beside the source (`foo.move.lean`,
 `foo.rs.lean`) for inspection, prints one `file:line:column: severity:
 message` line per message, and exits non-zero when any is an error. Its
@@ -96,8 +119,19 @@ resource and its existence a `spec module where axiom` of the module. The
 verifier's messages are the command's diagnostics, and a verification error
 fails the command as a Prover error does. The Prover's timing line becomes
 `build, export, leaner-move, total`, beside the verifier's own. `--filter` narrows the targets as
-usual; the Boogie backend's options have no effect. The verifier is found
-through `LEANER_MOVE_EXE` (its executable, run as is, so the caller supplies
+usual; the Boogie backend's options have no effect.
+
+The adapter omits non-opaque inline declarations already expanded by compiler-v2.
+Opaque inline declarations remain: their callers and behavioral predicates still
+reference them, and their bodies must satisfy their contracts. So does a
+non-opaque inline function with a specification of its own (a condition the
+source states, not one a schema application injects): the Move Prover verifies
+its body against it (`is_inline_verified`), while its calls stay expanded and a
+caller proves what the body does. An explicit
+`verify = false` retains the existing trusted-contract treatment. Their comments
+follow the same retention decision.
+
+The verifier is found through `LEANER_MOVE_EXE` (its executable, run as is, so the caller supplies
 `LEAN_PATH`), `LEANER_MOVE_HOME` (its Lean package), or the enclosing Aptos
 Core checkout, where `leaner-move/.lake/build/bin/leaner-move` runs through
 `lake --dir <package> env` under the toolchain the package pins (`lake` from
@@ -166,6 +200,13 @@ The prelude's injectivity and length axioms and the concrete names the
 Prover computes for concrete types are not mirrored. A caller never fails
 on a modelled callee; it fails only on what its own clauses claim.
 
+A Move specification function is partial: it is defined where its
+parameters declared with fixed-width integer types hold values of those
+types, and its value elsewhere is unspecified (G15 in
+[`prover-test-problems.md`](prover-test-problems.md)). The rendering keeps the
+declared types (`spec fun f(x : u64) : Int`); the body reads `x` as an `Int`,
+and the verifier derives the domain from the type.
+
 A recursive specification function unfolds where its measure descends,
 and a leaf holds it unfolded once at each of its applications whose guard
 the context decides. The
@@ -182,23 +223,42 @@ unfolding by their bounds.
 
 A specification is established in one of three ways, tried in this order:
 
-1. **Automatically.** The closer proves the function's obligations within a
+1. **Automatically.** The solver proves the function's obligations within a
    budget (`leaner.verifyHeartbeats`, 1500000 thousand heartbeats by
    default: about a minute of elaboration). Most functions end here.
 2. **By a proof file.** Move has no syntax for a proof, so the proofs of a
    Move file live in the LeanerLang file beside it: `foo.proof.lean` beside
    `foo.move`. Its items are spliced into the rendering of the file's
-   module, indented one level — `verify f by …` items, which replace the
-   automatic verification of `f` with the closer in residual mode followed
-   by the authored tactics, and any `theorem` the tactics use, which may
-   name every declaration of the module. A Rust file's `.spec.lean` carries
+   module, indented one level — `verify f by …` items, whose tactics prove
+   `f`'s goal in place of the automatic verification, and any `theorem` the
+   tactics use, which may name every declaration of the module. The tactics
+   of a proof (`designs/denotation.md`): `leaner_obligations` splits the goal
+   into the leaves `f` owes, each named by its clause (`ensures_2`,
+   `aborts_if_1`, `invariant_1_entry`, `invariant_1_step`, `requires_of_g`
+   for a callee `g`'s precondition). A clause owed on several paths is one
+   goal: the conjunction of its paths, each quantified over what its path
+   introduced; `leaner_paths` takes it apart into the path goals
+   `ensures_2_1`, `ensures_2_2`, …, as `leaner_prepare`, `leaner_decide` and
+   `leaner_solve` do first. A leaf is one path and one clause, whose own
+   conditionals, such as a specification function's cases, stay in it
+   (`leaner_split` splits them). `leaner_prepare` states a leaf in source
+   form; `leaner_decide` tries the bounded deciders on every path and fails
+   where one stays open; `leaner_solve` decides a leaf as the automatic
+   verification does, or reports its clause. `leaner_on | ensures_1,
+   aborts_if_2 => tac | _ => tac'` proves each clause by the first
+   alternative naming it, `_` taking the others; an alternative's failure is
+   reported at its goal. The automatic verification is `leaner_obligations`
+   followed by `leaner_solve` on every leaf. As Lean's tactics do, each of Leaner's acts on the main goal and
+   keeps the others; `leaner_bounded`, `leaner_inheriting`, `leaner_settle`,
+   `leaner_saturate_round` and `leaner_canonical_families` act on every
+   goal. A Rust file's `.spec.lean` carries
    its `verify` items the same way. A proof file accompanies a source file
    that declares one module; a file declaring several is refused.
    `pragma verify = manual` on the spec block states that the function is
    established this way: it is not attempted automatically, and a missing
    `verify f by …` is an error. The Move Prover reads it as `verify = true`.
 3. **By raising the budget.** `pragma heartbeats = N` on the spec block,
-   for a function the closer proves given more time.
+   for a function the solver proves given more time.
 
 When the automatic verification of `f` fails, the message says which of
 the two to do and where:
@@ -206,21 +266,29 @@ the two to do and where:
 ```text
 foo.move:12:5: error: leaner verification failed: the automatic verification
 of `f` exceeded its budget of 1500000 maxHeartbeats; provide a proof:
-`verify f by …` in `sources/foo.proof.lean` (`verify f by skip` shows the
-obligations it leaves), or raise the budget with `pragma heartbeats = N`,
+`verify f by …` in `sources/foo.proof.lean` (`verify f by leaner_obligations`
+lists its obligations), or raise the budget with `pragma heartbeats = N`,
 in thousands of maxHeartbeats
 ```
 
-An obligation the closer cannot decide reports its clause as before and the
+An obligation the solver cannot decide reports its clause as before and the
 same hint without the budget alternative. The file the hint names is the
 module's `proof_file` pragma, which the driver sets on every target module
-whether or not the file exists. `verify f by skip` is the way to see the
-obligations: the residual goals, one `case leaf_i` each, are reported as
-unsolved at the item, in the proof file's coordinates. A residual goal is in
-source form: the intermediate values the closer names are replaced by the
-expressions they stand for. A proof that fails
+whether or not the file exists. `verify f by leaner_obligations` is the way
+to see the obligations: the leaves, one `case` each, are reported as unsolved
+at the item, in the proof file's coordinates; `all_goals leaner_prepare`
+after it shows them in source form, the intermediate values the solver names
+replaced by the expressions they stand for. A proof that fails
 reports at its tactic in the proof file, and the function's summary says
 the proof does not establish its specification.
+
+In the editor, an open file's `verify` items are skipped with a message,
+since every change would run them again, except `verify! f` items, which
+run (`leaner.skip_verify`: unset, it holds in the language server only, which
+the command line tells apart by `internal.cmdlineSnapshots`; the verification
+driver sets it off). The packages' `moreServerOptions` would set it for the
+server once Lake passes them to library modules, leanprover/lean4#15626. The code action "Verify `f` here" on an item marks it so, "Skip
+`f` in the editor" unmarks it; `lake test` runs every item, marked or not.
 
 The integer bounds a specification names, `MAX_U8` … `MAX_U256`, `MAX_I8` …
 `MAX_I256`, and `MIN_I8` … `MIN_I256`, are Lean constants of type `Int` as
@@ -235,12 +303,14 @@ package digest (`move-command-line-common::files::is_lean_source`).
 
 ### Move frames
 
-A LeanerLang frame is closed: without `modifies` a function changes no global
-memory. A Move specification frames only the resource families it names
-targets for. The Move frontend states Move's reading explicitly
-(`LeanerMove/Frontend/Frames.lean`): no targets and a transitive global write
-become `modifies *`; targets on a non-`opaque` function become
-`modifies <targets>, *`.
+A LeanerLang frame is closed: without `modifies` a function changes no
+global memory. A function with a body that declares no contract (and plays
+no map or table role) claims no frame: it is verified for the invariants it
+writes, and its callers inline it. A Move specification frames only the
+resource families it names targets for. The Move frontend states Move's
+reading explicitly (`LeanerMove/Frontend/Frames.lean`): no targets and a
+transitive global write become `modifies *`; targets on a non-`opaque`
+function become `modifies <targets>, *`.
 
 ### Move signers
 
@@ -261,6 +331,18 @@ collide under a hash the function applies, in code or in a specification,
 at any depth (decided 2026-10-02). A hash of bytes a function computes is
 not covered, and a caller passing computed bytes to a function that
 assumes it cannot establish it.
+
+### Move serialization
+
+The Move Prover's prelude states of `bcs::serialize`, for every type, that
+it is injective and never empty, and that all addresses serialize to one
+length. A Move contract states these, as preconditions, of the function's
+parameters where it applies `bcs::serialize` or `bcs::to_bytes` at any
+depth, as it states the hashes' collision freedom (2026-10-09): each
+parameter's serialization is not empty, two parameters of one type with
+equal serializations are equal, and two address parameters serialize to one
+length (`Contract.serializeFacts`). Unlike the hashes' injectivity, these
+hold of BCS itself.
 
 ### Move vector intrinsics
 

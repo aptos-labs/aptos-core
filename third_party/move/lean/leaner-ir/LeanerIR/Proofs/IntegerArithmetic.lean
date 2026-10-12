@@ -104,6 +104,37 @@ theorem bitwiseAnd_self (value : Int) : bitwiseAnd value value = value := by
 theorem bitwiseOr_self (value : Int) : bitwiseOr value value = value := by
   cases value <;> simp only [bitwiseOr, bitwiseAnd_self] <;> rfl
 
+theorem complement_complement (value : Int) : ~~~~~~value = value := by
+  cases value <;> rfl
+
+/-- A conjunction with all ones, `-1`, keeps a value. -/
+theorem bitwiseAnd_negOne (value : Int) : bitwiseAnd value (-1) = value := by
+  show bitwiseAnd value (Int.negSucc 0) = value
+  cases value <;> simp [bitwiseAnd]
+
+theorem bitwiseAnd_zero (value : Int) : bitwiseAnd value 0 = 0 := by
+  show bitwiseAnd value (Int.ofNat 0) = Int.ofNat 0
+  cases value <;> simp [bitwiseAnd]
+
+theorem zero_bitwiseAnd (value : Int) : bitwiseAnd 0 value = 0 := by
+  rw [bitwiseAnd_comm, bitwiseAnd_zero]
+
+theorem bitwiseOr_zero (value : Int) : bitwiseOr value 0 = value := by
+  unfold bitwiseOr
+  rw [show (~~~(0 : Int)) = -1 from rfl, bitwiseAnd_negOne, complement_complement]
+
+theorem zero_bitwiseOr (value : Int) : bitwiseOr 0 value = value := by
+  unfold bitwiseOr
+  rw [show (~~~(0 : Int)) = -1 from rfl, bitwiseAnd_comm, bitwiseAnd_negOne, complement_complement]
+
+theorem bitwiseXor_zero (value : Int) : bitwiseXor value 0 = value := by
+  unfold bitwiseXor
+  rw [bitwiseOr_zero, bitwiseAnd_zero, show (~~~(0 : Int)) = -1 from rfl, bitwiseAnd_negOne]
+
+theorem zero_bitwiseXor (value : Int) : bitwiseXor 0 value = value := by
+  unfold bitwiseXor
+  rw [zero_bitwiseOr, zero_bitwiseAnd, show (~~~(0 : Int)) = -1 from rfl, bitwiseAnd_negOne]
+
 theorem bitwiseAnd_nonneg {left right : Int} (leftNonnegative : 0 ≤ left)
     (rightNonnegative : 0 ≤ right) : 0 ≤ bitwiseAnd left right := by
   rw [bitwiseAnd_nonnegative left right leftNonnegative rightNonnegative]
@@ -151,7 +182,7 @@ theorem shiftRight_mod (value modulus : Int) (distance : Nat)
     (Int.lt_of_le_of_lt (Int.shiftRight_le_of_nonneg lower) upper)
 
 /-- Negating a closed interval produces its two open complements. Kept as a
-small reusable proof so generated closers need not normalize large concrete
+small reusable proof so generated solvers need not normalize large concrete
 powers throughout an execution context. -/
 theorem outside_of_failed_range {lower upper value : Int}
     (failed : lower ≤ value → upper < value) :

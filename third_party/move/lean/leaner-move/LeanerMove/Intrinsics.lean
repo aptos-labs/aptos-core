@@ -31,6 +31,7 @@ inductive MapRole where
   | specAbortsIterBorrowMut | specAbortsNewFrom | specAbortsNewWithConfig
   | specAbortsReplaceKeyInplace | specAbortsTrim | specAbortsUpsertAll
   | specDel | specGet | specHasKey | specIterPreserved | specIterValid
+  | specInsertionKeyAt | specInsertionRank
   | specKeyAt | specLeafIterValid | specLeafOffset | specLen | specNew
   | specRank | specSet
   deriving Repr, BEq, DecidableEq, Inhabited
@@ -169,12 +170,12 @@ def signaturePatterns : MapRole → Array SignaturePattern
   | .specHasKey => #[signature #[owner, key] bool]
   | .specIterPreserved => #[signature #[owner, owner] bool]
   | .specIterValid => #[signature #[keyIterator, owner] bool]
-  | .specKeyAt => #[signature #[owner, num] key]
+  | .specKeyAt | .specInsertionKeyAt => #[signature #[owner, num] key]
   | .specLeafIterValid => #[signature #[leafIterator, owner] bool]
   | .specLeafOffset => #[signature #[leafIterator, owner] num]
   | .specLen => #[signature #[owner] num]
   | .specNew => #[signature #[] owner]
-  | .specRank => #[signature #[owner, key] num]
+  | .specRank | .specInsertionRank => #[signature #[owner, key] num]
   | .specSet => #[signature #[owner, key, value] owner]
 
 structure RoleSchema where
@@ -256,6 +257,8 @@ def roleSchemas : Array RoleSchema := #[
   specification .specHasKey "map_spec_has_key" .required,
   specification .specIterPreserved "map_spec_iter_preserved",
   specification .specIterValid "map_spec_iter_valid",
+  specification .specInsertionKeyAt "map_spec_insertion_key_at",
+  specification .specInsertionRank "map_spec_insertion_rank",
   specification .specKeyAt "map_spec_key_at",
   specification .specLeafIterValid "map_spec_leaf_iter_valid",
   specification .specLeafOffset "map_spec_leaf_offset",
@@ -278,6 +281,7 @@ def allRoles : Array MapRole := #[
   .specAbortsIterBorrowMut, .specAbortsNewFrom, .specAbortsNewWithConfig,
   .specAbortsReplaceKeyInplace, .specAbortsTrim, .specAbortsUpsertAll,
   .specDel, .specGet, .specHasKey, .specIterPreserved, .specIterValid,
+  .specInsertionKeyAt, .specInsertionRank,
   .specKeyAt, .specLeafIterValid, .specLeafOffset, .specLen, .specNew,
   .specRank, .specSet
 ]
@@ -286,14 +290,14 @@ def roleSchema? (name : String) : Option RoleSchema :=
   roleSchemas.find? (fun schema => schema.sourceName == name)
 
 def registryComplete : Bool :=
-  roleSchemas.size == 62 && allRoles.size == 62 &&
+  roleSchemas.size == 64 && allRoles.size == 64 &&
     roleSchemas.all (fun schema => allRoles.contains schema.role) &&
     roleSchemas.all (fun schema => !schema.signatures.isEmpty) &&
     allRoles.all (fun role => roleSchemas.countP (fun schema => schema.role == role) == 1) &&
     roleSchemas.all (fun schema =>
       roleSchemas.countP (fun other => other.sourceName == schema.sourceName) == 1) &&
     roleSchemas.countP (fun schema => schema.kind == .executable) == 37 &&
-    roleSchemas.countP (fun schema => schema.kind == .specification) == 25
+    roleSchemas.countP (fun schema => schema.kind == .specification) == 27
 
 private def diagnostic (code message : String) (loc : LocId) : Array Diagnostic :=
   #[.at code message loc]
@@ -355,13 +359,22 @@ private partial def matchesType (unit : RawUnit) (ownerName : NameId)
           | none => false
       | _, _ => false
 
+/-- A parameter matches its pattern; a fixed-width integer one matches `num`,
+since its type only bounds a specification function's domain (G15). -/
+private def matchesParameter (unit : RawUnit) (ownerName : NameId)
+    (pattern : TypePattern) (typeId : TypeId) : Bool :=
+  matchesType unit ownerName pattern typeId ||
+    (pattern == .num && unit.tables.types[typeId.index]?.any fun
+      | .integer (.bits _) _ => true
+      | _ => false)
+
 private def matchesSignature (unit : RawUnit) (ownerName : NameId)
     (pattern : SignaturePattern) (actual : Signature) : Bool :=
   actual.generics.size == 2 &&
     actual.generics.all (fun binder => binder.kind == .typeArg) &&
     pattern.parameters.size == actual.parameters.size &&
     (pattern.parameters.zip actual.parameters).all (fun (expected, parameter) =>
-      matchesType unit ownerName expected parameter.typeUse.typeId) &&
+      matchesParameter unit ownerName expected parameter.typeUse.typeId) &&
     actual.results.size == 1 &&
     matchesType unit ownerName pattern.result actual.results[0]!.typeId
 

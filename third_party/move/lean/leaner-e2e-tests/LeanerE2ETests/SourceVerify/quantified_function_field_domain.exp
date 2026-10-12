@@ -1,0 +1,1 @@
+LeanerE2ETests/SourceVerify/quantified_function_field_domain.move:4:1: error: quantification over nominal values containing function fields requires a field-validity domain, which is not carried yet

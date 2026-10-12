@@ -28,20 +28,6 @@ namespace LeanerMove.Frontend.Frames
 
 open LeanerMove.Frontend Xast Effects Names
 
-private partial def expChildren : ExpNode → List Exp
-  | .value .. | .«local» _ | .param _ | .loopCont .. | .specBlock _ | .quant .. => []
-  | .call _ _ arguments _ => arguments
-  | .invoke function arguments => function :: arguments
-  | .block _ binding body => binding.toList ++ [body]
-  | .ite condition thenBranch elseBranch => [condition, thenBranch, elseBranch]
-  | .«match» scrutinee arms =>
-      scrutinee :: arms.flatMap fun arm => arm.guard.toList ++ [arm.body]
-  | .sequence expressions => expressions
-  | .loop body => [body]
-  | .«return» value => [value]
-  | .assign _ value => [value]
-  | .mutate target value => [target, value]
-
 /-- The variables a pattern binds. -/
 private partial def patternNames (pattern : Pattern) : List String :=
   match pattern.node with
@@ -55,7 +41,7 @@ private partial def boundNames (expression : Exp) : List String :=
     | .block pattern .. | .assign pattern _ => patternNames pattern
     | .«match» _ arms => arms.flatMap (patternNames ·.pattern)
     | _ => []
-  own ++ (expChildren expression.node).flatMap boundNames
+  own ++ expression.node.children.flatMap boundNames
 
 /-- The function-typed parameters a body keeps: those without `modifies_of`,
 which keep global memory, the frame their callers establish
@@ -83,7 +69,7 @@ partial def writesGlobal (callee : QualifiedName → Bool) (params kept : List S
         | .param index => !(params[index]?.any kept.contains)
         | _ => true
     | _ => false
-  own || (expChildren expression.node).any (writesGlobal callee params kept)
+  own || expression.node.children.any (writesGlobal callee params kept)
 
 /-- Whether a specification declares modifications of global memory, which
 its callers see through its contract. -/

@@ -18,7 +18,7 @@ namespace LeanerMove.Frontend.Xast
 /-- Schema identifier of an XAST document. -/
 def schema : String := "move-xast-module"
 /-- The XAST version this consumer reads. -/
-def version : Nat := 9
+def version : Nat := 10
 
 /-- A source location: byte offsets into the module's file table. -/
 structure Loc where
@@ -239,7 +239,9 @@ mutual
     | mk (ty : Ty) (loc : Loc) (node : ExpNode)
 
   inductive ExpNode where
-    | value (value : Value) (constant : Option String)
+    /-- `defaultedNum` preserves the compiler's defaulted literal type, distinct
+    from an explicitly suffixed integer of the same value and width. -/
+    | value (value : Value) (constant : Option String) (defaultedNum : Bool := false)
     | «local» (name : String)
     | param (index : Nat)
     | call (op : Operation) (inst : List Ty) (args : List Exp) (surface : Option SurfaceSyntax)
@@ -337,6 +339,21 @@ def pattern : MatchArm → Pattern | .mk _ p _ _ => p
 def guard : MatchArm → Option Exp | .mk _ _ g _ => g
 def body : MatchArm → Exp | .mk _ _ _ b => b
 end MatchArm
+
+/-- The expressions an expression evaluates, in order. -/
+def ExpNode.children : ExpNode → List Exp
+  | .value .. | .«local» _ | .param _ | .loopCont .. | .specBlock _ | .quant .. => []
+  | .call _ _ arguments _ => arguments
+  | .invoke function arguments => function :: arguments
+  | .block _ binding body => binding.toList ++ [body]
+  | .ite condition thenBranch elseBranch => [condition, thenBranch, elseBranch]
+  | .«match» scrutinee arms =>
+      scrutinee :: arms.flatMap fun arm => arm.guard.toList ++ [arm.body]
+  | .sequence expressions => expressions
+  | .loop body => [body]
+  | .«return» result => [result]
+  | .assign _ assigned => [assigned]
+  | .mutate target assigned => [target, assigned]
 
 namespace QuantRange
 def pattern : QuantRange → Pattern | .mk p _ _ => p

@@ -108,6 +108,17 @@ theorem NRow.lend_refFree : (row : NRow) → row.refFree = true → (prophecies 
         HList.encode_cons]
 end
 
+/-- A reference-free result has the same current and prophecy row. -/
+theorem ResultShape.lend_refFree_view (shape : ResultShape) (free : shape.row.refFree = true)
+    (value : shape.carrier) (loans : List Nat) :
+    shape.lend true value loans = shape.lend false value loans := by
+  cases shape with
+  | none => cases loans <;> rfl
+  | one τ =>
+      have plain : τ.refFree = true := by
+        simpa only [ResultShape.row, NRow.refFree, Bool.and_true] using free
+      simp only [ResultShape.lend, NTy.lend_refFree τ plain]
+
 /-- Lending a woven row lends the supplied arguments and places the captures'
 encodings among them. -/
 theorem Weave.lend_compose : {full captured supplied : NRow} →
@@ -181,6 +192,24 @@ theorem Weave.composeList_of_mask_zero : {full captured supplied : NRow} →
       simp only [NRow.length, List.length_cons, Nat.add_right_cancel_iff] at lengths
       simp only [Weave.composeList, rest.composeList_of_mask_zero (by omega) args lengths]
   | _, _, _, .supplied _, _, [], lengths => by simp [NRow.length] at lengths
+
+omit [Skolems unit] in
+/-- A woven row has one argument per parameter of the target. -/
+theorem Weave.composeList_length : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) → (captures args : List RuntimeValue) →
+    captures.length = captured.length → args.length = supplied.length →
+    (weave.composeList captures args).length = full.length
+  | _, _, _, .nil, _, args, _, argLengths => by simpa [Weave.composeList] using argLengths
+  | _, _, _, .captured rest, _ :: captures, args, lengths, argLengths => by
+      simp only [NRow.length, List.length_cons, Nat.add_right_cancel_iff] at lengths
+      simp only [Weave.composeList, List.length_cons, NRow.length,
+        rest.composeList_length captures args lengths argLengths]
+  | _, _, _, .captured _, [], _, lengths, _ => by simp [NRow.length] at lengths
+  | _, _, _, .supplied rest, captures, _ :: args, lengths, argLengths => by
+      simp only [NRow.length, List.length_cons, Nat.add_right_cancel_iff] at argLengths
+      simp only [Weave.composeList, List.length_cons, NRow.length,
+        rest.composeList_length captures args lengths argLengths]
+  | _, _, _, .supplied _, _, [], _, argLengths => by simp [NRow.length] at argLengths
 
 omit [Skolems unit] in
 /-- The runtime's composition by the weave's mask is the weave's. -/
@@ -755,7 +784,8 @@ def _root_.LeanerIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape
   aborts := fun args => contract.aborts (HList.toSkolem θ σs args)
   mayAbort := fun args => contract.mayAbort (HList.toSkolem θ σs args)
   mustAbort := fun args => contract.mustAbort (HList.toSkolem θ σs args)
-  frame := fun args => contract.frame (HList.toSkolem θ σs args)
+  frame := fun args initial result final =>
+    contract.frame (HList.toSkolem θ σs args) initial (ResultShape.toSkolem θ shape result) final
 
 /-- A contract the run satisfies at the frame type arguments induce holds,
 read in the caller's view, of the run at the caller's types. -/

@@ -28,6 +28,8 @@ structure RelocatableNamespace where
   profiles : Array ProfileConfig
   /-- The namespace, its identity 0. -/
   body : Namespace FunctionBody
+  /-- The holders validation added to the namespace (`ValidatedNamespace.holders`). -/
+  holders : Array (PatternId × Holding) := #[]
   witnesses : Array StructurizationWitness := #[]
   initializationCertificates : Array InitializationCertificate := #[]
   borrowCertificates : Array BorrowCertificate := #[]
@@ -46,6 +48,7 @@ def RelocatableNamespace.references (object : RelocatableNamespace) : Array Name
 private structure Placed where
   tables : Tables
   body : Namespace FunctionBody
+  holders : Array (PatternId × Holding)
   witnesses : Array StructurizationWitness
   initializationCertificates : Array InitializationCertificate
   borrowCertificates : Array BorrowCertificate
@@ -60,6 +63,7 @@ private def placedIn (unit : ValidatedUnit) (identity : NamespaceId) : Option Pl
   pure {
     tables := unit.tables
     body := ns.toNamespace
+    holders := ns.holders
     witnesses := unit.structurizationWitnesses.filter (·.namespaceId == identity)
     initializationCertificates :=
       unit.initializationCertificates.filter (·.namespaceId == identity)
@@ -340,6 +344,7 @@ private def relocatePlaced (placed : Placed) (identity : NamespaceId) : RelocM P
   return {
     tables := target
     body := ← remap placed.body functions
+    holders := placed.holders
     witnesses := ← remap placed.witnesses functions
     initializationCertificates := ← remap placed.initializationCertificates functions
     borrowCertificates := ← remap placed.borrowCertificates functions
@@ -359,6 +364,7 @@ def extract (unit : ValidatedUnit) (identity : NamespaceId) :
     tables := state.target
     profiles := unit.profiles
     body := relocated.body
+    holders := relocated.holders
     witnesses := relocated.witnesses
     initializationCertificates := relocated.initializationCertificates
     borrowCertificates := relocated.borrowCertificates
@@ -524,8 +530,8 @@ def link (base : ValidatedUnit) (objects : Array RelocatableNamespace) :
   let tables := state.target
   let namespaces := placed.map (·.body)
   let orders := valueOrdersOf tables namespaces
-  let validated := namespaces.map fun ns =>
-    ({ toNamespace := ns, tables, orders } : ValidatedNamespace)
+  let validated := placed.map fun placed =>
+    ({ toNamespace := placed.body, tables, orders, holders := placed.holders } : ValidatedNamespace)
   let rawDependencies : Array Import.RawNamespaceInterface := dependencies.map fun dep => {
     namespaceId := dep.namespaceId, profile := dep.profile, exportedNames := dep.exportedNames
     structs := dep.structs

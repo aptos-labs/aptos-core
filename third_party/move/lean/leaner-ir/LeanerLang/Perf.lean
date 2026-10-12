@@ -53,6 +53,17 @@ initialize recorded : IO.Ref (Array Sample) ← IO.mkRef #[]
 ordinary `verify` pays nothing beyond the flag read. -/
 initialize measuring : IO.Ref Bool ← IO.mkRef false
 
+/-- The result of a measured verification attempt, including rejected targets.
+The benchmark uses the error count to distinguish target rejections from
+unrelated frontend or elaboration errors. -/
+structure Outcome where
+  target : String
+  status : String
+  errors : Nat
+  deriving ToJson
+
+initialize outcomes : IO.Ref (Array Outcome) ← IO.mkRef #[]
+
 /-- Whether a sample counts the objects of its proof. The verification
 benchmark turns it off: it compares time and heartbeats, and the count
 walks every proof term. -/

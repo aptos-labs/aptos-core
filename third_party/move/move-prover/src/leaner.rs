@@ -8,8 +8,11 @@
 
 use anyhow::{anyhow, bail, Result};
 use log::info;
-use move_model::model::{GlobalEnv, ModuleId};
-use move_model_exchange::{dump_ast_module, module_closure};
+use move_model::model::{GlobalEnv, ModuleId, VerificationScope};
+use move_model_exchange::{
+    ast::{Pragma, PragmaValue, Value, XastModule},
+    dump_ast_module, module_closure,
+};
 use std::{
     collections::BTreeSet,
     io::Write,
@@ -192,11 +195,46 @@ fn target_modules(
     Ok(selected)
 }
 
+/// Under an exclusive verification scope (`--verify-only`, `--only`, or a
+/// module's), each function of a target module is exported with
+/// `pragma verify` set as the Move Prover selects it: true for those the
+/// scope names, whatever they declare, and false for the others, which their
+/// callers still read as the verifier reads any unverified function.
+fn apply_scope(
+    model: &GlobalEnv,
+    module: ModuleId,
+    dumped: &mut XastModule,
+    scope: &VerificationScope,
+) {
+    if !scope.is_exclusive() {
+        return;
+    }
+    let module_env = model.get_module(module);
+    for function in dumped.functions.iter_mut() {
+        let Some(function_env) = module_env
+            .get_functions()
+            .find(|f| *f.get_simple_name_string() == function.name)
+        else {
+            continue;
+        };
+        // The specification's own pragmas and the resolved ones alike.
+        let verify = Pragma {
+            name: "verify".to_string(),
+            value: PragmaValue::Value(Value::Bool(function_env.should_verify(scope))),
+        };
+        for pragmas in [&mut function.spec.pragmas, &mut function.pragmas] {
+            pragmas.retain(|pragma| pragma.name != "verify");
+            pragmas.push(verify.clone());
+        }
+    }
+}
+
 /// Verifies `source`, a Move file or package directory of `model`, with the
 /// Leaner verifier: the modules of `source` (with `filter`, those whose file
 /// name contains it) and what verifying them reads are exported in the
 /// typed-AST exchange format, the verifier reads the export, verifies those
-/// modules with the others linked as dependencies, each function within
+/// modules (the functions an exclusive `scope` selects, `apply_scope`) with
+/// the others linked as dependencies, each function within
 /// `heartbeats` unless its `pragma heartbeats` says otherwise, writes their
 /// LeanerLang rendering to `output`, and reports its messages, one per line in
 /// the Move sources' coordinates, to `writer`. Fails when the verifier
@@ -206,6 +244,7 @@ pub fn verify(
     model: &GlobalEnv,
     source: &Path,
     filter: Option<&str>,
+    scope: &VerificationScope,
     heartbeats: Option<u64>,
     output: &Path,
     writer: &mut impl Write,
@@ -215,13 +254,17 @@ pub fn verify(
     let now = Instant::now();
     let runner = runner(source)?;
     let export = tempfile::tempdir()?;
-    let selection = module_closure(model, &target_modules(model, source, filter)?);
+    let targets = target_modules(model, source, filter)?;
+    let selection = module_closure(model, &targets);
     for module in model.get_modules() {
         // A bytecode-only dependency has no AST to export.
         if module.get_source_path().is_empty() || !selection.contains(&module.get_id()) {
             continue;
         }
-        let dumped = dump_ast_module(model, module.get_id())?;
+        let mut dumped = dump_ast_module(model, module.get_id())?;
+        if targets.contains(&module.get_id()) {
+            apply_scope(model, module.get_id(), &mut dumped, scope);
+        }
         let name = module.get_full_name_str().replace("::", "_");
         std::fs::write(
             export.path().join(format!("{}.xast.json", name)),

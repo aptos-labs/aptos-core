@@ -1,6 +1,6 @@
 # Static typing and preservation
 
-Status: Phases 1–4 done (2026-10-01); Phase 5 in progress (loan independence done 2026-10-01). Decided: preservation of runtime
+Status: Phases 1–4 done (2026-10-01); Phase 5 in progress (loan independence done 2026-10-01, for lent starts and injective renamings 2026-10-10). Decided: preservation of runtime
 typing for the big-step semantics (`higher-order-functions.md`, "H4:
 decisions", 1), built first as a proved-sound static type checker that the
 agreement proof (`denotation.md`) reuses.
@@ -65,7 +65,7 @@ Nothing a proof can use about types:
 4. **Induction (done 2026-10-01).** Preservation over the six big-step
    relations, natives as a hypothesis (`nativeCall` is opaque); see
    "Phase 4".
-5. **Use.** The closer's rule for invoking an unknown closure (H4c), and
+5. **Use.** The solver's rule for invoking an unknown closure (H4c), and
    the typing half of the agreement proof.
 
 ## Phase 1
@@ -289,7 +289,7 @@ executable unit's target width is its profiles' (`ExecutableUnit.width_eq`).
 
 ## Phase 5 (in progress)
 
-The closer's rule for invoking a closure a proof cannot see. `Satisfies`
+The solver's rule for invoking a closure a proof cannot see. `Satisfies`
 requires a computation to have no undefined outcome, and an invocation is
 undefined where a run of the closure's target returns results that do not
 decode at the invocation's type (`closureMeaning`). Preservation excludes
@@ -327,30 +327,46 @@ global loan registry. A successful run must refute `aborts_of` (a contract's
 both need runs from such starts to agree, as the agreement proof does.
 
 Two runs from starts with the same global memory holding no loan, on
-arguments holding none, mint the same loans in the same order, offset by
-their frontiers' difference; neither reads the write-backs pending at its
-start, and each registers only the loans it mints, which the registry's
-freshness keeps apart from what it holds. So the second run is the first
-with its loan identities renamed, and outcomes holding no loan are equal.
-Where global memory holds a hole of a loan at or beyond a frontier, the
-claim fails: a minted loan collides with it.
+arguments that agree up to the loans they are lent under, mint the same
+loans in the same order, offset by their frontiers' difference; neither
+reads the write-backs pending at its start, and each registers only the
+loans it mints, which the registry's freshness keeps apart from what it
+holds. So the second run is the first with its loan identities renamed,
+and outcomes holding no loan are equal. Where global memory holds a hole of
+a loan at or beyond a frontier, the claim fails: a minted loan collides
+with it. No run observes a loan's identity: `compare`, `==`, and `!=` read
+values as `RuntimeValue.observe` does, a mutable borrow as its current
+value and a hole as unit, as Move and Rust compare references by their
+referents (decided 2026-10-09).
 
-The proof (`Semantics/LoanIndependence.lean`) shifts loan identities by an
-offset on values, frames, and global memory (`Semantics/LoanRenaming.lean`)
-and relates a state to the second run's (`StateShifted`): global memory
-shifted, the frontier raised by the offset, the write-backs appended after
-each run's start shifted, and the registry's entries minted by the run
-shifted before entries below each start's frontier. `Above frontier` states
-that every loan a value or frame holds was minted at or beyond the frontier;
-a value is above a frontier exactly when it is a shift by it, so each
+The proof (`Semantics/LoanIndependence.lean`) renames loan identities by an
+injective `ρ` on values, frames, and global memory
+(`Semantics/LoanRenaming.lean`) and relates a state to the second run's
+(`StateRenamed`): global memory renamed, the frontier raised by an offset
+that `ρ` adds to every loan minted from the first frontier on, the
+write-backs appended after each run's start renamed, and the registry's
+entries of the loans the run holds renamed before entries neither run
+holds. `Within inside` states that every loan a value or frame holds
+satisfies `inside`: minted at or beyond the frontier, or lent. Each
 operation lemma is one commutation (`LoanRenamingOps`, `…Primitives`,
-`…Effects`, `…Functions`). The value order and structural equality read
-loan identities, and a shift preserves both. A forward induction over the
-first run's derivation builds the second (`shifts`); natives are a
-hypothesis (`NativesShift`), as for preservation. `runs_mirror` instantiates
-it at two starts; with determinism, `evalFunction_agree` relates any two
-runs, a returning run refutes `aborts_of` (`not_abortsOf_of_ok`), and its
-results, holding no loan, are `result_of` (`resultOf_eq_of_ok`).
+`…Effects`, `…Functions`); a value within `inside` is the image of an
+enumeration of `inside` (`LoanBase`), which reduces each `Within` lemma to
+the commutation. Comparisons commute because observation forgets loans
+(`observe_rename`). A forward induction over the first run's derivation
+builds the second (`shifts`); natives are a hypothesis (`NativesShift`), as
+for preservation.
+
+A start lending distinct unregistered loans below its frontier mirrors onto
+a start with the same memory lending the same references under
+consecutive loans placed past both frontiers (`StateRenamed.ofLent`,
+`lentRenaming`): lent loans to their positions, minted ones past them, the
+others kept, which is injective without counting. `runs_mirror` mirrors a
+run onto such a start; two runs from lent starts both mirror onto the
+same one, where determinism makes them equal, so they agree up to
+injective renamings (`evalFunction_agree`). A returning run refutes
+`aborts_of` (`not_abortsOf_of_ok`, `not_abortsOfMut_of_ok`), and its
+results, read without loans, are `result_of` (`resultOf_eq_of_ok`,
+`resultOfMut_eq_of_ensuresOfMut`).
 
 ### Integration (in progress)
 
@@ -383,7 +399,7 @@ theorem as follows, in this order:
    results decode at the frame. A generic function whose function-typed
    parameter's rows mention its type parameters assumes that its frame
    resolves them to scalars (`ScalarAt`).
-4. **The closer step.** At `wp (closureMeaning …)` on a closure not built
+4. **The solver step.** At `wp (closureMeaning …)` on a closure not built
    in the body, `wp_closureMeaning_unseen_at` with the assumptions; a
    run's `result_of` reads are rewritten by its results. Done for
    invocations from the initial state. An invocation in a callee inlined at
@@ -411,4 +427,4 @@ theorem as follows, in this order:
 ### Not in Phase 1
 
 Semantics changes, the loan invariant, operation lemmas beyond the
-existing ones, the induction, and the closer rule.
+existing ones, the induction, and the solver rule.

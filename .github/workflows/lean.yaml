@@ -56,6 +56,12 @@ jobs:
         working-directory: third_party/move/lean/leaner-rust/rust-exporter
         run: cargo --version
 
+      - name: Test the Rust exporter
+        # A standalone crate on its pinned nightly with `rustc-dev`, so not a
+        # member of the stable root workspace.
+        working-directory: third_party/move/lean/leaner-rust/rust-exporter
+        run: cargo test --locked --features rustc-public
+
       - name: Test LeanerIR
         working-directory: third_party/move/lean/leaner-ir
         run: |

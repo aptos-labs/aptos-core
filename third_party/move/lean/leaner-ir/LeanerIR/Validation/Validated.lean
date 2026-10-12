@@ -14,6 +14,17 @@ private constructor so only the shared checker can create one.
 
 namespace LeanerIR.Validation
 
+/-- Whether an operation reads through a mutable reference operand without
+passing it on: it neither lends it to a callee, writes through it, nor makes
+it part of its value. A field selection whose value is a reference passes
+its operand on, projected. -/
+def readsThroughReference (types : Array Ty) (operation : Operation) (result : TypeId) : Bool :=
+  match operation with
+  | .reference .dereference | .reference (.freeze _) => true
+  | .data _ => !(types[result.index]? matches some (.reference _))
+  | .primitive kind => !(kind matches .tuple | .vector | .repeatVector | .copyValue | .moveValue)
+  | _ => false
+
 /-- The direct expression children of one expression node, in evaluation
 order. Shared by the structural checks and the semantic-preparation
 rewrites. -/
@@ -58,6 +69,14 @@ structure ValueOrders where
   functions : Array (Array Nat) := #[]
   deriving Repr, BEq, Inhabited
 
+/-- How a local validation adds holds a mutable reference no source local
+holds (`holdMutableReferences`): for the operation that reads through it,
+or until it dies discarded. -/
+inductive Holding where
+  | read
+  | dropped
+  deriving Repr, BEq, DecidableEq, Inhabited
+
 /-- Checked backend input namespace whose functions contain only structured
 bodies (or are explicitly absent). `tables` is an immutable cached view of the
 owning compilation-unit table. -/
@@ -65,6 +84,9 @@ structure ValidatedNamespace extends Namespace FunctionBody where
   tables : Tables
   /-- The unit's value orders. A cached unit view, as `tables` is. -/
   orders : ValueOrders := {}
+  /-- The patterns binding the locals validation added to hold mutable
+  references, with how each holds its reference. -/
+  holders : Array (PatternId × Holding) := #[]
   deriving Repr, BEq, Inhabited
 
 private def nameIn (tables : Tables) (id : NameId) : String :=

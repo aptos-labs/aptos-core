@@ -6,7 +6,7 @@
 
 use anyhow::{bail, Result};
 use move_model::{
-    ast::{collect_proof_exps, ExpData, Proof},
+    ast::{collect_proof_exps, ExpData, Proof, Spec},
     model::{GlobalEnv, ModuleId},
 };
 use std::collections::BTreeSet;
@@ -82,6 +82,17 @@ fn dependencies(env: &GlobalEnv, module: ModuleId) -> BTreeSet<ModuleId> {
         }
         applied_lemma_modules(proof, usage);
     };
+    // A specification also calls functions, which the module usage of
+    // specifications does not record.
+    let use_spec = |usage: &mut BTreeSet<ModuleId>, spec: &Spec| {
+        for condition in &spec.conditions {
+            use_exp(usage, &condition.exp);
+            for exp in &condition.additional_exps {
+                use_exp(usage, exp);
+            }
+        }
+    };
+    use_spec(&mut usage, &module_env.get_spec());
     for function in module_env.get_functions() {
         for parameter in function.get_parameters() {
             parameter.1.module_usage(&mut usage);
@@ -90,6 +101,7 @@ fn dependencies(env: &GlobalEnv, module: ModuleId) -> BTreeSet<ModuleId> {
         if let Some(body) = function.get_def() {
             use_exp(&mut usage, body);
         }
+        use_spec(&mut usage, &function.get_spec());
         if let Some(proof) = &function.get_spec().proof {
             use_proof(&mut usage, proof);
         }
@@ -109,12 +121,16 @@ fn dependencies(env: &GlobalEnv, module: ModuleId) -> BTreeSet<ModuleId> {
         for field in struct_env.get_fields().chain(struct_env.get_ghost_fields()) {
             field.get_type().module_usage(&mut usage);
         }
+        use_spec(&mut usage, &struct_env.get_spec());
     }
     for (_, decl) in module_env.get_spec_funs() {
         for parameter in &decl.params {
             parameter.1.module_usage(&mut usage);
         }
         decl.result_type.module_usage(&mut usage);
+        if let Some(body) = &decl.body {
+            use_exp(&mut usage, body);
+        }
     }
     for (_, decl) in module_env.get_spec_vars() {
         decl.type_.module_usage(&mut usage);

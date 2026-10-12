@@ -83,7 +83,7 @@ run_cmd do
 /--
 error: the precondition of `apply` is not established
 ---
-error: leaner verification failed: the automatic verification of `use_apply` failed; provide a proof: `verify use_apply by …` in the module (`verify use_apply by skip` shows the obligations it leaves)
+error: leaner verification failed: the automatic verification of `use_apply` failed; provide a proof: `verify use_apply by …` in the module (`verify use_apply by leaner_obligations` lists its obligations)
 -/
 #guard_msgs in
 leaner module 0x42::unbounded where
@@ -308,5 +308,54 @@ run_cmd do
   for function in [`call_double, `call_double_exactly, `bump_once] do
     unless env.contains (`LeanerLang.Tests.Behavior ++ `«0x42».known ++ function ++ `verified) do
       throwError s!"{function} did not establish the named function value's behavior"
+
+-- The abort alternatives are marked by the opaque callee's specification.
+-- On the second alternative, the first call must either overflow itself or
+-- return x + 1 before the second invocation can be analyzed.
+set_option leaner.verifyHeartbeats 50000 in
+leaner module 0x42::nested_results where
+  fun twice(f : Fn(u64) -> u64 has Copy, x : u64) -> u64 := invoke(f, invoke(f, x))
+  spec twice where
+    pragma opaque
+    aborts_if aborts_of<f>(x) || aborts_of<f>(result_of<f>(x))
+    ensures result == result_of<f>(result_of<f>(x))
+
+  fun increment(x : u64) -> u64 := x + 1
+  spec increment where
+    aborts_if x + 1 > MAX_U64
+    ensures result == x + 1
+
+  fun add_two(x : u64) -> u64 :=
+    twice(function[Fn(u64) -> u64 has Copy](increment), x)
+  spec add_two where
+    aborts_if x + 2 > MAX_U64
+    ensures result == x + 2
+
+-- Overflow of the second invocation must not be forgotten. At MAX_U64 - 1
+-- the first invocation succeeds and the second aborts, refuting this clause.
+/--
+error: the specification clause `aborts_if x + 1 > MAX_U64` is not established
+---
+error: leaner verification failed: the automatic verification of `add_two` failed; provide a proof: `verify add_two by …` in the module (`verify add_two by leaner_obligations` lists its obligations)
+-/
+#guard_msgs in
+set_option leaner.verifyHeartbeats 50000 in
+leaner module 0x42::wrong_nested_abort where
+  fun twice(f : Fn(u64) -> u64 has Copy, x : u64) -> u64 := invoke(f, invoke(f, x))
+  spec twice where
+    pragma opaque
+    aborts_if aborts_of<f>(x) || aborts_of<f>(result_of<f>(x))
+    ensures result == result_of<f>(result_of<f>(x))
+
+  fun increment(x : u64) -> u64 := x + 1
+  spec increment where
+    aborts_if x + 1 > MAX_U64
+    ensures result == x + 1
+
+  fun add_two(x : u64) -> u64 :=
+    twice(function[Fn(u64) -> u64 has Copy](increment), x)
+  spec add_two where
+    aborts_if x + 1 > MAX_U64
+    ensures result == x + 2
 
 end LeanerLang.Tests.Behavior

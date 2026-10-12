@@ -3,7 +3,7 @@
 
 import LeanerLang.Contract
 import LeanerLang.Modules
-import LeanerIR.Proofs.Denote.Close
+import LeanerIR.Proofs.Denote.Solve
 
 /-!
 # Verification through the denotation
@@ -11,7 +11,7 @@ import LeanerIR.Proofs.Denote.Close
 `verify f` compiles `f`'s validated body to its typed term
 (`LeanerIR.Proofs.Denote.compileFunction`), certifies that compilation by
 `rfl`, proves the authored contract over the term's denotation by one
-normalization with the `lir_denote` inventory and the leaf closer, and
+normalization with the `lir_denote` inventory and the leaf solver, and
 transports the result to the big-step meaning through the agreement
 theorem.  Per target it publishes:
 
@@ -124,7 +124,14 @@ theorem LeanerLang.Contract.selectVariantField_encode_enum {unit : LeanerIR.Vali
       else .unit := by
   rw [LeanerIR.Proofs.Denote.NTy.encode_enum_payload]; rfl
 
-attribute [lir_denote_norm] LeanerLang.Contract.testVariants_encode_enum
+attribute [lir_denote_norm] LeanerIR.moveArithmeticError LeanerLang.Contract.abortCodeMatches
+attribute [lir_denote_norm] LeanerIR.Proofs.Denote.DataInvariant.withCollections
+  LeanerIR.Proofs.Denote.DataInvariant.collection LeanerIR.Proofs.Denote.DataInvariant.elements
+  LeanerIR.Proofs.Denote.DataInvariant.value LeanerIR.Proofs.Denote.DataInvariant.row
+  LeanerIR.Proofs.Denote.DataInvariant.variant
+attribute [lir_denote_norm] LeanerLang.Contract.updateNominalField
+  LeanerLang.Contract.updateFieldIndex
+  LeanerLang.Contract.testVariants_encode_enum
   LeanerLang.Contract.selectVariantField_encode_enum
   LeanerLang.Contract.testVariants_nominal_self
   LeanerLang.Contract.testVariants_nominal LeanerLang.Contract.variantMember
@@ -1066,7 +1073,7 @@ private partial def ensureEnumNative (unit : ValidatedUnit) (twins : Array SpecT
       ← mkLambdaFVars (← frameBinders skolems) (← mkAppM ``funext #[pointwise]))
   addDecl (.thmDecl { name := codecName, levelParams := [], type := statement, value := proof })
 
-/-- Close an equation whose sides the kernel identifies: the elaborator's
+/-- Solve an equation whose sides the kernel identifies: the elaborator's
 defeq check does not unfold the codecs a twin's encoding goes through, and
 the declaration's kernel check decides it. -/
 elab "leaner_twin_kernel_rfl" : tactic => do
@@ -1326,6 +1333,14 @@ private def bodyCallees (unit : ValidatedUnit) (handle : FunctionHandle) : Array
   | some { body := .structured root, .. } => expressionCallees unit handle.namespaceId root #[]
   | _ => #[]
 
+/-- Whether a function's body calls a function with a precondition, which
+it owes at the call. -/
+private def callsRequiring (unit : ValidatedUnit) (handle : FunctionHandle) : Bool :=
+  (bodyCallees unit handle).any fun callee =>
+    match unit.namespaces[callee.namespaceId.index]?.bind (·.functions[callee.functionId.index]?) with
+    | some declaration => declaration.contract.conditions.any (·.kind == .requires)
+    | none => false
+
 /-- Whether a function is on a cycle of calls: a call of it reaches it again. -/
 private def onCallCycle (unit : ValidatedUnit) (handle : FunctionHandle) : Bool := Id.run do
   let mut reached : Array FunctionHandle := #[]
@@ -1451,8 +1466,10 @@ Recorded once, with the predicate, for every module that builds contracts
 over the unit. -/
 private initialize storedDeclarations :
     SimplePersistentEnvExtension
-      (Name × Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String))
-      (NameMap (Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String))) ←
+      (Name × Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String) ×
+        Bool × Array (LeanerIR.StructHandle × String))
+      (NameMap (Array LeanerIR.StructHandle × Array (LeanerIR.StructHandle × String) ×
+        Bool × Array (LeanerIR.StructHandle × String))) ←
   registerSimplePersistentEnvExtension {
     addEntryFn := fun map (name, declarations) => map.insert name declarations
     addImportedFn := fun entries =>
@@ -1460,17 +1477,19 @@ private initialize storedDeclarations :
         {} entries }
 
 /-- Define once per unit the predicate of the data invariants of its stored
-resources (`Contract.storedInvariantTerm`), which the closer's normalization
+resources (`Contract.storedInvariantTerm`), which the solver's normalization
 unfolds where it is applied, and record the declarations it covers. -/
 def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
     (twins : Array SpecTypes.TwinInfo) : CommandElabM Contract.StoredInvariants := do
   let name := storedInvariantName segments
-  if let some (carriers, unsupported) := (storedDeclarations.getState (← getEnv)).find? name then
+  if let some (carriers, unsupported, hasCollections, collectionUnsupported) :=
+      (storedDeclarations.getState (← getEnv)).find? name then
     let predicate := if (← getEnv).contains name then some (mkConst name) else none
-    return { predicate, carriers, unsupported }
+    return { predicate, carriers, unsupported, hasCollections, collectionUnsupported }
   let stored ← liftTermElabM (Contract.storedInvariantTerm unit twins)
-  modifyEnv fun env => storedDeclarations.addEntry env (name, stored.carriers, stored.unsupported)
-  if stored.cases.isEmpty then return stored
+  modifyEnv fun env => storedDeclarations.addEntry env
+    (name, stored.carriers, stored.unsupported, stored.hasCollections, stored.collectionUnsupported)
+  if stored.cases.isEmpty && stored.collectionCases.isEmpty then return stored
   liftTermElabM do
     -- Over the unit memory is typed at, then the executable unit where an
     -- invariant reads it.
@@ -1481,7 +1500,7 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
         if readsUnit then
           mkForallFVars #[unitExpr] (← mkArrow (Contract.executableType unitExpr) type)
         else mkForallFVars #[unitExpr] type
-    -- A constant and its equation, which the closer's normalization unfolds
+    -- A constant and its equation, which the solver's normalization unfolds
     -- where the constant is applied to all its arguments.
     let define (constant : Name) (type value : Lean.Expr) (arity : Nat) : TermElabM Unit := do
       addDecl (.defnDecl {
@@ -1504,6 +1523,12 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
       let constant := name ++ Name.mkSimple s!"case{index}"
       define constant (← withUnit valueProp) case arity
       constants := constants.push constant
+    let argumentsProp ← mkArrow (mkConst ``NRow) valueProp
+    let mut collectionConstants : Array (LeanerIR.StructHandle × Name) := #[]
+    for (owner, case) in stored.collectionCases, index in [0:stored.collectionCases.size] do
+      let constant := name ++ Name.mkSimple s!"collectionCase{index}"
+      define constant (← withUnit argumentsProp) case (arity + 1)
+      collectionConstants := collectionConstants.push (owner, constant)
     let predicate ← withLocalDeclD `unit (mkConst ``ValidatedUnit) fun unitExpr =>
       withLocalDeclD `executable (Contract.executableType unitExpr) fun executable =>
       withLocalDeclD `resource (mkConst ``ResourceType) fun resource =>
@@ -1516,7 +1541,20 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
           for (owner, constant) in (stored.carriers.zip constants).reverse do
             let test ← mkEq handle? (← mkAppM ``Option.some #[toExpr owner])
             selected ← mkAppM ``ite #[test, mkAppN (mkConst constant) leading, selected]
-          mkLambdaFVars (leading ++ #[resource, held]) (mkApp selected held)
+          let globals ← mkLambdaFVars #[resource, held] (mkApp selected held)
+          if collectionConstants.isEmpty then return ← mkLambdaFVars leading globals
+          let declared ← withLocalDeclD `owner (mkConst ``LeanerIR.StructHandle) fun owner =>
+            withLocalDeclD `arguments (mkConst ``NRow) fun arguments =>
+            withLocalDeclD `raw (mkConst ``RuntimeValue) fun raw => do
+              let mut selected ← withLocalDeclD `arguments (mkConst ``NRow) fun arguments =>
+                withLocalDeclD `raw (mkConst ``RuntimeValue) fun raw =>
+                  mkLambdaFVars #[arguments, raw] (mkConst ``True)
+              for (handle, constant) in collectionConstants.reverse do
+                selected ← mkAppM ``ite #[← mkEq owner (toExpr handle),
+                  mkAppN (mkConst constant) leading, selected]
+              mkLambdaFVars #[owner, arguments, raw] (mkApp2 selected arguments raw)
+          mkLambdaFVars leading
+            (← mkAppM ``LeanerIR.Proofs.Denote.DataInvariant.withCollections #[globals, declared])
     define name (← withUnit (← mkArrow (mkConst ``ResourceType) valueProp)) predicate (arity + 1)
   return { stored with predicate := some (mkConst name) }
 
@@ -1568,8 +1606,8 @@ private def proofRequest (ns : ValidatedNamespace) (function : String) : Message
   let place := match proofFile? ns with
     | some path => m!"in `{path}`"
     | none => m!"in the module"
-  m!"provide a proof: `verify {function} by …` {place} (`verify {function} by skip` shows the \
-    obligations it leaves)"
+  m!"provide a proof: `verify {function} by …` {place} (`verify {function} by leaner_obligations` \
+    lists its obligations)"
 
 /-- What a failed verification asks for: an authored proof did not close
 its obligations; an automatic one asks for a proof, or for a larger budget
@@ -1759,7 +1797,8 @@ mutual
 /-- Whether evaluating an expression may change the global store: through a
 global operation, or through a call to a function that may. An invocation
 of a `kept` local, a function-typed parameter the body does not reassign,
-keeps the store (`KeepsMemoryAt`). -/
+keeps the store (`KeepsMemoryAt`); building a closure runs nothing, and a
+specification block is not evaluated. -/
 private partial def mayTouchStore (unit : ValidatedUnit) (namespaceId : NamespaceId)
     (id : LeanerIR.ExprId) (visiting : Array FunctionHandle) (kept : Array Nat := #[]) : Bool :=
   match unit.namespaces[namespaceId.index]? with
@@ -1767,6 +1806,7 @@ private partial def mayTouchStore (unit : ValidatedUnit) (namespaceId : Namespac
   | some ns =>
   match ns.expressions[id.index]? with
   | none => true
+  | some { kind := .spec _, .. } => false
   | some expression =>
       let direct := match expression.kind with
         | .operation (.global _) _ _ _ => true
@@ -1775,12 +1815,12 @@ private partial def mayTouchStore (unit : ValidatedUnit) (namespaceId : Namespac
             | some callee => calleeMayTouchStore unit callee visiting
             | none => true
         | .operation (.call (.constructor ..)) _ _ _
-        | .operation (.call (.destructor ..)) _ _ _ => false
+        | .operation (.call (.destructor ..)) _ _ _
+        | .operation (.call (.closure _ _)) _ _ _ => false
         | .operation (.call .invoke) _ arguments _ =>
             match (arguments[0]?.bind fun callee => ns.expressions[callee.index]?).map (·.kind) with
             | some (LeanerIR.ExprKind.localVar localId) => !kept.contains localId.index
             | _ => true
-        | .operation (.call (.closure _ _)) _ _ _
         | .operation (.call (.extension ..)) _ _ _ => true
         | _ => false
       direct || (LeanerIR.Validation.expressionChildren expression.kind).any
@@ -1821,6 +1861,42 @@ private def bodySpecifications (ns : ValidatedNamespace) (root : LeanerIR.ExprId
         if block.conditions.any (accept ·.kind) then found := found.push (id, block)
       pending := pending ++ LeanerIR.Validation.expressionChildren expression.kind
     return found
+
+/-- The names of the leaves owing a function's clauses, by the clauses' source
+ranges: each clause by its kind, numbered in source order among the clauses
+of that kind (`ensures_2`, `aborts_if_1`, `invariant_1`, `modifies_1`). -/
+private def clauseNames (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody) :
+    Array (LeanerIR.Proofs.ObligationRange × String) := Id.run do
+  let kindName : LeanerIR.ConditionKind → Option String
+    | .ensures => some "ensures" | .abortsIf => some "aborts_if"
+    | .abortsWith => some "aborts_with" | .succeedsIf => some "succeeds_if"
+    | .emits => some "emits" | .decreases => some "decreases"
+    | .loopInvariant => some "invariant" | .assertion => some "assert"
+    | .apply => some "apply" | .split => some "split"
+    | _ => none
+  let mut clauses : Array (String × LeanerIR.Proofs.ObligationRange) := #[]
+  for condition in declaration.contract.conditions do
+    if let some kind := kindName condition.kind then
+      clauses := clauses.push (kind, Contract.locRange unit condition.loc)
+  for target in declaration.contract.modifies do
+    if let some expression := ns.expressions[target.index]? then
+      clauses := clauses.push ("modifies", Contract.locRange unit expression.loc)
+  if let .structured root := declaration.body then
+    for (_, block) in bodySpecifications ns root fun _ => true do
+      for condition in block.conditions do
+        if let some kind := kindName condition.kind then
+          clauses := clauses.push (kind, Contract.locRange unit condition.loc)
+  let ordered := clauses.qsort fun (_, a) (_, b) =>
+    a.file < b.file || (a.file == b.file && a.startByte < b.startByte)
+  let mut counts : Std.HashMap String Nat := {}
+  let mut names := #[]
+  for (kind, range) in ordered do
+    if range.startByte ≥ range.endByte || names.any (·.1 == range) then continue
+    let index := counts.getD kind 0 + 1
+    counts := counts.insert kind index
+    names := names.push (range, s!"{kind}_{index}")
+  return names
 
 /-- The types a clause reads the locals of a function at: a reference local
 at its referent. -/
@@ -2153,6 +2229,37 @@ def assertionConditions (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId 
     conditions := conditions.push (loopSite namespaceId.index site.index, condition, readsUnit)
   return conditions
 
+/-- The precondition an inlined callee's caller owes where the callee
+starts, as the Move Prover asserts it at the call: its `requires` clauses
+over its arguments and the memory at its start
+(`Contract.startPrecondition`), if it states any. -/
+def preconditionCondition (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : LeanerIR.FunctionDecl LeanerIR.Validation.FunctionBody)
+    (params : NRow) (codecs types : Option Lean.Expr) (twins : Array SpecTypes.TwinInfo) :
+    TermElabM (Option (Lean.Expr × Bool)) := do
+  let required := (ContractView.interface.of declaration).contract.conditions.filter
+    fun condition => condition.kind == .requires &&
+      !Contract.conditionReadsRequires unit namespaceId condition.expression
+  if required.isEmpty then return none
+  let readsUnit := required.any fun condition =>
+    Contract.conditionReadsBehavior unit namespaceId condition.expression
+  let argumentsType ← mkAppM ``HList #[← quoteRow params]
+  let stateType ← memoryAt outer
+  let parameterTypes := params.toList
+  let localTypes ← clauseLocalTypes unit declaration
+  let condition ← overExecutable outer readsUnit fun executable =>
+    withLocalDeclD `start argumentsType fun start =>
+    withLocalDeclD `startState stateType fun startState => do
+      let startSlots ← slotProjections start parameterTypes.length
+      let locals ← (Array.range declaration.locals.size).mapM fun index =>
+        match parameterTypes[index]? with
+        | some τ => logicalValue τ startSlots[index]!
+        | none => pure none
+      mkLambdaFVars #[start, startState] (← Contract.startPrecondition unit namespaceId ns
+        declaration locals localTypes codecs types startState twins executable)
+  return some (condition, readsUnit)
+
 /-- Whether a condition of a specification block marks the state or a
 derivation instead of stating an assumption. -/
 private def isMarker (ns : ValidatedNamespace) (condition : LeanerIR.Condition) : Bool :=
@@ -2375,7 +2482,7 @@ def memoryConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Functi
       withLocalDeclD `state stateType fun state => do
         let before := mkApp3 (mkConst ``Prod.snd [.zero, .zero]) envType stateType anchor
         let owed ← Contract.memoryWriteInvariants unit namespaceId ns declaration codecs types
-          twins written state before executable
+          twins written state before executable (writtenType := some resource.typeId)
         mkLambdaFVars #[start, startState, anchor, env, state] owed
     conditions := conditions.push (site, condition, readsUnit)
   return conditions
@@ -2520,6 +2627,12 @@ private def nativeHypothesisType (unit : ValidatedUnit) (twins : Array SpecTypes
           typedAt skolems #[]]
       mkForallFVars #[skolems] statement
 
+/-- The functions whose verification has begun and not ended, by key: a
+callee among them has no theorem yet, and a caller assuming its contract
+would rest its proof on its own. -/
+private initialize inProgressTargets : EnvExtension (Array String) ←
+  registerEnvExtension (pure #[])
+
 /-- The axiom dependencies of this file's own constants, kept across the
 audits of one file: each audit walks only what an earlier audit has not. An
 environment extension, so that a rolled-back verification forgets its
@@ -2613,10 +2726,10 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) : CommandElabM Unit
       -- Rule 1 of the design: a verified function reasons over values,
       -- never over frames or loan bookkeeping.
       if dependency == ``sorryAx || dependency == ``LeanerIR.RuntimeFrame ||
-          dependency == ``LeanerIR.SemanticOperations.FreshGlobalLoanIds ||
+          dependency == ``LeanerIR.SemanticOperations.FreshStorageLoanIds ||
           dependency == ``LeanerIR.SemanticOperations.LoanDiscipline ||
-          dependency == ``LeanerIR.SemanticOperations.globalLoanKeyIn? ||
-          dependency == ``LeanerIR.SemanticOperations.removeGlobalLoan then
+          dependency == ``LeanerIR.SemanticOperations.storageLoanTargetIn? ||
+          dependency == ``LeanerIR.SemanticOperations.removeStorageLoan then
         throwError m!"artifact `{name}` retains forbidden dependency `{dependency}`"
       if base.isPrefixOf dependency || artifacts.isPrefixOf dependency then
         pending := pending.push dependency
@@ -3296,25 +3409,25 @@ private def lemmaTheoremCommand (unit : ValidatedUnit) (twins : Array SpecTypes.
              $(mkIdent (trustBinderName trusted)) $readArguments* $bundle $stated $earlier*
            have $step := $assumed
            simp only [$(rootIdent stepName):ident] at $step:ident
-           try leaner_denote_normalize at $step:ident
-           leaner_denote_split_hypotheses)))
+           try leaner_normalize at $step:ident
+           leaner_split_hypotheses)))
     | _ =>
         steps := steps.push (← `(tactic| all_goals
           (have $step : $(rootIdent stepName) $readArguments* $bundle := by
              simp only [$(rootIdent stepName):ident]
-             leaner_denote_lemma_owed
+             leaner_lemma_owed
            simp only [$(rootIdent stepName):ident] at $step:ident
-           leaner_denote_lemma_holds $step)))
+           leaner_lemma_holds $step)))
   let tactics : Array (TSyntax `tactic) :=
     -- The premise as stated, which an assumed step's hypothesis takes.
     #[← `(tactic| have $stated := $premise),
       ← `(tactic| simp only [$requires:ident, LeanerIR.Proofs.Obligation_iff] at $premise:ident),
-      ← `(tactic| try leaner_denote_normalize at $premise:ident),
-      ← `(tactic| leaner_denote_split_hypotheses)] ++ steps ++
+      ← `(tactic| try leaner_normalize at $premise:ident),
+      ← `(tactic| leaner_split_hypotheses)] ++ steps ++
     #[← `(tactic| all_goals
         (simp only [$ensures:ident]
-         try leaner_denote_normalize
-         all_goals leaner_denote_close))]
+         try leaner_normalize
+         all_goals leaner_solve_goals))]
   let script ← `(tactic| ($tactics;*))
   let theoremName := rootIdent names.theorem_
   unless recursive do
@@ -3343,7 +3456,7 @@ private def lemmaTheoremCommand (unit : ValidatedUnit) (twins : Array SpecTypes.
     decreasing_by
       all_goals
         ((try simp only [$measureDefinitions,*])
-         leaner_denote_lemma_decreasing))
+         leaner_lemma_decreasing))
 
 /-- Verify the lemmas `roots` reach, a recursion group at a time, each after
 the groups it applies; a group whose theorems exist is skipped. -/
@@ -3466,7 +3579,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
   -- over every skolem family and type instantiation; any other at the
   -- runtime family, a closed term the normalizer's caches keep, and the
   -- empty instantiation.
-  let generic := isGeneric declaration || family
+  let generic := isGeneric declaration || family ||
+    -- A generic invariant's ghost type parameter ranges over every type.
+    Contract.hasGhostInvariantInstances unit handle.namespaceId declaration
   -- A generic function outside a cycle is proved for the frames it runs in
   -- (`FrameOf`); a call passing its own type parameters runs in its frame.
   let framed := isGeneric declaration && cycle.isEmpty
@@ -3546,11 +3661,16 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
           @$(mkIdent (Name.mkSimple s!"native_{calleeKey}")))))
     else if throughContract &&
         (hasInterfaceView calleeDeclaration || automaticVerificationDisabled unit callee.namespaceId calleeNs calleeDeclaration ||
-          (Contract.mapRoleOf? unit callee.namespaceId calleeNs calleeDeclaration).isSome) then
+          (Contract.mapRoleOf? unit callee.namespaceId calleeNs calleeDeclaration).isSome ||
+          !(← getEnv).contains theoremName &&
+            !(inProgressTargets.getState (← getEnv)).contains calleeKey) then
       -- Callers see such a callee through the interface its body is not
-      -- proved against, or through the contract of a function whose
-      -- verification is disabled: they assume it, as they assume a
-      -- native's contract.
+      -- proved against, through the contract of a function whose
+      -- verification is disabled, or through the contract of one without a
+      -- theorem, whose verification failed or was not run: they assume it,
+      -- as they assume a native's contract, and as the Move Prover verifies
+      -- a caller against its callees' specifications. The callee's own
+      -- failure is reported where it is verified.
       let some (nativeParams, nativeResult) :=
           nativeSignature? unit callee.namespaceId calleeDeclaration
         | throwErrorAt reference m!"`{calleeKey}` has no native signature"
@@ -3574,8 +3694,9 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
         (← `(term| PProd.mk $handleTerm
           (PProd.mk $(Syntax.mkStrLit calleeKey) (@$(mkIdent theoremName) _ _ prepared))))
     else if throughContract then
-      throwErrorAt reference m!"`{function}` calls `{calleeKey}`, which is not verified; \
-        verify the callee first"
+      throwErrorAt reference m!"`{function}` calls `{calleeKey}`, whose verification depends \
+        on `{function}`'s own: `{calleeKey}` reaches `{function}` through the function values \
+        or callees its proof uses"
     else
       -- Any other callee is inlined: its compiled body stands for its
       -- meaning through the agreement theorem.
@@ -3812,6 +3933,12 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     -- proof meets: the function's own and those of its inlined callees, each
     -- keyed by its site and function.
     let owners := #[(handle, ns, declaration, compiled)] ++ inlined
+    -- The callees a body the proof meets calls: a closure's target, reached
+    -- through a function value, owes no precondition of its own there (its
+    -- invocation's is the value's, `requires_of`).
+    let called := owners.foldl (fun found (owner, _, _, _) =>
+      (bodyCallees unit owner).foldl (fun found callee =>
+        if found.contains callee then found else found.push callee) found) #[]
     let invariants ← liftTermElabM <| withExecutableSkolems fun executable skolems => do
       owners.flatMapM fun (owner, ownerNs, ownerDeclaration, ownerCompiled) => do
         let codecs := mkApp (mkConst ``Carriers.codec) (← Contract.frameCarriers skolems)
@@ -3842,6 +3969,11 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
             afterCallConditions unit executable owner ownerNs ownerDeclaration ownerCompiled.params codecs
               types twins
           else pure #[]
+        -- The precondition an inlined callee's caller owes where it starts.
+        let precondition ← if owner == handle || !called.contains owner then pure none
+          else
+            preconditionCondition unit executable owner.namespaceId ownerNs ownerDeclaration
+              ownerCompiled.params codecs types twins
         let invariants := invariants.map (fun (site, invariant, readsUnit) =>
           (site, invariant, readsUnit, "loopInvariant")) ++
           assertions.map (fun (site, condition, readsUnit) =>
@@ -3852,23 +3984,32 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
             (site, condition, readsUnit, "construction")) ++
           writes.map (fun (site, condition, readsUnit) =>
             (site, condition, readsUnit, "memoryWritten")) ++
-          calls.map fun (site, condition, readsUnit) =>
-            (site, condition, readsUnit, "afterCall")
+          calls.map (fun (site, condition, readsUnit) =>
+            (site, condition, readsUnit, "afterCall")) ++
+          (precondition.map fun (condition, readsUnit) =>
+            (0, condition, readsUnit, "precondition")).toArray
         invariants.mapM fun (site, invariant, readsUnit, kind) =>
           return (site, owner, ← mkLambdaFVars (← executableBinders executable skolems) invariant,
             readsUnit, kind)
     let mut loopPairs : Array Term := #[]
+    let mut preconditionPairs : Array Term := #[]
     for (site, owner, invariant, _, kind) in invariants do
-      let name := artifacts ++ Name.mkSimple s!"{kind}_{site}"
+      let name := if kind == "precondition" then
+          artifacts ++ Name.mkSimple s!"precondition_{functionKey unit owner}"
+        else artifacts ++ Name.mkSimple s!"{kind}_{site}"
       liftTermElabM (addAbbrev name invariant)
       -- The invariant's skolem instance is the loop's own: an inlined generic
-      -- callee runs under its frame's, so the closer applies it, at the unit
+      -- callee runs under its frame's, so the solver applies it, at the unit
       -- and frame its marker names, not the ambient instance an elaborated
       -- constant would take. The executable unit is the theorem's.
       let applied ← `(term| fun (_ : LeanerIR.Validation.ValidatedUnit)
           (Θ : LeanerIR.Proofs.Denote.Skolems $unitTerm) => @$(rootIdent name) $unitTerm executable Θ)
-      loopPairs := loopPairs.push
-        (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner), $applied)))
+      if kind == "precondition" then
+        preconditionPairs := preconditionPairs.push
+          (← `(term| ($(← handleSyntax owner), $applied)))
+      else
+        loopPairs := loopPairs.push
+          (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner), $applied)))
     liftTermElabM (publishCompiled segments unit function handle compiled)
     let pattern ← argumentPattern unit declaration compiled.params
     let budgetValue := (heartbeatBudget? declaration).getD (leaner.verifyHeartbeats.get (← getOptions))
@@ -4018,16 +4159,33 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
               $rest)
         `(term| (⟨$routes, $generics, $instantiation, fun _ => none⟩ :
           LeanerIR.Proofs.Denote.Meanings executable))
-    -- An authored script proves the obligations the closer leaves. A
-    -- contract binding a state label has the closer keep its program points.
-    let mut flags : Array (TSyntax `closeFlag) := #[]
-    if script?.isSome then flags := flags.push (← `(closeFlag| residual))
+    -- An authored script proves the obligations the solver leaves. A
+    -- contract binding a state label has the solver keep its program points.
+    let mut flags : Array (TSyntax `solveFlag) := #[]
     if Contract.contractBindsStateLabel unit ⟨namespaceIndex⟩ declaration then
-      flags := flags.push (← `(closeFlag| labeled))
-    let closeTactic ← `(tactic| leaner_denote_close $flags* [$loopPairs,*] with [$calleePairs,*]
-      using [$instantiationCertificates,*])
+      flags := flags.push (← `(solveFlag| labeled))
+    let unrollBound? := declaration.pragmas.findSome? fun
+      | .assign "unroll" (.constant (.integer bound)) _ =>
+          if 0 ≤ bound then some bound.toNat else none
+      | _ => none
+    let unrollPairs ← match unrollBound?, declaration.body with
+      | some bound, .structured root => (loopSpecifications ns root).mapM fun (site, _) =>
+          `(term| ($(quote (loopSite namespaceIndex site.index)), $(quote bound)))
+      | _, _ => pure #[]
+    -- An obligation no clause locates is reported at the function.
+    let solveTactic ← withRef reference `(tactic| leaner_solve_goals $flags* [$loopPairs,*]
+      with [$calleePairs,*] using [$instantiationCertificates,*] unrolling [$unrollPairs,*]
+      requiring [$preconditionPairs,*])
+    -- An authored proof's `leaner_obligations` are the function's, each leaf
+    -- named by the clause it owes.
+    let names ← (clauseNames unit ns declaration).mapM fun (range, name) =>
+      `(obligationName| ($(Syntax.mkStrLit name), $(Syntax.mkStrLit range.file),
+        $(Syntax.mkNumLit (toString range.startByte)), $(Syntax.mkNumLit (toString range.endByte))))
+    let obligationsTactic ← withRef reference `(tactic| leaner_obligations $flags* [$loopPairs,*]
+      with [$calleePairs,*] using [$instantiationCertificates,*] unrolling [$unrollPairs,*]
+      requiring [$preconditionPairs,*] naming [$names,*])
     -- A loop invariant reading `old` needs the function's start: the
-    -- arguments and state are recorded as a hypothesis the closer finds.
+    -- arguments and state are recorded as a hypothesis the solver finds.
     let readsStart : Bool := match declaration.body with
       | .structured root => (loopSpecifications ns root ++
             bodySpecifications ns root (· matches .assertion | .apply)).any fun (_, block) =>
@@ -4062,9 +4220,17 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
                        $resourcesFact:tactic))
         | none => pure resourcesFact
       else `(tactic| skip)
-    let scriptTactic ← match script? with
-      | some script => `(tactic| ($script:tacticSeq))
-      | none => `(tactic| skip)
+    -- The automatic verification, or the authored proof of the function's
+    -- goal.
+    let (automaticTactic, scriptTactic) ← match script? with
+      | some script =>
+          let authored := Id.run <| script.raw.replaceM fun stx =>
+            pure <| if stx.isOfKind ``LeanerIR.Proofs.Denote.leanerObligations &&
+                stx[1].getNumArgs == 0 then
+              some obligationsTactic.raw
+            else none
+          pure (← `(tactic| skip), ← `(tactic| ($(⟨authored⟩):tacticSeq)))
+      | none => pure (solveTactic, ← `(tactic| skip))
     -- Under its in-body assumptions: the reading that assumes them is
     -- verified, and the hypothesis that they hold carries the contract over.
     let assumptionsTactic ← if ownAssumptions then
@@ -4111,8 +4277,8 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
           $shapeTerm:ident, $mutablesTerm:ident, $typedContract:ident, lir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
           String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢
-         all_goals leaner_denote_normalize at $permitted:ident ⊢
-         all_goals $closeTactic:tactic)
+         all_goals leaner_normalize at $permitted:ident ⊢
+         all_goals $automaticTactic:tactic)
         $scriptTactic:tactic)
     let typedCommand ← if selectsBitVectors declaration then
         `(command| set_option leaner.bitVectors true in $typedCommand)
@@ -4503,7 +4669,9 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
 
 private partial def pathSegments (stx : Syntax) : Array String :=
   match stx with
-  | .ident _ raw _ _ => #[raw.toString]
+  -- The identifier's name, as the elaborator registers it: a quoted segment
+  -- such as a script's `«<SELF>_0»` without its quotes.
+  | .ident _ _ name _ => #[name.toString (escape := false)]
   | .atom _ value => if value == "::" then #[] else #[value]
   | .node _ _ arguments => arguments.flatMap pathSegments
   | _ => #[]
@@ -4519,7 +4687,17 @@ def scriptOfOptional (optional : Syntax) :
 qualified path names the module; a bare name must be declared by exactly one
 registered module. -/
 syntax (name := leanerVerifyCommand)
-  "verify" leanerPath ("by" Lean.Parser.Tactic.tacticSeq)? : command
+  ("verify!" <|> "verify") leanerPath ("by" Lean.Parser.Tactic.tacticSeq)? : command
+
+/-- Whether a `verify` item or command is marked `verify!`. -/
+def demandedVerify (stx : Syntax) : Bool :=
+  (stx[0].find? fun keyword => keyword.isAtom && keyword.getAtomVal == "verify!").isSome
+
+/-- Where the `verify` items are skipped (`skipVerify`), one without `!` is
+skipped with this message. -/
+def skippedInEditor (reference : Syntax) (function : String) : CommandElabM Unit :=
+  logInfoAt reference m!"`{function}` is not verified in the editor: `verify! {function}` runs \
+    it here; `lake test` runs every item"
 
 @[command_elab leanerVerifyCommand]
 def elabLeanerVerify : CommandElab := fun stx => Perf.withPhase .certification do
@@ -4535,6 +4713,9 @@ def elabLeanerVerify : CommandElab := fun stx => Perf.withPhase .certification d
   else segments
   let script := scriptOfOptional (stx[2]?.getD .missing)
   let function := segments.back!
+  if skipVerify (← getOptions) && !demandedVerify stx then
+    skippedInEditor pathSyntax function
+    return
   if segments.size > 1 then
     return ← verifyFunction pathSyntax segments.pop function script
   let owners := (LeanerLang.registeredUnits (← getEnv)).filter fun (_, unit) =>
@@ -4557,6 +4738,8 @@ private structure VerificationTarget where
   function : String
   reference : Syntax
   script : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)
+  /-- A `verify!` item: verified in the editor as well. -/
+  demanded : Bool
 
 /-- The specified functions a function's proof uses through their verified
 theorems: its callees with a specification, found through the unspecified
@@ -4614,41 +4797,62 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
     (target : VerificationTarget) : CommandElabM Unit := do
   if (← visited.get).contains target.function then return
   visited.modify (·.push target.function)
-  if let some (namespaceIndex, _, functionIndex, _) := findFunction? unit target.function then
-    for callee in verifiedCallees unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ do
-      let key := functionKey unit callee
-      if callee.namespaceId.index == namespaceIndex then
-        if let some calleeTarget := targets.find? (·.function == key) then
-          verifyInOrder unit segments targets visited covered calleeTarget
-      else
-        -- A callee of another module used through its contract is verified
-        -- in this unit too: a theorem about its own unit does not carry over.
-        let some (_, ns, _, declaration) := findFunction? unit key | continue
-        unless automaticVerificationDisabled unit callee.namespaceId ns declaration do
-          verifyInOrder unit segments targets visited covered
-            ⟨key, target.reference, none⟩
-  -- An authored proof sees the module's theorems by their short names.
-  let moduleNamespace := pathName segments
-  let openModule (scope : Scope) := { scope with
-    openDecls := .simple moduleNamespace [] :: scope.openDecls }
-  -- A member of a cycle verified from another member is not entered again.
-  if (← covered.get).contains target.function then return
-  let scripts (name : String) := (targets.find? (·.function == name)).bind (·.script)
-  let covering (names : Array String) : CommandElabM Unit := covered.modify (· ++ names)
+  modifyEnv (inProgressTargets.modifyState · (·.push target.function))
   try
-    if targets.any (·.script.isSome) then
-      withScope openModule
-        (verifyFunction target.reference segments target.function target.script scripts covering)
-    else verifyFunction target.reference segments target.function none scripts covering
-  catch error =>
-    -- A failure without a position of its own, such as a translation's, is
-    -- reported at the target and names it.
-    match error with
-    | .error ref message =>
-        if ref.getPos?.isSome then logException error
-        else logErrorAt target.reference m!"leaner verification of `{target.function}` failed: \
-          {message}"
-    | _ => logException error
+    if let some (namespaceIndex, _, functionIndex, _) := findFunction? unit target.function then
+      for callee in verifiedCallees unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ do
+        let key := functionKey unit callee
+        if callee.namespaceId.index == namespaceIndex then
+          if let some calleeTarget := targets.find? (·.function == key) then
+            verifyInOrder unit segments targets visited covered calleeTarget
+        else
+          -- A callee of another module used through its contract is verified
+          -- in this unit too: a theorem about its own unit does not carry over.
+          let some (_, ns, _, declaration) := findFunction? unit key | continue
+          unless automaticVerificationDisabled unit callee.namespaceId ns declaration do
+            verifyInOrder unit segments targets visited covered
+              ⟨key, target.reference, none, false⟩
+    -- An authored proof sees the module's theorems by their short names.
+    let moduleNamespace := pathName segments
+    let openModule (scope : Scope) := { scope with
+      openDecls := .simple moduleNamespace [] :: scope.openDecls }
+    -- A member of a cycle verified from another member is not entered again.
+    if (← covered.get).contains target.function then return
+    if skipVerify (← getOptions) && !target.demanded then
+      skippedInEditor target.reference target.function
+      return
+    let scripts (name : String) := (targets.find? (·.function == name)).bind (·.script)
+    let covering (names : Array String) : CommandElabM Unit := covered.modify (· ++ names)
+    let measuring ← Perf.measuring.get
+    let errorsBefore ← if measuring then do pure (countErrors (← get).messages) else pure 0
+    let messagesBefore ← if measuring then do
+        pure (← get).messages.reportedPlusUnreported.size
+      else pure 0
+    try
+      if targets.any (·.script.isSome) then
+        withScope openModule
+          (verifyFunction target.reference segments target.function target.script scripts covering)
+      else verifyFunction target.reference segments target.function none scripts covering
+    catch error =>
+      -- A failure without a position of its own, such as a translation's, is
+      -- reported at the target and names it.
+      match error with
+      | .error ref message =>
+          if ref.getPos?.isSome then logException error
+          else logErrorAt target.reference m!"leaner verification of `{target.function}` failed: \
+            {message}"
+      | _ => logException error
+    if measuring then
+      let errors := countErrors (← get).messages - errorsBefore
+      let logged := (← get).messages.reportedPlusUnreported.toList.drop messagesBefore
+      let timedOut := logged.any fun message =>
+        message.severity == .error && message.data.hasTag (· == `runtime.maxHeartbeats)
+      Perf.outcomes.modify (·.push {
+        target := s!"{moduleNamespace}::{target.function}"
+        status := if errors == 0 then "verified" else if timedOut then "timeout" else "rejected"
+        errors })
+  finally
+    modifyEnv (inProgressTargets.modifyState · (·.erase target.function))
 
 /-- Elaborate `commands` in the module namespace `moduleNamespace`, taken
 from the root: the namespace of the module's generated definitions. -/
@@ -4793,7 +4997,7 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
     if item.isOfKind ``leanerVerifyItem then
       item[1]?.map fun identifier =>
         ⟨identifier.getId.toString (escape := false), identifier,
-          scriptOfOptional (item[2]?.getD .missing)⟩
+          scriptOfOptional (item[2]?.getD .missing), demandedVerify item⟩
     else do
       let identifier ← item.getArgs.find? (·.isIdent)
       let function := identifier.getId.toString (escape := false)
@@ -4801,25 +5005,26 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
       let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
       if declaration.body == .absent || statesNothing declaration.contract ||
           automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration then none
-      some ⟨function, identifier, none⟩
+      some ⟨function, identifier, none, false⟩
   -- A function without a specification is verified against its loop
-  -- invariants, its in-body assertions, the data invariants of the values
-  -- it takes, returns, constructs, and mutates, and the invariants of the
-  -- memory it writes.
+  -- invariants, its in-body assertions, the preconditions of the functions
+  -- it calls, the data invariants of the values it takes, returns,
+  -- constructs, and mutates, and the invariants of the memory it writes.
   let named := targets.map (·.function)
   let targets := targets ++ (functionItems stx).filterMap fun item => do
     let identifier ← firstIdentifier? item[4]
     let function := identifier.getId.toString (escape := false)
     if named.contains function then none
-    let (namespaceIndex, ns, _, declaration) ← findFunction? unit function
+    let (namespaceIndex, ns, functionIndex, declaration) ← findFunction? unit function
     if declaration.body == .absent ||
         (declaration.contract.loc.isSome && !statesNothing declaration.contract) ||
         automaticVerificationDisabled unit ⟨namespaceIndex⟩ ns declaration ||
         !(handlesDataInvariants unit ns declaration ||
           bodyStates ns declaration (· matches .loopInvariant | .assertion | .apply) ||
+          callsRequiring unit ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩ ||
           Contract.owesMemoryInvariants unit ⟨namespaceIndex⟩ declaration) then
       none
-    some ⟨function, identifier, none⟩
+    some ⟨function, identifier, none, false⟩
   -- A function of a module this file registered before, which writes memory
   -- an invariant of this module reads, is verified against it here.
   let inFile := (moduleUnits (← getEnv)).map (·.1)
@@ -4831,7 +5036,7 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
         if declaration.body == .absent ||
             automaticVerificationDisabled unit ⟨index⟩ ns declaration ||
             !Contract.owesInvariantsOf unit ⟨0⟩ ⟨index⟩ declaration then none
-        else some ⟨functionKey unit ⟨⟨index⟩, ⟨functionIndex⟩⟩, pathSyntax, none⟩
+        else some ⟨functionKey unit ⟨⟨index⟩, ⟨functionIndex⟩⟩, pathSyntax, none, false⟩
   let targets := targets ++ writers
   if targets.isEmpty then return
   let visited ← IO.mkRef (#[] : Array String)
@@ -4839,5 +5044,34 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
   stageLog s!"module {pathName segments}: verification start"
   for target in targets do verifyInOrder unit segments targets visited covered target
   stageLog s!"module {pathName segments}: verification done"
+
+
+/-- The `verify` item or command at `cursor` within `stx`. -/
+private partial def verifyAt (cursor : String.Pos.Raw) (stx : Syntax) : Option Syntax :=
+  if (stx.isOfKind ``leanerVerifyItem || stx.isOfKind ``leanerVerifyCommand) &&
+      (stx.getPos? true).any (· ≤ cursor) && (stx.getTailPos? true).any (cursor ≤ ·) then
+    some stx
+  else stx.getArgs.findSome? (verifyAt cursor)
+
+open Server CodeAction RequestM in
+/-- In the editor, "Verify `f` here" marks the `verify` item at the cursor
+`verify!`, which runs where `leaner.skip_verify` skips the others; "Skip `f`"
+unmarks it. -/
+@[command_code_action leanerMoveModuleCommand leanerNamespaceCommand leanerRustNamespaceCommand
+  leanerVerifyCommand]
+def verifyHereCodeAction : CommandCodeAction := fun params _ _ node => do
+  let .node (.ofCommandInfo info) _ := node | return #[]
+  let doc ← readDoc
+  let cursor := doc.meta.text.lspPosToUtf8Pos params.range.start
+  let some item := verifyAt cursor info.stx | return #[]
+  let (some start, some tail) := (item[0].getPos? true, item[0].getTailPos? true) | return #[]
+  let function := (item[1].reprint.getD "").trim
+  let (title, start, newText) := if demandedVerify item then
+      (s!"Skip `{function}` in the editor", start, "verify")
+    else (s!"Verify `{function}` here", tail, "!")
+  return #[{ eager := {
+    title, kind? := "quickfix"
+    edit? := some <| .ofTextEdit doc.versionedIdentifier
+      { range := doc.meta.text.utf8RangeToLspRange ⟨start, tail⟩, newText } } }]
 
 end LeanerLang.Verify

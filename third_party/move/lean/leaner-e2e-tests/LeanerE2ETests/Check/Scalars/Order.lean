@@ -10,7 +10,7 @@ import LeanerE2ETests.CheckSupport
 values of one type, `-1`, `0`, or `1`. On integers it is their natural order;
 at a type parameter it is an arbitrary total order, whose laws
 (`RuntimeValue.order_trans` and friends) an authored proof uses. A
-`verify f by tactics` item runs the automatic closer first and hands the
+`verify f by tactics` item runs the automatic solver first and hands the
 obligations it leaves to the tactics.
 -/
 
@@ -25,12 +25,14 @@ leaner module 0x42::order where
     ensures result == (core.prim.compare(a, b) < 0)
     aborts_if false
 
-  -- Transitivity is a law of the order, not a fact the closer derives.
+  -- Transitivity is a law of the order, not a fact the solver derives.
   fun ordered3 {T} (a : T, b : T, c : T) -> Bool :=
     core.prim.compare(&a, &b) < 0 && core.prim.compare(&b, &c) < 0
   spec ordered3 where
     ensures result ==> core.prim.compare(a, c) < 0
     aborts_if false
   verify ordered3 by
-    intro right
-    exact Std.TransCmp.lt_trans ‹_› right
+    leaner_obligations
+    all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+    intro left right
+    exact Std.TransCmp.lt_trans left right

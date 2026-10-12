@@ -124,7 +124,7 @@ older source-specific work those packages own.
   files, Move frames, and how messages map back to the original sources.
 - [`designs/lemmas.md`](designs/lemmas.md): Move `spec lemma`s and `proof`
   blocks translated: LIR lemmas and proof steps (`apply`, `split`), lemma
-  theorems by well-founded recursion, and `apply` sites in the closer.
+  theorems by well-founded recursion, and `apply` sites in the solver.
 - [`designs/prover-test-problems.md`](designs/prover-test-problems.md): the
   registry of problems the Move Prover's unit tests show under Leaner
   (`MVP_TEST_FEATURE=lean`), each with its message and tests.
@@ -145,7 +145,7 @@ older source-specific work those packages own.
 - [`designs/state-labels.md`](designs/state-labels.md): state labels of
   Move specifications (`..S |~ …`, `exists S in *`) as memory variables,
   defined by state-change predicates or quantified; exchange, LIR,
-  LeanerLang, contracts, closer witnesses; milestones S1–S4.
+  LeanerLang, contracts, solver witnesses; milestones S1–S4.
 - [`leaner-rust/rust-exporter/README.md`](leaner-rust/rust-exporter/README.md):
   exact exporter scope, supported MIR fixtures, commands, and known boundaries.
 

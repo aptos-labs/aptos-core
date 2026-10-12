@@ -1,2 +1,2 @@
 Move prover returns: exiting with verification errors
-followed_by_mut_ref.lean:39:17: error: LEANER-SPEC-ARITY: behavior predicate expects 2 value argument(s), got 1
+followed_by_mut_ref.lean:39:18: error: LEANER-SPEC-ARITY: behavior predicate expects 2 value argument(s), got 1

@@ -712,7 +712,7 @@ leaner module aptos_std::smart_table where
   @[weight = 50]
   spec fun «spec_fold$gen$0» {T0} {T1}(
     _v : Vector<Entry<T0, T1> >, «keys$init» : Vector<T0>,
-    «values$init» : Vector<T1>, _end : Int
+    «values$init» : Vector<T1>, _end : u64
   ) : (Vector<T0>, Vector<T1>) :=
     if _end == 0 then («keys$init», «values$init»)
     else

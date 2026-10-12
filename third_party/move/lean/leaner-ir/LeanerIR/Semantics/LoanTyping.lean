@@ -907,14 +907,17 @@ theorem fillVisibleHole_typed {unit : ValidatedUnit} {loans : LoanTypes}
       exact ⟨frameTyped, stateTyped⟩
   · split at fill
     · split at fill
-      · rename_i key _ filled filled_eq
+      · rename_i key _ _ filled filled_eq
         simp only [Prod.mk.injEq] at fill
         obtain ⟨rfl, rfl, -⟩ := fill
         simp only [Option.bind_eq_some_iff] at filled_eq
         obtain ⟨value, lookup_eq, filled_eq⟩ := filled_eq
         refine ⟨frameTyped, ?_⟩
-        exact (stateTyped.subsume lookup_eq (fillHole?_subsumes loan_eq typed filled_eq)).of_eq
-          rfl rfl rfl
+        cases key with
+        | global key =>
+            exact (stateTyped.subsume lookup_eq (fillHole?_subsumes loan_eq typed filled_eq)).of_eq
+              rfl rfl rfl
+        | table key => exact stateTyped.of_eq rfl rfl rfl
       · simp only [Prod.mk.injEq] at fill
         obtain ⟨rfl, rfl, -⟩ := fill
         exact ⟨frameTyped, stateTyped⟩

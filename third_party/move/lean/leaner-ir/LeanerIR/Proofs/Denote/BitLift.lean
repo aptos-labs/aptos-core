@@ -487,7 +487,7 @@ register_option leaner.bitVectors : Bool := {
 }
 
 /-- Decide a leaf over bit vectors, where `leaner.bitVectors` selects it. -/
-elab "leaner_denote_bv" : tactic => do
+elab "leaner_bv" : tactic => do
   unless leaner.bitVectors.get (← getOptions) do throwError "bit-vector decisions are not selected"
   let goal ← liftGoal (← getMainGoal)
   replaceMainGoal [goal]

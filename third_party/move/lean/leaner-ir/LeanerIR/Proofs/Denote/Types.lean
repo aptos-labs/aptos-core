@@ -1581,17 +1581,54 @@ Global memory is typed (`designs/static-memory.md`): one partial map per
 resource type, holding values at the runtime family, which every frame of a
 verification shares.  Nothing decodes a stored value. -/
 
-/-- A resource type: the stored value's native type at the runtime family
-and the declaration's type arguments, phantom ones included. -/
+/-- Ordinary stored values retain their language type's bounds. Native
+collections hold an arbitrary finite array of typed elements: their storage
+is not a Move vector and imposes no vector length bound. -/
+inductive ResourceKind where
+  | value
+  | collection
+  deriving DecidableEq, Repr, Inhabited
+
+/-- A resource type: the stored value's (or collection element's) native type
+at the runtime family, its scope including phantom arguments, and storage kind. -/
 structure ResourceType where
   type : NTy
   arguments : NRow
+  kind : ResourceKind := .value
   deriving DecidableEq, Repr, Inhabited
+
+/-- Instantiate a resource's native types without changing its storage domain. -/
+@[reducible] def ResourceType.subst (resource : ResourceType) (types : NRow) : ResourceType :=
+  { resource with
+    type := resource.type.subst types
+    arguments := NRow.subst types resource.arguments }
 
 /-- The values stored at a resource type. -/
 @[reducible] def ResourceType.carrier (unit : Validation.ValidatedUnit) (resource : ResourceType) :
     Type :=
-  @NTy.carrier (Carriers.runtime unit) resource.type
+  match resource.kind with
+  | .value => @NTy.carrier (Carriers.runtime unit) resource.type
+  | .collection => Array (@NTy.carrier (Carriers.runtime unit) resource.type)
+
+/-- The runtime representation of a typed storage slot. Native collections
+use the runtime's unbounded array representation without a Move vector codec. -/
+@[reducible] noncomputable def ResourceType.encode (resource : ResourceType)
+    (value : resource.carrier unit) : RuntimeValue :=
+  match resource with
+  | ⟨type, _, .value⟩ => @NTy.encode (Carriers.runtime unit) type value
+  | ⟨type, _, .collection⟩ =>
+      .vector (value.map (@NTy.encode (Carriers.runtime unit) type))
+
+theorem ResourceType.encode_injective (resource : ResourceType) :
+    Function.Injective (resource.encode (unit := unit)) := by
+  rcases resource with ⟨type, arguments, kind⟩
+  cases kind with
+  | value => exact @NTy.encode_injective (Carriers.runtime unit) type
+  | collection =>
+      intro left right equal
+      have mapped := RuntimeValue.vector.inj equal
+      exact (Array.map_inj_right fun _ _ =>
+        @NTy.encode_injective (Carriers.runtime unit) type _ _).mp mapped
 
 /-- Global memory: per resource type, the value stored under each key. -/
 def Memory (unit : Validation.ValidatedUnit) : Type :=
@@ -1708,6 +1745,16 @@ theorem val_getElem_eq_getD_map_val {width : IntWidth} {signed : Bool}
     (elements[index]'inBounds).val = ((elements.map SpecInt.val)[index]?).getD 0 := by
   rw [List.getElem?_map, List.getElem?_eq_getElem inBounds]
   rfl
+
+/-- An optional certified read preserves the supplied fallback when projecting
+to integers; no in-bounds premise is needed. -/
+theorem val_getD_getElem?_map_val {width : IntWidth} {signed : Bool}
+    (elements : List (SpecInt width signed)) (index : Nat)
+    (fallback : SpecInt width signed) :
+    (elements[index]?.getD fallback).val =
+      ((elements.map SpecInt.val)[index]?).getD fallback.val := by
+  rw [List.getElem?_map]
+  cases elements[index]? <;> rfl
 
 /-- A position an array reads a value at lies within it. -/
 theorem lt_size_of_getElem?_eq_some {α : Type} {xs : Array α} {i : Nat} {value : α}
@@ -2636,6 +2683,13 @@ theorem shiftLeft_tmod_of_fits {width : Nat} (value : SpecInt (.bits width) fals
   rw [Int.tmod_eq_emod_of_nonneg nonnegative]
   exact shiftLeft_emod_of_fits value distance modulus fits
 
+/-- The truncating remainder of a shifted nonnegative value is its
+remainder: a specification's remainder meets the runtime's. -/
+theorem shiftLeft_tmod_of_nonneg (value : Int) (distance : Nat) (modulus : Int)
+    (nonnegative : 0 ≤ value) :
+    (Int.shiftLeft value distance).tmod modulus = Int.shiftLeft value distance % modulus :=
+  Int.tmod_eq_emod_of_nonneg (shiftLeft_nonneg value distance nonnegative)
+
 /-- A shift left is a multiplication by a power of two, which `omega` reads. -/
 theorem shiftLeft_eq_mul (value : Int) (distance : Nat) :
     Int.shiftLeft value distance = value * 2 ^ distance := by
@@ -2727,6 +2781,37 @@ theorem forall_named_ofBounds {width : Nat} {witness : SpecInt (.bits width) fal
     have : named = SpecInt.ofBounds witness value inRange := SpecInt.ext (by simp [definition])
     subst this
     exact h
+
+/-- A name defined by a value that fits is that value. -/
+theorem forall_named_fits {width : IntWidth} {signed : Bool} {value : Int}
+    {p : SpecInt width signed → Prop} (fits : IntegerValueFits width signed value) :
+    (∀ named : SpecInt width signed, named.val = value → p named) ↔ p ⟨value, fits⟩ :=
+  ⟨fun h => h _ rfl, fun h named definition => by
+    obtain ⟨v, _⟩ := named
+    simp only at definition
+    subst definition
+    exact h⟩
+
+open Lean Meta Simp in
+/-- A literal is not named: a computed value that is a literal, as in a loop
+unrolled over literals, decides the conditions that read it. -/
+simproc [lir_denote] namedLiteral (∀ _named : SpecInt _ _, _) := fun e => do
+  let .forallE name type body info := e | return .continue
+  unless type.isAppOfArity ``SpecInt 2 do return .continue
+  let .forallE _ premise rest _ := body | return .continue
+  if rest.hasLooseBVar 0 then return .continue
+  let some (_, lhs, value) := premise.eq? | return .continue
+  unless lhs.isAppOfArity ``SpecInt.val 3 && lhs.appArg! == .bvar 0 do return .continue
+  if value.hasLooseBVars then return .continue
+  let some _ ← getIntValue? value | return .continue
+  let fits := mkApp3 (mkConst ``IntegerValueFits) (type.getArg! 0) (type.getArg! 1) value
+  unless (← whnfD (← mkDecide fits)).isConstOf ``Bool.true do return .continue
+  let certificate ← mkDecideProof fits
+  let continuation := Expr.lam name type (rest.lowerLooseBVars 1 1) info
+  let equivalence ← mkAppOptM ``forall_named_fits
+    #[type.getArg! 0, type.getArg! 1, value, continuation, certificate]
+  let literal := mkApp4 (mkConst ``SpecInt.mk) (type.getArg! 0) (type.getArg! 1) value certificate
+  return .visit { expr := continuation.beta #[literal], proof? := some (← mkPropExt equivalence) }
 
 theorem wp_checkedInt (failure : ThrowKind) (width : Nat) (signed : Bool) (value : Int)
     (nonzero : width ≠ 0) (ensures : SpecInt (.bits width) signed → σ → Prop)
@@ -2961,6 +3046,12 @@ theorem Array.push_eq_push_iff {α : Type} (left right : Array α) (x y : α) :
 @[simp] theorem NTy.codec_ref [Carriers] (referent : NTy) :
     (NTy.ref referent).codec = Codec.prophecyPair referent.codec := rfl
 
+/-- A native integer already carries its range certificate. Decoding its
+value projection must not introduce another range branch. -/
+theorem specInt_decode_val (width : IntWidth) (signed : Bool) (value : SpecInt width signed) :
+    (Codec.specInt width signed).decode? (.integer value.val) = some value :=
+  (Codec.specInt width signed).decode_encode value
+
 /-- Decoding a runtime integer at a certified width: the value, when it fits. -/
 theorem specInt_decode_integer (width : IntWidth) (signed : Bool) (value : Int) :
     (Codec.specInt width signed).decode? (.integer value) =
@@ -3133,6 +3224,16 @@ theorem exists_range_eq_iff {α : Type} (n : Int) (P : Int → α → Prop) (y :
     exact ⟨i, low, high, holds⟩
   · rintro ⟨i, low, high, holds⟩
     exact ⟨y, ⟨i, low, high, holds⟩, rfl⟩
+
+/-- A property of encoded vector elements is a property of the native
+elements. Restrict the rewrite to runtime-value predicates so normalization
+does not try it on every unrelated universal proposition. -/
+theorem forall_runtime_mem_map_iff {α : Type}
+    {encode : α → RuntimeValue} {values : List α}
+    {predicate : RuntimeValue → Prop} :
+    (∀ value, value ∈ values.map encode → predicate value) ↔
+      ∀ value, value ∈ values → predicate (encode value) :=
+  List.forall_mem_map
 
 /-- An element of a mapped list under an existential: the element it maps. -/
 theorem exists_mem_map_iff {α β : Type} (f : α → β) (l : List α) (P : β → Prop) :
@@ -3804,6 +3905,17 @@ theorem variantEncode_plain (source : StructHandle) : (names : List String) → 
 end
 
 end Plain
+
+/-- Both ordinary slots and native collection slots encode loan-free values. -/
+theorem ResourceType.encode_plain (resource : ResourceType) (value : resource.carrier unit) :
+    Plain (resource.encode value) := by
+  rcases resource with ⟨type, arguments, kind⟩
+  cases kind with
+  | value => exact @NTy.encode_plain (Carriers.runtime unit) type value
+  | collection =>
+      refine .vector _ fun encoded member => ?_
+      obtain ⟨element, _, rfl⟩ := Array.mem_map.mp member
+      exact @NTy.encode_plain (Carriers.runtime unit) type element
 
 section Admits
 

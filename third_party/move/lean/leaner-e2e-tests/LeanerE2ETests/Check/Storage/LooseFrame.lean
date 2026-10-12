@@ -48,7 +48,7 @@ leaner module 0x42::loose_frame where
 open LeanerIR.Proofs.Denote in
 example {unit : LeanerIR.Validation.ValidatedUnit} [Skolems unit] (initial final : Memory unit)
     (addr other : String) (different : other ≠ addr)
-    (frame : «0x42».loose_frame.bump.typedContract.frame (addr, ()) initial final) :
+    (frame : «0x42».loose_frame.bump.typedContract.frame (addr, ()) initial () final) :
     final (Skolems.resource (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)) .nil)
         (.address other) =
       initial (Skolems.resource (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)) .nil)

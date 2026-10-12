@@ -340,7 +340,9 @@ private def manyDeathFixture (count : Nat) : RawUnit := Id.run do
   | none => false
 
 /-- An unrelated specification must not keep every old reference live.
-The first borrow is dead before its successor, despite the spec statement. -/
+The first borrow is dead before its successor, despite the spec statement.
+The successor, dereferenced where it dies, is then read as a shared borrow
+of its place, so its loan leaves the certificate. -/
 private def successorBorrowFixture : RawUnit :=
   let ns := deathFixture.namespaces[0]!
   let expressions := ns.expressions.set! 4 {
@@ -364,7 +366,10 @@ private def successorBorrowFixture : RawUnit :=
   | some unit => match (prepareExecution #[semantics] unit).toOption with
     | none => false
     | some _ =>
-      unit.borrowCertificates.any (·.loans.size == 2) &&
+      unit.borrowCertificates.any (·.loans.size == 1) &&
+      (match (unit.namespaces[0]?.bind fun ns => ns.expressions[4]? : Option Expr) with
+       | some { kind := .operation (.borrow .immutable ⟨0⟩) .., .. } => true
+       | _ => false) &&
       unit.borrowCertificates.all fun certificate =>
         certificate.loans.zipIdx.all fun (loan, index) =>
           SemanticOperations.certificateLoanId? unit certificate.namespaceId
@@ -2880,7 +2885,7 @@ private def heldKey : GlobalKey := { namespaceId := ⟨0⟩, typeId := ⟨5⟩, 
 
 private def holelessSlot : RuntimeState :=
   { globals := ({} : GlobalMap).insert heldKey (.integer 5)
-    globalLoans := [(0, heldKey)]
+    storageLoans := [(0, .global heldKey)]
     nextLoan := 1 }
 
 -- The value goes to the pending set; the slot keeps what it holds.

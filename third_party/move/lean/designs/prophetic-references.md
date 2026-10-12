@@ -96,6 +96,10 @@ preparation.)
   dereferences of shared-typed bases collapse to their bases), typing has
   a transparency rule (`value : T` implies `value : &T`), and no loan
   instance is minted — so loan identity can never leak into equality.
+  A **mutable borrow** compared by `==`, `!=`, or `compare` is read as its
+  current value (`RuntimeValue.observe`), as Move and Rust compare
+  references by their referents, so no comparison reads a loan identity
+  (decided 2026-10-09; `Check/References/ReferenceComparisons`).
 
 ### 2.2 Ghost prophecies
 
@@ -141,8 +145,28 @@ value, universally quantified in the rule, and threads a ghost environment
   `(outerLoan, loanHole returnedLoan)`. Caller reconciliation reads that
   prophecy hole to transfer the dynamic identity; it does not recover an
   owner root or projection path from the reference.
+- **Unheld results**: death reads the current value from the local that
+  holds the reference. A reference a call or an invocation returns that no
+  local holds — a discarded result, one a wildcard matches, the operand of
+  a dereference or a field read (`*f(x)`, `f(x).field`), or the base a
+  borrow selects from (`&mut f(x).field`) — is bound by validation to a
+  local of its own (`holdMutableReferences`, `$held`/`$dropped`), which
+  holds it until it dies; an operation reading through it reads the local,
+  the operands before it bound first in evaluation order, and the printers
+  spell the binding back as the source does, finding it among the holders
+  validation records (`ValidatedNamespace.holders`). Without the local the current
+  value is lost: the lender keeps the hole at run time, and its prophecy is
+  unconstrained in the denotation. A mutable borrow of a place that dies
+  unheld — dereferenced, frozen, read through a field or variant, compared,
+  discarded, or matched by a wildcard (`*(&mut x)`, `(&mut x).f`,
+  `let _ = &mut x`) — writes nothing: once the borrow analysis has checked
+  it as a mutable borrow, keeping its conflicts with live loans, validation
+  reads it as a shared borrow of its place, which mints no loan, and its
+  loan fact leaves the certificate (`foldPlaceBorrows`,
+  `Check/References/PlaceReads`, `PlaceReadErrors`). The shared reference
+  types it takes are interned before validation (`internSharedViews`).
 - **Globals**: `borrow_global_mut` leaves the prophecy (relationally) or the
-  hole (executably) in the global slot. `RuntimeState.globalLoans` separately
+  hole (executably) in the global slot. `RuntimeState.storageLoans` separately
   records the storage key for a live global loan and rekeys it from an outer
   loan to a returned reborrow. The key registry is write-back metadata, not
   part of the reference value; take/publish interact with holes only through
@@ -329,7 +353,7 @@ needed.
     the `List.findIdx?`/`List.findSome?` stepping lemmas — execute them in
     the simp phase; the equations are shape-conditional, so they never
     unfold against symbolic values;
-  - `leaner_intro` peels constructor-wrapped operand equations by
+  - the introduction step peels constructor-wrapped operand equations by
     injection before substituting (and re-locates the hypothesis after
     `changeLocalDecl` rebinds its id); a progress-failing `leaner_reduce!`
     branch resumes ground reduction after substitutions;
@@ -434,7 +458,7 @@ needed.
   and the native WP uses closed death certificates rather than unfolding a
   generic loan search. Returned local reborrows transfer identity through
   prophecy holes. Returned global reborrows additionally transfer the storage
-  key in the separate `globalLoans` registry from the completed outer loan to
+  key in the separate `storageLoans` registry from the completed outer loan to
   the returned loan. The runtime reference itself remains exactly
   `borrow loan current`, with no owning root or projection path. The native
   fixture covers scalar forwarding, mutation after a call, dynamic selection

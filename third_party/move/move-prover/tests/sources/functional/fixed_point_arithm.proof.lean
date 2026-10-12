@@ -4,7 +4,9 @@
 -- `mul_div`: the product's quotient by 2^32, shifted back, is at most the
 -- product, and the quotient by `y` at most `x`.
 verify mul_div by
-  case leaf_1 =>
+  leaner_obligations
+  all_goals (first | leaner_decide | (leaner_prepare; all_goals try leaner_decide))
+  case ensures_1 =>
     have fits := ‹¬((_ : Int) = 0 ∨ MAX_U64 < _)›
     have quotient := ‹¬((_ : Int) = 0 ∨ MAX_U64 < _) → _ = _› fits
     rw [quotient, ‹result.val.shiftLeft 32 = result.val * 4294967296›]

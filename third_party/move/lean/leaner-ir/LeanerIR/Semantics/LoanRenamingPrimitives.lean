@@ -6,10 +6,10 @@ import LeanerIR.Semantics.LoanRenamingOps
 /-!
 # Primitive operations under loan renaming
 
-The primitive vocabulary reads loan identities only through structural
-equality and the value order, both unchanged by a shift: a primitive applied
-to shifted arguments yields the shifted result
-(`evaluatePrimitiveOperation?_shift`).
+The primitive vocabulary compares values only as they are observed
+(`RuntimeValue.observe`), which no renaming of loans changes: a primitive
+applied to renamed arguments yields the renamed result
+(`evaluatePrimitiveOperation?_rename`).
 -/
 
 theorem List.map_eraseIdx {α β : Type} (f : α → β) :
@@ -38,112 +38,63 @@ theorem List.map_insertIdx {α β : Type} (f : α → β) (a : α) :
     simp [Array.toList_insertIdx, List.map_insertIdx]
   · rfl
 
-theorem Nat.compare_add_add_right (left right offset : Nat) :
-    compare (left + offset) (right + offset) = compare left right := by
-  simp only [Nat.compare_eq_ite_lt, Nat.add_lt_add_iff_right]
-
 namespace LeanerIR
+
+variable {inside : Nat → Prop}
 
 open SemanticOperations
 
-theorem RuntimeValue.kindRank_shift (offset : Nat) (value : RuntimeValue) :
-    (value.shift offset).kindRank = value.kindRank := by
-  cases value <;> simp [RuntimeValue.kindRank]
-
-mutual
-theorem RuntimeValue.order_shift (rank : ValueRanks) (offset : Nat) (left right : RuntimeValue) :
-    RuntimeValue.order rank (left.shift offset) (right.shift offset) =
-      RuntimeValue.order rank left right := by
-  rw [RuntimeValue.order, RuntimeValue.order, RuntimeValue.kindRank_shift,
-    RuntimeValue.kindRank_shift, RuntimeValue.orderPayload_shift rank offset left right]
-termination_by sizeOf left + sizeOf right + 1
-
-theorem RuntimeValue.orderPayload_shift (rank : ValueRanks) (offset : Nat)
-    (left right : RuntimeValue) :
-    RuntimeValue.orderPayload rank (left.shift offset) (right.shift offset) =
-      RuntimeValue.orderPayload rank left right := by
-  cases left <;> cases right <;>
-    simp only [RuntimeValue.shift_vector, RuntimeValue.shift_tuple, RuntimeValue.shift_nominal,
-      RuntimeValue.shift_closure, RuntimeValue.shift_borrow, RuntimeValue.shift_loanHole,
-      RuntimeValue.shift_unit, RuntimeValue.shift_bool, RuntimeValue.shift_character,
-      RuntimeValue.shift_integer, RuntimeValue.shift_address, RuntimeValue.shift_signer,
-      RuntimeValue.shift_string, RuntimeValue.shift_bytes, RuntimeValue.orderPayload,
-      Array.toList_map]
-  all_goals first
-    | exact RuntimeValue.orderList_shift rank offset _ _
-    | rw [RuntimeValue.orderList_shift rank offset]
-    | rw [RuntimeValue.order_shift rank offset, Nat.compare_add_add_right]
-    | exact Nat.compare_add_add_right _ _ _
-termination_by sizeOf left + sizeOf right
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
-
-theorem RuntimeValue.orderList_shift (rank : ValueRanks) (offset : Nat)
-    (lefts rights : List RuntimeValue) :
-    RuntimeValue.orderList rank (lefts.map (·.shift offset)) (rights.map (·.shift offset)) =
-      RuntimeValue.orderList rank lefts rights := by
-  match lefts, rights with
-  | [], [] => simp [RuntimeValue.orderList]
-  | [], _ :: _ => simp [RuntimeValue.orderList]
-  | _ :: _, [] => simp [RuntimeValue.orderList]
-  | left :: lefts, right :: rights =>
-      simp only [List.map_cons, RuntimeValue.orderList]
-      rw [RuntimeValue.order_shift rank offset left right,
-        RuntimeValue.orderList_shift rank offset lefts rights]
-termination_by sizeOf lefts + sizeOf rights
-decreasing_by all_goals (simp_wf; omega)
-end
-
-/-- A primitive result with the loans of its values raised. -/
-def shiftResult (offset : Nat) :
+/-- A primitive result with the loans of its values renamed. -/
+def renameResult (ρ : Nat → Nat) :
     Except (ThrowKind × Array RuntimeValue) RuntimeValue →
       Except (ThrowKind × Array RuntimeValue) RuntimeValue
-  | .ok value => .ok (value.shift offset)
-  | .error (kind, values) => .error (kind, values.map (·.shift offset))
+  | .ok value => .ok (value.rename ρ)
+  | .error (kind, values) => .error (kind, values.map (·.rename ρ))
 
-@[simp] theorem shiftResult_ok (offset : Nat) (value : RuntimeValue) :
-    shiftResult offset (.ok value) = .ok (value.shift offset) := rfl
-@[simp] theorem shiftResult_error (offset : Nat) (kind : ThrowKind) (values : Array RuntimeValue) :
-    shiftResult offset (.error (kind, values)) = .error (kind, values.map (·.shift offset)) := rfl
+@[simp] theorem renameResult_ok (ρ : Nat → Nat) (value : RuntimeValue) :
+    renameResult ρ (.ok value) = .ok (value.rename ρ) := rfl
+@[simp] theorem renameResult_error (ρ : Nat → Nat) (kind : ThrowKind) (values : Array RuntimeValue) :
+    renameResult ρ (.error (kind, values)) = .error (kind, values.map (·.rename ρ)) := rfl
 
-@[simp] theorem modularInteger_shift (offset : Nat) (resultType : Ty) (value : Int) :
-    Option.map (shiftResult offset ∘ Except.ok) (modularInteger resultType value) =
+@[simp] theorem modularInteger_rename (ρ : Nat → Nat) (resultType : Ty) (value : Int) :
+    Option.map (renameResult ρ ∘ Except.ok) (modularInteger resultType value) =
       Option.map Except.ok (modularInteger resultType value) := by
   unfold modularInteger
   split <;> simp
   split <;> simp
 
-theorem modularInteger_shift_of_eq {offset : Nat} {resultType : Ty} {value : Int}
+theorem modularInteger_rename_of_eq {ρ : Nat → Nat} {resultType : Ty} {value : Int}
     {result : RuntimeValue} (result_eq : modularInteger resultType value = some result) :
-    result.shift offset = result := by
+    result.rename ρ = result := by
   unfold modularInteger at result_eq
   split at result_eq
   · split at result_eq
     · cases result_eq
     · simp only [Option.some.injEq] at result_eq
       subst result_eq
-      exact RuntimeValue.shift_integer (offset := offset) _
+      exact RuntimeValue.rename_integer (ρ := ρ) _
   · cases result_eq
 
-@[simp] theorem modularInteger_bind_shift (offset : Nat) (resultType : Ty) (value : Int) :
+@[simp] theorem modularInteger_bind_rename (ρ : Nat → Nat) (resultType : Ty) (value : Int) :
     ((modularInteger resultType value).bind fun result =>
-        some (Except.ok (result.shift offset)) :
+        some (Except.ok (result.rename ρ)) :
           Option (Except (ThrowKind × Array RuntimeValue) RuntimeValue)) =
       (modularInteger resultType value).bind fun result => some (Except.ok result) :=
-  Option.bind_congr fun _ result_eq => by rw [modularInteger_shift_of_eq result_eq]
+  Option.bind_congr fun _ result_eq => by rw [modularInteger_rename_of_eq result_eq]
 
-@[simp] theorem checkedInteger_shift (offset : Nat) (failure : ThrowKind) (resultType : Ty)
+@[simp] theorem checkedInteger_rename (ρ : Nat → Nat) (failure : ThrowKind) (resultType : Ty)
     (value : Int) :
-    shiftResult offset (checkedInteger failure resultType value) =
+    renameResult ρ (checkedInteger failure resultType value) =
       checkedInteger failure resultType value := by
   unfold checkedInteger
   split
   · split <;> simp
   · simp
 
-theorem checkedUnaryInteger_shift (offset : Nat) (failure : ThrowKind) (resultType : Ty)
+theorem checkedUnaryInteger_rename (ρ : Nat → Nat) (failure : ThrowKind) (resultType : Ty)
     (arguments : Array RuntimeValue) (operation : Int → Int) :
-    checkedUnaryInteger failure resultType (arguments.map (·.shift offset)) operation =
-      (checkedUnaryInteger failure resultType arguments operation).map (shiftResult offset) := by
+    checkedUnaryInteger failure resultType (arguments.map (·.rename ρ)) operation =
+      (checkedUnaryInteger failure resultType arguments operation).map (renameResult ρ) := by
   unfold checkedUnaryInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, rest⟩⟩
@@ -151,10 +102,10 @@ theorem checkedUnaryInteger_shift (offset : Nat) (failure : ThrowKind) (resultTy
   · cases a <;> simp
   · simp
 
-theorem checkedBinaryInteger_shift (offset : Nat) (failure : ThrowKind) (resultType : Ty)
+theorem checkedBinaryInteger_rename (ρ : Nat → Nat) (failure : ThrowKind) (resultType : Ty)
     (arguments : Array RuntimeValue) (operation : Int → Int → Int) :
-    checkedBinaryInteger failure resultType (arguments.map (·.shift offset)) operation =
-      (checkedBinaryInteger failure resultType arguments operation).map (shiftResult offset) := by
+    checkedBinaryInteger failure resultType (arguments.map (·.rename ρ)) operation =
+      (checkedBinaryInteger failure resultType arguments operation).map (renameResult ρ) := by
   unfold checkedBinaryInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -163,10 +114,10 @@ theorem checkedBinaryInteger_shift (offset : Nat) (failure : ThrowKind) (resultT
   · cases a <;> (try (simp; done)) <;> cases b <;> simp
   · simp
 
-theorem modularUnaryInteger_shift (offset : Nat) (resultType : Ty)
+theorem modularUnaryInteger_rename (ρ : Nat → Nat) (resultType : Ty)
     (arguments : Array RuntimeValue) (operation : Int → Int) :
-    modularUnaryInteger resultType (arguments.map (·.shift offset)) operation =
-      (modularUnaryInteger resultType arguments operation).map (shiftResult offset) := by
+    modularUnaryInteger resultType (arguments.map (·.rename ρ)) operation =
+      (modularUnaryInteger resultType arguments operation).map (renameResult ρ) := by
   unfold modularUnaryInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, rest⟩⟩
@@ -174,10 +125,10 @@ theorem modularUnaryInteger_shift (offset : Nat) (resultType : Ty)
   · cases a <;> simp
   · simp
 
-theorem modularBinaryInteger_shift (offset : Nat) (resultType : Ty)
+theorem modularBinaryInteger_rename (ρ : Nat → Nat) (resultType : Ty)
     (arguments : Array RuntimeValue) (operation : Int → Int → Int) :
-    modularBinaryInteger resultType (arguments.map (·.shift offset)) operation =
-      (modularBinaryInteger resultType arguments operation).map (shiftResult offset) := by
+    modularBinaryInteger resultType (arguments.map (·.rename ρ)) operation =
+      (modularBinaryInteger resultType arguments operation).map (renameResult ρ) := by
   unfold modularBinaryInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -186,12 +137,12 @@ theorem modularBinaryInteger_shift (offset : Nat) (resultType : Ty)
   · cases a <;> (try (simp; done)) <;> cases b <;> simp
   · simp
 
-theorem overflowingBinaryInteger_shift (offset : Nat) (ns : Validation.ValidatedNamespace)
+theorem overflowingBinaryInteger_rename (ρ : Nat → Nat) (ns : Validation.ValidatedNamespace)
     (width : Option Nat) (resultType : Ty) (arguments : Array RuntimeValue)
     (operation : Int → Int → Int) :
-    overflowingBinaryInteger ns width resultType (arguments.map (·.shift offset)) operation =
+    overflowingBinaryInteger ns width resultType (arguments.map (·.rename ρ)) operation =
       (overflowingBinaryInteger ns width resultType arguments operation).map
-        (shiftResult offset) := by
+        (renameResult ρ) := by
   unfold overflowingBinaryInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -202,50 +153,50 @@ theorem overflowingBinaryInteger_shift (offset : Nat) (ns : Validation.Validated
   split
   · simp only [Function.comp_def, Option.map_bind, Option.map_some]
     refine Option.bind_congr fun bounds _ => Option.bind_congr fun value value_eq => ?_
-    simp [modularInteger_shift_of_eq value_eq]
+    simp [modularInteger_rename_of_eq value_eq]
   · rfl
 
-theorem bitwiseBinaryInteger_shift (offset : Nat) (resultType : Ty)
+theorem bitwiseBinaryInteger_rename (ρ : Nat → Nat) (resultType : Ty)
     (arguments : Array RuntimeValue) (operation : Nat → Nat → Nat) :
-    bitwiseBinaryInteger resultType (arguments.map (·.shift offset)) operation =
-      (bitwiseBinaryInteger resultType arguments operation).map (shiftResult offset) := by
+    bitwiseBinaryInteger resultType (arguments.map (·.rename ρ)) operation =
+      (bitwiseBinaryInteger resultType arguments operation).map (renameResult ρ) := by
   unfold bitwiseBinaryInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals try (simp; done)
-  simp only [List.map_cons, List.map_nil, RuntimeValue.shift_integer, Option.bind_eq_bind,
+  simp only [List.map_cons, List.map_nil, RuntimeValue.rename_integer, Option.bind_eq_bind,
     Option.map_bind, Function.comp_def]
   refine Option.bind_congr fun _ _ => Option.bind_congr fun _ _ =>
     Option.bind_congr fun value value_eq => ?_
-  simp [modularInteger_shift_of_eq value_eq]
+  simp [modularInteger_rename_of_eq value_eq]
 
-theorem bitwiseBinary_shift (offset : Nat) (resultType : Ty) (arguments : Array RuntimeValue)
+theorem bitwiseBinary_rename (ρ : Nat → Nat) (resultType : Ty) (arguments : Array RuntimeValue)
     (integerOperation : Nat → Nat → Nat) (booleanOperation : Bool → Bool → Bool) :
-    bitwiseBinary resultType (arguments.map (·.shift offset)) integerOperation booleanOperation =
+    bitwiseBinary resultType (arguments.map (·.rename ρ)) integerOperation booleanOperation =
       (bitwiseBinary resultType arguments integerOperation booleanOperation).map
-        (shiftResult offset) := by
-  have integer := bitwiseBinaryInteger_shift offset resultType arguments integerOperation
+        (renameResult ρ) := by
+  have integer := bitwiseBinaryInteger_rename ρ resultType arguments integerOperation
   unfold bitwiseBinary
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp [integer]; done)) <;> cases b)
   all_goals simp [integer]
 
-theorem bitwiseNotInteger_shift (offset : Nat) (resultType : Ty)
+theorem bitwiseNotInteger_rename (ρ : Nat → Nat) (resultType : Ty)
     (arguments : Array RuntimeValue) :
-    bitwiseNotInteger resultType (arguments.map (·.shift offset)) =
-      (bitwiseNotInteger resultType arguments).map (shiftResult offset) := by
+    bitwiseNotInteger resultType (arguments.map (·.rename ρ)) =
+      (bitwiseNotInteger resultType arguments).map (renameResult ρ) := by
   unfold bitwiseNotInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, rest⟩⟩
   all_goals try cases a
   all_goals (simp <;> split <;> (try split) <;> simp [Function.comp_def])
 
-theorem checkedShiftInteger_shift (offset : Nat) (failure : ThrowKind) (left : Bool)
+theorem checkedShiftInteger_rename (ρ : Nat → Nat) (failure : ThrowKind) (left : Bool)
     (resultType : Ty) (arguments : Array RuntimeValue) :
-    checkedShiftInteger failure left resultType (arguments.map (·.shift offset)) =
-      (checkedShiftInteger failure left resultType arguments).map (shiftResult offset) := by
+    checkedShiftInteger failure left resultType (arguments.map (·.rename ρ)) =
+      (checkedShiftInteger failure left resultType arguments).map (renameResult ρ) := by
   unfold checkedShiftInteger
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -253,48 +204,48 @@ theorem checkedShiftInteger_shift (offset : Nat) (failure : ThrowKind) (left : B
   all_goals (simp <;> split <;> (try split) <;> try simp)
   all_goals (split <;> simp [Function.comp_def])
 
-theorem compareOrdered_shift (offset : Nat) (arguments : Array RuntimeValue)
+theorem compareOrdered_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue)
     (integerRelation : Int → Int → Bool) (booleanRelation : Bool → Bool → Bool)
     (characterRelation : Nat → Nat → Bool) :
-    compareOrdered (arguments.map (·.shift offset)) integerRelation booleanRelation
+    compareOrdered (arguments.map (·.rename ρ)) integerRelation booleanRelation
         characterRelation =
       (compareOrdered arguments integerRelation booleanRelation characterRelation).map
-        (shiftResult offset) := by
+        (renameResult ρ) := by
   unfold compareOrdered
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals simp
 
-theorem equalValues?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    equalValues? (arguments.map (·.shift offset)) =
-      (equalValues? arguments).map (shiftResult offset) := by
+theorem equalValues?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    equalValues? (arguments.map (·.rename ρ)) =
+      (equalValues? arguments).map (renameResult ρ) := by
   unfold equalValues?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩ <;>
-    simp [RuntimeValue.shift_beq]
+    simp [RuntimeValue.observe_rename]
 
-theorem notEqualValues?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    notEqualValues? (arguments.map (·.shift offset)) =
-      (notEqualValues? arguments).map (shiftResult offset) := by
+theorem notEqualValues?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    notEqualValues? (arguments.map (·.rename ρ)) =
+      (notEqualValues? arguments).map (renameResult ρ) := by
   unfold notEqualValues?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩ <;>
-    simp [bne, RuntimeValue.shift_beq]
+    simp [bne, RuntimeValue.observe_rename]
 
-theorem divideIntegers?_shift (offset : Nat) (resultType : Ty) (arguments : Array RuntimeValue) :
-    divideIntegers? resultType (arguments.map (·.shift offset)) =
-      (divideIntegers? resultType arguments).map (shiftResult offset) := by
+theorem divideIntegers?_rename (ρ : Nat → Nat) (resultType : Ty) (arguments : Array RuntimeValue) :
+    divideIntegers? resultType (arguments.map (·.rename ρ)) =
+      (divideIntegers? resultType arguments).map (renameResult ρ) := by
   unfold divideIntegers?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals simp [Function.comp_def]
 
-theorem checkedDivideIntegers?_shift (offset : Nat) (failure : ThrowKind) (resultType : Ty)
+theorem checkedDivideIntegers?_rename (ρ : Nat → Nat) (failure : ThrowKind) (resultType : Ty)
     (arguments : Array RuntimeValue) :
-    checkedDivideIntegers? failure resultType (arguments.map (·.shift offset)) =
-      (checkedDivideIntegers? failure resultType arguments).map (shiftResult offset) := by
+    checkedDivideIntegers? failure resultType (arguments.map (·.rename ρ)) =
+      (checkedDivideIntegers? failure resultType arguments).map (renameResult ρ) := by
   unfold checkedDivideIntegers?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -302,22 +253,22 @@ theorem checkedDivideIntegers?_shift (offset : Nat) (failure : ThrowKind) (resul
   all_goals try (simp; done)
   rename_i right
   rcases right with ⟨_ | _⟩ | _
-  all_goals simp only [List.map_cons, List.map_nil, RuntimeValue.shift_integer]
+  all_goals simp only [List.map_cons, List.map_nil, RuntimeValue.rename_integer]
   all_goals simp [Function.comp_def]
 
-theorem moduloIntegers?_shift (offset : Nat) (resultType : Ty) (arguments : Array RuntimeValue) :
-    moduloIntegers? resultType (arguments.map (·.shift offset)) =
-      (moduloIntegers? resultType arguments).map (shiftResult offset) := by
+theorem moduloIntegers?_rename (ρ : Nat → Nat) (resultType : Ty) (arguments : Array RuntimeValue) :
+    moduloIntegers? resultType (arguments.map (·.rename ρ)) =
+      (moduloIntegers? resultType arguments).map (renameResult ρ) := by
   unfold moduloIntegers?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals simp [Function.comp_def]
 
-theorem checkedModuloIntegers?_shift (offset : Nat) (failure : ThrowKind) (resultType : Ty)
+theorem checkedModuloIntegers?_rename (ρ : Nat → Nat) (failure : ThrowKind) (resultType : Ty)
     (arguments : Array RuntimeValue) :
-    checkedModuloIntegers? failure resultType (arguments.map (·.shift offset)) =
-      (checkedModuloIntegers? failure resultType arguments).map (shiftResult offset) := by
+    checkedModuloIntegers? failure resultType (arguments.map (·.rename ρ)) =
+      (checkedModuloIntegers? failure resultType arguments).map (renameResult ρ) := by
   unfold checkedModuloIntegers?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -325,19 +276,19 @@ theorem checkedModuloIntegers?_shift (offset : Nat) (failure : ThrowKind) (resul
   all_goals try (simp; done)
   rename_i right
   rcases right with ⟨_ | _⟩ | _
-  all_goals simp only [List.map_cons, List.map_nil, RuntimeValue.shift_integer]
+  all_goals simp only [List.map_cons, List.map_nil, RuntimeValue.rename_integer]
   · simp
   all_goals
     simp only [Option.bind_eq_bind, Option.pure_def, Option.map_bind, Function.comp_def]
     refine Option.bind_congr fun _ _ => ?_
     split
     · next error error_eq =>
-        rw [Option.map_some, ← error_eq, checkedInteger_shift]
+        rw [Option.map_some, ← error_eq, checkedInteger_rename]
     · simp
 
-theorem insertVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    insertVector? (arguments.map (·.shift offset)) =
-      (insertVector? arguments).map (shiftResult offset) := by
+theorem insertVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    insertVector? (arguments.map (·.rename ρ)) =
+      (insertVector? arguments).map (renameResult ρ) := by
   unfold insertVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, rest⟩⟩⟩⟩
@@ -345,40 +296,40 @@ theorem insertVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
   all_goals simp
   all_goals split <;> simp
 
-theorem removeVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    removeVector? (arguments.map (·.shift offset)) =
-      (removeVector? arguments).map (shiftResult offset) := by
+theorem removeVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    removeVector? (arguments.map (·.rename ρ)) =
+      (removeVector? arguments).map (renameResult ρ) := by
   unfold removeVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals try (simp; done)
   rename_i elements index
-  simp only [List.map_cons, List.map_nil, RuntimeValue.shift_vector, RuntimeValue.shift_integer]
+  simp only [List.map_cons, List.map_nil, RuntimeValue.rename_vector, RuntimeValue.rename_integer]
   split
   · simp
   · rw [Array.getElem?_map]
     cases elements[index.toNat]? <;> simp
 
-theorem swapVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    swapVector? (arguments.map (·.shift offset)) =
-      (swapVector? arguments).map (shiftResult offset) := by
+theorem swapVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    swapVector? (arguments.map (·.rename ρ)) =
+      (swapVector? arguments).map (renameResult ρ) := by
   unfold swapVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, rest⟩⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b <;> (try (simp; done)) <;> cases c)
   all_goals try (simp; done)
   rename_i elements left right
-  simp only [List.map_cons, List.map_nil, RuntimeValue.shift_vector, RuntimeValue.shift_integer,
+  simp only [List.map_cons, List.map_nil, RuntimeValue.rename_vector, RuntimeValue.rename_integer,
     Array.size_map]
   split
   · simp
   · rw [Array.getElem?_map, Array.getElem?_map]
     cases elements[left.toNat]? <;> cases elements[right.toNat]? <;> simp
 
-theorem reverseSliceVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    reverseSliceVector? (arguments.map (·.shift offset)) =
-      (reverseSliceVector? arguments).map (shiftResult offset) := by
+theorem reverseSliceVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    reverseSliceVector? (arguments.map (·.rename ρ)) =
+      (reverseSliceVector? arguments).map (renameResult ρ) := by
   unfold reverseSliceVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, rest⟩⟩⟩⟩
@@ -386,10 +337,10 @@ theorem reverseSliceVector?_shift (offset : Nat) (arguments : Array RuntimeValue
   all_goals simp [reverseVectorRange_map]
   all_goals split <;> simp
 
-theorem checkVectorIndex?_shift (offset : Nat) (failure : ThrowKind)
+theorem checkVectorIndex?_rename (ρ : Nat → Nat) (failure : ThrowKind)
     (arguments : Array RuntimeValue) :
-    checkVectorIndex? failure (arguments.map (·.shift offset)) =
-      (checkVectorIndex? failure arguments).map (shiftResult offset) := by
+    checkVectorIndex? failure (arguments.map (·.rename ρ)) =
+      (checkVectorIndex? failure arguments).map (renameResult ρ) := by
   unfold checkVectorIndex?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
@@ -397,32 +348,34 @@ theorem checkVectorIndex?_shift (offset : Nat) (failure : ThrowKind)
   all_goals simp
   all_goals split <;> simp
 
-theorem containsVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    containsVector? (arguments.map (·.shift offset)) =
-      (containsVector? arguments).map (shiftResult offset) := by
+theorem containsVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    containsVector? (arguments.map (·.rename ρ)) =
+      (containsVector? arguments).map (renameResult ρ) := by
   unfold containsVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a)
-  all_goals simp [findVectorIndex_map _ (RuntimeValue.shift_beq offset)]
+  all_goals simp [findVectorIndex_map (·.rename ρ)
+    (fun left right => by rw [RuntimeValue.observe_rename, RuntimeValue.observe_rename])]
 
-theorem indexOfVector?_shift (offset : Nat) (indexType : Ty) (arguments : Array RuntimeValue) :
-    indexOfVector? indexType (arguments.map (·.shift offset)) =
-      (indexOfVector? indexType arguments).map (shiftResult offset) := by
+theorem indexOfVector?_rename (ρ : Nat → Nat) (indexType : Ty) (arguments : Array RuntimeValue) :
+    indexOfVector? indexType (arguments.map (·.rename ρ)) =
+      (indexOfVector? indexType arguments).map (renameResult ρ) := by
   unfold indexOfVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a)
-  all_goals simp [findVectorIndex_map _ (RuntimeValue.shift_beq offset)]
+  all_goals simp [findVectorIndex_map (·.rename ρ)
+    (fun left right => by rw [RuntimeValue.observe_rename, RuntimeValue.observe_rename])]
   split
   · simp
-  · simp only [Option.map_bind, Function.comp_def, Option.map_some, shiftResult_ok]
+  · simp only [Option.map_bind, Function.comp_def, Option.map_some, renameResult_ok]
     refine Option.bind_congr fun index index_eq => ?_
-    simp [modularInteger_shift_of_eq index_eq]
+    simp [modularInteger_rename_of_eq index_eq]
 
-theorem destroyEmptyVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    destroyEmptyVector? (arguments.map (·.shift offset)) =
-      (destroyEmptyVector? arguments).map (shiftResult offset) := by
+theorem destroyEmptyVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    destroyEmptyVector? (arguments.map (·.rename ρ)) =
+      (destroyEmptyVector? arguments).map (renameResult ρ) := by
   unfold destroyEmptyVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, rest⟩⟩
@@ -430,18 +383,18 @@ theorem destroyEmptyVector?_shift (offset : Nat) (arguments : Array RuntimeValue
   all_goals simp
   all_goals split <;> simp
 
-theorem concatVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    concatVector? (arguments.map (·.shift offset)) =
-      (concatVector? arguments).map (shiftResult offset) := by
+theorem concatVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    concatVector? (arguments.map (·.rename ρ)) =
+      (concatVector? arguments).map (renameResult ρ) := by
   unfold concatVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals simp
 
-theorem sliceVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
-    sliceVector? (arguments.map (·.shift offset)) =
-      (sliceVector? arguments).map (shiftResult offset) := by
+theorem sliceVector?_rename (ρ : Nat → Nat) (arguments : Array RuntimeValue) :
+    sliceVector? (arguments.map (·.rename ρ)) =
+      (sliceVector? arguments).map (renameResult ρ) := by
   unfold sliceVector?
   rw [Array.toList_map]
   rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, _ | ⟨d, rest⟩⟩⟩⟩
@@ -449,44 +402,44 @@ theorem sliceVector?_shift (offset : Nat) (arguments : Array RuntimeValue) :
   all_goals simp
   all_goals split <;> simp
 
-theorem shiftInteger_shift (offset : Nat) (left : Bool) (resultType : Ty)
+theorem shiftInteger_rename (ρ : Nat → Nat) (left : Bool) (resultType : Ty)
     (arguments : Array RuntimeValue) :
-    shiftInteger left resultType (arguments.map (·.shift offset)) =
-      (shiftInteger left resultType arguments).map (shiftResult offset) := by
+    shiftInteger left resultType (arguments.map (·.rename ρ)) =
+      (shiftInteger left resultType arguments).map (renameResult ρ) := by
   unfold shiftInteger
-  rw [checkedShiftInteger_shift]
+  rw [checkedShiftInteger_rename]
   rcases checkedShiftInteger .panic left resultType arguments with _ | ⟨_, _⟩ | _ <;> simp
 
-theorem evaluatePrimitiveOperation?_shift (offset : Nat) (ns : Validation.ValidatedNamespace)
+theorem evaluatePrimitiveOperation?_rename (ρ : Nat → Nat) (ns : Validation.ValidatedNamespace)
     (resultType : TypeId) (operation : PrimitiveOperation) (arguments : Array RuntimeValue)
     (width : Option Nat) :
-    evaluatePrimitiveOperation? ns resultType operation (arguments.map (·.shift offset)) width =
+    evaluatePrimitiveOperation? ns resultType operation (arguments.map (·.rename ρ)) width =
       (evaluatePrimitiveOperation? ns resultType operation arguments width).map
-        (shiftResult offset) := by
+        (renameResult ρ) := by
   unfold evaluatePrimitiveOperation?
   simp only [Option.bind_eq_bind, Option.map_bind]
   refine Option.bind_congr fun resolved _ => ?_
   cases operation
-  all_goals try simp only [Function.comp_apply, checkedUnaryInteger_shift,
-    checkedBinaryInteger_shift, modularUnaryInteger_shift, modularBinaryInteger_shift,
-    overflowingBinaryInteger_shift, bitwiseBinary_shift, bitwiseNotInteger_shift,
-    checkedShiftInteger_shift, compareOrdered_shift, equalValues?_shift, notEqualValues?_shift,
-    divideIntegers?_shift, checkedDivideIntegers?_shift, moduloIntegers?_shift,
-    checkedModuloIntegers?_shift, insertVector?_shift, removeVector?_shift, swapVector?_shift,
-    reverseSliceVector?_shift, checkVectorIndex?_shift, containsVector?_shift,
-    destroyEmptyVector?_shift, concatVector?_shift, sliceVector?_shift, shiftInteger_shift]
+  all_goals try simp only [Function.comp_apply, checkedUnaryInteger_rename,
+    checkedBinaryInteger_rename, modularUnaryInteger_rename, modularBinaryInteger_rename,
+    overflowingBinaryInteger_rename, bitwiseBinary_rename, bitwiseNotInteger_rename,
+    checkedShiftInteger_rename, compareOrdered_rename, equalValues?_rename, notEqualValues?_rename,
+    divideIntegers?_rename, checkedDivideIntegers?_rename, moduloIntegers?_rename,
+    checkedModuloIntegers?_rename, insertVector?_rename, removeVector?_rename, swapVector?_rename,
+    reverseSliceVector?_rename, checkVectorIndex?_rename, containsVector?_rename,
+    destroyEmptyVector?_rename, concatVector?_rename, sliceVector?_rename, shiftInteger_rename]
   case tuple | vector | range | implies | equivalent | identical => simp
   case indexOfVector =>
     split
     · split
       · simp only [Option.map_bind]
-        exact Option.bind_congr fun indexType _ => indexOfVector?_shift offset indexType arguments
+        exact Option.bind_congr fun indexType _ => indexOfVector?_rename ρ indexType arguments
       · rfl
     · rfl
   all_goals rw [Array.toList_map]
   case compare =>
     rcases arguments.toList with _ | ⟨a, _ | ⟨b, _ | ⟨c, rest⟩⟩⟩ <;>
-      simp [RuntimeValue.order_shift]
+      simp [RuntimeValue.observe_rename]
   case copyValue | moveValue =>
     rcases arguments.toList with _ | ⟨a, _ | ⟨b, rest⟩⟩ <;> simp
   case repeatVector =>
@@ -503,7 +456,7 @@ theorem evaluatePrimitiveOperation?_shift (offset : Nat) (ns : Validation.Valida
     all_goals try (cases a <;> (try (simp; done)) <;> cases b)
     all_goals try (simp; done)
     rename_i elements index
-    simp only [List.map_cons, List.map_nil, RuntimeValue.shift_vector, RuntimeValue.shift_integer]
+    simp only [List.map_cons, List.map_nil, RuntimeValue.rename_vector, RuntimeValue.rename_integer]
     split
     · simp
     · rw [Array.getElem?_map]
@@ -517,29 +470,30 @@ theorem evaluatePrimitiveOperation?_shift (offset : Nat) (ns : Validation.Valida
   all_goals try (cases a <;> (try (simp; done)) <;> cases b)
   all_goals try (simp; done)
 
-theorem evaluatePrimitiveOperation?_above {frontier : Nat} {ns : Validation.ValidatedNamespace}
+theorem evaluatePrimitiveOperation?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {ns : Validation.ValidatedNamespace}
     {resultType : TypeId} {operation : PrimitiveOperation} {arguments : Array RuntimeValue}
     {width : Option Nat} {result : Except (ThrowKind × Array RuntimeValue) RuntimeValue}
-    (above : ∀ argument ∈ arguments, argument.Above frontier)
+    (above : ∀ argument ∈ arguments, argument.Within inside)
     (evaluate : evaluatePrimitiveOperation? ns resultType operation arguments width = some result) :
-    (∀ value, result = .ok value → value.Above frontier) ∧
-      (∀ kind values, result = .error (kind, values) → ∀ value ∈ values, value.Above frontier) := by
-  rw [← Array.shift_unshift_all above, evaluatePrimitiveOperation?_shift] at evaluate
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp evaluate
+    (∀ value, result = .ok value → value.Within inside) ∧
+      (∀ kind values, result = .error (kind, values) → ∀ value ∈ values, value.Within inside) := by
+  rw [← Array.rename_inverse_all base above, evaluatePrimitiveOperation?_rename] at evaluate
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp evaluate
   refine ⟨fun value same => ?_, fun kind values same => ?_⟩
-  · cases base with
-    | ok base =>
-        simp only [shiftResult_ok, Except.ok.injEq] at same
-        exact same ▸ RuntimeValue.above_shift_self frontier base
-    | error base => cases same
-  · cases base with
-    | ok base => cases same
-    | error base =>
-        obtain ⟨baseKind, baseValues⟩ := base
-        simp only [shiftResult_error, Except.error.injEq, Prod.mk.injEq] at same
+  · cases original with
+    | ok original =>
+        simp only [renameResult_ok, Except.ok.injEq] at same
+        exact same ▸ base.within original
+    | error original => cases same
+  · cases original with
+    | ok original => cases same
+    | error original =>
+        obtain ⟨baseKind, baseValues⟩ := original
+        simp only [renameResult_error, Except.error.injEq, Prod.mk.injEq] at same
         obtain ⟨-, rfl⟩ := same
         intro value member
-        obtain ⟨original, -, rfl⟩ := Array.mem_map.mp member
-        exact RuntimeValue.above_shift_self frontier original
+        obtain ⟨renamed, -, rfl⟩ := Array.mem_map.mp member
+        exact base.within renamed
 
 end LeanerIR

@@ -1,0 +1,6 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/spec_int_instantiation.move:1:1: error: LIR-SEMANTIC-TYPE: in fun choice: equality primitive operand types differ at [1234, 1273)
+LIR-SEMANTIC-TYPE: in fun inc: equality primitive operand types differ at [628, 662)
+LIR-SEMANTIC-TYPE: in fun inc_wrong: equality primitive operand types differ at [1697, 1731)
+LIR-SEMANTIC-TYPE: in fun pair: equality primitive operand types differ at [1011, 1074)
+LIR-SEMANTIC-TYPE: in fun via_spec_fun: specification function argument types differ from the callee signature at [1503, 1541)

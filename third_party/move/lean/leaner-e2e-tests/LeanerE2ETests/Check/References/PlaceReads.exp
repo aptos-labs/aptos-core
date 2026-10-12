@@ -1,0 +1,2 @@
+LeanerE2ETests/Check/References/PlaceReads.lean:74:4: error: the specification clause `ensures result == x` is not established
+LeanerE2ETests/Check/References/PlaceReads.lean:73:7: error: leaner verification failed: the automatic verification of `deref_unchanged` failed; provide a proof: `verify deref_unchanged by …` in the module (`verify deref_unchanged by leaner_obligations` lists its obligations)

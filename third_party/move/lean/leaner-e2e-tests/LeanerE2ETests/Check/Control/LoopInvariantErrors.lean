@@ -52,10 +52,26 @@ leaner module 0x42::negative_loop_invariants where
     ensures result == 1
     aborts_if false
 
+  -- Two annotations of one loop are one specification: the `where` region
+  -- is checked as well as the annotation after it.
+  fun split_annotation() -> u64 := do
+    let mut i : u64 := 0
+    while i < 1 do
+      i := i + 1
+    where
+      invariant i == 0
+    spec do
+      invariant true
+    i
+  spec split_annotation where
+    ensures result == 1
+    aborts_if false
+
 -- A wrong loop invariant exports no verification theorem.
 open Lean Elab Command in
 run_cmd do
-  for function in ["bad_entry", "weak_exit", "bad_step", "bad_default"] do
+  for function in ["bad_entry", "weak_exit", "bad_step", "bad_default",
+      "split_annotation"] do
     let name := ((`«0x42».negative_loop_invariants).str function).str "verified"
     if (← getEnv).contains name then
       throwError "incorrect loop invariant exported a theorem: {name}"

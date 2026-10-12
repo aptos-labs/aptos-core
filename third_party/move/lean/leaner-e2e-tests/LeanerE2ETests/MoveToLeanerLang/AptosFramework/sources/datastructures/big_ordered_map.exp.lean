@@ -3519,7 +3519,7 @@ leaner module aptos_framework::big_ordered_map where
 
   @[map_spec_aborts_new_with_config (BigOrderedMap)]
   spec fun spec_aborts_new_with_config {K} {V}(
-    inner_max_degree : Int, leaf_max_degree : Int, _reuse_slots : Bool
+    inner_max_degree : u16, leaf_max_degree : u16, _reuse_slots : Bool
   ) : Bool :=
     inner_max_degree != 0 && (inner_max_degree < 4 || inner_max_degree > 4096)
       || leaf_max_degree != 0 && (leaf_max_degree < 3 || leaf_max_degree > 4096)

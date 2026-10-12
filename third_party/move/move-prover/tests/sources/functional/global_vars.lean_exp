@@ -1,2 +1,2 @@
-Move prover returns: the Leaner Move verifier exited with exit status: 1:
-uncaught exception: tests/sources/functional/global_vars.move: spec variable `sum_of_T2` has an initializer, which is not supported
+Move prover returns: exiting with verification errors
+tests/sources/functional/global_vars.move:1:1: error: spec variable `sum_of_T2` has an initializer, which is not supported

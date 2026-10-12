@@ -6,28 +6,31 @@ import LeanerIR.Semantics.Focus
 /-!
 # Renaming loan identities
 
-Two runs from starts that differ only in their loan bookkeeping mint the
-same loans in the same order, offset by their frontiers' difference
-(`designs/static-typing.md`, "Loan independence"). `shift` raises the loan
-identities of values, frames, and global memory by such an offset; `Above`
-states that every identity a value holds was minted at or beyond a
-frontier.
+Two runs from starts that differ only in their loan bookkeeping and in the
+loans their arguments are lent under mint the same loans in the same order,
+offset by their frontiers' difference, and lend the same arguments under
+loans of their own (`designs/static-typing.md`, "Loan independence").
+`rename` maps the loan identities of values, frames, and global memory by
+an injective renaming; `Within` states that every identity a value holds
+satisfies a predicate, such as having been minted at or beyond a frontier
+or being one of the lent loans. Comparisons read values through
+`RuntimeValue.observe`, which no renaming changes.
 -/
 
 namespace LeanerIR
 
 mutual
-/-- A value with each loan identity it holds raised by `offset`. -/
-def RuntimeValue.shift (offset : Nat) : RuntimeValue → RuntimeValue
-  | .vector elements => .vector (RuntimeValue.shiftList offset elements.toList).toArray
-  | .tuple elements => .tuple (RuntimeValue.shiftList offset elements.toList).toArray
+/-- A value with each loan identity it holds renamed by `ρ`. -/
+def RuntimeValue.rename (ρ : Nat → Nat) : RuntimeValue → RuntimeValue
+  | .vector elements => .vector (RuntimeValue.renameList ρ elements.toList).toArray
+  | .tuple elements => .tuple (RuntimeValue.renameList ρ elements.toList).toArray
   | .nominal source variant fields =>
-      .nominal source variant (RuntimeValue.shiftList offset fields.toList).toArray
+      .nominal source variant (RuntimeValue.renameList ρ fields.toList).toArray
   | .closure function mask typeInstantiation captures =>
       .closure function mask typeInstantiation
-        (RuntimeValue.shiftList offset captures.toList).toArray
-  | .borrow loan current => .borrow (loan + offset) (current.shift offset)
-  | .loanHole loan => .loanHole (loan + offset)
+        (RuntimeValue.renameList ρ captures.toList).toArray
+  | .borrow loan current => .borrow (ρ loan) (current.rename ρ)
+  | .loanHole loan => .loanHole (ρ loan)
   | .unit => .unit
   | .bool value => .bool value
   | .character value => .character value
@@ -39,425 +42,480 @@ def RuntimeValue.shift (offset : Nat) : RuntimeValue → RuntimeValue
 termination_by value => sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-/-- Each value of a list with its loan identities raised. -/
-def RuntimeValue.shiftList (offset : Nat) : List RuntimeValue → List RuntimeValue
+/-- Each value of a list with its loan identities renamed. -/
+def RuntimeValue.renameList (ρ : Nat → Nat) : List RuntimeValue → List RuntimeValue
   | [] => []
-  | value :: values => value.shift offset :: RuntimeValue.shiftList offset values
+  | value :: values => value.rename ρ :: RuntimeValue.renameList ρ values
 termination_by values => sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
 mutual
-/-- Every loan identity a value holds is at or beyond `frontier`. -/
-def RuntimeValue.Above (frontier : Nat) : RuntimeValue → Prop
+/-- Every loan identity a value holds satisfies `inside`. -/
+def RuntimeValue.Within (inside : Nat → Prop) : RuntimeValue → Prop
   | .vector elements | .tuple elements | .nominal _ _ elements | .closure _ _ _ elements =>
-      RuntimeValue.AboveList frontier elements.toList
-  | .borrow loan current => frontier ≤ loan ∧ current.Above frontier
-  | .loanHole loan => frontier ≤ loan
+      RuntimeValue.WithinList inside elements.toList
+  | .borrow loan current => inside loan ∧ current.Within inside
+  | .loanHole loan => inside loan
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ => True
 termination_by value => sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-/-- Every loan identity a list's values hold is at or beyond `frontier`. -/
-def RuntimeValue.AboveList (frontier : Nat) : List RuntimeValue → Prop
+/-- Every loan identity a list's values hold satisfies `inside`. -/
+def RuntimeValue.WithinList (inside : Nat → Prop) : List RuntimeValue → Prop
   | [] => True
-  | value :: values => value.Above frontier ∧ RuntimeValue.AboveList frontier values
+  | value :: values => value.Within inside ∧ RuntimeValue.WithinList inside values
 termination_by values => sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
-theorem RuntimeValue.shiftList_eq_map (offset : Nat) :
+theorem RuntimeValue.renameList_eq_map (ρ : Nat → Nat) :
     ∀ values : List RuntimeValue,
-      RuntimeValue.shiftList offset values = values.map (·.shift offset)
-  | [] => by simp [RuntimeValue.shiftList]
+      RuntimeValue.renameList ρ values = values.map (·.rename ρ)
+  | [] => by simp [RuntimeValue.renameList]
   | _ :: values => by
-      simp [RuntimeValue.shiftList, RuntimeValue.shiftList_eq_map offset values]
+      simp [RuntimeValue.renameList, RuntimeValue.renameList_eq_map ρ values]
 
-theorem RuntimeValue.aboveList_iff (frontier : Nat) :
+theorem RuntimeValue.withinList_iff (inside : Nat → Prop) :
     ∀ values : List RuntimeValue,
-      RuntimeValue.AboveList frontier values ↔ ∀ value ∈ values, value.Above frontier
-  | [] => by simp [RuntimeValue.AboveList]
+      RuntimeValue.WithinList inside values ↔ ∀ value ∈ values, value.Within inside
+  | [] => by simp [RuntimeValue.WithinList]
   | _ :: values => by
-      simp [RuntimeValue.AboveList, RuntimeValue.aboveList_iff frontier values]
+      simp [RuntimeValue.WithinList, RuntimeValue.withinList_iff inside values]
 
 section Equations
 
-variable (offset frontier : Nat)
+variable (ρ : Nat → Nat) (inside : Nat → Prop)
 
-@[simp] theorem RuntimeValue.shift_vector (elements : Array RuntimeValue) :
-    (RuntimeValue.vector elements).shift offset = .vector (elements.map (·.shift offset)) := by
-  rw [RuntimeValue.shift, RuntimeValue.shiftList_eq_map]; congr 1; apply Array.ext'; simp
+@[simp] theorem RuntimeValue.rename_vector (elements : Array RuntimeValue) :
+    (RuntimeValue.vector elements).rename ρ = .vector (elements.map (·.rename ρ)) := by
+  rw [RuntimeValue.rename, RuntimeValue.renameList_eq_map]; congr 1; apply Array.ext'; simp
 
-@[simp] theorem RuntimeValue.shift_tuple (elements : Array RuntimeValue) :
-    (RuntimeValue.tuple elements).shift offset = .tuple (elements.map (·.shift offset)) := by
-  rw [RuntimeValue.shift, RuntimeValue.shiftList_eq_map]; congr 1; apply Array.ext'; simp
+@[simp] theorem RuntimeValue.rename_tuple (elements : Array RuntimeValue) :
+    (RuntimeValue.tuple elements).rename ρ = .tuple (elements.map (·.rename ρ)) := by
+  rw [RuntimeValue.rename, RuntimeValue.renameList_eq_map]; congr 1; apply Array.ext'; simp
 
-@[simp] theorem RuntimeValue.shift_nominal (source : StructHandle) (variant : Option String)
+@[simp] theorem RuntimeValue.rename_nominal (source : StructHandle) (variant : Option String)
     (fields : Array RuntimeValue) :
-    (RuntimeValue.nominal source variant fields).shift offset =
-      .nominal source variant (fields.map (·.shift offset)) := by
-  rw [RuntimeValue.shift, RuntimeValue.shiftList_eq_map]; congr 1; apply Array.ext'; simp
+    (RuntimeValue.nominal source variant fields).rename ρ =
+      .nominal source variant (fields.map (·.rename ρ)) := by
+  rw [RuntimeValue.rename, RuntimeValue.renameList_eq_map]; congr 1; apply Array.ext'; simp
 
-@[simp] theorem RuntimeValue.shift_closure (function : FunctionHandle) (mask : Nat)
+@[simp] theorem RuntimeValue.rename_closure (function : FunctionHandle) (mask : Nat)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue) :
-    (RuntimeValue.closure function mask typeInstantiation captures).shift offset =
-      .closure function mask typeInstantiation (captures.map (·.shift offset)) := by
-  rw [RuntimeValue.shift, RuntimeValue.shiftList_eq_map]; congr 1; apply Array.ext'; simp
+    (RuntimeValue.closure function mask typeInstantiation captures).rename ρ =
+      .closure function mask typeInstantiation (captures.map (·.rename ρ)) := by
+  rw [RuntimeValue.rename, RuntimeValue.renameList_eq_map]; congr 1; apply Array.ext'; simp
 
-@[simp] theorem RuntimeValue.shift_borrow (loan : Nat) (current : RuntimeValue) :
-    (RuntimeValue.borrow loan current).shift offset = .borrow (loan + offset) (current.shift offset) := by
-  rw [RuntimeValue.shift]
+@[simp] theorem RuntimeValue.rename_borrow (loan : Nat) (current : RuntimeValue) :
+    (RuntimeValue.borrow loan current).rename ρ = .borrow (ρ loan) (current.rename ρ) := by
+  rw [RuntimeValue.rename]
 
-@[simp] theorem RuntimeValue.shift_loanHole (loan : Nat) :
-    (RuntimeValue.loanHole loan).shift offset = .loanHole (loan + offset) := by
-  rw [RuntimeValue.shift]
+@[simp] theorem RuntimeValue.rename_loanHole (loan : Nat) :
+    (RuntimeValue.loanHole loan).rename ρ = .loanHole (ρ loan) := by
+  rw [RuntimeValue.rename]
 
-@[simp] theorem RuntimeValue.shift_unit : RuntimeValue.unit.shift offset = .unit := by
-  rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_bool (value : Bool) :
-    (RuntimeValue.bool value).shift offset = .bool value := by rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_character (value : Nat) :
-    (RuntimeValue.character value).shift offset = .character value := by rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_integer (value : Int) :
-    (RuntimeValue.integer value).shift offset = .integer value := by rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_address (value : String) :
-    (RuntimeValue.address value).shift offset = .address value := by rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_signer (value : String) :
-    (RuntimeValue.signer value).shift offset = .signer value := by rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_string (value : String) :
-    (RuntimeValue.string value).shift offset = .string value := by rw [RuntimeValue.shift]
-@[simp] theorem RuntimeValue.shift_bytes (value : Array UInt8) :
-    (RuntimeValue.bytes value).shift offset = .bytes value := by rw [RuntimeValue.shift]
+@[simp] theorem RuntimeValue.rename_unit : RuntimeValue.unit.rename ρ = .unit := by
+  rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_bool (value : Bool) :
+    (RuntimeValue.bool value).rename ρ = .bool value := by rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_character (value : Nat) :
+    (RuntimeValue.character value).rename ρ = .character value := by rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_integer (value : Int) :
+    (RuntimeValue.integer value).rename ρ = .integer value := by rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_address (value : String) :
+    (RuntimeValue.address value).rename ρ = .address value := by rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_signer (value : String) :
+    (RuntimeValue.signer value).rename ρ = .signer value := by rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_string (value : String) :
+    (RuntimeValue.string value).rename ρ = .string value := by rw [RuntimeValue.rename]
+@[simp] theorem RuntimeValue.rename_bytes (value : Array UInt8) :
+    (RuntimeValue.bytes value).rename ρ = .bytes value := by rw [RuntimeValue.rename]
 
-@[simp] theorem RuntimeValue.above_vector (elements : Array RuntimeValue) :
-    (RuntimeValue.vector elements).Above frontier ↔ ∀ element ∈ elements, element.Above frontier := by
-  rw [RuntimeValue.Above, RuntimeValue.aboveList_iff]; simp
-@[simp] theorem RuntimeValue.above_tuple (elements : Array RuntimeValue) :
-    (RuntimeValue.tuple elements).Above frontier ↔ ∀ element ∈ elements, element.Above frontier := by
-  rw [RuntimeValue.Above, RuntimeValue.aboveList_iff]; simp
-@[simp] theorem RuntimeValue.above_nominal (source : StructHandle) (variant : Option String)
+@[simp] theorem RuntimeValue.within_vector (elements : Array RuntimeValue) :
+    (RuntimeValue.vector elements).Within inside ↔ ∀ element ∈ elements, element.Within inside := by
+  rw [RuntimeValue.Within, RuntimeValue.withinList_iff]; simp
+@[simp] theorem RuntimeValue.within_tuple (elements : Array RuntimeValue) :
+    (RuntimeValue.tuple elements).Within inside ↔ ∀ element ∈ elements, element.Within inside := by
+  rw [RuntimeValue.Within, RuntimeValue.withinList_iff]; simp
+@[simp] theorem RuntimeValue.within_nominal (source : StructHandle) (variant : Option String)
     (fields : Array RuntimeValue) :
-    (RuntimeValue.nominal source variant fields).Above frontier ↔
-      ∀ field ∈ fields, field.Above frontier := by
-  rw [RuntimeValue.Above, RuntimeValue.aboveList_iff]; simp
-@[simp] theorem RuntimeValue.above_closure (function : FunctionHandle) (mask : Nat)
+    (RuntimeValue.nominal source variant fields).Within inside ↔
+      ∀ field ∈ fields, field.Within inside := by
+  rw [RuntimeValue.Within, RuntimeValue.withinList_iff]; simp
+@[simp] theorem RuntimeValue.within_closure (function : FunctionHandle) (mask : Nat)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : Array RuntimeValue) :
-    (RuntimeValue.closure function mask typeInstantiation captures).Above frontier ↔
-      ∀ capture ∈ captures, capture.Above frontier := by
-  rw [RuntimeValue.Above, RuntimeValue.aboveList_iff]; simp
-@[simp] theorem RuntimeValue.above_borrow (loan : Nat) (current : RuntimeValue) :
-    (RuntimeValue.borrow loan current).Above frontier ↔ frontier ≤ loan ∧ current.Above frontier := by
-  rw [RuntimeValue.Above]
-@[simp] theorem RuntimeValue.above_loanHole (loan : Nat) :
-    (RuntimeValue.loanHole loan).Above frontier ↔ frontier ≤ loan := by
-  rw [RuntimeValue.Above]
+    (RuntimeValue.closure function mask typeInstantiation captures).Within inside ↔
+      ∀ capture ∈ captures, capture.Within inside := by
+  rw [RuntimeValue.Within, RuntimeValue.withinList_iff]; simp
+@[simp] theorem RuntimeValue.within_borrow (loan : Nat) (current : RuntimeValue) :
+    (RuntimeValue.borrow loan current).Within inside ↔ inside loan ∧ current.Within inside := by
+  rw [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_loanHole (loan : Nat) :
+    (RuntimeValue.loanHole loan).Within inside ↔ inside loan := by
+  rw [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_unit : RuntimeValue.unit.Within inside := by
+  simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_bool (value : Bool) :
+    (RuntimeValue.bool value).Within inside := by simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_character (value : Nat) :
+    (RuntimeValue.character value).Within inside := by simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_integer (value : Int) :
+    (RuntimeValue.integer value).Within inside := by simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_address (value : String) :
+    (RuntimeValue.address value).Within inside := by simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_signer (value : String) :
+    (RuntimeValue.signer value).Within inside := by simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_string (value : String) :
+    (RuntimeValue.string value).Within inside := by simp [RuntimeValue.Within]
+@[simp] theorem RuntimeValue.within_bytes (value : Array UInt8) :
+    (RuntimeValue.bytes value).Within inside := by simp [RuntimeValue.Within]
 
 end Equations
 
+/-! ## Laws -/
+
+mutual
+/-- Renaming twice is renaming by the composite. -/
+theorem RuntimeValue.rename_rename (ρ σ : Nat → Nat) (value : RuntimeValue) :
+    (value.rename σ).rename ρ = value.rename (ρ ∘ σ) := by
+  match value with
+  | .vector elements | .tuple elements =>
+      simp only [RuntimeValue.rename_vector, RuntimeValue.rename_tuple, Array.map_map]
+      congr 1
+      exact Array.map_congr_left fun element member => by
+        simpa using RuntimeValue.rename_rename ρ σ element
+  | .nominal source variant fields =>
+      simp only [RuntimeValue.rename_nominal, Array.map_map]
+      congr 1
+      exact Array.map_congr_left fun element member => by
+        simpa using RuntimeValue.rename_rename ρ σ element
+  | .closure function mask typeInstantiation captures =>
+      simp only [RuntimeValue.rename_closure, Array.map_map]
+      congr 1
+      exact Array.map_congr_left fun element member => by
+        simpa using RuntimeValue.rename_rename ρ σ element
+  | .borrow loan current =>
+      simp [RuntimeValue.rename_rename ρ σ current]
+  | .loanHole loan => simp
+  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .bytes _ => simp
+termination_by sizeOf value
+decreasing_by all_goals (simp_wf; first
+  | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
+end
+
+/-- Renamings that agree on the loans a value holds rename it alike. -/
+theorem RuntimeValue.rename_congr {inside : Nat → Prop} {ρ σ : Nat → Nat}
+    (same : ∀ loan, inside loan → ρ loan = σ loan) :
+    ∀ (value : RuntimeValue), value.Within inside → value.rename ρ = value.rename σ
+  | .vector elements, within | .tuple elements, within => by
+      simp only [RuntimeValue.within_vector, RuntimeValue.within_tuple] at within
+      simp only [RuntimeValue.rename_vector, RuntimeValue.rename_tuple]
+      congr 1
+      exact Array.map_congr_left fun element member =>
+        RuntimeValue.rename_congr same element (within element member)
+  | .nominal source variant fields, within => by
+      simp only [RuntimeValue.within_nominal] at within
+      simp only [RuntimeValue.rename_nominal]
+      congr 1
+      exact Array.map_congr_left fun element member =>
+        RuntimeValue.rename_congr same element (within element member)
+  | .closure function mask typeInstantiation captures, within => by
+      simp only [RuntimeValue.within_closure] at within
+      simp only [RuntimeValue.rename_closure]
+      congr 1
+      exact Array.map_congr_left fun element member =>
+        RuntimeValue.rename_congr same element (within element member)
+  | .borrow loan current, within => by
+      simp only [RuntimeValue.within_borrow] at within
+      simp [same loan within.1, RuntimeValue.rename_congr same current within.2]
+  | .loanHole loan, within => by
+      simp only [RuntimeValue.within_loanHole] at within
+      simp [same loan within]
+  | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
+  | .string _, _ | .bytes _, _ => by simp
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; first
+  | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
+
+/-- The identity renaming changes nothing. -/
+theorem RuntimeValue.rename_id : ∀ (value : RuntimeValue), value.rename id = value
+  | .vector elements | .tuple elements => by
+      simp only [RuntimeValue.rename_vector, RuntimeValue.rename_tuple]
+      congr 1
+      conv => rhs; rw [← Array.map_id elements]
+      exact Array.map_congr_left fun element member => RuntimeValue.rename_id element
+  | .nominal source variant fields => by
+      simp only [RuntimeValue.rename_nominal]
+      congr 1
+      conv => rhs; rw [← Array.map_id fields]
+      exact Array.map_congr_left fun element member => RuntimeValue.rename_id element
+  | .closure function mask typeInstantiation captures => by
+      simp only [RuntimeValue.rename_closure]
+      congr 1
+      conv => rhs; rw [← Array.map_id captures]
+      exact Array.map_congr_left fun element member => RuntimeValue.rename_id element
+  | .borrow loan current => by simp [RuntimeValue.rename_id current]
+  | .loanHole loan => by simp
+  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .bytes _ => by simp
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; first
+  | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
+
+/-- A value is the renaming back of its renaming by a renaming with a left
+inverse on the loans it holds. -/
+theorem RuntimeValue.rename_of_inverse {inside : Nat → Prop} {ρ σ : Nat → Nat}
+    (inverse : ∀ loan, inside loan → ρ (σ loan) = loan) (value : RuntimeValue)
+    (within : value.Within inside) : (value.rename σ).rename ρ = value := by
+  rw [RuntimeValue.rename_rename,
+    RuntimeValue.rename_congr (ρ := ρ ∘ σ) (σ := id) (fun loan member => inverse loan member)
+      value within,
+    RuntimeValue.rename_id]
+
+/-- A renaming's values hold loans in its image. -/
+theorem RuntimeValue.within_rename {inside : Nat → Prop} (ρ : Nat → Nat) :
+    ∀ (value : RuntimeValue), value.Within inside →
+      (value.rename ρ).Within fun loan => ∃ base, inside base ∧ ρ base = loan
+  | .vector elements, within | .tuple elements, within => by
+      simp only [RuntimeValue.within_vector, RuntimeValue.within_tuple] at within
+      simp only [RuntimeValue.rename_vector, RuntimeValue.rename_tuple,
+        RuntimeValue.within_vector, RuntimeValue.within_tuple, Array.mem_map]
+      rintro _ ⟨element, member, rfl⟩
+      exact RuntimeValue.within_rename ρ element (within element member)
+  | .nominal source variant fields, within => by
+      simp only [RuntimeValue.within_nominal] at within
+      simp only [RuntimeValue.rename_nominal, RuntimeValue.within_nominal, Array.mem_map]
+      rintro _ ⟨element, member, rfl⟩
+      exact RuntimeValue.within_rename ρ element (within element member)
+  | .closure function mask typeInstantiation captures, within => by
+      simp only [RuntimeValue.within_closure] at within
+      simp only [RuntimeValue.rename_closure, RuntimeValue.within_closure, Array.mem_map]
+      rintro _ ⟨element, member, rfl⟩
+      exact RuntimeValue.within_rename ρ element (within element member)
+  | .borrow loan current, within => by
+      simp only [RuntimeValue.within_borrow] at within
+      simp only [RuntimeValue.rename_borrow, RuntimeValue.within_borrow]
+      exact ⟨⟨loan, within.1, rfl⟩, RuntimeValue.within_rename ρ current within.2⟩
+  | .loanHole loan, within => by
+      simp only [RuntimeValue.within_loanHole] at within
+      simp only [RuntimeValue.rename_loanHole, RuntimeValue.within_loanHole]
+      exact ⟨loan, within, rfl⟩
+  | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
+  | .string _, _ | .bytes _, _ => by simp
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; first
+  | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
+
+/-- A weaker predicate holds of every loan a value holds. -/
+theorem RuntimeValue.Within.mono {inside outside : Nat → Prop}
+    (weaker : ∀ loan, inside loan → outside loan) :
+    ∀ {value : RuntimeValue}, value.Within inside → value.Within outside
+  | .vector elements, within | .tuple elements, within => by
+      simp only [RuntimeValue.within_vector, RuntimeValue.within_tuple] at within ⊢
+      exact fun element member => RuntimeValue.Within.mono weaker (within element member)
+  | .nominal source variant fields, within => by
+      simp only [RuntimeValue.within_nominal] at within ⊢
+      exact fun element member => RuntimeValue.Within.mono weaker (within element member)
+  | .closure function mask typeInstantiation captures, within => by
+      simp only [RuntimeValue.within_closure] at within ⊢
+      exact fun element member => RuntimeValue.Within.mono weaker (within element member)
+  | .borrow loan current, within => by
+      simp only [RuntimeValue.within_borrow] at within ⊢
+      exact ⟨weaker loan within.1, RuntimeValue.Within.mono weaker within.2⟩
+  | .loanHole loan, within => by
+      simp only [RuntimeValue.within_loanHole] at within ⊢
+      exact weaker loan within
+  | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
+  | .string _, _ | .bytes _, _ => by simp
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; first
+  | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
+
+/-- Every value holds only loans everything satisfies. -/
+theorem RuntimeValue.within_true : ∀ (value : RuntimeValue), value.Within fun _ => True
+  | .vector elements | .tuple elements => by
+      simp only [RuntimeValue.within_vector, RuntimeValue.within_tuple]
+      exact fun element member => RuntimeValue.within_true element
+  | .nominal source variant fields => by
+      simp only [RuntimeValue.within_nominal]
+      exact fun element member => RuntimeValue.within_true element
+  | .closure function mask typeInstantiation captures => by
+      simp only [RuntimeValue.within_closure]
+      exact fun element member => RuntimeValue.within_true element
+  | .borrow loan current => by simp [RuntimeValue.within_true current]
+  | .loanHole loan => by simp
+  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
+  | .bytes _ => by simp
+termination_by value => sizeOf value
+decreasing_by all_goals (simp_wf; first
+  | (have := Array.sizeOf_lt_of_mem ‹_ ∈ _›; omega) | omega)
+
+open Classical in
+/-- A left inverse of an injective renaming: the loan it renames to a loan,
+where there is one. -/
+noncomputable def invertLoans (ρ : Nat → Nat) (loan : Nat) : Nat :=
+  if found : ∃ base, ρ base = loan then Classical.choose found else 0
+
+theorem invertLoans_rename {ρ : Nat → Nat} (injective : Function.Injective ρ) (loan : Nat) :
+    invertLoans ρ (ρ loan) = loan := by
+  have found : ∃ base, ρ base = ρ loan := ⟨loan, rfl⟩
+  unfold invertLoans
+  rw [dif_pos found]
+  exact injective (Classical.choose_spec found)
+
+/-- An injective renaming renames distinct values apart. -/
+theorem RuntimeValue.rename_injective {ρ : Nat → Nat} (injective : Function.Injective ρ)
+    {left right : RuntimeValue} (same : left.rename ρ = right.rename ρ) : left = right := by
+  have inverse : ∀ loan, (fun _ => True) loan → invertLoans ρ (ρ loan) = loan :=
+    fun loan _ => invertLoans_rename injective loan
+  rw [← RuntimeValue.rename_of_inverse inverse left (RuntimeValue.within_true left),
+    same, RuntimeValue.rename_of_inverse inverse right (RuntimeValue.within_true right)]
+
+theorem RuntimeValue.rename_beq {ρ : Nat → Nat} (injective : Function.Injective ρ)
+    (left right : RuntimeValue) : (left.rename ρ == right.rename ρ) = (left == right) := by
+  rw [Bool.eq_iff_iff, beq_iff_eq, beq_iff_eq]
+  exact ⟨RuntimeValue.rename_injective injective, fun same => same ▸ rfl⟩
+
+/-- An injective renaming keeps loans apart. -/
+theorem _root_.Function.Injective.beq_eq {ρ : Nat → Nat} (injective : Function.Injective ρ)
+    (left right : Nat) : (ρ left == ρ right) = (left == right) := by
+  rw [Bool.eq_iff_iff, beq_iff_eq, beq_iff_eq]
+  exact injective.eq_iff
+
 /-! ## Loan-free values -/
 
-theorem RuntimeValue.shift_of_plain (offset : Nat) :
-    ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.shift offset = value
+theorem RuntimeValue.rename_of_plain (ρ : Nat → Nat) :
+    ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.rename ρ = value
   | _, .unit | _, .bool _ | _, .character _ | _, .integer _ | _, .address _ | _, .signer _
   | _, .string _ | _, .bytes _ => by simp
   | _, .vector elements plain => by
-      simp only [RuntimeValue.shift_vector, RuntimeValue.vector.injEq]
+      simp only [RuntimeValue.rename_vector, RuntimeValue.vector.injEq]
       conv => rhs; rw [← Array.map_id elements]
       exact Array.map_congr_left fun element member =>
-        RuntimeValue.shift_of_plain offset (plain element member)
+        RuntimeValue.rename_of_plain ρ (plain element member)
   | _, .tuple elements plain => by
-      simp only [RuntimeValue.shift_tuple, RuntimeValue.tuple.injEq]
+      simp only [RuntimeValue.rename_tuple, RuntimeValue.tuple.injEq]
       conv => rhs; rw [← Array.map_id elements]
       exact Array.map_congr_left fun element member =>
-        RuntimeValue.shift_of_plain offset (plain element member)
+        RuntimeValue.rename_of_plain ρ (plain element member)
   | _, .nominal source variant fields plain => by
-      simp only [RuntimeValue.shift_nominal, RuntimeValue.nominal.injEq, true_and]
+      simp only [RuntimeValue.rename_nominal, RuntimeValue.nominal.injEq, true_and]
       conv => rhs; rw [← Array.map_id fields]
       exact Array.map_congr_left fun field member =>
-        RuntimeValue.shift_of_plain offset (plain field member)
+        RuntimeValue.rename_of_plain ρ (plain field member)
   | _, .closure function mask typeInstantiation captures plain => by
-      simp only [RuntimeValue.shift_closure, RuntimeValue.closure.injEq, true_and]
+      simp only [RuntimeValue.rename_closure, RuntimeValue.closure.injEq, true_and]
       conv => rhs; rw [← Array.map_id captures]
       exact Array.map_congr_left fun capture member =>
-        RuntimeValue.shift_of_plain offset (plain capture member)
+        RuntimeValue.rename_of_plain ρ (plain capture member)
 
-theorem RuntimeValue.above_of_plain (frontier : Nat) :
-    ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.Above frontier
+theorem RuntimeValue.within_of_plain (inside : Nat → Prop) :
+    ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.Within inside
   | _, .unit | _, .bool _ | _, .character _ | _, .integer _ | _, .address _ | _, .signer _
-  | _, .string _ | _, .bytes _ => by simp [RuntimeValue.Above]
+  | _, .string _ | _, .bytes _ => by simp
   | _, .vector _ plain | _, .tuple _ plain => by
-      simpa using fun element member => RuntimeValue.above_of_plain frontier (plain element member)
+      simpa using fun element member => RuntimeValue.within_of_plain inside (plain element member)
   | _, .nominal _ _ _ plain => by
-      simpa using fun element member => RuntimeValue.above_of_plain frontier (plain element member)
+      simpa using fun element member => RuntimeValue.within_of_plain inside (plain element member)
   | _, .closure _ _ _ _ plain => by
-      simpa using fun element member => RuntimeValue.above_of_plain frontier (plain element member)
+      simpa using fun element member => RuntimeValue.within_of_plain inside (plain element member)
 
-/-! ## Lowering
+/-! ## Observation
 
-A value whose loans are at or beyond a frontier is the shift of one by the
-frontier, so whatever commutes with shifts keeps values above it. -/
-
-mutual
-/-- A value with each loan identity it holds lowered by `offset`. -/
-def RuntimeValue.unshift (offset : Nat) : RuntimeValue → RuntimeValue
-  | .vector elements => .vector (RuntimeValue.unshiftList offset elements.toList).toArray
-  | .tuple elements => .tuple (RuntimeValue.unshiftList offset elements.toList).toArray
-  | .nominal source variant fields =>
-      .nominal source variant (RuntimeValue.unshiftList offset fields.toList).toArray
-  | .closure function mask typeInstantiation captures =>
-      .closure function mask typeInstantiation
-        (RuntimeValue.unshiftList offset captures.toList).toArray
-  | .borrow loan current => .borrow (loan - offset) (current.unshift offset)
-  | .loanHole loan => .loanHole (loan - offset)
-  | .unit => .unit
-  | .bool value => .bool value
-  | .character value => .character value
-  | .integer value => .integer value
-  | .address value => .address value
-  | .signer value => .signer value
-  | .string value => .string value
-  | .bytes value => .bytes value
-termination_by value => sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
-
-def RuntimeValue.unshiftList (offset : Nat) : List RuntimeValue → List RuntimeValue
-  | [] => []
-  | value :: values => value.unshift offset :: RuntimeValue.unshiftList offset values
-termination_by values => sizeOf values
-decreasing_by all_goals (simp_wf; omega)
-end
+A comparison reads no loan identity, so it reads a value and its renaming
+alike. -/
 
 mutual
-theorem RuntimeValue.shift_unshift (offset : Nat) (value : RuntimeValue)
-    (above : value.Above offset) : (value.unshift offset).shift offset = value := by
-  match value, above with
-  | .vector elements, above =>
-      rw [RuntimeValue.unshift, RuntimeValue.shift_vector]
-      simp only [RuntimeValue.above_vector] at above
-      congr 1
-      apply Array.ext'
-      simp only [List.map_toArray]
-      exact RuntimeValue.shiftList_unshiftList offset elements.toList
-        (fun element member => above element (by simpa using member))
-  | .tuple elements, above =>
-      rw [RuntimeValue.unshift, RuntimeValue.shift_tuple]
-      simp only [RuntimeValue.above_tuple] at above
-      congr 1
-      apply Array.ext'
-      simp only [List.map_toArray]
-      exact RuntimeValue.shiftList_unshiftList offset elements.toList
-        (fun element member => above element (by simpa using member))
-  | .nominal source variant fields, above =>
-      rw [RuntimeValue.unshift, RuntimeValue.shift_nominal]
-      simp only [RuntimeValue.above_nominal] at above
-      congr 1
-      apply Array.ext'
-      simp only [List.map_toArray]
-      exact RuntimeValue.shiftList_unshiftList offset fields.toList
-        (fun element member => above element (by simpa using member))
-  | .closure function mask typeInstantiation captures, above =>
-      rw [RuntimeValue.unshift, RuntimeValue.shift_closure]
-      simp only [RuntimeValue.above_closure] at above
-      congr 1
-      apply Array.ext'
-      simp only [List.map_toArray]
-      exact RuntimeValue.shiftList_unshiftList offset captures.toList
-        (fun element member => above element (by simpa using member))
-  | .borrow loan current, above =>
-      rw [RuntimeValue.unshift, RuntimeValue.shift_borrow]
-      simp only [RuntimeValue.above_borrow] at above
-      rw [RuntimeValue.shift_unshift offset current above.2, Nat.sub_add_cancel above.1]
-  | .loanHole loan, above =>
-      rw [RuntimeValue.unshift, RuntimeValue.shift_loanHole]
-      simp only [RuntimeValue.above_loanHole] at above
-      rw [Nat.sub_add_cancel above]
-  | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
-  | .string _, _ | .bytes _, _ => rw [RuntimeValue.unshift]; simp
-termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
-
-theorem RuntimeValue.shiftList_unshiftList (offset : Nat) (values : List RuntimeValue)
-    (above : ∀ value ∈ values, value.Above offset) :
-    (RuntimeValue.unshiftList offset values).map (·.shift offset) = values := by
-  match values, above with
-  | [], _ => simp [RuntimeValue.unshiftList]
-  | head :: tail, above =>
-      rw [RuntimeValue.unshiftList, List.map_cons,
-        RuntimeValue.shift_unshift offset head (above head (by simp)),
-        RuntimeValue.shiftList_unshiftList offset tail
-          (fun value member => above value (by simp [member]))]
-termination_by sizeOf values
-decreasing_by all_goals (simp_wf; omega)
-end
-
-mutual
-theorem RuntimeValue.above_shift {frontier : Nat} (offset : Nat) (value : RuntimeValue)
-    (above : value.Above frontier) : (value.shift offset).Above (frontier + offset) := by
-  match value, above with
-  | .vector elements, above =>
-      simp only [RuntimeValue.above_vector, RuntimeValue.shift_vector, Array.mem_map] at above ⊢
-      rintro _ ⟨element, member, rfl⟩
-      exact RuntimeValue.above_shiftList offset elements.toList
-        (fun element member => above element (by simpa using member)) _
-        (List.mem_map.mpr ⟨element, by simpa using member, rfl⟩)
-  | .tuple elements, above =>
-      simp only [RuntimeValue.above_tuple, RuntimeValue.shift_tuple, Array.mem_map] at above ⊢
-      rintro _ ⟨element, member, rfl⟩
-      exact RuntimeValue.above_shiftList offset elements.toList
-        (fun element member => above element (by simpa using member)) _
-        (List.mem_map.mpr ⟨element, by simpa using member, rfl⟩)
-  | .nominal source variant fields, above =>
-      simp only [RuntimeValue.above_nominal, RuntimeValue.shift_nominal, Array.mem_map] at above ⊢
-      rintro _ ⟨element, member, rfl⟩
-      exact RuntimeValue.above_shiftList offset fields.toList
-        (fun element member => above element (by simpa using member)) _
-        (List.mem_map.mpr ⟨element, by simpa using member, rfl⟩)
-  | .closure function mask typeInstantiation captures, above =>
-      simp only [RuntimeValue.above_closure, RuntimeValue.shift_closure, Array.mem_map] at above ⊢
-      rintro _ ⟨element, member, rfl⟩
-      exact RuntimeValue.above_shiftList offset captures.toList
-        (fun element member => above element (by simpa using member)) _
-        (List.mem_map.mpr ⟨element, by simpa using member, rfl⟩)
-  | .borrow loan current, above =>
-      simp only [RuntimeValue.above_borrow, RuntimeValue.shift_borrow] at above ⊢
-      exact ⟨by omega, RuntimeValue.above_shift offset current above.2⟩
-  | .loanHole loan, above =>
-      simp only [RuntimeValue.above_loanHole, RuntimeValue.shift_loanHole] at above ⊢
-      omega
-  | .unit, _ | .bool _, _ | .character _, _ | .integer _, _ | .address _, _ | .signer _, _
-  | .string _, _ | .bytes _, _ => simp [RuntimeValue.Above]
-termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
-
-theorem RuntimeValue.above_shiftList {frontier : Nat} (offset : Nat) (values : List RuntimeValue)
-    (above : ∀ value ∈ values, value.Above frontier) :
-    ∀ value ∈ values.map (·.shift offset), value.Above (frontier + offset) := by
-  match values, above with
-  | [], _ => simp
-  | head :: tail, above =>
-      intro value member
-      rcases List.mem_cons.mp member with same | member
-      · exact same ▸ RuntimeValue.above_shift offset head (above head (by simp))
-      · exact RuntimeValue.above_shiftList offset tail
-          (fun value member => above value (by simp [member])) value member
-termination_by sizeOf values
-decreasing_by all_goals (simp_wf; omega)
-end
-
-mutual
-theorem RuntimeValue.above_zero (value : RuntimeValue) : value.Above 0 := by
+theorem RuntimeValue.observe_rename (ρ : Nat → Nat) (value : RuntimeValue) :
+    (value.rename ρ).observe = value.observe := by
   match value with
   | .vector elements =>
-      simp only [RuntimeValue.above_vector]
-      exact fun element member => RuntimeValue.aboveList_zero elements.toList element
-        (by simpa using member)
+      rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
+        RuntimeValue.observeList_renameList ρ elements.toList]
   | .tuple elements =>
-      simp only [RuntimeValue.above_tuple]
-      exact fun element member => RuntimeValue.aboveList_zero elements.toList element
-        (by simpa using member)
-  | .nominal _ _ fields =>
-      simp only [RuntimeValue.above_nominal]
-      exact fun element member => RuntimeValue.aboveList_zero fields.toList element
-        (by simpa using member)
-  | .closure _ _ _ captures =>
-      simp only [RuntimeValue.above_closure]
-      exact fun element member => RuntimeValue.aboveList_zero captures.toList element
-        (by simpa using member)
-  | .borrow _ current =>
-      simp only [RuntimeValue.above_borrow]
-      exact ⟨Nat.zero_le _, RuntimeValue.above_zero current⟩
-  | .loanHole _ => simp
-  | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
-  | .bytes _ => simp [RuntimeValue.Above]
-termination_by sizeOf value
-decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
-
-theorem RuntimeValue.aboveList_zero (values : List RuntimeValue) :
-    ∀ value ∈ values, value.Above 0 := by
-  match values with
-  | [] => simp
-  | head :: tail =>
-      intro value member
-      rcases List.mem_cons.mp member with same | member
-      · exact same ▸ RuntimeValue.above_zero head
-      · exact RuntimeValue.aboveList_zero tail value member
-termination_by sizeOf values
-decreasing_by all_goals (simp_wf; omega)
-end
-
-mutual
-theorem RuntimeValue.unshift_shift (offset : Nat) (value : RuntimeValue) :
-    (value.shift offset).unshift offset = value := by
-  match value with
-  | .vector elements =>
-      rw [RuntimeValue.shift, RuntimeValue.unshift, RuntimeValue.vector.injEq]
-      apply Array.ext'
-      exact RuntimeValue.unshiftList_shiftList offset elements.toList
-  | .tuple elements =>
-      rw [RuntimeValue.shift, RuntimeValue.unshift, RuntimeValue.tuple.injEq]
-      apply Array.ext'
-      exact RuntimeValue.unshiftList_shiftList offset elements.toList
+      rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
+        RuntimeValue.observeList_renameList ρ elements.toList]
   | .nominal source variant fields =>
-      rw [RuntimeValue.shift, RuntimeValue.unshift, RuntimeValue.nominal.injEq]
-      refine ⟨rfl, rfl, ?_⟩
-      apply Array.ext'
-      exact RuntimeValue.unshiftList_shiftList offset fields.toList
+      rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
+        RuntimeValue.observeList_renameList ρ fields.toList]
   | .closure function mask typeInstantiation captures =>
-      rw [RuntimeValue.shift, RuntimeValue.unshift, RuntimeValue.closure.injEq]
-      refine ⟨rfl, rfl, rfl, ?_⟩
-      apply Array.ext'
-      exact RuntimeValue.unshiftList_shiftList offset captures.toList
+      rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
+        RuntimeValue.observeList_renameList ρ captures.toList]
   | .borrow loan current =>
-      rw [RuntimeValue.shift, RuntimeValue.unshift, RuntimeValue.unshift_shift offset current]
-      simp
-  | .loanHole loan => rw [RuntimeValue.shift, RuntimeValue.unshift]; simp
+      rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe,
+        RuntimeValue.observe_rename ρ current]
+  | .loanHole loan => rw [RuntimeValue.rename, RuntimeValue.observe, RuntimeValue.observe]
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
-  | .bytes _ => rw [RuntimeValue.shift, RuntimeValue.unshift]
+  | .bytes _ => rw [RuntimeValue.rename]
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem RuntimeValue.unshiftList_shiftList (offset : Nat) (values : List RuntimeValue) :
-    RuntimeValue.unshiftList offset (RuntimeValue.shiftList offset values) = values := by
+theorem RuntimeValue.observeList_renameList (ρ : Nat → Nat) (values : List RuntimeValue) :
+    RuntimeValue.observeList (RuntimeValue.renameList ρ values) =
+      RuntimeValue.observeList values := by
   match values with
-  | [] => rw [RuntimeValue.shiftList, RuntimeValue.unshiftList]
+  | [] => rw [RuntimeValue.renameList]
   | head :: tail =>
-      rw [RuntimeValue.shiftList, RuntimeValue.unshiftList, RuntimeValue.unshift_shift offset head,
-        RuntimeValue.unshiftList_shiftList offset tail]
+      rw [RuntimeValue.renameList, RuntimeValue.observeList, RuntimeValue.observeList,
+        RuntimeValue.observe_rename ρ head, RuntimeValue.observeList_renameList ρ tail]
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
-theorem RuntimeValue.shift_injective (offset : Nat) {left right : RuntimeValue}
-    (same : left.shift offset = right.shift offset) : left = right := by
-  rw [← RuntimeValue.unshift_shift offset left, same, RuntimeValue.unshift_shift]
+/-- Elements each read as themselves read as the array's list. -/
+theorem RuntimeValue.observeList_plain_aux (elements : Array RuntimeValue)
+    (same : ∀ element ∈ elements, element.observe = element) :
+    elements.toList.map RuntimeValue.observe = elements.toList := by
+  conv => rhs; rw [← List.map_id elements.toList]
+  exact List.map_congr_left fun element member => same element (Array.mem_toList_iff.mp member)
 
-theorem RuntimeValue.shift_beq (offset : Nat) (left right : RuntimeValue) :
-    (left.shift offset == right.shift offset) = (left == right) := by
-  rw [Bool.eq_iff_iff, beq_iff_eq, beq_iff_eq]
-  exact ⟨RuntimeValue.shift_injective offset, fun same => same ▸ rfl⟩
+theorem RuntimeValue.observeList_eq_map (values : List RuntimeValue) :
+    RuntimeValue.observeList values = values.map RuntimeValue.observe := by
+  induction values with
+  | nil => rw [RuntimeValue.observeList]; rfl
+  | cons head tail ih => rw [RuntimeValue.observeList, ih]; rfl
 
-/-- A shift by a frontier is above it. -/
-theorem RuntimeValue.above_shift_self (frontier : Nat) (value : RuntimeValue) :
-    (value.shift frontier).Above frontier := by
-  simpa using RuntimeValue.above_shift frontier value (RuntimeValue.above_zero value)
+/-- A value holding no loan reads as itself. -/
+theorem RuntimeValue.observe_of_plain :
+    ∀ {value : RuntimeValue}, SemanticOperations.Plain value → value.observe = value
+  | _, .unit | _, .bool _ | _, .character _ | _, .integer _ | _, .address _ | _, .signer _
+  | _, .string _ | _, .bytes _ => by rw [RuntimeValue.observe]
+  | _, .vector elements plain => by
+      rw [RuntimeValue.observe, RuntimeValue.observeList_eq_map,
+        RuntimeValue.observeList_plain_aux elements (fun element member =>
+          RuntimeValue.observe_of_plain (plain element member)), Array.toArray_toList]
+  | _, .tuple elements plain => by
+      rw [RuntimeValue.observe, RuntimeValue.observeList_eq_map,
+        RuntimeValue.observeList_plain_aux elements (fun element member =>
+          RuntimeValue.observe_of_plain (plain element member)), Array.toArray_toList]
+  | _, .nominal source variant fields plain => by
+      rw [RuntimeValue.observe, RuntimeValue.observeList_eq_map,
+        RuntimeValue.observeList_plain_aux fields (fun field member =>
+          RuntimeValue.observe_of_plain (plain field member)), Array.toArray_toList]
+  | _, .closure function mask typeInstantiation captures plain => by
+      rw [RuntimeValue.observe, RuntimeValue.observeList_eq_map,
+        RuntimeValue.observeList_plain_aux captures (fun capture member =>
+          RuntimeValue.observe_of_plain (plain capture member)), Array.toArray_toList]
 
 /-! ## Walks
 
-A walk over a value with a node matcher that commutes with a shift commutes
+A walk over a value with a node matcher that commutes with a renaming commutes
 with it as a whole. -/
 
 namespace SemanticOperations
 
 section Walks
 
-variable {offset : Nat}
+variable {ρ : Nat → Nat}
 
 mutual
-theorem rewriteFirst_shift {f g : RuntimeValue → Option RuntimeValue}
-    (node : ∀ value, f (value.shift offset) = (g value).map (·.shift offset))
+theorem rewriteFirst_rename {f g : RuntimeValue → Option RuntimeValue}
+    (node : ∀ value, f (value.rename ρ) = (g value).map (·.rename ρ))
     (value : RuntimeValue) :
-    rewriteFirst f (value.shift offset) = (rewriteFirst g value).map (·.shift offset) := by
+    rewriteFirst f (value.rename ρ) = (rewriteFirst g value).map (·.rename ρ) := by
   unfold rewriteFirst
   rw [node value]
   cases g value with
@@ -465,24 +523,24 @@ theorem rewriteFirst_shift {f g : RuntimeValue → Option RuntimeValue}
   | none =>
       cases value with
       | vector elements =>
-          simp only [Option.map_none, RuntimeValue.shift_vector, Array.toList_map,
-            rewriteFirstList_shift node elements.toList, Option.map_map]
+          simp only [Option.map_none, RuntimeValue.rename_vector, Array.toList_map,
+            rewriteFirstList_rename node elements.toList, Option.map_map]
           congr 1; funext rewritten; simp
       | tuple elements =>
-          simp only [Option.map_none, RuntimeValue.shift_tuple, Array.toList_map,
-            rewriteFirstList_shift node elements.toList, Option.map_map]
+          simp only [Option.map_none, RuntimeValue.rename_tuple, Array.toList_map,
+            rewriteFirstList_rename node elements.toList, Option.map_map]
           congr 1; funext rewritten; simp
       | nominal source variant fields =>
-          simp only [Option.map_none, RuntimeValue.shift_nominal, Array.toList_map,
-            rewriteFirstList_shift node fields.toList, Option.map_map]
+          simp only [Option.map_none, RuntimeValue.rename_nominal, Array.toList_map,
+            rewriteFirstList_rename node fields.toList, Option.map_map]
           congr 1; funext rewritten; simp
       | closure function mask typeInstantiation captures =>
-          simp only [Option.map_none, RuntimeValue.shift_closure, Array.toList_map,
-            rewriteFirstList_shift node captures.toList, Option.map_map]
+          simp only [Option.map_none, RuntimeValue.rename_closure, Array.toList_map,
+            rewriteFirstList_rename node captures.toList, Option.map_map]
           congr 1; funext rewritten; simp
       | borrow loan current =>
-          simp only [Option.map_none, RuntimeValue.shift_borrow,
-            rewriteFirst_shift node current, Option.map_map]
+          simp only [Option.map_none, RuntimeValue.rename_borrow,
+            rewriteFirst_rename node current, Option.map_map]
           congr 1; funext x; simp
       | loanHole loan => simp
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
@@ -490,30 +548,30 @@ theorem rewriteFirst_shift {f g : RuntimeValue → Option RuntimeValue}
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem rewriteFirstList_shift {f g : RuntimeValue → Option RuntimeValue}
-    (node : ∀ value, f (value.shift offset) = (g value).map (·.shift offset))
+theorem rewriteFirstList_rename {f g : RuntimeValue → Option RuntimeValue}
+    (node : ∀ value, f (value.rename ρ) = (g value).map (·.rename ρ))
     (values : List RuntimeValue) :
-    rewriteFirstList f (values.map (·.shift offset)) =
-      (rewriteFirstList g values).map (·.map (·.shift offset)) := by
+    rewriteFirstList f (values.map (·.rename ρ)) =
+      (rewriteFirstList g values).map (·.map (·.rename ρ)) := by
   cases values with
   | nil => simp [rewriteFirstList]
   | cons value values =>
-      rw [List.map_cons, rewriteFirstList, rewriteFirstList, rewriteFirst_shift node value]
+      rw [List.map_cons, rewriteFirstList, rewriteFirstList, rewriteFirst_rename node value]
       cases rewriteFirst g value with
       | some rewritten => simp
       | none =>
-          simp only [Option.map_none, rewriteFirstList_shift node values, Option.map_map]
+          simp only [Option.map_none, rewriteFirstList_rename node values, Option.map_map]
           congr 1
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
 mutual
-theorem findFirst_shift {α β : Type} {f : RuntimeValue → Option β} {g : RuntimeValue → Option α}
+theorem findFirst_rename {α β : Type} {f : RuntimeValue → Option β} {g : RuntimeValue → Option α}
     {φ : α → β}
-    (node : ∀ value, f (value.shift offset) = (g value).map φ)
+    (node : ∀ value, f (value.rename ρ) = (g value).map φ)
     (value : RuntimeValue) :
-    findFirst f (value.shift offset) = (findFirst g value).map φ := by
+    findFirst f (value.rename ρ) = (findFirst g value).map φ := by
   unfold findFirst
   rw [node value]
   cases g value with
@@ -521,47 +579,47 @@ theorem findFirst_shift {α β : Type} {f : RuntimeValue → Option β} {g : Run
   | none =>
       cases value with
       | vector elements =>
-          simp only [Option.map_none, RuntimeValue.shift_vector, Array.toList_map,
-            findFirstList_shift node elements.toList]
+          simp only [Option.map_none, RuntimeValue.rename_vector, Array.toList_map,
+            findFirstList_rename node elements.toList]
       | tuple elements =>
-          simp only [Option.map_none, RuntimeValue.shift_tuple, Array.toList_map,
-            findFirstList_shift node elements.toList]
+          simp only [Option.map_none, RuntimeValue.rename_tuple, Array.toList_map,
+            findFirstList_rename node elements.toList]
       | nominal source variant fields =>
-          simp only [Option.map_none, RuntimeValue.shift_nominal, Array.toList_map,
-            findFirstList_shift node fields.toList]
+          simp only [Option.map_none, RuntimeValue.rename_nominal, Array.toList_map,
+            findFirstList_rename node fields.toList]
       | closure function mask typeInstantiation captures =>
-          simp only [Option.map_none, RuntimeValue.shift_closure, Array.toList_map,
-            findFirstList_shift node captures.toList]
+          simp only [Option.map_none, RuntimeValue.rename_closure, Array.toList_map,
+            findFirstList_rename node captures.toList]
       | borrow loan current =>
-          simp only [Option.map_none, RuntimeValue.shift_borrow, findFirst_shift node current]
+          simp only [Option.map_none, RuntimeValue.rename_borrow, findFirst_rename node current]
       | loanHole loan => simp
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem findFirstList_shift {α β : Type} {f : RuntimeValue → Option β}
+theorem findFirstList_rename {α β : Type} {f : RuntimeValue → Option β}
     {g : RuntimeValue → Option α} {φ : α → β}
-    (node : ∀ value, f (value.shift offset) = (g value).map φ)
+    (node : ∀ value, f (value.rename ρ) = (g value).map φ)
     (values : List RuntimeValue) :
-    findFirstList f (values.map (·.shift offset)) = (findFirstList g values).map φ := by
+    findFirstList f (values.map (·.rename ρ)) = (findFirstList g values).map φ := by
   cases values with
   | nil => simp [findFirstList]
   | cons value values =>
-      rw [List.map_cons, findFirstList, findFirstList, findFirst_shift node value]
+      rw [List.map_cons, findFirstList, findFirstList, findFirst_rename node value]
       cases findFirst g value with
       | some found => simp
-      | none => simp only [Option.map_none, findFirstList_shift node values]
+      | none => simp only [Option.map_none, findFirstList_rename node values]
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
 mutual
-theorem collectPruned_shift {α β : Type} {f : RuntimeValue → Option β}
+theorem collectPruned_rename {α β : Type} {f : RuntimeValue → Option β}
     {g : RuntimeValue → Option α} {φ : α → β}
-    (node : ∀ value, f (value.shift offset) = (g value).map φ)
+    (node : ∀ value, f (value.rename ρ) = (g value).map φ)
     (value : RuntimeValue) :
-    collectPruned f (value.shift offset) = (collectPruned g value).map φ := by
+    collectPruned f (value.rename ρ) = (collectPruned g value).map φ := by
   unfold collectPruned
   rw [node value]
   cases g value with
@@ -569,130 +627,134 @@ theorem collectPruned_shift {α β : Type} {f : RuntimeValue → Option β}
   | none =>
       cases value with
       | vector elements =>
-          simp only [Option.map_none, RuntimeValue.shift_vector, Array.toList_map,
-            collectPrunedList_shift node elements.toList]
+          simp only [Option.map_none, RuntimeValue.rename_vector, Array.toList_map,
+            collectPrunedList_rename node elements.toList]
       | tuple elements =>
-          simp only [Option.map_none, RuntimeValue.shift_tuple, Array.toList_map,
-            collectPrunedList_shift node elements.toList]
+          simp only [Option.map_none, RuntimeValue.rename_tuple, Array.toList_map,
+            collectPrunedList_rename node elements.toList]
       | nominal source variant fields =>
-          simp only [Option.map_none, RuntimeValue.shift_nominal, Array.toList_map,
-            collectPrunedList_shift node fields.toList]
+          simp only [Option.map_none, RuntimeValue.rename_nominal, Array.toList_map,
+            collectPrunedList_rename node fields.toList]
       | closure function mask typeInstantiation captures =>
-          simp only [Option.map_none, RuntimeValue.shift_closure, Array.toList_map,
-            collectPrunedList_shift node captures.toList]
+          simp only [Option.map_none, RuntimeValue.rename_closure, Array.toList_map,
+            collectPrunedList_rename node captures.toList]
       | borrow loan current =>
-          simp only [Option.map_none, RuntimeValue.shift_borrow, collectPruned_shift node current]
+          simp only [Option.map_none, RuntimeValue.rename_borrow, collectPruned_rename node current]
       | loanHole loan => simp
       | unit | bool _ | character _ | integer _ | address _ | signer _ | string _ | bytes _ =>
           simp
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem collectPrunedList_shift {α β : Type} {f : RuntimeValue → Option β}
+theorem collectPrunedList_rename {α β : Type} {f : RuntimeValue → Option β}
     {g : RuntimeValue → Option α} {φ : α → β}
-    (node : ∀ value, f (value.shift offset) = (g value).map φ)
+    (node : ∀ value, f (value.rename ρ) = (g value).map φ)
     (values : List RuntimeValue) :
-    collectPrunedList f (values.map (·.shift offset)) = (collectPrunedList g values).map φ := by
+    collectPrunedList f (values.map (·.rename ρ)) = (collectPrunedList g values).map φ := by
   cases values with
   | nil => simp [collectPrunedList]
   | cons value values =>
-      rw [List.map_cons, collectPrunedList, collectPrunedList, collectPruned_shift node value,
-        collectPrunedList_shift node values, Array.map_append]
+      rw [List.map_cons, collectPrunedList, collectPrunedList, collectPruned_rename node value,
+        collectPrunedList_rename node values, Array.map_append]
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
-/-! Node matchers commute with a shift of their loan and replacement. -/
+/-! Node matchers commute with a renaming of their loan and replacement. -/
 
-theorem holeFill?_shift (loan : Nat) (replacement value : RuntimeValue) :
-    holeFill? (loan + offset) (replacement.shift offset) (value.shift offset) =
-      (holeFill? loan replacement value).map (·.shift offset) := by
-  cases value <;> simp [Nat.add_right_cancel_iff]
+theorem holeFill?_rename (injective : Function.Injective ρ) (loan : Nat)
+    (replacement value : RuntimeValue) :
+    holeFill? (ρ loan) (replacement.rename ρ) (value.rename ρ) =
+      (holeFill? loan replacement value).map (·.rename ρ) := by
+  cases value <;> simp [injective.eq_iff]
 
-theorem holeMark?_shift (loan : Nat) (value : RuntimeValue) :
-    holeMark? (loan + offset) (value.shift offset) = (holeMark? loan value).map id := by
-  cases value <;> simp [Nat.add_right_cancel_iff]
+theorem holeMark?_rename (injective : Function.Injective ρ) (loan : Nat) (value : RuntimeValue) :
+    holeMark? (ρ loan) (value.rename ρ) = (holeMark? loan value).map id := by
+  cases value <;> simp [injective.eq_iff]
 
-theorem anyHole?_shift (value : RuntimeValue) :
-    anyHole? (value.shift offset) = (anyHole? value).map (· + offset) := by
+theorem anyHole?_rename (value : RuntimeValue) :
+    anyHole? (value.rename ρ) = (anyHole? value).map ρ := by
   cases value <;> simp
 
-theorem borrowCurrent?_shift (loan : Nat) (value : RuntimeValue) :
-    borrowCurrent? (loan + offset) (value.shift offset) =
-      (borrowCurrent? loan value).map (·.shift offset) := by
-  cases value <;> simp [Nat.add_right_cancel_iff]
+theorem borrowCurrent?_rename (injective : Function.Injective ρ) (loan : Nat)
+    (value : RuntimeValue) :
+    borrowCurrent? (ρ loan) (value.rename ρ) =
+      (borrowCurrent? loan value).map (·.rename ρ) := by
+  cases value <;> simp [injective.eq_iff]
 
-theorem borrowRewrite?_shift (loan : Nat) (replacement value : RuntimeValue) :
-    borrowRewrite? (loan + offset) (replacement.shift offset) (value.shift offset) =
-      (borrowRewrite? loan replacement value).map (·.shift offset) := by
-  cases value <;> simp [Nat.add_right_cancel_iff]
+theorem borrowRewrite?_rename (injective : Function.Injective ρ) (loan : Nat)
+    (replacement value : RuntimeValue) :
+    borrowRewrite? (ρ loan) (replacement.rename ρ) (value.rename ρ) =
+      (borrowRewrite? loan replacement value).map (·.rename ρ) := by
+  cases value <;> simp [injective.eq_iff]
 
-theorem borrowClear?_shift (loan : Nat) (value : RuntimeValue) :
-    borrowClear? (loan + offset) (value.shift offset) =
-      (borrowClear? loan value).map (·.shift offset) := by
-  cases value <;> simp [Nat.add_right_cancel_iff]
+theorem borrowClear?_rename (injective : Function.Injective ρ) (loan : Nat) (value : RuntimeValue) :
+    borrowClear? (ρ loan) (value.rename ρ) =
+      (borrowClear? loan value).map (·.rename ρ) := by
+  cases value <;> simp [injective.eq_iff]
 
 
 
 end Walks
 end SemanticOperations
 
-/-- A pending write-back or registration with its loan raised. -/
-abbrev shiftEntry {α : Type} (offset : Nat) (entry : Nat × α) : Nat × α :=
-  (entry.1 + offset, entry.2)
 
-/-- Global memory with the loans its slots hold raised. -/
-def GlobalMap.shift (offset : Nat) (globals : GlobalMap) : GlobalMap :=
-  ⟨globals.entries.map fun slot => { slot with value := slot.value.shift offset }⟩
 
-/-- A frame with its loans raised: its locals' values, the instance each
+/-! ## Frames, states, and outcomes -/
+
+/-- A pending write-back or registration with its loan renamed. -/
+abbrev renameEntry {α : Type} (ρ : Nat → Nat) (entry : Nat × α) : Nat × α :=
+  (ρ entry.1, entry.2)
+
+/-- Global memory with the loans its slots hold renamed. -/
+def GlobalMap.rename (ρ : Nat → Nat) (globals : GlobalMap) : GlobalMap :=
+  ⟨globals.entries.map fun slot => { slot with value := slot.value.rename ρ }⟩
+
+/-- Native Table contents with loans renamed; allocation identities are unchanged. -/
+def NativeTableStorage.rename (ρ : Nat → Nat) (storage : NativeTableStorage) :
+    NativeTableStorage :=
+  { storage with contents := storage.contents.rename ρ }
+
+/-- A frame with its loans renamed: its locals' values, the instance each
 site's loan has, and the loans whose places it caches. -/
-def RuntimeFrame.shift (offset : Nat) (frame : RuntimeFrame) : RuntimeFrame :=
+def RuntimeFrame.rename (ρ : Nat → Nat) (frame : RuntimeFrame) : RuntimeFrame :=
   { frame with
-    locals := frame.locals.map (Option.map (·.shift offset))
-    activeLoans := frame.activeLoans.map fun entry => (entry.1, entry.2 + offset)
-    loanLocations := frame.loanLocations.map (shiftEntry offset) }
+    locals := frame.locals.map (Option.map (·.rename ρ))
+    activeLoans := frame.activeLoans.map fun entry => (entry.1, ρ entry.2)
+    loanLocations := frame.loanLocations.map (renameEntry ρ) }
 
-/-- Every loan a frame holds or tracks is at or beyond `frontier`. -/
-structure RuntimeFrame.Above (frontier : Nat) (frame : RuntimeFrame) : Prop where
-  locals : ∀ slot ∈ frame.locals, ∀ value, slot = some value → value.Above frontier
-  activeLoans : ∀ entry ∈ frame.activeLoans, frontier ≤ entry.2
-  loanLocations : ∀ entry ∈ frame.loanLocations, frontier ≤ entry.1
+/-- Every loan a frame holds or tracks satisfies `inside`. -/
+structure RuntimeFrame.Within (inside : Nat → Prop) (frame : RuntimeFrame) : Prop where
+  locals : ∀ slot ∈ frame.locals, ∀ value, slot = some value → value.Within inside
+  activeLoans : ∀ entry ∈ frame.activeLoans, inside entry.2
+  loanLocations : ∀ entry ∈ frame.loanLocations, inside entry.1
 
-/-- Global memory with the loans its slots hold lowered. -/
-def GlobalMap.unshift (offset : Nat) (globals : GlobalMap) : GlobalMap :=
-  ⟨globals.entries.map fun slot => { slot with value := slot.value.unshift offset }⟩
-
-theorem GlobalMap.shift_unshift {frontier : Nat} {globals : GlobalMap}
-    (above : ∀ slot ∈ globals.entries, slot.value.Above frontier) :
-    (globals.unshift frontier).shift frontier = globals := by
+theorem GlobalMap.rename_of_inverse {inside : Nat → Prop} {ρ σ : Nat → Nat}
+    (inverse : ∀ loan, inside loan → ρ (σ loan) = loan) {globals : GlobalMap}
+    (within : ∀ slot ∈ globals.entries, slot.value.Within inside) :
+    (globals.rename σ).rename ρ = globals := by
   obtain ⟨entries⟩ := globals
-  simp only [GlobalMap.shift, GlobalMap.unshift, Array.map_map, GlobalMap.mk.injEq]
+  simp only [GlobalMap.rename, Array.map_map, GlobalMap.mk.injEq]
   conv => rhs; rw [← Array.map_id entries]
   apply Array.map_congr_left
   intro slot member
   simp only [Function.comp_apply, id]
-  rw [RuntimeValue.shift_unshift frontier slot.value (above slot member)]
+  rw [RuntimeValue.rename_of_inverse inverse slot.value (within slot member)]
 
-theorem GlobalMap.above_shift_self (frontier : Nat) (globals : GlobalMap) :
-    ∀ slot ∈ (globals.shift frontier).entries, slot.value.Above frontier := by
+theorem GlobalMap.within_rename {inside : Nat → Prop} (ρ : Nat → Nat) {globals : GlobalMap}
+    (within : ∀ slot ∈ globals.entries, slot.value.Within inside) :
+    ∀ slot ∈ (globals.rename ρ).entries,
+      slot.value.Within fun loan => ∃ base, inside base ∧ ρ base = loan := by
   intro slot member
-  simp only [GlobalMap.shift, Array.mem_map] at member
-  obtain ⟨base, -, rfl⟩ := member
-  exact RuntimeValue.above_shift_self frontier base.value
+  simp only [GlobalMap.rename, Array.mem_map] at member
+  obtain ⟨base, member, rfl⟩ := member
+  exact RuntimeValue.within_rename ρ base.value (within base member)
 
-/-- A frame with its loans lowered. -/
-def RuntimeFrame.unshift (offset : Nat) (frame : RuntimeFrame) : RuntimeFrame :=
-  { frame with
-    locals := frame.locals.map (Option.map (·.unshift offset))
-    activeLoans := frame.activeLoans.map fun entry => (entry.1, entry.2 - offset)
-    loanLocations := frame.loanLocations.map fun entry => (entry.1 - offset, entry.2) }
-
-theorem RuntimeFrame.shift_unshift {frontier : Nat} {frame : RuntimeFrame}
-    (above : frame.Above frontier) : (frame.unshift frontier).shift frontier = frame := by
+theorem RuntimeFrame.rename_of_inverse {inside : Nat → Prop} {ρ σ : Nat → Nat}
+    (inverse : ∀ loan, inside loan → ρ (σ loan) = loan) {frame : RuntimeFrame}
+    (within : frame.Within inside) : (frame.rename σ).rename ρ = frame := by
   obtain ⟨locals, activeLoans, loanLocations, typeInstantiation⟩ := frame
-  simp only [RuntimeFrame.shift, RuntimeFrame.unshift, Array.map_map, RuntimeFrame.mk.injEq,
-    and_true]
+  simp only [RuntimeFrame.rename, Array.map_map, RuntimeFrame.mk.injEq, and_true]
   refine ⟨?_, ?_, ?_⟩
   · conv => rhs; rw [← Array.map_id locals]
     apply Array.map_congr_left
@@ -701,92 +763,187 @@ theorem RuntimeFrame.shift_unshift {frontier : Nat} {frame : RuntimeFrame}
     | none => rfl
     | some value =>
         simp only [Function.comp_apply, Option.map_some, id, Option.some.injEq]
-        exact RuntimeValue.shift_unshift frontier value (above.locals _ member value rfl)
+        exact RuntimeValue.rename_of_inverse inverse value (within.locals _ member value rfl)
   · conv => rhs; rw [← Array.map_id activeLoans]
     apply Array.map_congr_left
     intro entry member
-    have := above.activeLoans entry member
-    simp only [Function.comp_apply, id]
-    ext <;> simp; omega
+    simp [inverse entry.2 (within.activeLoans entry member)]
   · conv => rhs; rw [← Array.map_id loanLocations]
     apply Array.map_congr_left
     intro entry member
-    have := above.loanLocations entry member
-    simp only [Function.comp_apply, id, shiftEntry]
-    ext <;> simp; omega
+    simp [renameEntry, inverse entry.1 (within.loanLocations entry member)]
 
-theorem RuntimeFrame.above_shift_self (frontier : Nat) (frame : RuntimeFrame) :
-    (frame.shift frontier).Above frontier where
+theorem RuntimeFrame.within_rename {inside : Nat → Prop} (ρ : Nat → Nat) {frame : RuntimeFrame}
+    (within : frame.Within inside) :
+    (frame.rename ρ).Within fun loan => ∃ base, inside base ∧ ρ base = loan where
   locals slot member value value_eq := by
-    simp only [RuntimeFrame.shift, Array.mem_map] at member
-    obtain ⟨base, -, rfl⟩ := member
+    simp only [RuntimeFrame.rename, Array.mem_map] at member
+    obtain ⟨base, member, rfl⟩ := member
     cases base with
     | none => cases value_eq
     | some base =>
         simp only [Option.map_some, Option.some.injEq] at value_eq
-        exact value_eq ▸ RuntimeValue.above_shift_self frontier base
+        exact value_eq ▸ RuntimeValue.within_rename ρ base (within.locals _ member base rfl)
   activeLoans entry member := by
-    simp only [RuntimeFrame.shift, Array.mem_map] at member
-    obtain ⟨base, -, rfl⟩ := member
-    simp
+    simp only [RuntimeFrame.rename, Array.mem_map] at member
+    obtain ⟨base, member, rfl⟩ := member
+    exact ⟨base.2, within.activeLoans base member, rfl⟩
   loanLocations entry member := by
-    simp only [RuntimeFrame.shift, Array.mem_map] at member
-    obtain ⟨base, -, rfl⟩ := member
-    simp
+    simp only [RuntimeFrame.rename, Array.mem_map] at member
+    obtain ⟨base, member, rfl⟩ := member
+    exact ⟨base.1, within.loanLocations base member, rfl⟩
 
-/-- A control with the loans of its values raised. -/
-def Control.shift (offset : Nat) : Control → Control
-  | .value result => .value (result.shift offset)
-  | .break_ nest result => .break_ nest (result.map (·.shift offset))
+theorem RuntimeFrame.Within.mono {inside outside : Nat → Prop}
+    (weaker : ∀ loan, inside loan → outside loan) {frame : RuntimeFrame}
+    (within : frame.Within inside) : frame.Within outside where
+  locals slot member value value_eq :=
+    RuntimeValue.Within.mono weaker (within.locals slot member value value_eq)
+  activeLoans entry member := weaker _ (within.activeLoans entry member)
+  loanLocations entry member := weaker _ (within.loanLocations entry member)
+
+/-- A control with the loans of its values renamed. -/
+def Control.rename (ρ : Nat → Nat) : Control → Control
+  | .value result => .value (result.rename ρ)
+  | .break_ nest result => .break_ nest (result.map (·.rename ρ))
   | .continue_ nest => .continue_ nest
-  | .return_ values => .return_ (values.map (·.shift offset))
-  | .throw_ kind arguments => .throw_ kind (arguments.map (·.shift offset))
+  | .return_ values => .return_ (values.map (·.rename ρ))
+  | .throw_ kind arguments => .throw_ kind (arguments.map (·.rename ρ))
 
-/-- Every loan the values of a control hold is at or beyond `frontier`. -/
-def Control.Above (frontier : Nat) : Control → Prop
-  | .value result => result.Above frontier
-  | .break_ _ result => ∀ value ∈ result, value.Above frontier
+/-- Every loan the values of a control hold satisfies `inside`. -/
+def Control.Within (inside : Nat → Prop) : Control → Prop
+  | .value result => result.Within inside
+  | .break_ _ result => ∀ value ∈ result, value.Within inside
   | .continue_ _ => True
-  | .return_ values | .throw_ _ values => ∀ value ∈ values, value.Above frontier
+  | .return_ values | .throw_ _ values => ∀ value ∈ values, value.Within inside
 
-/-- An outcome with the loans of its values raised. -/
-def Outcome.shift (offset : Nat) : Outcome → Outcome
-  | .returned values => .returned (values.map (·.shift offset))
-  | .threw kind arguments => .threw kind (arguments.map (·.shift offset))
+/-- An outcome with the loans of its values renamed. -/
+def Outcome.rename (ρ : Nat → Nat) : Outcome → Outcome
+  | .returned values => .returned (values.map (·.rename ρ))
+  | .threw kind arguments => .threw kind (arguments.map (·.rename ρ))
 
-/-- Every loan the values of an outcome hold is at or beyond `frontier`. -/
-def Outcome.Above (frontier : Nat) : Outcome → Prop
-  | .returned values | .threw _ values => ∀ value ∈ values, value.Above frontier
+/-- Every loan the values of an outcome hold satisfies `inside`. -/
+def Outcome.Within (inside : Nat → Prop) : Outcome → Prop
+  | .returned values | .threw _ values => ∀ value ∈ values, value.Within inside
+
+/-- An enumeration of the loans a predicate admits: an injective renaming
+into them, with a left inverse on them. A value holding only such loans is
+the enumeration's renaming of one, so what commutes with renamings keeps
+values among them. -/
+structure LoanBase (β γ : Nat → Nat) (inside : Nat → Prop) : Prop where
+  injective : Function.Injective β
+  inverse : ∀ loan, inside loan → β (γ loan) = loan
+  image : ∀ loan, inside (β loan)
+
+/-- The loans at or beyond a frontier, enumerated by raising. -/
+theorem LoanBase.above (frontier : Nat) :
+    LoanBase (· + frontier) (· - frontier) (frontier ≤ ·) where
+  injective _ _ same := by simpa using same
+  inverse loan above := by omega
+  image loan := by omega
+
+namespace LoanBase
+
+variable {β γ : Nat → Nat} {inside : Nat → Prop}
+
+/-- A value holding only loans an enumeration admits is the enumeration's
+renaming of one. -/
+theorem rename_inverse (base : LoanBase β γ inside) (value : RuntimeValue)
+    (within : value.Within inside) : (value.rename γ).rename β = value :=
+  RuntimeValue.rename_of_inverse base.inverse value within
+
+/-- An enumeration's renaming holds only loans it admits. -/
+theorem within (base : LoanBase β γ inside) (value : RuntimeValue) :
+    (value.rename β).Within inside :=
+  (RuntimeValue.within_rename β value (RuntimeValue.within_true value)).mono
+    fun _ ⟨original, _, renamed⟩ => renamed ▸ base.image original
+
+theorem rename_inverse_frame (base : LoanBase β γ inside) {frame : RuntimeFrame}
+    (within : frame.Within inside) : (frame.rename γ).rename β = frame :=
+  RuntimeFrame.rename_of_inverse base.inverse within
+
+theorem within_frame (base : LoanBase β γ inside) (frame : RuntimeFrame) :
+    (frame.rename β).Within inside :=
+  (RuntimeFrame.within_rename β (inside := fun _ => True)
+    { locals := fun _ _ value _ => RuntimeValue.within_true value
+      activeLoans := fun _ _ => trivial
+      loanLocations := fun _ _ => trivial }).mono
+    fun _ ⟨original, _, renamed⟩ => renamed ▸ base.image original
+
+theorem rename_inverse_globals (base : LoanBase β γ inside) {globals : GlobalMap}
+    (within : ∀ slot ∈ globals.entries, slot.value.Within inside) :
+    (globals.rename γ).rename β = globals :=
+  GlobalMap.rename_of_inverse base.inverse within
+
+theorem within_globals (base : LoanBase β γ inside) (globals : GlobalMap) :
+    ∀ slot ∈ (globals.rename β).entries, slot.value.Within inside := by
+  intro slot member
+  simp only [GlobalMap.rename, Array.mem_map] at member
+  obtain ⟨original, -, rfl⟩ := member
+  exact base.within original.value
+
+end LoanBase
+
+/-- A renaming of the loans of a first run to those of a second: injective,
+and the shift by `offset` from `frontier` on, where both mint, with the
+loans minted from the frontier on among those the runs hold (`inside`),
+which an enumeration admits. -/
+structure LoanRenaming (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat → Prop) : Prop where
+  injective : Function.Injective ρ
+  minted : ∀ loan, frontier ≤ loan → ρ loan = loan + offset
+  covers : ∀ loan, frontier ≤ loan → inside loan
+  base : ∃ β γ, LoanBase β γ inside
 
 /-- A loan registry of a second run mirroring one of a first: the first's
-registrations of the loans minted at or beyond `frontier`, raised, before
-entries below each run's start frontier, which no loan of the run reaches. -/
-def RegistryShifted (offset frontier : Nat) (registry registry' : List (Nat × GlobalKey)) :
-    Prop :=
-  ∃ minted junk junk', registry = minted ++ junk ∧
-    registry' = minted.map (shiftEntry offset) ++ junk' ∧
-    (∀ entry ∈ minted, frontier ≤ entry.1) ∧ (∀ entry ∈ junk, entry.1 < frontier) ∧
-    ∀ entry ∈ junk', entry.1 < frontier + offset
+registrations of the loans it holds (`inside`), renamed, before entries of
+loans neither run holds, which no loan of the run reaches. -/
+def RegistryRenamed (ρ : Nat → Nat) (inside : Nat → Prop)
+    (registry registry' : List (Nat × LoanTarget)) : Prop :=
+  ∃ held junk junk', registry = held ++ junk ∧
+    registry' = held.map (renameEntry ρ) ++ junk' ∧
+    (∀ entry ∈ held, inside entry.1) ∧ (∀ entry ∈ junk, ¬inside entry.1) ∧
+    ∀ entry ∈ junk', ∀ loan, inside loan → ρ loan ≠ entry.1
 
-/-- A state of a second run mirroring one of a first: its global memory, and
-the write-backs pending past each run's first `inert`, with their loans
-raised by `offset`; its frontier raised by it; and its loan registry the
-first's registrations of the loans minted at or beyond `frontier`, raised,
-before entries below each run's start frontier. Every loan the first run's
-state holds outside its inert write-backs is at or beyond `frontier`. -/
-structure StateShifted (offset frontier inert inert' : Nat) (state state' : RuntimeState) :
-    Prop where
-  globals : state'.globals = state.globals.shift offset
+/-- A state of a second run mirroring one of a first: its global memory,
+Table contents, and the write-backs pending past each run's first `inert`,
+with their loans renamed; its frontier raised by `offset`; and its loan
+registry the first's registrations of the loans minted at or beyond
+registrations of the loans it holds, renamed, before entries of loans neither
+run holds. Every loan the first run's state holds outside its inert
+write-backs is `inside`. -/
+structure StateRenamed (ρ : Nat → Nat) (offset frontier : Nat) (inside : Nat → Prop)
+    (inert inert' : Nat) (state state' : RuntimeState) : Prop where
+  renames : LoanRenaming ρ offset frontier inside
+  globals : state'.globals = state.globals.rename ρ
+  tables : state'.tables = state.tables.rename ρ
   nextLoan : state'.nextLoan = state.nextLoan + offset
   frontier_le : frontier ≤ state.nextLoan
   inert_le : inert ≤ state.pending.size
   inert_le' : inert' ≤ state'.pending.size
   pending : state'.pending.extract inert' state'.pending.size =
     (state.pending.extract inert state.pending.size).map fun entry =>
-      (entry.1 + offset, entry.2.shift offset)
-  registry : RegistryShifted offset frontier state.globalLoans state'.globalLoans
-  globalsAbove : ∀ slot ∈ state.globals.entries, slot.value.Above frontier
-  pendingAbove : ∀ entry ∈ state.pending.extract inert state.pending.size,
-    frontier ≤ entry.1 ∧ entry.2.Above frontier
+      (ρ entry.1, entry.2.rename ρ)
+  registry : RegistryRenamed ρ inside state.storageLoans state'.storageLoans
+  globalsWithin : ∀ slot ∈ state.globals.entries, slot.value.Within inside
+  tablesWithin : ∀ slot ∈ state.tables.contents.entries, slot.value.Within inside
+  pendingWithin : ∀ entry ∈ state.pending.extract inert state.pending.size,
+    inside entry.1 ∧ entry.2.Within inside
+
+section States
+
+variable {ρ : Nat → Nat} {offset frontier : Nat} {inside : Nat → Prop} {inert inert' : Nat}
+  {state state' : RuntimeState}
+
+/-- The first run's next loan is renamed to the second's. -/
+theorem StateRenamed.next (shifted : StateRenamed ρ offset frontier inside inert inert' state state') :
+    ρ state.nextLoan = state'.nextLoan := by
+  rw [shifted.renames.minted _ shifted.frontier_le, shifted.nextLoan]
+
+/-- The first run's next loan is one it may hold. -/
+theorem StateRenamed.next_inside
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state') :
+    inside state.nextLoan :=
+  shifted.renames.covers _ shifted.frontier_le
+
+end States
 
 end LeanerIR

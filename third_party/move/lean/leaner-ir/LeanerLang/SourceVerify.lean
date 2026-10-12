@@ -336,6 +336,10 @@ opaque importLeanerLang : IO Environment
 environment that has imported it. -/
 private def elaborate (environment : Environment) (input fileName : String)
     (options : Options) : IO (Environment × MessageLog) := do
+  -- The driver verifies, as the command line does; only the language server
+  -- skips by default.
+  let options := if (options.find `leaner.skip_verify).isSome then options
+    else options.setBool `leaner.skip_verify false
   let inputCtx := Parser.mkInputContext input fileName
   let (header, parserState, messages) ← Parser.parseHeader inputCtx
   unless (Elab.headerToImports header (includeInit := false)).map (·.module) == #[`LeanerLang] do

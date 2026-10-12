@@ -130,6 +130,7 @@ deriving instance ToExpr for Namespace
 deriving instance ToExpr for FunctionBody
 deriving instance ToExpr for LoanDeath
 deriving instance ToExpr for ValueOrders
+deriving instance ToExpr for Holding
 deriving instance ToExpr for ValidatedNamespace
 deriving instance ToExpr for ValidatedNamespaceInterface
 deriving instance ToExpr for ValidatedImportEvidence

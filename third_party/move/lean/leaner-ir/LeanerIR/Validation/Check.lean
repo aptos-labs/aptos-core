@@ -7,6 +7,8 @@ import LeanerIR.Validation.Validated
 import LeanerIR.Validation.Profiles
 import LeanerIR.Validation.Capability
 import LeanerIR.Validation.NominalCycles
+import LeanerIR.Validation.MutableTemporaries
+import LeanerIR.Validation.PlaceReads
 
 /-!
 # Shared checked-construction boundary
@@ -581,7 +583,8 @@ private def checkContract (registry : ProfileRegistry) (unit : RawUnit) (ns : Ra
 /-- The parameter frames of a function: each of a function-typed parameter,
 at most one per parameter, its formals locals beyond the parameters, one per
 argument of the parameter's function type, and `modifiesAll` without
-targets or formals. A structure or specification function declares none. -/
+targets or formals. Structures use their fields in place of parameters;
+specification functions declare no frames. -/
 private def checkParameterFrames (unit : RawUnit) (ns : RawNamespace)
     (parameters : Array Parameter) (locals : Array LocalDecl)
     (frames : Array ParameterFrame) : Array Diagnostic :=
@@ -969,7 +972,9 @@ private def checkNamespace (registry : ProfileRegistry) (unit : RawUnit)
         ds ++ checkProfileValue registry unit property ProfileSchema.checkProperty) #[] ++
       checkLocals unit.tables struct.locals ++
       checkContract registry unit ns struct.contract structBinders ++
-      checkParameterFrames unit ns #[] #[] struct.contract.parameterFrames ++
+      checkParameterFrames unit ns
+        (struct.fields.map fun field => { name := "", typeUse := field.type })
+        struct.locals struct.contract.parameterFrames ++
       checkAttributes registry unit unit.tables struct.attributes
     let ds := if !struct.fields.isEmpty && !struct.variants.isEmpty then
         ds.push <| .at "LIR-NOMINAL-SHAPE"
@@ -1504,9 +1509,11 @@ the appendix pass checks only the content structurization added, and the
 resolution pass resolves every authoritative name use through the checked
 `ResolutionIndex` retained by the validated unit. -/
 def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Diagnostic) ValidatedUnit := do
+  let (rawUnit, holders) := holdMutableReferences rawUnit
   let rawUnit := { rawUnit with
     namespaces := rawUnit.namespaces.map (normalizeValueBorrows rawUnit.tables) }
   let rawUnit := normalizeReferenceArguments rawUnit
+  let rawUnit := internSharedViews rawUnit
   let rawDiagnostics := checkUnit registry rawUnit
   if rawDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics rawDiagnostics)
@@ -1534,8 +1541,9 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
   if resolutionDiagnostics.any (·.severity == .error) then
     throw (dedupDiagnostics resolutionDiagnostics)
   let orders := valueOrdersOf rawUnit.tables structuredNamespaces
-  let namespaces := structurized.map fun s =>
-    ({ toNamespace := s.ns, tables := rawUnit.tables, orders } : ValidatedNamespace)
+  let namespaces := structurized.zipIdx.map fun (s, index) =>
+    ({ toNamespace := s.ns, tables := rawUnit.tables, orders, holders := holders[index]?.getD #[] }
+      : ValidatedNamespace)
   let unit := Internal.mkValidatedUnit rawUnit.tables rawUnit.profiles namespaces
     (rawUnit.dependencies.map fun dep => {
       namespaceId := dep.namespaceId
@@ -1587,7 +1595,14 @@ def validate (registry : ProfileRegistry) (rawUnit : RawUnit) : Except (Array Di
             borrowDs ++ functionBorrowDs.map ({ namespaceId := ns.identity, diagnostic := · }))
   if initializationErrors.any (·.severity == .error) then
     throw (dedupDiagnostics initializationErrors)
-  return Internal.mkValidatedUnit unit.tables unit.profiles unit.namespaces
+  -- Checked as mutable borrows, the place borrows no local holds are read
+  -- as shared ones from here on.
+  let folded : Array (ValidatedNamespace × Array ExprId) := unit.namespaces.map foldPlaceBorrows
+  let borrowCertificates := borrowCertificates.map fun (certificate : BorrowCertificate) =>
+    match folded[certificate.namespaceId.index]? with
+    | some (_, expressions) => certificate.withoutLoans expressions
+    | none => certificate
+  return Internal.mkValidatedUnit unit.tables unit.profiles (folded.map (·.1))
     unit.dependencies unit.evidence unit.indexes unit.structurizationWitnesses
     unit.resolution initializationCertificates borrowCertificates borrowDiagnostics
 

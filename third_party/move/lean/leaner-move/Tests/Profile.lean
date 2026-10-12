@@ -48,6 +48,15 @@ private def unit (kind : ExprKind) : RawUnit :=
 
 #guard semanticInventoryComplete
 
+private def arithmeticError : ProfileValue :=
+  { profile := .move, tag := "runtime.arithmetic_error" }
+
+#guard (schema.checkOperation arithmeticError).isEmpty
+#guard !(schema.checkOperation { arithmeticError with payload := "unexpected" }).isEmpty
+#guard semantics.classify .throw_ arithmeticError == some .executable
+#guard (semantics.classify .operation arithmeticError).isNone
+#guard semantics.rollbackThrow LeanerIR.moveArithmeticError
+
 private def vectorError : ProfileValue :=
   { profile := .move, tag := "runtime.vector_error" }
 
@@ -112,5 +121,25 @@ leaner module 0x42::stored_private_closure where
   fun hidden(x : u64) -> u64 := x
   fun stored() -> Fn(u64) -> u64 has Copy, Drop, Store :=
     function[Fn(u64) -> u64 has Copy, Drop, Store](hidden)
+
+-- A dependency interface cannot silently erase a field's write frame and
+-- let its caller assume the default empty frame. Owned declarations retain it.
+private def framedDependency : LeanerMove.Frontend.Xast.Module := {
+  (default : LeanerMove.Frontend.Xast.Module) with
+  address := "0x42", name := "dependency"
+  structs := [{ (default : LeanerMove.Frontend.Xast.Struct) with
+    name := "Writer"
+    fields := [{ name := "action", doc := "", ty := .function (.tuple []) (.tuple []) [] }]
+    «spec» := .mk none [] [] none [.mk default "action" [] [] [] true false] none }] }
+
+#guard match LeanerMove.Frontend.LIR.Encode.package
+    { modules := [], dependencies := [framedDependency] } with
+  | .error message => message.startsWith "modifies_of on fields of dependency"
+  | .ok _ => false
+
+#guard match LeanerMove.Frontend.LIR.Encode.package
+    { modules := [framedDependency], dependencies := [] } with
+  | .ok unit => unit.namespaces[0]!.structs[0]!.contract.parameterFrames.size == 1
+  | .error _ => false
 
 end LeanerIR.Move.Tests

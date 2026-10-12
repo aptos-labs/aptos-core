@@ -163,7 +163,7 @@ leaner module 0x43::verification_references_negative where
 /--
 error: the specification clause `ensures result == old(slot) && slot == result + 1` is not established
 ---
-error: leaner verification failed: the automatic verification of `reborrow_bad` failed; provide a proof: `verify reborrow_bad by …` in the module (`verify reborrow_bad by skip` shows the obligations it leaves)
+error: leaner verification failed: the automatic verification of `reborrow_bad` failed; provide a proof: `verify reborrow_bad by …` in the module (`verify reborrow_bad by leaner_obligations` lists its obligations)
 -/
 #guard_msgs in
 verify 0x43::verification_references_negative::reborrow_bad

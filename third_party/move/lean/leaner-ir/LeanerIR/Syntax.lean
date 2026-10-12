@@ -499,6 +499,23 @@ inductive ThrowKind where
   | profile (value : ProfileValue)
   deriving Repr, BEq, Inhabited
 
+/-- A Move arithmetic trap is distinct from an explicit user abort. The
+payload retains the failed operation's operands or result for diagnostics. -/
+@[match_pattern] def moveArithmeticError : ThrowKind :=
+  .profile { profile := .move, tag := "runtime.arithmetic_error" }
+
+/-- A Move vector trap, an index out of bounds, is distinct from a user
+abort as well. -/
+@[match_pattern] def moveVectorError : ThrowKind :=
+  .profile { profile := .move, tag := "runtime.vector_error" }
+
+/-- The tags of Move's runtime traps, which carry no payload. -/
+def moveTrapTags : Array String := #["runtime.vector_error", "runtime.arithmetic_error"]
+
+/-- Whether a throw is a Move runtime trap. -/
+def ThrowKind.isMoveTrap (kind : ThrowKind) : Bool :=
+  kind == moveVectorError || kind == moveArithmeticError
+
 /-- Move's abort code for a value no pattern matches: compiler-v2's
 `well_known::INCOMPLETE_MATCH_ABORT_CODE`, `0xCA26CBD9BE0B0001`. -/
 def moveIncompleteMatchAbortCode : Int := 14566554180833181697

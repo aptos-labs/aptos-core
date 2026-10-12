@@ -6,37 +6,39 @@ import LeanerIR.Semantics.LoanRenamingEffects
 /-!
 # Function boundaries under loan renaming
 
-A frame built from shifted arguments is the shifted frame, a finished
-control the shifted outcome, and a dying frame exports its loans into
+A frame built from renamed arguments is the renamed frame, a finished
+control the renamed outcome, and a dying frame exports its loans into
 mirroring states (`finalizeFunctionState_mirror`).
 -/
 
 namespace LeanerIR
 
+variable {inside : Nat → Prop}
+
 open Validation
 open SemanticOperations
 
-theorem RuntimeFrame.shift_empty (offset : Nat) :
-    ({ locals := #[] } : RuntimeFrame).shift offset = { locals := #[] } := by
-  simp [RuntimeFrame.shift]
+theorem RuntimeFrame.rename_empty (ρ : Nat → Nat) :
+    ({ locals := #[] } : RuntimeFrame).rename ρ = { locals := #[] } := by
+  simp [RuntimeFrame.rename]
 
-theorem RuntimeFrame.empty_above (frontier : Nat) :
-    ({ locals := #[] } : RuntimeFrame).Above frontier :=
+theorem RuntimeFrame.empty_within (inside : Nat → Prop) :
+    ({ locals := #[] } : RuntimeFrame).Within inside :=
   { locals := fun _ member => by simp at member
     activeLoans := fun _ member => by simp at member
     loanLocations := fun _ member => by simp at member }
 
 section Frames
 
-variable {offset frontier inert inert' : Nat} {state state₂ : RuntimeState}
+variable {ρ : Nat → Nat} {offset frontier inert inert' : Nat} {inside : Nat → Prop} {state state₂ : RuntimeState}
 
-theorem frameBorrows_shift (frame : RuntimeFrame) :
-    frameBorrows (frame.shift offset) =
-      (frameBorrows frame).map fun entry => (entry.1 + offset, entry.2.shift offset) := by
+theorem frameBorrows_rename (frame : RuntimeFrame) :
+    frameBorrows (frame.rename ρ) =
+      (frameBorrows frame).map fun entry => (ρ entry.1, entry.2.rename ρ) := by
   unfold frameBorrows
-  rw [RuntimeFrame.shift_locals, Array.foldl_map, ← Array.foldl_toList, ← Array.foldl_toList]
+  rw [RuntimeFrame.rename_locals, Array.foldl_map, ← Array.foldl_toList, ← Array.foldl_toList]
   conv => lhs; rw [show (#[] : Array (Nat × RuntimeValue)) =
-    (#[] : Array (Nat × RuntimeValue)).map fun entry => (entry.1 + offset, entry.2.shift offset)
+    (#[] : Array (Nat × RuntimeValue)).map fun entry => (ρ entry.1, entry.2.rename ρ)
     from Array.map_empty.symm]
   generalize (#[] : Array (Nat × RuntimeValue)) = start
   induction frame.locals.toList generalizing start with
@@ -46,205 +48,210 @@ theorem frameBorrows_shift (frame : RuntimeFrame) :
       | none => exact ih start
       | some value =>
           simp only [List.foldl_cons, Option.map_some]
-          rw [outermostBorrows_shift value, ← Array.map_append, ih]
+          rw [outermostBorrows_rename value, ← Array.map_append, ih]
 
-theorem frameBorrows_above {frame : RuntimeFrame} (frame_above : frame.Above frontier) :
-    ∀ entry ∈ frameBorrows frame, frontier ≤ entry.1 ∧ entry.2.Above frontier := by
+theorem frameBorrows_within {β γ : Nat → Nat} (base : LoanBase β γ inside) {frame : RuntimeFrame}
+    (frame_within : frame.Within inside) :
+    ∀ entry ∈ frameBorrows frame, inside entry.1 ∧ entry.2.Within inside := by
   intro entry member
-  rw [← RuntimeFrame.shift_unshift frame_above, frameBorrows_shift] at member
-  obtain ⟨base, -, rfl⟩ := Array.mem_map.mp member
-  exact ⟨Nat.le_add_left _ _, RuntimeValue.above_shift_self frontier base.2⟩
+  rw [← base.rename_inverse_frame frame_within, frameBorrows_rename] at member
+  obtain ⟨original, -, rfl⟩ := Array.mem_map.mp member
+  exact ⟨base.image _, base.within original.2⟩
 
 theorem settleFrameLoans_mirror : ∀ (fuel : Nat) {frame : RuntimeFrame} {state state₂ : RuntimeState},
-    StateShifted offset frontier inert inert' state state₂ → frame.Above frontier →
-    Mirrors offset frontier inert inert' (settleFrameLoans frame state fuel)
-      (settleFrameLoans (frame.shift offset) state₂ fuel)
-  | 0, _, _, _, shifted, frame_above => ⟨rfl, shifted, frame_above⟩
-  | fuel + 1, frame, state, state₂, shifted, frame_above => by
+    StateRenamed ρ offset frontier inside inert inert' state state₂ → frame.Within inside →
+    Mirrors ρ offset frontier inside inert inert' (settleFrameLoans frame state fuel)
+      (settleFrameLoans (frame.rename ρ) state₂ fuel)
+  | 0, _, _, _, shifted, frame_within => ⟨rfl, shifted, frame_within⟩
+  | fuel + 1, frame, state, state₂, shifted, frame_within => by
+      obtain ⟨β, γ, base⟩ := shifted.renames.base
       unfold settleFrameLoans
       have predicate : ((fun entry : Nat × RuntimeValue =>
-            holeInFrame (frame.shift offset) entry.1) ∘
-            fun entry : Nat × RuntimeValue => (entry.1 + offset, entry.2.shift offset)) =
+            holeInFrame (frame.rename ρ) entry.1) ∘
+            fun entry : Nat × RuntimeValue => (ρ entry.1, entry.2.rename ρ)) =
           fun entry => holeInFrame frame entry.1 := by
-        funext entry; simp [holeInFrame_shift]
-      rw [frameBorrows_shift, Array.find?_map, predicate]
+        funext entry; simp [holeInFrame_rename shifted.renames.injective]
+      rw [frameBorrows_rename, Array.find?_map, predicate]
       cases found : (frameBorrows frame).find? (fun entry => holeInFrame frame entry.1) with
-      | none => exact ⟨rfl, shifted, frame_above⟩
+      | none => exact ⟨rfl, shifted, frame_within⟩
       | some entry =>
           obtain ⟨loan, current⟩ := entry
-          obtain ⟨loan_above, current_above⟩ :=
-            frameBorrows_above frame_above _ (Array.mem_of_find?_eq_some found)
+          obtain ⟨loan_within, current_within⟩ :=
+            frameBorrows_within base frame_within _ (Array.mem_of_find?_eq_some found)
           simp only [Option.map_some]
           obtain ⟨cleared₂, clear_eq, clearShifted, clearAbove⟩ :=
-            clearBorrowValue_shift shifted frame_above loan_above
+            clearBorrowValue_rename shifted frame_within loan_within
           rw [clear_eq]
           obtain ⟨filled₂, fill_eq, fillShifted, fillAbove⟩ :=
-            fillVisibleHole_shift clearShifted clearAbove loan_above current_above
+            fillVisibleHole_rename clearShifted clearAbove loan_within current_within
           rw [fill_eq]
           exact settleFrameLoans_mirror fuel fillShifted fillAbove
 
-theorem exportSettledLoans_mirror (shifted : StateShifted offset frontier inert inert' state state₂)
-    {frame : RuntimeFrame} (frame_above : frame.Above frontier) :
-    StateShifted offset frontier inert inert' (exportSettledLoans frame state)
-      (exportSettledLoans (frame.shift offset) state₂) := by
-  have entries_above := frameBorrows_above frame_above
+theorem exportSettledLoans_mirror (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    {frame : RuntimeFrame} (frame_within : frame.Within inside) :
+    StateRenamed ρ offset frontier inside inert inert' (exportSettledLoans frame state)
+      (exportSettledLoans (frame.rename ρ) state₂) := by
+  obtain ⟨β, γ, base⟩ := shifted.renames.base
+  have entries_within := frameBorrows_within base frame_within
   unfold exportSettledLoans
-  rw [frameBorrows_shift, Array.foldl_map, ← Array.foldl_toList, ← Array.foldl_toList]
-  simp only [Array.mem_toList_iff.symm] at entries_above
-  simp only [holeInFrame_shift]
-  revert entries_above
+  rw [frameBorrows_rename, Array.foldl_map, ← Array.foldl_toList, ← Array.foldl_toList]
+  simp only [Array.mem_toList_iff.symm] at entries_within
+  simp only [holeInFrame_rename shifted.renames.injective]
+  revert entries_within
   generalize (frameBorrows frame).toList = borrows
-  intro entries_above
+  intro entries_within
   induction borrows generalizing state state₂ with
   | nil => exact shifted
   | cons entry borrows ih =>
       obtain ⟨loan, current⟩ := entry
-      obtain ⟨loan_above, current_above⟩ := entries_above _ List.mem_cons_self
+      obtain ⟨loan_within, current_within⟩ := entries_within _ List.mem_cons_self
       simp only [List.foldl_cons]
       split
-      · exact ih shifted fun entry member => entries_above entry (List.mem_cons_of_mem _ member)
+      · exact ih shifted fun entry member => entries_within entry (List.mem_cons_of_mem _ member)
       · obtain ⟨written₂, write_eq, writtenShifted, -⟩ :=
-          applyWriteBack_shift shifted (RuntimeFrame.empty_above frontier) loan_above
-            current_above
-        rw [RuntimeFrame.shift_empty] at write_eq
+          applyWriteBack_rename shifted (RuntimeFrame.empty_within inside) loan_within
+            current_within
+        rw [RuntimeFrame.rename_empty] at write_eq
         rw [write_eq]
         exact ih writtenShifted fun entry member =>
-          entries_above entry (List.mem_cons_of_mem _ member)
+          entries_within entry (List.mem_cons_of_mem _ member)
 
-theorem exportFrameLoans_mirror (shifted : StateShifted offset frontier inert inert' state state₂)
-    {frame : RuntimeFrame} (frame_above : frame.Above frontier) :
-    StateShifted offset frontier inert inert' (exportFrameLoans frame state)
-      (exportFrameLoans (frame.shift offset) state₂) := by
+theorem exportFrameLoans_mirror (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
+    {frame : RuntimeFrame} (frame_within : frame.Within inside) :
+    StateRenamed ρ offset frontier inside inert inert' (exportFrameLoans frame state)
+      (exportFrameLoans (frame.rename ρ) state₂) := by
   unfold exportFrameLoans
   have predicate : ((fun entry : Nat × RuntimeValue =>
-        holeInFrame (frame.shift offset) entry.1) ∘
-        fun entry : Nat × RuntimeValue => (entry.1 + offset, entry.2.shift offset)) =
+        holeInFrame (frame.rename ρ) entry.1) ∘
+        fun entry : Nat × RuntimeValue => (ρ entry.1, entry.2.rename ρ)) =
       fun entry => holeInFrame frame entry.1 := by
-    funext entry; simp [holeInFrame_shift]
-  rw [frameBorrows_shift, Array.find?_map, predicate, Array.size_map]
+    funext entry; simp [holeInFrame_rename shifted.renames.injective]
+  rw [frameBorrows_rename, Array.find?_map, predicate, Array.size_map]
   cases (frameBorrows frame).find? (fun entry => holeInFrame frame entry.1) with
-  | none => exact exportSettledLoans_mirror shifted frame_above
+  | none => exact exportSettledLoans_mirror shifted frame_within
   | some entry =>
       obtain ⟨settled, settledShifted, settledAbove⟩ :=
-        settleFrameLoans_mirror (frameBorrows frame).size shifted frame_above
+        settleFrameLoans_mirror (frameBorrows frame).size shifted frame_within
       simp only [Option.map_some]
       rw [settled]
       exact exportSettledLoans_mirror settledShifted settledAbove
 
-theorem Array.contains_map_add (loans : Array Nat) (loan offset : Nat) :
-    (loans.map (· + offset)).contains (loan + offset) = loans.contains loan := by
+theorem Array.contains_map_rename (injective : Function.Injective ρ) (loans : Array Nat)
+    (loan : Nat) : (loans.map ρ).contains (ρ loan) = loans.contains loan := by
   rw [Bool.eq_iff_iff]
-  simp
+  simp [injective.eq_iff]
 
 mutual
-theorem maskReturnedBorrows_shift (loans : Array Nat) (value : RuntimeValue) :
-    maskReturnedBorrows (loans.map (· + offset)) (value.shift offset) =
-      (maskReturnedBorrows loans value).shift offset := by
+theorem maskReturnedBorrows_rename (injective : Function.Injective ρ) (loans : Array Nat)
+    (value : RuntimeValue) :
+    maskReturnedBorrows (loans.map ρ) (value.rename ρ) =
+      (maskReturnedBorrows loans value).rename ρ := by
   match value with
   | .borrow loan current =>
-      rw [RuntimeValue.shift_borrow, maskReturnedBorrows, maskReturnedBorrows,
-        Array.contains_map_add]
+      rw [RuntimeValue.rename_borrow, maskReturnedBorrows, maskReturnedBorrows,
+        Array.contains_map_rename injective]
       split <;> simp
   | .vector elements =>
-      rw [RuntimeValue.shift_vector, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
-        maskReturnedBorrowList_shift loans elements.toList]
+      rw [RuntimeValue.rename_vector, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
+        maskReturnedBorrowList_rename injective loans elements.toList]
       simp
   | .tuple elements =>
-      rw [RuntimeValue.shift_tuple, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
-        maskReturnedBorrowList_shift loans elements.toList]
+      rw [RuntimeValue.rename_tuple, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
+        maskReturnedBorrowList_rename injective loans elements.toList]
       simp
   | .nominal source variant fields =>
-      rw [RuntimeValue.shift_nominal, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
-        maskReturnedBorrowList_shift loans fields.toList]
+      rw [RuntimeValue.rename_nominal, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
+        maskReturnedBorrowList_rename injective loans fields.toList]
       simp
   | .closure function mask instantiation captures =>
-      rw [RuntimeValue.shift_closure, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
-        maskReturnedBorrowList_shift loans captures.toList]
+      rw [RuntimeValue.rename_closure, maskReturnedBorrows, maskReturnedBorrows, Array.toList_map,
+        maskReturnedBorrowList_rename injective loans captures.toList]
       simp
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ | .loanHole _ => simp [maskReturnedBorrows]
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem maskReturnedBorrowList_shift (loans : Array Nat) (values : List RuntimeValue) :
-    maskReturnedBorrowList (loans.map (· + offset)) (values.map (·.shift offset)) =
-      (maskReturnedBorrowList loans values).map (·.shift offset) := by
+theorem maskReturnedBorrowList_rename (injective : Function.Injective ρ) (loans : Array Nat)
+    (values : List RuntimeValue) :
+    maskReturnedBorrowList (loans.map ρ) (values.map (·.rename ρ)) =
+      (maskReturnedBorrowList loans values).map (·.rename ρ) := by
   match values with
   | [] => simp [maskReturnedBorrowList]
   | value :: rest =>
       rw [List.map_cons, maskReturnedBorrowList, maskReturnedBorrowList, List.map_cons,
-        maskReturnedBorrows_shift loans value, maskReturnedBorrowList_shift loans rest]
+        maskReturnedBorrows_rename injective loans value, maskReturnedBorrowList_rename injective loans rest]
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
 mutual
-theorem maskReturnedBorrows_above (loans : Array Nat) (value : RuntimeValue)
-    (above : value.Above frontier) : (maskReturnedBorrows loans value).Above frontier := by
+theorem maskReturnedBorrows_within (loans : Array Nat) (value : RuntimeValue)
+    (above : value.Within inside) : (maskReturnedBorrows loans value).Within inside := by
   match value with
   | .borrow loan current =>
       rw [maskReturnedBorrows]
       split
-      · simp [RuntimeValue.Above]
+      · simp
       · exact above
   | .vector elements =>
       rw [maskReturnedBorrows]
-      simp only [RuntimeValue.above_vector, List.mem_toArray] at above ⊢
-      exact maskReturnedBorrowList_above loans elements.toList (fun value member =>
+      simp only [RuntimeValue.within_vector, List.mem_toArray] at above ⊢
+      exact maskReturnedBorrowList_within loans elements.toList (fun value member =>
         above value (Array.mem_toList_iff.mp member))
   | .tuple elements =>
       rw [maskReturnedBorrows]
-      simp only [RuntimeValue.above_tuple, List.mem_toArray] at above ⊢
-      exact maskReturnedBorrowList_above loans elements.toList (fun value member =>
+      simp only [RuntimeValue.within_tuple, List.mem_toArray] at above ⊢
+      exact maskReturnedBorrowList_within loans elements.toList (fun value member =>
         above value (Array.mem_toList_iff.mp member))
   | .nominal source variant fields =>
       rw [maskReturnedBorrows]
-      simp only [RuntimeValue.above_nominal, List.mem_toArray] at above ⊢
-      exact maskReturnedBorrowList_above loans fields.toList (fun value member =>
+      simp only [RuntimeValue.within_nominal, List.mem_toArray] at above ⊢
+      exact maskReturnedBorrowList_within loans fields.toList (fun value member =>
         above value (Array.mem_toList_iff.mp member))
   | .closure function mask instantiation captures =>
       rw [maskReturnedBorrows]
-      simp only [RuntimeValue.above_closure, List.mem_toArray] at above ⊢
-      exact maskReturnedBorrowList_above loans captures.toList (fun value member =>
+      simp only [RuntimeValue.within_closure, List.mem_toArray] at above ⊢
+      exact maskReturnedBorrowList_within loans captures.toList (fun value member =>
         above value (Array.mem_toList_iff.mp member))
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
   | .bytes _ | .loanHole _ => rw [maskReturnedBorrows]; exact above
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem maskReturnedBorrowList_above (loans : Array Nat) (values : List RuntimeValue)
-    (above : ∀ value ∈ values, value.Above frontier) :
-    ∀ value ∈ maskReturnedBorrowList loans values, value.Above frontier := by
+theorem maskReturnedBorrowList_within (loans : Array Nat) (values : List RuntimeValue)
+    (above : ∀ value ∈ values, value.Within inside) :
+    ∀ value ∈ maskReturnedBorrowList loans values, value.Within inside := by
   match values with
   | [] => intro value member; simp [maskReturnedBorrowList] at member
   | head :: rest =>
       rw [maskReturnedBorrowList]
       intro value member
       rcases List.mem_cons.mp member with rfl | member
-      · exact maskReturnedBorrows_above loans head (above head List.mem_cons_self)
-      · exact maskReturnedBorrowList_above loans rest
+      · exact maskReturnedBorrows_within loans head (above head List.mem_cons_self)
+      · exact maskReturnedBorrowList_within loans rest
           (fun value member => above value (List.mem_cons_of_mem _ member)) value member
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
-theorem returnedBorrowIds_shift (results : Array RuntimeValue) :
-    returnedBorrowIds (results.map (·.shift offset)) =
-      (returnedBorrowIds results).map (· + offset) := by
+theorem returnedBorrowIds_rename (results : Array RuntimeValue) :
+    returnedBorrowIds (results.map (·.rename ρ)) =
+      (returnedBorrowIds results).map ρ := by
   unfold returnedBorrowIds
   rw [Array.foldl_map, ← Array.foldl_toList, ← Array.foldl_toList]
-  conv => lhs; rw [show (#[] : Array Nat) = (#[] : Array Nat).map (· + offset)
+  conv => lhs; rw [show (#[] : Array Nat) = (#[] : Array Nat).map ρ
     from Array.map_empty.symm]
   generalize (#[] : Array Nat) = start
   induction results.toList generalizing start with
   | nil => rfl
   | cons result results ih =>
       simp only [List.foldl_cons]
-      rw [outermostBorrows_shift result, Array.map_map, ← ih]
+      rw [outermostBorrows_rename result, Array.map_map, ← ih]
       simp [Function.comp_def, Array.map_append, Array.map_map]
 
-theorem scalarFunctionResult_shift (results : Array RuntimeValue) :
-    scalarFunctionResult (results.map (·.shift offset)) = scalarFunctionResult results := by
+theorem scalarFunctionResult_rename (results : Array RuntimeValue) :
+    scalarFunctionResult (results.map (·.rename ρ)) = scalarFunctionResult results := by
   unfold scalarFunctionResult
   rw [Array.toList_map]
   rcases results.toList with _ | ⟨result, _ | ⟨second, rest⟩⟩
@@ -253,70 +260,70 @@ theorem scalarFunctionResult_shift (results : Array RuntimeValue) :
   · simp
 
 theorem exportReturnedFrameLoans_mirror
-    (shifted : StateShifted offset frontier inert inert' state state₂) {frame : RuntimeFrame}
-    (frame_above : frame.Above frontier) (results : Array RuntimeValue) :
-    StateShifted offset frontier inert inert' (exportReturnedFrameLoans results frame state)
-      (exportReturnedFrameLoans (results.map (·.shift offset)) (frame.shift offset) state₂) := by
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂) {frame : RuntimeFrame}
+    (frame_within : frame.Within inside) (results : Array RuntimeValue) :
+    StateRenamed ρ offset frontier inside inert inert' (exportReturnedFrameLoans results frame state)
+      (exportReturnedFrameLoans (results.map (·.rename ρ)) (frame.rename ρ) state₂) := by
   unfold exportReturnedFrameLoans
-  rw [Array.isEmpty_map, scalarFunctionResult_shift, frameBorrows_shift, Array.isEmpty_map,
-    returnedBorrowIds_shift]
+  rw [Array.isEmpty_map, scalarFunctionResult_rename, frameBorrows_rename, Array.isEmpty_map,
+    returnedBorrowIds_rename]
   simp only [Array.isEmpty_map]
   split
-  · exact exportFrameLoans_mirror shifted frame_above
+  · exact exportFrameLoans_mirror shifted frame_within
   split
-  · exact exportFrameLoans_mirror shifted frame_above
+  · exact exportFrameLoans_mirror shifted frame_within
   split
   · exact shifted
   split
-  · exact exportFrameLoans_mirror shifted frame_above
-  have frame_eq : ({ frame.shift offset with
-      locals := (frame.shift offset).locals.map
-        (Option.map (maskReturnedBorrows ((returnedBorrowIds results).map (· + offset)))) } :
+  · exact exportFrameLoans_mirror shifted frame_within
+  have frame_eq : ({ frame.rename ρ with
+      locals := (frame.rename ρ).locals.map
+        (Option.map (maskReturnedBorrows ((returnedBorrowIds results).map ρ))) } :
         RuntimeFrame) =
       ({ frame with
         locals := frame.locals.map (Option.map (maskReturnedBorrows (returnedBorrowIds results))) } :
-        RuntimeFrame).shift offset := by
-    simp [RuntimeFrame.shift, Array.map_map, Function.comp_def, Option.map_map,
-      maskReturnedBorrows_shift]
+        RuntimeFrame).rename ρ := by
+    simp [RuntimeFrame.rename, Array.map_map, Function.comp_def, Option.map_map,
+      maskReturnedBorrows_rename shifted.renames.injective]
   rw [frame_eq]
   refine exportFrameLoans_mirror shifted
     { locals := fun slot member value value_eq => ?_
-      activeLoans := frame_above.activeLoans
-      loanLocations := frame_above.loanLocations }
+      activeLoans := frame_within.activeLoans
+      loanLocations := frame_within.loanLocations }
   obtain ⟨original, original_member, rfl⟩ := Array.mem_map.mp member
   cases original with
   | none => cases value_eq
   | some original =>
       simp only [Option.map_some, Option.some.injEq] at value_eq
       subst value_eq
-      exact maskReturnedBorrows_above _ original
-        (frame_above.locals _ original_member original rfl)
+      exact maskReturnedBorrows_within _ original
+        (frame_within.locals _ original_member original rfl)
 
-@[simp] theorem Outcome.shift_returned (offset : Nat) (values : Array RuntimeValue) :
-    (Outcome.returned values).shift offset = .returned (values.map (·.shift offset)) := rfl
-@[simp] theorem Outcome.shift_threw (offset : Nat) (kind : ThrowKind) (values : Array RuntimeValue) :
-    (Outcome.threw kind values).shift offset = .threw kind (values.map (·.shift offset)) := rfl
+@[simp] theorem Outcome.rename_returned (ρ : Nat → Nat) (values : Array RuntimeValue) :
+    (Outcome.returned values).rename ρ = .returned (values.map (·.rename ρ)) := rfl
+@[simp] theorem Outcome.rename_threw (ρ : Nat → Nat) (kind : ThrowKind) (values : Array RuntimeValue) :
+    (Outcome.threw kind values).rename ρ = .threw kind (values.map (·.rename ρ)) := rfl
 
 theorem finalizeFunctionState_mirror {initial initial₂ : RuntimeState}
-    (initialShifted : StateShifted offset frontier inert inert' initial initial₂)
-    (shifted : StateShifted offset frontier inert inert' state state₂)
+    (initialShifted : StateRenamed ρ offset frontier inside inert inert' initial initial₂)
+    (shifted : StateRenamed ρ offset frontier inside inert inert' state state₂)
     {unit : ValidatedUnit} (executable : ExecutableUnit unit) (profile : Profile)
     {frame : RuntimeFrame}
-    (frame_above : frame.Above frontier) (outcome : Outcome) :
-    StateShifted offset frontier inert inert'
+    (frame_within : frame.Within inside) (outcome : Outcome) :
+    StateRenamed ρ offset frontier inside inert inert'
       (finalizeFunctionState executable profile initial state frame outcome)
-      (finalizeFunctionState executable profile initial₂ state₂ (frame.shift offset)
-        (outcome.shift offset)) := by
+      (finalizeFunctionState executable profile initial₂ state₂ (frame.rename ρ)
+        (outcome.rename ρ)) := by
   cases outcome with
   | returned results =>
-      exact exportReturnedFrameLoans_mirror shifted frame_above results
+      exact exportReturnedFrameLoans_mirror shifted frame_within results
   | threw kind values =>
-      simp only [Outcome.shift_threw, finalizeFunctionState]
+      simp only [Outcome.rename_threw, finalizeFunctionState]
       split
       · split
         · exact initialShifted
-        · exact exportFrameLoans_mirror shifted frame_above
-      · exact exportFrameLoans_mirror shifted frame_above
+        · exact exportFrameLoans_mirror shifted frame_within
+      · exact exportFrameLoans_mirror shifted frame_within
 
 theorem initialLocals_map (f : RuntimeValue → RuntimeValue) (count : Nat)
     (arguments : Array RuntimeValue) :
@@ -328,9 +335,9 @@ theorem initialLocals_map (f : RuntimeValue → RuntimeValue) (count : Nat)
     simp only [Array.getElem_ofFn, Array.getElem_map, Array.size_map]
     split <;> simp
 
-theorem parameterLoanLocations_shift (arguments : Array RuntimeValue) :
-    parameterLoanLocations (arguments.map (·.shift offset)) =
-      (parameterLoanLocations arguments).map (shiftEntry offset) := by
+theorem parameterLoanLocations_rename (arguments : Array RuntimeValue) :
+    parameterLoanLocations (arguments.map (·.rename ρ)) =
+      (parameterLoanLocations arguments).map (renameEntry ρ) := by
   unfold parameterLoanLocations
   rw [Array.zipIdx_map, Array.filterMap_map, Array.map_filterMap]
   congr 1
@@ -338,62 +345,64 @@ theorem parameterLoanLocations_shift (arguments : Array RuntimeValue) :
   obtain ⟨value, index⟩ := entry
   cases value <;> simp
 
-theorem initialFrame?_shift (declaration : FunctionDecl FunctionBody)
+theorem initialFrame?_rename (declaration : FunctionDecl FunctionBody)
     (arguments : Array RuntimeValue) (typeInstantiation : Array (TypeId × TypeId)) :
-    initialFrame? declaration (arguments.map (·.shift offset)) typeInstantiation =
-      (initialFrame? declaration arguments typeInstantiation).map (·.shift offset) := by
+    initialFrame? declaration (arguments.map (·.rename ρ)) typeInstantiation =
+      (initialFrame? declaration arguments typeInstantiation).map (·.rename ρ) := by
   unfold initialFrame?
   simp only [Array.size_map]
   split
   · rfl
   split
   · rfl
-  simp [RuntimeFrame.shift, initialLocals_map, parameterLoanLocations_shift]
+  simp [RuntimeFrame.rename, initialLocals_map, parameterLoanLocations_rename]
 
-theorem initialFrame?_above {declaration : FunctionDecl FunctionBody}
+theorem initialFrame?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {declaration : FunctionDecl FunctionBody}
     {arguments : Array RuntimeValue} {typeInstantiation : Array (TypeId × TypeId)}
-    {frame : RuntimeFrame} (above : ∀ argument ∈ arguments, argument.Above frontier)
+    {frame : RuntimeFrame} (above : ∀ argument ∈ arguments, argument.Within inside)
     (initial : initialFrame? declaration arguments typeInstantiation = some frame) :
-    frame.Above frontier := by
-  rw [← Array.shift_unshift_all above, initialFrame?_shift] at initial
-  obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp initial
-  exact RuntimeFrame.above_shift_self frontier base
+    frame.Within inside := by
+  rw [← Array.rename_inverse_all base above, initialFrame?_rename] at initial
+  obtain ⟨original, -, rfl⟩ := Option.map_eq_some_iff.mp initial
+  exact base.within_frame original
 
-theorem unpackFallthrough_shift (expected : Nat) (value : RuntimeValue) :
-    unpackFallthrough expected (value.shift offset) =
-      (unpackFallthrough expected value).map (·.map (·.shift offset)) := by
+theorem unpackFallthrough_rename (expected : Nat) (value : RuntimeValue) :
+    unpackFallthrough expected (value.rename ρ) =
+      (unpackFallthrough expected value).map (·.map (·.rename ρ)) := by
   unfold unpackFallthrough
   match expected with
   | 0 => cases value <;> simp
   | 1 => simp
   | count + 2 => cases value <;> simp
 
-theorem finishControl?_shift (resultCount : Nat) (control : Control) :
-    finishControl? resultCount (control.shift offset) =
-      (finishControl? resultCount control).map (·.shift offset) := by
+theorem finishControl?_rename (resultCount : Nat) (control : Control) :
+    finishControl? resultCount (control.rename ρ) =
+      (finishControl? resultCount control).map (·.rename ρ) := by
   cases control with
   | value value =>
-      simp only [Control.shift, finishControl?, unpackFallthrough_shift]
+      simp only [Control.rename, finishControl?, unpackFallthrough_rename]
       cases unpackFallthrough resultCount value <;> simp
   | return_ values =>
-      simp only [Control.shift, finishControl?, Array.size_map]
+      simp only [Control.rename, finishControl?, Array.size_map]
       split <;> simp
-  | throw_ kind values => simp [Control.shift, finishControl?]
-  | break_ => simp [Control.shift, finishControl?]
-  | continue_ => simp [Control.shift, finishControl?]
+  | throw_ kind values => simp [Control.rename, finishControl?]
+  | break_ => simp [Control.rename, finishControl?]
+  | continue_ => simp [Control.rename, finishControl?]
 
-theorem finishControl?_above {resultCount : Nat} {control : Control} {outcome : Outcome}
-    (above : control.Above frontier) (finish : finishControl? resultCount control = some outcome) :
-    outcome.Above frontier := by
+theorem finishControl?_within {β γ : Nat → Nat} (base : LoanBase β γ inside)
+    {resultCount : Nat} {control : Control} {outcome : Outcome}
+    (above : control.Within inside) (finish : finishControl? resultCount control = some outcome) :
+    outcome.Within inside := by
   cases control with
   | value value =>
       simp only [finishControl?, Functor.map, Option.map_eq_some_iff] at finish
       obtain ⟨values, values_eq, rfl⟩ := finish
-      rw [← RuntimeValue.shift_unshift frontier value above, unpackFallthrough_shift] at values_eq
-      obtain ⟨base, -, rfl⟩ := Option.map_eq_some_iff.mp values_eq
+      rw [← base.rename_inverse value above, unpackFallthrough_rename] at values_eq
+      obtain ⟨renamed, -, rfl⟩ := Option.map_eq_some_iff.mp values_eq
       intro value member
       obtain ⟨original, -, rfl⟩ := Array.mem_map.mp member
-      exact RuntimeValue.above_shift_self frontier original
+      exact base.within original
   | return_ values =>
       simp only [finishControl?] at finish
       split at finish
@@ -404,19 +413,19 @@ theorem finishControl?_above {resultCount : Nat} {control : Control} {outcome : 
   | continue_ => cases finish
 
 mutual
-theorem RuntimeValue.holeFree?_shift (value : RuntimeValue) :
-    (value.shift offset).holeFree? = value.holeFree? := by
+theorem RuntimeValue.holeFree?_rename (value : RuntimeValue) :
+    (value.rename ρ).holeFree? = value.holeFree? := by
   match value with
   | .vector elements | .tuple elements =>
-      simp only [RuntimeValue.shift_vector, RuntimeValue.shift_tuple]
+      simp only [RuntimeValue.rename_vector, RuntimeValue.rename_tuple]
       rw [RuntimeValue.holeFree?, RuntimeValue.holeFree?, Array.toList_map,
-        RuntimeValue.holeFreeList?_shift elements.toList]
+        RuntimeValue.holeFreeList?_rename elements.toList]
   | .nominal source variant fields =>
-      rw [RuntimeValue.shift_nominal, RuntimeValue.holeFree?, RuntimeValue.holeFree?,
-        Array.toList_map, RuntimeValue.holeFreeList?_shift fields.toList]
+      rw [RuntimeValue.rename_nominal, RuntimeValue.holeFree?, RuntimeValue.holeFree?,
+        Array.toList_map, RuntimeValue.holeFreeList?_rename fields.toList]
   | .closure function mask instantiation captures =>
-      rw [RuntimeValue.shift_closure, RuntimeValue.holeFree?, RuntimeValue.holeFree?,
-        Array.toList_map, RuntimeValue.holeFreeList?_shift captures.toList]
+      rw [RuntimeValue.rename_closure, RuntimeValue.holeFree?, RuntimeValue.holeFree?,
+        Array.toList_map, RuntimeValue.holeFreeList?_rename captures.toList]
   | .borrow loan current => simp [RuntimeValue.holeFree?]
   | .loanHole loan => simp [RuntimeValue.holeFree?]
   | .unit | .bool _ | .character _ | .integer _ | .address _ | .signer _ | .string _
@@ -424,26 +433,26 @@ theorem RuntimeValue.holeFree?_shift (value : RuntimeValue) :
 termination_by sizeOf value
 decreasing_by all_goals (simp_wf; (try simp only [Array.sizeOf_eq_toList]); omega)
 
-theorem RuntimeValue.holeFreeList?_shift (values : List RuntimeValue) :
-    RuntimeValue.holeFreeList? (values.map (·.shift offset)) =
+theorem RuntimeValue.holeFreeList?_rename (values : List RuntimeValue) :
+    RuntimeValue.holeFreeList? (values.map (·.rename ρ)) =
       RuntimeValue.holeFreeList? values := by
   match values with
   | [] => simp [RuntimeValue.holeFreeList?]
   | value :: rest =>
       rw [List.map_cons, RuntimeValue.holeFreeList?, RuntimeValue.holeFreeList?,
-        RuntimeValue.holeFree?_shift value, RuntimeValue.holeFreeList?_shift rest]
+        RuntimeValue.holeFree?_rename value, RuntimeValue.holeFreeList?_rename rest]
 termination_by sizeOf values
 decreasing_by all_goals (simp_wf; omega)
 end
 
-theorem Outcome.holeFree_shift (outcome : Outcome) :
-    (outcome.shift offset).holeFree = outcome.holeFree := by
+theorem Outcome.holeFree_rename (outcome : Outcome) :
+    (outcome.rename ρ).holeFree = outcome.holeFree := by
   cases outcome with
   | returned values =>
-      simp only [Outcome.shift_returned, Outcome.holeFree, Array.all_map]
+      simp only [Outcome.rename_returned, Outcome.holeFree, Array.all_map]
       congr 1
       funext value
-      simp [RuntimeValue.holeFree?_shift]
+      simp [RuntimeValue.holeFree?_rename]
   | threw => rfl
 
 end Frames

@@ -84,6 +84,15 @@ def IntWidth.fingerprint : IntWidth → Nat
   | .pointer => 0
   | .unbounded => 1
 
+def Profile.fingerprint : Profile → Nat
+  | .move => 0
+  | .rust => 1
+  | .extension id => id.index + 2
+
+def ReferenceKind.fingerprint : ReferenceKind → Nat
+  | .shared => 0
+  | .mutable => 1
+
 /-- A type's fingerprint, as a list: its constructor and the identities its
 fields hold. -/
 def Ty.fingerprintList : Ty → List Nat
@@ -111,7 +120,8 @@ def Ty.fingerprintList : Ty → List Nat
       (abilities.size :: abilities.toList.map Ability.fingerprint) ++
       arguments.size :: arguments.toList.map TypeId.index
   | .typeParameter index => [18, index]
-  | .reference value => [19, value.referent.index, value.lifetime.index]
+  | .reference value => [19, value.referent.index, value.lifetime.index, value.kind.fingerprint,
+      value.profile.fingerprint]
   | .profile _ => [20]
 
 /-- A list of naturals packed into one, in 32-bit chunks (bijective base

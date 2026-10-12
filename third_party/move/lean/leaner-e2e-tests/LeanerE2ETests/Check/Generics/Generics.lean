@@ -208,15 +208,15 @@ run_cmd do
 -- The public runtime boundary states the Move data domain explicitly: the
 -- public theorem carries a type parameter its type arguments leave a
 -- parameter as a loan-free runtime value, so loan-bearing values are not
--- admitted as generic data arguments, and runs from global memory a typed
--- memory encodes.
+-- admitted as generic data arguments, and runs from global and Table storage
+-- encoded by one typed memory.
 open LeanerIR LeanerIR.Proofs LeanerIR.Proofs.Denote in
 example {unit : Validation.ValidatedUnit} (executable : Validation.ExecutableUnit unit)
     (typeInstantiation : Array (TypeId × TypeId)) (value : RuntimeValue) (initial : RuntimeState) :
     («0x42».language_generics.identity.contract executable ⟨.cons (.param 0) .nil, rfl⟩
         typeInstantiation).requires #[value] initial ↔
-        SemanticOperations.FreshGlobalLoanIds initial ∧ SemanticOperations.Plain value ∧
-          ∃ memory, Encodes unit memory initial.globals := by
+        SemanticOperations.FreshStorageLoanIds initial ∧ SemanticOperations.Plain value ∧
+          ∃ memory, StorageEncodes unit memory initial := by
   simp only [«0x42».language_generics.identity.contract, Contract.prophetic, Contract.ofSkolem,
     Admissible, lendArguments, NRow.subst, NTy.subst, NRow.getD, NRow.lend, NTy.lend, NTy.encode,
     NTy.codec]

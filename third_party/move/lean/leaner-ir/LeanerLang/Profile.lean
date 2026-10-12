@@ -53,7 +53,7 @@ def moveSchema : ProfileSchema where
   checkReference := fun _ => #[]
   checkType := unsupportedExtension "Move" "type"
   checkOperation := fun value =>
-    if value.tag == "runtime.vector_error" && value.payload.isEmpty then #[]
+    if LeanerIR.moveTrapTags.contains value.tag && value.payload.isEmpty then #[]
     else unsupportedExtension "Move" "operation" value
   checkSurface := unsupportedExtension "Move" "surface"
   checkProperty := checkMoveProperty
