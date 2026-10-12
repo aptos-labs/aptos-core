@@ -3508,7 +3508,7 @@ holds, at every skolem family and type instantiation.  Its typed theorem
 alone is elaborated, and the natives it assumes returned, for `verifyCycle`
 to conclude. -/
 private def verifyMember (reference : Syntax) (segments : Array String) (function : String)
-    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq))
+    (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl))
     (cycle : Array (FunctionHandle × String)) (family : Bool := false) :
     CommandElabM (Array (FunctionHandle × String) × Array (FunctionHandle × String) ×
       Array Name) := do
@@ -4221,7 +4221,7 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
         | none => pure resourcesFact
       else `(tactic| skip)
     -- The automatic verification, or the authored proof of the function's
-    -- goal.
+    -- goal, which sees `VerexIR` and the module's `open` items opened.
     let (automaticTactic, scriptTactic) ← match script? with
       | some script =>
           let authored := Id.run <| script.raw.replaceM fun stx =>
@@ -4229,7 +4229,11 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
                 stx[1].getNumArgs == 0 then
               some obligationsTactic.raw
             else none
-          pure (← `(tactic| skip), ← `(tactic| ($(⟨authored⟩):tacticSeq)))
+          let mut tactic ← `(tactic| ($(⟨authored⟩):tacticSeq))
+          for decl in opens.reverse do
+            tactic ← `(tactic| open $decl:openDecl in $tactic:tactic)
+          tactic ← `(tactic| open $(mkIdent `VerexIR):ident in $tactic:tactic)
+          pure (← `(tactic| skip), tactic)
       | none => pure (solveTactic, ← `(tactic| skip))
     -- Under its in-body assumptions: the reading that assumes them is
     -- verified, and the hypothesis that they hold carries the contract over.
@@ -4413,7 +4417,7 @@ standing vacuous; with one, every member at every skolem family and type
 instantiation, the runtime slots standing vacuous. -/
 private def verifyCycle (reference : Syntax) (segments : Array String)
     (members : Array (FunctionHandle × String))
-    (scripts : String → Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) :
+    (scripts : String → Option (TSyntax ``Lean.Parser.Tactic.tacticSeq)) (opens : Array (TSyntax ``Lean.Parser.Command.openDecl)) :
     CommandElabM Unit := do
   let namespaceName := pathName segments
   let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
@@ -4443,7 +4447,7 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
       Array Name) := #[]
     for (_, name) in members do
       assumed := assumed.push
-        (← verifyMember reference segments name (scripts name) members family)
+        (← verifyMember reference segments name (scripts name) opens members family)
     let mut natives : Array (FunctionHandle × String) := #[]
     let mut assumptionDeps : Array (FunctionHandle × String) := #[]
     let mut trustDeps : Array Name := #[]
@@ -4627,7 +4631,8 @@ failing together. -/
 def verifyFunction (reference : Syntax) (segments : Array String) (function : String)
     (script? : Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := none)
     (scripts : String → Option (TSyntax ``Lean.Parser.Tactic.tacticSeq) := fun _ => none)
-    (covering : Array String → CommandElabM Unit := fun _ => pure ()) :
+    (covering : Array String → CommandElabM Unit := fun _ => pure ())
+    (opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := #[]) :
     CommandElabM Unit := do
   let namespaceName := pathName segments
   let some unit := VerexSL.registeredUnit? (← getEnv) namespaceName
@@ -4639,7 +4644,7 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
   let cycle := if (← getEnv).contains (base ++ `typedVerified) then #[]
     else callCycle unit handle
   if cycle.isEmpty then
-    discard <| verifyMember reference segments function script? #[]
+    discard <| verifyMember reference segments function script? opens #[]
     return
   let mut members : Array (FunctionHandle × String) := #[]
   for member in cycle do
@@ -4662,8 +4667,8 @@ def verifyFunction (reference : Syntax) (segments : Array String) (function : St
           `pragma verify = false`; the members of a cycle of calls are verified together"
     members := members.push (member, name.name)
   covering (members.map (·.2))
-  verifyCycle reference segments members fun name =>
-    if name == function then script? else scripts name
+  verifyCycle reference segments members (fun name =>
+    if name == function then script? else scripts name) opens
 
 /-! ## Commands -/
 
@@ -4698,6 +4703,9 @@ skipped with this message. -/
 def skippedInEditor (reference : Syntax) (function : String) : CommandElabM Unit :=
   logInfoAt reference m!"`{function}` is not verified in the editor: `verify! {function}` runs \
     it here; `lake test` runs every item"
+
+/-- What a module's theorems see opened, as its authored proofs do. -/
+def authoredOpens : List OpenDecl := [.simple `VerexIR []]
 
 @[command_elab verexVerifyCommand]
 def elabVerexVerify : CommandElab := fun stx => Perf.withPhase .certification do
@@ -4793,7 +4801,7 @@ its proof uses, so a caller finds its callees' theorems whatever the order
 of their declarations. A target already visited, on a cycle among them
 included, is not entered again. -/
 private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array String)
-    (targets : Array VerificationTarget) (visited covered : IO.Ref (Array String))
+    (opens : Array (TSyntax ``Lean.Parser.Command.openDecl)) (targets : Array VerificationTarget) (visited covered : IO.Ref (Array String))
     (target : VerificationTarget) : CommandElabM Unit := do
   if (← visited.get).contains target.function then return
   visited.modify (·.push target.function)
@@ -4804,13 +4812,13 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
         let key := functionKey unit callee
         if callee.namespaceId.index == namespaceIndex then
           if let some calleeTarget := targets.find? (·.function == key) then
-            verifyInOrder unit segments targets visited covered calleeTarget
+            verifyInOrder unit segments opens targets visited covered calleeTarget
         else
           -- A callee of another module used through its contract is verified
           -- in this unit too: a theorem about its own unit does not carry over.
           let some (_, ns, _, declaration) := findFunction? unit key | continue
           unless automaticVerificationDisabled unit callee.namespaceId ns declaration do
-            verifyInOrder unit segments targets visited covered
+            verifyInOrder unit segments opens targets visited covered
               ⟨key, target.reference, none, false⟩
     -- An authored proof sees the module's theorems by their short names.
     let moduleNamespace := pathName segments
@@ -4831,8 +4839,8 @@ private partial def verifyInOrder (unit : ValidatedUnit) (segments : Array Strin
     try
       if targets.any (·.script.isSome) then
         withScope openModule
-          (verifyFunction target.reference segments target.function target.script scripts covering)
-      else verifyFunction target.reference segments target.function none scripts covering
+          (verifyFunction target.reference segments target.function target.script scripts covering opens)
+      else verifyFunction target.reference segments target.function none scripts covering opens
     catch error =>
       -- A failure without a position of its own, such as a translation's, is
       -- reported at the target and names it.
@@ -4968,9 +4976,14 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
       let twins ← SpecTypes.ensureSpecTypes segments unit
       liftTermElabM (ensureSpecFunctionDefinitions unit twins)
   let moduleNamespace := pathName segments
+  -- The module's theorems and authored proofs see `VerexIR` and the
+  -- namespaces of its `open` items opened.
+  let opens : Array (TSyntax ``Lean.Parser.Command.openDecl) := (VerexSL.openItems stx).map (⟨·[1]!⟩)
+  let theoremOpens := authoredOpens ++ (← opens.toList.flatMapM elabOpenDecl)
   let theorems := VerexSL.theoremItems stx
   unless theorems.isEmpty do
     withModuleNamespace moduleNamespace <| Perf.withPhase .verification do
+      modifyScope fun scope => { scope with openDecls := theoremOpens ++ scope.openDecls }
       for theoremCommand in theorems do elabCommand theoremCommand
   let some unit := VerexSL.registeredUnit? (← getEnv) (pathName segments) | return
   -- The module's lemmas, and those its functions apply, before its functions.
@@ -5042,7 +5055,7 @@ def elaborateNamespaceWithVerification : CommandElab := fun stx =>
   let visited ← IO.mkRef (#[] : Array String)
   let covered ← IO.mkRef (#[] : Array String)
   stageLog s!"module {pathName segments}: verification start"
-  for target in targets do verifyInOrder unit segments targets visited covered target
+  for target in targets do verifyInOrder unit segments opens targets visited covered target
   stageLog s!"module {pathName segments}: verification done"
 
 

@@ -67,7 +67,6 @@ verex module 0x42::ordered_map where
       core.prim.compare(entries[i].key, key) >= 0
     aborts_if false
 
-  open VerexIR in
   /-- An entry left of the middle, whose key is below the needle, is below it. -/
   theorem search_below (order : RuntimeValue → RuntimeValue → Ordering)
       (key : Int → RuntimeValue) (needle : RuntimeValue) (size : Int) (low middle i : Int)
@@ -82,7 +81,6 @@ verex module 0x42::ordered_map where
     · subst same; exact atMiddle
     exact Std.TransCmp.lt_trans (sorted i middle h0 (by omega) hmiddle) atMiddle
 
-  open VerexIR in
   /-- An entry right of the middle, whose key is not below the needle, is not
   below it. -/
   theorem search_above (order : RuntimeValue → RuntimeValue → Ordering)
@@ -103,7 +101,7 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case requires_of_lower_bound_loop_1 =>
-      apply search_above (order := VerexIR.RuntimeValue.order _) (i := i) (high := high.val)
+      apply search_above (order := RuntimeValue.order _) (i := i) (high := high.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
         | assumption
@@ -111,7 +109,7 @@ verex module 0x42::ordered_map where
         | infer_instance
         | (rw [‹(_ : Array _)[_]? = some _›]; assumption)
     case requires_of_lower_bound_loop_7 =>
-      apply search_below (order := VerexIR.RuntimeValue.order _) (i := i) (low := low.val)
+      apply search_below (order := RuntimeValue.order _) (i := i) (low := low.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
         | assumption
@@ -162,7 +160,6 @@ verex module 0x42::ordered_map where
   spec fun has_key {K has Copy, Drop, Store} {V has Copy, Drop, Store}(entries : Vector<Entry<K, V> >, key : K) : Bool :=
     exists (i : Int), 0 <= i && i < entries.length && entries[i].key == key
 
-  open VerexIR in
   /-- Nothing below the lower bound carries the needle; past the end nothing
   is left. -/
   theorem absent_past_end (order : RuntimeValue → RuntimeValue → Ordering)
@@ -176,7 +173,6 @@ verex module 0x42::ordered_map where
     rw [i2, Std.ReflCmp.compare_self (cmp := order)] at lt
     cases lt
 
-  open VerexIR in
   /-- At the lower bound of a sorted range the needle is present exactly when
   the entry there carries it. -/
   theorem present_at_bound (order : RuntimeValue → RuntimeValue → Ordering)
@@ -202,14 +198,14 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case ensures_1_1 =>
-      apply absent_past_end (order := VerexIR.RuntimeValue.order _)
+      apply absent_past_end (order := RuntimeValue.order _)
       all_goals first
         | assumption
         | omega
         | infer_instance
     case ensures_1_2 =>
-      rw [← (VerexIR.Proofs.Codec.encode_injective _).eq_iff]
-      apply present_at_bound (order := VerexIR.RuntimeValue.order _)
+      rw [← (Proofs.Codec.encode_injective _).eq_iff]
+      apply present_at_bound (order := RuntimeValue.order _)
       all_goals first
         | assumption
         | omega
@@ -230,21 +226,18 @@ verex module 0x42::ordered_map where
       map.entries[i].value == result
     aborts_if !has_key(map.entries, key) with 2
 
-  open VerexIR in
   /-- An entry found at a position is the lookup there. -/
   theorem entryAt_found {α : Type} (project : α → RuntimeValue) (xs : Array α) (i : Int)
       (e : α) (found : xs[i.toNat]? = some e) :
       (Option.map project xs[i.toNat]?).getD .unit = project e := by
     simp [found]
 
-  open VerexIR in
   /-- An entry found at a position carries its key there. -/
   theorem present {α : Type} (key : α → RuntimeValue) (xs : Array α) (i : Int) (e : α)
       (found : xs[i.toNat]? = some e) (h0 : 0 ≤ i) (hi : i < xs.size) :
       ∃ a : Int, 0 ≤ a ∧ a < xs.size ∧ (Option.map key xs[a.toNat]?).getD .unit = key e :=
     ⟨i, h0, hi, entryAt_found key xs i e found⟩
 
-  open VerexIR in
   /-- An entry found at a position carries its key and value there. -/
   theorem present_with {α : Type} (key value : α → RuntimeValue) (xs : Array α) (i : Int)
       (e : α) (found : xs[i.toNat]? = some e) (h0 : 0 ≤ i) (hi : i < xs.size) :
@@ -252,7 +245,6 @@ verex module 0x42::ordered_map where
         (Option.map value xs[a.toNat]?).getD .unit = value e :=
     ⟨i, h0, hi, entryAt_found key xs i e found, entryAt_found value xs i e found⟩
 
-  open VerexIR in
   /-- Past the end, nothing below the lower bound carries the needle. -/
   theorem absent_past {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
       (key : α → RuntimeValue) (transitive : Std.TransCmp order) (xs : Array α)
@@ -267,7 +259,6 @@ verex module 0x42::ordered_map where
     rw [a2, Std.ReflCmp.compare_self (cmp := order)] at lt
     cases lt
 
-  open VerexIR in
   /-- At the lower bound of increasing keys, an entry without the needle
   means the needle is absent. -/
   theorem absent_at {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
@@ -298,12 +289,12 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals first
-      | (apply absent_past (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply absent_past (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
-      | (apply absent_at (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply absent_at (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance |
             (rw [entryAt_found (found := ‹_›)]; intro same
-             exact ‹¬_ = _› (VerexIR.Proofs.Codec.encode_injective _ same)))
+             exact ‹¬_ = _› (Proofs.Codec.encode_injective _ same)))
 
   -- ## Update
 
@@ -324,7 +315,6 @@ verex module 0x42::ordered_map where
       (forall (i : Int), p < i && i < map.entries.length ==> map.entries[i] == old(map).entries[i - 1])
     aborts_if has_key(map.entries, key) with 1
 
-  open VerexIR in
   /-- A lookup after an insertion. -/
   theorem entryAt_insert {α : Type} (project : α → RuntimeValue) (xs : Array α) (i : Int)
       (e : α) (h : i.toNat ≤ xs.size) (hi : 0 ≤ i) (k : Int) (hk : 0 ≤ k) :
@@ -340,7 +330,6 @@ verex module 0x42::ordered_map where
       · rw [if_pos (by omega), if_pos eq, if_pos (by omega)]; rfl
       · rw [if_neg (by omega), if_neg eq, show k.toNat - 1 = (k - 1).toNat by omega]
 
-  open VerexIR in
   /-- A key not below the needle and different from it is above it. -/
   theorem above_of_not_below (order : RuntimeValue → RuntimeValue → Ordering)
       (transitive : Std.TransCmp order) (lawful : Std.LawfulEqCmp order)
@@ -351,7 +340,6 @@ verex module 0x42::ordered_map where
     · exact absurd (Std.LawfulEqCmp.eq_of_compare e) different
     · exact Std.OrientedCmp.gt_iff_lt.mp e
 
-  open VerexIR in
   /-- Inserting a key at its lower bound keeps the keys increasing. -/
   theorem sorted_insert {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
       (key : α → RuntimeValue) (transitive : Std.TransCmp order)
@@ -390,7 +378,6 @@ verex module 0x42::ordered_map where
       · rw [if_neg a2, if_neg (show ¬b = i by omega)]
         exact sorted (a - 1) (b - 1) (by omega) (by omega) (by omega)
 
-  open VerexIR in
   /-- An insertion at a position: the new entry there, the entries before it
   in place, those after it shifted up by one. -/
   theorem insert_at {α : Type} (key value entry : α → RuntimeValue) (xs : Array α) (i : Int)
@@ -414,15 +401,15 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals first
-      | (apply absent_past (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply absent_past (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
-      | (apply absent_at (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply absent_at (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance |
             (rw [entryAt_found (found := ‹_›)]; intro same
-             exact ‹¬_ = _› (VerexIR.Proofs.Codec.encode_injective _ same)))
+             exact ‹¬_ = _› (Proofs.Codec.encode_injective _ same)))
       | (have found := ‹(_ : Array _)[_]? = some _›
          apply present _ _ _ _ found <;> first | assumption | omega)
-      | (apply sorted_insert (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply sorted_insert (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
       | (apply insert_at <;> first | assumption | omega)
 
@@ -447,7 +434,6 @@ verex module 0x42::ordered_map where
       (forall (i : Int), p <= i && i < map.entries.length ==> map.entries[i] == old(map).entries[i + 1])
     aborts_if !has_key(map.entries, key) with 2
 
-  open VerexIR in
   /-- A lookup after a removal. -/
   theorem entryAt_erase {α : Type} (project : α → RuntimeValue) (xs : Array α) (i : Int)
       (h : i.toNat < xs.size) (k : Int) (hk : 0 ≤ k) :
@@ -459,7 +445,6 @@ verex module 0x42::ordered_map where
     · rw [if_pos (by omega), if_pos lt]
     · rw [if_neg (by omega), if_neg lt, show k.toNat + 1 = (k + 1).toNat by omega]
 
-  open VerexIR in
   /-- Removing an entry keeps the keys increasing. -/
   theorem sorted_erase {α : Type} (order : RuntimeValue → RuntimeValue → Ordering)
       (key : α → RuntimeValue) (xs : Array α) (i : Int) (h : i.toNat < xs.size)
@@ -477,7 +462,6 @@ verex module 0x42::ordered_map where
     · omega
     · exact sorted (a + 1) (b + 1) (by omega) (by omega) (by omega)
 
-  open VerexIR in
   /-- A removal at a position holding an entry: the entry was there, the
   entries before it stay, those after it shift down by one. -/
   theorem erase_at {α : Type} (key value entry : α → RuntimeValue) (xs : Array α) (i : Int)
@@ -499,12 +483,12 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals first
-      | (apply absent_past (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply absent_past (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance)
-      | (apply absent_at (order := VerexIR.RuntimeValue.order _) <;>
+      | (apply absent_at (order := RuntimeValue.order _) <;>
           first | assumption | omega | infer_instance |
             (rw [entryAt_found (found := ‹_›)]; intro same
-             exact ‹¬_ = _› (VerexIR.Proofs.Codec.encode_injective _ same)))
+             exact ‹¬_ = _› (Proofs.Codec.encode_injective _ same)))
       | (apply sorted_erase <;> first | assumption | omega)
       | (have found := ‹(_ : Array _)[_]? = some _›
          rw [(Array.getElem_of_getElem? found).choose_spec]

@@ -261,6 +261,13 @@ partial def theoremItems (stx : Syntax) : Array Syntax :=
         | _ => declaration
     else found ++ theoremItems child) #[]
 
+/-- The `open` commands of a module's `open` items, in source order. -/
+partial def openItems (stx : Syntax) : Array Syntax :=
+  stx.getArgs.foldl (fun found child =>
+    if child.isOfKind ``verexOpenItem then found.push child[0]!
+    else if child.isOfKind ``verexTheoremItem then found
+    else found ++ openItems child) #[]
+
 /-- The in-module `verify` items and function specifications, in source
 order: what the module verifies explicitly and automatically. -/
 partial def verificationItems (stx : Syntax) : Array Syntax :=

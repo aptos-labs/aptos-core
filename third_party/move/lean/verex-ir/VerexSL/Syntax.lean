@@ -916,6 +916,9 @@ builtin_initialize register_parser_alias verexTheorem
 registered, in source order, and `verify` items after them. -/
 syntax (name := verexTheoremItem)
   (atomic(Lean.Parser.Command.open " in "))? verexTheorem : verexItem
+/-- `open N …` opens namespaces for the module's theorems and authored proofs,
+wherever it stands among the items; `VerexIR` is always open for them. -/
+syntax (name := verexOpenItem) Lean.Parser.Command.open : verexItem
 /-- `verify! f` runs in the editor, where `verex.skip_verify` skips the others. -/
 syntax (name := verexVerifyItem)
   ("verify!" <|> "verify") verexIdentifier ("by" Lean.Parser.Tactic.tacticSeq)? : verexItem

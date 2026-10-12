@@ -1,6 +1,8 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+open VerexIR.Maps VerexIR.Proofs VerexIR.Proofs.Denote
+
 -- The loop preserves the map's enumeration by removing its first entry.
 -- Use the map position laws directly on the prepared loop obligations.
 verify test_verify_drain_symbolic by
@@ -12,7 +14,7 @@ verify test_verify_drain_symbolic by
 verify test_aborts_if_new_from_1 by
   verex_obligations
   all_goals (try verex_decide)
-  all_goals simp_all [VerexIR.Maps.AbortsNewFrom, VerexIR.Maps.elementsOf]
+  all_goals simp_all [Maps.AbortsNewFrom, Maps.elementsOf]
 
 verify test_verify_borrow_front_key by
   verex_obligations
@@ -21,8 +23,8 @@ verify test_verify_borrow_front_key by
     | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | simp_all [vir_denote_norm, VerexIR.Maps.Valid, VerexIR.Maps.Ascending,
-        VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+    | simp_all [vir_denote_norm, Maps.Valid, Maps.Ascending,
+        RuntimeValue.order_integer, compare, compareOfLessAndEq]
   all_goals verex_canonical_families
   all_goals simp_all [vir_denote_norm]
 
@@ -32,8 +34,8 @@ verify test_verify_borrow_back_key by
     | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | simp_all [vir_denote_norm, VerexIR.Maps.Valid, VerexIR.Maps.Ascending,
-        VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+    | simp_all [vir_denote_norm, Maps.Valid, Maps.Ascending,
+        RuntimeValue.order_integer, compare, compareOfLessAndEq]
   all_goals verex_canonical_families
   all_goals simp_all [vir_denote_norm]
 
@@ -45,7 +47,6 @@ verify ground_enum_123 by
 
 -- The ground tests construct the same three keys with different values.
 -- Compute that constructor once, before symbolic map-position reasoning.
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem build_three (layout : Layout) (ranks : ValueRanks)
     (v1 v2 v3 : RuntimeValue) :
     updateAll layout (.ordered ranks) (empty layout)
@@ -53,15 +54,12 @@ open VerexIR VerexIR.Maps in
       layout.build [(.integer 1, v1), (.integer 2, v2), (.integer 3, v3)] := by
   simp [updateAll, elementsOf, empty, Discipline.set, ordSet, compare, compareOfLessAndEq]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem size_built (layout : Layout) (entries : Entries) :
     size (layout.build entries) = entries.length := by simp [size]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem hasKey_built_nil (layout : Layout) (key : RuntimeValue) :
     hasKey (layout.build []) key = false := by simp only [hasKey, entriesOf_build]; rfl
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem hasKey_built_cons (layout : Layout)
     (entry : RuntimeValue × RuntimeValue) (entries : Entries) (key : RuntimeValue) :
     hasKey (layout.build (entry :: entries)) key =
@@ -71,10 +69,10 @@ open VerexIR VerexIR.Maps in
 verify test_verify_remove_or_none by
   verex_obligations
   all_goals (try verex_decide)
-  all_goals simp_all [vir_denote_norm, VerexIR.Maps.size, VerexIR.Maps.hasKey,
-    VerexIR.Maps.containsB, VerexIR.Maps.remove, VerexIR.Maps.Discipline.del,
-    VerexIR.Maps.ordDel, VerexIR.Maps.AbortsNewFrom, VerexIR.Maps.elementsOf,
-    VerexIR.Maps.Valid, VerexIR.Maps.Ascending, VerexIR.RuntimeValue.order_integer,
+  all_goals simp_all [vir_denote_norm, Maps.size, Maps.hasKey,
+    Maps.containsB, Maps.remove, Maps.Discipline.del,
+    Maps.ordDel, Maps.AbortsNewFrom, Maps.elementsOf,
+    Maps.Valid, Maps.Ascending, RuntimeValue.order_integer,
     compare, compareOfLessAndEq]
   all_goals verex_canonical_families
   all_goals simp_all [vir_denote_norm]
@@ -96,7 +94,6 @@ theorem duplicate_indices {α : Type} (xs : List α) :
     · exact h i j hi hj lt eq
     · exact h j i hj hi (by omega) eq.symm
 
-open VerexIR VerexIR.Proofs VerexIR.Proofs.Denote in
 theorem duplicate_u64 (keys : SpecVector (SpecInt (.bits 64) false)) :
     ¬(keys.values.map (Codec.specInt (.bits 64) false).encode).toList.Nodup ↔
       ∃ i : Int, 0 ≤ i ∧ i < keys.values.size ∧
@@ -119,56 +116,49 @@ verify test_aborts_if_new_from_2 by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have duplicateLaw := duplicate_u64 keys
-  all_goals simp only [VerexIR.Proofs.Denote.asInt_getD_map_specInt 64 false (by decide)] at duplicateLaw
-  all_goals simp only [VerexIR.Maps.AbortsNewFrom, VerexIR.Maps.elementsOf,
+  all_goals simp only [asInt_getD_map_specInt 64 false (by decide)] at duplicateLaw
+  all_goals simp only [Maps.AbortsNewFrom, Maps.elementsOf,
     Array.toList_map, List.length_map, Array.length_toList] at *
   all_goals grind only
 
 verify test_verify_next_key by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals simp_all [VerexIR.Maps.nextKey?,
-    VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+  all_goals simp_all [Maps.nextKey?,
+    RuntimeValue.order_integer, compare, compareOfLessAndEq]
 
 verify test_verify_prev_key by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals simp_all [VerexIR.Maps.prevKey?,
-    VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+  all_goals simp_all [Maps.prevKey?,
+    RuntimeValue.order_integer, compare, compareOfLessAndEq]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem keyAt_built (layout : Layout) (entries : Entries) (index : Int) :
     keyAt (layout.build entries) index =
       (if index < 0 then .unit else ((entries[index.toNat]?).map Prod.fst).getD .unit) := by
   simp only [keyAt, entriesOf_build]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem valueAt_built (layout : Layout) (entries : Entries) (key : RuntimeValue) :
     valueAt (layout.build entries) key = get entries key := by simp [valueAt]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem rank_built (layout : Layout) (entries : Entries) (key : RuntimeValue) :
     rank (layout.build entries) key = indexOf entries key := by simp [rank]
 
 -- Evaluate reads of the concrete entry lists before generating symbolic rank facts.
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem indexOf_nil (key : RuntimeValue) :
     indexOf [] key = 0 := rfl
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem indexOf_cons (entry : RuntimeValue × RuntimeValue)
     (entries : Entries) (key : RuntimeValue) :
     indexOf (entry :: entries) key = (if entry.1 = key then 0 else indexOf entries key + 1) := by
   by_cases same : entry.1 = key <;> simp [indexOf, same]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem get_nil (key : RuntimeValue) : get [] key = .unit := rfl
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem get_cons (entry : RuntimeValue × RuntimeValue)
     (entries : Entries) (key : RuntimeValue) :
     get (entry :: entries) key = (if entry.1 = key then entry.2 else get entries key) := by
-  by_cases same : entry.1 = key <;> simp [VerexIR.Maps.get, same]
+  by_cases same : entry.1 = key <;> simp [Maps.get, same]
 
 verify test_verify_enumeration_view by
   verex_obligations
@@ -177,22 +167,19 @@ verify test_verify_enumeration_view by
     | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | simp_all [vir_denote_norm, VerexIR.Maps.Valid, VerexIR.Maps.Ascending,
-        VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+    | simp_all [vir_denote_norm, Maps.Valid, Maps.Ascending,
+        RuntimeValue.order_integer, compare, compareOfLessAndEq]
   all_goals verex_canonical_families
   all_goals simp_all [vir_denote_norm]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem remove_built (layout : Layout) (ranks : ValueRanks)
     (entries : Entries) (key : RuntimeValue) :
     remove layout (.ordered ranks) (layout.build entries) key =
       layout.build (ordDel key entries) := by
   simp [remove]
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem ordDel_nil (key : RuntimeValue) : ordDel key [] = [] := rfl
 
-open VerexIR VerexIR.Maps in
 @[vir_denote_norm] theorem ordDel_cons (entry : RuntimeValue × RuntimeValue)
     (entries : Entries) (key : RuntimeValue) :
     ordDel key (entry :: entries) = (if entry.1 = key then entries else entry :: ordDel key entries) := by
@@ -205,8 +192,8 @@ verify test_verify_pop_rank by
     | exact ⟨⟨1, by decide⟩, ⟨0, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨2, by decide⟩, ⟨1, by decide, by decide, by decide, rfl⟩, rfl⟩
     | exact ⟨⟨3, by decide⟩, ⟨2, by decide, by decide, by decide, rfl⟩, rfl⟩
-    | simp_all [vir_denote_norm, VerexIR.Maps.Valid, VerexIR.Maps.Ascending,
-        VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+    | simp_all [vir_denote_norm, Maps.Valid, Maps.Ascending,
+        RuntimeValue.order_integer, compare, compareOfLessAndEq]
   all_goals verex_canonical_families
   all_goals simp_all [vir_denote_norm]
 
@@ -214,8 +201,8 @@ verify test_verify_upsert by
   verex_obligations
   all_goals (try verex_decide)
   all_goals (repeat' verex_split)
-  all_goals simp_all [vir_denote_norm, VerexIR.Maps.update, VerexIR.Maps.Discipline.set,
-    VerexIR.Maps.ordSet, VerexIR.Maps.Valid, VerexIR.Maps.Ascending,
-    VerexIR.RuntimeValue.order_integer, compare, compareOfLessAndEq]
+  all_goals simp_all [vir_denote_norm, Maps.update, Maps.Discipline.set,
+    Maps.ordSet, Maps.Valid, Maps.Ascending,
+    RuntimeValue.order_integer, compare, compareOfLessAndEq]
   all_goals verex_canonical_families
   all_goals simp_all [vir_denote_norm]

@@ -44,7 +44,7 @@ verex module 0x42::insertion_map where
   verify descending by
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    all_goals simp [VerexIR.Maps.Valid, VerexIR.Maps.Discipline.Valid,
-      VerexIR.Maps.Distinct, VerexIR.Maps.entriesOf, VerexIR.RuntimeValue.field]
+    all_goals simp [Maps.Valid, Maps.Discipline.Valid,
+      Maps.Distinct, Maps.entriesOf, RuntimeValue.field]
 
 end VerexSL.Tests.Check.Specifications.InsertionMap

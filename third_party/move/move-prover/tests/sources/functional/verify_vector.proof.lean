@@ -81,4 +81,4 @@ verify verify_index_of by
       rw [heq]
       simp only [Option.map_some, Option.getD_some]
       intro equal
-      exact symmetric ((VerexIR.Proofs.Denote.Carriers.codec 0).encode_injective equal).symm
+      exact symmetric ((Proofs.Denote.Carriers.codec 0).encode_injective equal).symm

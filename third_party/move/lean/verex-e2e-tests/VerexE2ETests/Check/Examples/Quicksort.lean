@@ -22,6 +22,7 @@ namespace VerexSL.Tests.Check.Examples.Quicksort
 set_option verex.verifyHeartbeats 400000
 
 verex module 0x42::quicksort where
+  open Classical
   -- ## Partition
 
   struct PartitionResult {T has Copy, Drop, Store} has Copy, Drop, Store where
@@ -78,7 +79,6 @@ verex module 0x42::quicksort where
     if hi <= lo then 0
     else count(values, needle, lo, hi - 1) + (if values[hi - 1] == needle then 1 else 0)
 
-  open VerexIR Classical in
   /-- The generated definition of `count`, at a vector of elements. -/
   theorem count_unfold (a : Array RuntimeValue) (x : RuntimeValue) (lo hi : Int) :
       count.spec (.vector a, x, lo, hi, ()) =
@@ -89,7 +89,6 @@ verex module 0x42::quicksort where
     simp only [RuntimeValue.field, dite_eq_ite]
     congr
 
-  open VerexIR Classical in
   /-- An update outside `[lo, hi)` leaves the count over it unchanged. -/
   theorem count_set_outside (a : Array RuntimeValue) (x y : RuntimeValue) (i : Nat) :
       ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k → 0 ≤ lo → ((i : Int) < lo ∨ hi ≤ i) →
@@ -106,7 +105,6 @@ verex module 0x42::quicksort where
           ih (hi - 1 - lo).toNat (by omega) lo (hi - 1) rfl hlo (by omega),
           Array.getElem?_setIfInBounds_ne (by omega)]
 
-  open VerexIR Classical in
   /-- An update inside `[lo, hi)` trades the old element's count for the new one's. -/
   theorem count_set_inside (a : Array RuntimeValue) (x y : RuntimeValue) (i : Nat)
       (bound : i < a.size) :
@@ -130,7 +128,6 @@ verex module 0x42::quicksort where
           Array.getElem?_setIfInBounds_ne (fun h => hlast h.symm)]
         omega
 
-  open VerexIR Classical in
   /-- Swapping two positions inside `[lo, hi)` preserves every count over it. -/
   theorem count_swap (a : Array RuntimeValue) (x : RuntimeValue) (i j : Nat) (hi : i < a.size)
       (hj : j < a.size) (lo high : Int) (hlo : 0 ≤ lo) (hi1 : lo ≤ i) (hi2 : (i : Int) < high)
@@ -144,7 +141,6 @@ verex module 0x42::quicksort where
     rw [Array.getElem_setIfInBounds (by simpa using hj), ite_self]
     omega
 
-  open VerexIR Classical in
   /-- The same, for a vector of encoded elements. -/
   theorem count_swap_map {α : Type} (f : α → RuntimeValue) (a : Array α) (x : RuntimeValue)
       (i j : Nat) (hi : i < a.size) (hj : j < a.size) (lo high : Int) (hlo : 0 ≤ lo)
@@ -159,13 +155,11 @@ verex module 0x42::quicksort where
     exact count_swap (Array.map f a) x i j (by simpa using hi) (by simpa using hj) lo high hlo hi1 hi2
       hj1 hj2
 
-  open VerexIR in
   /-- An element found at a position is the lookup there. -/
   theorem lookup_eq {α : Type} (f : α → RuntimeValue) (xs : Array α) (k : Int) (a : α)
       (found : xs[k.toNat]? = some a) : f a = (Option.map f xs[k.toNat]?).getD .unit := by
     rw [found]; rfl
 
-  open VerexIR in
   /-- A lookup in a vector after swapping two of its positions. -/
   theorem swap_lookup_found {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j : Int) (a b : α)
       (ha : xs[i.toNat]? = some a) (hb : xs[j.toNat]? = some b) (k : Int) (hi : 0 ≤ i)
@@ -188,7 +182,6 @@ verex module 0x42::quicksort where
       · have : ¬i.toNat = k.toNat := by omega
         simp [this, e2]
 
-  open VerexIR in
   /-- Lookup through the certified swap used by the denotation. -/
   theorem swap_lookup {α : Type} (f : α → RuntimeValue) (xs : Array α) (i j k : Int)
       (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
@@ -202,7 +195,6 @@ verex module 0x42::quicksort where
       (swap_lookup_found f xs i j xs[i.toNat] xs[j.toNat]
         (Array.getElem?_eq_getElem ib) (Array.getElem?_eq_getElem jb) k hi hj hk)
 
-  open VerexIR Classical in
   /-- A certified swap inside the range preserves counts. -/
   theorem count_swap_bounded {α : Type} (f : α → RuntimeValue) (xs : Array α) (x : RuntimeValue)
       (i j : Int) (ib : i.toNat < xs.size) (jb : j.toNat < xs.size)
@@ -227,8 +219,8 @@ verex module 0x42::quicksort where
       | omega
       | assumption
       | verex_instance
-      | (rw [‹∀ x : (VerexIR.Proofs.Denote.NTy.param 0).carrier, count.spec
-            (VerexIR.RuntimeValue.vector (Array.map _ _), _, _, _, ()) = _›]
+      | (rw [‹∀ x : (Proofs.Denote.NTy.param 0).carrier, count.spec
+            (RuntimeValue.vector (Array.map _ _), _, _, _, ()) = _›]
          symm
          apply count_swap_bounded <;> first | assumption | omega)
     -- The pivot is the original vector's element at the pivot position.
@@ -266,7 +258,6 @@ verex module 0x42::quicksort where
     forall (i : Int), forall (j : Int),
       lo <= i && i < j && j < hi ==> core.prim.compare(values[i], values[j]) <= 0
 
-  open VerexIR Classical in
   /-- A count splits at any point of its range. -/
   theorem count_split (xs : Array RuntimeValue) (x : RuntimeValue) (lo mid : Int) :
       ∀ (k : Nat) (hi : Int), (hi - mid).toNat = k → lo ≤ mid → mid ≤ hi →
@@ -287,7 +278,6 @@ verex module 0x42::quicksort where
           ih (hi - 1 - mid).toNat (by omega) (hi - 1) rfl hlm (by omega)]
         omega
 
-  open VerexIR Classical in
   /-- Arrays agreeing on a range count alike over it. -/
   theorem count_congr (xs ys : Array RuntimeValue) (x : RuntimeValue) (lo : Int) :
       ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
@@ -304,7 +294,6 @@ verex module 0x42::quicksort where
       · rw [if_neg hle, if_neg hle, ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl
           (fun i h1 h2 => agree i h1 (by omega)), agree (hi - 1) (by omega) (by omega)]
 
-  open VerexIR Classical in
   theorem count_nonneg (xs : Array RuntimeValue) (x : RuntimeValue) (lo : Int) :
       ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
         0 ≤ count.spec (.vector xs, x, lo, hi, ()) := by
@@ -319,7 +308,6 @@ verex module 0x42::quicksort where
         have := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl
         split <;> omega
 
-  open VerexIR Classical in
   /-- An element of a range is counted there. -/
   theorem count_pos (xs : Array RuntimeValue) (lo i : Int) :
       ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k → lo ≤ i → i < hi →
@@ -337,7 +325,6 @@ verex module 0x42::quicksort where
       · have := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl h1 (by omega)
         split <;> omega
 
-  open VerexIR Classical in
   /-- What is counted in a range is an element of it. -/
   theorem exists_of_count_pos (xs : Array RuntimeValue) (x : RuntimeValue) (lo : Int) :
       ∀ (k : Nat) (hi : Int), (hi - lo).toNat = k →
@@ -357,7 +344,6 @@ verex module 0x42::quicksort where
           obtain ⟨i, h1, h2, h3⟩ := ih (hi - 1 - lo).toNat (by omega) (hi - 1) rfl (by omega)
           exact ⟨i, h1, by omega, h3⟩
 
-  open VerexIR Classical in
   /-- The frame of a sorted range: partition, then the two recursive sorts. -/
   theorem sort_frame {α : Type} (f : α → RuntimeValue) (v P L R : Array α) (low high p : Int)
       (hvP : ∀ i : Int, 0 ≤ i → i < v.size → i < low ∨ high ≤ i →
@@ -373,7 +359,6 @@ verex module 0x42::quicksort where
     intro i h0 h1 hout
     rw [hLR i h0 (by omega) (by omega), hPL i h0 (by omega) (by omega), hvP i h0 h1 hout]
 
-  open VerexIR Classical in
   /-- The counts of a sorted range: partition, then the two recursive sorts. -/
   theorem sort_counts {α : Type} (f : α → RuntimeValue) (v P L R : Array α) (low high p : Int)
       (cvP : ∀ a, count.spec (.vector (Array.map f v), f a, low, high, ()) =
@@ -410,7 +395,6 @@ verex module 0x42::quicksort where
       lower, ← cLR, ← count_split _ x low p _ high rfl hp (by omega),
       ← count_split _ x low (p + 1) _ high rfl (by omega) (by omega)]
 
-  open VerexIR Classical in
   /-- An element of a range whose counts are those of another range is an
   element of that one. -/
   theorem element_of_counts {α : Type} (f : α → RuntimeValue) (xs ys : Array α) (lo hi i : Int)
@@ -429,7 +413,6 @@ verex module 0x42::quicksort where
     simp only [Array.getElem?_map] at k3
     exact ⟨k, k1, k2, k3.trans (by simp [Array.getElem?_eq_getElem inRange])⟩
 
-  open VerexIR Classical in
   /-- The order of a sorted range: partition, then the two recursive sorts. -/
   theorem sort_order {α : Type} (f : α → RuntimeValue) (order : RuntimeValue → RuntimeValue → Ordering) [Std.TransCmp order]
       (P L R : Array α) (low high p : Int) (pivot : RuntimeValue)

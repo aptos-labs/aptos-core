@@ -1,16 +1,18 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+open VerexIR.Proofs.Denote
+
 -- A frame can change a resource with a trivial invariant while preserving
 -- the invariants of every other resource.
-theorem stored_invariants_outside {unit : VerexIR.Validation.ValidatedUnit}
-    {invariant : VerexIR.Proofs.Denote.ResourceType → VerexIR.RuntimeValue → Prop}
-    {initial final : VerexIR.Proofs.Denote.Memory unit}
-    {modified : VerexIR.Proofs.Denote.ResourceType}
+theorem stored_invariants_outside {unit : Validation.ValidatedUnit}
+    {invariant : ResourceType → RuntimeValue → Prop}
+    {initial final : Memory unit}
+    {modified : ResourceType}
     (frame : ∀ resource, resource ≠ modified → final resource = initial resource)
     (trivial : ∀ value, invariant modified value)
-    (holds : VerexIR.Proofs.Denote.MemoryInvariants invariant initial) :
-    VerexIR.Proofs.Denote.MemoryInvariants invariant final := by
+    (holds : MemoryInvariants invariant initial) :
+    MemoryInvariants invariant final := by
   intro resource key value read
   by_cases same : resource = modified
   · subst resource

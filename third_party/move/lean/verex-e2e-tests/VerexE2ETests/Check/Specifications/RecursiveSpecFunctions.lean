@@ -33,7 +33,6 @@ verex module 0x42::recursive_spec where
     if n <= 0 then 0
     else count(values, needle, n - 1) + (if values[n - 1] == needle then 1 else 0)
 
-  open VerexIR in
   /-- A vector whose first element is the needle counts it at least once. -/
   theorem count_first (values : RuntimeValue) (needle : Int) :
       ∀ (k : Nat) (n : Int), n.toNat = k → 1 ≤ n → (values.field 0).asInt = needle →
@@ -58,7 +57,7 @@ verex module 0x42::recursive_spec where
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     intro first
     refine count_first _ _ _ _ rfl (by omega) ?_
-    simp [VerexIR.RuntimeValue.field, ‹values.values[0]? = some _›, first]
+    simp [RuntimeValue.field, ‹values.values[0]? = some _›, first]
 
 verex module 0x42::sum_probe where
   spec fun sum_upto(v : Vector<u64>, n : Int) : Int :=

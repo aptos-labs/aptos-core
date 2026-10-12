@@ -231,7 +231,9 @@ A specification is established in one of three ways, tried in this order:
    `foo.move`. Its items are spliced into the rendering of the file's
    module, indented one level — `verify f by …` items, whose tactics prove
    `f`'s goal in place of the automatic verification, and any `theorem` the
-   tactics use, which may name every declaration of the module. The tactics
+   tactics use, which may name every declaration of the module. Theorems and
+   tactics see `VerexIR` opened, and an `open N …` item opens further
+   namespaces for all of them, wherever it stands. The tactics
    of a proof (`designs/denotation.md`): `verex_obligations` splits the goal
    into the leaves `f` owes, each named by its clause (`ensures_2`,
    `aborts_if_1`, `invariant_1_entry`, `invariant_1_step`, `requires_of_g`
