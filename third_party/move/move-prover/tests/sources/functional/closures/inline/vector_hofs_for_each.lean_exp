@@ -47,58 +47,403 @@ warning: cannot derive `aborts_of` exactly for this lambda argument: per-applica
     │         │               lambda argument
     │         from a call inlined at this callsite
 
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: leaner verification failed: the automatic verification of `map_double_wrong` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify map_double_wrong by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify map_double_wrong by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:26:13: error: the loop invariant `∀ (j in 0 .. i), result[j] == v[j] * 3` is not preserved by an iteration
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:69:5: error: verex verification failed: the automatic verification of `map_double_wrong` failed; provide a proof: `verify map_double_wrong by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify map_double_wrong by verex_obligations` lists its obligations)
 tests/sources/functional/closures/inline/vector_hofs_for_each.move:103:9: error: the specification clause `ensures result ==> v.length > spec.result[1] && v[spec.result[1]] == x` is not established
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: leaner verification failed: the automatic verification of `find_value` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify find_value by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify find_value by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:165:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:165:5: error: leaner verification failed: the automatic verification of `increment_all` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify increment_all by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify increment_all by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:181:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:181:5: error: leaner verification failed: the automatic verification of `scale_all` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify scale_all by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify scale_all by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:194:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:194:5: error: leaner verification failed: the automatic verification of `increment_all_inferred` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify increment_all_inferred by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify increment_all_inferred by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:210:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:210:5: error: leaner verification failed: the automatic verification of `clamp_all_inferred` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify clamp_all_inferred by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify clamp_all_inferred by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:226:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:226:5: error: leaner verification failed: the automatic verification of `clamp_all` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify clamp_all by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify clamp_all by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: leaner verification failed: the automatic verification of `bump_all` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify bump_all by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify bump_all by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:263:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/closures/inline/vector_hofs_for_each.move:263:5: error: leaner verification failed: the automatic verification of `bump_all_via_call` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify bump_all_via_call by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify bump_all_via_call by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:102:5: error: verex verification failed: the automatic verification of `find_value` failed; provide a proof: `verify find_value by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify find_value by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verification failed with a residual obligation:
+case h_2.right
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+a : VerexIR.Proofs.Denote.NTy.address.carrier
+assumed : True
+recursive✝ :
+  VerexIR.Proofs.Denote.HEnv
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        VerexIR.Proofs.Denote.NRow.nil))))))))) →
+    VerexIR.Proofs.Denote.Comp unit
+      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                          VerexIR.Proofs.Denote.NRow.nil)))))))))
+        Unit)
+state✝ : VerexIR.Proofs.Denote.Memory unit
+left✝³ :
+  (initialState✝
+        {
+          type :=
+            VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              VerexIR.Proofs.Denote.NRow.nil
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil),
+          arguments := VerexIR.Proofs.Denote.NRow.nil }
+        (VerexIR.StorageKey.address a)).isSome =
+    true
+right✝¹ :
+  ∀ (i : Int),
+    0 ≤ i →
+      i < ↑v.values.size →
+        (v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
+            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
+                    (initialState✝
+                      {
+                        type :=
+                          VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            VerexIR.Proofs.Denote.NRow.nil
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                              VerexIR.Proofs.Denote.NRow.nil),
+                        arguments := VerexIR.Proofs.Denote.NRow.nil }
+                      (VerexIR.StorageKey.address a))).getD
+                VerexIR.RuntimeValue.unit).asInt ≤
+          18446744073709551615
+fst✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+left✝² : ↑fst✝.values.size = ↑v.values.size
+left✝¹ : i.val ≤ ↑v.values.size
+left✝ : ↑v.values.size = ↑fst✝.values.size
+right✝ :
+  ∀ (j : Int),
+    i.val ≤ j →
+      j < ↑v.values.size →
+        (fst✝.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val = (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val
+a✝ : ↑v.values.size ≤ i.val
+this✝ :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
+    ((v, fst✝), a, PUnit.unit) initialState✝
+verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  verexContinuation✝¹
+loopHypothesis✝ :
+  ∀
+    (env :
+      VerexIR.Proofs.Denote.HEnv
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                          VerexIR.Proofs.Denote.NRow.nil))))))))))
+    (state : VerexIR.Proofs.Denote.Memory unit),
+    env.fst = none →
+      env.snd.fst = some a →
+        (∃ a, env.snd.snd.fst = some a ∧ a.snd = fst✝) →
+          env.snd.snd.snd.snd.fst = some (VerexIR.Proofs.Denote.vectorLength v) →
+            env.snd.snd.snd.snd.snd.fst = none →
+              env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+                env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
+                  (env.snd.snd.fst.elim False fun v_1 =>
+                      env.snd.snd.snd.fst.elim False fun i =>
+                        env.snd.snd.snd.snd.fst.elim False fun n =>
+                          VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13617 13623
+                              (i.val ≤ n.val) ∧
+                            VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13640 13688
+                                (↑v_1.fst.values.size = ↑v.values.size) ∧
+                              VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13705 13718
+                                  (n.val = ↑v_1.fst.values.size) ∧
+                                VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13735 13739 True ∧
+                                  VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13756 13760
+                                      True ∧
+                                    VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13777 13836
+                                      (∀ (j : Int),
+                                        i.val ≤ j →
+                                          j < n.val →
+                                            (v_1.fst.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+                                              (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
+                    VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
+                      (fun failure =>
+                        VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False)
+                      state
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop := ⋯
+x✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
+⊢ state✝ = initialState✝
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:246:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verification failed with a residual obligation:
+case h_1.right
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+v : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+a : VerexIR.Proofs.Denote.NTy.address.carrier
+assumed : True
+recursive✝ :
+  VerexIR.Proofs.Denote.HEnv
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        VerexIR.Proofs.Denote.NRow.nil))))))))) →
+    VerexIR.Proofs.Denote.Comp unit
+      (VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                          VerexIR.Proofs.Denote.NRow.nil)))))))))
+        Unit)
+state✝ : VerexIR.Proofs.Denote.Memory unit
+left✝³ :
+  (initialState✝
+        {
+          type :=
+            VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              VerexIR.Proofs.Denote.NRow.nil
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil),
+          arguments := VerexIR.Proofs.Denote.NRow.nil }
+        (VerexIR.StorageKey.address a)).isSome =
+    true
+right✝¹ :
+  ∀ (i : Int),
+    0 ≤ i →
+      i < ↑v.values.size →
+        (v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
+            ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
+                    (initialState✝
+                      {
+                        type :=
+                          VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            VerexIR.Proofs.Denote.NRow.nil
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                              VerexIR.Proofs.Denote.NRow.nil),
+                        arguments := VerexIR.Proofs.Denote.NRow.nil }
+                      (VerexIR.StorageKey.address a))).getD
+                VerexIR.RuntimeValue.unit).asInt ≤
+          18446744073709551615
+fst✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).vector.carrier
+i : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+left✝² : ↑fst✝.values.size = ↑v.values.size
+left✝¹ : i.val ≤ ↑v.values.size
+left✝ : ↑v.values.size = ↑fst✝.values.size
+right✝ :
+  ∀ (j : Int),
+    i.val ≤ j →
+      j < ↑v.values.size →
+        (fst✝.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val = (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val
+a✝ : ↑v.values.size ≤ i.val
+this✝ :
+  VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 10 } }
+    ((v, fst✝), a, PUnit.unit) initialState✝
+verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+      (fun result final =>
+        VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13992 14066
+            (∀ (i : Int),
+              0 ≤ i →
+                i < ↑(fst✝, fst✝).snd.values.size →
+                  ((fst✝, fst✝).snd.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val =
+                    (v.values[i.toNat]?.getD { val := 0, fits := ⋯ }).val +
+                      ((Option.map (fun value => VerexIR.RuntimeValue.integer value.fst.val)
+                              (final
+                                {
+                                  type :=
+                                    VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                      VerexIR.Proofs.Denote.NRow.nil
+                                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                                        VerexIR.Proofs.Denote.NRow.nil),
+                                  arguments := VerexIR.Proofs.Denote.NRow.nil }
+                                (VerexIR.StorageKey.address a))).getD
+                          VerexIR.RuntimeValue.unit).asInt) ∧
+          final = initialState✝)
+      (fun failure => VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False) state
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun flow state =>
+    match flow with
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+          (VerexIR.Proofs.Denote.Term.lit ()) env)
+        verexContinuation✝²
+        (fun failure => VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝² (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  verexContinuation✝¹
+loopHypothesis✝ :
+  ∀
+    (env :
+      VerexIR.Proofs.Denote.HEnv
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                          VerexIR.Proofs.Denote.NRow.nil))))))))))
+    (state : VerexIR.Proofs.Denote.Memory unit),
+    env.fst = none →
+      env.snd.fst = some a →
+        (∃ a, env.snd.snd.fst = some a ∧ a.snd = fst✝) →
+          env.snd.snd.snd.snd.fst = some (VerexIR.Proofs.Denote.vectorLength v) →
+            env.snd.snd.snd.snd.snd.fst = none →
+              env.snd.snd.snd.snd.snd.snd.snd.fst = none →
+                env.snd.snd.snd.snd.snd.snd.snd.snd.fst = none →
+                  (env.snd.snd.fst.elim False fun v_1 =>
+                      env.snd.snd.snd.fst.elim False fun i =>
+                        env.snd.snd.snd.snd.fst.elim False fun n =>
+                          VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13617 13623
+                              (i.val ≤ n.val) ∧
+                            VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13640 13688
+                                (↑v_1.fst.values.size = ↑v.values.size) ∧
+                              VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13705 13718
+                                  (n.val = ↑v_1.fst.values.size) ∧
+                                VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13735 13739 True ∧
+                                  VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13756 13760
+                                      True ∧
+                                    VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13777 13836
+                                      (∀ (j : Int),
+                                        i.val ≤ j →
+                                          j < n.val →
+                                            (v_1.fst.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val =
+                                              (v.values[j.toNat]?.getD { val := 0, fits := ⋯ }).val)) →
+                    VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
+                      (fun failure =>
+                        VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False)
+                      state
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector.ref
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).ref
+                  (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit
+                      VerexIR.Proofs.Denote.NRow.nil)))))))))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
+      (fun failure => VerexIR.Proofs.Obligation "vector_hofs_for_each.lean" 13972 13987 False) state
+x✝ : Option (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
+reference✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).ref.carrier
+x : reference✝.fst = reference✝.snd
+⊢ state✝ = initialState✝
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:245:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:242:5: error: verex verification failed: the automatic verification of `bump_all` failed; provide a proof: `verify bump_all by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify bump_all by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:267:9: error: the specification clause `ensures ∀ (i in 0 .. v.length), v[i] == old(v)[i] + global<Limit>(a).max` is not established
+tests/sources/functional/closures/inline/vector_hofs_for_each.move:263:5: error: verex verification failed: the automatic verification of `bump_all_via_call` failed; provide a proof: `verify bump_all_via_call by …` in `tests/sources/functional/closures/inline/vector_hofs_for_each.proof.lean` (`verify bump_all_via_call by verex_obligations` lists its obligations)

@@ -2,7 +2,7 @@
 
 ## Status
 
-Leaner supports literal addresses, package-level address aliases, address
+Verex supports literal addresses, package-level address aliases, address
 values in expressions, and authored module identities:
 
 ```lean
@@ -21,7 +21,7 @@ module Other at 0x43 where
 ```
 
 The `at` clause accepts either a numeric literal or an alias registered with
-`address_alias`. It is optional for compatibility with existing Leaner source;
+`address_alias`. It is optional for compatibility with existing Verex source;
 an omitted clause keeps the historical `0x0` module identity.
 
 ## Surface model
@@ -72,13 +72,13 @@ The underlying pipeline represents addresses as natural-number values:
 | Source | opaque `Move.Address`; `Address.ofNat` marker |
 | Alias metadata | `Move.AddressAlias` persistent environment entry |
 | Module metadata | `Move.ModuleRef.address` plus optional source alias |
-| LIR | `Instr.loadAddress`; module/external addresses encoded as hex strings |
+| VIR | `Instr.loadAddress`; module/external addresses encoded as hex strings |
 | Semantic IR | `MoveModel.IR.Address = Nat`, `.address` values, module address |
 | XIR | `{"address":"0x..."}` values and module/external address fields |
 | compiler v2 | Move bytecode address constants and module identifiers |
 
 Normalization recognizes both `Address.ofNat` and registered alias
-declarations and emits `loadAddress`. The LIR boundary checks the 256-bit bound
+declarations and emits `loadAddress`. The VIR boundary checks the 256-bit bound
 again before constructing semantic IR. Imported module metadata supplies the
 address of an external function reference; it is not replaced with the
 caller's address or a fixed zero.
@@ -105,7 +105,7 @@ It checks literal and aliased identities, imported aliases, cross-module
 reference addresses, resource access at literal addresses, runtime address
 equality, the bound, and unknown-alias diagnostics.
 
-The compiler-v2 transactional test `tests/leaner/addresses.lean` publishes a
+The compiler-v2 transactional test `tests/verex/addresses.lean` publishes a
 module at `0x42`, invokes it through that non-zero identity, returns both named
 and literal addresses through the production VM, and checks true and false
 address equality results.
@@ -114,7 +114,7 @@ address equality results.
 
 - `Move.toml` is not read by the Lean process. Package aliases are currently
   declared in Lean; generating an aliases file from a package manifest can be
-  added when Leaner sources become first-class package targets.
+  added when Verex sources become first-class package targets.
 - The `at` clause remains optional to avoid rewriting existing test modules.
 - Address arithmetic, ordering, and an `Address.toNat` source operation are not
   exposed.

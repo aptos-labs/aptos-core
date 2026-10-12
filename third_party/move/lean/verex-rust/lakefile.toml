@@ -1,0 +1,21 @@
+name = "verex-rust"
+defaultTargets = ["VerexRust", "verex-rust"]
+testDriver = "VerexRustTests"
+
+[[require]]
+name = "verex-ir"
+path = "../verex-ir"
+
+[[lean_lib]]
+name = "VerexRust"
+
+[[lean_exe]]
+name = "verex-rust"
+root = "Main"
+# Elaborating the rendering runs imported elaborators, which may reach the
+# interpreter.
+supportInterpreter = true
+
+[[lean_lib]]
+name = "VerexRustTests"
+roots = ["VerexRust.Tests.Profile", "VerexRust.Tests.Driver", "VerexRust.Tests.VerexSL", "VerexRust.Tests.RegistryConsumer", "VerexRust.Tests.Source", "VerexRust.Tests.SourcePredicates"]

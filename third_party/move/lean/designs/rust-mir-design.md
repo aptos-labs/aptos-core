@@ -1,23 +1,23 @@
-# Leaner Rust frontend through the shared Leaner IR
+# Verex Rust frontend through the shared Verex IR
 
 Status: living design and frontend decision; open work is listed in
 [`roadmap.md`](roadmap.md), section 7.
 
 ## Decision
 
-Leaner will build its Rust frontend in a new `leaner-rust` package around a
+Verex will build its Rust frontend in a new `verex-rust` package around a
 small, project-owned exporter using
 **[Rustc Public](https://rust-lang.github.io/rustc_public/getting-started.html)**
 (the project formerly called Stable MIR).  The exporter maps in-memory MIR to
-the versioned, Rust-profile `RawUnit` exchange format owned by `LeanerIR`,
+the versioned, Rust-profile `RawUnit` exchange format owned by `VerexIR`,
 serializes it, and stops the compiler before code generation.  It will not use
 Charon as the production import boundary and it will not introduce a second
 on-disk MIR format.
 
-The exporter owns only extraction, mechanical MIR-to-raw-LIR mapping, and
-serialization.  `LeanerIR` owns the exchange schema, validation, CFG
+The exporter owns only extraction, mechanical MIR-to-raw-VIR mapping, and
+serialization.  `VerexIR` owns the exchange schema, validation, CFG
 simplification, structurization, semantic interpretation, canonical
-Rust/Leaner source printing, and all proof-facing diagnostics.  This keeps the
+Rust/Verex source printing, and all proof-facing diagnostics.  This keeps the
 Rust-specific trusted/transformation surface small and ensures that the same
 validation path is used for future producers.
 
@@ -36,11 +36,11 @@ maintain two production frontends with independently observable behavior.
 
 ### Why this decision
 
-Rustc Public is the best long-term fit because Leaner wants the compiler's
+Rustc Public is the best long-term fit because Verex wants the compiler's
 actual typed, borrow-checked Rust input—not a verifier-oriented dialect that
 we must adopt as an additional source language.  It lets us track the Rust
 toolchain deliberately, preserve raw-pointer and other low-level MIR
-operations for a later unsafe model, and choose Leaner's own structured IR and
+operations for a later unsafe model, and choose Verex's own structured IR and
 semantics.  It also avoids making a second project and its pinned compiler
 driver a release dependency for every accepted Rust crate.
 
@@ -58,16 +58,16 @@ Charon has real advantages: it already serializes ULLBC/LLBC, reconstructs
 structured control flow, and has broad experience with Rust analysis,
 including unsafe syntax.  Its cost is equally real: it is a custom rustc
 driver built with a pinned nightly, its simplification and structurization are
-another semantic boundary before LeanerIR, and its support cadence becomes a
-constraint on Leaner's Rust-at-tip goal.  It is an excellent validation aid,
-not the right owner of Leaner's source-of-truth semantics.
+another semantic boundary before VerexIR, and its support cadence becomes a
+constraint on Verex's Rust-at-tip goal.  It is an excellent validation aid,
+not the right owner of Verex's source-of-truth semantics.
 
 | Dimension | Rustc Public exporter (chosen) | Charon |
 |---|---|---|
-| Rust compatibility | Directly interrogates the designated rustc revision; a new MIR form can be preserved or rejected by Leaner. | Adds a custom driver and its own pinned nightly compatibility window. |
-| Input representation | Raw, typed MIR-shaped CFG; Leaner validates every simplification and structurization. | ULLBC simplifies MIR; LLBC additionally reconstructs structured control flow. |
-| Leaner proof boundary | One project-owned exchange and one checked LeanerIR path. | Mature analysis IR, but its transformations become an extra boundary or must be duplicated. |
-| Unsafe growth | Preserves the compiler's pointer/unsafe operations in v1 even before Leaner models them. | Useful prior art and has unsafe-code support, but Leaner would inherit a second IR's operation choices. |
+| Rust compatibility | Directly interrogates the designated rustc revision; a new MIR form can be preserved or rejected by Verex. | Adds a custom driver and its own pinned nightly compatibility window. |
+| Input representation | Raw, typed MIR-shaped CFG; Verex validates every simplification and structurization. | ULLBC simplifies MIR; LLBC additionally reconstructs structured control flow. |
+| Verex proof boundary | One project-owned exchange and one checked VerexIR path. | Mature analysis IR, but its transformations become an extra boundary or must be duplicated. |
+| Unsafe growth | Preserves the compiler's pointer/unsafe operations in v1 even before Verex models them. | Useful prior art and has unsafe-code support, but Verex would inherit a second IR's operation choices. |
 | Delivery risk | Public surface remains in-tree and may omit a needed query or change; we carry a compatibility job. | Faster prototype and serializer today, but permanently depends on Charon's driver/toolchain release cadence. |
 | Assigned role | Production exporter. | Differential oracle, corpus source, and narrowly scoped fallback experiment. |
 
@@ -83,7 +83,7 @@ differently interpreted body.
 
 "Full Rust at tip" consequently means that we use rustc to type-check every
 crate and retain every encountered construct faithfully enough to either model
-it or reject it at a precise source location.  It does *not* mean that Leaner
+it or reject it at a precise source location.  It does *not* mean that Verex
 claims verification coverage for every standard-library implementation,
 platform ABI, unsafe operation, optimizer transformation, or target.  The
 artifact's declared profile, capability report, and theorem assumptions define
@@ -92,16 +92,16 @@ the actual coverage.
 ## Summary
 
 This project imports borrow-checked Rust MIR into the language-neutral
-`LeanerIR` boundary used by every Leaner frontend.  Leaner source frontends and
+`VerexIR` boundary used by every Verex frontend.  Verex source frontends and
 the Rust MIR adapter construct profile-tagged `RawUnit`s; the single
-`LeanerIR.Validation.validate` pipeline produces the `ValidatedUnit` consumed
+`VerexIR.Validation.validate` pipeline produces the `ValidatedUnit` consumed
 by common semantics, contracts, verification, executable lowering, and source
 backends.  No frontend produces a separate proof-facing function meaning.
 
 The Rust source printer is a required backend, not an attempt to recover the
 original Rust tokens.  For a supported Rust-profile unit it emits readable,
 canonical standard Rust (`.rs`), which rustc must re-import to an equivalent
-validated LIR body.  The profile-selected Leaner source backend remains useful
+validated VIR body.  The profile-selected Verex source backend remains useful
 for presentation, but generated Lean syntax is not the Rust round-trip
 mechanism.
 This makes the shared IR a genuine interchange representation rather than a
@@ -115,7 +115,7 @@ The shared schema is the union of known Move and Rust semantics, not only
 their intersection. A Rust construct does not become an opaque profile
 payload merely because Move cannot print it, and the converse holds for Move.
 Frontends may reject inputs they cannot faithfully lower and backends may
-reject valid LIR they cannot represent. Profile extension values are reserved
+reject valid VIR they cannot represent. Profile extension values are reserved
 for semantics outside the currently known union.
 
 A specification applies to the observable behavior of a typed function, not
@@ -130,10 +130,10 @@ for two non-semantic purposes:
 ## Goals
 
 - Import an explicitly supported, safe, sequential Rust subset from MIR.
-- Converge Leaner-source and Rust-MIR frontends on `RawUnit`, then on one
-  validated, typed, named LIR unit.
+- Converge Verex-source and Rust-MIR frontends on `RawUnit`, then on one
+  validated, typed, named VIR unit.
 - Reproduce imported Rust as readable, canonical Rust source from validated
-  LIR, and make the profile-selected source printers available to every
+  VIR, and make the profile-selected source printers available to every
   frontend that reaches the same unit.
 - Require generated Rust to recompile and re-import to an equivalent validated
   Rust-profile body.
@@ -152,13 +152,13 @@ for two non-semantic purposes:
 - Reconstructing the original Rust spelling, macro invocations, or surface
   constructs after MIR lowering. Source comments are retained separately as
   non-semantic provenance, but exact token attachment is not promised.
-- Making canonical generated Leaner source textually round-trip to the
+- Making canonical generated Verex source textually round-trip to the
   original `.rs` file.
 - Exact round-tripping of Rust syntax such as `for`, `?`, methods, and pattern
   syntax after MIR lowering.
 - Reimplementing rustc's type checker or trait solver.  Imported Rust must
-  still pass rustc compilation and borrow checking before MIR export.  Leaner
-  will additionally check the resulting LIR's borrowing discipline so those
+  still pass rustc compilation and borrow checking before MIR export.  Verex
+  will additionally check the resulting VIR's borrowing discipline so those
   facts can be consumed by the verifier.
 - Accepting unsafe Rust in the initial safe subset.  Unsafe-related MIR is
   preserved or rejected with provenance first; checked raw-pointer semantics
@@ -173,7 +173,7 @@ for two non-semantic purposes:
 ## Architecture
 
 ```text
-Leaner source (selected profile)       Rust source
+Verex source (selected profile)       Rust source
               |                            |
               | frontend elaboration       | rustc + exporter
               v                            v
@@ -183,32 +183,32 @@ Leaner source (selected profile)       Rust source
                                      v
                               ValidatedUnit
                     |          |             |
-                    |          |             +-- canonical Rust / Leaner source
+                    |          |             +-- canonical Rust / Verex source
                     |          |                    |
                     |          |                    +-- Rust: recompile / re-import
-                    |          |                    +-- Leaner: re-elaborate
+                    |          |                    +-- Verex: re-elaborate
                     |          |                    +-- semantic comparison
-                    |          +-- LIR relational meaning
+                    |          +-- VIR relational meaning
                     |                 +-- spec / verify / summaries
                     |                 +-- kernel-checked theorem
                     +-- language-specific executable lowering
 ```
 
-`LeanerIR` is the common boundary.  The existing
-[`Move.Compiler.LIR`](../v0/move/Move/Compiler/LIR.lean) is the named stackless IR
+`VerexIR` is the common boundary.  The existing
+[`Move.Compiler.VIR`](../v0/move/Move/Compiler/VIR.lean) is the named stackless IR
 (NSIR) executable backend, not the semantic source of truth and not a
 frontend target.  A Move-profile validated unit may lower to NSIR, but source
 analysis, validation, verification, diagnostics, and source generation never
 recover their meaning from NSIR or from retained Lean syntax.
 
-The shared LIR preserves names, scopes, places, and explicit semantic
+The shared VIR preserves names, scopes, places, and explicit semantic
 operations while making structured control the proof-facing representation.
-This is what makes it simultaneously a Leaner language and a source-generation
+This is what makes it simultaneously a VerexSL and a source-generation
 boundary.
 
-## The structured shared LIR as a transpiler boundary
+## The structured shared VIR as a transpiler boundary
 
-`LeanerIR` is neither Lean LCNF nor raw Rust MIR.  Both contain
+`VerexIR` is neither Lean LCNF nor raw Rust MIR.  Both contain
 frontend-specific administrative detail.  Its public construction boundary is
 `RawUnit`; its only backend and semantic input is `ValidatedUnit`.  Between
 them it is a normalized, typed language with:
@@ -234,9 +234,9 @@ constructor instantiations carry kinded `GenericArgument`s rather than an
 assumed type-only list.
 
 Raw MIR remains a CFG only in the imported `RawUnit`.  The Rust adapter
-mechanically decodes it; `LeanerIR.Validation.validate` performs the
+mechanically decodes it; `VerexIR.Validation.validate` performs the
 administrative simplification, dominance/post-dominance and natural-loop
-analysis, and constructs the structured LIR.  Rust MIR for the intended safe,
+analysis, and constructs the structured VIR.  Rust MIR for the intended safe,
 sequential subset is expected to be reducible often enough for this to be the
 normal path; reducibility is checked for each import, never assumed from the
 source language.
@@ -262,7 +262,7 @@ Consequences are handled at the exchange boundary. Optimizer-created or
 removed administrative detail is never assumed stable; every emitted artifact
 records its toolchain, the mapper exhaustively preserves or rejects the public
 MIR forms it sees, and compatibility corpus changes are reviewed before a
-toolchain is promoted. Readable Rust is recovered from validated LIR, not by
+toolchain is promoted. Readable Rust is recovered from validated VIR, not by
 trying to invert rustc's optimization choices.
 
 The structurizer produces a witness connecting MIR blocks and edges to the
@@ -274,7 +274,7 @@ presentation overlay.
 
 The initial importer rejects a graph it cannot structurize precisely, with a
 diagnostic at the relevant Rust origin.  A raw block/jump fallback is not part
-of the shared Leaner language.  The raw CFG and the structurization witness
+of the shared VerexSL.  The raw CFG and the structurization witness
 remain alignment material, useful for checking the translation and for
 diagnostics but outside the central semantics.
 
@@ -289,23 +289,23 @@ semanticProjection(validatedUnit)
 
 `importMir` constructs a fresh `RawUnit`; the ordinary validation pipeline
 must accept it.  Alpha-renaming, compiler temporaries, and printer-only
-grouping may differ.  If normalized LIR equality is unnecessarily strong, the
+grouping may differ.  If normalized VIR equality is unnecessarily strong, the
 replacement obligation is a checked semantic equivalence over the Rust
 profile.  Original Rust provenance remains associated with the first imported
-unit, while generated Rust gets a `GeneratedSourceMap` back to its LIR nodes.
+unit, while generated Rust gets a `GeneratedSourceMap` back to its VIR nodes.
 
-The corresponding Leaner-source property is separate and optional:
+The corresponding Verex-source property is separate and optional:
 
 ```text
-semanticProjection(validate(elaborateLeaner(printLeaner(validatedUnit))))
+semanticProjection(validate(elaborateVerex(printVerex(validatedUnit))))
   ≈α semanticProjection(validatedUnit)
 ```
 
-It is a source-backend test, not a route by which Leaner source syntax derives
+It is a source-backend test, not a route by which Verex source syntax derives
 semantics or proofs.
 
 This is deliberately a family of profile-selected target surfaces over one
-core and one Leaner surface language, not separate Leaner Move and Leaner Rust
+core and one Verex surface language, not separate Verex Move and Verex Rust
 dialects.  Implementing Rust-profile surface forms is deferred to a later
 session.  A Rust operation can use a Move-profile construct only when its
 integer, panic, drop, storage, and reference semantics match.  Otherwise the
@@ -319,23 +319,23 @@ The Rust-profile source backend consumes only `ValidatedUnit` plus the checked
 dependency interfaces and profile configuration recorded with it.  It emits a
 canonical Rust package or module set: readable `.rs` files, the edition and
 compiler settings needed to reproduce the profile, and a source map from
-generated ranges to LIR node IDs. It never reads original `.rs` tokens, macros,
+generated ranges to VIR node IDs. It never reads original `.rs` tokens, macros,
 or retained Lean syntax to fill a semantic gap. Comments already admitted in
-the shared LIR provenance table may be rendered, but never supply semantics.
+the shared VIR provenance table may be rendered, but never supply semantics.
 
 The printer prefers ordinary Rust constructs—bindings, assignments, `if`,
 `match`, `loop`, `break`, `continue`, direct calls, structs, and enums—rather
 than reproducing rustc temporaries.  It may choose different but canonical
 surface spelling, such as a `loop` instead of a recovered `while`, explicit
 match arms instead of a source `if let`, or the smallest valid `unsafe` block
-around an unsafe LIR operation. It does not promise token-identical comment
+around an unsafe VIR operation. It does not promise token-identical comment
 attachment, macro, or control-sugar round trips.
 
 Every printed construct has a profile rule.  In particular, the Rust backend
 must preserve integer width and overflow configuration, target-dependent
 `usize`/`isize`, panic behavior, drop order, visibility and signatures,
 generic predicates, selected trait/impl calls, and unsafe operations.  It
-emits an explicit diagnostic—not a lossy approximation—when the accepted LIR
+emits an explicit diagnostic—not a lossy approximation—when the accepted VIR
 node cannot yet be represented in standard Rust under the artifact's target
 configuration.  An imported dependency not emitted as Rust source is an
 explicit Cargo dependency or a declared external summary; it is never an
@@ -347,15 +347,15 @@ The backend gate is:
 2. compile/check it under the emitted, pinned Rust configuration;
 3. export its MIR through the same Rustc Public producer;
 4. construct and validate a fresh `RawUnit`; and
-5. compare profile-aware semantic LIR and source-map coverage with the input.
+5. compare profile-aware semantic VIR and source-map coverage with the input.
 
-This gives users readable Rust generated from LIR while retaining one semantic
+This gives users readable Rust generated from VIR while retaining one semantic
 path: the generated crate comes back through the same MIR adapter and
-`LeanerIR.Validation.validate` as any other Rust crate.
+`VerexIR.Validation.validate` as any other Rust crate.
 
 ## Small example and representation growth
 
-Consider this current Leaner Move function:
+Consider this current Verex Move function:
 
 ```lean
 fun bump_if (flag : Bool) (value : U64) : Action U64 := do
@@ -365,8 +365,8 @@ fun bump_if (flag : Bool) (value : U64) : Action U64 := do
     pure value
 ```
 
-`#print_leaner_lcnf bump_if` shows what Lean's compiler currently gives the
-Leaner normalizer.  In abbreviated form it is:
+`#print_verex_lcnf bump_if` shows what Lean's compiler currently gives the
+Verex normalizer.  In abbreviated form it is:
 
 ```text
 bump_if flag value world :=
@@ -407,7 +407,7 @@ fun bump_ref (slot : &mut U64) : Action Unit := do
 ```
 
 Base LCNF expands the state thread, read, numeral construction, addition, and
-write into roughly twenty generated names.  The structured LIR is one sequence
+write into roughly twenty generated names.  The structured VIR is one sequence
 with four operations: `readRef`, `loadInt 1`, checked `add`, and `writeRef`.
 Its proof-facing meaning expands for a different reason:
 
@@ -436,16 +436,16 @@ The remaining important growth modes are:
   invariants;
 - raw MIR adds storage markers, drop flags, cleanup edges, and bounds/overflow
   assertions that a semantics-preserving normalization pass must classify;
-- LIR import deliberately keeps one generic body; interpreter instantiation
+- VIR import deliberately keeps one generic body; interpreter instantiation
   supplies arguments and evidence without duplicating it. Any future native
-  code-generation artifact is outside the LIR translation boundary;
+  code-generation artifact is outside the VIR translation boundary;
 - nested mutable loans add prophecy variables linearly, while alias or
   disjointness case splits can become combinatorial if borrow evidence is not
   used effectively.
 
 ## One semantic function interface
 
-Every registered function is a declaration in a `ValidatedUnit`.  LIR semantic
+Every registered function is a declaration in a `ValidatedUnit`.  VIR semantic
 elaboration exposes a small Lean-facing handle with the equivalent of:
 
 ```lean
@@ -459,9 +459,9 @@ structure FunctionArtifact where
 ```
 
 `FunctionBody`, the signature, profile, origins, and alignment reference are
-LIR data; the import receipt and its justification live in the checked import
+VIR data; the import receipt and its justification live in the checked import
 envelope.  The function's relational meaning is derived only after the unit
-passes `LeanerIR.Validation.validate`; it is not selected by inspecting which
+passes `VerexIR.Validation.validate`; it is not selected by inspecting which
 frontend produced the artifact, nor by re-walking retained source.
 
 The dialect describes real semantic differences, not provenance.  For
@@ -478,7 +478,7 @@ functions in one profile and receive identical verification treatment.
 
 ## Mandatory retirement of the direct source path
 
-Today Leaner Move still has two paths: retained Lean syntax generates the
+Today Verex Move still has two paths: retained Lean syntax generates the
 proof-facing `sourceSpec`, while typed base LCNF reaches NSIR and
 `MoveModel.IR` for executable compilation.  That duplication is a migration
 problem, not an architecture available to the Rust frontend.
@@ -486,54 +486,54 @@ problem, not an architecture available to the Rust frontend.
 The target is one path for every frontend:
 
 ```text
-Leaner source ----+
-Move source ------+--> RawUnit --> LeanerIR.Validation.validate --> ValidatedUnit
+Verex source ----+
+Move source ------+--> RawUnit --> VerexIR.Validation.validate --> ValidatedUnit
 Rust MIR exchange-+                                          |
                                                             v
-                                           LIR semantic elaboration
+                                           VIR semantic elaboration
                                       -> meaning / contracts / `verify`
                                       -> interpreter / executable backends
-                                      -> Rust and Leaner source backends
+                                      -> Rust and Verex source backends
 ```
 
-Leaner source remains a frontend: Lean elaboration may parse, expand syntax,
+Verex source remains a frontend: Lean elaboration may parse, expand syntax,
 and construct a `RawUnit`, but no semantic pass reads retained syntax, Lean
-environment extensions, LCNF, NSIR, or `MoveModel.IR` after raw-LIR
+environment extensions, LCNF, NSIR, or `MoveModel.IR` after raw-VIR
 construction.  `spec`, `verify`, summaries, loop obligations, proof tactics,
 the interpreter, executable lowering, and every source printer look up the
-same validated LIR declaration.
+same validated VIR declaration.
 
 The existing direct verifier is a temporary comparison oracle while features
 are migrated.  It must not become a common `FunctionMeaning` adapter and it
-cannot be used as a fallback when the LIR path lacks support.  Once corpus
+cannot be used as a fallback when the VIR path lacks support.  Once corpus
 coverage reaches the retirement gate, the retained-source declaration store,
 source reparser, source-to-spec translator, and LCNF body rediscovery are
-deleted.  Compatibility command names may remain only as thin LIR façades.
+deleted.  Compatibility command names may remain only as thin VIR façades.
 
-## `leaner-rust`: Rustc Public driver and raw-LIR boundary
+## `verex-rust`: Rustc Public driver and raw-VIR boundary
 
-The Rust frontend is one new Lake package, `leaner-rust`, rather than separate
+The Rust frontend is one new Lake package, `verex-rust`, rather than separate
 Rust-profile and MIR-transport projects.  It contains the Lean Rust-profile
 library, its integration tests, and the Rust exporter source in a sibling
 Cargo crate:
 
 ```text
-leaner-rust/
-  lakefile.toml                 # requires ../leaner-ir
-  LeanerRust/                   # profile registration, capability policy,
+verex-rust/
+  lakefile.toml                 # requires ../verex-ir
+  VerexRust/                    # profile registration, capability policy,
                                 # RawUnit import façade, and tests
-  rust-exporter/                # `leaner-rust-export` Rust binary
+  rust-exporter/                # `verex-rust-export` Rust binary
     Cargo.toml                  # Rustc Public / rustc-driver dependencies
     src/main.rs                 # Cargo invocation and driver callback
     src/export.rs               # MIR -> Rust-profile RawUnit mapping
-    src/json.rs                 # versioned LeanerIR RawUnit encoder
+    src/json.rs                 # versioned VerexIR RawUnit encoder
   Tests/                        # Rust fixtures, JSON baselines, Lean checks
 ```
 
-`LeanerIR` owns the versioned, language-neutral `RawUnit` serializer.  The
+`VerexIR` owns the versioned, language-neutral `RawUnit` serializer.  The
 Rust crate implements that schema rather than inventing a second wire format.
 The generic receipt, freshness, and alignment rules are defined by the
-[shared LIR import model](lir-design.md#import-receipts-and-source-alignment).
+[shared VIR import model](vir-design.md#import-receipts-and-source-alignment).
 Lean owns the exporter invocation and consumes its detached output as
 untrusted, normally private transport data.  The Rust-specific receipt binds
 the rustc/exporter revision, selected MIR phase, crate graph, target and
@@ -542,10 +542,10 @@ resulting file is the only on-disk hand-off:
 
 ```text
 Rust crate
-  -> leaner-rust-export / Rustc Public callback
+  -> verex-rust-export / Rustc Public callback
   -> Rust-profile RawUnit JSON
-  -> LeanerIR RawUnit decoder
-  -> LeanerIR.Validation.validate
+  -> VerexIR RawUnit decoder
+  -> VerexIR.Validation.validate
   -> ValidatedUnit
 ```
 
@@ -558,7 +558,7 @@ then, in its post-analysis callback:
 4. returns `Compilation::Stop`, skipping MIR emission, LLVM code generation,
    object production, and linking.
 
-It does not structurize control flow, decide Leaner support, lower raw pointers
+It does not structurize control flow, decide Verex support, lower raw pointers
 to references, replace unsupported library calls with magic primitives, or
 construct `ValidatedUnit`.  No compiler handle, rustc-local index, or debug
 rendering crosses the process boundary.  Unknown MIR forms are precise export
@@ -577,10 +577,10 @@ query in the production mapper.
 
 The target is the body after type and borrow checking, but before
 semantics-obscuring MIR optimizations.  This retains explicit places, bounds
-and overflow checks, drops, cleanups, and source locations that Leaner needs
+and overflow checks, drops, cleanups, and source locations that Verex needs
 for a proof-relevant model.  The M0 exporter spike must demonstrate the exact
 Rustc Public query and bind its phase in the import receipt.  We will not name
-a private rustc query as part of the Leaner contract.
+a private rustc query as part of the Verex contract.
 
 If the first public surface can only expose a different phase, the spike must
 compare it with the target shape on the fixture corpus and document every
@@ -590,7 +590,7 @@ or experiment input, but not as the production definition of this phase.
 
 ### Rust-profile `RawUnit` payload
 
-The generic exchange and receipt schema belongs to LIR.  The Rust payload adds
+The generic exchange and receipt schema belongs to VIR.  The Rust payload adds
 only the source facts needed to interpret MIR:
 
 - declarations and dependencies: canonical item/type/trait/impl identities,
@@ -604,37 +604,37 @@ only the source facts needed to interpret MIR:
   distinguish user code from compiler-generated code.
 
 Raw pointers, pointer casts, `UnsafeCell`, unions, and calls marked unsafe
-have first-class raw-LIR tags from v1 even when the first semantic profile
+have first-class raw-VIR tags from v1 even when the first semantic profile
 rejects them.  That preserves the Rust input truthfully, gives actionable
 diagnostics, and prevents a future unsafe frontend from inventing a new import
 format.  A profile must explicitly declare whether it supports each tag.
 
 A successful rustc type and borrow check is required upstream admission
 evidence, but it is not the only proof-facing justification for borrowing.
-Leaner will run its own borrow checker on validated LIR, migrating the useful
+Verex will run its own borrow checker on validated VIR, migrating the useful
 rules from the older translation, and expose its checked facts or certificate
-to the verifier.  Those LIR rules may deliberately accept a broader abstract
+to the verifier.  Those VIR rules may deliberately accept a broader abstract
 language than rustc; imported Rust remains limited to programs rustc accepts.
 A trust report is part of every theorem that claims to apply to the imported
 Rust program.
 
 ### Invocation, distribution, and caching
 
-`leaner-rust-export` is a special Leaner tool called by the Lean/Lake build
+`verex-rust-export` is a special Verex tool called by the Lean/Lake build
 driver, not a Cargo plugin that every user installs or compiles.  For now it
-runs against a Leaner-managed, pinned nightly toolchain with matching
-`rustc-dev` and LLVM libraries.  Leaner setup either ships that paired driver
+runs against a Verex-managed, pinned nightly toolchain with matching
+`rustc-dev` and LLVM libraries.  Verex setup either ships that paired driver
 and sysroot or downloads them into a versioned local cache.  An optional
 environment/configuration override permits development against another
 explicit toolchain.
 
 Users continue to use their ordinary stable `cargo` workflow.  The export tool
-performs a separate `cargo check`-like analysis only when Leaner imports a
+performs a separate `cargo check`-like analysis only when Verex imports a
 Rust crate.  It stops the selected root crate after extraction; dependencies
 are prepared as normal check/metadata artifacts so Cargo still receives the
 artifacts it expects.  The cache key includes the manifest and lockfile,
 sources, features, target, rustc/exporter revision, and semantic profile.  If
-Rustc Public later provides a stable distribution surface, Leaner may revisit
+Rustc Public later provides a stable distribution surface, Verex may revisit
 how it delivers this managed tool; that does not change the RawUnit or
 validation boundary.
 
@@ -649,7 +649,7 @@ for early fixtures and differential tests.
 But Charon is intentionally more than extraction: it simplifies MIR and
 performs control-flow reconstruction through transformation passes.  It also
 requires a custom driver compiled with a pinned nightly.  Those are good
-design choices for Charon and Aeneas, but Leaner needs the raw CFG as evidence
+design choices for Charon and Aeneas, but Verex needs the raw CFG as evidence
 and must validate its own structurization into the shared IR.  Importing LLBC
 would duplicate a proof-relevant transformation outside our checked boundary;
 importing ULLBC would still make a separately versioned driver a permanent
@@ -667,20 +667,20 @@ validate MIR CFG
   -> simplify administrative control
   -> compute dominators, post-dominators, and natural loops
   -> recover selections and loop regions
-  -> structured LIR (`if`, `match`, `while` / `loop`, `break`, `continue`)
+  -> structured VIR (`if`, `match`, `while` / `loop`, `break`, `continue`)
 ```
 
 Selection headers and their joins recover `if` and `match`.  A natural-loop
 header and backedge recover a `while` or `loop`; its header edge is
 `continue`, and its exit edge is `break`.  The structurizer records a checked
 correspondence from these regions back to the MIR blocks and edges.  Its
-alignment obligation is that the MIR CFG and recovered structured LIR have the
+alignment obligation is that the MIR CFG and recovered structured VIR have the
 same outcomes for every supported input.
 
 Reducibility is an import condition, not an assumed universal Rust property.
 The initial frontend rejects a function whose MIR cannot be structurized under
 the supported rules, rather than exposing general `goto`/basic-block syntax in
-Leaner or using an approximate proof rule.  This keeps user-facing loop
+Verex or using an approximate proof rule.  This keeps user-facing loop
 invariants, source generation, and WP reasoning over the structured loop node
 rather than over raw block numbers.
 
@@ -735,9 +735,9 @@ transaction abort must remain distinguishable in the semantics.
 
 ## Generics, core traits, and the specialization boundary
 
-Importing only monomorphized MIR would produce one Leaner body per concrete
+Importing only monomorphized MIR would produce one Verex body per concrete
 Rust instance. Proving every copy independently is neither necessary nor a
-good default, and it would prevent the LIR interpreter from operating over the
+good default, and it would prevent the VIR interpreter from operating over the
 source program's generic structure. The import contract therefore requires
 one generic body for each generic Rust item. `RawUnit` and `ValidatedUnit`
 never contain a monomorphization manifest or a cloned concrete body as their
@@ -748,7 +748,7 @@ A concrete call can still carry resolved implementation-selection evidence.
 That evidence binds an already generic trait call to a validated implementation
 dictionary; it is not body cloning or monomorphization. The interpreter
 instantiates the generic body with its supplied type/const/lifetime arguments
-and evidence values, preserving one LIR declaration and meaning.
+and evidence values, preserving one VIR declaration and meaning.
 
 The desired separation is:
 
@@ -763,7 +763,7 @@ generic shared function + explicit trait evidence
 generic theorem                 concrete call result
 ```
 
-Traits are a language-neutral core-LIR facility, not part of the Rust profile:
+Traits are a language-neutral core-VIR facility, not part of the Rust profile:
 a future Move trait feature must use the same trait declarations,
 implementations, associated items, evidence arguments, interpreter behavior,
 and proof contracts. The shared IR needs enough structure to state and invoke
@@ -820,7 +820,7 @@ step_twice_verified:
 
 Each concrete `impl Step for Counter` proves `StepContract` once.  Every use
 of `step_twice::<Counter>` then obtains the generic theorem by instantiation;
-it does not reverify the two calls.  In generated Leaner source, Lean type
+it does not reverify the two calls.  In generated Verex source, Lean type
 class syntax is a natural presentation for the evidence parameter and a
 separate `LawfulStep`-style class can carry the method contract.  The shared
 IR should nevertheless use language-neutral evidence records rather than
@@ -838,7 +838,7 @@ connects the single generic proof to each concrete call. It is a generic
 interpretation theorem, not a new user proof per instance. A future separate
 native code-generation backend may additionally prove that any concrete
 artifact it produces refines this generic interpretation; that backend is not
-allowed to replace the generic LIR body.
+allowed to replace the generic VIR body.
 
 Full Rust trait expressiveness should be staged rather than admitted as one
 indivisible feature:
@@ -870,15 +870,15 @@ There are two useful fallbacks when a fully parametric proof is impossible:
 Neither fallback permits cloned, monomorphized bodies into `RawUnit` or
 `ValidatedUnit`.
 
-The current Move path already provides partial precedent: generic Leaner
+The current Move path already provides partial precedent: generic Verex
 functions are exported as one parametric declaration. The Rust design preserves
 that separation and uses per-instance verification only for behavior that is
 genuinely type- or implementation-dependent; such a view is derived from,
-never substituted for, generic LIR.
+never substituted for, generic VIR.
 
 ## Ordinary references
 
-This landed as the prophetic ownership model of validated LIR
+This landed as the prophetic ownership model of validated VIR
 ([`prophetic-references.md`](prophetic-references.md)), which generalizes
 the V0 `Mutation` structure to the shared IR. A shared reference is an
 observation; a mutable borrow is a runtime value owning the loaned content,
@@ -909,7 +909,7 @@ Unsafe Rust is an architectural requirement, not a reason to model raw
 pointers as ordinary references or to accept undefined behavior silently.
 Rust's `unsafe` marker permits operations for which the compiler does not
 establish memory-safety conditions; raw pointers may be null, dangling, or
-aliased in ways that references may not.  Leaner must retain that distinction
+aliased in ways that references may not.  Verex must retain that distinction
 from import through theorem statement.
 
 The shared Rust profile therefore introduces a separate pointer-and-memory
@@ -1019,10 +1019,10 @@ encoded by reusing Move rollback behavior under another name.
 ## Specifications
 
 The `spec` command resolves a function declaration in a `ValidatedUnit` and
-constructs a contract from its LIR signature and logical parameter view.  It
+constructs a contract from its VIR signature and logical parameter view.  It
 must not inspect body provenance or retained frontend syntax.
 
-For example, the same form should be valid for a Rust-MIR or Leaner-source
+For example, the same form should be valid for a Rust-MIR or Verex-source
 frontend declaration after both enter the same validated unit:
 
 ```lean
@@ -1032,7 +1032,7 @@ spec Crate.increment (value : &mut U64) where
 verify Crate.increment
 ```
 
-As in Leaner Move, mutable parameters are presented by referent value:
+As in Verex Move, mutable parameters are presented by referent value:
 
 - `old(value)` denotes the initial referent;
 - `value` in a normal postcondition denotes the final referent;
@@ -1063,8 +1063,8 @@ A proved callee exports a modular summary.  Callers use that summary rather
 than unfold its body, regardless of whether caller and callee came from Lean
 or MIR.  This permits, within a compatible dialect and type/effect boundary:
 
-- a Leaner-source function calling an imported Rust function;
-- an imported function calling a Leaner-source model;
+- a Verex-source function calling an imported Rust function;
+- an imported function calling a Verex-source model;
 - imported functions verified against other imported summaries;
 - opaque external functions with explicitly trusted or separately proved
   contracts.
@@ -1074,8 +1074,8 @@ depends.
 
 ## Alignment and theorem meaning
 
-The [shared LIR model](lir-design.md#import-receipts-and-source-alignment)
-defines the distinction between a proof about validated LIR and a claim about
+The [shared VIR model](vir-design.md#import-receipts-and-source-alignment)
+defines the distinction between a proof about validated VIR and a claim about
 its source.  Rust adds one temporary assumption: the pinned Rustc Public
 exporter preserves the selected MIR body when constructing `RawUnit`.
 Successful rustc type and borrow checking is upstream admission evidence, not
@@ -1086,12 +1086,12 @@ checked translation/refinement results and composes them with `f.verified`.
 
 The current compiler already carries important pieces:
 
-- named LIR locals include an optional source name;
-- LIR instructions and terminators carry optional authored spans;
+- named VIR locals include an optional source name;
+- VIR instructions and terminators carry optional authored spans;
 - `MoveModel.IR.Module` has function, block, instruction, and terminator
   source maps plus user-facing local names.
 
-See [`Move.Compiler.LIR`](../v0/move/Move/Compiler/LIR.lean) and
+See [`Move.Compiler.VIR`](../v0/move/Move/Compiler/VIR.lean) and
 [`MoveModel.IR.Module`](../v0/move-model/MoveModel/IR/Module.lean).
 
 The current `SourceSpan` is a half-open byte range in one implicit file.  Rust
@@ -1127,8 +1127,8 @@ LSP bridge or editor integration, but it does not require a different semantic
 design.
 
 The Rust source backend emits a `GeneratedSourceMap` from ranges in the
-canonical `.rs` files to LIR node IDs and their original origins.  Re-import
-records the reverse association.  The Leaner source backends provide the same
+canonical `.rs` files to VIR node IDs and their original origins.  Re-import
+records the reverse association.  The Verex source backends provide the same
 mapping for generated Lean files.  Diagnostics can therefore show the readable
 generated construct while still choosing the original Rust range as the
 primary location.  Formatting or regenerating a derived file must not change
@@ -1149,7 +1149,7 @@ across importer changes.
 
 ## Deferred-work register
 
-This register mirrors Rust-specific entries in the core LIR design. A deferred
+This register mirrors Rust-specific entries in the core VIR design. A deferred
 item stays here until it lands, is explicitly rejected, or is superseded by a
 recorded decision.
 
@@ -1157,7 +1157,7 @@ recorded decision.
 |---|---|---|
 | Complete/frozen RawUnit JSON v1 Rust mirror | The typed Rust mirror emits all Rust integer type widths and arbitrary-precision integer values, tuples, fixed arrays, references, direct calls, plain structs, nominal enums, constructors, actual discriminants, downcast/field/index places, MIR assertions and administration, and drop/unwind terminators. Rust serde and the Lean decoder reject duplicate and unknown fields recursively; exhaustive raw-control, core type/value/place, operation/expression/specification, and declaration corpora round-trip canonically and reject recursive unknown-field mutations. Only approval and publication of the current v1 spelling as an external compatibility contract remain before the contract is frozen | M0 before fixtures beyond the supported mirror become compatibility artifacts |
 | Public function predicate query | `FnDef::generics_of` exposes lifetime/type parameter declarations, so unconstrained generic function bodies and local direct generic calls are retained once. Predicate queries remain public only on `TraitDecl`; the generic trait fixture exposes the trait's `Self` predicate and direct trait-method callee but not the function's `T: Step` clause. Const-function binder types are also unavailable | M0 before the generic trait RawUnit fixture can satisfy the gate. Filed upstream as [rust-lang/rust#161892](https://github.com/rust-lang/rust/issues/161892); the public queries are requested rather than reading `rustc_middle` |
-| Complete MIR-to-RawUnit mapper | The selected phase is generic optimized MIR. A CFG-driven mapper now handles compilation-unit scalar/reference/aggregate/nominal/function type and name tables, the never type, borrowed UTF-8 `str` and its byte length, all fixed and pointer-width Rust integers, tuples, fixed arrays, unsized slices, nested references, composites containing references, safe non-variadic Rust-ABI function pointers to local nongeneric functions, concrete type-, lifetime-, and evaluated scalar const-parameterized local ADTs, unconstrained lifetime/type-generic functions and their local direct calls, lifetime entries, multiple functions, declaration-local ID remapping, shared namespace arenas, integer constants/primitives and integer casts, explicit copy/move/borrow/read including `CopyForDeref`, tuple/vector and struct/enum aggregate construction including compact repeated arrays, tuple and dynamic/constant fixed-array indexing, dynamic and from-end slice indexing, fixed-array and dynamic-slice length, pointer metadata, from-end subslice places, dereference/downcast/field places, Boolean and integer switches, direct and function-pointer calls, enum discriminant reads and updates, ordinary panic assertions, inert storage/place/type administration, drop/unwind terminators, comments, and source ranges. Unsupported MIR is rejected at its exact node instead of falling through a fixture shape; the selected post-analysis normalization removes `OpaqueCast` projections before export and treats rustc's last-use `Copy` of an unconstrained type parameter or mutable reference as the consuming source move required by shared LIR | M1: add remaining admitted type/rvalue forms, symbolic const-dependent type shapes, destructive/provenance MIR administration exposed by Rustc Public, and constrained/const generic functions once their metadata is public; M4 adds cleanup and effectful drop glue |
+| Complete MIR-to-RawUnit mapper | The selected phase is generic optimized MIR. A CFG-driven mapper now handles compilation-unit scalar/reference/aggregate/nominal/function type and name tables, the never type, borrowed UTF-8 `str` and its byte length, all fixed and pointer-width Rust integers, tuples, fixed arrays, unsized slices, nested references, composites containing references, safe non-variadic Rust-ABI function pointers to local nongeneric functions, concrete type-, lifetime-, and evaluated scalar const-parameterized local ADTs, unconstrained lifetime/type-generic functions and their local direct calls, lifetime entries, multiple functions, declaration-local ID remapping, shared namespace arenas, integer constants/primitives and integer casts, explicit copy/move/borrow/read including `CopyForDeref`, tuple/vector and struct/enum aggregate construction including compact repeated arrays, tuple and dynamic/constant fixed-array indexing, dynamic and from-end slice indexing, fixed-array and dynamic-slice length, pointer metadata, from-end subslice places, dereference/downcast/field places, Boolean and integer switches, direct and function-pointer calls, enum discriminant reads and updates, ordinary panic assertions, inert storage/place/type administration, drop/unwind terminators, comments, and source ranges. Unsupported MIR is rejected at its exact node instead of falling through a fixture shape; the selected post-analysis normalization removes `OpaqueCast` projections before export and treats rustc's last-use `Copy` of an unconstrained type parameter or mutable reference as the consuming source move required by shared VIR | M1: add remaining admitted type/rvalue forms, symbolic const-dependent type shapes, destructive/provenance MIR administration exposed by Rustc Public, and constrained/const generic functions once their metadata is public; M4 adds cleanup and effectful drop glue |
 | Checked implementation-selection evidence and dictionary interpretation | Generic bodies, binder kinds, traits, impls, associated items, and generic arguments are core; `EvidenceId` is opaque | M2 before trait method calls execute or transfer contracts/proofs |
 | Remaining MIR administrative statements and exceptional control | Direct calls lower to assignment plus their normal continuation; non-Boolean switches lower to typed matches; rustc's impossible exhaustive-enum default becomes a non-matching path. Rustc's borrow-check-only `FakeRead` normalizes to an inert place mention after explicit rustc admission, and the shared structurizer erases validated storage live/dead, place mention, and user-type ascription nodes. Ordinary bounds/overflow/division/remainder assertions lower to explicit panic branches under `panic=abort`. RawUnit and the Rust mirror retain deinitialization, discriminant updates, and retags; the optimized-MIR mapper resolves the public `SetDiscriminant` case to a stable enum variant. The public statement API exposes neither `Deinit` nor `Retag`; its ubiquitous `Rvalue::Use(..., WithRetag::Yes)` is explicitly normalized only under the admitted, rustc-checked `unsafe=reject` profile because it has no safe observable runtime effect. An unsafe/provenance profile must preserve it. These destructive/provenance nodes, cleanup edges, pointer-alignment assertions, and reachable `unreachable` blocks remain rejected by structurization | Rust M4 for destruction, cleanup, and richer panic behavior; M5/unsafe profile for retag/provenance and pointer-alignment assertions |
 | Drop flags, cleanup scopes, and panic semantics | Under fixed `panic=abort`, a drop terminator with an unreachable unwind edge structurizes to an explicit typed `drop` operation followed by its normal continuation. Cleanup edges and effectful drop glue remain preserved/rejected; no cleanup is approximated | Finish M4 drop effects and flags; full unwinding requires a later separately approved milestone |
@@ -1170,15 +1170,15 @@ recorded decision.
 
 ### M0 — Rustc Public exporter spike and import contract
 
-- Create the `leaner-rust` Lake package and its `rust-exporter` Cargo crate.
-  The Lean package depends only on `leaner-ir`; the Rust crate contains all
+- Create the `verex-rust` Lake package and its `rust-exporter` Cargo crate.
+  The Lean package depends only on `verex-ir`; the Rust crate contains all
   Rustc Public/rustc-driver bootstrap dependencies.
 - Freeze RawUnit JSON v1, including the language-neutral generic,
   trait/implementation and associated-item schema, plus the
   Rust-profile capability vocabulary. Add fixtures for scalar arithmetic,
   enums, loops, direct calls, a generic trait method call, ordinary borrows,
   drops, a raw-pointer operation, and an unsupported operation.
-- Implement the `leaner-rust-export` driver against the pinned Rustc Public
+- Implement the `verex-rust-export` driver against the pinned Rustc Public
   toolchain.  It must serialize a detached Rust-profile `RawUnit` in its
   post-analysis callback and return `Compilation::Stop`.  The mapper makes no
   direct `rustc_middle` queries; startup-only bridge dependencies stay confined
@@ -1214,7 +1214,7 @@ Current M0 progress on the pinned `nightly-2026-07-23` toolchain:
 - Generic optimized MIR is the selected public phase. Plain lifetime/type
   generic functions and local direct calls retain one parametric body and
   explicit core instantiations; the `generic_identity` artifact prepares,
-  executes, prints as LeanerLang, and round-trips through canonical Rust.
+  executes, prints as VerexSL, and round-trips through canonical Rust.
   No public function-predicate query exposes the trait fixture's `T: Step`
   clause, and no public query exposes a const function binder's declared type;
   those remaining API gaps are explicit M0 boundaries recorded above.
@@ -1238,13 +1238,13 @@ Current M0 progress on the pinned `nightly-2026-07-23` toolchain:
 - The mapper is now driven by supported MIR nodes rather than exact fixture
   shapes. It emits multiple local functions in deterministic identity order,
   resolves a non-recursive direct call through the compilation-unit name
-  table, remaps each function's MIR local arena to parameter-first LIR locals,
+  table, remaps each function's MIR local arena to parameter-first VIR locals,
   shares namespace expression/place arenas, and records separate source ranges
   for function declarations, locals, statements, and terminators.
 - A `u32` `SwitchInt` artifact retains its ordered constant cases and default
   edge. Lean decodes and re-encodes it canonically, and the shared structurizer
   lowers it to a typed match with literal arms and a wildcard default.
-- Ordinary shared references now use core LIR reference types and an interned
+- Ordinary shared references now use core VIR reference types and an interned
   inference-lifetime entry. Copying through a dereference validates and
   prepares for execution; a second fixture preserves the MIR `Ref` as a
   place-based immutable borrow and passes that reference to a direct call.
@@ -1254,7 +1254,7 @@ Current M0 progress on the pinned `nightly-2026-07-23` toolchain:
   vocabulary. A Rust assignment through `&mut u32`, followed by a read through
   that reference, validates and prepares for execution without a Rust-specific
   operation tag.
-- Source-to-LeanerLang error baselines verify that raw pointers and inline
+- Source-to-VerexSL error baselines verify that raw pointers and inline
   assembly are rejected at the first unsupported typed node/terminator and
   never leave a partial RawUnit file. The exporter-local diagnostic capability
   probe still observes these constructs so future support cannot silently
@@ -1332,15 +1332,15 @@ Current M0 progress on the pinned `nightly-2026-07-23` toolchain:
 - Rust slices use the dynamic core vector type behind a profile-tagged shared
   reference. MIR `PtrMetadata` lowers to core reference dereference plus
   `length`, while dynamic slice indexing uses the existing place index and
-  explicit bounds assertion. Canonical Leaner source uses receiver auto-deref
-  as `values.length` and `values[index]`, while the lowered LIR retains the
+  explicit bounds assertion. Canonical Verex source uses receiver auto-deref
+  as `values.length` and `values[index]`, while the lowered VIR retains the
   explicit dereference. Its baseline validates and structurizes; target
   width is no longer inferred or a preparation blocker, while complete slice
   execution remains part of the reference/place integration.
 - Rust's unsized UTF-8 `str` maps to the core string type behind ordinary
   shared or mutable references. Shared and consuming mutable-reference
   identity functions validate, execute over string heap values, print as
-  LeanerLang `&string` / `&mut string`, and re-import through canonical Rust
+  VerexSL `&string` / `&mut string`, and re-import through canonical Rust
   `&str` / `&mut str` with equal outcomes and final heaps. The retained typed
   `core::str::len` call maps to core `length`, whose string semantics count
   UTF-8 bytes rather than Unicode scalar values.
@@ -1391,7 +1391,7 @@ Current M0 progress on the pinned `nightly-2026-07-23` toolchain:
   exact `drop place -> normal / unwind unreachable` shape structurizes to a
   typed core `drop` operation followed by the normal continuation. Its
   artifact validates, prepares, and prints as `drop(place)` in
-  LeanerLang. Cleanup edges and effectful drop glue remain explicit M4
+  VerexSL. Cleanup edges and effectful drop glue remain explicit M4
   boundaries; no cleanup behavior is erased or approximated.
 - MIR storage-live/dead, place-mention, and user-type-ascription statements
   have typed RawUnit mirror forms; borrow-check-only fake reads normalize to
@@ -1418,8 +1418,8 @@ Current M0 progress on the pinned `nightly-2026-07-23` toolchain:
 - Complete the MIR-to-RawUnit mapper for types, named locals, places, basic
   blocks, direct calls, source origins, and the information needed to
   structurize reducible control.
-- Register the `LeanerRust` profile and decode the generic RawUnit serializer
-  through `LeanerIR.Validation.validate`.
+- Register the `VerexRust` profile and decode the generic RawUnit serializer
+  through `VerexIR.Validation.validate`.
 - Validate the structurization witness and reject unsupported control shapes
   before constructing the shared body.
 - Import generic predicates, core trait/implementation declarations,
@@ -1434,28 +1434,28 @@ validation or reporting path.
 
 ### M1.5 — Lean build integration and managed toolchain
 
-- Add a Lean/Lake driver command that invokes `leaner-rust-export` for a Cargo
+- Add a Lean/Lake driver command that invokes `verex-rust-export` for a Cargo
   manifest, package, feature set, and target, then registers the validated
   unit for proof and source-backend consumers.
 - Define the tool cache and artifact location from source/Cargo-lock hashes,
   features, target, profile, exporter, and rustc revision.
-- Implement the Leaner-managed exporter/sysroot installation plus an explicit
+- Implement the Verex-managed exporter/sysroot installation plus an explicit
   developer override.  Normal users must not install nightly, `rustc-dev`, or
   the driver with `cargo install`.
 - Run dependencies with ordinary check/metadata artifacts and stop only the
   extracted root crate after analysis.
 
-Gate: a clean checkout imports a fixture through one Leaner setup/build command
+Gate: a clean checkout imports a fixture through one Verex setup/build command
 without relying on the user's Rust toolchain, and a repeated build is cached.
 
 Current M1.5 progress:
 
-- The `leaner-rust` Lake executable provides `import-file` for a
+- The `verex-rust` Lake executable provides `import-file` for a
   self-contained Rust library source. It builds `rust-exporter` from its local
   `rust-toolchain.toml`, invokes the resulting binary with the matching sysroot
   library path, decodes the detached JSON, and validates it through
-  `LeanerIR.Rust.validate` before publishing the requested artifact.
-- `LEANER_RUST_EXPORTER` and `LEANER_RUST_SYSROOT` are explicit development
+  `VerexIR.Rust.validate` before publishing the requested artifact.
+- `VEREX_RUST_EXPORTER` and `VEREX_RUST_SYSROOT` are explicit development
   overrides. The normal path never uses `cargo install`; it asks Cargo/rustup
   to build the checkout-owned exporter with the pinned toolchain. The managed
   checkout path uses Cargo's optimized release profile because the semantic
@@ -1470,8 +1470,8 @@ Current M1.5 progress:
 - `scripts/bench-rust-pipeline.sh source` reports exporter setup, cache-key,
   rustc/export, RawUnit validation, Rust-source/map, semantic-projection,
   preparation, and interpreter timings. Its `e2e` mode separately reports
-  Rust import, LeanerLang printing, and LeanerLang re-import/elaboration.
-  `LeanerRust.Benchmark` is inert unless `LEANER_RUST_BENCHMARK` is set, so the
+  Rust import, VerexSL printing, and VerexSL re-import/elaboration.
+  `VerexRust.Benchmark` is inert unless `VEREX_RUST_BENCHMARK` is set, so the
   phase probes remain available without affecting ordinary test output.
 - File-mode cache keys bind the canonical source path and content, exporter
   binary, toolchain declaration, profile name/version/options, target, and all
@@ -1491,7 +1491,7 @@ Current M1.5 progress:
   file in local/path package roots, and package/features/target selection.
   An uncached key gets a content-addressed Cargo target directory, avoiding a
   destructive clean and ensuring Cargo cannot mark a changed root fresh before
-  the wrapper emits its artifact. `LEANER_RUST_CACHE` overrides the default
+  the wrapper emits its artifact. `VEREX_RUST_CACHE` overrides the default
   checkout-local cache for development.
 - Lean integration tests perform fresh and repeated cached imports through
   both file and Cargo modes; the Cargo fixture includes a path dependency to
@@ -1517,17 +1517,17 @@ Current M1.5 progress:
 
 - Support scalar/ADT operations, assignments, direct calls, structured
   selections, and recovered reducible loops without custom destruction.
-- Generate function meanings only from validated LIR bodies.
+- Generate function meanings only from validated VIR bodies.
 - Verify generic bodies parametrically over trait evidence and method
   contracts for the initial methods, associated-types, and trait-inheritance
   subset.
 - Emit canonical Rust source for the accepted scalar/ADT/control subset and
   check the `Rust → MIR → RawUnit → ValidatedUnit` semantic round trip.
-- Exercise Leaner source printing separately as another validated-LIR backend.
+- Exercise Verex source printing separately as another validated-VIR backend.
 - Attach the existing-style `spec` / `verify` interface.
 - Export modular summaries and source-positioned proof obligations.
 
-Current M2 progress: `LeanerRust.Source.render` is the first standard-Rust
+Current M2 progress: `VerexRust.Source.render` is the first standard-Rust
 backend and accepts only the shared `ValidatedUnit` boundary. It emits explicit
 local storage and structured control for the target-independent Boolean and
 fixed-integer scalar subset, including assignments, branches, loops, returns,
@@ -1540,7 +1540,7 @@ aggregate, call, struct, reference, ownership, overflow, and control cases are
 rendered deterministically, compiled through
 the same pinned Rustc Public importer, revalidated, and compared by observable
 interpreter outcome. Every executable case is also compared through the
-provenance-free `LeanerRust.Equivalence` semantic projection. That projection
+provenance-free `VerexRust.Equivalence` semantic projection. That projection
 alpha-normalizes binder and local spelling, Copy loads, associative block
 nesting, and the exact return/call forwarding, shift-distance cast, and
 duplicated panic-guard administration introduced by standard-Rust rendering
@@ -1549,7 +1549,7 @@ the redundant bounds guards rustc restores around already guarded fixed-array,
 slice, and from-end slice accesses. Unsupported declaration, contract,
 attribute, and specification
 families fail the comparison explicitly rather than disappearing from it. The
-independent LeanerLang backend covers all forty-nine checked-in successful
+independent VerexSL backend covers all forty-nine checked-in successful
 Rust RawUnit fixtures:
 scalar and fixed-width signatures, unary and Boolean bitwise operations, pure
 tuple construction, context-directed integer casts, repeated fixed vectors,
@@ -1602,7 +1602,7 @@ in-bounds result and its preserved bounds panic through this path. The same
 unit executes fixed-array destructuring and a statically safe literal index
 after re-import, checking that only rustc's redundant restored guards are
 contracted. Value-level
-reference dereference remains explicit in LIR but canonical Leaner slice
+reference dereference remains explicit in VIR but canonical Verex slice
 indexing uses receiver auto-deref. From-end owned
 subslice borrows render as slice-rest pattern matches rather than range indexing,
 so their canonical Rust re-import stays dependency-free and compares normal and
@@ -1632,7 +1632,7 @@ deterministic half-open UTF-8 byte ranges for every emitted function,
 nominal declaration and generic binder, variant, field,
 declaration/signature/local/expression type use, expression, pattern, place occurrence,
 and function-scoped local
-declaration/reference. Each range retains its stable LIR node ID and
+declaration/reference. Each range retains its stable VIR node ID and
 `LocId`; function-owned nodes additionally retain their import `OriginId` and
 checked `AlignmentId`. Nominals carry no invented import provenance because
 `StructDecl` has none in the schema. Unicode cases verify that mapped ranges
@@ -1648,14 +1648,14 @@ metadata—including contracts, abilities, properties, pragmas, and attributes�
 are explicit source-backend errors rather than silently omitted.
 Plain type-generic identity and local direct-call bodies now preserve their
 binders and inferred instantiations through RawUnit, execution, canonical
-LeanerLang, canonical Rust, and semantic source re-import. LeanerLang omits the
+VerexSL, canonical Rust, and semantic source re-import. VerexSL omits the
 type argument on the direct call because its ordinary argument type determines
 it. Rustc's optimized last-use `Copy` spelling for an unconstrained parameter
 is normalized to the source-valid consuming move; a body that really requires
 two copies still fails preparation without `Copy` evidence. An inherent
 non-generic method and its receiver call use the same checked local
 function/ADT boundary, retain the explicit overflow path, and execute after a
-fresh LeanerLang elaboration. Canonical LeanerLang also contracts rustc's
+fresh VerexSL elaboration. Canonical VerexSL also contracts rustc's
 overflowing-result tuple plus Boolean assertion branch for checked add,
 subtract, and multiply into the corresponding `checked*Panic` primitive. The
 method fixture exercises both its ordinary result and overflow panic before
@@ -1668,11 +1668,11 @@ summaries remain before M2 is complete.
 ### M3 — Ownership and ordinary references
 
 - Model moves and initializedness.
-- Implement the LIR borrow checker, migrating applicable rules from the older
+- Implement the VIR borrow checker, migrating applicable rules from the older
   translation, and expose its checked loan/lifetime facts or certificate to
   the verifier.
 - Retain rustc's successful borrow check as upstream admission evidence and a
-  differential oracle, not as the semantic authority for LIR borrowing.
+  differential oracle, not as the semantic authority for VIR borrowing.
 - Reuse and extend prophecy semantics for `&T`, `&mut T`, reborrows, calls,
   and returned references.
 - Add positive and negative agreement tests against Rust execution.
@@ -1767,7 +1767,7 @@ outcomes and final heap state after canonical-source re-import, including an
 observable mutable write through `&mut`. A negative overlapping-mutable-borrow
 fixture is rejected by rustc with E0499 before artifact emission. Together,
 these cases retain rustc as an upstream differential oracle while the shared
-LIR preparation pass remains the semantic authority for admitted artifacts.
+VIR preparation pass remains the semantic authority for admitted artifacts.
 
 ### M4 — Drop and panic
 
@@ -1784,7 +1784,7 @@ retained calls to the well-known abort intrinsic and stable
 artifact validates, prepares, and executes as terminal panic. A raw MIR drop
 with an unreachable unwind edge structurizes to an explicit core drop and its
 normal continuation, validates and prepares, and is visible as
-`drop(place)` in the LeanerLang E2E baseline. Cleanup edges, `Resume`,
+`drop(place)` in the VerexSL E2E baseline. Cleanup edges, `Resume`,
 effectful drop glue, and drop flags remain explicit rejection boundaries
 rather than being erased.
 
@@ -1809,12 +1809,12 @@ rather than being erased.
 
 ### M7 — Alignment
 
-- State and prove the generic core-LIR semantic results.
+- State and prove the generic core-VIR semantic results.
 - Validate or prove refinement from the MIR exchange through `RawUnit` to the
   supported `ValidatedUnit` fragment.
 - Establish semantic equivalence for the
   `ValidatedUnit → Rust source → MIR → RawUnit → ValidatedUnit` round trip,
-  and separately for supported Leaner source backends.
+  and separately for supported Verex source backends.
 - Prove that generic type/const/implementation-evidence instantiation preserves
   the function meaning, so generic theorems transfer to concrete calls. Any
   later native specialization must be a separate refinement of this result.
@@ -1838,21 +1838,21 @@ For a supported Rust function, the project should be able to:
 
 1. compile and borrow-check the Rust crate with a pinned configuration;
 2. decode its MIR and provenance to `RawUnit`, then validate it through the
-   single LIR pipeline;
+   single VIR pipeline;
 3. emit readable canonical Rust source from the resulting `ValidatedUnit`;
 4. recompile that source and recover an equivalent validated Rust-profile
    body through the same MIR importer;
 5. preserve a generic body and its trait obligations rather than requiring a
    separate proof for every concrete use;
-6. interpret the resulting LIR for a Rust fixture and obtain the same
+6. interpret the resulting VIR for a Rust fixture and obtain the same
    observable result as the Rust execution.
 
 Later verification sessions extend this to:
 
-7. attach a normal Leaner-style contract to the registered function;
+7. attach a normal Verex-style contract to the registered function;
 8. prove that contract with the common verification interface;
 9. transfer that theorem to concrete calls through validated evidence, without
-   replacing the generic LIR body;
+   replacing the generic VIR body;
 10. report failed obligations at their original Rust locations;
 11. state exactly which alignment theorem or trusted importer assumption makes
    the result a claim about the Rust MIR body.

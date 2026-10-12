@@ -1,16 +1,16 @@
-# Leaner to Move bytecode design plan
+# Verex to Move bytecode design plan
 
 Status: living design document
 
 > **Terminology and target architecture.** In this document,
-> `Move.Compiler.LIR` names the current compiler-facing named executable CFG.
-> The independent [unified LIR design](../../../designs/lir-design.md) reserves “LIR” for a
-> new profile-aware representation shared by Move, Leaner Move, Leaner Rust,
+> `Move.Compiler.VIR` names the current compiler-facing named executable CFG.
+> The independent [unified VIR design](../../../designs/vir-design.md) reserves “VIR” for a
+> new profile-aware representation shared by Move, Verex Move, Verex Rust,
 > and Rust MIR frontends and source backends. During that migration, the
 > representation described here
 > is called **named stackless IR (NSIR)**. This document remains authoritative
 > for the currently implemented bytecode path; it is not the design of the
-> new LIR.
+> new VIR.
 
 This document describes the intended compiler pipeline from Lean-authored
 contracts to official Move bytecode. It is deliberately editable: settled
@@ -82,7 +82,7 @@ representative. Generic ability and memory typing must also be completed.
 ## Settled architecture
 
 The executable compiler must go through `MoveModel.IR`; there is no direct
-LIR-to-XIR lowering. Direct source verification is a separate Lean branch and
+VIR-to-XIR lowering. Direct source verification is a separate Lean branch and
 does not generate or consume XIR:
 
 ```text
@@ -97,7 +97,7 @@ Lean declarations
     |
     | attributes and base LCNF normalization
     v
-Move.Compiler.LIR.Module
+Move.Compiler.VIR.Module
     |
     | name resolution and semantic lowering
     v
@@ -134,7 +134,7 @@ source theorem to emitted bytecode requires a compiler-correctness proof.
 
 Layer ownership is strict:
 
-- `Move.Compiler.LIR` knows Lean declaration and local names.
+- `Move.Compiler.VIR` knows Lean declaration and local names.
 - `MoveModel.IR` owns executable semantics and transformations.
 - `MoveModel.Frontend.XIR` owns finite interchange data and JSON serialization.
 - The Move model owns shared runtime-declaration construction used by both the
@@ -144,7 +144,7 @@ Layer ownership is strict:
   pipeline owns checking, optimization, file-format construction, and final
   verification.
 
-Imports enforce this direction. In particular, `Move.Compiler.LIR` imports
+Imports enforce this direction. In particular, `Move.Compiler.VIR` imports
 `MoveModel.IR`, not `MoveModel.Frontend.XIR`.
 
 ## Implemented IR boundary
@@ -152,8 +152,8 @@ Imports enforce this direction. In particular, `Move.Compiler.LIR` imports
 The prototype now uses two explicit conversions:
 
 ```lean
-Move.Compiler.LIR.Module.toIR :
-  Move.Compiler.LIR.Module → Except String MoveModel.IR.Module
+Move.Compiler.VIR.Module.toIR :
+  Move.Compiler.VIR.Module → Except String MoveModel.IR.Module
 
 MoveModel.Frontend.XIR.MModule.ofIR :
   MoveModel.IR.Module → Except String MoveModel.Frontend.XIR.MModule
@@ -162,9 +162,9 @@ MoveModel.Frontend.XIR.MModule.ofIR :
 The second conversion lives in `MoveModel/Frontend/XIR/FromIR.lean`. Keeping it out
 of `MoveModel.IR` avoids reversing the dependency and creating an import cycle.
 
-## Move.Compiler.LIR extensions
+## Move.Compiler.VIR extensions
 
-`Move.Compiler.LIR` remains the named, compiler-facing representation. It already
+`Move.Compiler.VIR` remains the named, compiler-facing representation. It already
 contains most metadata needed by the next stage:
 
 - Module address and name
@@ -189,10 +189,10 @@ structure AbilitySet where
 Move structures and enums declare exact abilities using Lean's deriving
 surface: `has Copy, Drop, Store, Key`. `struct` itself grants no
 abilities, and a resource is represented by `struct ... has Key`.
-Lowering records these abilities in LIR, Move IR, and XIR; the production Move
+Lowering records these abilities in VIR, Move IR, and XIR; the production Move
 compiler validates that field types support them.
 
-No instruction changes are required for the current Leaner subset. Existing
+No instruction changes are required for the current Verex subset. Existing
 function calls, reference operations, branches, and resource operations all
 have corresponding `MoveModel.IR` operations.
 
@@ -246,7 +246,7 @@ structure Module where
 end MoveModel.IR
 ```
 
-`Address` is a `Nat` in the model. LIR-to-IR lowering parses the source address
+`Address` is a `Nat` in the model. VIR-to-IR lowering parses the source address
 string, checks the 256-bit bound, and retains the numeric address. XIR JSON
 encodes it in canonical hexadecimal form.
 
@@ -264,9 +264,9 @@ Move bytecodes.
 A module-aware reference-elimination wrapper must update the dialect to
 `.referenceEliminated`.
 
-## LIR to IR lowering
+## VIR to IR lowering
 
-`Move.Compiler.LIR.Module.toIR` performs the only name-resolution pass:
+`Move.Compiler.VIR.Module.toIR` performs the only name-resolution pass:
 
 1. Validate unique Move struct and function names.
 2. Assign deterministic positional resource and function IDs.
@@ -276,7 +276,7 @@ A module-aware reference-elimination wrapper must update the dialect to
 5. Assign block IDs in layout order and preserve the actual entry ID.
 6. Construct `MoveModel.IR.StructDecl`, `FunDecl`, `Cfg`, `Block`, `Instr`, and
    `Term` values directly.
-7. Convert an LIR `.entry` visibility to IR `.public_` plus `isEntry := true`,
+7. Convert an VIR `.entry` visibility to IR `.public_` plus `isEntry := true`,
    and `.friend_` to IR `.friend`.
 8. Attach abilities, names, address, and `acquires` to `MoveModel.IR.Module`.
 9. Mark the result as `.stackless`.
@@ -412,18 +412,18 @@ Export is an explicit build action, not an incidental elaboration-time write.
 Baseline files use:
 
 ```text
-#export_leaner_xir compiled to "Account.xir.json"
+#export_verex_xir compiled to "Account.xir.json"
 ```
 
-Compiler inputs use `#export_leaner "Module"`, which combines automatic
+Compiler inputs use `#export_verex "Module"`, which combines automatic
 attribute discovery, semantic `IR.Module` construction, and the compiler
 handoff in one source-facing directive. The request is registered where it appears and is
 processed at end of input, allowing it to live immediately after imports and
 before namespaces or opens. An optional `structs [...] functions [...]` suffix
-selects declarations explicitly. The lower-level `#emit_leaner_xir compiled`
+selects declarations explicitly. The lower-level `#emit_verex_xir compiled`
 form materializes the existing `IR.Module` only when an exchange file is
 requested. Both only write when compiler v2 supplies its private
-`LEANER_XIR_OUTPUT`; ordinary Lean builds just validate the module.
+`VEREX_XIR_OUTPUT`; ordinary Lean builds just validate the module.
 
 The preferred authoring form is `module Module where ...`. This macro
 creates the same-named Lean namespace, opens the `Move` API and syntax, and
@@ -472,7 +472,7 @@ Compiler phases:
 
 XIR import intentionally occurs after AST-level transforms. Stackless XIR has
 no Move model AST, so AST transformations such as lambda lifting cannot act on
-it. If Leaner later exports lambdas, XIR must preserve a model-AST-level form
+it. If Verex later exports lambdas, XIR must preserve a model-AST-level form
 and be imported before lambda lifting; the current first-order XIR enters at
 the stackless boundary.
 
@@ -527,9 +527,9 @@ operation in their diagnostic.
 
 ### Lean validation
 
-- Source constructs belong to the supported Leaner subset.
+- Source constructs belong to the supported Verex subset.
 - Names resolve uniquely.
-- Every LIR type and operation lowers to `MoveModel.IR`.
+- Every VIR type and operation lowers to `MoveModel.IR`.
 - Module addresses fit in 256 bits.
 - Every in-range local and block is declared.
 - Function and resource references are in range.
@@ -558,7 +558,7 @@ checker is not a substitute for passing the production verifier.
 ### Lean tests
 
 - Source-level `spec`/`verify` tests which execute semantic IR directly.
-- LIR-to-IR expected-shape tests.
+- VIR-to-IR expected-shape tests.
 - IR interpreter execution for Arithmetic, Account, Read, and Calls.
 - IR-to-XIR materialization and XIR JSON tests at the explicit export/import
   boundaries.
@@ -579,7 +579,7 @@ checker is not a substitute for passing the production verifier.
 
 For each representative Lean-authored Move program:
 
-1. Compile Lean source through LIR, IR, XIR, JSON, and `.mv`.
+1. Compile Lean source through VIR, IR, XIR, JSON, and `.mv`.
 2. Execute the original IR with `MoveModel.IR.interpFun`.
 3. Execute the generated module in the Move VM.
 4. Compare return values, abort codes, and relevant global storage.
@@ -592,19 +592,19 @@ table indices and byte offsets need not match.
 
 ### Milestone 1: establish the IR boundary — implemented
 
-- Add abilities to `Move.Compiler.LIR`.
+- Add abilities to `Move.Compiler.VIR`.
 - Add `MoveModel.IR.Module` and its metadata types.
-- Implement `Move.Compiler.LIR.Module.toIR`.
-- Remove the direct LIR-to-XIR lowering.
+- Implement `Move.Compiler.VIR.Module.toIR`.
+- Remove the direct VIR-to-XIR lowering.
 - Run existing interpreter tests through the new IR path.
-- Add LIR-to-IR shape and failure tests.
+- Add VIR-to-IR shape and failure tests.
 
 ### Milestone 2: materialize XIR — implemented
 
 - Add `MoveModel.Frontend.XIR.MModule` and metadata records.
 - Implement checked `MModule.ofIR`.
 - Add convenience projections to the semantic `Program`.
-- Add `lowerToIR` using direct LIR-to-IR quotation.
+- Add `lowerToIR` using direct VIR-to-IR quotation.
 - Add round-trip and malformed-finite-IR tests.
 
 ### Milestone 3: JSON contract — implemented
@@ -646,7 +646,7 @@ table indices and byte offsets need not match.
 
 ### Milestone 7: source-to-bytecode proof connection — not implemented
 
-- State semantic preservation for normalization and LIR-to-IR lowering.
+- State semantic preservation for normalization and VIR-to-IR lowering.
 - Relate generated source `Spec`s to the corresponding IR function semantics.
 - Compose that result with the existing IR transformations and adequacy
   theorems.
@@ -665,7 +665,7 @@ table indices and byte offsets need not match.
   general recursive functions and checked, stack-safe direct `continue` loops.
 - Unsupported types, operations, imported signatures, and dependencies fail
   with clear errors.
-- No compiler path bypasses `MoveModel.IR` by lowering LIR directly to XIR.
+- No compiler path bypasses `MoveModel.IR` by lowering VIR directly to XIR.
 
 ## Open questions
 
@@ -681,7 +681,7 @@ table indices and byte offsets need not match.
 ## Change log
 
 - 2026-08-15: Initial plan recorded. Established the mandatory
-  `Move.Compiler.LIR → MoveModel.IR → MoveModel.Frontend.XIR → JSON` pipeline and the initial
+  `Move.Compiler.VIR → MoveModel.IR → MoveModel.Frontend.XIR → JSON` pipeline and the initial
   bytecode-backend milestones.
 - 2026-08-15: Integrated `.lean` target and package-source discovery into Move
   compiler v2.
@@ -696,4 +696,4 @@ table indices and byte offsets need not match.
 - 2026-08-20: Recorded implemented structured `while`/`loop` CFG lowering, the
   `public fun` / `friend fun` visibility keywords with `public(friend)`
   export, and the split of the language definition into
-  [`leaner-move.md`](leaner-move.md).
+  [`verex-move.md`](verex-move.md).

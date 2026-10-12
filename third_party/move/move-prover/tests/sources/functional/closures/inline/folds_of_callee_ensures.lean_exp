@@ -1,3 +1,16 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_callee_ensures.move:24:10: error: operation `LeanerIR.Operation.data
-  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 1 } } "total")` is outside the current LeanerLang parser
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:69:9: error: the specification clause `aborts_if spec_sum(v, v.length) > MAX_U64` is not established
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:68:5: error: verex verification failed: the automatic verification of `sum_via_callee` failed; provide a proof: `verify sum_via_callee by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_via_callee by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:91:9: error: the specification clause `aborts_if spec_sum(v, v.length) > MAX_U64` is not established
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:90:5: error: verex verification failed: the automatic verification of `sum_via_bare_callee` failed; provide a proof: `verify sum_via_bare_callee by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_via_bare_callee by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:141:5: error: the loop invariant `acc
+        == «spec_fold$lambda$2»(v, with_state_anchor!(12, old(acc)), i)
+        && (∀ (_j_13 in 0 .. i),
+          !(«spec_fold$lambda$2»(
+            v, with_state_anchor!(12, old(acc)), _j_13
+          ).total
+            + v[_j_13]
+            > MAX_U64))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:146:5: error: verex verification failed: the automatic verification of `sum_field` failed; provide a proof: `verify sum_field by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_field by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:189:9: error: the specification clause `ensures result == spec_sum(v, v.length) + 1` is not established
+tests/sources/functional/closures/inline/folds_of_callee_ensures.move:187:5: error: verex verification failed: the automatic verification of `sum_via_callee_wrong` failed; provide a proof: `verify sum_via_callee_wrong by …` in `tests/sources/functional/closures/inline/folds_of_callee_ensures.proof.lean` (`verify sum_via_callee_wrong by verex_obligations` lists its obligations)

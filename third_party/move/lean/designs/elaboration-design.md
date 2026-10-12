@@ -1,16 +1,16 @@
-# Leaner: Elaboration, Verification, and Execution from LIR
+# Verex: Elaboration, Verification, and Execution from VIR
 
 ## Status and scope
 
-This document defines the migration from the current Leaner source-specific
+This document defines the migration from the current Verex source-specific
 elaboration and verification path to a single path driven by validated
-Leaner IR. It builds on the shared representation in
-[`lir-design.md`](lir-design.md); it does not redefine the LIR
+Verex IR. It builds on the shared representation in
+[`vir-design.md`](vir-design.md); it does not redefine the VIR
 syntax or the frontend interchange format.
 
 **Reframing (2026-08-27):** the `move`, `move-model`, and `transpiler`
 packages were deprecated wholesale as reference-only; nothing current links
-them, and the Move exchange frontend now lives in `LeanerMove.Frontend`.
+them, and the Move exchange frontend now lives in `VerexMove.Frontend`.
 This changes the migration story this document was written around: there is
 no longer a live direct elaboration path to shadow (M3), migrate away from
 (M6), or retire incrementally (M7) — the old path is frozen as an oracle and
@@ -18,7 +18,7 @@ its corpus is mined by copying tests, not by switching defaults. The spine's
 remaining deliverables are the M2 tail (executable coverage of the corpus
 plus the owed metatheory: determinism, completeness up to fuel,
 preservation/no-stuck) and M4–M5 (contracts, calculated WP, and
-borrow/state/loop/modular verification), targeting the LeanerLang surface and
+borrow/state/loop/modular verification), targeting the VerexSL surface and
 the e2e corpus. Separately, the validation pipeline work (single-run
 validate, authoritative resolution and unification typing, analyses run once
 at validate with certificates on `ValidatedUnit`) landed 2026-08-27;
@@ -81,7 +81,7 @@ Direct calls are resolved during preparation and checked against callee
 parameter and packed-result types after structural type/lifetime substitution.
 Closure construction applies the same substitution to captured parameter
 prefixes and the residual function type; invocation checks the callable,
-argument vector, and result type. Generic bodies remain single LIR bodies.
+argument vector, and result type. Generic bodies remain single VIR bodies.
 Direct calls and closure construction also require the caller and target to
 share a profile until an explicit validated boundary-adapter representation
 exists.
@@ -200,9 +200,14 @@ logical boundary.
 The shared checker also enforces result-slot bounds/types, type-domain
 instantiations/results, correlates resource-domain operations with their
 nominal type arguments/results, and enforces the fixed nullary/unary result
-shapes of `old`, `wellFormed`, and `abortFlag`. Trace, no-op, and source-level
-bit-vector/integer conversion nodes are unary and type-preserving, matching the
-existing source backend's representation-independent rendering.
+shapes of `old`, `wellFormed`, and `abortFlag`. Trace and no-op nodes are unary
+and type-preserving. Neutral fixed-width/logical-integer coercions are unary
+and check the corresponding numeric domains. They must not be conflated with
+Move's polymorphic `int2bv`/`bv2int` representation wrappers: unsigned
+conversion and subsequent arithmetic can wrap, while signed instances stay
+in the integer representation. The Move importer rejects those wrappers
+until representation flow is modeled (2026-10-07; registry C17). Erasing them
+previously allowed false overflow proofs.
 Specification vector construction, update, concatenation, containment,
 index-of, in-range, and range operations check their fixed arity and
 vector/element/index/result relationships before M4 interpretation. Their
@@ -249,7 +254,7 @@ identity over its already-evaluated operand: consuming a local is represented
 by the place-based `move`, while a local expression cannot silently duplicate
 a non-`Copy` value. Validation turns a direct read of a non-`Copy` local in
 executable code into that `move`, a `Copy` place load of a selection from it,
-or a place read under an observer (`lir-design.md`). Neither form is delegated to a Move string tag.
+or a place read under an observer (`vir-design.md`). Neither form is delegated to a Move string tag.
 Value-level borrow, dereference, and freeze are a typed reference-operation
 family. Under the prophetic ownership model
 ([`prophetic-references.md`](prophetic-references.md)) they execute over
@@ -272,34 +277,34 @@ first-order ability checks on their type arguments.
 Specification calls and built-ins use the closed, payload-bearing
 `SpecOperation` family as well. Function targets are `QualifiedRef`s; result
 indexes, state anchors, trace kinds, memory ranges, and integer widths are
-typed fields. Move XAST and the Leaner frontend translate these operations in
+typed fields. Move XAST and the Verex frontend translate these operations in
 both directions without routing known logical constructs through profile
 strings. The Move profile consequently admits no residual type or operation
 tags; its remaining tags describe frontend-only declaration metadata.
 Remaining M2 work includes general index
 evaluation, full type/ability/initialization checking, profile lifetime and
 borrow constraints, and full preservation. The prophecy-reference refinement
-obligation is gone: validated LIR runs one prophetic ownership semantics for
+obligation is gone: validated VIR runs one prophetic ownership semantics for
 execution and verification alike
 ([`prophetic-references.md`](prophetic-references.md)).
 
 The intended endpoint is:
 
-> Validated LIR is the only semantic input to Leaner execution,
+> Validated VIR is the only semantic input to Verex execution,
 > verification, executable lowering, and generated Lean declarations.
 
-Source provenance must survive every path out of LIR. Validation errors,
+Source provenance must survive every path out of VIR. Validation errors,
 interpreter errors, language throws, verification obligations, and backend
 diagnostics must point to the originating `LocId` and, through it, the
 authored source range. A pass may refine or add related locations, but it may
 not replace an available authored location with only a generated one.
 
-The source language remains useful. Leaner source becomes one frontend which
-constructs raw LIR, just as Move and Rust MIR do. What is retired is the
+The source language remains useful. Verex source becomes one frontend which
+constructs raw VIR, just as Move and Rust MIR do. What is retired is the
 second, direct path that derives semantics by walking retained Lean syntax.
 
 The first implementation target is an interpreter and a relational big-step
-semantics for structured LIR. Verification is then defined against that
+semantics for structured VIR. Verification is then defined against that
 semantics. Existing source semantics and proof code may be copied into the
 new package: the old implementation is a migration source, not a compatibility
 boundary that must remain internally unchanged.
@@ -311,24 +316,24 @@ keeps separate:
 
 1. **Frontend elaboration** parses and resolves a source language and creates
    a `RawUnit` with source locations and alignment evidence.
-2. **LIR semantic elaboration** consumes a `ValidatedUnit` and registers Lean
+2. **VIR semantic elaboration** consumes a `ValidatedUnit` and registers Lean
    declarations for its runtime meaning, contracts, proof interface, and
    optional executable façade.
 
 Only the second operation is shared by every frontend. Lean still elaborates
-the syntax of a Leaner source file, but source syntax no longer defines the
-function's semantic or verification path after LIR construction.
+the syntax of a Verex source file, but source syntax no longer defines the
+function's semantic or verification path after VIR construction.
 
-“Execution” below means execution of LIR itself. Lowering Move-profile LIR to
+“Execution” below means execution of VIR itself. Lowering Move-profile VIR to
 the existing stackless `MoveModel.IR` and then to bytecode remains a separate
 backend and a separate preservation obligation.
 
 ## Current architecture
 
-The current Leaner Move path derives related meanings independently:
+The current Verex Move path derives related meanings independently:
 
 ```text
-Leaner source
+Verex source
   |
   +--> Lean elaboration --> Lean definitions / Move.Action façade
   |                              |
@@ -337,10 +342,10 @@ Leaner source
   |                                      +--> Move.Verify.Source
   |                                           --> sourceSpec / contract / proof
   |
-  +--> Lean environment / LCNF --> Move.Compiler.LIR (NSIR)
+  +--> Lean environment / LCNF --> Move.Compiler.VIR (NSIR)
                                     --> MoveModel.IR --> interpreter / bytecode
   |
-  +--> transitional Leaner-to-LIR importer
+  +--> transitional Verex-to-VIR importer
 ```
 
 In particular:
@@ -348,29 +353,29 @@ In particular:
 - `v0/move/Move/Verify/Syntax.lean` stores a private retained `Declaration`
   containing raw `Syntax`, reparses source, reconstructs signatures, analyzes
   borrow scopes, and generates relational specifications;
-- `v0/move/Move/Compiler/LIR.lean` independently recovers executable structure
+- `v0/move/Move/Compiler/VIR.lean` independently recovers executable structure
   from elaborated Lean declarations;
 - `v0/move/Move/Compiler/Elab.lean` quotes the lowered `MoveModel.IR` back into
   Lean; and
-- the current LIR path can print canonical Leaner source, but it does not yet
-  supply the elaboration, execution, or proof meaning of that LIR.
+- the current VIR path can print canonical Verex source, but it does not yet
+  supply the elaboration, execution, or proof meaning of that VIR.
 
 This duplication is the problem being removed. It permits the compiler and
 verifier to disagree, makes imported MIR a special case, and causes source
 syntax and Lean environment side tables to remain semantic inputs long after
-a validated LIR body exists.
+a validated VIR body exists.
 
 ## Target architecture
 
 ```text
-Leaner source --------+
-Move source ----------+--> RawUnit --> LeanerIR.Validation.validate --> ValidatedUnit
+Verex source --------+
+Move source ----------+--> RawUnit --> VerexIR.Validation.validate --> ValidatedUnit
 Rust MIR -------------+                                      |
                                                              |
                          +-----------------------------------+----------------+
                          |                                   |                |
                          v                                   v                v
-                 LIR interpreter                    LIR big-step       LIR contracts
+                 VIR interpreter                    VIR big-step       VIR contracts
                  (computable)                       semantics          and WP
                          |                                   |                |
                          +---------- soundness --------------+------ verify f
@@ -389,7 +394,7 @@ semantics.
 
 ### Package ownership
 
-`leaner-ir/LeanerIR` owns:
+`verex-ir/VerexIR` owns:
 
 - the runtime value and state model for the known Move/Rust semantic union;
 - structured expression, place, call, control, and throw semantics;
@@ -397,7 +402,7 @@ semantics.
 - the authoritative relational big-step semantics;
 - contracts, semantic weakest preconditions, calculated WP rules, and their
   soundness theorems;
-- the generic `verify` proof interface over LIR functions; and
+- the generic `verify` proof interface over VIR functions; and
 - semantic capability checking and source-positioned semantic diagnostics,
   including runtime termination sites and proof-obligation origins.
 
@@ -406,16 +411,16 @@ depend on `move`, `move-model`, or `transpiler`.
 
 The module and namespace ownership mirrors the pipeline:
 
-- `LeanerIR.Import` owns raw frontend envelopes and checked CFG
+- `VerexIR.Import` owns raw frontend envelopes and checked CFG
   structurization;
-- `LeanerIR.Validation` owns diagnostics, validated envelopes, structural
+- `VerexIR.Validation` owns diagnostics, validated envelopes, structural
   checking, and semantic capability preparation;
-- `LeanerIR.Semantics` modules own the runtime domain and big-step relations;
-- `LeanerIR.Interpreter` owns executable evaluation; and
-- `LeanerIR.Proofs` owns soundness and future verification theorems.
+- `VerexIR.Semantics` modules own the runtime domain and big-step relations;
+- `VerexIR.Interpreter` owns executable evaluation; and
+- `VerexIR.Proofs` owns soundness and future verification theorems.
 
-Test modules live below `LeanerIR.Tests` and are named for the boundary they
-exercise; there is no undifferentiated `LeanerIR.Tests` source module.
+Test modules live below `VerexIR.Tests` and are named for the boundary they
+exercise; there is no undifferentiated `VerexIR.Tests` source module.
 
 Profile libraries supply implementations only for genuine extension nodes
 and profile policies such as transaction-abort rollback or panic cleanup.
@@ -426,11 +431,11 @@ fields. A vocabulary check alone is not an executable meaning.
 
 The other packages become clients:
 
-- `move` owns Leaner surface syntax, the Leaner-to-LIR frontend, compatibility
+- `move` owns Verex surface syntax, the Verex-to-VIR frontend, compatibility
   commands, and Move executable lowering;
-- `leaner-move` supplies Move policy and validates residual frontend-only
+- `verex-move` supplies Move policy and validates residual frontend-only
   property metadata;
-- `move-model` is a lower executable/prover IR and no longer defines LIR
+- `move-model` is a lower executable/prover IR and no longer defines VIR
   meaning; and
 - `transpiler` owns exchange adapters and source printing, not semantics.
 
@@ -465,7 +470,7 @@ prepareVerification : SemanticsRegistry -> ValidatedUnit ->
 
 These wrappers contain indexes and checked handlers; they do not copy or
 translate function bodies. Eventually the common checks should move into
-`LeanerIR.Validation.validate`, leaving preparation to check only consumer
+`VerexIR.Validation.validate`, leaving preparation to check only consumer
 capability.
 
 ## Runtime model
@@ -559,7 +564,7 @@ The exact signatures may evolve, but the following properties are required:
 - a block propagates non-local control without evaluating its suffix;
 - `loop` consumes a matching depth-zero break/continue and decrements outer
   nesting depths when propagating them;
-- a call evaluates arguments in LIR-defined order, enters a fresh frame, and
+- a call evaluates arguments in VIR-defined order, enters a fresh frame, and
   converts a callee return into a caller value;
 - `throw_` preserves all argument values;
 - patterns either bind atomically or do not match;
@@ -581,7 +586,7 @@ structure FunctionMeaning where
 ```
 
 It is selected by profile and function identity, never by whether the body
-came from Leaner, Move, MIR, or generated source.
+came from Verex, Move, MIR, or generated source.
 
 **Open rules (2026-09-03).** The rules are stated over a callee oracle:
 `EvalExprWith unit callee` (with `EvalValuesWith`, `EvalStatementsWith`,
@@ -590,7 +595,7 @@ came from Leaner, Move, MIR, or generated source.
 the nested inductive tying the knot — its one rule evaluates the body under
 `EvalFunction unit` itself.  `EvalExpr unit` and the other closed relations
 are the instances at that oracle, so every consumer keeps its spelling.
-The knot's metatheory lived in `LeanerIR/Proofs/Oracle.lean`, removed with the pre-denotation routes: the open
+The knot's metatheory lived in `VerexIR/Proofs/Oracle.lean`, removed with the pre-denotation routes: the open
 rules are monotone in the oracle, and `EvalFunction.induction` states that
 the closed semantics is below every oracle closed under one unfolding of
 the function boundary — the least-fixed-point induction a recursive
@@ -616,8 +621,8 @@ A language `throw_` is therefore a successful, source-positioned interpreter
 result.
 
 The initial implementation should copy the useful finite-store and proof
-patterns from `MoveModel.IR.Interp`, but it must execute structured LIR
-directly. Defining LIR execution by lowering to `MoveModel.IR` would make the
+patterns from `MoveModel.IR.Interp`, but it must execute structured VIR
+directly. Defining VIR execution by lowering to `MoveModel.IR` would make the
 lowering correct by definition, lose the structured semantics wanted for
 Lean and Rust, and prevent that lowering from being tested independently.
 
@@ -653,7 +658,7 @@ SemanticWP f normalPost throwPost initialState :=
   every outcome related by f.semantics satisfies the matching postcondition
 ```
 
-A calculated `wpExpr` is then implemented by structural recursion over LIR so
+A calculated `wpExpr` is then implemented by structural recursion over VIR so
 proofs do not quantify over derivation trees. Its soundness theorem connects
 it to `SemanticWP`. This ordering prevents tactics from becoming the
 definition of correctness.
@@ -670,14 +675,14 @@ be moved or copied in layers:
 - proof automation last.
 
 > Superseded 2026-08-27: the runtime and proof representations of
-> references ARE identical. Validated LIR is prophecy-based ownership per
+> references ARE identical. Validated VIR is prophecy-based ownership per
 > [`prophetic-references.md`](prophetic-references.md); the interpreter
 > runs the ghost-erased rules, so the former concrete-to-relational
 > refinement obligation is replaced by that design's agreement theorem.
 
 ### Specification expressions and contracts
 
-Contracts already live in LIR as `FunctionContract`, `Condition`, `Frame`,
+Contracts already live in VIR as `FunctionContract`, `Condition`, `Frame`,
 and expression roots. The verifier interprets these nodes directly:
 
 - `requires` constrains the initial logical environment;
@@ -695,30 +700,30 @@ must diagnose any construct for which no logical denotation exists.
 
 ### Generated proof interface
 
-For each executable declaration `f`, LIR semantic elaboration exposes the
+For each executable declaration `f`, VIR semantic elaboration exposes the
 equivalent of:
 
 ```lean
-f.lirDecl    -- stable handle into the validated unit
+f.virDecl    -- stable handle into the validated unit
 f.semantics  -- FunctionMeaning
-f.spec       -- denotation of the LIR FunctionContract
+f.spec       -- denotation of the VIR FunctionContract
 f.contract   -- Contract.Satisfies f.semantics f.spec
 f.verified   -- theorem produced by `verify f`
 ```
 
 During migration, `f.sourceSpec` may remain as a compatibility alias for
 `f.semantics`; it must not be generated by walking retained source. Calls use
-proved or trusted summaries attached to LIR function identities, so callers
+proved or trusted summaries attached to VIR function identities, so callers
 and callees may come from different frontends when their profiles are
 compatible.
 
-`verify f` becomes a small command elaborator which resolves `f.lirDecl`,
-constructs the standard `Contract.Satisfies` theorem, and invokes LIR proof
+`verify f` becomes a small command elaborator which resolves `f.virDecl`,
+constructs the standard `Contract.Satisfies` theorem, and invokes VIR proof
 automation. It does not retrieve raw source syntax.
 
 ## Lean declaration elaboration
 
-LIR semantic elaboration should quote or register each validated unit once.
+VIR semantic elaboration should quote or register each validated unit once.
 Generated declarations refer to a unit constant and stable declaration IDs;
 they should not expand every expression node into a fresh Lean syntax tree.
 This avoids repeating an arena once for execution, again for verification,
@@ -726,13 +731,13 @@ and again for compilation.
 
 The elaborator has two outputs:
 
-1. **Semantic declarations**, such as `f.semantics`, `f.spec`, and stable LIR
+1. **Semantic declarations**, such as `f.semantics`, `f.spec`, and stable VIR
    handles. These are required for every supported function.
 2. **Ergonomic façades**, such as a typed Lean function or `Move.Action`
    wrapper. These are generated only when the function's profile and types
    can be represented by that surface API.
 
-Nominal LIR declarations similarly generate Lean structures/enums and the
+Nominal VIR declarations similarly generate Lean structures/enums and the
 type-reification evidence needed to cross between typed façades and
 `RuntimeValue`. Generic bodies stay generic over type, const, lifetime, and
 trait/ability evidence; the semantic elaborator must not monomorphize them
@@ -752,13 +757,13 @@ To control elaboration size:
 
 Every generated declaration and obligation records its originating
 `NamespaceId`, declaration ID, and `LocId` in a persistent environment
-extension. Errors from semantic preparation use the LIR location directly.
+extension. Errors from semantic preparation use the VIR location directly.
 Errors raised while elaborating a generated Lean declaration are translated
 through this reverse map before presentation.
 
-Generated subterms inherit the most specific LIR node location. A diagnostic
+Generated subterms inherit the most specific VIR node location. A diagnostic
 may add related source ranges for the call site, callee declaration, macro
-origin, or imported MIR location. The canonical Leaner printer is another
+origin, or imported MIR location. The canonical Verex printer is another
 consumer of this map; generated text is not the authoritative error location.
 
 Location propagation is required at every semantic boundary:
@@ -768,17 +773,17 @@ Location propagation is required at every semantic boundary:
 - the interpreter reports a `throw_` at the throwing expression and a stuck
   operation at the operation expression, with caller locations as related
   ranges;
-- calculated WP nodes and generated Lean goals retain the `LocId` of the LIR
+- calculated WP nodes and generated Lean goals retain the `LocId` of the VIR
   code or contract clause which created them;
 - a malformed specification points to its `Condition`, `Frame`, or
   specification-expression location;
 - an unproved verification goal is displayed at the relevant code or spec
   location, even when the generated theorem has synthetic Lean syntax; and
-- executable and source lowerings maintain an explicit target-node-to-LIR-
-  location map so later backend errors can be translated back through LIR.
+- executable and source lowerings maintain an explicit target-node-to-VIR-
+  location map so later backend errors can be translated back through VIR.
 
-When one target node combines several LIR nodes, it keeps one primary
-location and all other contributing locations as related ranges. When one LIR
+When one target node combines several VIR nodes, it keeps one primary
+location and all other contributing locations as related ranges. When one VIR
 node expands to several target nodes, every target inherits its location.
 Generated nodes without a direct authored range retain `generatedBy` and
 `parent` links until an authored ancestor is reached.
@@ -812,7 +817,7 @@ source-positioned capability diagnostic for every reachable node.
   failures, and call stacks.
 - Prove operation and interpreter soundness for this subset.
 
-Gate: hand-built validated LIR runs scalar, tuple, branch, loop, call, normal
+Gate: hand-built validated VIR runs scalar, tuple, branch, loop, call, normal
 return, and throw examples; thrown and stuck cases identify the expected
 source range; and every interpreter test also has a big-step soundness
 instance.
@@ -853,39 +858,39 @@ binders for nested type and ability checks.
 - Prove preservation and interpreter/reference agreement for the supported
   profiles.
 
-Gate: the interpreter covers the executable portion of the existing Leaner
+Gate: the interpreter covers the executable portion of the existing Verex
 language corpus without routing through `MoveModel.IR`.
 
-### M3 — Shadow semantic elaboration for Leaner source
+### M3 — Shadow semantic elaboration for Verex source
 
 > Reframed 2026-08-27: with the direct path deprecated rather than live, the
 > shadow/differential arrangement is no longer the goal; what survives is
-> registering complete raw LIR units from the LeanerLang frontend, which is in
+> registering complete raw VIR units from the VerexSL frontend, which is in
 > place. The differential-execution role passed to the MonoVM harness.
 
-- Make the Leaner frontend register its complete raw LIR unit.
-- Run LIR semantic elaboration beside the current direct definitions.
-- Generate `f.lirDecl`, `f.semantics`, and execution wrappers from LIR.
-- Make `lowerToIR` consume the registered validated LIR rather than rediscover
+- Make the Verex frontend register its complete raw VIR unit.
+- Run VIR semantic elaboration beside the current direct definitions.
+- Generate `f.virDecl`, `f.semantics`, and execution wrappers from VIR.
+- Make `lowerToIR` consume the registered validated VIR rather than rediscover
   the body from Lean LCNF.
-- Differentially execute the old compiled path and the new LIR interpreter.
+- Differentially execute the old compiled path and the new VIR interpreter.
 
 Gate: supported source programs have equal observable return/throw and state
-results on both paths, with no source-syntax fallback inside the LIR path.
+results on both paths, with no source-syntax fallback inside the VIR path.
 
 ### M4 — Contracts and calculated WP
 
-- Interpret LIR specification functions, conditions, frames, and invariants.
-- Copy the common contract and semantic-WP foundation into `LeanerIR.Proofs`.
+- Interpret VIR specification functions, conditions, frames, and invariants.
+- Copy the common contract and semantic-WP foundation into `VerexIR.Proofs`.
 - Implement and prove sound the calculated WP for the M1 executable subset.
-- Generate `f.spec` and `f.contract` from LIR.
-- Switch `verify f` to LIR lookup for migrated functions.
+- Generate `f.spec` and `f.contract` from VIR.
+- Switch `verify f` to VIR lookup for migrated functions.
 - Attach the originating code or specification `LocId` to every generated
   obligation and translate unsolved goals back to source.
 
-> Status 2026-08-27. Landed in `LeanerIR/Proofs`: `Spec`/`Contract` (the
+> Status 2026-08-27. Landed in `VerexIR/Proofs`: `Spec`/`Contract` (the
 > reference stack's relational model and contract calculus generalized over
-> the failure vocabulary `ε`; simp sets `lir_wp_norm`/`lir_spec_norm` —
+> the failure vocabulary `ε`; simp sets `vir_wp_norm`/`vir_spec_norm` —
 > prefixed because the frozen stack owns the unprefixed names in shared
 > import closures), `Meaning` (`functionSpec` reads the relational meaning
 > off the big-step judgment, with two-way interpreter agreement and the
@@ -901,20 +906,20 @@ results on both paths, with no source-syntax fallback inside the LIR path.
 > `abortComponents` readings), named constants and `spec.bitVectorToInt`
 > translate in clauses, and every generated obligation carries the authored
 > clause's byte range through an `Obligation` marker — a residual goal is
-> reported by `leaner_report` as an error at that clause, which is the
-> LocId-attachment bullet delivered for LeanerLang-authored units. The
+> reported by `verex_report` as an error at that clause, which is the
+> LocId-attachment bullet delivered for VerexSL-authored units. The
 > first verification tests copied from the reference stack
-> (`LeanerLang/Tests/VerificationAborts.lean`, now `Check/Control/Aborts.lean`, from `AbortDirections`)
-> prove the same public contracts from LIR, and a deliberately wrong body
+> (`VerexSL/Tests/VerificationAborts.lean`, now `Check/Control/Aborts.lean`, from `AbortDirections`)
+> prove the same public contracts from VIR, and a deliberately wrong body
 > fails at the expected `ensures` range under `#guard_msgs`. The prepared
 > unit is quoted once per namespace (`<ns>.semantics` with kernel-checked
 > equations), so every verify in a namespace shares one preparation and
 > goals reference the unit by name.
 >
 > Alignment with the reference `verify` pipeline (`Move.Verify.Tactics`,
-> `Move.Verify.Syntax`): the LIR analog of `f.sourceSpec` is the uniform
+> `Move.Verify.Syntax`): the VIR analog of `f.sourceSpec` is the uniform
 > `functionSpec` — no per-function derivation from retained source. Because
-> LIR is a deep embedding, symbolic execution needs the arena lookups
+> VIR is a deep embedding, symbolic execution needs the arena lookups
 > reduced; the generator therefore quotes the validated unit's per-function
 > data as literals and derives each function's shallow WP unfolding through
 > the calculation rules once, after which `verify f` behaves as in the
@@ -928,7 +933,7 @@ results on both paths, with no source-syntax fallback inside the LIR path.
 > call stepping, declared-abort clause discharge.
 
 Gate: the first copied verification tests prove the same public contracts
-from LIR, and a deliberately wrong body fails against the unchanged contract
+from VIR, and a deliberately wrong body fails against the unchanged contract
 at the expected body or specification range.
 
 ### M5 — Borrow, state, loop, and modular verification
@@ -936,28 +941,28 @@ at the expected body or specification range.
 - Port prophecy-backed references and their concrete-execution refinement.
 - Port checked operations, rollback, globals, frames, calls, summaries,
   recursion, loops, and invariants.
-- Ensure calls consume LIR summaries without inspecting callee source.
+- Ensure calls consume VIR summaries without inspecting callee source.
 - Carry all trusted external summaries and frontend alignment assumptions into
   theorem reports.
 
 Gate: the representative reference, global-state, loop, and cross-call proof
-tests pass solely through LIR semantics.
+tests pass solely through VIR semantics.
 
 > Status 2026-08-29 (second revision). Global state verifies through a
 > **typed spec-level state**, replacing both the untyped accessor reading and
 > the earlier state-typing assumption. Per struct declaration the frontend
 > generates a typed twin (certified `SpecInt` integers, plain Lean scalars,
 > nested twins) with an `erase`/`decode?` pair and proved roundtrips
-> (`LeanerLang/SpecTypes.lean`); a contract's `requires` quantifies one
+> (`VerexSL/SpecTypes.lean`); a contract's `requires` quantifies one
 > typed map `StorageKey → Option Twin` per storable family, tied to runtime
 > memory by `FamilyRepresentation` — the map laws are proved on the keyed
 > `GlobalMap` and cross-family disjointness is a theorem of key
 > disequality, not an assumption. Clauses read storage through the typed
 > accessors, so a resource read out of memory is the erasure of a typed
 > value: constructor shape by reduction, range facts from the certified
-> fields. `leaner_storage` routes a stuck lookup onto the typed map through
+> fields. `verex_storage` routes a stuck lookup onto the typed map through
 > the representation hypothesis and case splits the typed entry;
-> `leaner_drive` replaces the stock repeat combinators with an explicit
+> `verex_drive` replaces the stock repeat combinators with an explicit
 > once-per-goal fixpoint driver. `modifies global<T>(k)` generates the
 > keyed frame (every other key reads the same), discharged by the map laws.
 >
@@ -970,7 +975,7 @@ tests pass solely through LIR semantics.
 > boolean fields, `spec.old`), `move_from` with post-state clauses and
 > frames, and whole-resource `&mut` update (`*coin := new Coin {...}`).
 > The write-back of a mutable global borrow is keyed by the state's loan
-> registry (`RuntimeState.globalLoans`) — certified exclusivity makes the
+> registry (`RuntimeState.storageLoans`) — certified exclusivity makes the
 > recorded key the hole's location, so nothing searches global memory.
 > Signers key storage by their address in `RuntimeValue.storageKey?`.
 >
@@ -989,9 +994,9 @@ tests pass solely through LIR semantics.
 > corpus is an oracle to copy from (see Test migration), and the deprecated
 > packages are excluded from test runs.
 
-- Move the Leaner test corpus in feature waves, maintaining an explicit
+- Move the Verex test corpus in feature waves, maintaining an explicit
   supported/unsupported ledger.
-- Change Leaner commands so the LIR path is the default and the old path is
+- Change Verex commands so the VIR path is the default and the old path is
   available only behind a temporary comparison option.
 - Replace compatibility `sourceSpec` declarations with aliases.
 - Prevent new tests from using the direct elaborator.
@@ -1007,10 +1012,10 @@ derive semantics or proofs.
 
 - Delete the retained-source `Declaration` store and source reparser.
 - Delete duplicated source signature, source borrow-scope, and source-to-Spec
-  translation code after their last LIR equivalent lands.
+  translation code after their last VIR equivalent lands.
 - Remove the environment/LCNF body rediscovery path from executable lowering.
 - Keep surface syntax, compatibility names, and proof tactics only where they
-  are thin clients of LIR.
+  are thin clients of VIR.
 
 Gate: searching the production path finds no semantic analysis over retained
 Lean syntax, all frontends meet at `ValidatedUnit`, and execution,
@@ -1041,11 +1046,11 @@ Suggested waves are:
 
 There are three complementary test forms:
 
-- **semantic unit tests** construct small raw LIR fixtures, validate them, and
+- **semantic unit tests** construct small raw VIR fixtures, validate them, and
   run the interpreter;
-- **frontend integration tests** elaborate Leaner source to LIR and run that
+- **frontend integration tests** elaborate Verex source to VIR and run that
   validated artifact; and
-- **differential tests** compare LIR execution with the existing
+- **differential tests** compare VIR execution with the existing
   `MoveModel.IR` interpreter or transactional VM for the common subset.
 
 Big-step tests should not merely recompute the interpreter. Successful
@@ -1056,42 +1061,42 @@ Negative tests assert diagnostic codes and source ranges before execution.
 The aggregate test roots should be split by concern, for example:
 
 ```text
-LeanerIR/Tests/Validation.lean
-LeanerIR/Tests/Interpreter.lean
-LeanerIR/Tests/Semantics/*
-LeanerIR/Tests/Verification/*
-LeanerIR/Tests/Elaboration/*
+VerexIR/Tests/Validation.lean
+VerexIR/Tests/Interpreter.lean
+VerexIR/Tests/Semantics/*
+VerexIR/Tests/Verification/*
+VerexIR/Tests/Elaboration/*
 ```
 
-This keeps the independent `leaner-ir` test suite useful without importing
+This keeps the independent `verex-ir` test suite useful without importing
 the old `Move` package. Cross-package frontend agreement and VM differential
-tests live in the dedicated `leaner-e2e-tests` package rather than adding
-frontend dependencies to `leaner-ir` or a semantic-profile package.
+tests live in the dedicated `verex-e2e-tests` package rather than adding
+frontend dependencies to `verex-ir` or a semantic-profile package.
 
 ## Correctness obligations
 
 The migration is complete only when the following claims are explicit:
 
-- interpreter results are admitted by LIR big-step semantics
+- interpreter results are admitted by VIR big-step semantics
   (`run_sound`, implemented);
-- finite deterministic LIR executions are reproduced with sufficient fuel
+- finite deterministic VIR executions are reproduced with sufficient fuel
   (`evalFunction_complete`/`run_complete` over fuel monotonicity, implemented;
   big-step determinism of `EvalFunction` and `FunctionMeaning` follows
   because the interpreter is a function);
 - semantic preparation plus well-typed inputs implies preservation and no
   stuck execution;
 - interpreter outcomes, errors, and generated proof obligations preserve
-  their originating LIR locations;
+  their originating VIR locations;
 - calculated WP implies semantic WP;
 - `f.verified` proves `Contract.Satisfies f.semantics f.spec`;
 - concrete reference execution refines the prophecy verification model;
 - Move abort finalization rolls back exactly the required state;
-- each executable lowering preserves LIR outcomes;
+- each executable lowering preserves VIR outcomes;
 - each frontend's alignment evidence justifies relating its source artifact
-  to LIR semantics; and
-- canonical source re-elaboration preserves normalized LIR semantics.
+  to VIR semantics; and
+- canonical source re-elaboration preserves normalized VIR semantics.
 
-The first six are owned by `leaner-ir`.
+The first six are owned by `verex-ir`.
 
 ### Preservation and no-stuck decomposition
 
@@ -1117,7 +1122,7 @@ the structural layer it builds on.
    nested `ConstValue` recursion is structural, not `partial`.
 4. **Operation lemmas.** Every semantic operation evaluator preserves typing
    and — for no-stuck — is defined on the operand shapes semantic
-   preparation admits. Each `LIR-SEMANTIC-TYPE` rule in validation names the
+   preparation admits. Each `VIR-SEMANTIC-TYPE` rule in validation names the
    shapes its operation lemma may assume.
 5. **Evaluator induction.** Preservation threads a growing `StateTyping`
    through the mutual evaluators; no-stuck additionally consumes the
@@ -1127,7 +1132,7 @@ the structural layer it builds on.
    stuck diagnostic.
 
 > Status 2026-08-27: stages 1–4 are proved in
-> `LeanerIR/Semantics/Typing.lean` for the pure primitive vocabulary —
+> `VerexIR/Semantics/Typing.lean` for the pure primitive vocabulary —
 > `WfPrimitive.eval_typed` covers the scalar, boolean, character-cast, and
 > overflowing groups (bitwise operations under an integer result node need
 > the operand-scalarity premise), and per-operation lemmas cover the
@@ -1138,47 +1143,47 @@ the structural layer it builds on.
 
 Profile finalization laws are proved
 against interfaces declared there. Lowering and frontend alignment theorems
-are owned by their adapters, then composed with LIR verification. Constructing
+are owned by their adapters, then composed with VIR verification. Constructing
 a `ValidatedUnit` alone does not prove source or MIR alignment.
 
 ## Compatibility policy
 
 The migration should preserve user-facing source names and the shape of
 `spec f` / `verify f` where practical. Internal generated names and theorem
-statements may change when needed to state the LIR result honestly.
+statements may change when needed to state the VIR result honestly.
 
 Compatibility aliases are acceptable only when they point from the old API to
-new LIR-owned declarations. New LIR semantics must never call back into the
+new VIR-owned declarations. New VIR semantics must never call back into the
 old source translator. A temporary differential mode may run both paths and
 report disagreements, but neither result may silently replace the other.
 
 Unsupported constructs fail during validation or semantic preparation with a
 location and stable diagnostic code. Falling back to source elaboration would
 hide coverage gaps and is therefore forbidden once a function opts into the
-LIR path.
+VIR path.
 
 ## Settled decisions
 
-- Validated structured LIR, not retained source syntax or lower CFG IR, is the
+- Validated structured VIR, not retained source syntax or lower CFG IR, is the
   semantic source of truth.
-- The interpreter executes structured LIR directly and is fuelled only as a
+- The interpreter executes structured VIR directly and is fuelled only as a
   termination device.
 - The relational big-step semantics is authoritative and contains no fuel.
 - Verification is stated over big-step function meaning, with a proved-sound
   calculated WP for automation.
 - Concrete runtime references and prophecy proof references may differ, but
   require a refinement theorem.
-- LIR semantic declarations are independent of frontend origin.
+- VIR semantic declarations are independent of frontend origin.
 - Source locations propagate through execution, verification, and lowering;
   they are diagnostic metadata and never alter semantic outcomes.
-- Generic LIR bodies remain generic over evidence rather than being
+- Generic VIR bodies remain generic over evidence rather than being
   monomorphized for elaboration.
 - Generated Lean declarations are small indexed façades over one registered
-  unit, not repeated expansions of the LIR body.
-- Existing elaboration and proof code may be copied into `leaner-ir` and then
+  unit, not repeated expansions of the VIR body.
+- Existing elaboration and proof code may be copied into `verex-ir` and then
   adapted structurally; keeping the old implementation DRY is not a goal.
 - The direct source-semantic path is deleted only after corpus coverage and
-  comparison gates make the LIR path the default.
+  comparison gates make the VIR path the default.
 
 ## Open implementation choices
 

@@ -1,2 +1,17 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/generic_aliasing_ghost_main.move:17:9: error: generic module invariants are outside the current LeanerLang parser
+tests/sources/regression/generic_aliasing_ghost_main.move:17:9: error: the module invariant `invariant {T} {U} {X} (!exists<N>(@0x42)
+        ==> !exists<R<T> >(@0x42) && !exists<S<U> >(@0x42)
+          && !exists<Q<X> >(@0x42))
+        && (exists<M>(@0x42)
+          ==> !(exists<R<T> >(@0x42) && exists<S<U> >(@0x42))
+            || exists<Q<X> >(@0x42))
+        && (exists<W<T, U, X> >(@0x7) ==> exists<W<T, U, X> >(@0x7))
+        && (exists<W<u64, u8, T> >(@0x7) ==> exists<W<u64, u8, T> >(@0x7))` does not hold after a write of memory it reads
+tests/sources/regression/generic_aliasing_ghost_main.move:56:5: error: verex verification failed: the automatic verification of `f` failed; provide a proof: `verify f by …` in the module (`verify f by verex_obligations` lists its obligations)
+tests/sources/regression/generic_aliasing_ghost_main.move:71:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x43)
+        ==> !exists<R<T> >(@0x43) && !exists<S<U> >(@0x43))
+        && (exists<M>(@0x43)
+          ==> !(exists<R<T> >(@0x43) && exists<S<U> >(@0x43)))
+        && (exists<W<u8, T, U> >(@0x7)
+          ==> exists<W<u64, u64, u8> >(@0x7) || true)` does not hold after a write of memory it reads
+tests/sources/regression/generic_aliasing_ghost_main.move:102:5: error: verex verification failed: the automatic verification of `f` failed; provide a proof: `verify f by …` in the module (`verify f by verex_obligations` lists its obligations)

@@ -36,10 +36,12 @@ theorem newton_quotient {y r : Int} (square : 0 < y → r * r ≤ y)
   exact Int.mul_lt_mul_of_pos_right (by omega) (by decide)
 
 verify sqrt by
-  case leaf_1 =>
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+  case aborts_if_1_6 =>
     have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
     have := newton_quotient ‹_› ‹_› (by omega) (by omega) (by omega)
     omega
-  case leaf_2 =>
+  case aborts_if_1_8 =>
     have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
     omega

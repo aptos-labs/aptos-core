@@ -1,2 +1,43 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bv_aborts.move:1:1: error: specification function call namespace is out of range
+tests/sources/functional/bv_aborts.move:16:9: error: the specification clause `aborts_if x
+        > 815 with internal(0)
+      | (868234287550 << 24)
+        % 115792089237316195423570985008687907853269984665640564039457584007913129639936` is not established
+tests/sources/functional/bv_aborts.move:14:5: error: verification failed with a residual obligation:
+case left
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+x : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
+      (fun result final => final = initialState✝ ∧ x.val ≤ 815)
+      (fun failure =>
+        VerexIR.Proofs.Obligation "bv_aborts.lean" 1939 2099
+          (815 < x.val ∧
+            match failure with
+            | (VerexIR.ThrowKind.abort, payload) =>
+              payload =
+                #[VerexIR.RuntimeValue.integer
+                    (VerexIR.Proofs.IntegerArithmetic.bitwiseOr (Int.shiftLeft 11 16 + 0)
+                      (Int.shiftLeft 868234287550 24 %
+                        115792089237316195423570985008687907853269984665640564039457584007913129639936))]
+            | (VerexIR.ThrowKind.profile value, snd) =>
+              (value = { profile := VerexIR.Profile.move, tag := "runtime.arithmetic_error" } ∨
+                  value = { profile := VerexIR.Profile.move, tag := "runtime.vector_error" }) ∧
+                VerexIR.Proofs.IntegerArithmetic.bitwiseOr (Int.shiftLeft 11 16 + 0)
+                    (Int.shiftLeft 868234287550 24 %
+                      115792089237316195423570985008687907853269984665640564039457584007913129639936) =
+                  -1
+            | x => False))
+      state
+a✝ : x.val > 815
+⊢ x.val ≤ 815
+tests/sources/functional/bv_aborts.move:14:5: error: verex verification failed: the automatic verification of `assert_with_spec` failed; provide a proof: `verify assert_with_spec by …` in `tests/sources/functional/bv_aborts.proof.lean` (`verify assert_with_spec by verex_obligations` lists its obligations)

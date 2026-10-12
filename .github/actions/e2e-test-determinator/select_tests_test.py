@@ -161,8 +161,8 @@ class E2eSelectionTest(unittest.TestCase):
         self.assertIn("e2e-selection", self.job_needs(runner))
         self.assertIn("known_e2e_tests", runner)  # older trusted registry runs Lean
         self.assertIn("selected_e2e_tests", runner)
-        self.assertIn("move-compiler-v2 leaner::tests", runner)
-        self.assertIn("working-directory: third_party/move/lean/leaner-e2e-tests", runner)
+        self.assertIn("move-compiler-v2 verex::tests", runner)
+        self.assertIn("working-directory: third_party/move/lean/verex-e2e-tests", runner)
         result = jobs["result"]
         self.assertIn("if: always()", result)
         self.assertIn('test "$SELECTION_RESULT" = success', result)
