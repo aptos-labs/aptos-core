@@ -34,8 +34,3 @@ verify test_index_of by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals simp_all [vir_denote_norm]
-
-verify option_type by
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  all_goals simp_all [vir_denote_norm]

@@ -5,4 +5,9 @@ tests/sources/functional/math8.move:96:5: error: the bound `pragma unroll = 2` o
 tests/sources/functional/math8.move:96:5: error: verex verification failed: the automatic verification of `floor_log2` failed; provide a proof: `verify floor_log2 by …` in `tests/sources/functional/math8.proof.lean` (`verify floor_log2 by verex_obligations` lists its obligations)
 tests/sources/functional/math8.move:123:9: error: the specification clause `aborts_if false` is not established
 tests/sources/functional/math8.move:127:9: error: the specification clause `ensures x > 0 ==> x < (result + 1) * (result + 1)` is not established
-tests/sources/functional/math8.move:122:5: error: verex verification failed: the automatic verification of `sqrt` failed; provide a proof: `verify sqrt by …` in `tests/sources/functional/math8.proof.lean` (`verify sqrt by verex_obligations` lists its obligations)
+tests/sources/functional/math8.move:122:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (1000000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+tests/sources/functional/math8.move:122:5: error: verex verification failed: the automatic verification of `sqrt` exceeded its budget of 1000000 maxHeartbeats; provide a proof: `verify sqrt by …` in `tests/sources/functional/math8.proof.lean` (`verify sqrt by verex_obligations` lists its obligations), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats

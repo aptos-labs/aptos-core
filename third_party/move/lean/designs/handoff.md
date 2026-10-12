@@ -30,6 +30,11 @@ to 2026-10-11 are in [`historical/handoff-2026-10.md`](historical/handoff-2026-1
 
 ## Recent decisions
 
+- 2026-10-12: the default budget is 1000 thousand `maxHeartbeats`, about thirty
+  seconds; the registry runs with it (was 25 thousand).
+- 2026-10-12: an authored proof is kept only where the automatic run fails, or
+  where the proof costs at most 66% of it; `--ignore-proofs` measures this
+  (`scripts/proof-census.py`, `perf-notes.md`, "Proof census").
 - 2026-10-12: the names Verex, VIR, VerexSL (VSL for short), applied everywhere,
   `v0/` and `historical/` included.
 - 2026-10-12: a function with a body that declares no contract and plays no map or
@@ -94,17 +99,19 @@ costs.
      `verify_vector::verify_contains` over its budget.
    - `macro_verification::foreach` times out at 25k; the lead is the loop's
      unchanged-tail invariant (`perf-notes.md`).
-7. Awaiting a user decision:
-   - The larger levers for V20 `discarded_mut_ref_result::run`: invariant clauses
-     over native values need a specification carrier with unbounded fields.
-   - `int2bv` at a type parameter.
+7. The 40 authored proofs the census still needs (`perf-notes.md`, "Proof
+   census"): fee formulas with nested quotients by literals, `sqrt`, chains of
+   products, array sizes after updates, `Option.map` encodings, witnesses over
+   literal vectors. Rerun the census after each family.
+8. Awaiting a user decision: `int2bv` at a type parameter.
 
 ## Open findings not yet in a design
 
 - Ensure the InfoView works on the standalone proofs of `.move` and `.rs`
   sources (`foo.proof.lean` beside `foo.move`, `foo.spec.lean` beside
   `foo.rs`): opening one in the editor shows the goals of its `verify … by`
-  steps (user request, 2026-10-12).
+  steps (user request, 2026-10-12). Options in `proof-file-editing.md`;
+  user decision pending.
 - With its `verify` items skipped, the editor still re-elaborates a module's
   registration on every edit (`OrderedMap.lean`: 7–8 s, measured 2026-10-11).
 - `bug_15880::test2` fails unattributed: its failing asserts (`v == 4`,
@@ -138,6 +145,10 @@ costs.
   runs the four Lean suites and compiler-v2's Lean and transactional tests. The
   registry and the benchmark run outside CI: run the affected tests where a change
   can move verdicts or costs.
+- The proof census: `python3 scripts/proof-census.py [--only <path part>]
+  [--renderings <dir>]`; with `--renderings`, the renderings re-verify against a
+  scratch copy of `verex-ir` (`lake env lean -Dweak.verex.ignoreProofs=true`)
+  for iterating on the solver without rebuilding the tree.
 - Before pushing a change to a PR: `gt sync --no-interactive`, `gt submit --no-stack
   --no-interactive`, then update the PR description.
 - During performance work, run the affected benchmark and regenerate its data and

@@ -1,12 +1,10 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/amm_example.move:152:9: error: the specification clause `ensures (reserve_in + amount_in) * (reserve_out - result)
         >= reserve_in * reserve_out` is not established
-tests/sources/functional/closures/amm_example.move:148:9: error: the specification clause `ensures result <= reserve_out` is not established
 tests/sources/functional/closures/amm_example.move:129:5: error: verex verification failed: the automatic verification of `constant_product_with_fee` failed; provide a proof: `verify constant_product_with_fee by …` in `tests/sources/functional/closures/amm_example.proof.lean` (`verify constant_product_with_fee by verex_obligations` lists its obligations)
 tests/sources/functional/closures/amm_example.move:176:9: error: the specification clause `aborts_if !exists<Fee>(client)` is not established
 tests/sources/functional/closures/amm_example.move:178:9: error: the specification clause `aborts_if global<Fee>(client).bps > 10000` is not established
 tests/sources/functional/closures/amm_example.move:182:9: error: the specification clause `aborts_if reserve_in + effective_in == 0` is not established
-tests/sources/functional/closures/amm_example.move:187:9: error: the specification clause `ensures result <= reserve_out` is not established
 tests/sources/functional/closures/amm_example.move:173:5: error: verex verification failed: the automatic verification of `constant_product_with_fee_non_compliant` failed; provide a proof: `verify constant_product_with_fee_non_compliant by …` in `tests/sources/functional/closures/amm_example.proof.lean` (`verify constant_product_with_fee_non_compliant by verex_obligations` lists its obligations)
 tests/sources/functional/closures/amm_example.move:220:9: error: the specification clause `aborts_if amount_in == 0` is not established
 tests/sources/functional/closures/amm_example.move:223:9: error: the specification clause `aborts_if pool.reserve_x + amount_in > MAX_U64` is not established

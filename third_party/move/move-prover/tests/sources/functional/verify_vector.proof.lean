@@ -61,24 +61,3 @@ verify verify_model_swap_remove by
     rw [Array.eraseIdxIfInBounds_eq, dif_pos (by simpa using bounded)]
     simp only [Array.size_eraseIdx, Array.size_swapIfInBounds]
     omega
-
--- Instantiate the no-match prefix invariant at the observed element.
-verify verify_index_of by
-  verex_obligations
-  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-  case ensures_1_1 =>
-    expose_names
-    rintro ⟨x, ⟨j, low, high, read⟩, equal⟩
-    have absent := left j low (by omega)
-    rw [read] at absent
-    exact absent (by simpa only [Option.map_some, Option.getD_some] using equal)
-  case invariant_1_step =>
-    expose_names
-    by_cases previous : i < i_1.val
-    · exact left i (by omega) previous
-    · have same : i = i_1.val := by omega
-      subst i
-      rw [heq]
-      simp only [Option.map_some, Option.getD_some]
-      intro equal
-      exact symmetric ((Proofs.Denote.Carriers.codec 0).encode_injective equal).symm

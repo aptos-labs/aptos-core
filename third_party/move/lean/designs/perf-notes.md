@@ -2723,3 +2723,55 @@ equation in `constant_product`, `0 - num_shares.val = 0` in
 `deduct_shares`); restricting the hypothesis stages to those still left
 `deduct_shares` undecided. `verex_map_positions` reads the goal and strips
 its clause markers, so it cannot run on a path's conjunction.
+
+## Proof census and recurring facts (2026-10-12)
+
+`scripts/proof-census.py` verifies every source that carries authored proofs
+(31: framework modules, the paper examples, registry tests, VerexSL checks and
+source-verification fixtures) three times: as it is, with its proofs ignored
+(`--ignore-proofs`) at the default budget (1G heartbeats, about thirty
+seconds at 32M heartbeats a second), and with them ignored at four times that
+budget. A proof is dropped when the automatic run verifies within the default
+budget and the proof costs more than 66% of it; otherwise it is kept, as
+cheaper, as needed for the budget, or as needed.
+
+Before the facts below, of 71 authored proofs 18 could be dropped, 2 were
+cheaper, 1 needed the budget (`pool_u64::buy_in`, verified at 3.18G), 48 were
+needed and 2 fail by design. The raised budget helps only `buy_in`: the needed
+proofs stand in for facts and steps the solver lacks, not for time.
+
+The residual leaves the pipeline hands to `grind` show three recurring
+families, added as generic facts and steps:
+
+- `verex_quotient`, a pipeline stage before `grind`: a comparison with a
+  quotient by a positive divisor that is not a literal becomes one with a
+  product (`Int.ediv_le_of_le_mul`, `Int.ediv_lt_of_lt_mul`,
+  `Int.le_ediv_of_mul_le`), a side an equation names as such a quotient
+  rewritten to it first; the products are distributed over sums before
+  `verex_grind`, so that they share monomials (`mul_div`,
+  `amm::constant_product`).
+- Products of consecutive integers are nonnegative and even
+  (`mul_succ_facts` and its variants), in the structural nonnegativity and the
+  per-product facts: triangular sums (`sum_range`, `sum_from`,
+  `sum_skip_first`, `opaque_inline_loop_sum::sum` and `test_sum_twice`).
+- Literal bounds of a product's factors, derived by omega where no hypothesis
+  states one, feed the products' McCormick bounds (`assertProductBounds`):
+  the overflow obligations of the triangular sums.
+
+After them 19 proofs can be dropped, 7 are cheaper, 1 needs the budget and 40
+are needed. The benchmark moves by +0.3% heartbeats, the cost gates by +0.02%.
+Twenty proofs are removed (eight proof files): `capability::delegate` and
+`revoke`, the three of `ristretto255`, `math_fixed::sqrt`, and companions of
+the registry. The source-verification fixtures keep theirs: they test authored
+proofs.
+
+What the 40 needed proofs stand in for:
+
+- Arithmetic: fee formulas with nested quotients by literals (the AMM fee
+  variants, `calculator::process`), `math_fixed64::sqrt`, the bounds of a
+  chain of products (`mul5`), and the AMM swap and pool constructors.
+- Structure: array sizes after updates (`verify_model_swap_remove`), the
+  encodings under `Option.map` (`stored_fun_values`, `verify_swap_remove`),
+  witnesses over literal vectors (`test_contains`), map keys and loops
+  (`ordered_map`, the VerexSL examples), `capability::acquire`, and folds
+  over specification lambdas (`specialize_generic_caller`).

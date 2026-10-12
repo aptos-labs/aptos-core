@@ -2702,6 +2702,29 @@ theorem shiftRight_eq_div (value : Int) (distance : Nat) :
   rw [← Int.shiftRight_eq, Int.shiftRight_eq_div_pow]
   simp
 
+/-- A product of consecutive integers is even and nonnegative, in each order
+of its factors: what a triangular sum `n * (n - 1) / 2` needs, which `omega`
+reads with the product as an atom. -/
+theorem mul_succ_facts (n : Int) : 0 ≤ n * (n + 1) ∧ n * (n + 1) % 2 = 0 := by
+  refine ⟨?_, ?_⟩
+  · by_cases h : n ≤ -1
+    · exact Int.mul_nonneg_of_nonpos_of_nonpos (by omega) (by omega)
+    · exact Int.mul_nonneg (by omega) (by omega)
+  · rcases Int.emod_two_eq n with h | h <;> simp [Int.mul_emod, Int.add_emod, h]
+
+theorem mul_pred_facts (n : Int) : 0 ≤ n * (n - 1) ∧ n * (n - 1) % 2 = 0 := by
+  refine ⟨?_, ?_⟩
+  · by_cases h : n ≤ 0
+    · exact Int.mul_nonneg_of_nonpos_of_nonpos h (by omega)
+    · exact Int.mul_nonneg (by omega) (by omega)
+  · rcases Int.emod_two_eq n with h | h <;> simp [Int.mul_emod, Int.sub_emod, h]
+
+theorem succ_mul_facts (n : Int) : 0 ≤ (n + 1) * n ∧ (n + 1) * n % 2 = 0 := by
+  rw [Int.mul_comm]; exact mul_succ_facts n
+
+theorem pred_mul_facts (n : Int) : 0 ≤ (n - 1) * n ∧ (n - 1) * n % 2 = 0 := by
+  rw [Int.mul_comm]; exact mul_pred_facts n
+
 /-- The bounds of a product of unsigned certified integers, in the form
 `omega` reads with the product as an atom. -/
 theorem mul_unsigned_bounds {leftWidth rightWidth : Nat} (left : SpecInt (.bits leftWidth) false)

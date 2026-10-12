@@ -282,6 +282,25 @@ private def signedValue? (e : Lean.Expr) : Option (Lean.Expr × Lean.Expr) :=
     some ((e.getArg! 0).getArg! 0, e.getArg! 2)
   else none
 
+/-- A product of consecutive integers, `n * (n + 1)` or `n * (n - 1)` in either
+order of its factors, with the lemma stating its facts and `n`. -/
+private def consecutiveProduct? (e : Lean.Expr) : Option (Name × Lean.Expr) := do
+  guard (e.isAppOfArity ``HMul.hMul 6 && (e.getArg! 0).isConstOf ``Int)
+  let (left, right) := (e.getArg! 4, e.getArg! 5)
+  let isOne (e : Lean.Expr) := (e.int? <|> e.nat?.map Int.ofNat) == some 1
+  let offset (e : Lean.Expr) : Option (Bool × Lean.Expr) :=
+    if e.isAppOfArity ``HAdd.hAdd 6 && isOne (e.getArg! 5) then some (true, e.getArg! 4)
+    else if e.isAppOfArity ``HSub.hSub 6 && isOne (e.getArg! 5) then some (false, e.getArg! 4)
+    else none
+  if let some (up, base) := offset right then
+    if base == left then
+      return (if up then ``VerexIR.Proofs.Denote.mul_succ_facts
+        else ``VerexIR.Proofs.Denote.mul_pred_facts, left)
+  let some (up, base) := offset left | none
+  guard (base == right)
+  return (if up then ``VerexIR.Proofs.Denote.succ_mul_facts
+    else ``VerexIR.Proofs.Denote.pred_mul_facts, right)
+
 /-- A proof that an integer term is nonnegative, from its structure: a
 certified unsigned value, a nonnegative literal, and sums, products,
 shifts, conjunctions, and remainders of nonnegative terms. -/
@@ -297,6 +316,8 @@ private partial def nonnegative? (e : Lean.Expr) : MetaM (Option Lean.Expr) := d
     | some left, some right => some <$> mkAppM lemma #[left, right]
     | _, _ => pure none
   if e.isAppOfArity ``HAdd.hAdd 6 then return ← both ``Int.add_nonneg
+  if let some (lemma, n) := consecutiveProduct? e then
+    return some (← mkAppM ``And.left #[mkApp (mkConst lemma) n])
   if e.isAppOfArity ``HMul.hMul 6 then return ← both ``Int.mul_nonneg
   if e.isAppOfArity ``Int.shiftLeft 2 then
     let some value ← nonnegative? (e.getArg! 0) | return none
@@ -498,10 +519,13 @@ private def operationFact? (goal : MVarId) (reads : DivisionReads) (sub : Lean.E
       | none => pure none
     return ← conjoin? bounds division
   if sub.isAppOfArity ``HMul.hMul 6 && (sub.getArg! 0).isConstOf ``Int then
-    match unsignedValue? (sub.getArg! 4), unsignedValue? (sub.getArg! 5) with
-    | some (_, left), some (_, right) =>
-        return some (← mkAppM ``VerexIR.Proofs.Denote.mul_unsigned_bounds #[left, right])
-    | _, _ => return none
+    -- A product of consecutive integers is even and nonnegative.
+    let consecutive := (consecutiveProduct? sub).map fun (lemma, n) => mkApp (mkConst lemma) n
+    let unsigned ← match unsignedValue? (sub.getArg! 4), unsignedValue? (sub.getArg! 5) with
+      | some (_, left), some (_, right) =>
+          some <$> mkAppM ``VerexIR.Proofs.Denote.mul_unsigned_bounds #[left, right]
+      | _, _ => pure none
+    return ← conjoin? unsigned consecutive
   if sub.isAppOfArity ``Int.tdiv 2 || sub.isAppOfArity ``Int.tmod 2 then
     let bounds ← tdivBounds? sub
     let (dividend, divisor) := (sub.getArg! 0, sub.getArg! 1)
@@ -1271,6 +1295,30 @@ private def assertProductBounds (goal : MVarId) : MetaM MVarId := goal.withConte
       let difference ← mkAppM ``HSub.hSub #[type.getArg! 3, lower]
       bounds := bounds.push (difference,
         ← mkAppM ``Int.sub_nonneg_of_le #[← mkAppM ``Int.add_one_le_of_lt #[decl.toExpr]])
+  -- A factor's literal bounds that omega derives from the context, where no
+  -- hypothesis states one: `i < n` and `n < 1000` bound `i` by `1000`.
+  let mut literals : Array Int := #[]
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let type ← instantiateMVars decl.type
+    if (type.isAppOfArity ``LE.le 4 || type.isAppOfArity ``LT.lt 4) &&
+        (type.getArg! 0).isConstOf ``Int then
+      if let some c := (type.getArg! 3).int? then
+        if 0 < c && !literals.contains c then literals := literals.push c
+  literals := literals.qsort (· < ·)
+  let mut bounded : Array Lean.Expr := #[]
+  for (left, right) in products do
+    for factor in #[left, right] do
+      if factor.int?.isSome || bounded.contains factor then continue
+      bounded := bounded.push factor
+      if let some proof ← omegaProof? goal (← mkAppM ``LE.le #[mkIntLit 0, factor]) then
+        bounds := bounds.push (← mkAppM ``HSub.hSub #[factor, mkIntLit 0],
+          ← mkAppM ``Int.sub_nonneg_of_le #[proof])
+      for c in literals do
+        if let some proof ← omegaProof? goal (← mkAppM ``LE.le #[factor, mkIntLit c]) then
+          bounds := bounds.push (← mkAppM ``HSub.hSub #[mkIntLit c, factor],
+            ← mkAppM ``Int.sub_nonneg_of_le #[proof])
+          break
   let boundsOf (factor : Lean.Expr) := bounds.filter fun (difference, _) =>
     readsLinearly factor difference
   let mut goal := goal
@@ -1307,6 +1355,72 @@ elab "verex_grind" : tactic => focusGoal do
   let some elements ← arraysByElements (← abstractRankTables goal) | replaceMainGoal []
   replaceMainGoal [← assertProductBounds (← identifyReads elements)]
   evalTactic (← `(tactic| verex_budgeted grind))
+
+/-- A quotient of integers by a divisor that is not a literal, as `(dividend,
+divisor)`: `omega` reads one as an atom, unlike a quotient by a literal. -/
+private def variableQuotient? (e : Lean.Expr) : Option (Lean.Expr × Lean.Expr) :=
+  if e.isAppOfArity ``HDiv.hDiv 6 && (e.getArg! 0).isConstOf ``Int &&
+      ((e.getArg! 5).int? <|> (e.getArg! 5).nat?.map Int.ofNat).isNone then
+    some (e.getArg! 4, e.getArg! 5)
+  else none
+
+/-- A comparison with a quotient by a positive divisor that is not a literal
+becomes one with a product, as authored proofs take it: `s / d ≤ b` from
+`s ≤ b * d` (`Int.ediv_le_of_le_mul`), `s / d < b` from `s < b * d`, and
+`a ≤ s / d` from `a * d ≤ s`, for `0 < d` by omega. A side a hypothesis
+equates with such a quotient is rewritten to it first. The comparison of
+products is then decided by omega over its atoms, or, its products
+distributed over sums so that they share their monomials, by `verex_grind`
+with the monomials' bounds. -/
+elab "verex_quotient" : tactic => focusGoal do
+  let goal ← getMainGoal
+  let isInt (e : Lean.Expr) := (e.getArg! 0).isConstOf ``Int
+  let comparison (target : Lean.Expr) : Option (Name × Lean.Expr × Lean.Expr) :=
+    if target.isAppOfArity ``LE.le 4 && isInt target then
+      some (``LE.le, target.getArg! 2, target.getArg! 3)
+    else if target.isAppOfArity ``LT.lt 4 && isInt target then
+      some (``LT.lt, target.getArg! 2, target.getArg! 3)
+    else none
+  -- A hypothesis `side = q` (or `q = side`) with `q` a quotient by a variable.
+  let definition? (side : Lean.Expr) : MetaM (Option Lean.Expr) := goal.withContext do
+    for decl in ← getLCtx do
+      if decl.isImplementationDetail then continue
+      let type ← instantiateMVars decl.type
+      unless type.isAppOfArity ``Eq 3 && (type.getArg! 0).isConstOf ``Int do continue
+      if type.getArg! 1 == side && (variableQuotient? (type.getArg! 2)).isSome then
+        return some decl.toExpr
+      if type.getArg! 2 == side && (variableQuotient? (type.getArg! 1)).isSome then
+        return some (← mkEqSymm decl.toExpr)
+    return none
+  let some (relation, lhs, rhs) := comparison (← instantiateMVars (← goal.getType))
+    | throwError "the goal compares no integers"
+  let mut goal := goal
+  -- The side to reduce: a quotient, or what a hypothesis equates with one.
+  for side in #[lhs, rhs] do
+    if (variableQuotient? side).isNone then
+      if let some equation ← definition? side then
+        let target ← instantiateMVars (← goal.getType)
+        let result ← goal.withContext (goal.rewrite target equation)
+        goal ← goal.replaceTargetEq result.eNew result.eqProof
+  let some (relation, lhs, rhs) := comparison (← instantiateMVars (← goal.getType))
+    | throwError "the goal compares no integers"
+  let (lemma, args, divisor) ←
+    if let some (dividend, divisor) := variableQuotient? lhs then
+      let lemma := if relation == ``LE.le then ``Int.ediv_le_of_le_mul else ``Int.ediv_lt_of_lt_mul
+      pure (lemma, #[dividend, rhs, divisor], divisor)
+    else if let some (dividend, divisor) := variableQuotient? rhs then
+      unless relation == ``LE.le do throwError "no reduction of `<` below a quotient"
+      pure (``Int.le_ediv_of_mul_le, #[lhs, dividend, divisor], divisor)
+    else throwError "no quotient by a variable"
+  let some positive ← omegaProof? goal (← mkAppM ``LT.lt #[mkIntLit 0, divisor])
+    | throwError "the divisor is not positive"
+  let premises ← goal.apply (mkAppN (mkConst lemma) (args.push positive))
+  setGoals premises
+  evalTactic (← `(tactic| all_goals first
+    | omega
+    | (verex_bounds; omega)
+    | (simp only [Int.mul_add, Int.add_mul, Int.mul_sub, Int.sub_mul]; verex_grind)
+    | verex_grind))
 
 /-- Introduce the binders and premises a leaf's goal states, through the
 `Obligation` markers heading them: a quantified clause is decided at an
@@ -4941,6 +5055,7 @@ macro "verex_pipeline" : tactic => `(tactic| verex_focus ( (
           all_goals (first
             | verex_timed "pipe-bounds-omega" (verex_bounds; omega)
             | verex_timed "pipe-bv" verex_bv
+            | verex_timed "pipe-quotient" verex_quotient
             | verex_timed "pipe-grind" verex_grind)))))))
 
 /-- A value the arithmetic rules named, with its definition, if a hypothesis

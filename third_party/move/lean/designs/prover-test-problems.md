@@ -613,8 +613,9 @@ normalization.
 
 In `functional/fixed_point_arithm.move::mul_div`, the obligation has a
 hypothesis named `x`. It hides the parameter `x`, which becomes the
-inaccessible `x✝⁴`, so a hand proof cannot name it. The proofs in
-`fixed_point_arithm.proof.lean` work around this with `‹…›` patterns.
+inaccessible `x✝⁴`, so a hand proof cannot name it; authored proofs work
+around this with `‹…›` patterns. (`mul_div` itself verifies automatically
+since 2026-10-12.)
 
 ### G4. A proof file needs a single-module Move file
 
@@ -861,7 +862,9 @@ verifies completely. `opaque_inline_body_fail` rejects the bad `inc` body and it
 dependent caller, while the explicitly trusted variant verifies. An authored
 companion proves `opaque_inline_loop_sum::sum` and `test_sum_twice` at the unchanged
 25k budget (13.196M and 5.093M raw heartbeats). All positive targets in that file
-verify; only the deliberately wrong `test_sum_wrong` postcondition fails.
+verify; only the deliberately wrong `test_sum_wrong` postcondition fails. Since
+2026-10-12 both verify automatically (facts of products of consecutive
+integers), and the companion is removed.
 All three scoped ordinary baseline checks pass. The fresh full benchmark has
 30 verified problems and one expected rejection; its generated main-relative
 report preceded the Move package suite and the 437-file registry audit. Both
@@ -1314,7 +1317,8 @@ negative cases remain rejected (`/tmp/registry-nonlinear-target.log`).
 The proof companion for `functional/invariants_with_quant.move` now proves
 all four quantified postconditions at the existing 25k budget by enumerating
 the three valid indices and computing the vector reads. The file has no
-remaining diagnostics (`/tmp/registry-quant-vector-target.log`).
+remaining diagnostics (`/tmp/registry-quant-vector-target.log`). Since
+2026-10-12 it verifies automatically, and the companion is removed.
 All eleven positives in `for_loop_invariants.move` now verify. Its three
 triangular-sum proofs use a proved conversion from truncating to Euclidean
 division: `i * (i - 1)` is nonnegative for every integer. This prevents costly
@@ -1326,7 +1330,8 @@ Both intentionally incorrect loop invariants remain rejected
 normalizes literal list spines before branch exploration and supplies the
 four membership witnesses for `test_contains`. `test_index_of` and
 `option_type` close by simplification at the unchanged 25k budget
-(`/tmp/registry-simple-vector-target.log`).
+(`/tmp/registry-simple-vector-target.log`). Since 2026-10-12 `option_type`
+verifies automatically, and its proof is removed.
 
 ### V26. Stored write frames and global invariant preservation
 
@@ -1416,8 +1421,7 @@ The functions are marked as follows:
 - (lemma): a `spec lemma` whose theorem is not established
   ([`lemmas.md`](lemmas.md)).
 
-A function can fail because of a V entry of the same test. The functions
-proved by the hand proof beside `fixed_point_arithm` are not listed.
+A function can fail because of a V entry of the same test.
 
 ## Outside the unit tests
 
