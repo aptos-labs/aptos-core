@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_drop_helper::DropHelper;
 use aptos_types::{
@@ -11,7 +10,6 @@ use aptos_types::{
     transaction::{TransactionInfo, Version},
 };
 use derive_more::Deref;
-use itertools::zip_eq;
 use std::{clone::Clone, sync::Arc};
 
 #[derive(Clone, Debug, Default, Deref)]
@@ -87,29 +85,6 @@ impl Inner {
 
     pub fn txn_accumulator(&self) -> &Arc<InMemoryTransactionAccumulator> {
         &self.transaction_accumulator
-    }
-
-    pub fn ensure_transaction_infos_match(
-        &self,
-        transaction_infos: &[TransactionInfo],
-    ) -> Result<()> {
-        ensure!(
-            self.transaction_infos.len() == transaction_infos.len(),
-            "Lengths don't match. {} vs {}",
-            self.transaction_infos.len(),
-            transaction_infos.len(),
-        );
-
-        for (version, (txn_info, expected_txn_info)) in (self.first_version()..).zip(zip_eq(
-            self.transaction_infos.iter(),
-            transaction_infos.iter(),
-        )) {
-            ensure!(
-                txn_info == expected_txn_info,
-                "Transaction infos don't match. version:{version}, txn_info:{txn_info}, expected_txn_info:{expected_txn_info}",
-            );
-        }
-        Ok(())
     }
 
     pub fn first_version(&self) -> Version {

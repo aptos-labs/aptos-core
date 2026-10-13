@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    chunk_executor::chunk_result_verifier::ChunkResultVerifier,
+    chunk_executor::chunk_result_verifier::ChunkPiecesVerifier,
     metrics::CHUNK_OTHER_TIMERS,
     types::{
         executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
@@ -28,7 +28,7 @@ pub(crate) struct ChunkToUpdateLedger {
 
     /// from the input -- can be checked / used only after the transaction accumulator
     /// is updated.
-    pub chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
+    pub chunk_verifier: ChunkPiecesVerifier,
 }
 
 /// It's a two stage pipeline:
