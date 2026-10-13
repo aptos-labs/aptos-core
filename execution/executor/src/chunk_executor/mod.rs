@@ -73,6 +73,7 @@ use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
 
 pub mod chunk_commit_queue;
 pub mod chunk_result_verifier;
+pub mod partial_block;
 pub mod transaction_chunk;
 
 /// `BlockExecutorConfigFromOnchain` for executing a chunk against the given

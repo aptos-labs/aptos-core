@@ -41,6 +41,10 @@ pub trait TransactionChunk {
         self.len() == 0
     }
 
+    fn next_version(&self) -> Version {
+        self.first_version() + self.len() as Version
+    }
+
     fn into_output<V: VMBlockExecutor>(
         self,
         parent_state: &LedgerState,
@@ -53,6 +57,25 @@ pub struct ChunkToExecute {
     pub transactions: Vec<Transaction>,
     pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
     pub first_version: Version,
+}
+
+impl ChunkToExecute {
+    /// Splits off the transactions from index `at` on.
+    pub fn split_off(&mut self, at: usize) -> Self {
+        Self {
+            transactions: self.transactions.split_off(at),
+            persisted_aux_info: self.persisted_aux_info.split_off(at),
+            first_version: self.first_version + at as Version,
+        }
+    }
+
+    /// Appends the transactions right after this chunk.
+    pub fn append(&mut self, mut other: Self) {
+        assert_eq!(other.first_version, self.next_version());
+        self.transactions.append(&mut other.transactions);
+        self.persisted_aux_info
+            .append(&mut other.persisted_aux_info);
+    }
 }
 
 impl TransactionChunk for ChunkToExecute {
@@ -122,6 +145,43 @@ pub struct ChunkToApply {
     pub first_version: Version,
 }
 
+impl ChunkToApply {
+    /// Splits off the transactions from index `at` on.
+    pub fn split_off(&mut self, at: usize) -> Self {
+        Self {
+            transactions: self.transactions.split_off(at),
+            transaction_outputs: self.transaction_outputs.split_off(at),
+            persisted_aux_info: self.persisted_aux_info.split_off(at),
+            first_version: self.first_version + at as Version,
+        }
+    }
+
+    /// Appends the transactions right after this chunk.
+    pub fn append(&mut self, mut other: Self) {
+        assert_eq!(other.first_version, self.next_version());
+        self.transactions.append(&mut other.transactions);
+        self.transaction_outputs
+            .append(&mut other.transaction_outputs);
+        self.persisted_aux_info
+            .append(&mut other.persisted_aux_info);
+    }
+
+    /// Drops the outputs, so the transactions are executed instead.
+    pub fn into_chunk_to_execute(self) -> ChunkToExecute {
+        let Self {
+            transactions,
+            transaction_outputs: _,
+            persisted_aux_info,
+            first_version,
+        } = self;
+        ChunkToExecute {
+            transactions,
+            persisted_aux_info,
+            first_version,
+        }
+    }
+}
+
 impl TransactionChunk for ChunkToApply {
     fn first_version(&self) -> Version {
         self.first_version
@@ -157,5 +217,79 @@ impl TransactionChunk for ChunkToApply {
             state_view,
             onchain_config,
         )
+    }
+}
+
+pub enum ChunkToExecuteOrApply {
+    Execute(ChunkToExecute),
+    Apply(ChunkToApply),
+}
+
+impl ChunkToExecuteOrApply {
+    /// Splits off the transactions from index `at` on.
+    pub fn split_off(&mut self, at: usize) -> Self {
+        match self {
+            Self::Execute(chunk) => Self::Execute(chunk.split_off(at)),
+            Self::Apply(chunk) => Self::Apply(chunk.split_off(at)),
+        }
+    }
+
+    /// Appends the transactions right after this chunk. The result is applied only if both are,
+    /// since outputs are needed for all transactions to apply them.
+    pub fn append(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Apply(mut chunk), Self::Apply(other)) => {
+                chunk.append(other);
+                Self::Apply(chunk)
+            },
+            (Self::Execute(mut chunk), other) => {
+                chunk.append(other.into_chunk_to_execute());
+                Self::Execute(chunk)
+            },
+            (Self::Apply(chunk), Self::Execute(other)) => {
+                let mut chunk = chunk.into_chunk_to_execute();
+                chunk.append(other);
+                Self::Execute(chunk)
+            },
+        }
+    }
+
+    fn into_chunk_to_execute(self) -> ChunkToExecute {
+        match self {
+            Self::Execute(chunk) => chunk,
+            Self::Apply(chunk) => chunk.into_chunk_to_execute(),
+        }
+    }
+}
+
+impl TransactionChunk for ChunkToExecuteOrApply {
+    fn first_version(&self) -> Version {
+        match self {
+            Self::Execute(chunk) => chunk.first_version(),
+            Self::Apply(chunk) => chunk.first_version(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Execute(chunk) => chunk.len(),
+            Self::Apply(chunk) => chunk.len(),
+        }
+    }
+
+    fn into_output<V: VMBlockExecutor>(
+        self,
+        parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
+        state_view: CachedStateView,
+    ) -> Result<ExecutionOutput> {
+        match self {
+            Self::Execute(chunk) => {
+                chunk.into_output::<V>(parent_state, parent_positions, state_view)
+            },
+            Self::Apply(chunk) => {
+                chunk.into_output::<V>(parent_state, parent_positions, state_view)
+            },
+        }
     }
 }
