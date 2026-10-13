@@ -54,6 +54,8 @@ def isolate(lines, module, target, options, proofs=()):
     functions = []
     specifications = set()
     skipping_proof = False
+    # Where the module's items end: before the first top-level command after it.
+    end = None
     identifier = r"(?:«[^»]+»|\w+)"
     for line in lines:
         if line.startswith("verex module "):
@@ -62,6 +64,9 @@ def isolate(lines, module, target, options, proofs=()):
             in_module = line.split()[2].split("::")[-1] == module
             seen_module = in_module
             current = None
+        elif in_module and line.strip() and not line.startswith(" "):
+            in_module = False
+            end = len(out)
         if line.startswith("set_option verex.stageLog"):
             continue
         if in_module:
@@ -92,11 +97,16 @@ def isolate(lines, module, target, options, proofs=()):
         raise ValueError(f"module {module!r} was not found")
     if target not in functions:
         raise ValueError(f"function {target!r} was not found in module {module!r}")
-    out.extend(proofs)
+    items = list(proofs)
     # Functions with assertions but no explicit spec are verification targets too.
     for function in functions:
         if function != target and function not in specifications:
-            out.extend([f"  spec {function} where", "    pragma verify = false", ""])
+            items.extend([f"  spec {function} where", "    pragma verify = false", ""])
+    if end is None:
+        end = len(out)
+    if items and items[-1].strip():
+        items.append("")
+    out[end:end] = items
     text = "\n".join(out) + "\n"
     settings = "".join(f"set_option {name} {value}\n" for name, value in options)
     return text.replace("import VerexSL\n", "import VerexSL\n" + settings, 1)
