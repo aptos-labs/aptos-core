@@ -188,12 +188,19 @@ pub async fn verify_fast_sync_version_and_metrics(node: &mut LocalNode, sync_to_
     verify_first_ledger_info(node);
 }
 
-/// Verifies that the ledger info at version 0 exists in the given node's DB
+/// Verifies that the ledger info at version 0, and the data behind it, exist in
+/// the given node's DB
 fn verify_first_ledger_info(node: &mut LocalNode) {
     // Get the DB path for the node
     let db_path = node.config().base.data_dir.as_path();
     let mut db_path_buf = db_path.to_path_buf();
     db_path_buf.push("db");
+
+    // Verify that fast syncing didn't leave a second DB behind
+    assert!(
+        !db_path_buf.join("fast_sync_secondary").exists(),
+        "Fast sync should not create a secondary genesis DB!"
+    );
 
     // Stop the node to prevent any DB contention
     node.stop();
@@ -201,6 +208,23 @@ fn verify_first_ledger_info(node: &mut LocalNode) {
     // Verify that the ledger info exists at version 0
     let aptos_db = AptosDB::new_for_test_with_sharding(db_path_buf.as_path(), 1 << 13);
     aptos_db.get_epoch_ending_ledger_info(0).unwrap();
+
+    // Verify the node actually committed the data behind that ledger info. A
+    // node that only pre-committed it reports no synced version, and would go
+    // on treating itself as never having bootstrapped.
+    assert!(
+        aptos_db.get_synced_version().unwrap().is_some(),
+        "A bootstrapped node must report a synced version!"
+    );
+
+    // Verify genesis was committed cleanly rather than by way of a rejected
+    // write and a retry. The node recorded the epoch-0 ledger info up front, so
+    // committing it a second time is rejected as a gap in epoch history.
+    let logs = node.get_log_contents().unwrap();
+    assert!(
+        !logs.contains("Gap in epoch history"),
+        "Committing genesis must not re-write the ledger info the node already recorded!"
+    );
 
     // Drop the DB handle before restarting the node to release the rocks DB lock file
     drop(aptos_db);

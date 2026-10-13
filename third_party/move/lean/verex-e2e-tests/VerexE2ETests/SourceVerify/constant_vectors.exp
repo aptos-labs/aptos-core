@@ -1,0 +1,4 @@
+VerexE2ETests/SourceVerify/constant_vectors.move:19:31: error: the assertion `BYTES[0] == 22` does not hold
+VerexE2ETests/SourceVerify/constant_vectors.move:19:5: error: verex verification failed: the automatic verification of `wrong_byte` failed; provide a proof: `verify wrong_byte by …` in `VerexE2ETests/SourceVerify/constant_vectors.proof.lean` (`verify wrong_byte by verex_obligations` lists its obligations)
+VerexE2ETests/SourceVerify/constant_vectors.move:20:34: error: the assertion `ADDRESSES[0] == @0x2` does not hold
+VerexE2ETests/SourceVerify/constant_vectors.move:20:5: error: verex verification failed: the automatic verification of `wrong_address` failed; provide a proof: `verify wrong_address by …` in `VerexE2ETests/SourceVerify/constant_vectors.proof.lean` (`verify wrong_address by verex_obligations` lists its obligations)

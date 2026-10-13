@@ -9,11 +9,11 @@
 //! Lean toolchain's `lean/lean.h`, links into the Lean test executable:
 //!
 //! ```c
-//! uint32_t leaner_monovm_abi_version(void);
-//! int32_t leaner_monovm_run(
+//! uint32_t verex_monovm_abi_version(void);
+//! int32_t verex_monovm_run(
 //!     const uint8_t *request, size_t request_len,
-//!     struct leaner_buffer *response);
-//! void leaner_monovm_buffer_free(struct leaner_buffer response);
+//!     struct verex_buffer *response);
+//! void verex_monovm_buffer_free(struct verex_buffer response);
 //! ```
 //!
 //! Only owned bytes cross the boundary. Every domain failure — compilation,
@@ -37,20 +37,20 @@ use payload::{Outcome, Request, Response, Stage, PAYLOAD_VERSION};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// Native ABI version of the C boundary. Bump when an exported function's
-/// signature, the `LeanerBuffer` layout, or the containment contract
+/// signature, the `VerexBuffer` layout, or the containment contract
 /// changes; the payload schema has its own independent version.
 pub const ABI_VERSION: u32 = 1;
 
 /// An owning byte buffer crossing the C boundary. Produced by
-/// [`leaner_monovm_run`] and returned to [`leaner_monovm_buffer_free`]; the
+/// [`verex_monovm_run`] and returned to [`verex_monovm_buffer_free`]; the
 /// bytes are always a `payload::Response`.
 #[repr(C)]
-pub struct LeanerBuffer {
+pub struct VerexBuffer {
     pub data: *mut u8,
     pub len: usize,
 }
 
-impl LeanerBuffer {
+impl VerexBuffer {
     fn from_vec(bytes: Vec<u8>) -> Self {
         let bytes = bytes.into_boxed_slice();
         let len = bytes.len();
@@ -79,12 +79,12 @@ impl LeanerBuffer {
 
 /// Reports the native ABI version of this library.
 #[unsafe(no_mangle)]
-pub extern "C" fn leaner_monovm_abi_version() -> u32 {
+pub extern "C" fn verex_monovm_abi_version() -> u32 {
     ABI_VERSION
 }
 
 /// Runs one request. Returns `0` when `*response` holds the encoded
-/// response and the caller owes it to `leaner_monovm_buffer_free`; a
+/// response and the caller owes it to `verex_monovm_buffer_free`; a
 /// nonzero status means no response could be produced at all and
 /// `*response` is a null buffer.
 ///
@@ -93,15 +93,15 @@ pub extern "C" fn leaner_monovm_abi_version() -> u32 {
 /// `request` must be readable for `request_len` bytes when it is non-null,
 /// and `response` must be writable.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn leaner_monovm_run(
+pub unsafe extern "C" fn verex_monovm_run(
     request: *const u8,
     request_len: usize,
-    response: *mut LeanerBuffer,
+    response: *mut VerexBuffer,
 ) -> i32 {
     if response.is_null() {
         return 1;
     }
-    unsafe { *response = LeanerBuffer::null() };
+    unsafe { *response = VerexBuffer::null() };
     let request_bytes = if request.is_null() {
         &[][..]
     } else {
@@ -112,18 +112,18 @@ pub unsafe extern "C" fn leaner_monovm_run(
         || run_bytes(request_bytes),
         |message| encode_response(&internal_response(message)),
     );
-    unsafe { *response = LeanerBuffer::from_vec(bytes) };
+    unsafe { *response = VerexBuffer::from_vec(bytes) };
     0
 }
 
-/// Frees a response buffer produced by [`leaner_monovm_run`]. Passing a
+/// Frees a response buffer produced by [`verex_monovm_run`]. Passing a
 /// null buffer is a no-op.
 ///
 /// # Safety
 ///
 /// `response` must be a buffer produced by this library and not yet freed.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn leaner_monovm_buffer_free(response: LeanerBuffer) {
+pub unsafe extern "C" fn verex_monovm_buffer_free(response: VerexBuffer) {
     let _ = response.into_vec();
 }
 

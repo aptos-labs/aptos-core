@@ -23,7 +23,10 @@ use move_core_types::{
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use rustc_hash::FxHashSet;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -36,6 +39,8 @@ pub struct VMOutput {
     module_write_set: ModuleWriteSet,
     fee_statement: FeeStatement,
     status: TransactionStatus,
+    /// Hot state promotions, non-empty only in block epilogues.
+    hotness: BTreeSet<StateKey>,
     /// Trace of the user transaction payload execution in Move VM. Trace is always created as
     /// empty, and users have to set it manually after execution.
     #[derivative(PartialEq = "ignore", Debug = "ignore")]
@@ -54,6 +59,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            hotness: BTreeSet::new(),
             trace: Trace::empty(),
         }
     }
@@ -64,6 +70,7 @@ impl VMOutput {
             module_write_set: ModuleWriteSet::empty(),
             fee_statement: FeeStatement::zero(),
             status,
+            hotness: BTreeSet::new(),
             trace: Trace::empty(),
         }
     }
@@ -96,6 +103,18 @@ impl VMOutput {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
+    }
+
+    /// Sets the keys the block epilogue makes hot. They bypass the change set because they are
+    /// not writes, and are materialized into the `WriteSet`'s hotness bucket.
+    ///
+    /// Panics if hotness is already set.
+    pub fn set_hotness(&mut self, hotness: BTreeSet<StateKey>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
     }
 
     /// Sets the trace for this output. Should only be called once to replace the default empty
@@ -162,6 +181,7 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
+            hotness,
             trace,
         } = self;
 
@@ -186,6 +206,7 @@ impl VMOutput {
         let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+        write_set.add_hotness(hotness);
         if !native_positions.is_empty() {
             // `freeze()` produces V0, whose extension bucket is `#[serde(skip)]`.
             // Upgrade so the positions survive serialization (write-set replay,

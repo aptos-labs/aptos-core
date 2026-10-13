@@ -256,6 +256,13 @@ impl AptosDB {
         );
         let mut ledger_batch = SchemaBatch::new();
         ledger_metadata_db.put_ledger_info(genesis_li, &mut ledger_batch)?;
-        ledger_metadata_db.write_schemas(ledger_batch)
+        ledger_metadata_db.write_schemas(ledger_batch)?;
+
+        // The cached latest ledger info is otherwise only populated when the DB
+        // is opened, so without this the DB reports no ledger info at all until
+        // the next restart.
+        ledger_metadata_db.set_latest_ledger_info(genesis_li.clone());
+
+        Ok(())
     }
 }

@@ -1,2 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/defines.move:54:5: error: primitive `LeanerIR.PrimitiveOperation.equal` has non-inferable generic operation arguments

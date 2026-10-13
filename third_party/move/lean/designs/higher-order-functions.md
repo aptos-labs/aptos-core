@@ -7,7 +7,7 @@ Move function values (language 2.2) are closures: a function, a mask saying
 which of its parameters are bound, and the bound values. Their
 specifications (language 2.4) use behavioral predicates (`requires_of`,
 `aborts_of`, `ensures_of`, `result_of`) and state labels. This design carries
-them through LIR, execution, the denotation, and verification, and connects
+them through VIR, execution, the denotation, and verification, and connects
 them to Move sources, Move bytecode, and Rust function pointers.
 
 Sources: the Move Book (`functions.md`, "Function Values";
@@ -47,24 +47,24 @@ What the stack had before H1:
 
 | Layer | Present | Missing |
 |---|---|---|
-| LIR | `Ty.function` with abilities; `CallKind.closure`, `invoke`; `RuntimeValue.closure handle captures`; behavioral predicates as `SpecOperation.behavior kind range` | capture mask (captures are a parameter prefix); the closure's type instantiation |
+| VIR | `Ty.function` with abilities; `CallKind.closure`, `invoke`; `RuntimeValue.closure handle captures`; behavioral predicates as `SpecOperation.behavior kind range` | capture mask (captures are a parameter prefix); the closure's type instantiation |
 | Validation | target, arity, and capture types checked; the function type's abilities ignored | reference captures, abilities, persistence; `invoke` in the borrow analysis |
 | Runtime | big-step rules, interpreter, soundness/completeness | `invoke` runs under the caller's type instantiation and registers no returned loan; closures ordered by handle index |
 | Denotation | direct calls; `propheticMeaning` defined for any handle | no function `NTy`; closures and `invoke` are `notCarried` |
-| Contracts | LeanerLang parses predicates and `@n` labels | contracts reject behavioral predicates |
-| LeanerLang | `Fn(..) -> R has ..`, `function[F](target, captures)`, `invoke(f, args)` | masks, generic targets, `f(x)` application |
+| Contracts | VerexSL parses predicates and `@n` labels | contracts reject behavioral predicates |
+| VerexSL | `Fn(..) -> R has ..`, `function[F](target, captures)`, `invoke(f, args)` | masks, generic targets, `f(x)` application |
 | Move frontend | function types, `invoke`, predicates in the exchange | closure construction: the producer skips the function, and `Encode.lean` drops the skip without a diagnostic |
 | XIR | — | function types, `PackClosure`, `CallClosure` |
 | Rust | function pointers (non-capturing) | capturing closures, `Fn*` traits |
 | Tests | `Tests/Closures.lean`, `Tests/Generics.lean` | Check, SourceVerify, and MonoVM differential fixtures |
 
-## LIR
+## VIR
 
 **Masks.** `CallKind.closure` gains the mask, a bit set over the target's
 parameters as in Move; a prefix is the mask with the low `n` bits set. The
 alternative, adapter functions that reorder parameters, would add functions
-the source does not have and break the LeanerLang round trip. `compose` and
-`extract` are defined once in `LeanerIR` and used by validation, the
+the source does not have and break the VerexSL round trip. `compose` and
+`extract` are defined once in `VerexIR` and used by validation, the
 runtime, and the denotation.
 
 **Instantiation.** A closure of a generic target fixes its type arguments at
@@ -79,8 +79,8 @@ caller's.
 - the function type's abilities are within those the captures and the
   target allow (above); Move's persistence rule is a Move profile rule
   (`ProfileSchema.storableTarget`, defined once as
-  `LeanerLang.moveStorableTarget` over both spellings of the modifiers and
-  used by the LeanerLang and Move registries, `LIR-CLOSURE-STORE`);
+  `VerexSL.moveStorableTarget` over both spellings of the modifiers and
+  used by the VerexSL and Move registries, `VIR-CLOSURE-STORE`);
 - `invoke` requires the operand's function type, arity, and argument types
   (exists), and consumes a non-`copy` function value;
 - the borrow analysis treats `invoke` as a call: reference arguments are lent
@@ -134,7 +134,7 @@ a generic target, `propheticMeaning_subst` carries the meaning at the
 caller's types to the family the type arguments induce, the form a direct
 call with type arguments has. The normalizer applies both (the generic one
 through a simproc, since the invocation spells the substituted rows), so
-the closer uses the target's theorem as for a direct call, and closure
+the solver uses the target's theorem as for a direct call, and closure
 targets join a function's callees.
 
 How this relates to the Prover's datatype of function-value sources is the
@@ -178,7 +178,7 @@ has exact predicates rather than a vacuous default.
 At an invocation, a literal closure is `C_f`: it reduces to the direct call. A
 parameter is `P` and a value read from a field is `F`: their predicates are
 opaque atoms, constrained by the contract's `requires` and by data
-invariants. The closer's discipline mirrors the Prover's triggers: a
+invariants. The solver's discipline mirrors the Prover's triggers: a
 predicate is unfolded only for a literal closure, through its target's
 theorem.
 
@@ -206,7 +206,7 @@ In Lean the closed world is a theorem, and the one that holds is: every
 closure an execution creates is a closure of a site of the executable unit;
 values from the arguments, however nested, and from the initial state are
 arbitrary, where a type without `store` cannot occur in the initial state. It is proved once, by induction over the big-step relation. The
-closer uses it on demand, where a proof cannot see a value's provenance, for
+solver uses it on demand, where a proof cannot see a value's provenance, for
 example a closure returned by an opaque callee whose contract does not
 describe it: the value is one of the unit's closures of `τ`, a case split
 whose cases are direct calls, or it came from an input and is known through
@@ -242,7 +242,7 @@ which `¬aborts_of` does not give. The theorem of a function whose
 contract, or a callee's at any depth, states `result_of` takes the
 hypothesis `Terminating` (runs of the unit's functions end, the Move
 Prover's assumption), under which an invocation that does not abort
-returns (`returns_of_terminating`); the closer reads `result_of` of a
+returns (`returns_of_terminating`); the solver reads `result_of` of a
 literal closure that way, and the target's contract then applies to the
 run.
 
@@ -250,7 +250,7 @@ run.
 precondition, but a caller needs the target's precondition to use the
 target's verified contract. The table maps each target of the module's
 closures to its `requires` over runtime arguments, each parameter read from
-its argument (`buildDeclaredRequires`), with one `lir_denote_norm` equation
+its argument (`buildDeclaredRequires`), with one `vir_denote_norm` equation
 per target; a precondition stating a behavioral predicate would read the
 table itself and is rejected. A verified target's theorem (`Satisfies`)
 then yields what the Prover asserts as compliance: under `requires_of`,
@@ -260,13 +260,13 @@ then yields what the Prover asserts as compliance: under `requires_of`,
 **Literal closures.** Of a closure whose target, weave, and captures a leaf
 sees, on reference-free arguments and result, the predicates reduce to the
 target: `requires_of` to its table entry at the woven arguments
-(`requiresOf_closureOf`, the closer's `behavior` step), and `ensures_of`
+(`requiresOf_closureOf`, the solver's `behavior` step), and `ensures_of`
 and `aborts_of` to runs of its prophetic meaning (`ensuresOf_closureOf`,
-`abortsOf_closureOf`). The closer reads the runtime arguments back as
+`abortsOf_closureOf`). The solver reads the runtime arguments back as
 natives, certifying an integer by its bounds, establishes the target's
 precondition, and adds what the target's theorem states of the run
 (`ensuresOf_closureOf_verified`, `abortsOf_closureOf_verified`). A target
-a call inlines is passed to the closer by its theorem as well. A target
+a call inlines is passed to the solver by its theorem as well. A target
 without a theorem, a function without a specification, is read by its
 body (decided 2026-10-02, as the Move Prover infers the specification of
 such a lambda): a hypothesis stating `ensures_of` or `aborts_of` of it
@@ -282,9 +282,72 @@ and otherwise the run `result_of` reads applies. A parameter of a shared
 reference type is the value it observes: a closure over such a target is
 typed at the row of the referents (`ClosureTypedAt`, `observedType`).
 
-Mutable-reference arguments follow the prophetic model: `ensures_of` relates
-the argument's entry value and its resolved final value, as the Move Book's
-single-occurrence form (`ensures_of<f>(x_mut, r)`) states.
+Mutable-reference arguments follow the prophetic model, in the Prover's
+argument layout (`spec_translator.rs`, `bytecode_translator.rs`): a
+predicate's inputs are the arguments' values, a `&mut` one's its entry
+value; `ensures_of` takes after them the declared results and then the final
+value of each `&mut` argument, in order (`ensures_of<f>(old(x), x)` for
+`f: |&mut T|`); `result_of` names the declared results alone, and
+`requires_of` and `aborts_of` the inputs alone. The meaning (done
+2026-10-09, `AbortsOfMut`, `EnsuresOfMut`, `ResultOfMut` in
+`Proofs/Behavior.lean`): the invocation runs with each `&mut` argument lent
+under a loan of its own, `.borrow loan entry` (`lendMutable`, its positions
+marked by the function type), from a start whose bookkeeping lends exactly
+those loans, and the final value is the one the run exports for the loan
+(`RuntimeState.pending`), with the holes of returned references filled, as
+`argumentsResolve` reads a call (`ResolvesAt`); a reference-free function
+value keeps `AbortsOf`/`EnsuresOf`/`ResultOf`. For a literal closure this is
+a run of the target's prophetic meaning at the reference `(entry, final)`
+(`ensuresOfMut_closureOf`, `abortsOfMut_closureOf` and their `_verified`
+forms in `Proofs/Invocation.lean`, over rows each element of which is a
+mutable reference or holds none, `NRow.lentFlat`), which the solver reads by
+the target's contract (`dispatchBehavior`) or body (`denotedRun`) as for
+reference-free rows. The run is read at native arguments recovered from the
+statement's runtime values (`nativeOf?`): a struct's or an enum's value,
+which normalization leaves as `RuntimeValue.nominal` once the variant is
+known, is read back as its fields' natives, a variant injected at its
+position (in the denotation's normal form, `variantCarrier.first_eq` and
+`later_eq`) at the carriers of the closure's frame. At a leaf, `aborts_of`
+and `ensures_of` of a literal closure that captures values read as those of
+the function value naming its target at the woven arguments
+(`abortsOf_closureOf_captured`): the invocation depends on the closure and
+its arguments only through the target and the woven row. The rewrite is of
+the leaf's goal, decided by the cheap deciders after it
+(`verex_woven_behaviors`); the context keeps the closures as built,
+where frames and contracts name them. A
+contract reads a
+`&mut` input at the invocation's
+pre-state (its entry value, or its copy at a pre-state label), as the
+Prover reads `old` of it, and a final value of `ensures_of` at the
+post-state (`Contract.mutableAt`). Not carried yet: an invocation of a
+function value with `&mut` parameters the proof does not see (its `wp` needs
+the H4b typing of lent arguments), a state label defined by such an
+invocation, and `modifies_of` frames of such function values (`FramedAt` is
+vacuous at rows with references).
+
+A result that is a mutable reference is read as its referent's value at
+return, as the Prover reads it (decided 2026-10-09): `EnsuresOfMut` and
+`ResultOfMut` take which results hold mutable references
+(`mutableResults`, from the function type) and read them through
+`RuntimeValue.observe` (`readResults`); other results are read as returned.
+A function value returning one but taking none is read by these
+predicates too. Lent invocations are deterministic up to loan identities
+(`static-typing.md`, "Loan independence"), so `result_of` is the results
+every run returns where those hold no loan
+(`resultOfMut_eq_of_ensuresOfMut`) and a returning run refutes `aborts_of`
+(`not_abortsOfMut_of_ok`). A call of a target whose parameters and result
+are each a mutable reference or hold none is a run of the function value
+naming it (`wp_named_mut`, with `NativesShift` `wp_named_mut_typed`): where
+its returned reference is settled (`ResultShape.Settled`, its prophecy its
+current value, as the reference's death leaves it), the continuation
+assumes `ensures_of` at the call's entry values, the result's current
+value, and the arguments' final values, and that `result_of` is that
+result; it assumes the absence of aborts unconditionally. The solver names
+such a call where the goal owes a behavioral predicate, through the
+continuations bound as local definitions and a loop's back edge
+(`obligesBehavior`), and a theorem whose verified body states `aborts_of`
+or `result_of` in a loop invariant, assertion, or assumption assumes the
+typing and termination its contract would (`bodyReads`).
 
 **Frames.** Without `modifies_of`, Move treats a function parameter as not
 modifying global memory, and the compiler checks every closure passed for it.
@@ -298,7 +361,9 @@ of a verified body with a function-typed parameter assumes, beside its
 typing, that it keeps memory (`KeepsMemoryAt`: every run from typed memory
 at reference-free arguments ends in the memory it started from). A run of
 such a parameter's invocation ends where it started, and a loop whose body
-invokes only parameters it does not reassign keeps its state. A caller
+invokes only parameters it does not reassign keeps its state; building a
+function value changes no memory, and a loop's specification blocks, where
+a behavioral invariant names one, are not evaluated. A caller
 establishes the frame of a literal closure from its target's theorem, where
 the target's assumptions and precondition hold at every argument and typed
 memory and its frame changes nothing (`KeepsMemoryAt.ofVerified`), or else
@@ -307,7 +372,7 @@ from the target's body, an obligation over every argument and typed memory
 from its code. The Move frontend reads an invocation of such a parameter as
 writing no global memory, so a higher-order function's frame is closed.
 
-`modifies_of<f>(a) R[a]` (2026-10-03) reaches LIR as a parameter frame
+`modifies_of<f>(a) R[a]` (2026-10-03) reaches VIR as a parameter frame
 (XAST 6, RawUnit JSON 1.3): the theorem then assumes `FramedAt`, the closed
 frame but for the targets with the formals bound to an invocation's
 arguments, and a caller establishes it the same two ways, a target's frame
@@ -317,15 +382,40 @@ a parameter does not keep its state, and the frontend reads the invocation
 as a write. A frame a hypothesis states of a passed function value
 establishes any wider one (`FramedAt.mono`).
 
+Default frames of directly function-typed Move fields are now carried as
+implicit data invariants (2026-10-05). `EncodedKeepsMemory` states the frame
+over the field's runtime encoding. Construction, mutation, parameters,
+results, and stored resources check or carry it; an invocation of a closure
+read from storage recovers its frame from `MemoryInvariants.read`. The
+compiler and contract generator share the field predicate so packing and
+mutation cannot miss the obligation. `StoredFrames` checks construction,
+publication, removal, and invocation; `StoredFrameErrors` rejects both
+packing and assigning a memory-writing closure. This does not constrain
+arbitrary function values supplied as type arguments or nested in vectors.
+Explicit struct-field write frames (2026-10-06) use `EncodedFramed` instead:
+the frame's formals bind invocation arguments, its resource types are
+instantiated in the enclosing nominal's type scope, and its addresses are
+evaluated in the invocation's pre-state. Other fields of the same struct
+are available to address expressions. A wildcard frame imposes no memory
+restriction. The same construction and mutation checkpoints establish the
+frame, and opaque results carry it to callers. Source-clause markers are
+unwrapped when applying these guarantees. Shared-reference arguments admit
+referent-typed specification formals, matching behavioral predicates.
+Explicit enum-field write frames still receive an unsupported diagnostic.
+All four full suites passed with the focused frame checks. Dependency
+interfaces still omit nominal contracts, so an explicit write frame at that
+boundary is rejected; importing it as an empty frame would be unsound. The
+interface rejection and preservation of owned frames have frontend guards.
+
 **State labels.** A contract is a Lean proposition over states, so a label is
 a state variable: `..S |~ ensures_of<f>(x, y)` makes `S` the post-state of the
 application, and a label quantified by `exists S in *` or `forall S in *`, or
-left free in a clause, is a bound `RuntimeState`. LeanerLang's `@n` anchors
+left free in a clause, is a bound `RuntimeState`. VerexSL's `@n` anchors
 already number them; `Contract.lean` binds them. The Prover's flattening of
 intermediate states for SMT is not needed.
 
 **Verification.** In a higher-order function's proof the predicates over its
-parameters are opaque atoms. The closer rewrites `invoke` on a variable with
+parameters are opaque atoms. The solver rewrites `invoke` on a variable with
 one lemma, `wp` of the call as the predicates, and then works with the
 contract's clauses about them. `invoke` on a literal closure reduces to the
 direct call, and closure targets join the callees whose theorems a proof
@@ -333,7 +423,7 @@ assumes, so a caller of a higher-order function uses the target's contract as
 it would for a direct call. Generic higher-order functions need nothing
 further: the carrier does not depend on type parameters.
 
-## LeanerLang
+## VerexSL
 
 Existing forms stay canonical: `Fn(A, B) -> R has copy, drop`,
 `function[F](target, captures…)`, `invoke(f, args…)`, the predicates, and
@@ -343,7 +433,7 @@ Existing forms stay canonical: `Fn(A, B) -> R has copy, drop`,
   parameter; `_` marks a parameter supplied at invocation, and a prefix needs
   none;
 - generic targets: `function[Fn(T) -> T](f::<T>, …)`, replacing
-  `LEANER-CLOSURE-GENERICS`;
+  `VEREX-CLOSURE-GENERICS`;
 - `f(x)` for a function-typed local, printed back as `f(x)`;
 - `modifies_of<f>(a: address) R[a]` in a specification, for the frame above.
 
@@ -364,13 +454,13 @@ Lambdas stay out; lifted Move lambdas arrive as ordinary functions.
   (`{"function": [[params], [results], [abilities]]}`) and the operations
   `closure`/`closure_inst` (target, mask, type arguments; the captures are
   the operands) and `invoke` (the function value last, as in stackless
-  bytecode; LIR passes it first). compiler-v2 loads them as stackless
+  bytecode; VIR passes it first). compiler-v2 loads them as stackless
   `Closure` and `Invoke`; a closure's target is a used, not a called,
   function of its creator.
 
 ## Rust
 
-Function pointers already reach LIR as closures without captures. Capturing
+Function pointers already reach VIR as closures without captures. Capturing
 closures take their environment by reference (`Fn`, `FnMut`) or by value
 (`FnOnce`); the reference cases need captured references, which the
 prophetic model can express but this design excludes. They are a later
@@ -379,15 +469,15 @@ traits are.
 
 ## Tests
 
-- **LIR:** `compose`/`extract`; generic closures keep their instantiation;
+- **VIR:** `compose`/`extract`; generic closures keep their instantiation;
   reference captures and excess abilities rejected; `invoke` lends and
   returns references; closures ordered by name.
 - **MonoVM differential** (Move sources): masks in every position, generic
   closures, closures as struct fields, equality, aborts inside a closure,
   `&mut` arguments through `invoke`. The harness has no global state and no
   `std::cmp`, so closures in resources are exercised through XIR on MoveVM
-  (compiler-v2's `leaner/closures.lean`) and the order by the LIR tests.
-- **Check fixtures** (LeanerLang): a known closure through a higher-order
+  (compiler-v2's `verex/closures.lean`) and the order by the VIR tests.
+- **Check fixtures** (VerexSL): a known closure through a higher-order
   function; a higher-order function verified against `requires_of`,
   `aborts_of`, `ensures_of`, `result_of`; `&mut` arguments; a generic
   higher-order function; a stored closure; state labels over two calls;
@@ -401,13 +491,13 @@ traits are.
 1. **H1 — closures at run time.** Done: masks (`ClosureMask`, RawUnit JSON
    1.2), instantiations fixed at construction, validation (mask, reference
    captures, capture abilities), `invoke` as a call in the borrow analysis,
-   name ordering (`ValueOrders`), the interpreter and its proofs, LIR tests.
+   name ordering (`ValueOrders`), the interpreter and its proofs, VIR tests.
 2. **H2 — Move path.** Done: closure construction in the exchange (XAST 5),
    the silent-drop fix, the Move persistence rule for `store`, the
-   LeanerLang mask and generic-target spellings, XIR 7 lowering, the MonoVM
+   VerexSL mask and generic-target spellings, XIR 7 lowering, the MonoVM
    differential fixture `MonoDifferential/closures.move` (masks, a generic
    target, struct fields, a higher-order function, aborts, `&mut` arguments,
-   equality), and compiler-v2's transactional `leaner/closures.lean`
+   equality), and compiler-v2's transactional `verex/closures.lean`
    (the same through XIR on MoveVM, and a closure stored in a resource).
 3. **H3 — denotation.** Done: the function `NTy` over `ClosureValue`,
    `Term.closure`, `Term.closureGeneric`, `Term.invoke`, `closureMeaning`,
@@ -426,7 +516,7 @@ traits are.
      a predicate takes the executable unit as its last parameter, and one
      stating `requires_of` the table after it; theorems instantiate them at
      the unit they quantify and at the module's table
-     (`LeanerLang/Tests/Behavior.lean`). Without state labels a predicate
+     (`VerexSL/Tests/Behavior.lean`). Without state labels a predicate
      reads the function's entry state, and in `ensures` relates it to the
      exit state; labels and mutable reference parameters are rejected
      until H4d.
@@ -436,10 +526,10 @@ traits are.
      [`static-typing.md`](static-typing.md); Phases 1–4 done (2026-10-01):
      the checker at preparation and the preservation theorem; Phase 5 in
      progress: the invocation rule's core and loan independence done.
-   - **H4c:** the closer's rule for an invocation of an unknown closure as
+   - **H4c:** the solver's rule for an invocation of an unknown closure as
      the predicates, the dispatch of a literal closure to its target's
      theorem, and the closed-world theorem. The dispatch is done
-     (2026-10-01, "Literal closures" above, `LeanerLang/Tests/Behavior.lean`);
+     (2026-10-01, "Literal closures" above, `VerexSL/Tests/Behavior.lean`);
      the rule for an unknown closure needs H4b, since its `wp` excludes the
      undefined outcome.
    - **H4d:** state labels, parameter frames, `&mut` arguments, and the
@@ -447,10 +537,13 @@ traits are.
      Done (2026-10-03): parameter frames with and without `modifies_of`
      ("Frames" above), shared reference parameters, the Check fixture
      `Check/Closures/Frames.lean`, and generic higher-order functions over
-     rows of type parameters (`Check/Closures/GenericHofs.lean`). Open:
-     state labels, `&mut` arguments,
-     frames and typing of closures stored in fields (the exchange carries
-     their `modifies_of`), and `reads_of` (below).
+     rows of type parameters (`Check/Closures/GenericHofs.lean`); `&mut`
+     arguments of literal closures and of contracts (2026-10-09, above).
+     Open: state labels over `&mut` invocations, invocations of unseen
+     function values with `&mut` parameters, explicit `modifies_of` frames
+     on stored closures, and `reads_of` (below).
+     Default frames of directly function-typed Move fields are implemented
+     (2026-10-05, “Frames” above); explicit field write frames are diagnosed.
 5. **H5 — re-entrancy.** Call-stack modules and resource locks in the
    semantics, with MonoVM.
 
@@ -718,7 +811,7 @@ the readings to agree.
 
 ## Non-goals
 
-- Lambdas in LeanerLang.
+- Lambdas in VerexSL.
 - Captured references, for Move and Rust alike.
 - `reads_of`: a meaning is exact, so reads need no declaration to be sound;
   what it adds, independence of the result from other memory, can follow.

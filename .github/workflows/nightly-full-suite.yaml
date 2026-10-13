@@ -260,14 +260,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run nightly-full-suite-retry.yaml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f run_id="$GITHUB_RUN_ID"
 
-  # Every run posts its result with the linked seven-night bar, except a first
-  # attempt whose retry was dispatched: the retry posts instead. The result job's
-  # status decides the colour of this run's square. Delivery errors must not
-  # change the run conclusion, which the bar reads for past nights.
+  # Post a failed result, or a successful retry (yellow). A first attempt whose
+  # retry was dispatched waits for that attempt's result. Green and cancelled
+  # runs stay quiet. Delivery errors must not change the run conclusion, which
+  # the bar reads for past nights.
   notify:
     name: Notify Slack
     needs: [result, retry]
-    if: ${{ always() && needs.retry.result != 'success' }}
+    if: ${{ always() && !cancelled() && needs.retry.result != 'success' && (needs.result.result == 'failure' || (needs.result.result == 'success' && github.run_attempt != '1')) }}
     continue-on-error: true
     runs-on: ubuntu-latest
     permissions: {}

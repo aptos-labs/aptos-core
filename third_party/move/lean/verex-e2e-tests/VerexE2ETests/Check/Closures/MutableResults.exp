@@ -1,0 +1,2 @@
+VerexE2ETests/Check/Closures/MutableResults.lean:40:4: error: the specification clause `ensures result_of<function[Fn(&mut Cell) -> &mut Cell](increment)>(old(c)) == old(c)` is not established
+VerexE2ETests/Check/Closures/MutableResults.lean:39:7: error: verex verification failed: the automatic verification of `bump_unchanged` failed; provide a proof: `verify bump_unchanged by …` in the module (`verify bump_unchanged by verex_obligations` lists its obligations)

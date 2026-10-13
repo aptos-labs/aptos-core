@@ -10,7 +10,7 @@ use libtest_mimic::{Arguments, Trial};
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
 use move_model::metadata::LanguageVersion;
-use move_prover::{cli::Options, leaner, run_move_prover_v2};
+use move_prover::{cli::Options, run_move_prover_v2, verex};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use once_cell::sync::OnceCell;
 use std::{
@@ -88,12 +88,12 @@ fn get_features() -> &'static [Feature] {
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
             },
-            // Tests with the Lean-based Leaner verifier, whose messages differ
-            // from Boogie's. A function's verification gets a tight heartbeat
-            // budget; one needing more raises its own with `pragma heartbeats`.
+            // Tests with the Lean-based Verex verifier, whose messages differ
+            // from Boogie's. A function's verification gets the verifier's
+            // default heartbeat budget, as on the command line.
             Feature {
                 name: "lean",
-                flags: &["--lean", "--heartbeats=25"],
+                flags: &["--lean"],
                 inclusion_mode: InclusionMode::Implicit,
                 enable_in_ci: false,
                 only_if_requested: true,
@@ -143,14 +143,14 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
     let baseline_valid = if options.lean {
-        if !leaner::verifier_available() {
+        if !verex::verifier_available() {
             if NOT_CONFIGURED_WARNED
                 .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
                 .is_ok()
             {
                 warn!(
-                    "The Leaner Move verifier is not built, its tests will be skipped. Build it \
-            with `cd third_party/move/lean/leaner-move && lake build leaner-move`."
+                    "The Verex Move verifier is not built, its tests will be skipped. Build it \
+            with `cd third_party/move/lean/verex-move && lake build verex-move`."
                 );
             }
             return Ok(());
@@ -325,7 +325,7 @@ fn collect_enabled_tests(tests: &mut Vec<Trial>, group: &str, feature: &Feature,
 
 // Test entry point based on lbtest-mimic.
 fn main() {
-    // A panic in the Leaner verifier reaches its messages with Lean's
+    // A panic in the Verex verifier reaches its messages with Lean's
     // backtrace, whose addresses differ between runs.
     // SAFETY: no other thread exists yet.
     unsafe { std::env::set_var("LEAN_BACKTRACE", "0") };

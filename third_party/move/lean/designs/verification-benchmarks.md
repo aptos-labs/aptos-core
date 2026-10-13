@@ -1,17 +1,15 @@
 # Verification benchmarks
 
-Status: 2026-09-30, implemented and run locally (stages 1–3 below); the
-workflow is written but has not run in CI yet, and the PIES registration is
-open.
+Status: 2026-10-08, running nightly on `main` with a report published on
+GitHub Pages. Pull request runs remain opt-in.
 
-A nightly benchmark measures how long Leaner takes to verify a fixed set of
+A nightly benchmark measures how long Verex takes to verify a fixed set of
 standard problems and plots each problem's cost over the recent nightly
 runs. It is a monitor, not a gate: it never fails a pull request.
 The `DenotePerformance` and `CompositionPerformance` baselines in
-`leaner-ir` (`perf-notes.md`, "How to measure") remain the regression gates.
-The job runs in CI like the execution performance test and reports to the
-same Slack channel. The same commands run locally and compare a local run
-with the nightly history.
+`verex-ir` (`perf-notes.md`, "How to measure") remain the regression gates.
+The job runs in CI like the execution performance test. The same commands run
+locally and compare a local run with the nightly history.
 
 ## Goals
 
@@ -30,7 +28,7 @@ default, comparing with the Boogie backend.
 ## Problems
 
 A problem is one verification input in the tree: Move modules of an
-in-tree package, a LeanerLang file, or a Rust file with its specification.
+in-tree package, a VerexSL file, or a Rust file with its specification.
 The manifest `bench/problems.toml` (under `third_party/move/lean`) names
 each problem and where its input lives, relative to the repository root:
 
@@ -44,24 +42,40 @@ modules = ["aptos_framework::ordered_map"]
 [[problem]]
 name = "quicksort"
 kind = "lean"
-file = "third_party/move/lean/leaner-e2e-tests/LeanerE2ETests/Check/Examples/Quicksort.lean"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/Quicksort.lean"
 
 [[problem]]
 name = "bounds"
 kind = "rust"
-file = "third_party/move/lean/leaner-e2e-tests/LeanerE2ETests/SourceVerify/bounds.rs"
-spec = "third_party/move/lean/leaner-e2e-tests/LeanerE2ETests/SourceVerify/bounds.spec.lean"
+file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/bounds.rs"
+spec = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/bounds.spec.lean"
 repeat = 3
 ```
 
 A Move problem with `dev = true` compiles its package in dev mode, with
 its `[dev-addresses]`, as the higher-order paper's examples need.
 
+A problem may declare `expected_rejections`, an array of fully qualified
+verification target names. AMM declares its intentionally non-compliant fee
+constructor this way. The benchmark reports **expected rejection** only when
+exactly those targets are rejected, every other measured target verifies,
+and their diagnostic counts account for all errors. An accepted negative is
+an **unexpected acceptance**; a timeout, missing target, or unrelated error
+remains a problem. This label describes the verifier's outcome, rather than
+claiming that a satisfiability solver produced `sat`.
+
+Suite totals include all available measurements, including rejected targets
+and work spent before a timeout. Subset runs have no suite total. Comparisons
+include common measured problems and display both statuses; a previously
+rejected problem becoming verified therefore does not add its entire cost to
+the suite for the first time. Historical measurements without heartbeat data
+contribute no heartbeat count, so their totals represent available measurements.
+
 A problem's input is whatever the tree holds at the commit being measured,
 so a curve can move because the input changed rather than the verifier.
 Each result records the git object id of its input (`git rev-parse
 HEAD:<path>` of the package directory or file), and the report marks the
-runs where it changed. The copies under `leaner-e2e-tests/.../MoveToLeanerLang`
+runs where it changed. The copies under `verex-e2e-tests/.../MoveToVerexSL`
 are not used; they have already drifted from the tree (`cmp`, `features`).
 
 The problems are chosen to cover the verifier's cost centers: arithmetic,
@@ -78,8 +92,8 @@ crypto natives, and the kernel-heavy unit preparation. The initial set:
 | `math64`, `math128` | `aptos-stdlib` | arithmetic, `sqrt` (about 53 s) |
 | `math_fixed`, `fixed_point64` | `aptos-stdlib` | fixed-point arithmetic |
 | `simple_map` | `aptos-stdlib` | intrinsic map, insertion order |
-| `comparator`, `type_info`, `capability` | `aptos-stdlib` | generics, reflection natives |
-| `pool_u64` | `aptos-stdlib` | quantified map invariants (partly verified today) |
+| `comparator`, `capability` | `aptos-stdlib` | generics, capability delegation |
+| `pool_u64` | `aptos-stdlib` | quantified map invariants; all 22 targets verify |
 | `ristretto255` | `aptos-stdlib` | crypto natives, frame certificates (about 95 s) |
 | `ed25519` | `aptos-stdlib` | crypto natives |
 | `ordered_map` | `aptos-framework` | intrinsic map, sorted, iterators (about 80–110 s) |
@@ -87,11 +101,12 @@ crypto natives, and the kernel-heavy unit preparation. The initial set:
 | `behavior` | `bench/package` | behavioral predicates: `aborts_of`, `ensures_of`, `result_of`, `requires_of` over lambdas and named functions |
 | `closures`, `closure_loop` | `bench/package` | function values: captures, struct fields, higher-order functions with bodies, invocation in a loop |
 | `amm`, `calculator` | `higher-order-paper-26/examples` | the higher-order paper's examples: a pricing closure in a resource under state-quantified invariants, an enum state holding a continuation closure |
-| `Quicksort`, `OrderedMap` | `Check/Examples` | LeanerLang: nested loops, authored proofs |
+| `Quicksort`, `OrderedMap` | `Check/Examples` | VerexSL: nested loops, authored proofs |
 | `VectorOperations`, `GenericStorage` | `Check/Vectors`, `Check/Generics` | shared terms, generic storage |
 | `bounds` | `SourceVerify` | the Rust frontend |
 
-These are 32 problems. The `bench/package` problems are written for the
+These are 31 problems; `type_info` is excluded pending its native model.
+The `bench/package` problems are written for the
 benchmark, to cover what the in-tree packages do not exercise. A problem that does not verify completely today
 stays in the set: its curve then also shows the progress on it. Problems
 that need table intrinsics (`smart_table`, `big_ordered_map`) join once
@@ -146,11 +161,11 @@ symbolic iterator tests beyond the extract `perf-notes.md` measured.
 
 ## Measurements
 
-A problem runs in its own process, natively (the `leaner-move` executable
+A problem runs in its own process, natively (the `verex-move` executable
 runs the elaborator natively, while `lake env lean` interprets it;
 `perf-notes.md`, "Reading a profile"). The measures, main one first:
 
-- **Wall time per phase.** The phase clock of `LeanerLang.Perf` charges
+- **Wall time per phase.** The phase clock of `VerexSL.Perf` charges
   wall time to the innermost running phase (load, frontend, render,
   lowering, certification, verification). The report groups the phases as:
   - *elaboration*: lowering and certification: the modules lowered to
@@ -184,7 +199,7 @@ elaborating thread. They miss:
 - the external Move compile in the frontend;
 - native code that does not allocate.
 
-They are the elaborator and closer part of the cost only. The cost of the
+They are the elaborator and solver part of the cost only. The cost of the
 last rounds was largely in kernel-checked certificates (`perf-notes.md`),
 which heartbeats do not see.
 
@@ -204,7 +219,7 @@ Heartbeats serve two purposes beside wall time:
   heartbeats on any machine; repeats of a problem agree to within 0.001 %.
   A wall-time change with flat heartbeats is in the kernel, in other
   threads, or noise; a change in both is more work in the elaborator or
-  the closer.
+  the solver.
 - **Comparison across machines.** Heartbeats compare a local run with CI
   directly; wall time does not.
 
@@ -216,7 +231,7 @@ beside them.
 
 Runs use the verifier's default options. The profiler is never on: its
 own counting inflates heartbeats and adds time. Before the first problem,
-the driver loads the environment once untimed (`leaner-bench warmup`), so
+the driver loads the environment once untimed (`verex-bench warmup`), so
 the first problem does not pay for a cold file cache.
 
 ## Components
@@ -237,7 +252,7 @@ serves:
 
 - `move exchange --format ast --modules <a::m>,…`, which exports the
   closure, dependencies included;
-- `leaner-move verify <package> --modules <a::m>,…`, which verifies the
+- `verex-move verify <package> --modules <a::m>,…`, which verifies the
   named modules and links the rest of the closure (and, without
   `--modules`, now applies `--filter` to a package directory it exports
   itself, which it ignored before);
@@ -247,24 +262,24 @@ serves:
 
 `ordered_map` exports its closure in 1.9 s and verifies in 197 s.
 
-### `leaner-bench`
+### `verex-bench`
 
-The executable `leaner-bench` in `leaner-e2e-tests`, which links the Move,
-Rust, and LeanerLang frontends and the Check fixtures' support, runs one
+The executable `verex-bench` in `verex-e2e-tests`, which links the Move,
+Rust, and VerexSL frontends and the Check fixtures' support, runs one
 problem and writes its result as JSON:
 
 ```bash
-leaner-bench move <package> --modules <a::m>,… [--dev] --out result.json
-leaner-bench lean <file.lean> --out result.json
-leaner-bench rust <file.rs> [--spec <file.spec.lean>] --out result.json
-leaner-bench warmup
+verex-bench move <package> --modules <a::m>,… [--dev] --out result.json
+verex-bench lean <file.lean> --out result.json
+verex-bench rust <file.rs> [--spec <file.spec.lean>] --out result.json
+verex-bench warmup
 ```
 
 A `lean` problem is elaborated with the imports of its header, natively.
 Every run turns on per-target measurement with the object count off. A
 Rust problem runs from `third_party/move/lean`, where the Rust exporter is
 found. A result, to which the driver adds the problem's name, kind, group
-(the package name of a Move problem, `LeanerLang` or `Rust` otherwise), input
+(the package name of a Move problem, `VerexSL` or `Rust` otherwise), input
 id, CPU time, and repeats:
 
 ```json
@@ -282,7 +297,7 @@ id, CPU time, and repeats:
 }
 ```
 
-### `scripts/leaner-bench.py`
+### `scripts/verex-bench.py`
 
 The driver, written in Python like the other performance jobs, uses only
 the standard library and the `gh` CLI:
@@ -319,13 +334,13 @@ the standard library and the `gh` CLI:
 ## History
 
 Every CI run uploads its `results.json` as the workflow artifact
-`leaner-bench-results`, retained for 90 days. The history is the results
+`verex-bench-results`, retained for 90 days. The history is the results
 of the most recent runs:
 
 ```bash
-gh run list --workflow leaner-bench.yaml --branch main --status completed \
+gh run list --workflow verex-bench.yaml --branch main --status completed \
   --limit 3N --json databaseId,headSha,createdAt,url
-gh run download <databaseId> --name leaner-bench-results
+gh run download <databaseId> --name verex-bench-results
 ```
 
 The window defaults to 30 runs, a month of nightlies; retention bounds it
@@ -338,7 +353,10 @@ measured, so its point is kept.
 Each point on a curve is annotated with what changed since the previous
 point: the problem's input, the Lean toolchain, or its status. A problem
 added to the manifest starts its curve at the run that added it, and a
-removed problem stops.
+removed problem stops. The HTML index and problem sections use the latest
+full run's problem list, plus any subsequent subset measurements. Removed
+problems therefore disappear from the current page while their measurements
+remain in historical artifacts and historical suite totals.
 
 ## Reports
 
@@ -351,29 +369,28 @@ removed problem stops.
   marks those not verified in the latest run. Wall time is in seconds;
   heartbeats are in the largest of k, M, and G of which a chart's largest
   value is at least one. The charts are inline SVG generated by the script, so
-  the page needs no network access and no plotting library. CI publishes it
-  on the repository's Pages site: every run at
-  `https://aptos-labs.github.io/aptos-core/leaner-bench/runs/<run id>/`,
-  pull request runs included, and the latest nightly at
-  `https://aptos-labs.github.io/aptos-core/leaner-bench/`; the pages of the
-  90 most recent runs are kept.
+  the page needs no network access and no plotting library. CI publishes the
+  latest main report at the stable repository Pages URL,
+  `https://aptos-labs.github.io/aptos-core/verex-bench/`. The charts contain
+  the history, so individual runs have no separate Pages site. Pull request
+  reports remain available as workflow artifacts.
 - **Step summary.** `report --markdown` writes the job summary, headed by
-  the link to the run's page: one row per
+  a link to the stable page for main runs: one row per
   problem with its status, the three wall times, their change against the
   previous run and against the median of the window, the change in overall
   heartbeats, and a sparkline (`▁▂▃▄▅▆▇█`) of overall wall time.
-- **Slack.** `report --slack` writes the message posted after each nightly
-  run: the commit; the suite's overall wall time with the same two changes;
+- **Slack payload.** `report --slack` can write a message for manual use, but
+  the benchmark workflow does not send it. The payload contains the commit;
+  the suite's overall wall time with the same two changes;
   the number of problems verified, failed, and timed out; the problems whose
   overall wall time moved against the window median by more than the noise
   threshold (10 % until stage 4 measures the noise), whose heartbeats moved
   by at least 5 %, or whose status or input changed, each with its
-  sparkline; and links to the run's page and the run. Being a monitor, it
-  reports every nightly, not only on failures.
+  sparkline; and links to the chart page and workflow run when provided.
 
 ## CI
 
-The workflow `.github/workflows/leaner-bench.yaml`:
+The workflow `.github/workflows/verex-bench.yaml`:
 
 - **Triggers.** `workflow_dispatch` for the nightly. Repository policy
   prohibits GitHub cron: PIES dispatches the nightly on `main`, registered
@@ -382,7 +399,7 @@ The workflow `.github/workflows/leaner-bench.yaml`:
   `problems` (a subset) and `window`; GitHub dispatches only a workflow
   that is on the default branch. A pull request of this repository (not a
   fork) runs the benchmark on its head when it carries the
-  `CICD:run-leaner-bench` label, again on every push while it does, and
+  `CICD:run-verex-bench` label, again on every push while it does, and
   its report compares it with `main`'s nightlies.
 - **Job `bench`.** The dedicated benchmark runner of the execution
   performance test (`benchmark-c3d-60`), in its concurrency group
@@ -390,24 +407,22 @@ The workflow `.github/workflows/leaner-bench.yaml`:
   no other benchmark shares the machine. Steps: check out the commit; set
   up Rust (`.github/actions/rust-setup`) and Python 3.12; install Lean
   (`scripts/dev_setup.sh -b -p -l -k`); build the ci-profile `move` CLI;
-  install the Rust exporter's pinned toolchain; `lake build leaner-bench`
-  in `leaner-e2e-tests`; `scripts/leaner-bench.py run`; upload
-  `leaner-bench-results`. `timeout-minutes: 150`.
+  install the Rust exporter's pinned toolchain; `lake build verex-bench`
+  in `verex-e2e-tests`; `scripts/verex-bench.py run`; upload
+  `verex-bench-results`. `timeout-minutes: 150`.
 - **Job `report`.** Needs `bench`, on a small runner, with `permissions:
   actions: read` and `GH_TOKEN: ${{ github.token }}` for the history. Runs
-  `leaner-bench.py report --current` over the downloaded results of this
+  `verex-bench.py report --current` over the downloaded results of this
   run, which the history lists only once the run has completed; appends
-  the markdown to `$GITHUB_STEP_SUMMARY`; and uploads the page and the
-  Slack message as `leaner-bench-report`.
+  the markdown to `$GITHUB_STEP_SUMMARY`; and uploads the page as
+  `verex-bench-report`.
 - **Job `publish`.** Needs `report`, with `permissions: contents: write`,
-  the only job that writes; it runs no code of the benchmarked commit.
+  runs only for dispatches on `main`, and is the only job that writes. It runs
+  no code of the benchmarked commit.
   Commits the page to the `gh-pages` branch (a sparse checkout of
-  `leaner-bench/`, rebasing and retrying when a concurrent deploy moved
-  the branch), and on a dispatch from `main` posts the Slack message with
-  `slackapi/slack-github-action` (pinned as in
-  `workflow-run-execution-performance.yaml`) to
-  `secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL`, the execution performance
-  channel. A failed post does not fail the run.
+  `verex-bench/`, rebasing and retrying when a concurrent deploy moved
+  the branch), replacing `verex-bench/index.html` and removing any old
+  `verex-bench/runs/` pages.
 - **Concurrency.** One group per ref, runs never cancelled, so that every
   nightly produces a point.
 
@@ -418,7 +433,7 @@ stay well within the hour the set is trimmed to.
 
 ```bash
 cargo build --locked --profile ci -p aptos-move-cli --features binary --bin move
-python3 third_party/move/lean/scripts/leaner-bench.py run [--only math128,ordered_map]
+python3 third_party/move/lean/scripts/verex-bench.py run [--only math128,ordered_map]
 ```
 
 A local run is recorded in the local history, and the files of local runs
@@ -426,19 +441,23 @@ stay in `third_party/move/lean`, ignored by git:
 
 - `local_benchmark_history.jsonl`: the latest 100 local runs, each with its
   branch;
-- `local_benchmark.html`: the page of the current branch's local runs after
-  the CI history, rewritten by every local run (`report --local-runs`);
+- `local_benchmark.json`: the latest local measurement;
+- `local_benchmark.html`: the latest local run against the main CI history,
+  regenerated by the script after every run; use `report --local-runs`
+  explicitly to include intermediate local runs. The page opens with the 20
+  most expensive targets in the latest run, ranked by heartbeats, with outcome
+  status and links to their problem sections;
 - `local_benchmark_logs/`: the problems' logs of the latest local run.
 
 A series of changes on a branch, one command after each (commit first):
 
 ```bash
-python3 third_party/move/lean/scripts/leaner-bench.py run --only math128,ordered_map
+python3 third_party/move/lean/scripts/verex-bench.py run --only math128,ordered_map
 ```
 
-`run` builds `leaner-bench` from the current sources, measures, records the
-run, rewrites the page, and prints its comparison with the previous run on
-the branch. `compare` only reads recorded runs: `history --local` lists the
+`run` builds `verex-bench` from the current sources, measures, records the
+run, rewrites the page, and prints its comparison with main.
+`compare` only reads recorded runs: `history --local` lists the
 series (`@-N … @-1`), and `compare @-4 @-1` gives the change since `@-4`.
 Keep the same `--only` set through a series and commit each change, since a
 run is labeled by its commit (`+` when the tree was dirty). Heartbeats tell
@@ -446,8 +465,8 @@ whether the elaborator's work changed, wall time whether the change shows;
 an agent follows its own optimizations this way. The suite total compares
 full runs only.
 
-`run --package <dir>` builds and runs `leaner-bench` of another copy of
-`leaner-e2e-tests`, such as one on a native disk.
+`run --package <dir>` builds and runs `verex-bench` of another copy of
+`verex-e2e-tests`, such as one on a native disk.
 
 The page fetches the CI history with the user's `gh` login. Its comparison
 table measures the latest local run against the latest CI run at or before
@@ -461,21 +480,19 @@ after, on the same idle machine.
 
 ## Stages
 
-1. **Measurement** (done). Heartbeats in the phase clock; `leaner-bench`
+1. **Measurement** (done). Heartbeats in the phase clock; `verex-bench`
    for the three kinds; CPU time in the driver. Repeats agree to within
    0.001 % in heartbeats.
 2. **Module selection** (done). `--modules` in the exporter with the
    closure above, tested in `aptos-move/cli/src/tests/exchange.rs`.
 3. **Manifest and driver** (done). `problems.toml` with the initial set,
    `run`, `report`, and `compare`; the suite takes about 9 minutes locally.
-4. **CI** (written, not yet run). The workflow with the `bench` job and the
-   artifact, run by manual dispatch. Five runs of one commit measure the
-   wall-time noise per problem on the runner, which sets the repeat counts
-   and the report's threshold.
-5. **History and Slack** (written, not yet run). The `report` job, the HTML
-   and step summary, and the Slack post; the PIES registration in
-   `internal-ops` remains.
-6. **Pull requests** (label written, not yet run). The `CICD:run-leaner-bench`
+4. **CI** (running nightly). The `bench` job uploads its results artifact.
+   Measuring wall-time noise over repeated runs of one commit remains open;
+   that measurement sets the repeat counts and the report's threshold.
+5. **History and report** (running nightly). The `report` job renders the HTML
+   and step summary; PIES dispatches the workflow from `internal-ops`.
+6. **Pull requests** (label written, not yet verified). The `CICD:run-verex-bench`
    label runs the benchmark on a pull request, with the comparison in the
    job summary. A sticky comment, as the mono-move benchmark posts, remains
    open.
@@ -486,6 +503,4 @@ after, on the same idle machine.
   performance and mono-move benchmarks, so the nightly may wait for them.
   If the wait becomes a problem, PIES can dispatch the benchmark at a time
   the others do not run.
-- **Slack cadence.** Every nightly, as proposed, or only when a problem
-  moves beyond the threshold or changes status.
 - **Window.** 30 runs by default.

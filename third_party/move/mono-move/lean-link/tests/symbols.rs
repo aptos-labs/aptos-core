@@ -8,9 +8,9 @@
 use std::{path::PathBuf, process::Command};
 
 const EXPORTS: &[&str] = &[
-    "leaner_monovm_abi_version",
-    "leaner_monovm_run",
-    "leaner_monovm_buffer_free",
+    "verex_monovm_abi_version",
+    "verex_monovm_run",
+    "verex_monovm_buffer_free",
 ];
 
 #[test]

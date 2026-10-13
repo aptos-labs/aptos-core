@@ -24,6 +24,8 @@ mod decryption;
 #[cfg(test)]
 mod execution;
 #[cfg(test)]
+mod fast_sync_api;
+#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod fullnode;

@@ -1,0 +1,3 @@
+VerexE2ETests/Check/Closures/WovenBehaviors.lean:43:4: error: the specification clause `ensures ∀ (y : u64),
+      aborts_of<result>(y) == aborts_of<function[Fn(u64, u64) -> u64](sub)>(y, x)` is not established
+VerexE2ETests/Check/Closures/WovenBehaviors.lean:41:7: error: verex verification failed: the automatic verification of `swapped` failed; provide a proof: `verify swapped by …` in the module (`verify swapped by verex_obligations` lists its obligations)

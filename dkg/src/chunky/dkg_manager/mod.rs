@@ -6,6 +6,7 @@ use crate::{
         agg_subtrx_producer,
         missing_transcript_fetcher::TranscriptFetcher,
         subtrx_cert_producer,
+        transcript_cache::TranscriptCache,
         types::{
             AggregatedSubtranscriptWithHashes, CertifiedAggregatedSubtranscript,
             ChunkyTranscriptWithHash, MissingTranscriptRequest, MissingTranscriptResponse,
@@ -45,7 +46,7 @@ use fail::fail_point;
 use futures_channel::oneshot;
 use futures_util::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
-use rand::{prelude::StdRng, thread_rng, Rng, SeedableRng};
+use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{collections::HashMap, fmt, mem, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 use tokio_retry::strategy::ExponentialBackoff;
@@ -137,6 +138,9 @@ pub struct ChunkyDKGManager {
     // Values use ChunkyTranscriptWithHash for cached hash lookups.
     received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
 
+    // Extra verified versions used by certification retries, separate from our aggregate.
+    fetched_transcripts: Arc<RwLock<TranscriptCache>>,
+
     // Guards for spawned RPC handler tasks, keyed by requesting validator's address.
     // Tuple of (subtranscript_hash, handle). Skip-if-running: if a handler for the same
     // sender+hash is still running, skip spawning a new one.
@@ -180,6 +184,7 @@ impl ChunkyDKGManager {
             pull_notification_tx,
             pull_notification_rx,
             received_transcripts: Arc::new(RwLock::new(HashMap::new())),
+            fetched_transcripts: Arc::new(RwLock::new(TranscriptCache::default())),
             rpc_handler_guards: HashMap::new(),
             stopped: false,
             state: InnerState::Init,
@@ -808,6 +813,7 @@ impl ChunkyDKGManager {
 
         // Spawn a tokio task to handle the validation computation.
         let received_transcripts = self.received_transcripts.clone();
+        let fetched_transcripts = self.fetched_transcripts.clone();
         let epoch_state = self.epoch_state.clone();
         let ssk = self.ssk.clone();
         let my_addr = self.my_addr;
@@ -825,6 +831,7 @@ impl ChunkyDKGManager {
                     ssk,
                     my_addr,
                     received_transcripts,
+                    fetched_transcripts,
                     epoch_state,
                     network_sender,
                 ),
@@ -854,11 +861,12 @@ impl ChunkyDKGManager {
     }
 
     /// Resolve all subtranscripts required by a signature request: validate the bitmask,
-    /// check local storage, poll for late arrivals, and fetch any still-missing transcripts.
+    /// check local storage and verified variants, and immediately fetch missing copies.
     async fn resolve_subtranscripts(
         sender: AccountAddress,
         req: &ChunkyDKGSubtranscriptSignatureRequest,
         received_transcripts: &Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
+        fetched_transcripts: &Arc<RwLock<TranscriptCache>>,
         epoch_state: &Arc<EpochState>,
         dkg_config: &Arc<ChunkyDKGSession>,
         network_sender: Arc<NetworkSender>,
@@ -892,88 +900,62 @@ impl ChunkyDKGManager {
             .check_voting_power(dealers.iter().map(|(addr, _)| addr), true)
             .map_err(|e| anyhow!("dealer set does not meet quorum: {:?}", e))?;
 
-        let check_local = || {
+        let (mut subtranscripts, missing_dealers) = {
             let map = received_transcripts.read();
+            let cache = fetched_transcripts.read();
             let mut subtranscripts = Vec::new();
             let mut missing = Vec::new();
             for &(addr, expected_hash) in &dealers {
-                match map.get(&addr) {
-                    Some(twh) if twh.hash() == expected_hash => {
-                        subtranscripts.push(twh.get_subtranscript())
-                    },
-                    _ => missing.push(addr),
+                let transcript = map
+                    .get(&addr)
+                    .filter(|t| t.hash() == expected_hash)
+                    .or_else(|| cache.get(addr, expected_hash));
+                match transcript {
+                    Some(t) => subtranscripts.push(t.get_subtranscript()),
+                    None => missing.push((addr, expected_hash)),
                 }
             }
             (subtranscripts, missing)
         };
 
-        let (mut subtranscripts, missing_dealers) = check_local();
-
         if !missing_dealers.is_empty() {
-            // Poll received_transcripts to let the aggregator resolve mismatches.
-            // Most of the time, the aggregator collects all needed transcripts
-            // within this window, eliminating the need to fetch entirely.
-            // The first RPC from the requester will time out (RB rpc_timeout_ms = 10s),
-            // but skip-if-running keeps this handler alive across retries.
-            const MAX_WAIT: Duration = Duration::from_secs(10);
-            const POLL_INTERVAL: Duration = Duration::from_millis(500);
-            const MAX_FETCH_JITTER: Duration = Duration::from_secs(5);
-            let jitter = Duration::from_millis(
-                rand::thread_rng().gen_range(0, MAX_FETCH_JITTER.as_millis() as u64),
-            );
-            let deadline = tokio::time::Instant::now() + MAX_WAIT + jitter;
-
-            let mut still_missing = missing_dealers.clone();
-            while tokio::time::Instant::now() < deadline {
-                tokio::time::sleep(POLL_INTERVAL).await;
-                let (s, m) = check_local();
-                subtranscripts = s;
-                still_missing = m;
-                if still_missing.is_empty() {
-                    break;
-                }
-            }
-
-            let resolved = missing_dealers.len().saturating_sub(still_missing.len());
+            // The aggregator retains the first accepted transcript per dealer, so
+            // waiting cannot fix a conflicting hash after a dealer restarts. Fetch
+            // immediately, within the requesting peer's RPC deadline.
             info!(
                 sender = sender,
-                initial_mismatches = missing_dealers.len(),
-                resolved_by_delay = resolved,
-                still_missing = still_missing.len(),
-                "[ChunkyDKG] Post-delay recheck: {}/{} mismatches resolved by aggregator",
-                resolved,
-                missing_dealers.len(),
+                missing_transcripts = missing_dealers.len(),
+                "[ChunkyDKG] Fetching missing or conflicting transcripts"
             );
-
-            if !still_missing.is_empty() {
-                let fetcher = TranscriptFetcher::new(
-                    sender,
-                    req.dealer_epoch,
-                    still_missing,
-                    Duration::from_secs(10),
-                    Arc::clone(dkg_config),
-                    epoch_state.clone(),
-                );
-                let fetched = monitor!(
-                    "chunky_dkg_transcript_fetch",
-                    fetcher.run(network_sender).await
-                );
-                match fetched {
-                    Ok(transcripts) => {
-                        counters::CHUNKY_DKG_TRANSCRIPT_FETCH_TOTAL
-                            .with_label_values(&["success"])
-                            .inc();
-                        for t in transcripts.into_values() {
-                            subtranscripts.push(t.get_subtranscript());
-                        }
-                    },
-                    Err(e) => {
-                        counters::CHUNKY_DKG_TRANSCRIPT_FETCH_TOTAL
-                            .with_label_values(&["failure"])
-                            .inc();
-                        return Err(e);
-                    },
-                }
+            let fetcher = TranscriptFetcher::new(
+                sender,
+                req.dealer_epoch,
+                missing_dealers,
+                Duration::from_secs(10),
+                Arc::clone(dkg_config),
+                epoch_state.clone(),
+            );
+            let fetched = monitor!(
+                "chunky_dkg_transcript_fetch",
+                fetcher
+                    .run(network_sender, fetched_transcripts.clone())
+                    .await
+            );
+            match fetched {
+                Ok(transcripts) => {
+                    counters::CHUNKY_DKG_TRANSCRIPT_FETCH_TOTAL
+                        .with_label_values(&["success"])
+                        .inc();
+                    for t in transcripts.into_values() {
+                        subtranscripts.push(t.get_subtranscript());
+                    }
+                },
+                Err(e) => {
+                    counters::CHUNKY_DKG_TRANSCRIPT_FETCH_TOTAL
+                        .with_label_values(&["failure"])
+                        .inc();
+                    return Err(e);
+                },
             }
         }
 
@@ -1033,6 +1015,7 @@ impl ChunkyDKGManager {
         ssk: Arc<DealerPrivateKey>,
         _my_addr: AccountAddress,
         received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
+        fetched_transcripts: Arc<RwLock<TranscriptCache>>,
         epoch_state: Arc<EpochState>,
         network_sender: Arc<NetworkSender>,
     ) -> Result<DKGMessage> {
@@ -1054,6 +1037,7 @@ impl ChunkyDKGManager {
             sender,
             &req,
             &received_transcripts,
+            &fetched_transcripts,
             &epoch_state,
             &dkg_config,
             network_sender,
@@ -1099,6 +1083,7 @@ impl ChunkyDKGManager {
             pull_notification_tx,
             pull_notification_rx,
             received_transcripts: Arc::new(RwLock::new(HashMap::new())),
+            fetched_transcripts: Arc::new(RwLock::new(TranscriptCache::default())),
             rpc_handler_guards: HashMap::new(),
             stopped: false,
             state: InnerState::Init,

@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/script_false.move:11:9: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/SourceVerify/script_false.move:10:5: error: verex verification failed: the automatic verification of `main` failed; provide a proof: `verify main by …` in `VerexE2ETests/SourceVerify/script_false.proof.lean` (`verify main by verex_obligations` lists its obligations)

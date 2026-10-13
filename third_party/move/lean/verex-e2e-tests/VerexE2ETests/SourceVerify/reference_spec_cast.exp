@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/reference_spec_cast.move:23:9: error: the specification clause `ensures x == old(x)` is not established
+VerexE2ETests/SourceVerify/reference_spec_cast.move:19:5: error: verex verification failed: the automatic verification of `false_increment` failed; provide a proof: `verify false_increment by …` in `VerexE2ETests/SourceVerify/reference_spec_cast.proof.lean` (`verify false_increment by verex_obligations` lists its obligations)

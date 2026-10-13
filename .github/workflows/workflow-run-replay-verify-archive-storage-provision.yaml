@@ -21,6 +21,7 @@ jobs:
   provision:
     runs-on: 2cpu-gh-ubuntu24-x64
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Checkout code

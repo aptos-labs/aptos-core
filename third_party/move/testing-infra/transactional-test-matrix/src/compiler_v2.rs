@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! The Compiler V2 transactional-test corpus: Move sources compiled by
-//! Compiler V2 and run on the VM, plus Lean sources under `tests/leaner/`.
+//! Compiler V2 and run on the VM, plus Lean sources under `tests/verex/`.
 
 use crate::{Applicability, Corpus, MatrixConfig, MonoMoveDivergence, Resolution, VmBackend};
 use move_command_line_common::testing::EXP_EXT;
@@ -50,7 +50,7 @@ fn test_run_config(resolution: &Resolution<'_, CompilerV2Payload>) -> TestRunCon
 /// Excluded by every config that takes all tests: these directories are served
 /// by the specialized configs below (non-default settings, or no cross-compilation).
 const COMMON_EXCLUSIONS: &[&str] = &[
-    "/leaner/",
+    "/verex/",
     "/operator_eval/",
     "/no-recursive-check/",
     "/no-access-check/",
@@ -114,19 +114,19 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
     // Lean-authored programs have their own front end and use one default
     // Compiler V2 configuration outside the generic optimization matrix.
     MatrixConfig {
-        name: "leaner",
+        name: "verex",
         experiments: &[],
         language_version: LanguageVersion::latest(),
-        include: &["/leaner/"],
+        include: &["/verex/"],
         exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
         },
         mono_move: LEAN_ONLY,
     },
-    // Let Leaner-permissive borrow programs reach the production bytecode
+    // Let Verex-permissive borrow programs reach the production bytecode
     // verifier even when compiler-v2's stricter reference checker reports the
-    // same program under the dedicated Leaner configuration.
+    // same program under the dedicated Verex configuration.
     MatrixConfig {
         name: "no-reference-safety",
         experiments: &[
@@ -134,7 +134,7 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
             (Experiment::REFERENCE_SAFETY, false),
         ],
         language_version: LanguageVersion::latest(),
-        include: &["/leaner/borrow_checker/leaner_permissive_"],
+        include: &["/verex/borrow_checker/verex_permissive_"],
         exclude: &[],
         payload: CompilerV2Payload {
             cross_compile: false,
@@ -263,9 +263,9 @@ const CONFIGS: &[MatrixConfig<CompilerV2Payload>] = &[
 /// Sources whose result differs by config, so each config gets its own
 /// `test.<config>.exp` rather than sharing `test.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
-    // These run under both the default Leaner config and the config with
+    // These run under both the default Verex config and the config with
     // Compiler V2 reference safety disabled.
-    "/leaner/borrow_checker/leaner_permissive_",
+    "/verex/borrow_checker/verex_permissive_",
     "control_flow/abort_complex.move",
     "control_flow/abort_invalid.move",
     "control_flow/abort_vector.move",

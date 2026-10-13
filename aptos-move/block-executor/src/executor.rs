@@ -1894,16 +1894,6 @@ where
 
         let mut amount = BTreeMap::new();
 
-        // TODO(HotState): there are three possible paths where the block epilogue
-        // output is passed to the DB:
-        //   1. a block from consensus is executed: the VM outputs the block end info
-        //      and the block epilogue transaction and output are generated here.
-        //   2. a chunk re-executed: The VM will see the block epilogue transaction and
-        //      should output the transaction output by looking at the block end info
-        //      embedded in the epilogue transaction (and maybe the state view).
-        //   3. a chunk replayed by transaction output: we get the transaction output
-        //      directly.
-
         for (i, output) in outputs.enumerate().take(epilogue_txn_idx as usize) {
             // TODO(grao): Also include other transactions that is "Keep" if we are confident
             // that we successfully charge enough gas amount as it appears in the FeeStatement

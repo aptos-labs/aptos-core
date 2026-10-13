@@ -1,0 +1,4 @@
+VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:18:4: error: the specification clause `ensures successor(300) == 301` is not established
+VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:17:7: error: verex verification failed: the automatic verification of `outside` failed; provide a proof: `verify outside by …` in the module (`verify outside by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:24:4: error: the specification clause `ensures triangle(-1) == 0` is not established
+VerexE2ETests/Check/Specifications/SpecFunctionDomainErrors.lean:23:7: error: verex verification failed: the automatic verification of `negative` failed; provide a proof: `verify negative by …` in the module (`verify negative by verex_obligations` lists its obligations)

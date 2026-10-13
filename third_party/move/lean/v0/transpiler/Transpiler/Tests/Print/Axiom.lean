@@ -63,13 +63,13 @@ private def axiomModule : Module := {
 
 private def checkAxiomPrinter : IO Unit := do
   let input : Package := { modules := [axiomModule] }
-  let checked ← match Transpiler.LIR.Backend.fromXast input with
+  let checked ← match Transpiler.VIR.Backend.fromXast input with
     | .ok checked => pure checked
     | .error error => throw <| IO.userError error
-  let effects ← match Transpiler.LIR.Effects.computePrinterTable checked with
+  let effects ← match Transpiler.VIR.Effects.computePrinterTable checked with
     | .ok effects => pure effects
     | .error error => throw <| IO.userError error
-  let package ← match Transpiler.LIR.Backend.toPrinterPackage .move checked with
+  let package ← match Transpiler.VIR.Backend.toPrinterPackage .move checked with
     | .ok package => pure package
     | .error error => throw <| IO.userError error
   let some sourceModule := package.modules.head?

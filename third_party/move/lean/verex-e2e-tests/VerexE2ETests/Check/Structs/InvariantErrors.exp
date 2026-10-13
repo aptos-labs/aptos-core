@@ -1,0 +1,4 @@
+VerexE2ETests/Check/Structs/InvariantErrors.lean:21:4: error: the data invariant `invariant this.value <= 100` does not hold where a value is constructed
+VerexE2ETests/Check/Structs/InvariantErrors.lean:25:6: error: verex verification failed: the automatic verification of `too_much` failed; provide a proof: `verify too_much by …` in the module (`verify too_much by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Structs/InvariantErrors.lean:21:4: error: the data invariant `invariant this.value <= 100` does not hold where a value is constructed
+VerexE2ETests/Check/Structs/InvariantErrors.lean:27:6: error: verex verification failed: the automatic verification of `pair` failed; provide a proof: `verify pair by …` in the module (`verify pair by verex_obligations` lists its obligations)

@@ -1,0 +1,273 @@
+VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:12:43: error: incorrect final counter value
+case ensures_3
+executable✝ : Validation.ExecutableUnit unit
+nativesTyped : NativesTyped executable✝
+nativesShift : NativesShift executable✝
+verexAgree : Proofs.TypesAgree unit
+verexResources : Proofs.ResourcesTyped unit
+addr : Proofs.Denote.NTy.address.carrier
+initialState✝ : Proofs.Denote.Memory unit
+assumed permitted : True
+a✝⁵ :
+  ¬(initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          (StorageKey.address addr) =
+        none ∨
+      18446744073709551615 <
+        ((Option.map (fun value => RuntimeValue.integer value.fst.val)
+                  (initialState✝
+                    {
+                      type :=
+                        Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                          (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                      arguments := Proofs.Denote.NRow.nil }
+                    (StorageKey.address addr))).getD
+              RuntimeValue.unit).asInt +
+          1)
+a✝⁴ :
+  ¬Proofs.AbortsOf executable✝
+      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [RuntimeValue.address addr] initialState✝
+a✝³ :
+  Proofs.ResultOf executable✝
+      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [RuntimeValue.address addr] initialState✝ =
+    #[]
+a✝² :
+  ∀ (key : StorageKey),
+    ¬key = StorageKey.address addr →
+      Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key =
+        initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key
+a✝¹ :
+  ∀ (resource : Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil } →
+      Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr] initialState✝ resource =
+        initialState✝ resource
+a✝ :
+  Proofs.Denoted
+    (Proofs.EnsuresOf executable✝
+      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [RuntimeValue.address addr] #[] initialState✝
+      (Proofs.StateOf executable✝
+        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [RuntimeValue.address addr] initialState✝))
+x✝⁵ :
+  (Proofs.StateOf executable✝
+        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [RuntimeValue.address addr] initialState✝
+        {
+          type :=
+            Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+              (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+          arguments := Proofs.Denote.NRow.nil }
+        (StorageKey.address addr)).isSome =
+    true
+x✝⁴ :
+  ¬Proofs.AbortsOf executable✝
+      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [RuntimeValue.address addr]
+      (Proofs.StateOf executable✝
+        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [RuntimeValue.address addr] initialState✝)
+x✝³ :
+  Proofs.ResultOf executable✝
+      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [RuntimeValue.address addr]
+      (Proofs.StateOf executable✝
+        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [RuntimeValue.address addr] initialState✝) =
+    #[]
+x✝² :
+  ∀ (key : StorageKey),
+    ¬key = StorageKey.address addr →
+      Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr]
+          (Proofs.StateOf executable✝
+            (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+            [RuntimeValue.address addr] initialState✝)
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key =
+        Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          key
+x✝¹ :
+  ∀ (resource : Proofs.Denote.ResourceType),
+    ¬resource =
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil } →
+      Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr]
+          (Proofs.StateOf executable✝
+            (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+            [RuntimeValue.address addr] initialState✝)
+          resource =
+        Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr] initialState✝ resource
+x✝ :
+  Proofs.Denoted
+    (Proofs.EnsuresOf executable✝
+      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+      [RuntimeValue.address addr] #[]
+      (Proofs.StateOf executable✝
+        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+            Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [RuntimeValue.address addr] initialState✝)
+      (Proofs.StateOf executable✝
+        (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+            Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+        [RuntimeValue.address addr]
+        (Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr] initialState✝)))
+consumed :
+  ((Option.map (fun value => RuntimeValue.integer value.fst.val)
+            (Proofs.StateOf executable✝
+              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                  Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+              [RuntimeValue.address addr] initialState✝
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr))).getD
+        RuntimeValue.unit).asInt =
+    ((Option.map (fun value => RuntimeValue.integer value.fst.val)
+              (initialState✝
+                {
+                  type :=
+                    Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                      (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                  arguments := Proofs.Denote.NRow.nil }
+                (StorageKey.address addr))).getD
+          RuntimeValue.unit).asInt +
+      1
+x :
+  (Proofs.StateOf executable✝
+          (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+              Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+          [RuntimeValue.address addr] initialState✝
+          {
+            type :=
+              Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+            arguments := Proofs.Denote.NRow.nil }
+          (StorageKey.address addr)).isSome =
+      true →
+    ¬(((Option.map (fun value => RuntimeValue.bool value.fst)
+                  (Proofs.StateOf executable✝
+                    (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+                        Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                    [RuntimeValue.address addr]
+                    (Proofs.StateOf executable✝
+                      (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                          Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                      [RuntimeValue.address addr] initialState✝)
+                    {
+                      type :=
+                        Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+                      arguments := Proofs.Denote.NRow.nil }
+                    (StorageKey.address addr))).getD
+              RuntimeValue.unit).asBool =
+          true ↔
+        ((Option.map (fun value => RuntimeValue.bool value.fst)
+                  (Proofs.StateOf executable✝
+                    (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                        Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                    [RuntimeValue.address addr] initialState✝
+                    {
+                      type :=
+                        Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } Proofs.Denote.NRow.nil
+                          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.bool Proofs.Denote.NRow.nil),
+                      arguments := Proofs.Denote.NRow.nil }
+                    (StorageKey.address addr))).getD
+              RuntimeValue.unit).asBool =
+          true)
+⊢ ((Option.map (fun value => RuntimeValue.integer value.fst.val)
+            (Proofs.StateOf executable✝
+              (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 1 } }
+                  Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+              [RuntimeValue.address addr]
+              (Proofs.StateOf executable✝
+                (Proofs.Denote.closureOf { namespaceId := { index := 0 }, functionId := { index := 0 } }
+                    Proofs.Denote.Weave.nil.supplied.mask #[] ()).encode
+                [RuntimeValue.address addr] initialState✝)
+              {
+                type :=
+                  Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                    (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                arguments := Proofs.Denote.NRow.nil }
+              (StorageKey.address addr))).getD
+        RuntimeValue.unit).asInt =
+    ((Option.map (fun value => RuntimeValue.integer value.fst.val)
+              (initialState✝
+                {
+                  type :=
+                    Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+                      (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil),
+                  arguments := Proofs.Denote.NRow.nil }
+                (StorageKey.address addr))).getD
+          RuntimeValue.unit).asInt +
+      2
+VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:9:8: error: verex verification failed: the proof of `wrong_final_value` does not establish its specification

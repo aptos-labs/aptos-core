@@ -12,4 +12,4 @@ warning: proof uses trusted assumption
    │             ^^^^^^^^^^^^^^^^^^^^^^
 
 tests/sources/functional/proof/if_else.move:159:18: error: the assertion `!(a <= b) ==> _result == a` does not hold
-tests/sources/functional/proof/if_else.move:152:5: error: leaner verification failed: the automatic verification of `min` failed; provide a proof: `verify min by …` in `tests/sources/functional/proof/if_else.proof.lean` (`verify min by skip` shows the obligations it leaves)
+tests/sources/functional/proof/if_else.move:152:5: error: verex verification failed: the automatic verification of `min` failed; provide a proof: `verify min by …` in `tests/sources/functional/proof/if_else.proof.lean` (`verify min by verex_obligations` lists its obligations)

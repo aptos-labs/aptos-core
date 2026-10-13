@@ -1,2 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: generic module invariants are outside the current LeanerLang parser
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` does not hold after a write of memory it reads
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the specification clause `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` is not established
+tests/sources/regression/generic_aliasing_ghost_pair.move:25:5: error: verex verification failed: the automatic verification of `concrete` failed; provide a proof: `verify concrete by …` in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean` (`verify concrete by verex_obligations` lists its obligations)
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the module invariant `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` does not hold after a write of memory it reads
+tests/sources/regression/generic_aliasing_ghost_pair.move:15:9: error: the specification clause `invariant {T} {U} (!exists<N>(@0x42) ==> !exists<P<T, U> >(@0x42))
+        && (exists<M>(@0x42) ==> !exists<P<T, U> >(@0x42))` is not established
+tests/sources/regression/generic_aliasing_ghost_pair.move:36:5: error: verex verification failed: the automatic verification of `declared` failed; provide a proof: `verify declared by …` in `tests/sources/regression/generic_aliasing_ghost_pair.proof.lean` (`verify declared by verex_obligations` lists its obligations)

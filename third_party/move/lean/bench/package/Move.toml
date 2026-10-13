@@ -4,7 +4,7 @@
 # Problems of the verification benchmark written for it (bench/problems.toml).
 
 [package]
-name = "LeanerBench"
+name = "VerexBench"
 version = "0.0.0"
 
 [addresses]

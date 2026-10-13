@@ -60,5 +60,5 @@ import Move.Tests.Verification.ResourceComposition
 import Move.Tests.Verification.SpecFunctions
 import Move.Tests.Verification.SpecLogicalArithmetic
 
-/-! Aggregate root for the categorized Leaner Move regression suite. Lake
+/-! Aggregate root for the categorized Verex Move regression suite. Lake
 needs a root module per test library, so every new test file is added here. -/

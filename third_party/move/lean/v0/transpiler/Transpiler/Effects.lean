@@ -7,9 +7,9 @@ import Transpiler.Names
 /-!
 # Transitional printer effect view
 
-Leaner marks effectful functions with an `Action` result and has an explicit
+Verex marks effectful functions with an `Action` result and has an explicit
 frame (`modifies`); Move has neither. The fixed-point analysis now consumes
-validated LIR in `Transpiler.LIR.Effects`. This module retains only the
+validated VIR in `Transpiler.VIR.Effects`. This module retains only the
 XAST-shaped fact table and render-shape helpers used by the established
 printer while that printer is migrated:
 
@@ -49,7 +49,7 @@ def struct? (p : Package) (name : QualifiedName) : Option Struct := do
   let mod ← p.find? name.module
   mod.structs.find? fun s => s.name == name.name
 
-/-- Whether a struct carries a data invariant: Leaner certifies its values,
+/-- Whether a struct carries a data invariant: Verex certifies its values,
 and creating one is an `Action` (`T.certify`), where the invariant is owed. -/
 def certified (p : Package) (name : QualifiedName) : Bool :=
   (p.struct? name).any fun s => s.spec.conditions.any fun c => c.kind == .structInvariant

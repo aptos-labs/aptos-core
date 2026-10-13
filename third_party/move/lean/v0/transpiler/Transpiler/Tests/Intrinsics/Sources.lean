@@ -2,7 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Transpiler
-import LeanerIR.TestInfra
+import VerexIR.TestInfra
 
 /-!
 The E16 source fixtures are reduced, faithful copies of the framework packages:
@@ -13,14 +13,14 @@ The E16 source fixtures are reduced, faithful copies of the framework packages:
 * `Programs/Intrinsics/AptosFramework` contains the definitions and specifications of
   `OrderedMap` and `BigOrderedMap` and depends on the reduced stdlib fixture.
 
-This test carries all six map-intrinsic declarations through XAST, raw LIR,
+This test carries all six map-intrinsic declarations through XAST, raw VIR,
 and the Move-profile graph/signature validator. It then ensures that the
 transpiler rejects their owning modules explicitly at the still-suspended E16
 semantic interpretation boundary.
 -/
 
 open Transpiler Transpiler.Xast Transpiler.Effects Transpiler.Driver Transpiler.Print
-open LeanerIR.TestInfra
+open VerexIR.TestInfra
 
 namespace Transpiler.Tests.Intrinsics.Sources
 
@@ -31,7 +31,7 @@ private def aptosFrameworkDir : System.FilePath :=
   "Transpiler/Tests/Programs/Intrinsics/AptosFramework"
 
 private def moveStdlibDir : System.FilePath :=
-  "../../leaner-e2e-tests/LeanerE2ETests/MoveToLeanerLang/MoveStdlib"
+  "../../verex-e2e-tests/VerexE2ETests/MoveToVerexSL/MoveStdlib"
 
 private def moveStdlibInput (path : System.FilePath) : Bool :=
   path.fileName.any fun name =>
@@ -85,7 +85,7 @@ private def requireIntrinsicRejection (pkg : Package) : IO Unit := do
     let some (outcome, source?) := outputs.find? fun (outcome, _) => outcome.module == m.ref
       | throw (IO.userError s!"missing transpiler outcome for {m.name}")
     if source?.isSome then
-      throw (IO.userError s!"intrinsic module {m.name} unexpectedly produced Leaner source")
+      throw (IO.userError s!"intrinsic module {m.name} unexpectedly produced Verex source")
     let expected := s!"intrinsic type `{owner.name}` uses model `map`; E16 is suspended"
     match outcome.error with
     | some error =>

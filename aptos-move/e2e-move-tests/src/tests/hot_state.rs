@@ -99,6 +99,14 @@ fn execute_and_get_hot_state_promotions(
             .clone(),
         txn => panic!("Expected block epilogue, got: {:?}", txn),
     };
+    let epilogue_hotness: BTreeSet<_> = outputs
+        .last()
+        .expect("Block epilogue output must exist")
+        .write_set()
+        .hotness_keys()
+        .cloned()
+        .collect();
+    assert_eq!(epilogue_hotness, to_make_hot);
     (statuses, to_make_hot, written_keys)
 }
 

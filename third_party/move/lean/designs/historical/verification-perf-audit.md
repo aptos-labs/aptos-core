@@ -1,7 +1,7 @@
 # Verification performance audit (historical)
 
 Status: historical since 2026-09-08. This audit measured the retired
-routes (`leaner_denotation_*` tactics, `Performance.exp`); its findings
+routes (`verex_denotation_*` tactics, `Performance.exp`); its findings
 became the principles of [`../denotation.md`](../denotation.md), whose
 gate is `DenotePerformance.exp`. It is kept for its measurements and is
 not updated.
@@ -10,10 +10,10 @@ The bar is v0: seconds per `verify` target.
 
 ## Regression tracking
 
-[`LeanerLang/Tests/Performance.lean`](../leaner-ir/LeanerLang/Tests/Performance.lean)
+[`VerexSL/Tests/Performance.lean`](../verex-ir/VerexSL/Tests/Performance.lean)
 is the benchmark: one curated target per cost class, each proved by a bare
 `verify`, compared against
-[`Performance.exp`](../leaner-ir/LeanerLang/Tests/Performance.exp) and run
+[`Performance.exp`](../verex-ir/VerexSL/Tests/Performance.exp) and run
 as part of `lake test`.  Two numbers gate it and one does not:
 
 * **heartbeats** — the elaborator's own work counter, reproducible to
@@ -59,7 +59,7 @@ twelve targets moved, which is itself the signature of a whole-file
 re-record rather than a targeted change. The figures in the next section
 predate that regeneration and are kept as the relative picture they were
 written to show; the current absolute numbers are in
-[`Performance.exp`](../leaner-ir/LeanerLang/Tests/Performance.exp).
+[`Performance.exp`](../verex-ir/VerexSL/Tests/Performance.exp).
 
 One further measurement rule, now also in the report text: never compare
 a `-Dprofiler=true` run against the baseline. Profiling inflates
@@ -100,8 +100,8 @@ The findings below are ordered by that split.
 **F0 — the drive rebuilt its rule set at every program point (fixed).**
 The two tactics the drive spends its time in were measured directly, by
 timing each alternative of the drive loop on `guarded`, the cheapest target
-in the benchmark. Of 484ms of drive time, `leaner_denotation_reconcile`
-took 234ms over 22 calls and `leaner_denotation_reduce_equation!` 222ms
+in the benchmark. Of 484ms of drive time, `verex_denotation_reconcile`
+took 234ms over 22 calls and `verex_denotation_reduce_equation!` 222ms
 over 18: **94% in two alternatives, both of which mostly fail** (4 wins of
 22, and 3 of 18). The rest of the loop — sixteen other alternatives, 285
 attempts in all — accounted for 28ms.
@@ -112,14 +112,14 @@ elaborated into a discrimination tree on **every** application, while the
 drive applies them at every program point. Cutting the inventory from 68
 lemmas to 4 dropped that alternative from 234ms to 65ms with an
 identical drive path, which puts the rebuild at about 7.7ms a call, or
-0.11ms per lemma per call. `leaner_denotation_reconcile_at` builds two
+0.11ms per lemma per call. `verex_denotation_reconcile_at` builds two
 such sets per call, which is why it was the second-largest cost.
 
-The inventory is now the registered `lir_reconcile` attribute set
-(declared in [`SimpAttrs.lean`](../leaner-ir/LeanerIR/Proofs/SimpAttrs.lean),
+The inventory is now the registered `vir_reconcile` attribute set
+(declared in [`SimpAttrs.lean`](../verex-ir/VerexIR/Proofs/SimpAttrs.lean),
 membership listed in one `attribute` command beside the tactics that use
 it), so the environment maintains the tree once.
-`leaner_denotation_reconcile_at` still adds inline the four
+`verex_denotation_reconcile_at` still adds inline the four
 returned-reference rows it alone carried. Membership is unchanged, and
 **every benchmark target produced a byte-identical proof** — the object
 counts did not move — so this is search removed, not proof changed:
@@ -164,13 +164,13 @@ next layer. Of about 20 seconds of drive time over 384 goals:
   so the negative answer is the expensive one.
 * `apply And.intro` cost 956ms over 70 attempts for 8 wins, for the same
   reason: `apply` unifies against the goal.
-* `leaner_denotation_reconcile_returned!` cost 581ms over 256 attempts for
+* `verex_denotation_reconcile_returned!` cost 581ms over 256 attempts for
   zero wins, because it evaluated its two preconditions in the wrong
   order — the cheap one is a search of the target, the expensive one scans
   every hypothesis, and it computed the expensive one unconditionally.
 
-All three now decide syntactically first: `leaner_denotation_trivial`
-requires the target to be spelled `True`, `leaner_denotation_split_conjunction`
+All three now decide syntactically first: `verex_denotation_trivial`
+requires the target to be spelled `True`, `verex_denotation_split_conjunction`
 requires an `And`, and the returned-reborrow guard checks its pending
 write-back before scanning the context. The drive reduces a head before
 reaching these alternatives, so a post that means `True` arrives spelled
@@ -193,15 +193,15 @@ each goal was recorded alongside the outcome. Two classes stood out, and
 both were the drive doing one thing while another of its own rules was
 waiting to do the right one:
 
-* 44 goals whose target is quantified cost `leaner_denotation_reconcile`
+* 44 goals whose target is quantified cost `verex_denotation_reconcile`
   1.7 seconds and were reconciled **zero** times; they are exactly the 44
-  goals `leaner_denotation_intro_guarded` went on to win.
+  goals `verex_denotation_intro_guarded` went on to win.
 * 34 conjunctive goals cost it 3.9 seconds for 7 rewrites, with
-  `leaner_denotation_split_conjunction` waiting behind it.
+  `verex_denotation_split_conjunction` waiting behind it.
 
 Reconciliation is normalization of a proposition; a binder and a
 conjunction are structure, and the drive carries its own rules for those.
-The alternative is now `leaner_denotation_reconcile_guarded`, which
+The alternative is now `verex_denotation_reconcile_guarded`, which
 declines a quantified or conjunctive target. Reordering was considered
 first and rejected: the alternative list documents that a visible storage
 read must be resolved before logical introduction, so introduction cannot
@@ -217,7 +217,7 @@ suites stay green.
 
 **F0d — head reduction re-decided by `change` what `whnf` had just
 established (fixed).** With the waste removed, the largest alternative left
-was `leaner_denotation_reduce_head` at about 25ms a call, and it was
+was `verex_denotation_reduce_head` at about 25ms a call, and it was
 expensive even where it succeeded — 104ms a call on `consValues`, 114ms on
 `wpExpr_localVar.match_1`, both of which win every time they are tried. The
 cost was not the reduction. The tactic finished with `goal.change reduced`,
@@ -293,7 +293,7 @@ were tested against it, and all four were rejected:
   the storage proofs grew 1%, so substitution did happen and simply did
   not pay;
 * replacing the five semantic-operation *definition* unfolds with the
-  closed `lir_reconcile` rows: **worse**, 2.51s;
+  closed `vir_reconcile` rows: **worse**, 2.51s;
 * removing the argument and result codec unfolds, on the theory they
   produce the `dite` chains simp then fights: **no change**, 1.80s.
 
@@ -311,7 +311,7 @@ the proof term rather than searching for it — closes `guarded` at 7.4M
 against 14.6M, **-49%**, on a target whose closing was 53% of its cost. So
 the floor is an artifact of searching, not a property of the obligations.
 It is implemented and gated in
-[`Certify.lean`](../leaner-ir/LeanerIR/Proofs/Certify.lean); the gate
+[`Certify.lean`](../verex-ir/VerexIR/Proofs/Certify.lean); the gate
 matters, because an ungated attempt on the eleven targets it cannot yet
 close cost 2–4% each and made the prototype a net loss. What blocks the
 next target is recorded there: not the grammar, but the loan-registry side
@@ -324,8 +324,8 @@ drive and closing: `withdraw` and `deposit` are about 96% drive,
 `bump_twice` 91%, while the mid-sized reference targets are 55–84%
 *closing* and `guarded` is about half each. So the drive is roughly 85% of
 the benchmark and the two dominant alternatives left in it are
-`leaner_denotation_reconcile` (44ms a call on `withdraw`) and
-`leaner_denotation_reduce_head` (23ms a call) — both now doing real
+`verex_denotation_reconcile` (44ms a call on `withdraw`) and
+`verex_denotation_reduce_head` (23ms a call) — both now doing real
 rewriting and reduction over oversized frame and state records, which is
 F7's term-size problem and the case for the certifying executor in
 [`certifying-execution.md`](historical/certifying-execution.md).

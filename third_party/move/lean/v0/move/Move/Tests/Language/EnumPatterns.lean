@@ -5,7 +5,7 @@
 import Move
 import MoveModel.Tests.Common
 
-/-! Nested enum patterns through Leaner lowering and the Move IR interpreter. -/
+/-! Nested enum patterns through Verex lowering and the Move IR interpreter. -/
 
 namespace Tests.MovePrograms
 
