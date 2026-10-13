@@ -43,6 +43,7 @@ use proptest::prelude::*;
 use std::iter::once;
 
 mod chunk_executor_tests;
+mod chunk_result_verifier_tests;
 #[cfg(test)]
 mod mock_vm;
 
