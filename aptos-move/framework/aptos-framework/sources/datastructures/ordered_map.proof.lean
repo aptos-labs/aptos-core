@@ -1,11 +1,16 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "ordered_map.move"
+verex proofs where
+
 open VerexIR.Maps VerexIR.Proofs VerexIR.Proofs.Denote
 
 -- The loop preserves the map's enumeration by removing its first entry.
 -- Use the map position laws directly on the prepared loop obligations.
-verify test_verify_drain_symbolic by
+verify! test_verify_drain_symbolic by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals grind

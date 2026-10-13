@@ -2,9 +2,11 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexE2ETests.CheckSupport
-/-! External Table entries carry deep data invariants at their resolved type
-arguments. Computed keys, nested Tables, generic and phantom parameters, and
-specification-only reads all use the same memory-bound lookup rule. -/
+/-! A table's entries carry deep data invariants at their resolved type
+arguments. Computed keys, generic and phantom parameters, and
+specification-only reads all read the owned contents. A nested table is read
+through a role at a table-bearing type argument, which the denotation does
+not carry (`designs/intrinsic-maps.md`, "Stages"). -/
 
 set_option maxHeartbeats 25000
 set_option verex.verifyHeartbeats 25000
@@ -50,7 +52,6 @@ verex module 0x42::table_stored_invariants where
     requires has(get(t, a), b)
     aborts_if false
     ensures result <= 10
-  verify nested
 
   public fun direct(t : &Table<u64, Payload>, k : u64) -> u64 := 10
   spec direct where
@@ -96,6 +97,12 @@ verex module 0x42::table_stored_invariants where
     aborts_if false
     ensures permitted::<u8>(result)
   verify tagged_u8
+
+/--
+error: no denotation for `nested`: a type argument holding a map's contents is not carried by the denotation
+-/
+#guard_msgs in
+verify 0x42::table_stored_invariants::nested
 
 /--
 error: the specification clause `ensures result < 10` is not established

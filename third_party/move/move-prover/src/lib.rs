@@ -139,7 +139,6 @@ fn run_move_prover_lean<W: WriteColor>(
         error_writer,
         "exiting with model building errors",
     )?;
-    let output = Path::new(&options.output_path).with_extension("lean");
     verex::verify(
         &env,
         source,
@@ -149,7 +148,6 @@ fn run_move_prover_lean<W: WriteColor>(
             heartbeats: options.heartbeats,
             ignore_proofs: options.ignore_proofs,
         },
-        &output,
         error_writer,
         start_time,
     )

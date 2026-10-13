@@ -42,7 +42,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                     arguments := VerexIR.Proofs.Denote.NRow.nil }
                   (VerexIR.StorageKey.address modifier_addr)).isSome =
               true →
-            VerexIR.Proofs.Obligation "stored_fun_values.lean" 15353 15422
+            VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 15353 15422
               ((Option.map
                       (fun value =>
                         VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 3 } none
@@ -101,7 +101,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                   (VerexIR.StorageKey.address modifier_addr)).isSome =
               true)
       (fun failure =>
-        VerexIR.Proofs.Obligation "stored_fun_values.lean" 15299 15348
+        VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 15299 15348
           (initialState✝
               {
                 type :=
@@ -150,7 +150,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           (VerexIR.Proofs.Denote.Var.here.there.there.set value env))
         verexContinuation✝
         (fun failure =>
-          VerexIR.Proofs.Obligation "stored_fun_values.lean" 15299 15348
+          VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 15299 15348
             (initialState✝
                 {
                   type :=
@@ -387,7 +387,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                 (VerexIR.StorageKey.address modifier_addr)).isSome =
             true)
       (fun failure =>
-        VerexIR.Proofs.Obligation "stored_fun_values.lean" 18450 18495
+        VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18450 18495
           (initialState✝
               {
                 type :=
@@ -436,7 +436,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           (VerexIR.Proofs.Denote.Var.here.there.there.set value env))
         verexContinuation✝
         (fun failure =>
-          VerexIR.Proofs.Obligation "stored_fun_values.lean" 18450 18495
+          VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18450 18495
             (initialState✝
                 {
                   type :=
@@ -591,7 +591,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                     arguments := VerexIR.Proofs.Denote.NRow.nil }
                   (VerexIR.StorageKey.address modifier_addr)).isSome =
               true →
-            VerexIR.Proofs.Obligation "stored_fun_values.lean" 18863 18932
+            VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18863 18932
               ((Option.map
                       (fun value =>
                         VerexIR.RuntimeValue.nominal { namespaceId := { index := 0 }, structId := 3 } none
@@ -650,7 +650,7 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
                   (VerexIR.StorageKey.address modifier_addr)).isSome =
               true)
       (fun failure =>
-        VerexIR.Proofs.Obligation "stored_fun_values.lean" 18813 18858
+        VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18813 18858
           (initialState✝
               {
                 type :=
@@ -699,7 +699,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           (VerexIR.Proofs.Denote.Var.here.there.there.set value env))
         verexContinuation✝
         (fun failure =>
-          VerexIR.Proofs.Obligation "stored_fun_values.lean" 18813 18858
+          VerexIR.Proofs.Obligation "tests/sources/functional/closures/.verex/stored_fun_values.move.lean" 18813 18858
             (initialState✝
                 {
                   type :=

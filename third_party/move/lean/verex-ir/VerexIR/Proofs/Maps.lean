@@ -614,26 +614,66 @@ def Discipline.Valid : Discipline → Entries → Prop
 /-! ## Layouts -/
 
 /-- Where a map value keeps its entries: the owner's value (a plain struct,
-or one variant of an enum) holds one vector of two-field entries. -/
+or one variant of an enum) holds its entries in its last field, a vector of
+two-field entry values. An entries layout has that field alone, its entries
+values of the entry declaration. A table layout holds the handle of the
+table first, then its cached length if the owner caches one, then the
+hidden contents field of entry tuples (`designs/intrinsic-maps.md`,
+"Views"). -/
 structure Layout where
   owner : StructHandle
   variant : Option String
-  entry : StructHandle
+  /-- The declaration of the entry values; `none` for the tuples of a table. -/
+  entry : Option StructHandle
+  /-- A table layout: the first field is the table's handle. -/
+  handle : Bool
+  /-- A table layout caching its length before its contents. -/
+  length : Bool
 
 /-- The entries a map value holds. -/
 def entriesOf (map : RuntimeValue) : Entries :=
-  match map.field 0 with
-  | .vector elements => elements.toList.map fun entry => (entry.field 0, entry.field 1)
+  match map with
+  | .nominal _ _ fields =>
+      match fields.back? with
+      | some (.vector elements) => elements.toList.map fun entry => (entry.field 0, entry.field 1)
+      | _ => []
   | _ => []
 
-/-- The map value holding entries. -/
-def Layout.build (layout : Layout) (entries : Entries) : RuntimeValue :=
-  .nominal layout.owner layout.variant
-    #[.vector (entries.map fun entry => .nominal layout.entry none #[entry.1, entry.2]).toArray]
+/-- An entry's value. -/
+def Layout.entryValue (layout : Layout) (entry : RuntimeValue × RuntimeValue) : RuntimeValue :=
+  match layout.entry with
+  | some declaration => .nominal declaration none #[entry.1, entry.2]
+  | none => .tuple #[entry.1, entry.2]
 
-@[simp] theorem entriesOf_build (layout : Layout) (entries : Entries) :
-    entriesOf (layout.build entries) = entries := by
-  simp [entriesOf, Layout.build, RuntimeValue.field, List.map_map, Function.comp_def]
+/-- The map value holding entries, at a handle for a table layout. -/
+def Layout.build (layout : Layout) (handle : RuntimeValue) (entries : Entries) : RuntimeValue :=
+  .nominal layout.owner layout.variant
+    (((if layout.handle then #[handle] else #[]) ++
+        (if layout.length then #[RuntimeValue.integer entries.length] else #[])).push
+      (.vector (entries.map layout.entryValue).toArray))
+
+/-- The handle of a map value: of a table layout, its first field. -/
+def Layout.handleOf (layout : Layout) (map : RuntimeValue) : RuntimeValue :=
+  if layout.handle then map.field 0 else .unit
+
+@[simp] theorem Layout.field_entryValue_zero (layout : Layout) (entry : RuntimeValue × RuntimeValue) :
+    (layout.entryValue entry).field 0 = entry.1 := by
+  cases declaration : layout.entry <;> simp [Layout.entryValue, declaration, RuntimeValue.field]
+
+@[simp] theorem Layout.field_entryValue_one (layout : Layout) (entry : RuntimeValue × RuntimeValue) :
+    (layout.entryValue entry).field 1 = entry.2 := by
+  cases declaration : layout.entry <;> simp [Layout.entryValue, declaration, RuntimeValue.field]
+
+@[simp] theorem entriesOf_build (layout : Layout) (handle : RuntimeValue) (entries : Entries) :
+    entriesOf (layout.build handle entries) = entries := by
+  simp [entriesOf, Layout.build, Array.back?_push, List.map_map, Function.comp_def]
+
+/-- The entries of a value whose one field is a vector of entries. -/
+@[simp] theorem entriesOf_single (owner : StructHandle) (variant : Option String)
+    (elements : Array RuntimeValue) :
+    entriesOf (.nominal owner variant #[.vector elements]) =
+      elements.toList.map fun entry => (entry.field 0, entry.field 1) := by
+  simp [entriesOf, Array.back?]
 
 
 /-! ## Map values
@@ -706,14 +746,14 @@ theorem write_read_keyAt {α : Type} {read : RuntimeValue → α} {write : α �
 
 /-- The keys of entries encoded one by one, the key as their first field, are
 read back when every encoded first field is. -/
-@[vir_denote_norm] theorem keysRead_map {α β : Type} {read : RuntimeValue → α}
+@[vir_denote_norm, vir_denote_side] theorem keysRead_map {α β : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
     (encode : β → RuntimeValue) (entries : Array β)
     (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
     KeysRead read write (.nominal owner variant #[.vector (entries.map encode)]) := by
   intro pair member
-  simp only [entriesOf, RuntimeValue.field, List.getElem?_toArray, List.getElem?_cons_zero,
-    Option.getD_some, Array.toList_map, List.map_map, List.mem_map, Function.comp_def] at member
+  simp only [entriesOf_single, Array.toList_map, List.map_map, List.mem_map,
+    Function.comp_def] at member
   obtain ⟨value, _, rfl⟩ := member
   exact roundTrip value
 
@@ -759,17 +799,35 @@ theorem order_keyAt_keyAt {map other : RuntimeValue} {index position : Int}
   rw [← RuntimeValue.order_integer rank, integer_asInt_keyAt keys nonneg bound,
     integer_asInt_keyAt otherKeys low high]
 
-/-- The empty map. -/
-def empty (layout : Layout) : RuntimeValue := layout.build []
+/-- The empty map of an entries layout. -/
+def empty (layout : Layout) : RuntimeValue := layout.build .unit []
 
-/-- The map with a key's value updated. -/
+/-- The map with a key's value updated, at the map's handle. -/
 def update (layout : Layout) (discipline : Discipline) (map key value : RuntimeValue) :
     RuntimeValue :=
-  layout.build (discipline.set (entriesOf map) key value)
+  layout.build (layout.handleOf map) (discipline.set (entriesOf map) key value)
 
-/-- The map without a key. -/
+/-- The map without a key, at the map's handle. -/
 def remove (layout : Layout) (discipline : Discipline) (map key : RuntimeValue) : RuntimeValue :=
-  layout.build (discipline.del (entriesOf map) key)
+  layout.build (layout.handleOf map) (discipline.del (entriesOf map) key)
+
+/-- A table layout's map holds its handle first. -/
+@[simp] theorem Layout.field_zero_build (layout : Layout) (handle : RuntimeValue)
+    (entries : Entries) (h : layout.handle = true) :
+    (layout.build handle entries).field 0 = handle := by
+  cases hl : layout.length <;> simp [Layout.build, RuntimeValue.field, h, hl]
+
+/-! Updating and removing keep a table's handle. -/
+
+@[simp, vir_denote_norm] theorem field_zero_update (layout : Layout) (discipline : Discipline)
+    (map key value : RuntimeValue) (h : layout.handle = true) :
+    (update layout discipline map key value).field 0 = map.field 0 := by
+  simp [update, Layout.handleOf, Layout.field_zero_build _ _ _ h, h]
+
+@[simp, vir_denote_norm] theorem field_zero_remove (layout : Layout) (discipline : Discipline)
+    (map key : RuntimeValue) (h : layout.handle = true) :
+    (remove layout discipline map key).field 0 = map.field 0 := by
+  simp [remove, Layout.handleOf, Layout.field_zero_build _ _ _ h, h]
 
 /-- The representation invariant of a map value. -/
 def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
@@ -784,6 +842,24 @@ def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
 
 @[simp, vir_denote_norm, grind .] theorem valid_empty (layout : Layout) (discipline : Discipline) : Valid discipline (empty layout) := by
   cases discipline <;> simp [Valid, empty, Distinct, Ascending]
+
+/-! A map built at a handle, as a table allocation yields it. -/
+
+@[simp, vir_denote_norm] theorem size_build (layout : Layout) (handle : RuntimeValue)
+    (entries : Entries) : size (layout.build handle entries) = (entries.length : Int) := by
+  simp [size]
+
+@[simp, vir_denote_norm] theorem hasKey_build (layout : Layout) (handle key : RuntimeValue)
+    (entries : Entries) : hasKey (layout.build handle entries) key = containsB entries key := by
+  simp [hasKey]
+
+@[simp, vir_denote_norm] theorem valueAt_build (layout : Layout) (handle key : RuntimeValue)
+    (entries : Entries) : valueAt (layout.build handle entries) key = get entries key := by
+  simp [valueAt]
+
+@[simp, vir_denote_norm] theorem valid_build_nil (layout : Layout) (handle : RuntimeValue)
+    (discipline : Discipline) : Valid discipline (layout.build handle []) := by
+  cases discipline <;> simp [Valid, Distinct, Ascending]
 
 /-! Updates and removals, for either discipline. -/
 
@@ -811,6 +887,14 @@ def Valid (discipline : Discipline) (map : RuntimeValue) : Prop :=
       simp only [size, update, entriesOf_build, Discipline.set_ordered, hasKey]
       rw [length_ordSet rank valid]
       split <;> simp
+
+/-- Under the sequence discipline the size law needs no validity: an update
+replaces the key's first entry or appends. A table's contents follow it. -/
+@[vir_denote_norm] theorem size_update_sequence (layout : Layout) (map key value : RuntimeValue) :
+    size (update layout .sequence map key value) =
+      if hasKey map key then size map else size map + 1 := by
+  simp only [size, update, entriesOf_build, Discipline.set_sequence, length_seqSet, hasKey]
+  split <;> simp
 
 @[vir_denote_norm, grind .] theorem valid_update (layout : Layout) {discipline : Discipline}
     {map : RuntimeValue} (valid : Valid discipline map) (key value : RuntimeValue) :
@@ -1090,20 +1174,36 @@ def nextKey? (rank : ValueRanks) (map key : RuntimeValue) : Option RuntimeValue 
 order: a later equal key wins. -/
 def updateAll (layout : Layout) (discipline : Discipline) (map keys values : RuntimeValue) :
     RuntimeValue :=
-  layout.build (((elementsOf keys).zip (elementsOf values)).foldl
+  layout.build (layout.handleOf map) (((elementsOf keys).zip (elementsOf values)).foldl
     (fun entries entry => discipline.set entries entry.1 entry.2) (entriesOf map))
 
 /-- The map holding the entries of the first `count` positions. -/
 def takeEntries (layout : Layout) (map : RuntimeValue) (count : Int) : RuntimeValue :=
-  layout.build ((entriesOf map).take count.toNat)
+  layout.build (layout.handleOf map) ((entriesOf map).take count.toNat)
 
-/-- The map holding the entries from position `count` on. -/
+/-- The map holding the entries from position `count` on, at a fresh value
+of an entries layout. -/
 def dropEntries (layout : Layout) (map : RuntimeValue) (count : Int) : RuntimeValue :=
-  layout.build ((entriesOf map).drop count.toNat)
+  layout.build .unit ((entriesOf map).drop count.toNat)
 
 /-- The map with a key replaced by another at its position. -/
 def replaceKey (layout : Layout) (map old new : RuntimeValue) : RuntimeValue :=
-  layout.build ((entriesOf map).map fun entry => if entry.1 = old then (new, entry.2) else entry)
+  layout.build (layout.handleOf map)
+    ((entriesOf map).map fun entry => if entry.1 = old then (new, entry.2) else entry)
+
+@[simp, vir_denote_norm] theorem field_zero_updateAll (layout : Layout) (discipline : Discipline)
+    (map keys values : RuntimeValue) (h : layout.handle = true) :
+    (updateAll layout discipline map keys values).field 0 = map.field 0 := by
+  simp [updateAll, Layout.handleOf, Layout.field_zero_build _ _ _ h, h]
+
+@[simp, vir_denote_norm] theorem field_zero_takeEntries (layout : Layout) (map : RuntimeValue)
+    (count : Int) (h : layout.handle = true) :
+    (takeEntries layout map count).field 0 = map.field 0 := by
+  simp [takeEntries, Layout.handleOf, Layout.field_zero_build _ _ _ h, h]
+
+@[simp, vir_denote_norm] theorem field_zero_replaceKey (layout : Layout) (map old new : RuntimeValue)
+    (h : layout.handle = true) : (replaceKey layout map old new).field 0 = map.field 0 := by
+  simp [replaceKey, Layout.handleOf, Layout.field_zero_build _ _ _ h, h]
 
 /-- Adding several entries aborts on vectors of different lengths, a key
 the map holds, or a key twice. -/

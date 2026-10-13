@@ -218,7 +218,9 @@ def run(source: Source, ignore: bool, budget: int | None, keep: Path | None = No
                     int(done.group(2)), done.group(3), done.group(4) == "authored")
         if not result.targets and completed.returncode != 0:
             result.failure = (completed.stdout + completed.stderr).strip()[-400:]
-        rendering = next((path for path in (work / "rendering.lean", work / "out.lean")
+        # The Prover writes a file's rendering where its proof file finds it.
+        beside = source.path.parent / ".verex" / f"{source.path.name}.lean"
+        rendering = next((path for path in (work / "rendering.lean", beside)
                           if path.exists()), None)
         if keep and rendering:
             keep.mkdir(parents=True, exist_ok=True)

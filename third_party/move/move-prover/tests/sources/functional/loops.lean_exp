@@ -11,7 +11,7 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
-      (fun failure => VerexIR.Proofs.Obligation "loops.lean" 1459 1473 True) state
+      (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     VerexIR.Proofs.Denote.NTy.unit.carrier →
@@ -22,7 +22,9 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
           (VerexIR.Proofs.Denote.Term.lit ()) env)
-        verexContinuation✝² (fun failure => VerexIR.Proofs.Obligation "loops.lean" 1459 1473 True) state
+        verexContinuation✝²
+        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True)
+        state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
       verexContinuation✝² (VerexIR.Proofs.Denote.Flow.return_ result env) state
     | VerexIR.Proofs.Denote.Flow.break_ nest env =>
@@ -49,17 +51,19 @@ loopHypothesis✝ :
       VerexIR.Proofs.Denote.HEnv
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
     (state : VerexIR.Proofs.Denote.Memory unit),
-    (env.fst.elim False fun i => VerexIR.Proofs.Obligation "loops.lean" 1407 1414 (i.val ≤ 11)) →
+    (env.fst.elim False fun i =>
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1407 1414 (i.val ≤ 11)) →
       state = state✝ →
         VerexIR.Proofs.wp (recursive✝ env) verexContinuation✝
-          (fun failure => VerexIR.Proofs.Obligation "loops.lean" 1459 1473 True) state
+          (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True)
+          state
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.Flow.iterate recursive✝ value) verexContinuation✝
-      (fun failure => VerexIR.Proofs.Obligation "loops.lean" 1459 1473 True) state
+      (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
 a✝ : 10 < i.val
 ⊢ False
 tests/sources/functional/loops.move:57:5: error: verex verification failed: the automatic verification of `iter10_no_abort_incorrect` failed; provide a proof: `verify iter10_no_abort_incorrect by …` in `tests/sources/functional/loops.proof.lean` (`verify iter10_no_abort_incorrect by verex_obligations` lists its obligations)

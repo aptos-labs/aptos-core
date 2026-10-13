@@ -68,8 +68,8 @@ verex module 0x42::table_snapshots where
 
 end VerexSL.Tests.Check.Specifications.TableSnapshots
 
--- A shared reference has the same native carrier as its referent, but must
--- not give the Table's contents a second runtime storage key.
+-- A shared reference denotes its referent's type: the table it refers to is
+-- held at the owner's slot, never at one of the reference's own.
 run_cmd do
   let some unit := VerexSL.registeredUnit? (← Lean.getEnv) `«0x42».table_snapshots
     | throwError "missing Table snapshot module"
@@ -79,8 +79,10 @@ run_cmd do
     for i in [:ns.tables.types.size] do
       let .reference reference := ns.tables.types[i]! | continue
       unless reference.kind == .shared do continue
-      if (VerexIR.Proofs.Denote.TableMemory.runtimeResourceOf unit ⟨n⟩ reference.referent).isSome then
-        checked := true
-        unless (VerexIR.Proofs.Denote.TableMemory.runtimeResourceOf unit ⟨n⟩ ⟨i⟩).isNone do
-          throwError "a shared Table reference incorrectly names native storage"
+      let some referent := VerexIR.Proofs.Denote.ntyOf unit ⟨n⟩ reference.referent | continue
+      let .struct source _ _ := referent | continue
+      unless VerexIR.Proofs.Denote.tableOwner unit source && referent.paramFree do continue
+      checked := true
+      unless VerexIR.Proofs.Denote.ntyOf unit ⟨n⟩ ⟨i⟩ == some referent do
+        throwError "a shared Table reference denotes another type than its referent"
   unless checked do throwError "the Table storage-key regression checked no shared reference"

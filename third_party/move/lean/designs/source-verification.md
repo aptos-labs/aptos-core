@@ -35,16 +35,16 @@ explicit widths; see [`numeric-representation.md`](numeric-representation.md).
 ```text
 foo.move ─ compiler-v2 XAST ─┐
                              ├─ validated VIR ─ VerexSL rendering ─ elaboration ─ messages
-foo.rs ─── rustc MIR ────────┘                  (+ foo.spec.lean items)                  │
+foo.rs ─── rustc MIR ────────┘                  (+ foo.spec.lean items)    (+ foo.proof.lean)
                                                                                           ▼
-                                                           foo.move / foo.rs / foo.spec.lean positions
+                                            foo.move / foo.rs / foo.spec.lean / foo.proof.lean positions
 ```
 
 ## Commands
 
 ```bash
 cd verex-move && lake build verex-move
-lake env .lake/build/bin/verex-move verify foo.move [--output foo.move.lean]
+lake env .lake/build/bin/verex-move verify foo.move [--output <rendering.lean>]
 
 cd verex-rust && lake build verex-rust
 lake env .lake/build/bin/verex-rust verify foo.rs [--spec foo.spec.lean] \
@@ -66,8 +66,15 @@ sets Lean options for the verification a command or the benchmark runs, for
 debugging: a value `true` or `false` is a Bool, a numeral a Nat, anything
 else a String (for example `VEREX_OPTIONS=verex.solverDebug=true` prints
 the solver's steps).
-Each command writes the rendering beside the source (`foo.move.lean`,
-`foo.rs.lean`) for inspection, prints one `file:line:column: severity:
+Each command writes the rendering, for inspection and for the source's
+proof file, which loads it in the editor ("Proofs"): a package's goes to
+`build/verex-verify.lean` under the package, a Move file's to the build
+directory of the package around it (`build/verex/<path>.lean`, out of the
+package's sources, whose Lean files the package elaborates) or, for a file of
+no package, to `.verex/foo.move.lean` beside it, a Rust file's beside it
+(`foo.rs.lean`). The rendering
+records the sources it was made from and the hashes of their content
+(`verex sources at`). The command prints one `file:line:column: severity:
 message` line per message, and exits non-zero when any is an error. Its
 last line is the wall time per phase, as the Move Prover reports its own:
 
@@ -148,7 +155,8 @@ builds the model of the file and its dependencies as one program through
 the checker and rewriters, exports the file's modules and what verifying
 them reads, and runs `verex-move verify <file.move> --export <that
 directory>`, which verifies the modules the file declares with the others
-linked; the rendering goes beside the output path, with extension `lean`.
+linked; `verex-move` writes the rendering where the file's proof file finds
+it, as for its own command.
 `--heartbeats` sets the default budget.
 
 The Prover's unit tests (`move-prover/tests/sources`) run this way as the
@@ -224,16 +232,37 @@ unfolding by their bounds.
 A specification is established in one of three ways, tried in this order:
 
 1. **Automatically.** The solver proves the function's obligations within a
-   budget (`verex.verifyHeartbeats`, 1500000 thousand heartbeats by
-   default: about a minute of elaboration). Most functions end here.
+   budget (`verex.verifyHeartbeats`, 1000000 thousand heartbeats by
+   default: about thirty seconds of elaboration). Most functions end here.
 2. **By a proof file.** Move has no syntax for a proof, so the proofs of a
-   Move file live in the VerexSL file beside it: `foo.proof.lean` beside
-   `foo.move`. Its items are spliced into the rendering of the file's
-   module, indented one level — `verify f by …` items, whose tactics prove
-   `f`'s goal in place of the automatic verification, and any `theorem` the
-   tactics use, which may name every declaration of the module. Theorems and
-   tactics see `VerexIR` opened, and an `open N …` item opens further
-   namespaces for all of them, wherever it stands. The tactics
+   Move file live in the Lean file beside it: `foo.proof.lean` beside
+   `foo.move`. Its header establishes the context of the file's module, and
+   the items after it prove the module's functions:
+
+   ```lean
+   import VerexMove.Proofs
+
+   verex proofs for "foo.move"
+   verex proofs where
+
+   verify f by
+     …
+   ```
+
+   The items are `verify f by …` items, whose tactics prove `f`'s goal in
+   place of the automatic verification, the `theorem`s the tactics use,
+   which may name every declaration of the module, and `open N …` items;
+   any other item belongs to the module and is refused, and so is a
+   `verify` before `verex proofs where`. `verex proofs where` verifies the
+   module with these items as the module's own command verifies it with its
+   own: theorems, then lemmas, then the targets, callees first, the
+   functions no item names automatically. The driver registers a module
+   that has a proof file with its verification deferred and elaborates the
+   proof file over what the module's command left: the header finds the
+   module registered. A proof file sees its module and the modules rendered
+   before it, not another proof file's theorems. Theorems and tactics see
+   `VerexIR` opened, and an `open N …` item opens further namespaces for all
+   of them, wherever it stands. The tactics
    of a proof (`designs/denotation.md`): `verex_obligations` splits the goal
    into the leaves `f` owes, each named by its clause (`ensures_2`,
    `aborts_if_1`, `invariant_1_entry`, `invariant_1_step`, `requires_of_g`
@@ -253,9 +282,9 @@ A specification is established in one of three ways, tried in this order:
    followed by `verex_solve` on every leaf. As Lean's tactics do, each of Verex's acts on the main goal and
    keeps the others; `verex_bounded`, `verex_inheriting`, `verex_settle`,
    `verex_saturate_round` and `verex_canonical_families` act on every
-   goal. A Rust file's `.spec.lean` carries
-   its `verify` items the same way. A proof file accompanies a source file
-   that declares one module; a file declaring several is refused.
+   goal. A Rust file's `.spec.lean`, spliced into its namespace, carries
+   its `verify` items too. A proof file accompanies a source file that
+   declares one module; a file declaring several is refused.
    `pragma verify = manual` on the spec block states that the function is
    established this way: it is not attempted automatically, and a missing
    `verify f by …` is an error. The Move Prover reads it as `verify = true`.
@@ -291,6 +320,24 @@ the command line tells apart by `internal.cmdlineSnapshots`; the verification
 driver sets it off). The packages' `moreServerOptions` would set it for the
 server once Lake passes them to library modules, leanprover/lean4#15626. The code action "Verify `f` here" on an item marks it so, "Skip
 `f` in the editor" unmarks it; `lake test` runs every item, marked or not.
+
+A proof file opens in the Lake workspace at the root of its tree
+(`aptos-move/framework`, `move-prover/tests/sources`, the paper's
+examples, `verex-e2e-tests` for its fixtures), which requires `verex-move`.
+Its header loads the module's context from the rendering the last
+verification of its Move file wrote: the latest of the file's rendering and
+its package's `build/verex-verify.lean` that renders the module. The
+module and the modules rendered before it are registered, their
+verification deferred, as the driver registers them. A source changed since
+the rendering warns at the header. Lean reuses the header while it is
+unchanged, so the context is loaded once: after verifying the source again,
+restart the file to load the new rendering. An edit re-elaborates `verex
+proofs where` alone: with the `verify` items skipped, the module's theorems
+and lemmas and the `verify!` items. A message about the rendering, such as
+a clause's or an automatic target's, is reported at the proof file's item
+that raised it, or at `verex proofs where`, opened by its position in the
+rendering (`verex.relocateMessages`, which the driver turns off to report it
+in the Move file).
 
 The integer bounds a specification names, `MAX_U8` … `MAX_U256`, `MAX_I8` …
 `MAX_I256`, and `MIN_I8` … `MIN_I256`, are Lean constants of type `Int` as
@@ -365,8 +412,8 @@ The shared driver is `VerexSL.SourceVerify` in `verex-ir`. The rendering
 is elaborated in the command's own process, so the elaborators run natively,
 and a message is mapped by the first rule that applies:
 
-1. A position in the items spliced from a specification or proof file maps
-   line by line to that file.
+1. A message in a proof file is at its own position. A position in the
+   items spliced from a specification file maps line by line to that file.
 2. Otherwise the source's validated namespace and the one elaborated from the
    rendering are aligned: declarations by name, then node by node while the
    two shapes agree — expressions, patterns, places, and contract clauses by
@@ -380,7 +427,10 @@ and a message is mapped by the first rule that applies:
 
 `verex-e2e-tests/VerexE2ETests/SourceVerify/` holds the examples: every
 `.move` and `.rs` file there is verified as the commands do it, and its
-messages are the baseline `<name>.exp` (none when it verifies). The Move
+messages are the baseline `<name>.exp` (none when it verifies). A Move
+file's proof file is then elaborated on its own, as the editor does,
+loading the rendering just written; its messages are `<name>.proof.exp`, and
+a source changed after its rendering must warn at the header. The Move
 standard library of the Move corpus is verified as a package, its modules
 rendered in dependency order and each linking the modules it uses; its
 baseline `MoveStdlib.exp` lists what does not verify yet.

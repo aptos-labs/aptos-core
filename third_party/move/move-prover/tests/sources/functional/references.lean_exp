@@ -14,7 +14,8 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
     VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value) (fun result final => False)
-      (fun failure => VerexIR.Proofs.Obligation "references.lean" 5782 5796 True) state
+      (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
+      state
 value✝ value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 a✝³ : { val := 10, fits := ⋯ } = value
 a✝² : value = value✝
@@ -29,7 +30,8 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
           (VerexIR.Proofs.Denote.Term.lit ()) env)
-        verexContinuation✝ (fun failure => VerexIR.Proofs.Obligation "references.lean" 5782 5796 True)
+        verexContinuation✝
+        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
       verexContinuation✝ (VerexIR.Proofs.Denote.Flow.return_ result env) state
