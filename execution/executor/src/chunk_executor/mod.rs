@@ -54,7 +54,10 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
-use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
+use chunk_result_verifier::{
+    ChunkPiece, ChunkPiecesVerifier, ChunkResultVerifier, ReplayChunkVerifier,
+    StateSyncChunkVerifier,
+};
 use fail::fail_point;
 use itertools::{multizip, Itertools};
 use std::{
@@ -443,7 +446,9 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .lock()
             .enqueue_for_ledger_update(ChunkToUpdateLedger {
                 output,
-                chunk_verifier,
+                chunk_verifier: ChunkPiecesVerifier::new(vec![ChunkPiece::whole_chunk(
+                    chunk_verifier,
+                )]),
             })?;
 
         info!(
@@ -467,25 +472,24 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             chunk_verifier,
         } = chunk;
 
-        let txn_infos = chunk_verifier.transaction_infos();
         let known_state_checkpoints = Some(
-            txn_infos
-                .iter()
+            chunk_verifier
+                .transaction_infos()
                 .map(|t| t.state_checkpoint_hash())
                 .collect_vec(),
         );
         let known_hot_state_checkpoints =
             output.execution_output.hot_state_root_in_txn_info.then(|| {
-                txn_infos
-                    .iter()
+                chunk_verifier
+                    .transaction_infos()
                     .map(|t| t.hot_state_checkpoint_hash())
                     .collect_vec()
             });
         let compute_trading_native_state_roots =
             output.execution_output.compute_trading_native_state_roots;
         let known_position_state_checkpoints = compute_trading_native_state_roots.then(|| {
-            txn_infos
-                .iter()
+            chunk_verifier
+                .transaction_infos()
                 .map(|t| t.position_state_checkpoint_hash())
                 .collect_vec()
         });
