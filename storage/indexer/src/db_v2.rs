@@ -35,10 +35,28 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
+
+/// How long `get_table_info_with_retry` waits for the info of a table to be indexed.
+///
+/// A reader can race the async parser: a transaction is committed before the infos of its tables
+/// are indexed, which takes milliseconds when the indexer keeps up. The info of some handles is
+/// never indexed though: the tables created by a simulated transaction are in no committed
+/// transaction, and a handle that the parser couldn't resolve is dropped (see `finalize_batch`).
+const TABLE_INFO_RETRY_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// How long after giving up on the info of a table `get_table_info_with_retry` doesn't wait for it
+/// again. A simulated transaction can write many items to a table that it creates, and a lookup
+/// for each of them would wait for the info of the table: they would add up to far more than
+/// `TABLE_INFO_RETRY_TIMEOUT`.
+const TABLE_INFO_GIVE_UP_MEMORY: Duration = Duration::from_secs(10);
+
+/// The most tables that are remembered as given up on. The tables of simulated transactions are
+/// new every time, so the memory is cleaned up when it is full.
+const MAX_GIVEN_UP_TABLES: usize = 1024;
 
 #[derive(Debug)]
 pub struct IndexerAsyncV2 {
@@ -53,6 +71,9 @@ pub struct IndexerAsyncV2 {
     // is obscure and will be stored as bytes with parent table's handle, once parent table's parsed with instructions,
     // child table handle will be parsed accordingly.
     pending_on: DashMap<TableHandle, DashSet<Bytes>>,
+    // The tables whose info wasn't indexed in time, and when `get_table_info_with_timeout` gave up
+    // waiting for it. At most `MAX_GIVEN_UP_TABLES`.
+    given_up_on: DashMap<TableHandle, Instant>,
 }
 
 impl IndexerAsyncV2 {
@@ -65,6 +86,7 @@ impl IndexerAsyncV2 {
             db,
             next_version: AtomicU64::new(next_version),
             pending_on: DashMap::new(),
+            given_up_on: DashMap::new(),
         })
     }
 
@@ -162,11 +184,41 @@ impl IndexerAsyncV2 {
         self.db.get::<TableInfoSchema>(&handle)
     }
 
+    /// Looks up the info of a table, waiting up to `TABLE_INFO_RETRY_TIMEOUT` for it to be
+    /// indexed. See `get_table_info_with_timeout`.
     pub fn get_table_info_with_retry(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        self.get_table_info_with_timeout(handle, TABLE_INFO_RETRY_TIMEOUT)
+    }
+
+    /// Looks up the info of a table, retrying until it is indexed or `timeout` has passed.
+    ///
+    /// If the info isn't there by then, the result is that of the last lookup: `Ok(None)`, or the
+    /// error if the database can't be read.
+    pub fn get_table_info_with_timeout(
+        &self,
+        handle: TableHandle,
+        timeout: Duration,
+    ) -> Result<Option<TableInfo>> {
+        let deadline = Instant::now() + timeout;
         let mut retried = 0;
         loop {
-            if let Ok(Some(table_info)) = self.get_table_info(handle) {
-                return Ok(Some(table_info));
+            let lookup = self.get_table_info(handle);
+            if let Ok(Some(_)) = lookup {
+                return lookup;
+            }
+
+            if retried == 0 && self.gave_up_on_recently(handle) {
+                return lookup;
+            }
+
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                self.remember_giving_up_on(handle);
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(1)),
+                    log_table_info_given_up(handle, retried, timeout)
+                );
+                return lookup;
             }
 
             // Log the first failure, and then sample subsequent failures to avoid log spam
@@ -180,8 +232,27 @@ impl IndexerAsyncV2 {
             }
 
             retried += 1;
-            std::thread::sleep(Duration::from_millis(TABLE_INFO_RETRY_TIME_MILLIS));
+            std::thread::sleep(remaining.min(Duration::from_millis(TABLE_INFO_RETRY_TIME_MILLIS)));
         }
+    }
+
+    fn gave_up_on_recently(&self, handle: TableHandle) -> bool {
+        self.given_up_on
+            .get(&handle)
+            .is_some_and(|gave_up_at| gave_up_at.elapsed() < TABLE_INFO_GIVE_UP_MEMORY)
+    }
+
+    fn remember_giving_up_on(&self, handle: TableHandle) {
+        if self.given_up_on.len() >= MAX_GIVEN_UP_TABLES {
+            self.given_up_on
+                .retain(|_, gave_up_at| gave_up_at.elapsed() < TABLE_INFO_GIVE_UP_MEMORY);
+            if self.given_up_on.len() >= MAX_GIVEN_UP_TABLES {
+                // All of them are recent. Not remembering this one only means that it is waited
+                // for again, which is what happened before they were remembered.
+                return;
+            }
+        }
+        self.given_up_on.insert(handle, Instant::now());
     }
 
     pub fn is_indexer_async_v2_pending_on_empty(&self) -> bool {
@@ -214,6 +285,16 @@ fn log_table_info_failure(handle: TableHandle, retried: u64) {
         retry_count = retried,
         table_handle = handle.0.to_canonical_string(),
         "[DB] Failed to get table info",
+    )
+}
+
+/// Logs that the wait for the information of a table was given up
+fn log_table_info_given_up(handle: TableHandle, retried: u64, timeout: Duration) {
+    warn!(
+        retry_count = retried,
+        timeout_ms = timeout.as_millis() as u64,
+        table_handle = handle.0.to_canonical_string(),
+        "[DB] Gave up waiting for table info to be indexed",
     )
 }
 
@@ -373,6 +454,26 @@ mod tests {
         IndexerAsyncV2::new(db).unwrap()
     }
 
+    fn table_info() -> TableInfo {
+        TableInfo {
+            key_type: TypeTag::U64,
+            value_type: TypeTag::Vector(Box::new(TypeTag::U8)),
+        }
+    }
+
+    fn table_handle(i: u64) -> TableHandle {
+        let mut bytes = [0u8; AccountAddress::LENGTH];
+        bytes[..8].copy_from_slice(&i.to_be_bytes());
+        TableHandle(AccountAddress::new(bytes))
+    }
+
+    /// A time `age` ago, for entries of `given_up_on` that were made a while ago.
+    fn ago(age: Duration) -> Instant {
+        Instant::now()
+            .checked_sub(age)
+            .expect("the system has been up for longer than the age")
+    }
+
     /// An unresolved handle is dropped and the processed version advances, rather than
     /// blocking progress.
     #[test]
@@ -401,5 +502,187 @@ mod tests {
             "the unresolvable handle should have been dropped"
         );
         assert_eq!(indexer.next_version(), end_version);
+    }
+
+    /// The info of a table that is never indexed, e.g. one that a simulated transaction
+    /// creates, must not make the reader wait forever.
+    #[test]
+    fn lookup_of_a_table_that_is_never_indexed_returns() {
+        let tmp = TempPath::new();
+        let indexer = Arc::new(new_test_indexer(&tmp));
+
+        // Look it up on another thread, so that a lookup that never returns fails the test
+        // instead of hanging it.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        {
+            let indexer = indexer.clone();
+            std::thread::spawn(move || {
+                let handle = TableHandle(AccountAddress::ONE);
+                let _ = sender.send(indexer.get_table_info_with_retry(handle));
+            });
+        }
+
+        let result = receiver
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the lookup of a table that is never indexed should give up waiting");
+        assert_eq!(result.unwrap(), None);
+    }
+
+    /// The table that a simulated transaction creates can have many items, and the lookup of
+    /// each of them would wait for the info of the table. They must not add up.
+    #[test]
+    fn giving_up_on_a_table_is_remembered() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+        let handle = TableHandle(AccountAddress::ONE);
+
+        let timeout = Duration::from_millis(300);
+        let started = Instant::now();
+        assert_eq!(
+            indexer
+                .get_table_info_with_timeout(handle, timeout)
+                .unwrap(),
+            None
+        );
+        assert!(
+            started.elapsed() >= timeout,
+            "the first lookup should wait for the info of the table"
+        );
+
+        // The next lookup doesn't wait, however long the caller is willing to wait.
+        let started = Instant::now();
+        assert_eq!(
+            indexer
+                .get_table_info_with_timeout(handle, Duration::from_secs(10))
+                .unwrap(),
+            None
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "a table that was given up on a moment ago should not be waited for again"
+        );
+    }
+
+    /// Indexing a table takes a moment after its transaction is committed, and a reader that
+    /// asks in that moment has to get the info.
+    #[test]
+    fn table_info_that_is_indexed_while_waiting_is_returned() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+        let handle = table_handle(1);
+
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                std::thread::sleep(Duration::from_millis(100));
+                indexer
+                    .db
+                    .put::<TableInfoSchema>(&handle, &table_info())
+                    .unwrap();
+            });
+
+            let started = Instant::now();
+            let found = indexer
+                .get_table_info_with_timeout(handle, Duration::from_secs(10))
+                .unwrap();
+            assert_eq!(found, Some(table_info()));
+            assert!(started.elapsed() < Duration::from_secs(5));
+        });
+    }
+
+    #[test]
+    fn indexed_table_info_is_returned_without_waiting() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+        let handle = table_handle(1);
+        indexer
+            .db
+            .put::<TableInfoSchema>(&handle, &table_info())
+            .unwrap();
+
+        let started = Instant::now();
+        let found = indexer
+            .get_table_info_with_timeout(handle, Duration::from_secs(60))
+            .unwrap();
+        assert_eq!(found, Some(table_info()));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    /// Remembering that a table was given up on only skips the waiting: the table is returned as
+    /// soon as it is indexed.
+    #[test]
+    fn table_that_was_given_up_on_is_returned_once_it_is_indexed() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+        let handle = table_handle(1);
+
+        assert_eq!(
+            indexer
+                .get_table_info_with_timeout(handle, Duration::from_millis(50))
+                .unwrap(),
+            None
+        );
+        assert!(indexer.gave_up_on_recently(handle));
+
+        indexer
+            .db
+            .put::<TableInfoSchema>(&handle, &table_info())
+            .unwrap();
+        assert_eq!(
+            indexer
+                .get_table_info_with_timeout(handle, Duration::ZERO)
+                .unwrap(),
+            Some(table_info())
+        );
+    }
+
+    #[test]
+    fn table_that_was_given_up_on_long_ago_is_waited_for_again() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+        let handle = table_handle(1);
+        let long_ago = ago(TABLE_INFO_GIVE_UP_MEMORY + Duration::from_secs(1));
+        indexer.given_up_on.insert(handle, long_ago);
+        assert!(!indexer.gave_up_on_recently(handle));
+
+        let timeout = Duration::from_millis(200);
+        let started = Instant::now();
+        assert_eq!(
+            indexer
+                .get_table_info_with_timeout(handle, timeout)
+                .unwrap(),
+            None
+        );
+        assert!(started.elapsed() >= timeout);
+    }
+
+    #[test]
+    fn tables_given_up_on_are_remembered_up_to_a_limit() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+
+        for i in 0..(MAX_GIVEN_UP_TABLES as u64 + 50) {
+            // Doesn't wait: gives up at once.
+            let handle = table_handle(i);
+            let found = indexer.get_table_info_with_timeout(handle, Duration::ZERO);
+            assert_eq!(found.unwrap(), None);
+        }
+        assert_eq!(indexer.given_up_on.len(), MAX_GIVEN_UP_TABLES);
+    }
+
+    #[test]
+    fn old_tables_are_forgotten_to_make_room_for_new_ones() {
+        let tmp = TempPath::new();
+        let indexer = new_test_indexer(&tmp);
+        let long_ago = ago(TABLE_INFO_GIVE_UP_MEMORY + Duration::from_secs(1));
+        for i in 0..MAX_GIVEN_UP_TABLES as u64 {
+            indexer.given_up_on.insert(table_handle(i), long_ago);
+        }
+
+        let new_handle = table_handle(MAX_GIVEN_UP_TABLES as u64);
+        let found = indexer.get_table_info_with_timeout(new_handle, Duration::ZERO);
+        assert_eq!(found.unwrap(), None);
+
+        assert!(indexer.gave_up_on_recently(new_handle));
+        assert!(indexer.given_up_on.len() <= MAX_GIVEN_UP_TABLES);
     }
 }
