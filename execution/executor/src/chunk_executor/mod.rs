@@ -66,7 +66,7 @@ use std::{
     },
     time::Instant,
 };
-use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
+use transaction_chunk::TransactionChunk;
 
 pub mod chunk_commit_queue;
 pub mod chunk_result_verifier;
@@ -234,9 +234,10 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             proof: txn_infos_with_proof,
         } = txn_list_with_proof;
 
-        let chunk = ChunkToExecute {
+        let chunk = TransactionChunk {
             transactions,
             persisted_aux_info,
+            transaction_outputs: None,
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
         let chunk_verifier = Arc::new(StateSyncChunkVerifier {
@@ -281,10 +282,10 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         } = txn_output_list_with_proof;
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
-        let chunk = ChunkToApply {
+        let chunk = TransactionChunk {
             transactions,
-            transaction_outputs,
             persisted_aux_info,
+            transaction_outputs: Some(transaction_outputs),
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
         let chunk_verifier = Arc::new(StateSyncChunkVerifier {
@@ -399,9 +400,9 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     }
 
     // ************************* Chunk Executor Implementation *************************
-    fn enqueue_chunk<Chunk: TransactionChunk + Sync>(
+    fn enqueue_chunk(
         &self,
-        chunk: Chunk,
+        chunk: TransactionChunk,
         chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
         mode_for_log: &'static str,
     ) -> Result<()> {
@@ -420,10 +421,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         let first_version = parent_state.next_version();
         ensure!(
-            chunk.first_version() == parent_state.next_version(),
+            chunk.first_version == parent_state.next_version(),
             "Chunk carries unexpected first version. Expected: {}, got: {}",
             parent_state.next_version(),
-            chunk.first_version(),
+            chunk.first_version,
         );
 
         let num_txns = chunk.len();
@@ -840,10 +841,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         })
         .multiunzip();
 
-        let chunk = ChunkToApply {
+        let chunk = TransactionChunk {
             transactions,
-            transaction_outputs,
             persisted_aux_info,
+            transaction_outputs: Some(transaction_outputs),
             first_version: begin_version,
         };
         let chunk_verifier = Arc::new(ReplayChunkVerifier {
