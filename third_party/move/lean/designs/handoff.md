@@ -18,6 +18,19 @@ P1–P3; Table owners as owned values, `intrinsic-maps.md`, stage 2) and #20710
 - [`perf-notes.md`](perf-notes.md): costs, open performance leads, rejected experiments.
 - [`state-labels.md`](state-labels.md), "Milestones": S1–S3b implemented, S4 open.
 
+## Session note (2026-10-13, suspended)
+
+Branch `wrwg/lean-tables`, draft PR aptos-labs/aptos-core#20755, head
+e8b4b335, CI running on it; the previous head's two e2e failures
+(`MutableResults.bump`, the `behavior_manual_facts` baseline) are fixed in
+that head. Done on the branch: tables as owned values with the runtime
+boundary and the roles' runtime semantics; V7 closed as the registry entry
+says. Awaiting user decisions: the V7 residue (`tr` disjointness, `rk`
+continuation, `app_disjoint`'s existential abort condition, the fold
+invariants of `folds_of_map_intrinsic`; the prover's rule is to consult
+before working verification failures), and whether to take the C8 ghost
+field route under "Open findings". Then V16 and V1, per "Next, in order".
+
 ## Outside the repository
 
 - aptos-labs/internal-ops#9675 points the PIES nightly at `verex-bench.yaml`; merge
