@@ -26,8 +26,8 @@ structure TableLayout where
   deriving Repr, Inhabited
 
 /-- The table layout of a declaration: an intrinsic map owner with a key and
-a value parameter, no variants, and fields that are none, a handle, or a
-handle and a cached length. -/
+a value parameter, no variants, and fields that are none, the Boolean
+placeholder of an empty struct, a handle, or a handle and a cached length. -/
 def tableLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : Nat) :
     Option TableLayout := do
   let ns ← unit.namespaces[namespaceId.index]?
@@ -39,6 +39,8 @@ def tableLayout? (unit : ValidatedUnit) (namespaceId : NamespaceId) (structId : 
     unit.tables.types[field.type.typeId.index]?
   let (handle, length) ← match fieldTypes with
     | [] => some (false, false)
+    -- The Boolean placeholder Move's compilers give an empty struct.
+    | [Ty.bool] => some (false, false)
     | [Ty.address] => some (true, false)
     | [Ty.address, Ty.integer (.bits 64) false] => some (true, true)
     | _ => none

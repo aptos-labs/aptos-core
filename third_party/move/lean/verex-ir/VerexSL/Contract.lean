@@ -892,20 +892,27 @@ private def mapModel? (unit : ValidatedUnit) (ty : IrTy) : Option MapModel := do
     let discipline := if ordered then mkApp (mkConst ``VerexIR.Maps.Discipline.ordered) rank
       else mkConst ``VerexIR.Maps.Discipline.sequence
     let layout := mkAppN (mkConst ``VerexIR.Maps.Layout.mk) #[toExpr owner, toExpr variant,
-      toExpr (some entry), toExpr false, toExpr false]
+      toExpr (some entry), toExpr false, toExpr false, toExpr false]
     some { layout, discipline }
+  -- An owner of a handle, or of nothing (an abstract map the Prover's tests
+  -- declare, whose one field is the Boolean placeholder Move's compilers
+  -- give an empty struct), is read through its hidden contents field; it
+  -- enumerates in key order where it binds an ordering role, as an entries
+  -- layout does.
   let tableLayout : Option MapModel := do
     guard (declaration.variants.isEmpty && declaration.generics.size == 2)
-    let (handle, length) ← match fieldTypes with
-      | [] => some (false, false)
-      | [.address] => some (true, false)
-      | [.address, .integer (.bits 64) false] => some (true, true)
+    let (handle, length, dummy) ← match fieldTypes with
+      | [] => some (false, false, false)
+      | [.bool] => some (false, false, true)
+      | [.address] => some (true, false, false)
+      | [.address, .integer (.bits 64) false] => some (true, true, false)
       | _ => none
-    guard !ordered
+    let discipline := if ordered then mkApp (mkConst ``VerexIR.Maps.Discipline.ordered) rank
+      else mkConst ``VerexIR.Maps.Discipline.sequence
     let layout := mkAppN (mkConst ``VerexIR.Maps.Layout.mk) #[toExpr owner,
       toExpr (none : Option String), toExpr (none : Option VerexIR.StructHandle), toExpr handle,
-      toExpr length]
-    some { layout, discipline := mkConst ``VerexIR.Maps.Discipline.sequence, table := true, handle }
+      toExpr length, toExpr dummy]
+    some { layout, discipline, table := true, handle }
   entriesLayout <|> tableLayout
 
 /-- The specification role a specification function plays for an intrinsic

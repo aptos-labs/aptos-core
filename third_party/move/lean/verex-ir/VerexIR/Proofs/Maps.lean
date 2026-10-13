@@ -629,6 +629,10 @@ structure Layout where
   handle : Bool
   /-- A table layout caching its length before its contents. -/
   length : Bool
+  /-- A table layout of an owner declared without fields, whose first field
+  is the Boolean placeholder Move's compilers give an empty struct
+  (`dummy_field`); the value keeps it as a table keeps its handle. -/
+  dummy : Bool
 
 /-- The entries a map value holds. -/
 def entriesOf (map : RuntimeValue) : Entries :=
@@ -645,16 +649,18 @@ def Layout.entryValue (layout : Layout) (entry : RuntimeValue × RuntimeValue) :
   | some declaration => .nominal declaration none #[entry.1, entry.2]
   | none => .tuple #[entry.1, entry.2]
 
-/-- The map value holding entries, at a handle for a table layout. -/
+/-- The map value holding entries, at a handle for a table layout, or at its
+placeholder for one of an owner without fields. -/
 def Layout.build (layout : Layout) (handle : RuntimeValue) (entries : Entries) : RuntimeValue :=
   .nominal layout.owner layout.variant
-    (((if layout.handle then #[handle] else #[]) ++
+    (((if layout.handle || layout.dummy then #[handle] else #[]) ++
         (if layout.length then #[RuntimeValue.integer entries.length] else #[])).push
       (.vector (entries.map layout.entryValue).toArray))
 
-/-- The handle of a map value: of a table layout, its first field. -/
+/-- The handle of a map value: of a table layout, its first field, which a
+placeholder layout keeps the same way. -/
 def Layout.handleOf (layout : Layout) (map : RuntimeValue) : RuntimeValue :=
-  if layout.handle then map.field 0 else .unit
+  if layout.handle || layout.dummy then map.field 0 else .unit
 
 @[simp] theorem Layout.field_entryValue_zero (layout : Layout) (entry : RuntimeValue × RuntimeValue) :
     (layout.entryValue entry).field 0 = entry.1 := by
@@ -800,7 +806,8 @@ theorem order_keyAt_keyAt {map other : RuntimeValue} {index position : Int}
     integer_asInt_keyAt otherKeys low high]
 
 /-- The empty map of an entries layout. -/
-def empty (layout : Layout) : RuntimeValue := layout.build .unit []
+def empty (layout : Layout) : RuntimeValue :=
+  layout.build (if layout.dummy then .bool false else .unit) []
 
 /-- The map with a key's value updated, at the map's handle. -/
 def update (layout : Layout) (discipline : Discipline) (map key value : RuntimeValue) :

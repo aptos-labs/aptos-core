@@ -82,8 +82,11 @@ which the registry already constrains:
   roles (`spec_insertion_key_at`, `spec_insertion_rank`) read the same model
   positions without selecting the ordered discipline.
 - **Table layout**: the owner holds a handle (`Table`), or a handle and a
-  cached length (the registry's `extensions::table::Table`), or nothing, and
-  the runtime keeps its entries in native storage behind the handle. In the
+  cached length (the registry's `extensions::table::Table`), or nothing (an
+  abstract map of the Prover's tests, whose one field is then the Boolean
+  placeholder `dummy_field` Move's compilers give an empty struct, kept as a
+  table keeps its handle), and the runtime keeps its entries in native
+  storage behind the handle. In the
   denotation, the owner's type has one hidden last field holding the entries
   ("Owned Table values" below), so its model is read as an entries layout's,
   under the sequence discipline; the runtime boundary erases the field and

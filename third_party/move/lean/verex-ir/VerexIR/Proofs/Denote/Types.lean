@@ -454,7 +454,8 @@ def ntyOfFuel (types : TypeLookup) (unit : ValidatedUnit) :
 
 /-- Whether a declaration owns a handle-backed intrinsic map: the registry
 binds it to the map model, it has a key and a value parameter, and its
-fields are its handle, with a cached length in the registry's variant, and
+fields are its handle, with a cached length in the registry's variant, or
+none, or the Boolean placeholder Move's compilers give an empty struct, and
 no entries vector (`designs/intrinsic-maps.md`, "Views"). Its native type
 holds the entries as a hidden last field. -/
 def tableOwner (unit : ValidatedUnit) (handle : StructHandle) : Bool :=
@@ -468,7 +469,8 @@ def tableOwner (unit : ValidatedUnit) (handle : StructHandle) : Bool :=
         declaration.variants.isEmpty && declaration.generics.size == 2 &&
         match (declaration.fields.toList.mapM fun field =>
             unit.tables.types[field.type.typeId.index]? : Option (List Ty)) with
-        | some [] | some [.address] | some [.address, .integer (.bits 64) false] => true
+        | some [] | some [.bool] | some [.address] | some [.address, .integer (.bits 64) false] =>
+            true
         | _ => false
 
 /-- The native type of a nominal declaration: its field row, or its named

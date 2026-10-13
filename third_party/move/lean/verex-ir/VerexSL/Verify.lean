@@ -3768,10 +3768,12 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     if calleeDeclaration.body == .absent then
       -- A native has no body: its contract is assumed, as a hypothesis. One
       -- without a specification is assumed by the model the Move Prover's
-      -- prelude gives it (`NativeModel`), and rejected without one, as the
-      -- Prover rejects it.
+      -- prelude gives it (`NativeModel`), or by the intrinsic map role it
+      -- plays (`designs/intrinsic-maps.md`, "Roles"), and rejected without
+      -- either, as the Prover rejects it.
       let nativeModel := nativeModelOf? unit callee calleeNs calleeDeclaration
-      if readsNativeModel calleeDeclaration && nativeModel.isNone then
+      let playsRole := (Contract.mapRoleOf? unit callee.namespaceId calleeNs calleeDeclaration).isSome
+      if readsNativeModel calleeDeclaration && nativeModel.isNone && !playsRole then
         throwErrorAt reference m!"`{function}` calls the native `{calleeKey}`, which has \
           neither a specification nor a prelude model; specify it"
       unless usesContract do
