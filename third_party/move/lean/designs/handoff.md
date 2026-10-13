@@ -1,10 +1,10 @@
 # Handoff
 
-Status 2026-10-12. Branch `wrwg/lean4`, draft PR #20710 on main: the work through
-2026-10-11 (Prover parity, invariants, authored proofs), the rename Leaner → Verex,
-LIR → VIR, LeanerLang → VerexSL (VSL), `open` items for authored proofs, the
-`int2bv` fix for `num` parameters, and a baseline; CI green. The session notes up
-to 2026-10-11 are in [`historical/handoff-2026-10.md`](historical/handoff-2026-10.md).
+Status 2026-10-13. Branch `wrwg/proof-files`, PR #20746 on main: proof files as
+Lean files (`proof-file-editing.md`, P1–P3) and Table owners as owned values
+(`intrinsic-maps.md`, stage 2). #20710 (Prover parity, authored proofs, the rename
+Leaner → Verex) is merged. The session notes up to 2026-10-11 are in
+[`historical/handoff-2026-10.md`](historical/handoff-2026-10.md).
 
 ## Where the state is
 
@@ -30,6 +30,10 @@ to 2026-10-11 are in [`historical/handoff-2026-10.md`](historical/handoff-2026-1
 
 ## Recent decisions
 
+- 2026-10-13: a table owner's type has a hidden last field holding its contents;
+  the runtime boundary erases it (`intrinsic-maps.md`, "Owned Table values").
+  Tables behind type parameters are not carried. Decision 2026-10-13: tables
+  are values in the runtime semantics too; the erasing boundary is to be removed.
 - 2026-10-12: the default budget is 1000 thousand `maxHeartbeats`, about thirty
   seconds; the registry runs with it (was 25 thousand).
 - 2026-10-12: an authored proof is kept only where the automatic run fails, or
@@ -76,11 +80,11 @@ costs.
    from expansion guards over struct fields, vector elements and other
    specification results. Recovery: bound the fields and elements of typed values
    statically, or change how leaves decide inline guards.
-3. Registry gaps by size: V7 intrinsic maps (5 tests: Table view and native storage
-   agreement, fresh allocation, old and labelled snapshots, empty abstract map
-   owners; `intrinsic-maps.md`), C8 `update` of a specification variable (9), V16
-   natives (7), V1 `update_field` rendering (11 messages). Vector reverse
-   preparation is the next proof lead (`perf-notes.md`).
+3. Registry gaps by size: V7 intrinsic maps (empty abstract map owners;
+   tables behind type parameters, `intrinsic-maps.md`), C8 `update`
+   of a specification variable (9), V16 natives, V1 `update_field` rendering (11
+   messages). Vector reverse preparation is the next proof lead
+   (`perf-notes.md`).
 4. S4: `unmodified_memory_at_label::swap` needs a decision on reads of removed
    resource contents (`state-labels.md`).
 5. Unbounded loops under `pragma unroll` time out at 25k before the exhausted-bound

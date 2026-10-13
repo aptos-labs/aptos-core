@@ -1,4 +1,6 @@
 Move prover returns: exiting with verification errors
 tests/sources/regression/vector_theory_boogie_array_intern.move:14:9: error: the specification clause `ensures ∀ (a : Address), a != addr ==> (old(a ∈ pool) ==> a ∈ pool)` is not established
 tests/sources/regression/vector_theory_boogie_array_intern.move:10:5: error: verex verification failed: the automatic verification of `f1` failed; provide a proof: `verify f1 by …` in `tests/sources/regression/vector_theory_boogie_array_intern.proof.lean` (`verify f1 by verex_obligations` lists its obligations)
-tests/sources/regression/vector_theory_boogie_array_intern.move:28:5: error: `f2` calls the native `0x2::table::remove_box`, which has neither a specification nor a prelude model; specify it
+tests/sources/regression/vector_theory_boogie_array_intern.move:32:9: error: the specification clause `ensures ∀ (addr : Address),
+        spec_contains(pool.shares, addr) <==> addr ∈ pool.holders` is not established
+tests/sources/regression/vector_theory_boogie_array_intern.move:28:5: error: verex verification failed: the automatic verification of `f2` failed; provide a proof: `verify f2 by …` in `tests/sources/regression/vector_theory_boogie_array_intern.proof.lean` (`verify f2 by verex_obligations` lists its obligations)

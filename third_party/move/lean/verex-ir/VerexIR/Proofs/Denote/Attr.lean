@@ -25,6 +25,13 @@ equality, and decided conditionals, so a normalization settles the guards
 of an operation at literal arguments. -/
 register_simp_attr vir_denote_eval
 
+/-- The lemmas a discharger rewrites a side condition with. A discharger
+runs in a state simp discards afterwards, so a lemma it names that is not
+an equation would leave its auxiliary simp theorem behind in that state and
+the proof naming it without a declaration; registered here, the auxiliary
+theorem is made with the declaration. -/
+register_simp_attr vir_denote_side
+
 open Lean Elab Command Meta in
 /-- Put the equations of recursive definitions into `vir_denote` as rewrite
 rules taken before a term's arguments are visited. A rewrite by an equation

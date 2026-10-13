@@ -176,16 +176,13 @@ verification success or benchmark change is claimed. Whole-package collection,
 binder/physical-local widths and representation-aware lowering remain open;
 see `numeric-representation.md` and `/tmp/bv-width-tests.log`.
 
-Table representation revision (2026-10-07): target an owned identity+contents
-value in the denotation, keeping native storage in its runtime agreement boundary.
-The exploratory source-frame extension was removed. `StateView` supplies checked
-state-dependent recovery, preservation of undefined outcomes, and input consistency;
-`TableValueBoundary` connects recursive snapshots and now carries typed retained
-observations, generic transport and two-state argument/result rows (19 focused
-checks pass). Compiler/contract integration, loan reconciliation and native
-allocation/mutation dispatch remain open; see `intrinsic-maps.md`. Existing typed
-footprint laws remain useful for runtime agreement. These are test-only additions
-following the full checkpoint, not new registry successes.
+Table representation (2026-10-13): a table is an owned value of its handle
+and contents, the contents a hidden last field of the owner's type in the
+denotation, erased at the runtime boundary and related to native storage
+there; all table roles have contracts, and identity equality compares
+handles. Tables behind type parameters are not carried; tables are to become
+values in the runtime semantics as well (decision 2026-10-13); see
+`intrinsic-maps.md`, "Owned Table values".
 
 Scalar internal bit-vector support (2026-10-07): opaque `bv_internal` bodies
 can use scalar executable bitwise operations without classifying their ordinary
@@ -432,83 +429,17 @@ Open:
   `big_vector`, `smart_table`, `smart_vector`, `storage_slots_allocator`
   and `pool_u64*` wait, together with an `Inhabited` twin for structs
   holding a table; and the hashes' injectivity axiom.
-  Table foundation (2026-10-06, [`intrinsic-maps.md`](intrinsic-maps.md)):
-  identity/content snapshots, owned entry reconciliation, logical fresh
-  allocation, and typed content-memory frame laws are kernel-proved. Native
-  contents and allocation history use unbounded typed collections, independently
-  of ordinary Move vector bounds and of a Table variant's cached length field.
-  Table entry borrows are tied to the whole owner by Move's call rule;
-  focused compiler probes confirm conflicts even at distinct keys. Call
-  boundaries and behavioral predicates now encode native storage, including
-  holes observed through returned current/prophecy rows. Result-aware runtime
-  frames constrain the actual returned row; loan independence and labeled
-  post-state uniqueness cover it. Tagged stored-loan targets now route entry
-  write-back into Table contents and preserve unrelated storage and allocation
-  history. Native entry-loan primitives now register those destinations and
-  prove lookup, loan discipline, renaming, and reconciliation. Allocation,
-  insertion, removal and checked retirement primitives now have freshness,
-  frame and renaming proofs. Typed lookup/add/remove agreement and typed mutable
-  entry reconciliation pass the focused operation checks and axiom audit.
-  The separate `SnapshotValue` carrier now preserves nested observations per
-  occurrence, proves physical-codec round trips and generic caller/callee
-  transport, and passes eleven focused regressions plus its axiom audit.
-  Contract translation now carries observations through aggregate expressions,
-  expanded specification functions, old/labeled inputs and functional Table roles.
-  `table_contais_to_length` verifies at its original budget, and its baseline
-  refresh and recheck pass. Source regressions cover caller-side labels and
-  per-occurrence functional snapshots. Five source proofs and six compatibility
-  checks pass. The full benchmark retains 30 verified samples and the expected
-  AMM rejection at 15.808G heartbeats. All four suites pass (125 Check fixtures
-  and both cost gates); all 437 registry checks pass after the scoped baseline
-  refresh. `map_equality_encoding` also verifies. Remaining Table fixtures now
-  reach the native-model/reference-denotation gaps.
-  The canonical-slot follow-up excludes shared-reference aliases and resolves
-  caller/callee names to one owner/type slot, with a uniqueness proof that does
-  not assume interning. Whole-heap insert/erase agreement and the new
-  `TableStorageKeys` source regression pass focused checks. This follow-up has
-  not yet had another full benchmark or suite run (126 Check fixtures now).
-  The next storage increment proves whole-storage allocation/add/remove/retire
-  agreement, including active unrelated loans observed through returned references.
-  Actual entry borrowing and write-back agree with the typed contents update.
-  Five focused test roots and a 31-theorem standard-axiom audit pass; no additional
-  registry fixture is closed by these adapter prerequisites.
-  Shared Table lookup and membership use explicit intrinsic-contract hypotheses.
-  Caller/callee observation transport and snapshot/typed lookup agreement are
-  kernel-proved. `TableReads` covers generic/nested reads, an opaque caller's
-  old-state contract and aggregate payload equality; incorrect lookup and
-  payload-bound claims remain rejected.
-  Generated collection predicates now carry deep stored-entry invariants with
-  resolved generic and phantom arguments. Table calls in code or specifications
-  extend memory reach even for parameters with no global access. Nine
-  `TableStoredInvariants` positive proofs and two false-claim rejections pass at
-  25k. The replacement theorem requires every written key/value's invariant.
-  A frontend rejection guards Table identity against physical-metadata equality;
-  Table identity/content invariants and carrier-dependent generic callbacks
-  still need extensions.
-  `table_option` now verifies at the unchanged native 25k setting. Its obsolete
-  failure baseline was removed by the owning runner; the ordinary recheck
-  passes. Whole typed-theorem cost falls 28.690M → 25.254M raw heartbeats
-  (−11.9749%), with 21,500 proof objects instead of 22,076. The diagnostic sample
-  includes work outside the local proof-budget scope. Both cost gates, all
-  Table invariant positives/rejections, the identity guard, call-range cases,
-  TableReads and TableSnapshots pass (`historical/handoff-2026-10.md`). The field optimization is
-  restricted to known aggregates so generic observations retain their old form.
-  The first normalization benchmark exposed an ordered_map/OrderedMap
-  regression, so the checkpoint correctly stopped before broad suites. The
-  original call-range eligibility guard is restored; Table's stored-read/aggregate
-  optimizations remain. Native table_option and both cost gates pass. The corrected
-  benchmark has 30 verified plus one expected rejection, no timeouts, at
-  15,646,929,683 heartbeats. Main-relative JSON/HTML are refreshed first. All
-  four builds and full suites pass; all 437 registry baselines match without
-  refresh. Final Table theorem cost with the guard restored is 26,045,418
-  raw heartbeats and 21,500 objects; native 25k verification passes (`historical/handoff-2026-10.md`).
-  The preceding call-range checkpoint passes all four full suites and all
-  437 registry baselines. The subsequent computed-index benchmark preserves
-  30 verified problems plus one expected AMM rejection at 15,646,803,818
-  heartbeats; main-relative JSON/HTML are refreshed with type_info excluded.
-  Mutating/allocation native contracts and
-  adapters, whole-memory ownership frames, Table type-domain
-  quantification, future `final` contents and pure `spec_new` identity remain open.
+  Tables (2026-10-13, [`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table
+  values"): a table is an owned value of its handle and contents, so the
+  `table` natives are reached through the roles their module binds, with
+  the map model's contracts; `new` allocates a handle the allocation history
+  lacks. The snapshot carrier, the separate contents memory and its slot
+  modules, and the stored collection invariants are replaced by the hidden
+  contents field and the erasing runtime boundary (`StorageEncodes`,
+  `Encloses`). Open: tables behind type parameters (nested tables, roles at
+  table-bearing instances), on which `smart_table`, `big_vector`,
+  `smart_vector`, `storage_slots_allocator`, `pool_u64_unbound` and
+  `big_ordered_map` wait.
 - **Closed (2026-09-30): discarded statement values.** A Move branch that
   discards a value (`v.remove(index);` in `capability::remove_element`,
   `pool_u64::deduct_shares`) failed with VEREX-TYPE-MISMATCH. The exchange
@@ -828,7 +759,7 @@ files without `verify` targets.
 | Vectors | `CertifiedReads`, `ElementQuantifiers`, `VectorBounds`, `VectorOperations`, `Vectors`, `GenericSwapRemove` | `CertifiedReads`: signed/unsigned bounds through total integer reads, zero for missing entries, and rejection of a false signed nonnegativity claim at 25k. `ElementQuantifiers`: element-wise preconditions establish indexed-read properties for value/reference vectors, signed integers, Booleans and generic equality predicates; stronger bounds and a missing-entry claim remain rejected at 25k. A target whose guards stay undecided exhausts heartbeats rather than failing fast. |
 | Control | `Aborts`, `ControlForms`, `LiteralLoops`, `LoopControlErrors`, `LoopInvariantErrors`, `LoopInvariants`, `Loops`, `LoopVerification` | `Aborts`: a false contract (intended). `LiteralLoops`: loops over literal vectors with recursive specification functions in their invariants, and a nested loop with a nonlinear invariant; a wrong value fails (intended). `LoopInvariantErrors`: an invariant not established at entry and at an iteration, and one of a loop's two annotations (a `where` region and a following `spec`), both of which form its specification. |
 | References | `BorrowCertificates`, `BorrowChecker`, `BorrowErrors`, `BorrowGlobalErrors`, `CorePrimitives`, `Freeze`, `Loans`, `MutableTemporaries`, `OperandLoans`, `PlaceReadErrors`, `PlaceReads`, `Prophecies`, `ReferenceComparisons`, `ReferencePatterns`, `References`, `ReturnedMutRefErrors`, `ReturnedMutRefs` | `PlaceReads`: mutable place borrows that die unheld (dereferenced, read through, compared, discarded) read their places, run and verified; one intended failure. `PlaceReadErrors`: such a borrow in conflict with a live shared loan is rejected. `ReferenceComparisons`: `==` and `!=` of mutable references compare referents at run time. `BorrowCertificates` asserts certificates, no `verify`. `MutableTemporaries`: `&mut` results discarded, matched by a wildcard, read or borrowed through, run and verified; one intended failure. `BorrowChecker`: twelve rejections at preparation, the accepted programs verified. |
-| Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GenericSpecResourceArguments`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors`, `TableReads`, `TableStorageKeys`, `TableStoredInvariants` | `TableStoredInvariants`: nine stored-entry proofs at 25k, including phantom arguments, computed keys and both handle layouts, plus two false-claim rejections. `TableReads`: membership, scalar/generic/nested lookup, opaque caller old-state contract and false-lookup rejection. `TableStorageKeys`: canonical Table slots across caller/callee namespaces, reference exclusion and distinct handles. `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
+| Storage | `CalleeFrames`, `CrossInv`, `GenericSpecReads`, `GenericSpecResourceArguments`, `GlobalBorrows`, `GlobalInv`, `LooseFrame`, `Normalized`, `Read`, `ResourceComposition`, `Storage`, `StorageSpecErrors`, `TableAllocation`, `TableReads`, `TableStorageKeys`, `TableStoredInvariants` | `TableAllocation`: tables allocated at fresh handles and filled, emptied and read through their roles, a duplicate-key abort, vector values, and a false value rejection; the callers' frames leave the allocation history open. `TableGlobalWrites`: entries added to and updated in a stored table owe their data invariants, as a plain stored field does, with one false write rejected for each, and a cached length after additions to a fresh table. `TableStoredInvariants`: eight stored-entry proofs at 25k, including phantom arguments, computed keys and both handle layouts, two false-claim rejections, and a nested table rejected as not carried (`intrinsic-maps.md`, "Stages"). `TableReads`: membership, scalar and generic lookup, opaque caller old-state contract, aggregate payloads, false-lookup and false-bound rejections, and a nested table rejected as not carried. `TableStorageKeys`: canonical Table slots across caller/callee namespaces, reference exclusion and distinct handles. `LooseFrame` carries an authored proof. `GenericSpecReads`: a generic specification function reads the resources of its call's type arguments; a claim about another type fails (intended); a generic caller calls a generic function twice at its own type parameter. |
 | Calls | `AbstractClauses`, `BcsSerialization`, `Callees`, `Calls`, `Composition`, `FailedCallees`, `InlinedCallees`, `Modules`, `OpaqueGeneric`, `PreludeNatives`, `Summaries` | `FailedCallees`: a caller verified against a callee whose own specification fails (both reported as intended). Intended negatives: a caller does not see a `[concrete]` result (`AbstractClauses`), an opaque callee's body (`InlinedCallees`), a postcondition a callee of another module refutes (`Modules`), one serialized length for values of a type other than addresses (`BcsSerialization`). |
 | Generics | `GenericCycles`, `GenericFunctions`, `GenericScalarCalls`, `Generics`, `GenericStorage` | `Generics`: a generic function's public theorem applied at a concrete instantiation, coherent by evaluation. |
 | Closures | `Carriers`, `Frames`, `GenericHofs`, `GenericResources`, `InvariantBehavior`, `Known`, `MutableResults`, `StoredFrames`, `StoredFrameErrors`, `StoredWriteFrames`, `StoredWriteFrameErrors`, `WovenBehaviors` | `MutableResults`: a discarded `&mut` result of a call is the run its `ensures_of`, `result_of` (the value at return), and absence of aborts state; a wrong result fails (intended). `WovenBehaviors`: a leading and a trailing capture behave as the target at the woven arguments; exchanged arguments fail (intended). `StoredWriteFrames`: addressed and wildcard frames, generic resource instantiation, opaque results, and captured owners. `StoredWriteFrameErrors`: wrong resource, replacement, and false preservation claims are rejected.  `InvariantBehavior`: construction checks quantified behavioral invariants. `StoredFrames`: default function-field frames survive publication, removal, and invocation. `StoredFrameErrors`: packing and replacement reject memory-writing closures. `Carriers`: a function value the proof does not see is typed by its carrier, without a typing assumption, in a unit declaring a phantom type parameter and resources with function-typed fields; a wrong result fails (intended). `Known`: known closures invoked through their targets' contracts, a generic target included, at a concrete caller and at a generic caller's own parameters, beside a function type over those parameters; a wrong postcondition fails (intended). `Frames`: function-valued parameters keep memory, established from a target's theorem or body, over memory holding an enum resource and an instance of a generic declaration; a closure that changes memory fails (intended). `GenericHofs`: generic higher-order functions invoking a function value over their type parameters, callers at type arguments, and a value passed through; a wrong result fails (intended). |
