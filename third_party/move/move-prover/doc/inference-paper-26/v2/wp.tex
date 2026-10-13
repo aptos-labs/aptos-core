@@ -13,7 +13,7 @@ Move has Rust-style references: |&T| for shared reads and |&mut T| for exclusive
 \MVP exploits this guarantee to rewrite bytecode into a form in which references are plain values~\cite{DillGPQXZ22}, originally in order to keep the verification conditions first-order and free of a heap model.
 Two passes perform the elimination.
 Shared references are inlined: |&T| disappears and reads through it become reads of the underlying value.
-A mutable reference becomes a pair of the value it currently denotes and a \emph{borrow path} back to its root --- a local, a |&mut| parameter, or a global resource |R[a]| (Sec.~\ref{sec:globals}) --- and a write through the reference updates only this value.
+A mutable reference becomes a pair of the value it currently denotes and a \emph{borrow path} back to its root, which is a local, a |&mut| parameter, or a global resource |R[a]| (Sec.~\ref{sec:globals}); a write through the reference updates only this value.
 Where the lifetime of the reference ends, as determined by a borrow analysis, explicit \emph{write-backs} are inserted along the path up to the first ancestor that is still alive; each rebuilds the parent value with the field or element replaced.
 A |&mut| parameter becomes an in/out value parameter: it enters as a plain value and leaves as the value written back last.
 Where the root of a reference is not statically unique, as in |if (c) &mut x else &mut y|, the write-back is guarded by an explicit test of which parent the reference was taken from.
@@ -40,7 +40,7 @@ At a return, $E = \{\,\mathtt{result}_i = t_i\,\}$ for the returned temporaries 
 Instructions transform the state as follows.
 \begin{Itemize}
 \item \emph{Assignment and operators.}
-  $t := e$ substitutes $e$ for $t$ in $E$ and $A$; an operator that can abort --- arithmetic overflow and underflow, division by zero, an index out of range, a cast that truncates, a missing enum variant --- also adds its abort predicate to $A$.
+  $t := e$ substitutes $e$ for $t$ in $E$ and $A$; an operator that can abort (arithmetic overflow and underflow, division by zero, an index out of range, a cast that truncates, a missing enum variant) also adds its abort predicate to $A$.
 \item \emph{References.}
   The central instruction is the write-back, which ends the lifetime of a reference.
   A write-back of $v$ into a parent |x| replaces |x| by |x| with the field or element of the edge set to $v$.
@@ -48,7 +48,7 @@ Instructions transform the state as follows.
   A write-back to a global root |R[a]| instead adds |modifies R[a]| and an equation for the new value of |R[a]| at the current state label, and moves $\ell$ to the label before the write-back; the global borrow $r := \,$|&mut R[a]| substitutes |R[a]| for $r$ and adds |!exists<R>(a)| to $A$.
   Since every reference is a path to a named root, no instruction needs a heap.
 \item \emph{Calls.}
-  A call $t := f(\bar a)$ substitutes |result_of<f>|$(\bar a)$ for $t$ --- or the callee's specification function, if $f$ is pure --- adds |aborts_of<f>|$(\bar a)$ to $A$, and relates the memory before and after the call through |ensures_of<f>|; when the callee has no abort contract, the abort condition is recorded as \emph{partial} rather than invented.
+  A call $t := f(\bar a)$ substitutes |result_of<f>|$(\bar a)$ for $t$ (or the callee's specification function, if $f$ is pure), adds |aborts_of<f>|$(\bar a)$ to $A$, and relates the memory before and after the call through |ensures_of<f>|; when the callee has no abort contract, the abort condition is recorded as \emph{partial} rather than invented.
   Calls are thus summarized modularly: the caller's contract says what $f$ returns without committing to how.
 \item \emph{Branches.}
   At a branch on $c$ the two incoming states are merged path-sensitively: conditions common to both sides are kept as they are, the others are guarded, $c \Rightarrow e$ and $\neg c \Rightarrow e'$ in $E$, $c \wedge a$ and $\neg c \wedge a'$ in $A$.
@@ -156,14 +156,13 @@ The agent's skills are written against these markers: they identify the loop tha
 \label{sec:advantages}
 
 Reference elimination was introduced to make \emph{verification} of Move tractable~\cite{DillGPQXZ22}: without a heap, the verification conditions stay first-order and the solver needs no frame reasoning.
-Running \WP on the eliminated form is, to our knowledge, a new use of it.
 A predicate transformer over programs with references has to carry a model of locations: |*r| means the contents of whatever |r| points to, an assignment through one reference may change the value read through another, and the transformer needs either an explicit heap with separation or ownership reasoning to keep the substitutions sound~\cite{RustHorn,Aeneas}.
 Its output is then stated over that model --- heap fragments, prophecy variables, ownership predicates --- and has to be translated before a user can read it.
 On the eliminated form none of this arises.
 Every reference is a path to a named root, so substitution is exact by construction; the only aliasing that survives is between global resources whose addresses may coincide, and it surfaces as an explicit condition such as |from == to| above.
 The derived predicates mention only parameters, results, fields, and resources, which is the vocabulary of the specification language, so the reverse mapping of Sec.~\ref{sec:reverse} reduces to renaming.
 And because inference and verification run on the same pipeline, every inferred contract is checked under the semantics that produced it; the instrumented contracts of callees and the loop invariants are available in-line to both.
-The whole analysis is about nine thousand lines of Rust on top of the existing pipeline, the by far largest part of it simplification of predicates, and adds no new semantics to the Move Prover.
+The whole analysis is about nine thousand lines of Rust on top of the existing pipeline, by far the largest part of it being the simplification of predicates, and it adds no new semantics to the Move Prover.
 
 %%% Local Variables:
 %%% mode: latex

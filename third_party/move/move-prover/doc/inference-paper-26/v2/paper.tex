@@ -29,12 +29,11 @@
 \maketitle
 
 \begin{abstract}
-Formal verification suffers from the cost of specification: to establish high-level facts, contracts have to be written for supporting functions, many of them mechanical and low-level. 
-Specification inference derives such contracts from the program. 
+Formal verification suffers from the cost of specification: to establish high-level facts, contracts have to be written for supporting functions, many of them mechanical and low-level.
+Specification inference promises to automatically derive such contracts from the program.
 We present a hybrid of agentic and mechanical inference for Move, a smart contract language similar to Rust, integrated with the Move Prover.
-An agent controls inference and verification through a tool that, besides calling the Move Prover, derives specifications from code by weakest-precondition analysis.
-With this tool, and with loop invariants it proposes itself, the agent derives complete specifications for non-trivial problems.
-We evaluate the approach on 26 verification targets, 24 of them extracted from public Move code of the Aptos framework that has no specification, under a frontier model, Sol~5.6, and a mid-tier model of the same family, Terra~5.6. Without \WP, the agent completes 99\% of its cells under the frontier model and 93\% under the mid-tier model. \WP leaves completeness unchanged and lowers the cost by 11--21\%; on targets without loops, the hybrid tactics cost 36--60\% of the agent alone. The mid-tier model costs 53--59\% of the frontier model and falls behind it mainly on one target that needs a permutation argument.
+An agent controls inference and verification through a tool that, besides calling the Move Prover, derives specifications from code by weakest-precondition analysis (\WP).
+We evaluate the approach on 26 non-trivial verification targets, 24 of them extracted from public Move code of the Aptos framework that has no specification, under a frontier model and a mid-tier model of the same family (Sol~5.6 and Terra~5.6). With and without \WP, the agent completes over 90\% of the tasks, so agentic inference is effective on its own; adding \WP\ lowers its cost by 11--21\% overall and by 40--64\% on targets without loops.
 
 	\keywords{Specification inference \and Weakest precondition \and Reference elimination \and LLM agents \and Move Prover}
 \end{abstract}
@@ -49,6 +48,9 @@ We evaluate the approach on 26 verification targets, 24 of them extracted from p
 \subsubsection*{Data Availability Statement.}
 The corpus is published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}: the package extracted from a pinned commit of the Aptos repository, the reference specifications, and both mutant sets.
 The round archives behind every table and figure --- per-cell costs, token counters, wall times, and mutant outcomes --- and the scripts that produce them from the archives are published there as well; \Anon{\cite{SpecInferenceCorpus}}{\cite{MoveFlowAnon}} explains how to verify the corpus, re-score a round, and rerun the experiment.
+
+\subsubsection*{Use of AI Tools.}
+Parts of the text of this paper were drafted and edited with a coding agent\Anon{ (Claude Code)}{}; the authors reviewed and take responsibility for all content.
 
 \bibliography{biblio}
 

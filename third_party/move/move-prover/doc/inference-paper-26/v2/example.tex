@@ -3,7 +3,7 @@
 \label{sec:example}
 
 Hybrid inference combines two sources of specifications: the mechanical \WP analysis of Sec.~\ref{sec:wp}, which derives exact contracts but needs loop invariants to do so, and a coding agent, which supplies the loop invariants and whatever else the analysis cannot derive, and repairs the specification based on verifier feedback.
-The prover is connected to the agent through an MCP service that offers a tool for verification and a tool for \WP inference, and the agent carries a set of skills describing the language, the tools, and the workflow (Sec.~\ref{sec:skills}).
+The prover is connected to the agent through a Model Context Protocol (MCP) service that offers a tool for verification and a tool for \WP inference, and the agent carries a set of skills describing the language, the tools, and the workflow (Sec.~\ref{sec:skills}).
 We walk through one session; the example is written in Move but should be readable without knowing the language~\cite{MoveOnAptosBook}.
 
 \label{sec:pow}
@@ -79,7 +79,7 @@ The specification language of the Move Prover uses unbounded integers, |num|, wh
   }
 \end{MoveBoxTool}
 
-The agent tries to verify this specification, but verification times out with the following diagnosis:
+The agent tries to verify this specification, but verification times out with the following diagnosis (the walkthrough runs with a solver timeout of 5 seconds, shorter than the 40 seconds of the evaluation):
 
 \begin{MoveBoxTool}{verify}
   verification failed:
@@ -119,6 +119,6 @@ The quantifier the diagnosis points to is the recursive definition of the helper
   spec lemma math_pow_mono ...  // left out for brevity
 \end{MoveBoxAgent}
 
-\noindent This specification passes verification, and the agent returns it as the result.
+\noindent This specification passes verification, and the agent returns it as the result after four turns.
 
 \endinput

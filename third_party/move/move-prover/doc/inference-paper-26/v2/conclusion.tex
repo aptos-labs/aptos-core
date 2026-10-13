@@ -4,13 +4,7 @@
 
 \SubSection{Interpreting the Results}
 
-The evaluation has three results. An agent without mechanical help completes 99\% of its
-cells under the frontier model and 93\% under the mid-tier model. \WP does not change
-completeness, but it lowers the cost wherever it derives the contract by itself. And the
-mid-tier model nearly reaches the results of the frontier model, at a cost that follows
-its lower price.
-
-\Paragraph{Where \WP pays off}
+\Paragraph{Where \WP helps}
 On targets without loops, \WP needs no help: it derives the complete contract, and the
 agent only checks it, at 36--60\% of the cost of writing the contract directly. Half of
 this corpus is of this kind, including four of the five compositions over callee
@@ -39,7 +33,7 @@ should need fewer rounds with the tool.
 The reverse mapping of Sec.~\ref{sec:reverse} relies on the elimination being
 \emph{path-based}: an eliminated reference is still a path to a location the source can
 name, so the derived predicate has a source-level spelling. A \emph{prophecy}-based
-elimination in the style of RustHorn and Creusot~\cite{RustHorn}, in which a mutable
+elimination in the style of RustHorn and Creusot~\cite{RustHorn,Creusot22}, in which a mutable
 reference is a pair of its current value and a prophecy variable for its final value,
 pinned when the borrow ends, has been designed for \MVP but not implemented; it would
 need no borrow paths and would handle borrows through function values, which the
@@ -51,20 +45,35 @@ final value of the borrow has no source-level counterpart at all, and a predicat
 would have to be existentially closed or restated through the callee's contract. We do
 not know yet whether that always yields a readable contract.
 
+\Paragraph{Restrictions of validity}
+The reference specifications, the mutants, and the skills were written by the authors,
+who also built \WP; the agent-only tactic receives the same reference material, and the
+mutants are the same for every tactic, but a different corpus or different skills could
+favor a tactic differently. Six mutants per target probe six obligations, so a contract
+that kills them all may still be weaker than the reference in ways the mutants do not
+test. Four replicates per cell bound what the comparison can resolve: the agent is not
+deterministic, and differences of a few cells per arm lie within that noise. Costs are
+list prices of one provider under one runtime, and the targets are functions of one
+codebase under two models of one family.
+
 \Paragraph{Open questions}
-The evaluation leaves the questions of scale open. Its targets are functions, not
-modules; its corpus comes from one codebase; its two models are of one family; and its
-cost measure is dollars under their price schedules. We plan to apply inference to the
-parts of the Aptos framework~\cite{AptosFrameworkBook} that already carry hand-written
-specifications and to compare the inferred contracts with them --- a comparison this
-corpus cannot make, since its targets were selected for having no specification.
+Whether \WP changes completeness is open. What we measured is about equal across
+tactics, and that is not surprising, since the loop invariants and specification helpers
+that decide the hard targets have to be found by the agent in every tactic; but the
+measure is coarse, and a difference small enough to hide behind six mutants and four
+replicates would still matter on a larger corpus. The scale of inference is open as well:
+the targets are functions, not modules. We plan to apply inference to the parts of the
+Aptos framework~\cite{AptosFrameworkBook} that already carry hand-written specifications
+and to compare the inferred contracts with them --- a comparison this corpus cannot make,
+since its targets were selected for having no specification.
 
 \SubSection{Related Work}
 
-Specification inference predates large language models --- Daikon~\cite{DaikonTSE01} learned likely invariants from program traces --- but the techniques that followed stayed tied to particular property classes and source languages, and the advent of LLMs has revived interest in the area.
+Specification inference predates large language models --- Daikon~\cite{DaikonTSE01} learned likely invariants from program traces, Houdini~\cite{Houdini01} kept the candidate annotations a verifier could not refute, and bi-abduction~\cite{BiAbduction09} inferred shape preconditions and postconditions compositionally --- but these techniques stayed tied to particular property classes and source languages, and the advent of LLMs has revived interest in the area.
 Pei et al.~\cite{PeiEtAl23} showed that fine-tuned LLMs can predict program invariants statically at quality competitive with dynamic analysis.
 Kamath et al.~\cite{KamathEtAl23} pair an LLM that \emph{proposes} loop invariants with a symbolic checker that \emph{validates} them, retrying on failure --- a propose-and-validate loop that recurs in much of the subsequent work.
 For Verus, AlphaVerus~\cite{AlphaVerus} bootstraps verified code by self-improving translation with tree search over verifier feedback, and VeriStruct~\cite{VeriStruct26} synthesizes Verus-style specifications and proofs for Rust functions, modules, and data structures through planner-orchestrated phases.
+AutoSpec~\cite{AutoSpec24} generates ACSL specifications for C with an LLM guided by static analysis of the call graph and validated by Frama-C, and SpecGen~\cite{SpecGen25} generates JML specifications for Java in a conversation with the verifier followed by mutation of the candidates.
 For smart contracts in Solidity, PropertyGPT~\cite{PropertyGPT25} retrieves human-written Certora properties as input examples for specification generation.
 Most directly related to our work, MSG~\cite{MSG25} targets the same Move specification language through a skill-based agentic design that consumes verifier feedback beyond a binary success/failure verdict.
 Across these systems the LLM remains responsible for the entire specification; the verifier serves as a binary oracle or, in MSG and our setup, as a feedback channel, but never as a contributor of mechanically derived content.
@@ -87,7 +96,7 @@ Second, the workflow is delivered as a plugin to a general-purpose, interactive 
 
 We have presented a specification inference approach for the Move Prover that runs \WP on reference-eliminated bytecode, where backward propagation is substitution and the derived contracts can be mapped back to the references of the source, and we have combined it with a coding agent that supplies what \WP cannot: loop invariants, simplification, and proof hints. The prover checks both.
 Reference elimination was introduced for verification; this work shows that it serves inference as well, and the approach should carry over to verifiers for Rust-like languages that eliminate references along paths.
-A controlled comparison on 26 targets, 24 of them from public code of the Aptos framework without specifications --- three tactics, four replicates each, two models --- found that a pure agent produces a complete specification in 93--99\% of its cells; that \WP leaves completeness unchanged but lowers the cost by 11--21\%, all of it on targets without loops, where the hybrids cost 36--60\% of the agent alone; and that the mid-tier model costs 53--59\% of the frontier model and falls behind it mainly on one target.
+On 26 targets, the agent alone already completes most cells, and \WP lowers the cost wherever it derives the contract by itself, most for the cheaper model.
 We expect local and specialized models, for which the additional context costs least, to benefit further from \WP.
 
 %%% Local Variables:
