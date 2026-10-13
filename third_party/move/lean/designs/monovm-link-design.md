@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Leaner needs an executable comparison partner for Move programs. A test should
+Verex needs an executable comparison partner for Move programs. A test should
 be able to compare the behavior of compiler-produced Move code with both the
-original validated LIR and the LIR obtained after a LeanerLang source round
+original validated VIR and the VIR obtained after a VerexSL source round
 trip.
 
 This is differential testing, not validation against a trusted reference.
-MonoVM and the Leaner pipeline are both new implementations; neither side is
+MonoVM and the Verex pipeline are both new implementations; neither side is
 the baseline. A failing comparison is a finding that can locate a bug in
 either implementation — or a genuine ambiguity in the shared understanding of
 Move semantics — and that symmetry is the point of the harness.
@@ -19,13 +19,13 @@ driver instead of invoking a CLI or maintaining a long-lived subprocess:
 ```text
 Move sources ──► compiler + MonoVM ───────────────► observable outcome
       │
-      └────────► Move frontend ─► validated LIR ─► LeanerIR interpreter
+      └────────► Move frontend ─► validated VIR ─► VerexIR interpreter
                                       │
-                                      └─► LeanerLang ─► LIR interpreter
+                                      └─► VerexSL ─► VIR interpreter
 ```
 
-The first comparison checks the Move-to-LIR semantic boundary. The second
-checks that canonical LeanerLang printing and re-elaboration preserve it.
+The first comparison checks the Move-to-VIR semantic boundary. The second
+checks that canonical VerexSL printing and re-elaboration preserve it.
 This is testing evidence, not a proof that either runtime implements Move
 correctly.
 
@@ -37,7 +37,7 @@ layers:
 
 ```text
 Lean `ByteArray`
-    │ `@[extern "leaner_monovm_run"]`
+    │ `@[extern "verex_monovm_run"]`
 small C shim using `lean/lean.h`
     │ pointer + length C ABI
 Rust static library
@@ -55,11 +55,11 @@ so the Rust crate never touches the Lean object ABI and no third-party
 The Rust library exports a minimal versioned ABI:
 
 ```c
-uint32_t leaner_monovm_abi_version(void);
-int32_t leaner_monovm_run(
+uint32_t verex_monovm_abi_version(void);
+int32_t verex_monovm_run(
     const uint8_t *request, size_t request_len,
-    struct leaner_buffer *response);
-void leaner_monovm_buffer_free(struct leaner_buffer response);
+    struct verex_buffer *response);
+void verex_monovm_buffer_free(struct verex_buffer response);
 ```
 
 Every domain failure — compilation, loading, execution, malformed request —
@@ -67,7 +67,7 @@ travels *inside* the response payload. The `int32_t` status is transport-only:
 zero means the response buffer is valid; nonzero means no response could be
 produced at all, and Lean surfaces it as an `IO` error.
 
-`leaner_monovm_run` must catch Rust panics and encode them as internal harness
+`verex_monovm_run` must catch Rust panics and encode them as internal harness
 errors. A panic or Rust allocation must never cross the C boundary. This
 containment relies on unwinding: no current workspace Cargo profile sets
 `panic = "abort"`, and the adapter crate must refuse to compile under one
@@ -116,7 +116,7 @@ while `LinkingError` (the request named something unresolvable) and
 the diagnostic text beside it is each engine's own wording.
 
 `exhausted` is separate from `aborted` because the two sides meter different
-resources: the LeanerIR interpreter is fuelled, MonoVM is gas- and heap-
+resources: the VerexIR interpreter is fuelled, MonoVM is gas- and heap-
 bounded. Exhaustion on either side is inconclusive for semantic equality — a
 test must raise the budget, never record exhaustion as agreement or mismatch.
 Requests must set a finite gas budget so runs terminate on divergent
@@ -187,7 +187,7 @@ Lake should own the native dependency:
 4. The target trace includes the Cargo lockfile, relevant Rust sources, target
    triple, compiler profile, and native ABI version.
 
-This differs deliberately from the leaner-rust exporter precedent, where the
+This differs deliberately from the verex-rust exporter precedent, where the
 Lean driver runs Cargo at test runtime and caches by input hash: a subprocess
 can be built lazily, but a linked library must exist at Lake link time, so
 Lake targets must own this build. Custom targets and target-valued
@@ -198,13 +198,13 @@ Lake's `extern_lib` mechanism should not be used. It is not deprecated, but it
 attaches at package scope: Lake links a package's extern libraries into every
 executable of that package and of every downstream dependent. Only the native
 test executable needs the foreign symbols, so the per-executable
-`moreLinkObjs` scoping is the correct one; ordinary LeanerIR libraries and the
+`moreLinkObjs` scoping is the correct one; ordinary VerexIR libraries and the
 language server stay free of the native dependency.
 
 The Lean-facing module is intentionally small:
 
 ```lean
-@[extern "leaner_monovm_run"]
+@[extern "verex_monovm_run"]
 opaque runBytes (request : @& ByteArray) : IO ByteArray
 
 def run (request : Request) : IO Response := do
@@ -213,17 +213,17 @@ def run (request : Request) : IO Response := do
 
 Elaborating this module needs no native symbols (`runBytes` is opaque), but
 evaluating it does: under `lake env lean` or `#eval` the interpreter has no
-`leaner_monovm_run` and fails. Harness calls therefore run only through the
+`verex_monovm_run` and fails. Harness calls therefore run only through the
 linked test executable.
 
 ## Test integration
 
 Executable Move fixtures contain concrete calls and expected input types. They
-remain automatically discovered beside the existing Move-to-LeanerLang
+remain automatically discovered beside the existing Move-to-VerexSL
 baselines. For every call the e2e driver compares:
 
-1. MonoVM outcome versus the original validated-LIR interpreter outcome;
-2. the original outcome versus freshly elaborated LeanerLang LIR;
+1. MonoVM outcome versus the original validated-VIR interpreter outcome;
+2. the original outcome versus freshly elaborated VerexSL VIR;
 3. the final resource/event state for every represented observable.
 
 Printer baselines remain useful and independent: a semantic mismatch must not
@@ -269,9 +269,9 @@ Neither side is the baseline, so a mismatch is triaged, never baselined away:
   already executes Move sources differentially on MoveVM and MonoVM, so the
   minimized program can be dropped into that suite to vote MonoVM right or
   wrong before touching the Lean side.
-- The finding is classified as a MonoVM bug, a Leaner frontend or interpreter
+- The finding is classified as a MonoVM bug, a Verex frontend or interpreter
   bug, or a semantic-boundary question neither implementation settles; the
-  last kind feeds the LIR semantics documents rather than a code fix.
+  last kind feeds the VIR semantics documents rather than a code fix.
 - The minimized repro becomes a regression test owned by whichever side was
   wrong, in addition to the e2e fixture.
 
@@ -302,25 +302,25 @@ the register stays a triage record rather than a to-do list.
 
 - **M3, 2026-08-27 — Move `while`-loop lowering is not executable-capable.**
   A fixture whose body uses a Move `while` loop fails `prepareExecution`
-  with three `LIR-SEMANTIC-TYPE` errors (pattern assignment result not
+  with three `VIR-SEMANTIC-TYPE` errors (pattern assignment result not
   `Unit`, valueless `break` targeting a non-`Unit` loop, non-`Unit`
-  fallthrough body). This is a Leaner frontend/semantic-preparation gap,
+  fallthrough body). This is a Verex frontend/semantic-preparation gap,
   not a MonoVM issue: the round-trip executable corpus simply never lowered
   a Move loop. The differential fixtures use recursion until the loop
   lowering is classified; the first `while`-loop fixture added afterwards
   becomes its regression test.
 
-- **M4, 2026-08-27 — the LeanerLang printer emitted unreadable `>>` in vector
+- **M4, 2026-08-27 — the VerexSL printer emitted unreadable `>>` in vector
   literals.** *Fixed.* A `vector<vector<u64>>` literal rendered as
-  `vector<Vector<u64>>[…]`, whose `>>` the LeanerLang lexer reads as a shift
+  `vector<Vector<u64>>[…]`, whose `>>` the VerexSL lexer reads as a shift
   token, so canonical source did not re-import. Both the semantic renderer
-  (`LeanerLang/Print.lean`) and the formatter (`LeanerLang/Print/Layout.lean`)
+  (`VerexSL/Print.lean`) and the formatter (`VerexSL/Print/Layout.lean`)
   built that type argument by hand instead of through the helper each module
   already had for exactly this (`typeArguments` / `closeAngles`); the type
   printers used the helper, so only expression positions were affected. Both
   now route through their helper.
-  `MoveToLeanerLang/move_vector_literals.move` is the regression test.
-  This is a Leaner printer bug, not a MonoVM or semantic one — it was found
+  `MoveToVerexSL/move_vector_literals.move` is the regression test.
+  This is a Verex printer bug, not a MonoVM or semantic one — it was found
   because the round-trip leg re-elaborates what the printer emits, which no
   printer baseline checked for nested generic literals.
 
@@ -338,11 +338,11 @@ the register stays a triage record rather than a to-do list.
   *Open; semantic-boundary question, owned by neither engine yet.* With the
   adapter fixed above, the comparison is now between two program outcomes and
   they still disagree: for `u8` `x + 200` with `x = 100`, MonoVM reports
-  `failed InvalidOperation` while the Leaner path aborts carrying code `300`.
+  `failed InvalidOperation` while the Verex path aborts carrying code `300`.
   Both detect the overflow; they disagree about whether that is a runtime
-  failure or an abort with a code. Expectation is that the Leaner side should
+  failure or an abort with a code. Expectation is that the Verex side should
   also report an under/overflow failure rather than synthesize an abort code,
-  but this is the third triage category — it settles in the LIR semantics
+  but this is the third triage category — it settles in the VIR semantics
   documents, not by patching one side to imitate the other, and the adapter
   must not reclassify a failure as an abort to manufacture agreement.
   `MonoDifferential/arithmetic_overflow.move` holds the case, and its
@@ -350,7 +350,7 @@ the register stays a triage record rather than a to-do list.
   first fixture whose baseline records an open finding rather than agreement.
 
 - **M4, 2026-08-27 — `prepareExecution` did not scale to a package-size
-  unit.** *Fixed by the LIR validation rework, re-measured 2026-08-28.* The
+  unit.** *Fixed by the VIR validation rework, re-measured 2026-08-28.* The
   same staged MoveStdlib unit (15 namespaces, 291 functions) that previously
   ran **more than 16 CPU-minutes without completing** now prepares in **2 ms**,
   and `reimportUnit` over it in **3 ms** against a previously observed **57+
@@ -359,22 +359,22 @@ the register stays a triage record rather than a to-do list.
   about cost.
 
 - **M4, 2026-08-28 — Move's vector natives had no executable meaning.**
-  *Partly fixed.* `vector::empty` and `vector::length` now lower to the LIR
+  *Partly fixed.* `vector::empty` and `vector::length` now lower to the VIR
   `vector` and `length` operations in the Move frontend, following the logical
   bytecode model, which already treats these natives as operations rather than
   callable functions. `MonoDifferential/stdlib_vector.move` compares clean
   across all three engines. Still calls, and so still absent bodies: the
   length-changing natives (`push_back`, `pop_back`, `swap`, `move_range`,
-  `destroy_empty`), which need LIR operations that do not exist yet, and
+  `destroy_empty`), which need VIR operations that do not exist yet, and
   `borrow`/`borrow_mut`, which need the value-borrow to place-borrow
-  normalization — LIR has the place vocabulary but the encoder never builds
+  normalization — VIR has the place vocabulary but the encoder never builds
   places. Element access is available meanwhile through Move's index notation.
   The other 12 stdlib natives (hash, BCS, string, signer, `cmp`, `mem`,
   feature flags) are deliberately left absent per the milestone's scope; a
   fixture reaching one records the resulting error in its baseline.
 
 - **M4, 2026-08-28 — the frontend built value borrows, which are not
-  executable.** *Fixed.* LIR distinguishes borrowing a *place* from borrowing
+  executable.** *Fixed.* VIR distinguishes borrowing a *place* from borrowing
   a *value*, and classifies the value form `unsupportedExecutable`: it names
   no location to point at. The Move frontend only ever built the value form,
   because it never constructed places at all — so no Move `&x` prepared for
@@ -430,7 +430,7 @@ the register stays a triage record rather than a to-do list.
 
 - **M4, 2026-08-28 — the canonical printer's fixed point held only by
   coincidence.** *Fixed.* `ordered_map.exp.lean` recorded
-  "generated Move LeanerLang is not a canonical fixed point" as its expected
+  "generated Move VerexSL is not a canonical fixed point" as its expected
   output, so the defect was already blessed into the corpus.
   `renderSemanticNamespace` wrapped a single-statement block in `do` while the
   parser produces the bare statement, so a unit's semantic form depended on
@@ -441,9 +441,9 @@ the register stays a triage record rather than a to-do list.
   formatter itself was never at fault: it is idempotent on its own output,
   which is what isolated the first render as the outlier.
 
-- **M4, 2026-08-28 — the two paths into LIR disagreed about `length`.**
-  *Fixed.* The LeanerLang elaborator lowered Move `x.length` to a call to
-  `0x1::std::vector::length` while the Rust profile lowered it to the LIR
+- **M4, 2026-08-28 — the two paths into VIR disagreed about `length`.**
+  *Fixed.* The VerexSL elaborator lowered Move `x.length` to a call to
+  `0x1::std::vector::length` while the Rust profile lowered it to the VIR
   primitive. Once the Move frontend produced the primitive, canonical source
   stopped round tripping: printing a primitive and reading it back yielded an
   unresolvable call. Both profiles now lower to the primitive, and the
@@ -486,16 +486,16 @@ the register stays a triage record rather than a to-do list.
 
 - **H2, 2026-09-30 — MonoVM does not compare function values.** *Open;
   MonoVM.* `==` on two closures fails in MonoVM with "equality is not
-  supported for this operand type", while the LIR interpreter and MoveVM
-  (compiler-v2's `leaner/closures.lean`, through XIR) compare them
+  supported for this operand type", while the VIR interpreter and MoveVM
+  (compiler-v2's `verex/closures.lean`, through XIR) compare them
   structurally: `adder(4) == adder(4)` holds and `adder(4) == adder(5)` does
   not. `MonoDifferential/closures.move` records the divergence.
 
 - **H2, 2026-09-30 — a non-`Copy` local was read as a copy.** *Fixed.*
-  Both the Move frontend and LeanerLang lowered a by-value use of a local
+  Both the Move frontend and VerexSL lowered a by-value use of a local
   whose type lacks `Copy` (`take(s)`, `s.v`, `f(x)` for a closure without
   `copy`) to a plain local read, which requires `Copy`, so
-  `prepareExecution` rejected the unit (`LIR-SEMANTIC-ABILITY`); LeanerLang
+  `prepareExecution` rejected the unit (`VIR-SEMANTIC-ABILITY`); VerexSL
   moved only a type parameter without `Copy`. Validation now infers the
   access from the checked types (a move, a `Copy` place load of a
   selection, or a place read under an observer), for every frontend.
@@ -528,14 +528,14 @@ third_party/move/
     src/engine.rs                         compile → load → run over mono-move
     tests/                                ABI, payload, and containment tests
 
-  lean/leaner-e2e-tests/
+  lean/verex-e2e-tests/
     lakefile.lean                         replaces lakefile.toml in M2
     shim/monovm_shim.c                    C shim against the pinned lean/lean.h
-    LeanerE2ETests/MonoVM/Link.lean       opaque extern + transport + codecs
-    LeanerE2ETests/MonoVM/Payload.lean    request/response/value schema
-    LeanerE2ETests/MonoVM/Directives.lean fixture directive parser
-    LeanerE2ETests/MonoDifferential/Baseline.lean   differential driver
-    LeanerE2ETests/MonoDifferential/*.move executable fixtures
+    VerexE2ETests/MonoVM/Link.lean        opaque extern + transport + codecs
+    VerexE2ETests/MonoVM/Payload.lean     request/response/value schema
+    VerexE2ETests/MonoVM/Directives.lean fixture directive parser
+    VerexE2ETests/MonoDifferential/Baseline.lean   differential driver
+    VerexE2ETests/MonoDifferential/*.move executable fixtures
 ```
 
 Public exposure of the executor's call helpers (`call_function`,
@@ -588,8 +588,8 @@ never enter semantic equality.
 - Add `mono-move-lean-link` as an aptos-core workspace member next to the
   mono-move crates with `crate-type = ["rlib", "staticlib"]`. The rlib keeps
   ordinary Rust tests linkable; the staticlib is the artifact Lake links.
-- Export `leaner_monovm_abi_version`, `leaner_monovm_run`, and
-  `leaner_monovm_buffer_free` exactly as in the boundary section. Guard with
+- Export `verex_monovm_abi_version`, `verex_monovm_run`, and
+  `verex_monovm_buffer_free` exactly as in the boundary section. Guard with
   `compile_error!` under `cfg(panic = "abort")` and wrap the whole run in
   `catch_unwind`, encoding a caught panic as an `internal`-stage error.
 - Implement payload v1 encode/decode with serde. Every domain failure —
@@ -640,22 +640,22 @@ responses.
 ### M2 — C shim, Lake targets, and the first linked call
 
 - Write `shim/monovm_shim.c` against the pinned toolchain's `lean/lean.h`:
-  copy the response into a Lean `ByteArray`, call `leaner_monovm_buffer_free`,
+  copy the response into a Lean `ByteArray`, call `verex_monovm_buffer_free`,
   and turn a nonzero transport status into a Lean `IO` error. The shim touches
   no other Lean object representation.
-- Migrate `leaner-e2e-tests` from `lakefile.toml` to an equivalent
+- Migrate `verex-e2e-tests` from `lakefile.toml` to an equivalent
   `lakefile.lean` (same requires, default targets, and test driver), then add
   two custom targets: one runs Cargo in the explicitly selected release
   profile against the worktree's workspace and exposes the staticlib, one
   compiles the shim with `leanc`. Attach both through target-valued
-  `moreLinkObjs` on `LeanerE2ETestDriver` only, adding whatever system
+  `moreLinkObjs` on `VerexE2ETestDriver` only, adding whatever system
   libraries the Rust staticlib needs (`-lm -ldl -lpthread` are expected;
   confirm at implementation) via `moreLinkArgs`.
 - The Cargo target's trace covers the adapter crate sources, the workspace
   `Cargo.lock`, the profile name, the target triple, and the native ABI
   version, so a change on any of them relinks the driver. Running Cargo from
   the worktree root is what makes the same-checkout requirement structural.
-- Add `LeanerE2ETests/MonoVM/Link.lean` with the opaque `@[extern]` function,
+- Add `VerexE2ETests/MonoVM/Link.lean` with the opaque `@[extern]` function,
   `Lean.Data.Json` codecs, and an assertion that the native ABI version
   matches the Lean-side constant — a mismatch must produce an actionable
   rebuild hint, not a decode error. Log the response identity next to the
@@ -674,21 +674,21 @@ shape); no other package gains a native dependency.
   in the same `// RUN: publish` / `// RUN: execute <addr>::<m>::<f> --args …`
   grammar the mono-move differential suite already consumes; the mono-move
   parser rejects unknown modifiers, so Lean-side knobs (`--fuel`, `--gas`)
-  live in a namespaced `// LEANER:` directive instead of extending `// RUN:`.
+  live in a namespaced `// VEREX:` directive instead of extending `// RUN:`.
   A file that runs in both harnesses is the triage path made concrete: the
   minimized repro drops directly into the legacy-VM arbiter.
-  `LeanerE2ETests/MonoDifferential/` holds them; the driver discovers them
+  `VerexE2ETests/MonoDifferential/` holds them; the driver discovers them
   automatically. They deliberately carry no `.exp.lean` printer expectation,
   but each pairs with a side-by-side `.exp` recording every engine's
   normalized outcome, per **Recorded results** above.
 - Implement the Lean-side directive parser independently; it is small and its
   grammar is fixed by this design.
 - Per execute step the driver runs three interpretations: the linked MonoVM
-  call; the original validated LIR through `prepareExecution` with
-  `LeanerIR.Move.semantics` and `Interpreter.run` under the directive's fuel;
-  and the same interpretation after the canonical LeanerLang round trip
+  call; the original validated VIR through `prepareExecution` with
+  `VerexIR.Move.semantics` and `Interpreter.run` under the directive's fuel;
+  and the same interpretation after the canonical VerexSL round trip
   (print, re-elaborate, lower, validate, prepare). The frontend side reuses
-  `Transpiler.Cli.exportMoveFiles` and `Transpiler.LIR.Backend.fromXast`.
+  `Transpiler.Cli.exportMoveFiles` and `Transpiler.VIR.Backend.fromXast`.
 - Normalize both sides into one outcome shape: Lean `.returned` values and
   `.threw .abort` with the code among its arguments map onto `returned` and
   `aborted`; `InterpreterError.outOfFuel` and the adapter's `exhausted` both
@@ -740,16 +740,16 @@ for a `&mut` argument yet either.
 
 - The Lean and MonoVM sides reach the stdlib by different routes, and the
   milestone is about making them agree. MonoVM registers the natives; the Lean
-  side lowers the ones LIR can express to operations, which is what the logical
+  side lowers the ones VIR can express to operations, which is what the logical
   bytecode model already does. A fixture using those needs no stdlib module in
   its unit at all — staging the package is not the mechanism, and is not used.
 - Delivered: `vector::empty` and `vector::length`.
   `MonoDifferential/stdlib_vector.move` compares clean across all three
   interpretations.
-- Delivered since: `push_back` through the new LIR push operation, and
+- Delivered since: `push_back` through the new VIR push operation, and
   `borrow`/`borrow_mut` as place borrows, which also makes Move's index
   notation and `while` loops over vectors executable.
-- Delivered since: `swap` through the new LIR swap operation, and
+- Delivered since: `swap` through the new VIR swap operation, and
   specification-only locals no longer blocking execution preparation.
 - Not delivered, with owners named in the findings register: `pop_back`,
   which needs a printer fix rather than IR work; `move_range` and

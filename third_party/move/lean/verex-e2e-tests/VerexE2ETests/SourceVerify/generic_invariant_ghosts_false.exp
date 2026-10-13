@@ -1,0 +1,2 @@
+VerexE2ETests/SourceVerify/generic_invariant_ghosts_false.move:14:9: error: the module invariant `invariant {T} ∀ (a : Address), exists<Box<T> >(a) ==> exists<Marker>(a)` does not hold after a write of memory it reads
+VerexE2ETests/SourceVerify/generic_invariant_ghosts_false.move:21:5: error: verex verification failed: the automatic verification of `unmark` failed; provide a proof: `verify unmark by …` in `VerexE2ETests/SourceVerify/generic_invariant_ghosts_false.proof.lean` (`verify unmark by verex_obligations` lists its obligations)

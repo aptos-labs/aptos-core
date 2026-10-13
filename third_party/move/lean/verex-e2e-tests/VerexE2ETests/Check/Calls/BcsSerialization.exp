@@ -1,0 +1,2 @@
+VerexE2ETests/Check/Calls/BcsSerialization.lean:50:4: error: the specification clause `ensures result` is not established
+VerexE2ETests/Check/Calls/BcsSerialization.lean:49:7: error: verex verification failed: the automatic verification of `value_lengths` failed; provide a proof: `verify value_lengths by …` in the module (`verify value_lengths by verex_obligations` lists its obligations)

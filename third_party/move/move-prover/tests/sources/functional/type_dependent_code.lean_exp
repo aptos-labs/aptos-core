@@ -1,638 +1,628 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/type_dependent_code.move:10:5: error: verification failed with a residual obligation:
 case h_2.continues
-registry✝ : LeanerIR.Validation.SemanticsRegistry
-executable✝ : LeanerIR.Validation.ExecutableUnit unit
-prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-Θ✝ : LeanerIR.Proofs.Denote.Skolems unit
-typeInstantiation✝ : Array (LeanerIR.TypeId × LeanerIR.TypeId)
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
-  LeanerIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } } 1
+  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } } 1
     typeInstantiation✝
-account : LeanerIR.Proofs.Denote.NTy.signer.carrier
-x : (LeanerIR.Proofs.Denote.NTy.param 0).carrier
-snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
-initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+x : (VerexIR.Proofs.Denote.NTy.param 0).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
-leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
-    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
-      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
-    LeanerIR.Proofs.Denote.NTy.unit.carrier →
-  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final =>
         ¬((initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true ∨
             (initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.int 8 false))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true))
       (fun failure =>
-        LeanerIR.Proofs.Obligation "type_dependent_code.lean" 365 405
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
             ((initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true) ∨
-          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 410 451
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
             ((initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.int 8 false))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true))
       state
-leanerAnchor✝ : LeanerIR.Proofs.Denote.AnchorSaved 9 (some account, some x, ()) initialState✝
-leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
-    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
-      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
-    LeanerIR.Proofs.Denote.NTy.unit.carrier →
-  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 9 (some account, some x, ()) initialState✝
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun flow state =>
     match flow with
-    | LeanerIR.Proofs.Denote.Flow.value value env =>
-      LeanerIR.Proofs.wp
-        (LeanerIR.Proofs.Denote.Flow.bind
-          (LeanerIR.Proofs.Denote.Flow.bind
-            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-              (LeanerIR.Proofs.Denote.Term.memoryWritten 9) env)
-            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (VerexIR.Proofs.Denote.Term.memoryWritten 9) env)
+            fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
-          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-            (((LeanerIR.Proofs.Denote.Term.globalPublish 35
-                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                        LeanerIR.Proofs.Denote.NRow.nil)
-                      (LeanerIR.Proofs.Denote.Term.var LeanerIR.Proofs.Denote.Var.here)
-                      (LeanerIR.Proofs.Denote.Term.pack { namespaceId := { index := 0 }, structId := 0 }
-                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                          LeanerIR.Proofs.Denote.NRow.nil)
-                        (LeanerIR.Proofs.Denote.Args.cons (LeanerIR.Proofs.Denote.Term.lit { val := 0, fits := ⋯ })
-                          LeanerIR.Proofs.Denote.Args.nil))).seqAfter
-                  (LeanerIR.Proofs.Denote.Term.memoryWritten 35)).drop
-              (LeanerIR.Proofs.Denote.Term.lit ()))
+          VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (((VerexIR.Proofs.Denote.Term.globalPublish 35
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                        VerexIR.Proofs.Denote.NRow.nil)
+                      (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
+                      (VerexIR.Proofs.Denote.Term.pack { namespaceId := { index := 0 }, structId := 0 }
+                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                          VerexIR.Proofs.Denote.NRow.nil)
+                        (VerexIR.Proofs.Denote.Args.cons (VerexIR.Proofs.Denote.Term.lit { val := 0, fits := ⋯ })
+                          VerexIR.Proofs.Denote.Args.nil))).seqAfter
+                  (VerexIR.Proofs.Denote.Term.memoryWritten 35)).drop
+              (VerexIR.Proofs.Denote.Term.lit ()))
             env)
-        leanerContinuation✝¹
+        verexContinuation✝¹
         (fun failure =>
-          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 365 405
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 410 451
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.int 8 false))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true))
         state
-    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
-    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
-    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 x✝¹ :
   Option
-    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
-      (LeanerIR.Proofs.Denote.Skolems.resource
-        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)))
+    (VerexIR.Proofs.Denote.ResourceType.carrier unit
+      (VerexIR.Proofs.Denote.Skolems.resource
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)))
 heq✝¹ :
   initialState✝
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account) =
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
     none
 invariantHolds✝¹ : True
-leanerAnchor :
-  LeanerIR.Proofs.Denote.AnchorSaved 35 (some account, some x, ())
+verexAnchor :
+  VerexIR.Proofs.Denote.AnchorSaved 35 (some account, some x, ())
     (initialState✝.set
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account)
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account)
       (some
-        (LeanerIR.Proofs.Denote.Skolems.toRuntime
-          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
           (x, ()))))
-leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
-    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
-      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
-    LeanerIR.Proofs.Denote.NTy.unit.carrier →
-  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun flow state =>
     match flow with
-    | LeanerIR.Proofs.Denote.Flow.value value env =>
-      LeanerIR.Proofs.wp
-        (LeanerIR.Proofs.Denote.Flow.bind
-          (LeanerIR.Proofs.Denote.Flow.bind
-            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-              (LeanerIR.Proofs.Denote.Term.memoryWritten 35) env)
-            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (VerexIR.Proofs.Denote.Term.memoryWritten 35) env)
+            fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
-          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-            (LeanerIR.Proofs.Denote.Term.lit ()) env)
-        leanerContinuation✝¹
+          VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (VerexIR.Proofs.Denote.Term.lit ()) env)
+        verexContinuation✝¹
         (fun failure =>
-          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 365 405
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 410 451
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.int 8 false))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true))
         state
-    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
-    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
-    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 x✝ :
   Option
-    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
-      (LeanerIR.Proofs.Denote.Skolems.resource
-        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false) LeanerIR.Proofs.Denote.NRow.nil)
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false) LeanerIR.Proofs.Denote.NRow.nil))
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false) LeanerIR.Proofs.Denote.NRow.nil)))
+    (VerexIR.Proofs.Denote.ResourceType.carrier unit
+      (VerexIR.Proofs.Denote.Skolems.resource
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)))
 heq✝ :
   initialState✝.set
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account)
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account)
       (some
-        (LeanerIR.Proofs.Denote.Skolems.toRuntime
-          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
           (x, ())))
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons
-            (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account) =
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.int 8 false))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
     none
 invariantHolds✝ : True
 ⊢ initialState✝
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.int 8 false)
-                LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons
-            (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.int 8 false))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account) =
+          VerexIR.Proofs.Denote.NRow.cons
+            (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.int 8 false))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
     none
 tests/sources/functional/type_dependent_code.move:11:9: error: the specification clause `aborts_if exists<S<X> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:12:9: error: the specification clause `aborts_if exists<S<u8> >(account.address)` is not established
-tests/sources/functional/type_dependent_code.move:10:5: error: leaner verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves)
-tests/sources/functional/type_dependent_code.move:1:1: error: verification failed with a residual obligation:
+tests/sources/functional/type_dependent_code.move:10:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by verex_obligations` lists its obligations)
+tests/sources/functional/type_dependent_code.move:26:5: error: verification failed with a residual obligation:
 case h_2.continues
-registry✝ : LeanerIR.Validation.SemanticsRegistry
-executable✝ : LeanerIR.Validation.ExecutableUnit unit
-prepared✝ : LeanerIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-Θ✝ : LeanerIR.Proofs.Denote.Skolems unit
-typeInstantiation✝ : Array (LeanerIR.TypeId × LeanerIR.TypeId)
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+Θ✝ : VerexIR.Proofs.Denote.Skolems unit
+typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
-  LeanerIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 1 } } 2
+  VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 1 } } 2
     typeInstantiation✝
-account : LeanerIR.Proofs.Denote.NTy.signer.carrier
-t1 : (LeanerIR.Proofs.Denote.NTy.param 0).carrier
-t2 : (LeanerIR.Proofs.Denote.NTy.param 1).carrier
-snd✝ : LeanerIR.Proofs.Denote.HList LeanerIR.Proofs.Denote.NRow.nil
-initialState✝ : LeanerIR.Proofs.Denote.Memory unit
+account : VerexIR.Proofs.Denote.NTy.signer.carrier
+t1 : (VerexIR.Proofs.Denote.NTy.param 0).carrier
+t2 : (VerexIR.Proofs.Denote.NTy.param 1).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
-leanerContinuation✝¹ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
-    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
-      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
-    LeanerIR.Proofs.Denote.NTy.unit.carrier →
-  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    LeanerIR.Proofs.wp (LeanerIR.Proofs.Denote.ResultShape.finish mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish mutables shape value)
       (fun result final =>
         ¬((initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true ∨
             (initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 1))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true))
       (fun failure =>
-        LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1006 1047
+        VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
             ((initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true) ∨
-          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1052 1093
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
             ((initialState✝
                   {
                     type :=
-                      LeanerIR.Proofs.Denote.Skolems.resolve
-                        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                            LeanerIR.Proofs.Denote.NRow.nil)
-                          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                            LeanerIR.Proofs.Denote.NRow.nil)),
+                      VerexIR.Proofs.Denote.Skolems.resolve
+                        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                            VerexIR.Proofs.Denote.NRow.nil)
+                          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                            VerexIR.Proofs.Denote.NRow.nil)),
                     arguments :=
-                      LeanerIR.Proofs.Denote.NRow.cons
-                        (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
-                        LeanerIR.Proofs.Denote.NRow.nil }
-                  (LeanerIR.StorageKey.address account)).isSome =
+                      VerexIR.Proofs.Denote.NRow.cons
+                        (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 1))
+                        VerexIR.Proofs.Denote.NRow.nil }
+                  (VerexIR.StorageKey.address account)).isSome =
               true))
       state
-leanerAnchor✝ : LeanerIR.Proofs.Denote.AnchorSaved 495 (some account, some t1, some t2, ()) initialState✝
-leanerContinuation✝ : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
-    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
-      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
-    LeanerIR.Proofs.Denote.NTy.unit.carrier →
-  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 495 (some account, some t1, some t2, ()) initialState✝
+verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun flow state =>
     match flow with
-    | LeanerIR.Proofs.Denote.Flow.value value env =>
-      LeanerIR.Proofs.wp
-        (LeanerIR.Proofs.Denote.Flow.bind
-          (LeanerIR.Proofs.Denote.Flow.bind
-            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-              (LeanerIR.Proofs.Denote.Term.memoryWritten 495) env)
-            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (VerexIR.Proofs.Denote.Term.memoryWritten 495) env)
+            fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
-          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-            (((LeanerIR.Proofs.Denote.Term.globalPublish 629
-                      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                        LeanerIR.Proofs.Denote.NRow.nil)
-                      (LeanerIR.Proofs.Denote.Term.var LeanerIR.Proofs.Denote.Var.here)
-                      (LeanerIR.Proofs.Denote.Term.pack { namespaceId := { index := 0 }, structId := 0 }
-                        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                          LeanerIR.Proofs.Denote.NRow.nil)
-                        (LeanerIR.Proofs.Denote.Args.cons
-                          (LeanerIR.Proofs.Denote.Term.var LeanerIR.Proofs.Denote.Var.here.there.there)
-                          LeanerIR.Proofs.Denote.Args.nil))).seqAfter
-                  (LeanerIR.Proofs.Denote.Term.memoryWritten 629)).drop
-              (LeanerIR.Proofs.Denote.Term.lit ()))
+          VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (((VerexIR.Proofs.Denote.Term.globalPublish 629
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                        VerexIR.Proofs.Denote.NRow.nil)
+                      (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
+                      (VerexIR.Proofs.Denote.Term.pack { namespaceId := { index := 0 }, structId := 0 }
+                        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                          VerexIR.Proofs.Denote.NRow.nil)
+                        (VerexIR.Proofs.Denote.Args.cons
+                          (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there)
+                          VerexIR.Proofs.Denote.Args.nil))).seqAfter
+                  (VerexIR.Proofs.Denote.Term.memoryWritten 629)).drop
+              (VerexIR.Proofs.Denote.Term.lit ()))
             env)
-        leanerContinuation✝¹
+        verexContinuation✝¹
         (fun failure =>
-          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1006 1047
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1052 1093
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 1))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true))
         state
-    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
-    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
-    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 x✝¹ :
   Option
-    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
-      (LeanerIR.Proofs.Denote.Skolems.resource
-        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)))
+    (VerexIR.Proofs.Denote.ResourceType.carrier unit
+      (VerexIR.Proofs.Denote.Skolems.resource
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)))
 heq✝¹ :
   initialState✝
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account) =
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
     none
 invariantHolds✝¹ : True
-leanerAnchor :
-  LeanerIR.Proofs.Denote.AnchorSaved 629 (some account, some t1, some t2, ())
+verexAnchor :
+  VerexIR.Proofs.Denote.AnchorSaved 629 (some account, some t1, some t2, ())
     (initialState✝.set
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account)
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account)
       (some
-        (LeanerIR.Proofs.Denote.Skolems.toRuntime
-          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
           (t1, ()))))
-leanerContinuation : LeanerIR.Proofs.Denote.Flow LeanerIR.Proofs.Denote.ResultShape.none
-    (LeanerIR.Proofs.Denote.NRow.cons LeanerIR.Proofs.Denote.NTy.signer
-      (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
-    LeanerIR.Proofs.Denote.NTy.unit.carrier →
-  LeanerIR.Proofs.Denote.Memory unit → Prop :=
+verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun flow state =>
     match flow with
-    | LeanerIR.Proofs.Denote.Flow.value value env =>
-      LeanerIR.Proofs.wp
-        (LeanerIR.Proofs.Denote.Flow.bind
-          (LeanerIR.Proofs.Denote.Flow.bind
-            (LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-              (LeanerIR.Proofs.Denote.Term.memoryWritten 629) env)
-            fun x env => LeanerIR.Proofs.Spec.pure (LeanerIR.Proofs.Denote.Flow.value value env))
+    | VerexIR.Proofs.Denote.Flow.value value env =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            (VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+              (VerexIR.Proofs.Denote.Term.memoryWritten 629) env)
+            fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
-          LeanerIR.Proofs.Denote.Term.denote (LeanerIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
-            (LeanerIR.Proofs.Denote.Term.lit ()) env)
-        leanerContinuation✝¹
+          VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝)
+            (VerexIR.Proofs.Denote.Term.lit ()) env)
+        verexContinuation✝¹
         (fun failure =>
-          LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1006 1047
+          VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true) ∨
-            LeanerIR.Proofs.Obligation "type_dependent_code.lean" 1052 1093
+            VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
               ((initialState✝
                     {
                       type :=
-                        LeanerIR.Proofs.Denote.Skolems.resolve
-                          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                              LeanerIR.Proofs.Denote.NRow.nil)
-                            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1)
-                              LeanerIR.Proofs.Denote.NRow.nil)),
+                        VerexIR.Proofs.Denote.Skolems.resolve
+                          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
+                              VerexIR.Proofs.Denote.NRow.nil)),
                       arguments :=
-                        LeanerIR.Proofs.Denote.NRow.cons
-                          (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
-                          LeanerIR.Proofs.Denote.NRow.nil }
-                    (LeanerIR.StorageKey.address account)).isSome =
+                        VerexIR.Proofs.Denote.NRow.cons
+                          (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 1))
+                          VerexIR.Proofs.Denote.NRow.nil }
+                    (VerexIR.StorageKey.address account)).isSome =
                 true))
         state
-    | LeanerIR.Proofs.Denote.Flow.return_ result env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.return_ result env) state
-    | LeanerIR.Proofs.Denote.Flow.break_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.break_ nest env) state
-    | LeanerIR.Proofs.Denote.Flow.continue_ nest env =>
-      leanerContinuation✝¹ (LeanerIR.Proofs.Denote.Flow.continue_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.return_ result env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.return_ result env) state
+    | VerexIR.Proofs.Denote.Flow.break_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.break_ nest env) state
+    | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
+      verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 x✝ :
   Option
-    (LeanerIR.Proofs.Denote.ResourceType.carrier unit
-      (LeanerIR.Proofs.Denote.Skolems.resource
-        (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)
-          (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil))
-        (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)))
+    (VerexIR.Proofs.Denote.ResourceType.carrier unit
+      (VerexIR.Proofs.Denote.Skolems.resource
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)))
 heq✝ :
   initialState✝.set
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 0))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account)
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 0))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account)
       (some
-        (LeanerIR.Proofs.Denote.Skolems.toRuntime
-          (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil)
-            (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 0) LeanerIR.Proofs.Denote.NRow.nil))
+        (VerexIR.Proofs.Denote.Skolems.toRuntime
+          (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
           (t1, ())))
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account) =
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 1))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
     none
 invariantHolds✝ : True
 ⊢ initialState✝
       {
         type :=
-          LeanerIR.Proofs.Denote.Skolems.resolve
-            (LeanerIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)
-              (LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.NTy.param 1) LeanerIR.Proofs.Denote.NRow.nil)),
+          VerexIR.Proofs.Denote.Skolems.resolve
+            (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+              (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)),
         arguments :=
-          LeanerIR.Proofs.Denote.NRow.cons (LeanerIR.Proofs.Denote.Skolems.resolve (LeanerIR.Proofs.Denote.NTy.param 1))
-            LeanerIR.Proofs.Denote.NRow.nil }
-      (LeanerIR.StorageKey.address account) =
+          VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.Skolems.resolve (VerexIR.Proofs.Denote.NTy.param 1))
+            VerexIR.Proofs.Denote.NRow.nil }
+      (VerexIR.StorageKey.address account) =
     none
 tests/sources/functional/type_dependent_code.move:27:9: error: the specification clause `aborts_if exists<S<T1> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:28:9: error: the specification clause `aborts_if exists<S<T2> >(account.address)` is not established
-tests/sources/functional/type_dependent_code.move:26:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by skip` shows the obligations it leaves)
-tests/sources/functional/type_dependent_code.move:49:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/type_dependent_code.move:49:5: error: leaner verification failed: the automatic verification of `test1` exceeded its budget of 25000 maxHeartbeats; provide a proof: `verify test1 by …` in the module (`verify test1 by skip` shows the obligations it leaves), or raise the budget with `pragma heartbeats = N`, in thousands of maxHeartbeats
+tests/sources/functional/type_dependent_code.move:26:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by verex_obligations` lists its obligations)
+tests/sources/functional/type_dependent_code.move:50:9: error: the specification clause `ensures global<S<u8> >(account.address).x == 0` is not established
+tests/sources/functional/type_dependent_code.move:49:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof: `verify test1 by …` in the module (`verify test1 by verex_obligations` lists its obligations)
 tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
-tests/sources/functional/type_dependent_code.move:65:5: error: leaner verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by skip` shows the obligations it leaves)
+tests/sources/functional/type_dependent_code.move:65:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof: `verify test2 by …` in the module (`verify test2 by verex_obligations` lists its obligations)

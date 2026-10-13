@@ -1,2 +1,111 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:9:1: error: a behavioral predicate over a function with mutable reference parameters is not carried yet
+tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verification failed with a residual obligation:
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+f :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            VerexIR.Proofs.Denote.NRow.nil
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)).ref
+        VerexIR.Proofs.Denote.NRow.nil)
+      [false] VerexIR.Proofs.Denote.NRow.nil).carrier
+x_value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed :
+  VerexIR.Proofs.KeepsMemoryAt executable✝
+    (VerexIR.Proofs.Denote.NRow.cons
+      (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)).ref
+      VerexIR.Proofs.Denote.NRow.nil)
+    f.val
+permitted : True
+fst✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+left✝¹ : 0 ≤ x_value.val
+right✝¹ : x_value.val ≤ 18446744073709551615
+left✝ : 0 ≤ fst✝.val
+right✝ : fst✝.val ≤ 18446744073709551615
+⊢ VerexIR.Proofs.wp
+    (VerexIR.Proofs.Denote.closureMeaning executable✝ f.val
+      (VerexIR.Proofs.Denote.NRow.cons
+        (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+            VerexIR.Proofs.Denote.NRow.nil
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)).ref
+        VerexIR.Proofs.Denote.NRow.nil)
+      VerexIR.Proofs.Denote.ResultShape.none (((x_value, PUnit.unit), fst✝, PUnit.unit), ()))
+    (fun value state =>
+      VerexIR.Proofs.wp
+        (VerexIR.Proofs.Denote.Flow.bind
+          (VerexIR.Proofs.Denote.Flow.bind
+            (VerexIR.Proofs.Denote.Flow.bind VerexIR.Proofs.Spec.bottom fun value env =>
+              VerexIR.Proofs.Denote.Flow.bind
+                (VerexIR.Proofs.Denote.Args.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+                  VerexIR.Proofs.Denote.Args.nil env)
+                fun values env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value (value, values) env))
+            fun values env =>
+            VerexIR.Proofs.Spec.bind
+              (VerexIR.Proofs.Denote.closureMeaning executable✝ f.val
+                (VerexIR.Proofs.Denote.NRow.cons
+                  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                      VerexIR.Proofs.Denote.NRow.nil
+                      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                        VerexIR.Proofs.Denote.NRow.nil)).ref
+                  VerexIR.Proofs.Denote.NRow.nil)
+                VerexIR.Proofs.Denote.ResultShape.none values)
+              fun result =>
+              VerexIR.Proofs.Spec.pure
+                (VerexIR.Proofs.Denote.Flow.value (VerexIR.Proofs.Denote.ResultShape.none.toBody result) env))
+          fun x env =>
+          VerexIR.Proofs.Denote.Term.denote (VerexIR.Proofs.Denote.closedMeanings executable✝ #[])
+            (VerexIR.Proofs.Denote.Term.lit ()) env)
+        (fun value state =>
+          VerexIR.Proofs.wp
+            (match value with
+            | VerexIR.Proofs.Denote.Flow.value value env =>
+              match env.snd.fst with
+              | some reference =>
+                (VerexIR.Proofs.Spec.assume (reference.fst = reference.snd)).bind fun x =>
+                  VerexIR.Proofs.Denote.Mutables.nil.resolve env (VerexIR.Proofs.Spec.pure ())
+              | none => VerexIR.Proofs.Spec.pure ()
+            | VerexIR.Proofs.Denote.Flow.return_ result env =>
+              match env.snd.fst with
+              | some reference =>
+                (VerexIR.Proofs.Spec.assume (reference.fst = reference.snd)).bind fun x =>
+                  VerexIR.Proofs.Denote.Mutables.nil.resolve env (VerexIR.Proofs.Spec.pure result)
+              | none => VerexIR.Proofs.Spec.pure result
+            | VerexIR.Proofs.Denote.Flow.break_ nest env => VerexIR.Proofs.Spec.bottom
+            | VerexIR.Proofs.Denote.Flow.continue_ nest env => VerexIR.Proofs.Spec.bottom)
+            (fun result final =>
+              (∃ S S_x,
+                  VerexIR.Proofs.RequiresOf (requiresTable unit)
+                      ((VerexIR.Proofs.Denote.NTy.function
+                            (VerexIR.Proofs.Denote.NRow.cons
+                              (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                  VerexIR.Proofs.Denote.NRow.nil
+                                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                                    VerexIR.Proofs.Denote.NRow.nil)).ref
+                              VerexIR.Proofs.Denote.NRow.nil)
+                            [false] VerexIR.Proofs.Denote.NRow.nil).encode
+                        f)
+                      [S_x] S ∧
+                    ¬VerexIR.Proofs.AbortsOfMut executable✝
+                        ((VerexIR.Proofs.Denote.NTy.function
+                              (VerexIR.Proofs.Denote.NRow.cons
+                                (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 }
+                                    VerexIR.Proofs.Denote.NRow.nil
+                                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                                      VerexIR.Proofs.Denote.NRow.nil)).ref
+                                VerexIR.Proofs.Denote.NRow.nil)
+                              [false] VerexIR.Proofs.Denote.NRow.nil).encode
+                          f)
+                        [true] [S_x] S) ∧
+                final = initialState✝)
+            (fun failure => True) state)
+        (fun failure => True) state)
+    (fun failure => True) initialState✝
+tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verex verification failed: the automatic verification of `apply_twice` failed; provide a proof: `verify apply_twice by …` in `tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.proof.lean` (`verify apply_twice by verex_obligations` lists its obligations)

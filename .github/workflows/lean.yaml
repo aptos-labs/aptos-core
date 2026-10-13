@@ -53,29 +53,35 @@ jobs:
         # The Lean suites build the exporter from several modules at once; a
         # first use of its pinned nightly would install it from each build,
         # and concurrent rustup installs of one toolchain collide.
-        working-directory: third_party/move/lean/leaner-rust/rust-exporter
+        working-directory: third_party/move/lean/verex-rust/rust-exporter
         run: cargo --version
 
-      - name: Test LeanerIR
-        working-directory: third_party/move/lean/leaner-ir
+      - name: Test the Rust exporter
+        # A standalone crate on its pinned nightly with `rustc-dev`, so not a
+        # member of the stable root workspace.
+        working-directory: third_party/move/lean/verex-rust/rust-exporter
+        run: cargo test --locked --features rustc-public
+
+      - name: Test VerexIR
+        working-directory: third_party/move/lean/verex-ir
         run: |
           source "$HOME/.profile"
           lake test
 
-      - name: Test Leaner Move profile
-        working-directory: third_party/move/lean/leaner-move
+      - name: Test Verex Move profile
+        working-directory: third_party/move/lean/verex-move
         run: |
           source "$HOME/.profile"
           lake test
 
-      - name: Test Leaner Rust profile
-        working-directory: third_party/move/lean/leaner-rust
+      - name: Test Verex Rust profile
+        working-directory: third_party/move/lean/verex-rust
         run: |
           source "$HOME/.profile"
           lake test
 
       - name: Test end-to-end baselines
-        working-directory: third_party/move/lean/leaner-e2e-tests
+        working-directory: third_party/move/lean/verex-e2e-tests
         # The driver manages its own ci-profile exchange frontend; the build
         # step above just gives cargo failures their own step.
         run: |
@@ -83,20 +89,20 @@ jobs:
           lake test
 
       - name: Build the verification benchmark
-        # Run nightly by leaner-bench.yaml; built here so a change breaking
+        # Run nightly by verex-bench.yaml; built here so a change breaking
         # it shows on the pull request.
-        working-directory: third_party/move/lean/leaner-e2e-tests
+        working-directory: third_party/move/lean/verex-e2e-tests
         run: |
           source "$HOME/.profile"
-          lake build leaner-bench
+          lake build verex-bench
 
       - name: Test compiler-v2 Lean integration
-        # compiler-v2 elaborates `.lean` sources in leaner-move, which the
-        # Leaner Move step above has built.
+        # compiler-v2 elaborates `.lean` sources in verex-move, which the
+        # Verex Move step above has built.
         run: |
-          cargo test --locked -p move-compiler-v2 leaner::tests
+          cargo test --locked -p move-compiler-v2 verex::tests
           cargo test --locked -p move-compiler-v2-transactional-tests \
-            --test tests -- leaner/
+            --test tests -- verex/
 
   result:
     name: Lean integration result

@@ -1,0 +1,11 @@
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:16:16: error: the loop invariant `i < n` is not established at entry
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:16:16: error: the loop invariant `i < n` is not preserved by an iteration
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:18:7: error: verex verification failed: the automatic verification of `bad_entry` failed; provide a proof: `verify bad_entry by …` in the module (`verify bad_entry by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:30:4: error: the specification clause `ensures result == n` is not established
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:29:7: error: verex verification failed: the automatic verification of `weak_exit` failed; provide a proof: `verify weak_exit by …` in the module (`verify weak_exit by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:39:16: error: the loop invariant `i == 0` is not preserved by an iteration
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:41:7: error: verex verification failed: the automatic verification of `bad_step` failed; provide a proof: `verify bad_step by …` in the module (`verify bad_step by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:52:4: error: the specification clause `ensures result == 1` is not established
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:51:7: error: verex verification failed: the automatic verification of `bad_default` failed; provide a proof: `verify bad_default by …` in the module (`verify bad_default by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:62:16: error: the loop invariant `i == 0` is not preserved by an iteration
+VerexE2ETests/Check/Control/LoopInvariantErrors.lean:66:7: error: verex verification failed: the automatic verification of `split_annotation` failed; provide a proof: `verify split_annotation by …` in the module (`verify split_annotation by verex_obligations` lists its obligations)

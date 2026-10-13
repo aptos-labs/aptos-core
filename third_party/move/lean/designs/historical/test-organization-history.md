@@ -8,7 +8,7 @@ work. Claims such as "passes", "ported", "source checkpoint", "latest", and
 native-only implementation. Some earlier passes used the now-disabled legacy
 encoding. A historical pass or commit does not establish a current native pass.
 
-The old term **source checkpoint** meant that a LeanerLang translation was
+The old term **source checkpoint** meant that a VerexSL translation was
 committed and passed at that time; it did not certify native encoding or absence
 of later failures. Do not use it as a current completion label. This archive is
 retained for provenance, original v0 counts, semantic decisions, and proof-cost
@@ -89,7 +89,7 @@ projection writes, checked failure/definedness, and the actual registered
 reference-mutation evaluator at an arbitrary slot. No `RuntimeValue` or frame
 is introduced into the native update computation.
 
-The registered `LeanerIR.Tests.NativeVectorMutation` tests include symbolic
+The registered `VerexIR.Tests.NativeVectorMutation` tests include symbolic
 length/element/loan preservation, invalid bounds and wrong-output rejections,
 exact vector and reference updates, and zero/three-iteration clearing. An
 aggregate clearing loop proves every bit false and preserves its unrelated
@@ -162,36 +162,36 @@ The same six IR targets fail; all native regression/cost gates pass. Move
 1. **A benchmark plugged into the ground.** v0 (the deprecated `move`
    package) verified its acceptance corpus with mostly bare `verify`
    commands, and its language and negative tests pinned elaboration,
-   compilation, and diagnostics.  The leaner stack must reach parity on
+   compilation, and diagnostics.  The verex stack must reach parity on
    that corpus and then be measured against it:
-   - v0's `Tests/Verification/` (ported to [`Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/)):
+   - v0's `Tests/Verification/` (ported to [`Check/`](../verex-e2e-tests/VerexE2ETests/Check/)):
      23 files, 174 `verify` commands, 99 bare (automatic) and 75 with
      proof scripts; `Quicksort.lean` (3 verifies, ~220 proof lines) and
      `OrderedMap.lean` (9 verifies, ~480 proof lines) carry the
      AI-generated proofs.
-   - v0's `Tests/Language/` (ported to [`Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/)): 20
+   - v0's `Tests/Language/` (ported to [`Check/`](../verex-e2e-tests/VerexE2ETests/Check/)): 20
      files covering the language surface (integers of every width, signed
      arithmetic, enums and their payloads and references, generics,
      loops, tuples, vectors, addresses, attributes, abilities).
-   - v0's `Tests/Negative/` (ported to [`Check/`](../leaner-e2e-tests/LeanerE2ETests/Check/)): 9 files
+   - v0's `Tests/Negative/` (ported to [`Check/`](../verex-e2e-tests/VerexE2ETests/Check/)): 9 files
      pinning diagnostics (borrow errors, returned `&mut` shapes, lowering
      and surface rejections, spec-function and specification errors,
      verification failures).
 2. **Every end-to-end test verifies.** We map one language with
-   specifications into LeanerLang, and the produced LeanerLang must
+   specifications into VerexSL, and the produced VerexSL must
    verify.  Today no end-to-end test elaborates its output.
 
 ## What exists today
 
 | Suite | What it checks | Verification |
 |---|---|---|
-| `leaner-ir` `LeanerIR/Tests` (16 files) | IR validation, semantics, interpreter, codecs | none (unit tests) |
-| `leaner-ir` `LeanerLang/Tests` | elaborator (`Frontend`), three hand row proofs, 10 `Verification*.lean` fixtures (46 verifies), the `Performance` gate (20 targets) | yes, on hand-authored LeanerLang |
-| `leaner-move` `Tests` (2 files) | profile, intrinsics | none |
-| `leaner-rust` `LeanerRust/Tests` | driver, registry, source backend, 9 LeanerLang programs | none |
-| `leaner-e2e-tests` `MoveToLeanerLang` | 14 direct `.move` files plus MoveStdlib (14 modules, 106 spec blocks), AptosStdlib (6), AptosFramework (2): printed LeanerLang compared textually and re-parsed for a canonical fixed point | none |
-| `leaner-e2e-tests` `RustToLeanerLang` | 53 `.rs` fixtures, same textual baseline | none |
-| `leaner-e2e-tests` `MonoVM`, `MonoDifferential` | linked MonoVM smoke test; three-engine differential execution | none (execution) |
+| `verex-ir` `VerexIR/Tests` (16 files) | IR validation, semantics, interpreter, codecs | none (unit tests) |
+| `verex-ir` `VerexSL/Tests` | elaborator (`Frontend`), three hand row proofs, 10 `Verification*.lean` fixtures (46 verifies), the `Performance` gate (20 targets) | yes, on hand-authored VerexSL |
+| `verex-move` `Tests` (2 files) | profile, intrinsics | none |
+| `verex-rust` `VerexRust/Tests` | driver, registry, source backend, 9 VerexSL programs | none |
+| `verex-e2e-tests` `MoveToVerexSL` | 14 direct `.move` files plus MoveStdlib (14 modules, 106 spec blocks), AptosStdlib (6), AptosFramework (2): printed VerexSL compared textually and re-parsed for a canonical fixed point | none |
+| `verex-e2e-tests` `RustToVerexSL` | 53 `.rs` fixtures, same textual baseline | none |
+| `verex-e2e-tests` `MonoVM`, `MonoDifferential` | linked MonoVM smoke test; three-engine differential execution | none (execution) |
 
 The gap: the corpus that defines "done" is not run by anything, the
 end-to-end output is text that nobody elaborates, and the verification
@@ -200,22 +200,22 @@ either.
 
 ## The convention
 
-A **check** is a LeanerLang source file under
-`leaner-e2e-tests/LeanerE2ETests/Check/`: a `.lean` file that imports
-`LeanerLang` and contains `leaner module` declarations with
+A **check** is a VerexSL source file under
+`verex-e2e-tests/VerexE2ETests/Check/`: a `.lean` file that imports
+`VerexSL` and contains `verex module` declarations with
 specifications, `verify` commands (bare, or with an inline proof script
 where real mathematics lives, as v0 did), and whatever other commands the
-test needs.  **Everything under `Check/` is LeanerLang** — no Move
+test needs.  **Everything under `Check/` is VerexSL** — no Move
 sources, no Rust sources, and not the v0 surface: a v0 test is ported by
-rewriting it in LeanerLang.  The frontend paths keep their own
-directories (`MoveToLeanerLang`, `RustToLeanerLang`).  The driver
+rewriting it in VerexSL.  The frontend paths keep their own
+directories (`MoveToVerexSL`, `RustToVerexSL`).  The driver
 elaborates the file and records its diagnostics.
 
 - **The output is the baseline, verbatim**, side by side as `<name>.exp`,
   the way compiler-v2's baseline tests record theirs
   (`move-prover/test-utils/src/baseline_test.rs`,
   `verify_or_update_baseline`): the `.exp` is exactly what `lean` prints
-  for the file — `LeanerE2ETests/Check/Verification/WrongIncrement.lean:12:2:
+  for the file — `VerexE2ETests/Check/Verification/WrongIncrement.lean:12:2:
   error: verification failed for …` and the message body as the user
   reads it — with no reformatting.  The only cleaning is compiler-v2's:
   trailing whitespace trimmed, a single trailing newline.  The driver
@@ -234,31 +234,31 @@ elaborates the file and records its diagnostics.
   down, and under a per-command heartbeat cap that the driver passes
   (start at 50M, five times the largest generated route), so a proof that
   silently falls back to search surfaces as a diff instead of a slow
-  suite.  Cost stays gated precisely by `LeanerLang/Tests/Performance`;
+  suite.  Cost stays gated precisely by `VerexSL/Tests/Performance`;
   the cap only catches collapses.
 - **Discovery, not registration.** Every `.lean` under `Check/` is a
   check; subdirectories mirror the v0 categories.
 
 ```text
-leaner-e2e-tests/LeanerE2ETests/
+verex-e2e-tests/VerexE2ETests/
   Check/
     Verification/
       Account.lean            # clean: no .exp
       Quicksort.lean          # proofs inline, clean: no .exp
       WrongIncrement.lean     # negative
-      WrongIncrement.exp      # LeanerE2ETests/Check/Verification/WrongIncrement.lean:12:2: error: verification failed …
+      WrongIncrement.exp      # VerexE2ETests/Check/Verification/WrongIncrement.lean:12:2: error: verification failed …
     Negative/
       Borrows.lean
       Borrows.exp
     Language/
       Integers.lean
-  MoveToLeanerLang/           # unchanged (see T2 for the verifying stage)
-  RustToLeanerLang/           # unchanged
+  MoveToVerexSL/              # unchanged (see T2 for the verifying stage)
+  RustToVerexSL/              # unchanged
   MonoVM/, MonoDifferential/  # unchanged
 ```
 
-`LEANER_E2E_SUITE=check` selects the suite; `lake test` runs it with the
-others.  `LeanerIR.TestInfra.Baseline` gains compiler-v2's semantics
+`VEREX_E2E_SUITE=check` selects the suite; `lake test` runs it with the
+others.  `VerexIR.TestInfra.Baseline` gains compiler-v2's semantics
 (`check` today always writes the file, even an empty one): write when
 the output is non-empty, remove when it is empty, trim trailing
 whitespace.
@@ -266,7 +266,7 @@ whitespace.
 ## Historical source-coverage ledger
 
 The v0 trees are ported one file at a time — each file rewritten in
-LeanerLang, since the v0 surface is a different language — each check
+VerexSL, since the v0 surface is a different language — each check
 landing only when it passes: a clean run for a positive test, the
 intended diagnostics for a negative one.  The deprecated file stays as
 the reference until its port lands.  The ledger below is kept current in this document; a row
@@ -282,7 +282,7 @@ are unchanged. Subsequent regressions are marked explicitly.
 native without fallback and pass the native computation/VC dependency audit,
 plus its functional, negative, agreement, and unchanged performance gates.
 Neither a commit nor a passing legacy-backed test satisfies this condition.
-Completed native fixtures also end with `#leaner_require_native_all`: this
+Completed native fixtures also end with `#verex_require_native_all`: this
 checks every successful source verification declared in that file, including
 targets missing an individual assertion. Imported proofs are excluded. A
 regression test deliberately verifies a function by the old route and checks
@@ -324,7 +324,7 @@ commit status is no longer an outstanding step for these rows.
 | `Negative/Specifications.lean` | 3 cases | **source checkpoint** (2026-09-07; non-resource existence/modifies clauses reject with positioned ability diagnostics. The former `old(address)` rejection is now an admission-free positive proof, with two execution checks and canonical round-tripping. No implementation changes.) |
 | `Negative/Borrows.lean` | 5 original proofs, 1 rejection | **source checkpoint** (2026-09-07; all originals plus an owner-restoration proof, seven execution cases, two final-state assertions, Rust rejection, admission guards, and canonical round-trips pass. The positioned rejection checks fit a 1M guard. Move direct-local mutable borrows with an unused let result retire before the body; used aliases and projected/global/Rust borrows retain their conflict checks.) |
 | `Negative/IntrinsicUnsupported.lean` | 2 original cases | **source checkpoint** (2026-09-07; intrinsic attributes are now implemented. The incomplete owner fails full Move-schema validation with four missing-role diagnostics; the orphan `map_spec_get` role fails positioned source lowering. A complete four-role graph validates and canonically round-trips through the full Move schema. This is schema coverage, not native-map execution support.) |
-| `Negative/Lowering.lean` | 2 original proofs, compiler diagnostics | **source checkpoint** (2026-09-07; six source/LIR rejection checks, five proofs with admission guards, thirteen executions, and canonical round-trips pass. The former Lean-host vector helpers use the shared-primitive spellings, as in VectorOperations; this does not claim executable imported standard-library bodies. Body metadata cannot replace authored semantics, recursive Move types reject, host/unresolved calls have positioned diagnostics, and additional contract resource families and mutual calls are covered positively.) |
+| `Negative/Lowering.lean` | 2 original proofs, compiler diagnostics | **source checkpoint** (2026-09-07; six source/VIR rejection checks, five proofs with admission guards, thirteen executions, and canonical round-trips pass. The former Lean-host vector helpers use the shared-primitive spellings, as in VectorOperations; this does not claim executable imported standard-library bodies. Body metadata cannot replace authored semantics, recursive Move types reject, host/unresolved calls have positioned diagnostics, and additional contract resource families and mutual calls are covered positively.) |
 | Remaining `Negative/` (2 files: `ReturnedMutRefs`, `SpecFunctions`) | | not ported |
 | `Language/EmptyModule.lean` | 0 | **source checkpoint** (2026-09-05; empty module elaboration and semantic preparation pass the unchanged driver cap) |
 | `Language/Abilities.lean` | 0 | **source checkpoint** (2026-09-05; all eight declarations, generic ability bounds, and phantom profile metadata pass the unchanged driver cap) |
@@ -335,11 +335,11 @@ commit status is no longer an outstanding step for these rows.
 | `Language/Signed.lean` | 6 | **source checkpoint** (2026-09-05; user resolved the semantic discrepancy: match the VM. All ten functions, six verifies, and twelve VM-boundary interpreter assertions pass under the unchanged cap. The port adds the `MIN_INT % -1` remainder abort omitted by v0 and checks its exact overflow payload; neither v0 nor VM semantics changed.) |
 | `Language/Arithmetic.lean` | 12 | **source checkpoint** (2026-09-05; all twelve functions and verifies, all twenty-nine original scalar execution cases, and all nine original resource-store cases pass under the unchanged cap. Checked unsigned quotient/remainder facts are exposed without case enumeration; structural integer inequality normalizes directly. Resource cases pin both the resulting store and cleaned loan state, including pre-borrow arithmetic aborts.) |
 | `Language/Tuples.lean` | 10 | **source checkpoint** (2026-09-05; all ten functions and verifies and all ten original interpreter assertions pass under the unchanged cap. Tuple locals and parameters use heterogeneous native products, with the VM's flat `RuntimeValue.tuple` introduced only by the boundary codec. Composed tuple-returning calls invert that codec structurally without enumerating runtime-value constructors.) |
-| `Language/Addresses.lean` | 2 (+1 helper) | **source checkpoint** (2026-09-05; both original verifies, a variable-key read helper, and six equivalent interpreter assertions pass under the unchanged cap. Source-package aliases are represented by their resolved 256-bit literal at the LeanerLang boundary. Runtime address equality closes as logical equality without unfolding String's byte implementation; fixed-address resource reads compose through the typed family-presence bridge.) |
+| `Language/Addresses.lean` | 2 (+1 helper) | **source checkpoint** (2026-09-05; both original verifies, a variable-key read helper, and six equivalent interpreter assertions pass under the unchanged cap. Source-package aliases are represented by their resolved 256-bit literal at the VerexSL boundary. Runtime address equality closes as logical equality without unfolding String's byte implementation; fixed-address resource reads compose through the typed family-presence bridge.) |
 | `Language/EnumPatterns.lean` | 6 | **source checkpoint** (2026-09-06; all six original verifies and eight interpreter assertions (five originals plus three direct cases) pass the unchanged 50M cap. Branch-sensitive normalization prunes unselected continuations, and direct branch/enum agreement dispatch avoids relational tactic backtracking. All six public verification theorems are checked for admissions.) |
-| `Language/Literals.lean` | 2 | **source checkpoint** (2026-09-05; all five functions, both verifies, and all seven interpreter assertions pass the unchanged cap. Typed loan-freedom discharges the finalizer's aggregate collector, and lawful runtime equality connects vector guards to specification equality. The classifier costs 13.90M typed-proof heartbeats. Typed vector literals preserve LeanerLang's intentional distinction from `Bytes`; the abort message remains a byte literal.) |
+| `Language/Literals.lean` | 2 | **source checkpoint** (2026-09-05; all five functions, both verifies, and all seven interpreter assertions pass the unchanged cap. Typed loan-freedom discharges the finalizer's aggregate collector, and lawful runtime equality connects vector guards to specification equality. The classifier costs 13.90M typed-proof heartbeats. Typed vector literals preserve VerexSL's intentional distinction from `Bytes`; the abort message remains a byte literal.) |
 | `Language/Integers.lean` | 12 | **source checkpoint** (2026-09-05; all twelve verifies and 31 interpreter assertions pass the unchanged driver cap. Checked narrowing/widening casts, unsigned bitwise masks and shifts, exact cast/shift abort payloads, nested computed constants, decision-tree matches, conditional effects, and shared primitive references are covered. Native cast regressions additionally pass a 5M raw-heartbeat cap.) |
-| `Language/EnumRefs.lean` | 0 | **source checkpoint** (2026-09-05; this execution-only v0 file has no verifies. All sixteen original functions and ten execution assertions pass the unchanged driver cap. Mutable match payloads use one stable reborrow per arm. Explicit variant guards represent v0's checked field projections because raw LIR field selection is partial.) |
+| `Language/EnumRefs.lean` | 0 | **source checkpoint** (2026-09-05; this execution-only v0 file has no verifies. All sixteen original functions and ten execution assertions pass the unchanged driver cap. Mutable match payloads use one stable reborrow per arm. Explicit variant guards represent v0's checked field projections because raw VIR field selection is partial.) |
 | `Language/Vectors.lean` | 6 | **source checkpoint** (2026-09-06; all six original contracts and executions pass the unchanged 50M cap, with admission guards. Shared insertion/removal primitives preserve bounds and removal transfers both the removed value and remaining vector. The `make` helper has an additional proved no-abort clause for modular callers. Exact bounded-vector result decoding and loan-discipline composition after a call each have 1M regressions.) |
 | `Language/Loops.lean` | 10 (6 proofs) | **source checkpoint** (2026-09-06; all fifteen functions, ten original contracts, and eighteen executions pass the unchanged 50M cap, with admission guards. Typed default invariants handle unannotated loops; the second phase retains the bound from v0's manual proof. Labeled exits/continues use existing IR nesting depths. Hidden resource-borrow owners survive scalar loops, with proved cache preservation. Structured loop/no-helper/early-return assertions and source round trips replace the corresponding v0 CFG checks.) |
 | `Language/ControlForms.lean` | 18 (6 proofs) | **source checkpoint** (2026-09-06; all 22 original functions, 18 original verifies, and 37 original executions are retained. Two additional Boolean functions/contracts and six executions cover short-circuit OR, eager core operations, and computed-index overflow. All 20 verifies are automatic under the unchanged 50M cap, with admission guards and canonical print/reparse.) |
@@ -349,7 +349,7 @@ commit status is no longer an outstanding step for these rows.
 
 Totals to reach: 174 verifies (99 automatic, 75 with proofs) across the
 23 verification files.  v0 files also carry `#test` execution assertions
-over the lowered module; a port keeps them where the leaner surface has
+over the lowered module; a port keeps them where the verex surface has
 an equivalent and otherwise leaves execution to the MonoVM differential
 suite, which owns it.
 
@@ -357,7 +357,7 @@ suite, which owns it.
 
 The complete capped Check audit passes **60/60**: **18/23 verification,
 19/20 language, 7/9 negative** source ports. `Negative/Lowering` passes five
-proofs, thirteen executions, source/LIR rejection checks, admission guards,
+proofs, thirteen executions, source/VIR rejection checks, admission guards,
 and canonical round-tripping. Recursive Move nominal definitions are rejected
 at shared validation, including cycles through vectors, generic arguments,
 variant fields, function signatures, and dependency interfaces. Rust retains
@@ -406,7 +406,7 @@ Native migration is tracked independently of those source-port counts:
 | `Verification/LoopInvariants` | `count_to`, `sum_ones` | Authored invariants over multiple mutable scalar locals pass; mutable aggregate/vector `clear` remains a native gap. |
 
 Each listed migration selects `native` explicitly and uses
-`#leaner_require_native`, which rejects a legacy typed theorem and audits the
+`#verex_require_native`, which rejects a legacy typed theorem and audits the
 native computation/VC artifacts. This gate does not claim that the compatible
 `RuntimeState`/failure vocabulary has already become a fully typed global
 store. Shared conditional rules cover typed scalar comparisons, Boolean
@@ -743,7 +743,7 @@ the iteration certificate, not discarded. The owned-local continuation law
 passes one typed exit state into one continuation. Runtime frames occur only
 in these execution-agreement statements, not the loop computation or WP.
 
-The registered `LeanerIR.Tests.NativeLoop` passes under a 1M-heartbeat cap per
+The registered `VerexIR.Tests.NativeLoop` passes under a 1M-heartbeat cap per
 declaration: arbitrary countdowns, a store-changing invariant, exact later
 abort payloads, undefined behavior, divergence, a concrete local update and
 break, continue agreement, and rejection of outer-loop control. A false
@@ -1123,7 +1123,7 @@ Remaining work, in order:
    assertions, source roundtrip, and the full Check/integration/performance
    audit. The five added collision scenarios are not yet validated.
 
-`lake build LeanerLang` passes. Focused `SpecTypes` codec/data-certificate
+`lake build VerexSL` passes. Focused `SpecTypes` codec/data-certificate
 tests and the existing native `Check/Verification/Generics` pass. The small
 certificate regressions retain a 1M cap. The previous full Check audit and
 six known performance failures below describe the preceding checkpoint,
@@ -1173,7 +1173,7 @@ This checkpoint does not claim performance parity.
 execution checks. All ten contracts verify automatically, including nested
 labeled exits/continues and resource-backed `drain`. The second `two_phases`
 loop carries the `<= 3` bound from v0's hand proof. The separate v0
-`Action`/`pure` and arrow-binding spellings map to ordinary LeanerLang locals;
+`Action`/`pure` and arrow-binding spellings map to ordinary VerexSL locals;
 its tail recurrence maps to a structured loop, not a helper or self call.
 Structural assertions check those loop counts, absence of calls/helpers, and
 the early return; source rendering/reimport is a fixed point.
@@ -1256,7 +1256,7 @@ user annotation. The port uses `randomness = 7` for v0's positional literal.
 User annotations are distinct from intrinsic owner/role graphs, including
 when both occur on one declaration. Canonical rendering/reimport preserves
 both; four negative cases pin malformed owners, missing owners, role arity,
-and roles on nominal declarations. No new LIR metadata schema or verification
+and roles on nominal declarations. No new VIR metadata schema or verification
 strategy is needed. Specification-function annotations use the existing
 unified contract pragma slot and print as declaration attributes.
 
@@ -1281,7 +1281,7 @@ Global removal and publication now check active loans using the same family
 identity as global borrowing. Three low-level tests cover shared/mutable
 removal and publication; three positive source cases cover ended loans,
 different families, and non-invalidating existence checks. Structural
-`#leaner_unit` materialization alone is not an executable-safety check.
+`#verex_unit` materialization alone is not an executable-safety check.
 
 The full capped Check audit passes **45/46**, with only the existing
 `LoopInvariants` draft failing. No positive failure baseline or increased
@@ -1416,7 +1416,7 @@ verification `GlobalBorrows`, `Loans`, and `LoopInvariants`. An intermediate
 context-wide equality fallback regressed `CrossInv`; restricting it to vector
 guards restores that check, and the final sweep introduces no new failures.
 The next vector gap is representation: v0's `Move.Vector` carries a `< 2^64`
-length certificate; Leaner's native array currently does not. This remains
+length certificate; Verex's native array currently does not. This remains
 necessary for `EnumPayloads.batch_length`, not a reason to weaken its clause.
 
 ### Returned-reference composition checkpoint (2026-09-05, `1e621f970d`)
@@ -1466,7 +1466,7 @@ No gate or diagnostic baseline was relaxed.
 - The complete 44-file Check audit passes **36/44**. The eight failures are
   `Language/{EnumPatterns,EnumPayloads,Enums,Literals}` and
   `Verification/{GlobalBorrows,Loans,LoopInvariants,References}`.
-- IR tests pass except the older `LeanerLang.Tests.Performance` root.
+- IR tests pass except the older `VerexSL.Tests.Performance` root.
   `OperationWP`, `Frontend`, `NativeStoreRow`, `NativeLocalCalls`, and
   `CompositionPerformance` pass. Move and Rust package tests pass. The
   independent Move/Rust source and Mono suites passed at the immediately
@@ -1488,7 +1488,7 @@ No gate or diagnostic baseline was relaxed.
   heartbeats per general mutation/loan-retirement evaluation.
 - The full 44-file Check audit still passes 35 files and fails nine: the
   same files listed below, with only `scale` failing inside `EnumRefs`.
-  `leaner-ir` builds and its test suite fails only the older `Performance`
+  `verex-ir` builds and its test suite fails only the older `Performance`
   root. `NativeStoreRow`, `NativeLocalCalls`, `CompositionPerformance`, and
   frontend tests pass. Move and Rust package tests pass too.
 - `MoveStdlib/option` now passes the first-print/reimport fixed-point check.
@@ -1506,7 +1506,7 @@ No gate or diagnostic baseline was relaxed.
   suites also pass independently. The full suite is still not green because
   Check has the nine failures above; no failure output was accepted as a
   passing baseline. The final source audit passes 35/44 files, and the IR
-  rerun fails only `LeanerLang.Tests.Performance` with all native-call and
+  rerun fails only `VerexSL.Tests.Performance` with all native-call and
   composition gates unchanged and passing.
 
 ### Earlier follow-up worktree audit (2026-09-05)
@@ -1527,11 +1527,11 @@ No gate or diagnostic baseline was relaxed.
   `call_then_add` from 5.108M to 4.658M raw heartbeats, below its 4.943M
   ceiling; `add_then_call` costs 4.835M and `four_calls` 11.243M. These are
   boundary certificates; native computation VCs remain frame-free.
-- `leaner-ir` builds and its full test run fails only the older `Performance`
+- `verex-ir` builds and its full test run fails only the older `Performance`
   root. `NativeLocalCalls`, `CompositionPerformance`, and frontend
   round-trip regressions pass. The retired-route performance budgets were
   not adjusted.
-- Fresh `leaner-move` and `leaner-rust` package tests pass.
+- Fresh `verex-move` and `verex-rust` package tests pass.
 - Printer round trips now hide only synthetic single-write reference
   holders, with a function-scoped reachability check. Copyable immutable
   enum matches print in the decision-tree form produced by source lowering.
@@ -1548,7 +1548,7 @@ and completes `Language/Integers`. It promotes four verification files
 eight language files (`EmptyModule`, `Abilities`, `PositionalStructs`,
 `Signed`, `Arithmetic`, `Tuples`, `Addresses`, `Integers`) to **ported**.
 Their checks pass with `maxHeartbeats=50000` and
-`weak.leaner.verifyHeartbeats=50000`: 50M raw heartbeats, not 50 billion.
+`weak.verex.verifyHeartbeats=50000`: 50M raw heartbeats, not 50 billion.
 
 - The complete 43-file Check audit matches expectations for 35 files.
   Eight fail: `EnumPatterns`, `EnumPayloads`, `Enums`, `Literals`,
@@ -1562,13 +1562,13 @@ Their checks pass with `maxHeartbeats=50000` and
   and shifts; nested primitive constants fold with checked agreement rather
   than becoming assumptions. Specification shifts retain VM masking behavior.
   `NativeCasts` passes at 5M raw heartbeats; `NativeConstants` also passes.
-- `leaner-ir` builds. Its full test suite passes except the cost gates
+- `verex-ir` builds. Its full test suite passes except the cost gates
   `Performance` and `NativeLocalCalls`. The latter's `call_then_add` costs
   5.108M aggregate raw heartbeats against the unchanged 4.943M ceiling; its
   proof-object count remains below budget. The older performance gate still
   has over-budget targets awaiting migration. `CompositionPerformance` passes.
-- Fresh `leaner-move` and `leaner-rust` `lake test` runs pass.
-- Full `leaner-e2e-tests` `lake test` fails first at the Move printer's
+- Fresh `verex-move` and `verex-rust` `lake test` runs pass.
+- Full `verex-e2e-tests` `lake test` fails first at the Move printer's
   `aliased` canonical fixed-point check: re-lowering a field assignment adds
   a temporary reference binding, so the second print differs. This is an
   integration regression, not an accepted baseline change. The independent
@@ -1584,9 +1584,9 @@ not the completion of T1 or an all-green integration milestone.
 Use the driver's actual options, not a larger substitute:
 
 ```bash
-cd leaner-e2e-tests
-lake env lean -DmaxHeartbeats=50000 -Dweak.leaner.verifyHeartbeats=50000 \
-  LeanerE2ETests/Check/Verification/GlobalBorrows.lean
+cd verex-e2e-tests
+lake env lean -DmaxHeartbeats=50000 -Dweak.verex.verifyHeartbeats=50000 \
+  VerexE2ETests/Check/Verification/GlobalBorrows.lean
 ```
 
 Lean's option counts thousands of raw heartbeats: `50000` is the 50M
@@ -1606,9 +1606,9 @@ cap. `50000000` would silently allow a thousand times more work.
 - The performance benchmark is **not passing**. In particular, generic
   scalar-result callers remain unsupported and several existing cost classes
   exceed their recorded budgets. `Performance.exp` has not been relaxed.
-- Validation of the current work: `leaner-ir` builds and its unit-test
-  targets pass except `LeanerLang.Tests.Performance`; `leaner-move` and
-  `leaner-rust` pass `lake test`. The capped Check audit leaves `Generics`,
+- Validation of the current work: `verex-ir` builds and its unit-test
+  targets pass except `VerexSL.Tests.Performance`; `verex-move` and
+  `verex-rust` pass `lake test`. The capped Check audit leaves `Generics`,
   `References`, and `GlobalBorrows` failing their existing expectations.
 
 A new file's existence, a run with a larger cap, or an expected diagnostic
@@ -1638,15 +1638,15 @@ ten checks pass at the same cap, including both strict/omitted and explicit
 abort clauses, and concrete integer, Bool, address, string, signer, and byte
 results. Shared canonical-decoder shape lemmas replace per-call runtime
 constructor splitting; malformed empty-family proof quotations are repaired.
-`GenericStorage` still passes all seven checks. Fresh `leaner-move` and
-`leaner-rust` `lake test` runs pass, as do all IR test targets except the old
+`GenericStorage` still passes all seven checks. Fresh `verex-move` and
+`verex-rust` `lake test` runs pass, as do all IR test targets except the old
 performance gate. That gate now has no failed verification targets: its
 remaining failures are costs. In particular, `carry_u64` is 7.36M typed
 heartbeats against its 4.76M baseline (54% over), so it is functionally
 repaired but not performance-complete. Existing cost baselines remain intact.
 
 **Native-computation pilot (2026-09-05):** work has shifted from tuning row
-scripts to replacing their verification path. New IR/LeanerLang rule tests
+scripts to replacing their verification path. New IR/VerexSL rule tests
 cover exact typed-computation transport, generic representation edge cases,
 and fail-closed route selection. The explicit-artifact `carry`/`carry_u64`
 pilot passes an aggregate cost gate against the unchanged original ceilings,
@@ -1780,7 +1780,7 @@ Two semantic issues surfaced while examining subsequent ports:
 - v0 `Language/Signed.mod_values` says remainder aborts only when the divisor
   is zero; its specification and old interpreter return zero for
   `(-2147483648) % (-1)`. The real Move VM's `rem_checked` calls
-  `i32::checked_rem`, which rejects this pair. Current Leaner checked modulo
+  `i32::checked_rem`, which rejects this pair. Current Verex checked modulo
   also rejects it, with the out-of-range quotient payload `2147483648`.
   New kernel tests pin this exact result and the successful neighboring
   `MIN_INT % 1` case. Porting the original contract unchanged would require
@@ -1796,26 +1796,26 @@ Two semantic issues surfaced while examining subsequent ports:
 
 ## Where existing tests go
 
-- `LeanerLang/Tests/Verification*.lean` (46 verifies): each becomes a
+- `VerexSL/Tests/Verification*.lean` (46 verifies): each becomes a
   check under `Check/Verification/` and the fixture is deleted once its
   check lands; the negative ones (`VerificationAborts`, `reborrow_bad`)
   land with their `.exp`.
-- `LeanerLang/Tests/Performance.lean` and `.exp`: unchanged; it is the
+- `VerexSL/Tests/Performance.lean` and `.exp`: unchanged; it is the
   cost gate and stays a curated set.
 - The hand row proofs (`NativeRow`, `NativeCallRow`, `NativeStoreRow`):
   unchanged; they test proof rules, not programs.
-- Assertion-style tests in `leaner-move`, `leaner-rust`, and
-  `LeanerIR/Tests`: unchanged.
+- Assertion-style tests in `verex-move`, `verex-rust`, and
+  `VerexIR/Tests`: unchanged.
 - The deprecated packages stay until the ledger is complete.
 
 ## Milestones
 
 | Status | Step | Gate |
 |---|---|---|
-| **DONE (2026-09-02)** | **T0 the check driver.** `LEANER_E2E_SUITE=check` (`LeanerE2ETests/Check.lean`): discovers `Check/**/*.lean`, runs each in its own `lean` process under the heartbeat cap, records its output verbatim, compares against the optional `.exp` through `Baseline.checkOutput` (`UB=1` writes or removes, as compiler-v2 does). The cap reaches the generated theorems through the registered option `leaner.verifyHeartbeats`, which the generator reads in place of its former literal budget (default unchanged); the driver passes it as `-Dweak.leaner.verifyHeartbeats`. Seeded with `Check/Verification/Increment.lean` (clean, no `.exp`) and `Check/Negative/WrongIncrement.lean`, whose `.exp` is lean's two diagnostics: the clause not established at its range, and the module's verification failure. | Met: the suite runs in `lake test`; the positive seed has no `.exp`, the negative seed's `.exp` is the verbatim output; a deliberately wrong clause on the positive seed produced a baseline diff, and a budget of 10 produced the deterministic timeout at the `verify`. |
+| **DONE (2026-09-02)** | **T0 the check driver.** `VEREX_E2E_SUITE=check` (`VerexE2ETests/Check.lean`): discovers `Check/**/*.lean`, runs each in its own `lean` process under the heartbeat cap, records its output verbatim, compares against the optional `.exp` through `Baseline.checkOutput` (`UB=1` writes or removes, as compiler-v2 does). The cap reaches the generated theorems through the registered option `verex.verifyHeartbeats`, which the generator reads in place of its former literal budget (default unchanged); the driver passes it as `-Dweak.verex.verifyHeartbeats`. Seeded with `Check/Verification/Increment.lean` (clean, no `.exp`) and `Check/Negative/WrongIncrement.lean`, whose `.exp` is lean's two diagnostics: the clause not established at its range, and the module's verification failure. | Met: the suite runs in `lake test`; the positive seed has no `.exp`, the negative seed's `.exp` is the verbatim output; a deliberately wrong clause on the positive seed produced a baseline diff, and a budget of 10 produced the deterministic timeout at the `verify`. |
 | **IN PROGRESS (since 2026-09-02)** | **T1 port the v0 trees.** One file at a time, ledger kept current. Native-encoding migration now takes priority over additional ports. Historical recommended order: `Verification/` first (automatic targets before proof-carrying ones; `Quicksort` and `OrderedMap` last), then `Negative/`, then `Language/`. The last committed checkpoint has eighteen verification source ports, nineteen language files, and seven negative files passing its Check audit; active worktree regressions are recorded above. Incomplete and regressed rows are marked explicitly above; no new failure baseline qualifies a file as ported. The latest committed checkpoint completes `Negative/Lowering`; the preceding hand `References` fixture is not the v0 `ReturnedMutRefs` port. See the latest audit for integration and performance failures. Historical benchmark numbers are not current passing measurements. | Every ledger row passes its check under the driver cap, and the performance gate passes. Parity target: every v0 automatic verify is automatic here; proof-carrying targets may be automatic or use explicit proofs of their mathematics. |
-| NOT STARTED | **T2 the produced LeanerLang verifies.** The Move stage appends `verify f` for every spec'd function with a body (v0's `--verify`), so the `.exp.lean` baselines carry the commands, and every `.exp.lean` under `MoveToLeanerLang` runs as a check with `<module>.check.exp` beside it. Most stdlib rows will read as failures at first: that is the benchmark plugged into the ground. Same later for `RustToLeanerLang` once Rust contracts exist (rust-mir-design M2). | Every produced module with a spec has a check result; a `proved` that turns into anything else fails the suite. |
-| **DONE (2026-09-02)** | **T3 retire the hand fixtures.** The ten `LeanerLang/Tests/Verification*.lean` fixtures are checks under `Check/Verification/` (`Prophecies`, `Aborts`, `Storage`, `Generics`, `Corpus`, `References`, `Loops`, `Typed`, `Rust`, plus the seeds `Increment` and `Account`); their `.exp` files record the constructs without a generated route, since the frame route was retired the same day. | Met: `leaner-ir`'s verification tests are the row proofs and the cost gate only. |
+| NOT STARTED | **T2 the produced VerexSL verifies.** The Move stage appends `verify f` for every spec'd function with a body (v0's `--verify`), so the `.exp.lean` baselines carry the commands, and every `.exp.lean` under `MoveToVerexSL` runs as a check with `<module>.check.exp` beside it. Most stdlib rows will read as failures at first: that is the benchmark plugged into the ground. Same later for `RustToVerexSL` once Rust contracts exist (rust-mir-design M2). | Every produced module with a spec has a check result; a `proved` that turns into anything else fails the suite. |
+| **DONE (2026-09-02)** | **T3 retire the hand fixtures.** The ten `VerexSL/Tests/Verification*.lean` fixtures are checks under `Check/Verification/` (`Prophecies`, `Aborts`, `Storage`, `Generics`, `Corpus`, `References`, `Loops`, `Typed`, `Rust`, plus the seeds `Increment` and `Account`); their `.exp` files record the constructs without a generated route, since the frame route was retired the same day. | Met: `verex-ir`'s verification tests are the row proofs and the cost gate only. |
 
 T0 and T2 are driver work with no proof engineering and are independent
 of the route work in [`certifying-execution.md`](historical/certifying-execution.md);

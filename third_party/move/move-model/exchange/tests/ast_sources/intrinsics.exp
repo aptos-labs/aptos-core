@@ -1,6 +1,6 @@
 {
   "schema": "move-xast-module",
-  "version": 9,
+  "version": 10,
   "address": "0x1",
   "address_alias": null,
   "name": "intrinsics",

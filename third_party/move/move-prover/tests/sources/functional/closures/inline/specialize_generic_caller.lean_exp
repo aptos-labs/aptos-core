@@ -1,4 +1,3 @@
-Move prover returns: exiting with verification errors
 warning: cannot derive `folds_of` exactly for this lambda argument: the enclosing function has no specification which requires the fold summary; weakening the enclosing loop invariant; see https://github.com/aptos-labs/aptos-core/issues/20371
    ┌─ tests/sources/functional/closures/inline/specialize_generic_caller.move:30:23
    │
@@ -10,6 +9,3 @@ warning: cannot derive `folds_of` exactly for this lambda argument: the enclosin
    │         │           │
    │         │           lambda argument
    │         from a call inlined at this callsite
-
-tests/sources/functional/closures/inline/specialize_generic_caller.move:65:9: error: the specification clause `ensures result == v.length` is not established
-tests/sources/functional/closures/inline/specialize_generic_caller.move:63:5: error: leaner verification failed: the automatic verification of `use_concrete` failed; provide a proof: `verify use_concrete by …` in `tests/sources/functional/closures/inline/specialize_generic_caller.proof.lean` (`verify use_concrete by skip` shows the obligations it leaves)

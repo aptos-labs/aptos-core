@@ -1,3 +1,0 @@
-Move prover returns: exiting with verification errors
-tests/sources/functional/state_labels/aliasing.move:79:5: error: operation `LeanerIR.Operation.data
-  (LeanerIR.DataOperation.updateField { namespaceId := { index := 0 }, name := { index := 2 } } "value")` is outside the current LeanerLang parser

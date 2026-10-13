@@ -543,7 +543,7 @@ macro_rules
        omega))
 
 /-- Source retained by the `fun` command for later specification generation.
-This is deliberately syntax, rather than LIR or Move IR: verification is
+This is deliberately syntax, rather than VIR or Move IR: verification is
 defined over the authored source constructs. -/
 private structure Declaration where
   resultType : Syntax
@@ -1072,7 +1072,7 @@ private structure LoanExitFrame where
 
 /-- One value captured by the compiler before an inlined fold.  The Move
 prover represents this as `with_state_anchor(label, old(value))`; generated
-Leaner keeps the label in syntax until the source translator replaces it with
+Verex keeps the label in syntax until the source translator replaces it with
 this lexical snapshot. -/
 private structure StateAnchorCapture where
   label : Nat
@@ -7731,7 +7731,7 @@ scoped macro "spec " function:ident binder:moveSpecBinder* " where "
       ensures $postcondition;
       aborts $abortCondition)
 
-/-- A Move-style pragma clause.  Leaner interprets the two pragmas that bear
+/-- A Move-style pragma clause.  Verex interprets the two pragmas that bear
 on abort semantics: `aborts_if_is_partial` — the `aborts_if` clauses state
 only where the function *must* abort (with the written code), and where no
 declared condition holds any outcome is permitted — and
@@ -7762,7 +7762,7 @@ private def readPragmas (pragmas : Array Syntax) : MacroM (Bool × Bool × Bool)
     | "aborts_if_is_strict" => isStrict := true
     | "opaque" => isOpaque := true
     | name =>
-      Macro.throwErrorAt clause s!"unknown pragma `{name}`; Leaner interprets `aborts_if_is_partial`, `aborts_if_is_strict`, and `opaque`"
+      Macro.throwErrorAt clause s!"unknown pragma `{name}`; Verex interprets `aborts_if_is_partial`, `aborts_if_is_strict`, and `opaque`"
   return (isPartial, isStrict, isOpaque)
 
 /-- Under `pragma opaque` the canonical specification is elaborated with the
@@ -7916,7 +7916,7 @@ macro_rules
 meaning in specification expressions.  When `f` is a Move function of this
 module, the declaration is its *specification version* — the value-level
 reading under which the Move Prover lets a pure Move function be called in a
-specification; Move derives it, Leaner asks for it to be written (and the
+specification; Move derives it, Verex asks for it to be written (and the
 transpiler writes it) — and `f args` in a `spec` clause denotes the
 definition `f.specFun args`.  Otherwise it declares a new specification
 function under its own name.  Binders are those of `spec`: values (a Move

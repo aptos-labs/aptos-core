@@ -133,13 +133,13 @@ pub struct ProverOptions {
     #[clap(long, hide = true)]
     pub for_test: bool,
 
-    /// Verify with the Lean-based Leaner verifier instead of the Boogie
+    /// Verify with the Lean-based Verex verifier instead of the Boogie
     /// backend: the package is exported in the typed-AST exchange format and
     /// every specified function is verified against its `spec` blocks in
     /// Lean, with each message reported at its Move source position. A
     /// function or module raises its heartbeat budget with `pragma heartbeats`.
-    /// The verifier is `third_party/move/lean/leaner-move`, located through
-    /// `LEANER_MOVE_EXE`, `LEANER_MOVE_HOME`, or the enclosing checkout.
+    /// The verifier is `third_party/move/lean/verex-move`, located through
+    /// `VEREX_MOVE_EXE`, `VEREX_MOVE_HOME`, or the enclosing checkout.
     #[clap(long)]
     pub lean: bool,
 
@@ -148,6 +148,12 @@ pub struct ProverOptions {
     /// overrides it. Ignored by the Boogie backend.
     #[clap(long)]
     pub heartbeats: Option<u64>,
+
+    /// With `--lean`, verify every function automatically, ignoring its
+    /// authored proof (`foo.proof.lean`) and `pragma verify = manual`:
+    /// whether a proof is still needed. Ignored by the Boogie backend.
+    #[clap(long)]
+    pub ignore_proofs: bool,
 }
 
 impl ProverOptions {
@@ -204,14 +210,14 @@ impl ProverOptions {
             experiments_vec.push(Experiment::UNSAFE_PACKAGE_VISIBILITY.to_string());
         };
         if lean {
-            // The Leaner verifier reads the typed AST, which stops after the
+            // The Verex verifier reads the typed AST, which stops after the
             // checker and rewriters so that it keeps its source shape; the
             // specification rewriter resolves Move functions called in
             // specifications and is asked for explicitly. The Boogie
             // backend's options have no effect on it.
             experiments_vec.push(format!("{}=on", Experiment::SPEC_REWRITE));
         }
-        // The Leaner verifier inlines dependency code, which only the full
+        // The Verex verifier inlines dependency code, which only the full
         // pipeline of a compilation target provides: every module is a
         // target of the compilation, and the verifier itself narrows the
         // verification targets to the package and the filter.
@@ -238,7 +244,10 @@ impl ProverOptions {
         }
         model.check_errors("in compilation")?;
         let filter = self.filter.clone();
-        let heartbeats = self.heartbeats;
+        let settings = move_prover::verex::Settings {
+            heartbeats: self.heartbeats,
+            ignore_proofs: self.ignore_proofs,
+        };
         let mut options = self.convert_options(package_path)?;
         if for_test {
             options.setup_logging_for_test();
@@ -246,13 +255,12 @@ impl ProverOptions {
             options.setup_logging()
         }
         if lean {
-            let output = package_path.join("build").join("leaner-verify.lean");
-            return move_prover::leaner::verify(
+            return move_prover::verex::verify(
                 &model,
                 package_path,
                 filter.as_deref(),
-                heartbeats,
-                &output,
+                &options.prover.verify_scope,
+                &settings,
                 writer,
                 now,
             );

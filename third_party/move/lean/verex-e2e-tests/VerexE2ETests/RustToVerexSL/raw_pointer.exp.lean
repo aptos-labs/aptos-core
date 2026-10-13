@@ -1,0 +1,4 @@
+-- error: VerexE2ETests/RustToVerexSL/raw_pointer.rs:1:1: Rust exporter failed:
+-- verex-rust-export: M0 probe bodies=1 generic_bodies=0 blocks=1 statements=1 generic_parameters=0 traits=0 trait_methods=0 trait_predicates=0 trait_impls=0 direct_calls=0 switches=0 drops=0 cleanup_edges=0 borrows=0 raw_pointer_types=1 raw_pointer_operations=1 inline_asm=0 sources={"raw_pointer.rs"} callees={}
+-- verex-rust-export: stopping before codegen
+-- verex-rust-export: cannot emit RawUnit: unsupported Rust local type: RigidTy(RawPtr(Ty { id: 2, kind: RigidTy(Uint(U32)) }, Not))

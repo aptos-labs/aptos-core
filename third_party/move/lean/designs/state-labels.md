@@ -14,13 +14,13 @@ spec inc_twice {
 }
 ```
 
-This design carries labels end to end: the exchange, LIR, LeanerLang,
-contracts, and the closer. It completes the state-label part of H4d in
+This design carries labels end to end: the exchange, VIR, VerexSL,
+contracts, and the solver. It completes the state-label part of H4d in
 [`higher-order-functions.md`](higher-order-functions.md) ("Behavioral
 predicates and state labels"), whose sketch it follows: a contract is a
 proposition over states, so a label is a state variable. Every test of
 `move-prover/tests/sources/functional/state_labels/` (29) fails today, 18 of
-them in the LeanerLang parser (registry entries V1, V20, and one message of
+them in the VerexSL parser (registry entries V1, V20, and one message of
 V2 in [`prover-test-problems.md`](prover-test-problems.md)).
 
 ## Semantics, as the Move Prover defines them
@@ -70,7 +70,7 @@ same: the dump adds `"label": n` to a quantifier binder of type
 a per-module table `labels: [{id, name}]` so a defined (free) label is
 spelled by its source name too. XAST version 9.
 
-**LIR.** `MemoryRange` and the labeled operations exist (`behavior`,
+**VIR.** `MemoryRange` and the labeled operations exist (`behavior`,
 `functionCall`, `lemma`, `publish`, `remove`, `update`, and `global` with
 an optional label; `exists` gains the same label, which the exchange
 exports already). A `QuantifierBinder` over the `stateDomain` domain gains the
@@ -83,7 +83,7 @@ body, as the Prover's tests do), and that a state-domain binder binds a
 label. Label numbers stay
 function-local, as the model keeps them.
 
-**LeanerLang.** The numeric forms `@n |~`, `@n.. |~`, `..@n |~`,
+**VerexSL.** The numeric forms `@n |~`, `@n.. |~`, `..@n |~`,
 `@n..@m |~` already exist for behavioral calls. Labels become names:
 
 ```
@@ -131,13 +131,13 @@ yet"); `spec.global` and `exists` take a label the same way.
 ## Verification
 
 In a theorem, a label in a hypothesis (a callee's contract) is instantiated
-where the closer uses the clause: a universally quantified label at the
-state the closer reasons about, an existential one by introduction. A label
+where the solver uses the clause: a universally quantified label at the
+state the solver reasons about, an existential one by introduction. A label
 in the goal (the target's own `ensures`) needs a witness: for a defined
 label the witness is its definition; for `∃ S in *` the candidates are the
 states the proof knows — the pre-state, the post-state, and the states the
 call rule records after each call (the anchors `Contract.lean` already
-binds for in-body assertions). The closer tries them in program order and
+binds for in-body assertions). The solver tries them in program order and
 takes the first the rest of the leaf closes with; a `∀ S in *` goal is a
 universally quantified leaf, decided as other quantified leaves are. This
 is sound, and complete for the Prover's tests, which assert existential
@@ -145,14 +145,14 @@ splits at call boundaries.
 
 ## Milestones
 
-- **S1 — round trip.** Done 2026-10-05. Exchange label names (XAST 9), LIR binder labels and
-  validation, LeanerLang names for labels and the labeled forms for
+- **S1 — round trip.** Done 2026-10-05. Exchange label names (XAST 9), VIR binder labels and
+  validation, VerexSL names for labels and the labeled forms for
   specification-function calls, state-change predicates, and one-state
   reads, printer and lowering. Gate: every `state_labels` test re-elaborates;
   the 18 parser rejections become verification outcomes; the e2e corpus
   unchanged (no module of it uses labels), plus the round-trip fixture
-  `MoveToLeanerLang/state_labels.move`. Labels are names (`NameId`s) in
-  LIR; a labeled `exists` is `SpecOperation.exists`. A Check fixture waits
+  `MoveToVerexSL/state_labels.move`. Labels are names (`NameId`s) in
+  VIR; a labeled `exists` is `SpecOperation.exists`. A Check fixture waits
   for S2: a Check baseline never records an unsupported proof.
 - **S2 — contracts.** Labels bound in `Contract.lean`: quantified labels
   as `Memory unit` binders, defined labels by their defining predicates,
@@ -171,10 +171,39 @@ splits at call boundaries.
     parameters, which is S3's "values at labels"; `spec_fun_old_param_labeled`
     and the `*_mismatch` tests (rejected by the Prover's Boogie translator
     over exactly those copies) wait for it.
-  - S2b, open: defined labels — `publish`, `remove`, `update` as memory
-    functions of the pre-state; a label an `ensures_of` or `result_of`
-    defines as the invocation's post-state.
-- **S3 — the closer.** Witnesses for existential labels from the recorded
+  - S2b, implemented 2026-10-05: `publish`, `remove`, and `update` translate as
+    exact memory changes with their presence conditions. A free label they
+    define is a memory expression, resolved across clauses in any order;
+    naming it assumes neither resource presence nor the defining predicate.
+    Chained definitions preserve other slots and resource types. The
+    contract carries these expressions into an opaque caller: no program
+    point of the callee is needed when its contract replaces the call.
+    `Check/Specifications/DefinedStateLabels` covers those calls, local
+    specification bindings, chains, and generic resources;
+    `DefinedStateLabelErrors` keeps negated definitions, implication
+    antecedents, and removal on an aborting path as genuine failures.
+    Invocation labels now translate to `Proofs.StateOf`, the post-state
+    chosen from the same successful invocation as `ResultOf`. The projection
+    defaults to the pre-state when no successful run exists and adds no
+    success assumption. `stateOf_eq_of_ensuresOf` proves that a successful
+    execution determines this state, using runtime determinism up to loan
+    renaming, injective slot encodings, and agreement on unnamed resources.
+    Call rules and terminating-run reasoning carry the state equation into
+    callers. Literal callable encodings retain their native function types
+    so the solver can reconstruct their invocation rows.
+    `InvocationStateLabels` exercises forward references, chains, both
+    projections through opaque contracts, and function-valued parameters;
+    `InvocationStateLabelErrors` rejects an always-aborting call's false
+    no-abort claim. The Prover's `aborting_result_definition` now fails its
+    intended clauses; `aborts_if_at_state_label::caller` verifies within its
+    25k heartbeat budget (since 2026-10-07).
+    Functional `update_field` values are now carried in label definitions.
+    Lowering `old(e)` switches to the range's pre-state before lowering `e`;
+    an old-only read in a definition of `..S` must not introduce a dependency
+    on `S`. The source regression `field_update_labels` proves the opaque
+    caller's increment and rejects a claim of two increments. Its caller
+    uses decoded memory facts rather than callee program-point witnesses.
+- **S3 — the solver.** Witnesses for existential labels from the recorded
   states, instantiation of universal ones. Gate: `spec_fun_old_param_labeled`,
   `aliasing`, `two_state_labels`, `intermediate_states` verify as the Prover
   does (their deliberate failures excepted).
@@ -187,13 +216,13 @@ splits at call boundaries.
     copies needs a witness.
   - S3b, done 2026-10-05: witnesses. A program point is a hypothesis of the
     leaf (`ProgramPoint value state`, an implementation detail the deciders
-    skip): where the closer unfolds a let-bound continuation at a call
+    skip): where the solver unfolds a let-bound continuation at a call
     boundary it asserts the `(value, state)` the continuation is applied
     to, and the context's rewrites carry the point to the leaf, which a
     ledger beside the goal would not survive (a substitution renames the
     values). Points are kept for a target whose contract binds a label
     (`Contract.contractBindsStateLabel`, the `labeled` flag of
-    `leaner_denote_close`); other targets pay nothing. `leaner_denote_witness`
+    `verex_solve_goals`); other targets pay nothing. `verex_witness`
     tries the points first for a label's existential: the point's state for
     a `Memory` binder, the encodings of its locals in the binder's domain
     (`RuntimeValue`, `Int`, …; a reference by its referent's current value)
@@ -220,11 +249,40 @@ splits at call boundaries.
     instantiated where its clause is used. The `*_mismatch` tests, which the
     Prover's Boogie translator rejects over its copies, are read uniformly
     here (an intended difference).
+    Behavioral predicates under a label (2026-10-09): a label's existential
+    whose body states `requires_of`, `aborts_of` or `ensures_of` of a
+    literal closure is witnessed at the first point where every conjunct,
+    instantiated there, is derived through the closure's target
+    (`dispatchBehavior`: the table of declared preconditions, the permitted
+    aborts of its verified contract), its derived facts out of their clause
+    markers, and closed by the cheap deciders (`behaviorWitness` in
+    `Solve.lean`). `bp_requires_aborts_labeled_mut` verifies, witnessed at
+    the entry; `SourceVerify/behavior_label_witness.move` has it and a label
+    no point witnesses. Not covered: a target without a theorem, whose
+    `aborts_of` the witness would read by its body (the solver's main loop,
+    not the cheap deciders), and a positive `aborts_of`, which no rule
+    establishes from a contract.
 - **S4 — the rest of the directory.** The verification failures left in the
   directory after S3 (`spec_functions`, `spec_fun_mixed_memory`, …) are
   each attributed: a labels gap, or another registry entry.
 
 ## Open
+
+- `unmodified_memory_at_label::swap` reads `old(Resource[addr])` under the
+  pre-label of a publication, after that label's removal of `Resource`.
+  Boogie's `$ResourceRemove` clears the domain bit but retains the contents;
+  Verex's `Memory` has `Option` slots and removal writes `none`, whose
+  specification read is the default value. The positive `swap` clause
+  therefore remains unproved. `swap_wrong` fails its intended clause.
+  This is a difference in reads of absent resources, not a missing label
+  or missing caller program point.
+  The calculator benchmark had the same issue in
+  `S1.. |~ result_of<old(State[addr]).Continuation.0>(x)`, with `S1` after
+  removal. Its specification now binds the old continuation before entering
+  the labeled expression, then invokes that binding at `S1`. This expresses
+  the intended closure invocation without depending on retained contents of
+  an absent resource. No memory semantics or caller-side label interpretation
+  is changed.
 
 - A free label with no defining operation. `nonlinear_cfg_error.move` reads
   `..S |~ Counter[addr].value == …` with `S` undefined and expects the

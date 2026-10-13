@@ -1,0 +1,4 @@
+VerexE2ETests/Check/Calls/FailedCallees.lean:23:4: error: the specification clause `ensures result == x + 1` is not established
+VerexE2ETests/Check/Calls/FailedCallees.lean:20:7: error: verex verification failed: the automatic verification of `bump` failed; provide a proof: `verify bump by …` in the module (`verify bump by verex_obligations` lists its obligations)
+VerexE2ETests/Check/Calls/FailedCallees.lean:37:4: error: the specification clause `ensures result == x + 4` is not established
+VerexE2ETests/Check/Calls/FailedCallees.lean:35:7: error: verex verification failed: the automatic verification of `twice_by_body` failed; provide a proof: `verify twice_by_body by …` in the module (`verify twice_by_body by verex_obligations` lists its obligations)

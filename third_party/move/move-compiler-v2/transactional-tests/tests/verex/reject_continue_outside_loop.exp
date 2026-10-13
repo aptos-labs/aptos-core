@@ -1,0 +1,11 @@
+processed 1 task
+task 0 lines 3-10:  publish [import VerexMove]
+Error: compilation errors:
+ error: VEREX-CONTINUE-CONTEXT: `continue` appears outside a loop
+  ┌─ TEMPFILE:8:5
+  │
+8 │     continue
+  │     ^^^^^^^^
+
+
+exiting with Verex elaboration errors

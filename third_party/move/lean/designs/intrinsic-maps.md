@@ -1,30 +1,50 @@
 # Intrinsic maps
 
-Status: 2026-09-30, stage 1 implemented: `ordered_map` verifies (its own
-iterator tests and a client module); `simple_map` and `pool_u64` in part.
+Status: 2026-10-13, stage 2 implemented: a table is an owned value of its
+handle and contents, read and written through the roles ("Owned Table
+values"); tables are to become values in the runtime semantics as well
+("Tables in the runtime semantics").
+Stage 1 (2026-09-30): `ordered_map` verifies (its own iterator tests and a
+client module); `simple_map` and `pool_u64` in part.
 
 A Move structure marked `pragma intrinsic = map` binds roles of the Move
-Prover's map theory to functions of its module (`lir-design.md`, "Intrinsic
+Prover's map theory to functions of its module (`vir-design.md`, "Intrinsic
 declarations and role graphs"; the Move-profile registry in
-`leaner-move/LeanerMove/Intrinsics.lean` checks the 62 roles). This design
+`verex-move/VerexMove/Intrinsics.lean` checks the 64 roles). This design
 gives the roles their verification meaning. The authority for what each role
 guarantees is the Prover's `table_module` in
-`move-prover/boogie-backend/src/prelude/native.bpl`; where Leaner deviates,
+`move-prover/boogie-backend/src/prelude/native.bpl`; where Verex deviates,
 the deviation is named below.
 
 ## Equality and order
 
-Equality stays structural everywhere, in code and in specifications, as in
-Move. The Prover instead compares intrinsic maps by content (`$IsEqual` over
-length, key set, and values), which is coarser than what Move observes for a
-map whose physical order is visible (`SimpleMap`: runtime `==`, `keys`,
-`values`, `to_vec_pair`). An equality coarser than the observations is not a
-congruence, so Leaner does not adopt it. Instead, the model of a map value is
-exactly as fine as what Move can observe of it.
+Code equality follows Move's physical representation. For entries-layout
+maps, specification equality stays structural too. The Prover instead
+compares intrinsic maps by content (`$IsEqual` over length, key set, and
+values), which is coarser than what Move observes for a map whose physical
+order is visible (`SimpleMap`: runtime `==`, `keys`, `values`,
+`to_vec_pair`). An equality coarser than these observations is not a
+congruence, so Verex does not adopt it for entries-layout maps.
+
+For `Table`, specification equality compares allocation identity, represented
+by its handle (user decision, 2026-10-06). Distinct executions of `new`
+allocate distinct identities, including executions at the same call site;
+two empty tables are therefore unequal. Updating contents preserves identity.
+The actual Table types have no `drop` ability and do not support runtime
+`==`; their specification equality is available independently of that ability.
+This identity rule differs from the Prover's content equality.
+
+A table's value carries its contents, so `old(t)` and `t` across a mutation
+are two values of one identity with different contents, and the functional
+`spec_set` and `spec_del` yield values of the same identity. Identity
+equality is therefore a separate comparison (`NTy.identityRuntime`), never
+Lean equality of the values, which would equate the contents across the
+mutation. A state label binds a memory; a table parameter's contents are its
+value's at that label, as every other parameter's are.
 
 The order is `std::cmp::compare`: `RuntimeValue.order`
-(`LeanerIR/Semantics/Runtime.lean`), a total order on runtime values whose
-laws are proved in `LeanerIR/Proofs/Order.lean` (oriented, transitive, a tie
+(`VerexIR/Semantics/Runtime.lean`), a total order on runtime values whose
+laws are proved in `VerexIR/Proofs/Order.lean` (oriented, transitive, a tie
 is equality). The native `cmp::compare` denotes it, as the Prover's per-type
 `$1_cmp_$compare` does (integers and addresses numerically, `false < true`,
 vectors and fields lexicographically, enum values by variant position, then
@@ -57,14 +77,54 @@ which the registry already constrains:
   entry structures (`SimpleMap { data }`, `OrderedMap::SortedVectorMap
   { entries }`). The model is that vector, read as pairs; the discipline is
   ordered when the owner binds an ordering role (`spec_key_at`, `spec_rank`,
-  front/back, prev/next), sequence otherwise.
-- **Table layout**: the entries live in native table storage behind a handle
-  (`Table`), and composite owners build on tables (`TableWithLength`,
-  `SmartTable`, `BigOrderedMap`). Their model needs the table natives
-  (`new_table_handle`, `add_box`, `borrow_box`, `remove_box`, …) with a state
-  component for table contents (stage 2). None of them has runtime `==` (no
-  `drop`); `SmartTable`'s iteration reads its buckets, whose content is
+  front/back, prev/next), sequence otherwise. The separate insertion-position
+  roles (`spec_insertion_key_at`, `spec_insertion_rank`) read the same model
+  positions without selecting the ordered discipline.
+- **Table layout**: the owner holds a handle (`Table`), or a handle and a
+  cached length (the registry's `extensions::table::Table`), or nothing, and
+  the runtime keeps its entries in native storage behind the handle. In the
+  denotation, the owner's type has one hidden last field holding the entries
+  ("Owned Table values" below), so its model is read as an entries layout's,
+  under the sequence discipline; the runtime boundary erases the field and
+  relates it to native storage. Composite owners build on tables
+  (`TableWithLength`, `SmartTable`, `BigOrderedMap`); none has runtime `==`
+  (no `drop`). `SmartTable`'s iteration reads its buckets, whose content is
   itself a table model, so its observations stay functions of the model.
+
+### Ownership of table contents
+
+Move checks an entry reference returned by `borrow` or `borrow_mut` as a
+borrow of the whole Table argument. This is the ordinary function-call rule:
+returned mutable references borrow from the mutable reference arguments,
+and returned shared references borrow from the reference arguments. A live
+entry borrow therefore prevents a conflicting mutable call on its Table,
+including one at a different key. Shared entry borrows may coexist, and
+mutable borrows used successively or on distinct owned Tables are accepted.
+
+The Table type has no `copy` ability, its handle field is private, and `new`
+allocates the handle. Ordinary clients cannot manufacture another Table value
+with the same handle and bypass the borrow relationship. The module and native
+implementation remain responsible for unique allocation and not duplicating
+ownership. The Aptos table natives use the same implementation for shared and
+mutable borrow, retrieving the entry's `GlobalValue` by handle and serialized
+key; they rely on Move's static checking rather than a separate lock per entry.
+
+Consequently, the verifier reasons about contents as an owned value of the
+Table, even though runtime storage is external. A mutable entry borrow
+transfers the value and reconciles its final value into that owner's
+contents; it preserves the handle and unrelated entries. Shared observations
+are stable for the duration of their certified borrow. This extends the
+existing prophetic-reference discipline instead of introducing independent
+aliases through the handle. The agreement of the owned value with native
+storage is the runtime boundary of "Owned Table values" below; allocation
+freshness is the `new` role's contract over the allocation history.
+
+The source of these rules is
+`move-bytecode-verifier/src/reference_safety/abstract_state.rs` (`core_call`)
+and `move-compiler-v2/src/pipeline/reference_safety/reference_safety_processor_v3.rs`
+(`call_operation`). Five focused compiler probes on 2026-10-06 accepted shared,
+successive mutable, and distinct-Table borrows, and rejected overlapping mutable
+borrows and removal during a shared borrow. The conflicting keys were distinct.
 
 ## Validity
 
@@ -104,7 +164,8 @@ verified against them (the Prover does not verify them either).
 | `replace_key_inplace` | absent old key; new key out of order | the entry's key replaced at its position |
 | `borrow_front`, `borrow_back`, `front_key`, `back_key`, `pop_front`, `pop_back` | empty | smallest or largest entry; `pop_*` removes it |
 | `prev_key`, `next_key` | never | the neighbouring key as `Option` |
-| `spec_key_at`, `spec_rank` | — | position ↔ key |
+| `spec_key_at`, `spec_rank` | — | position ↔ key in key order |
+| `spec_insertion_key_at`, `spec_insertion_rank` | — | position ↔ key in sequence order |
 | `keys`, `values`, `to_vec_pair`, `to_ordered_map` | never | the entries' keys, values, both; the same entries as an ordered map |
 | `spec_aborts_*` | — | the abort condition of the executable role |
 | `spec_iter_valid`, `spec_leaf_iter_valid`, `spec_iter_preserved`, `spec_leaf_offset` | — | iterator validity versions (stage 3) |
@@ -117,11 +178,96 @@ keeps `SimpleMap`'s order.
 
 ## Proofs
 
-The closer keeps map values abstract: observations (`size`, `hasKey`,
+### Owned Table values (2026-10-13)
+
+A table is an owned value of its identity and its contents (user decision,
+2026-10-07), as every other intrinsic map is a value of its entries. In the
+denotation, a table owner's type (`tableOwner`: an intrinsic map owner whose
+declared fields are none, a handle, or a handle and a cached length) has one
+hidden last field, `NTy.table K V`, whose carrier is the list of its entries
+as carrier pairs and whose encoding is a vector of pairs (`structNTyFuel`).
+Every operation of the denotation over values, codecs, type substitution,
+skolem transport, typing, and data invariants (`DataInvariant.value`'s
+`.table` case: every key and value deep), treats the field as any other.
+The specification twin of an owner gets the same hidden field
+(`SpecTypes.tableContentsField`, `FieldRep.table`), so a specification reads
+a table's contents off its value, at the memory of its clause, and `old(t)`
+and `t` are two values of one identity.
+
+**The runtime boundary.** The runtime keeps a table's entries outside its
+value, in native storage. The boundary erases: `NTy.erase` is the physical
+value, the hidden fields dropped, and `NTy.tables` lists the tables a value
+holds, each its owner type, handle, and physical entries. A memory encodes
+as a runtime state when its globals encode erased (`Encodes`) and its tables
+are the state's native storage (`TablesEncode`: the entries at the slot of
+the owner's type and handle, `tableSlot?`, resolved in the declaring
+namespace; the allocation history at `TableMemory.allocationResource`);
+`StorageEncodes` is both. A call starts from a state enclosing its
+arguments' tables (`Encloses`) and ends in one enclosing the results' and
+the mutated arguments' (`ReturnedEncloses`, through the returned row);
+`propheticRun`, closure invocation, and the behavioral predicates state
+these. Erasure is injective on the values a memory encloses
+(`NTy.eq_of_erase_eq`, `TablesAt`), which `memory_eq_of_encodes` rests on.
+The runtime has no semantics of the table natives (`BigStep.nativeCall` is
+opaque); the role contracts below are hypotheses of the typed theorems, as
+every native's contract is.
+
+**Roles.** `Maps.Layout` names the owner, the variant, the entry structure
+of an entries layout, and whether a table layout holds a handle and a cached
+length; `entriesOf` reads the last field of either, and `Layout.build`
+rebuilds a value at a handle, with the length when cached. The model
+operations (`update`, `remove`, `updateAll`, `takeEntries`, `replaceKey`)
+rebuild at the map's own handle (`handleOf`), so they keep its identity
+(`NTy.identityRuntime_update` and its siblings). A table owner's model
+(`Contract.mapModel?`) has the sequence discipline, and every executable and
+specification role is available to it. Allocation (`map_new`) yields a value
+at a fresh handle, one the allocation history lacks, and appends it to the
+history. The history is a slot no Move specification names, so the frame of
+a function that allocates a table, itself or through a callee at any depth
+(`Contract.allocatesTables`), leaves that slot open and keeps every other
+resource as its `modifies` clauses say; a function that allocates none keeps
+the whole memory. A pure `map_spec_new` of a table is rejected: a
+specification function has no allocation to take its identity from, and an
+identity it would invent cannot be related to the executable one.
+
+**Equality.** A specification's equality between values of a type holding
+table contents compares `NTy.identityRuntime` of both operands
+(`Contract.identityOperands`): a table owner with a handle is its handle (the
+cached length, which an insertion changes, is not part of the identity), a
+handle-less owner is structural, and the identity recurses through fields,
+elements, entries, and references. Lean equality of the values stays
+available to the denotation, where two values of one identity differ by
+their contents, as `old(t)` and `t` across a mutation do.
+
+**Behavioral predicates and named calls** lend a value's encoding to a
+callee's meaning; a value holding tables has no encoding without its
+storage, so `lendsEncoded` (reference-free and table-free) gates them, as
+`refFree` alone did, and `lentFlat` likewise.
+
+**Tables in the runtime semantics (decision 2026-10-13).** A table has no
+`copy`, so its contents are part of its owner's value; the runtime semantics
+is to represent it as a value as well, its natives operating on the value as
+in the Move Prover's map model. The erasing boundary above is then removed.
+
+**Fixtures.** `Check/Storage/TableReads.lean` (membership, shared lookup,
+a generic lookup, an opaque caller's `old`, an aggregate payload, and two
+rejected claims), `Check/Specifications/TableSnapshots.lean` (mutable and
+nested inputs, labels in an opaque callee and its caller, functional
+snapshots and identity equality), `Check/Storage/TableStoredInvariants.lean`
+(deep data invariants of stored values at resolved type arguments, both
+handle layouts, two rejected claims), `Check/Storage/TableStorageKeys.lean`
+(one slot per owner type and handle across namespaces, none for a shared
+reference), `Check/Storage/TableAllocation.lean` (fresh handles, the
+allocation history in callers' frames), `Check/Storage/TableGlobalWrites.lean`
+(data invariants of entries written into a stored table), and `VerexSL/Tests/StoredTableInvariantErrors.lean` (an
+invariant over two tables' identities, and a rejected one over their
+lengths).
+
+The solver keeps map values abstract: observations (`size`, `hasKey`,
 `valueAt`, `keyAt`, `rank`) are reduced by the laws over the operations, and
 never by evaluating a model's list, which would lose the laws' patterns. Where
-the Prover's SMT solver has map axioms, the closer adds their instances
-(`leaner_denote_map_positions`) at the positions a leaf reads a map at,
+the Prover's SMT solver has map axioms, the solver adds their instances
+(`verex_map_positions`) at the positions a leaf reads a map at,
 deciding the positions by omega:
 
 - a key read at its scalar type and written back is the key, for a map whose
@@ -141,7 +287,11 @@ deciding the positions by omega:
    validity as a data invariant; specification roles; executable-role
    contracts.
    Gate: `simple_map`, `pool_u64`, `ordered_map`.
-2. Table natives and table-layout owners. Gate: `table`,
-   `table_with_length`, `smart_table`, `big_vector`, `smart_vector`,
-   `storage_slots_allocator`, `pool_u64_unbound`, `big_ordered_map`.
+2. Table owners as owned values: the hidden contents field, the erasing
+   runtime boundary, all roles for table layouts, identity equality
+   (2026-10-13, above). Gate: `verify_table`, `bitwise_table`,
+   `table_option`, `data_invariant_in_map`, `table_contais_to_length`;
+   then `table`, `table_with_length`, `smart_table`, `big_vector`,
+   `smart_vector`, `storage_slots_allocator`, `pool_u64_unbound`,
+   `big_ordered_map`, which wait on tables behind type parameters.
 3. Iterator validity versions (`BigOrderedMap` iterators).

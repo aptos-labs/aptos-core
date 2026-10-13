@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 pub const VERIFY_PRAGMA: &str = "verify";
 
 /// Value of the `verify` pragma stating that an authored proof establishes the
-/// function's specification: the Leaner verifier requires `verify f by ...` in
+/// function's specification: the Verex verifier requires `verify f by ...` in
 /// the proof file; the Move Prover treats it as `true`.
 pub const VERIFY_MANUAL: &str = "manual";
 
@@ -37,7 +37,7 @@ pub const WEIGHT_PROP: &str = "weight";
 pub const VERIFY_DURATION_ESTIMATE_PRAGMA: &str = "verify_duration_estimate";
 
 /// Pragma indicating the heartbeat budget of the function's verification in
-/// the Leaner verifier, in thousands of Lean `maxHeartbeats` units; a function
+/// the Verex verifier, in thousands of Lean `maxHeartbeats` units; a function
 /// whose proof needs more than the default raises it for itself. Ignored by
 /// the Move Prover.
 pub const HEARTBEATS_PRAGMA: &str = "heartbeats";

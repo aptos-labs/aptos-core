@@ -2,12 +2,12 @@
 
 Status: proposed 2026-08-28, scheduled as Rust milestone M5
 ([`roadmap.md`](roadmap.md), section 7). Designs the first
-unsafe-pointer profile for validated LIR on top of
+unsafe-pointer profile for validated VIR on top of
 [`prophetic-references.md`](prophetic-references.md), refining the U-stage
 roadmap of
 [`rust-mir-design.md`](rust-mir-design.md#unsafe-rust-and-raw-pointers);
 prerequisite for the interior-mutability design demanded by
-[`lir-design.md`](lir-design.md)'s register.
+[`vir-design.md`](vir-design.md)'s register.
 
 ## 1. Unsafe Memory in Rust
 
@@ -221,7 +221,7 @@ against `memory`, and its methods are ordinary code: `read p` is
 | `Semantics/Operations.lean` | Materialization, checked access, alloc/dealloc, anchor-aware place resolution and drop. |
 | `BigStep.lean` + `Interpreter.lean` | Same deterministic rules; `undefined` propagation; frame exit kills anchored allocations. |
 | `Proofs/*` | Agreement over the new outcome; invariants (one live anchor per allocation, monotone `memory`); WP safety arms and `memory.*` normal forms. |
-| `LeanerLang/Contract.lean` | Safety pre-/postconditions for raw-pointer signatures. |
+| `VerexSL/Contract.lean` | Safety pre-/postconditions for raw-pointer signatures. |
 | Validation + exporter/mapper | Profile gating; escape/bracket certificate facts; lowering with precise rejection. |
 | Rust profile registry | `StoredPtr<T>` well-known type, lowering to `isValid`-guarded raw access. |
 

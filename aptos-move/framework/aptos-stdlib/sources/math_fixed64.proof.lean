@@ -1,3 +1,11 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import VerexMove.Proofs
+
+verex proofs for "math_fixed64.move"
+verex proofs where
+
 -- `math128::sqrt` returns r with r² ≤ y < (r + 1)², facts `omega` does not
 -- combine: the root of a nonzero u128 is between 1 and 2^64 - 1, so the
 -- scaled root is a nonzero divisor, and the quotient of one Newton step
@@ -36,10 +44,12 @@ theorem newton_quotient {y r : Int} (square : 0 < y → r * r ≤ y)
   exact Int.mul_lt_mul_of_pos_right (by omega) (by decide)
 
 verify sqrt by
-  case leaf_1 =>
+  verex_obligations
+  all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
+  case aborts_if_1_6 =>
     have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
     have := newton_quotient ‹_› ‹_› (by omega) (by omega) (by omega)
     omega
-  case leaf_2 =>
+  case aborts_if_1_8 =>
     have := sqrt_root_range ‹_› ‹_› (by omega) (by omega) (by omega)
     omega

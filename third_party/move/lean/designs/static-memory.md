@@ -18,7 +18,7 @@ one typed map per storable family tied to the runtime map by
   caller cannot meet the next callee's precondition (two storage calls in
   a row do not verify), and stating it would take a proof per function.
 - Every goal over storage carries encodings, decodings, the representation
-  existential, and the closer's routing between them (`FamilyRepresentation`
+  existential, and the solver's routing between them (`FamilyRepresentation`
   unfolding).
 
 In a static memory, typing holds by construction: a slot of a resource type
@@ -52,7 +52,7 @@ Every frame of a verification shares this one memory, so its type never
 changes across a call.
 
 **State.** The denotation's state is the memory: `Comp α := Spec Memory
-Failure α`. Loan bookkeeping (`globalLoans`, `nextLoan`, `pending`) occurs
+Failure α`. Loan bookkeeping (`storageLoans`, `nextLoan`, `pending`) occurs
 only inside the prophetic meaning of a call, under its existentially
 quantified runtime start (`Admissible`, `exportsAfter`), and leaves the
 denotation's state; `RuntimeState.withLoansOf` goes away.
@@ -100,10 +100,16 @@ Storage no longer keys through the runtime type instantiation
 runtime side of calls and closures.
 
 **Calls.** A callee's run (`propheticRun`) runs the big-step semantics from
-every admissible runtime start whose globals encode the caller's memory and
-yields the memory its exit globals encode (`Encodes`: under every runtime
-key, the encoding of the slot of the resource type its type identifier
-denotes, `resourceOf`). Its prophetic meaning (`propheticMeaning`) is the
+every admissible runtime start whose stores encode the caller's memory and
+yields the memory its exit stores encode (`StorageEncodes`, combining global
+`Encodes` with `TableMemory.EncodesStorage`). For globals, each runtime
+key holds the encoding of its closed resource type’s slot, as selected by
+`runtimeResourceOf`. Open generic entries in the type table are
+templates, not independent runtime keys. The template lookup (`resourceOf`)
+remains available to frame coherence, which relates a template to its
+instantiated resource. Unnamed-memory agreement uses the same runtime-key
+lookup as encoding, so it still preserves every slot an encoding cannot name.
+Its prophetic meaning (`propheticMeaning`) is the
 run where the frame is coherent with the runtime type instantiation
 (`Coherent`: every resource type of the callee's namespace mentioning only
 its own type parameters, instantiated as the runtime does, is the frame's),
@@ -122,6 +128,26 @@ rely on.
 
 ## Contracts
 
+Tables (2026-10-13; [`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table
+values"): a table owner's type has a hidden last field holding its entries,
+so a memory holds tables as values. The runtime keeps them in native storage
+beside the physical values, with a persistent allocation history;
+`StorageEncodes` relates a memory to a runtime state by the erased values
+(`Encodes`) and the tables at their owner's slot (`TablesEncode`,
+`tableSlot?`), and a call's start and exit states enclose the tables its
+arguments and results hold (`Encloses`, `ReturnedEncloses`). `ResourceType`
+distinguishes ordinary values from unbounded native collections, which the
+allocation history uses.
+
+An escaping reference leaves a heap hole. At a successful call boundary,
+`StorageEncodesReturned` observes globals and Table contents by resolving
+those holes with the explicit returned row. Prophetic calls use the prophecy
+row; runtime contracts and behavioral predicates use the current row.
+`Contract.frame` takes the result so its runtime storage observation is tied
+to that row, just like ensures. Source modifies predicates remain unchanged,
+and frames remain unconditional even when abort conditions excuse ensures.
+Loan-renaming and labeled-state uniqueness proofs cover these observations.
+
 - `global<R>(k)` reads the memory slot at the contract frame's resource
   type and reads as the encoding of the value it holds (the clauses'
   domain for every aggregate), `exists<R>(k)` whether the slot holds one.
@@ -135,7 +161,7 @@ rely on.
   checks them: owed where a value is constructed (`Term.constructed`) and
   where a mutation of a local whose type carries one ends, at the death of
   a loan of the local and after a write into it (`Term.mutationEnd`), both
-  cuts the closer proves from the invariant's clauses; assumed of
+  cuts the solver proves from the invariant's clauses; assumed of
   parameters at entry and owed of results and of the referents of mutable
   parameters at exit. A function constructing or mutating such a value is
   verified even without a specification.
@@ -213,14 +239,14 @@ Nothing about memory typing is left to a function's proof or to its
 callers. The restatement changes the trusted base and is reviewed as
 such.
 
-## What changes in the closer
+## What changes in the solver
 
 - Removed: the representation hypothesis, `decode?`/`encode` facts for
   stored values, and the per-step memory typing of unseen invocations.
 - Added: the memory's update laws (read after write at the same or another
   type or key), the frame's resolution and transports at the runtime and
   induced frames, and a stage that reads memory as the leaf's case splits
-  fixed it (`leaner_denote_memory_reads`), before a split and at a leaf,
+  fixed it (`verex_memory_reads`), before a split and at a leaf,
   so that a clause's read meets the program's.
 - Callee frames apply to memory reads directly.
 
@@ -256,7 +282,7 @@ gaps below. Open:
   generic resource (registry V22), so such a unit's unseen function values
   are not carried.
 - Invoking a function value read from storage is the rule for an unseen
-  closure (`higher-order-functions.md`, H4c), which the closer lacks, so a
+  closure (`higher-order-functions.md`, H4c), which the solver lacks, so a
   stored invariant about it is not used yet (`closures/stored_fun_values`,
   `use_reader`).
 
