@@ -63,7 +63,7 @@ use aptos_vm_environment::prod_configs::{
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use futures::StreamExt;
-use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
+use measurements::{BlockMeasurements, EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
 use std::{
     fs,
@@ -103,6 +103,16 @@ pub struct SingleRunResults {
     pub measurements: OverallMeasurement,
     pub per_stage_measurements: Vec<OverallMeasurement>,
     pub per_stage_events: EventMeasurements,
+    pub per_block_measurements: BlockMeasurements,
+}
+
+/// Prints the per-block stages and the labeled timers, each for a human to
+/// read and each as one JSON line for the e2e-perf harness.
+fn print_block_and_timer_tables(overall: &OverallMeasurement, per_block: &BlockMeasurements) {
+    per_block.print_end_table();
+    per_block.print_json_line();
+    overall.print_timers_end_table();
+    overall.print_timers_json_line();
 }
 
 pub fn default_benchmark_features() -> Features {
@@ -692,7 +702,7 @@ where
 
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
-    let (num_pipeline_txns, staged_results, staged_events) = pipeline.join();
+    let (num_pipeline_txns, staged_results, staged_events, per_block_results) = pipeline.join();
 
     info!("Executed workload {}", workload_name);
 
@@ -719,10 +729,12 @@ where
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
+    print_block_and_timer_tables(&overall_results, &per_block_results);
     Some(SingleRunResults {
         measurements: overall_results,
         per_stage_measurements: staged_results,
         per_stage_events: staged_events,
+        per_block_measurements: per_block_results,
     })
 }
 
@@ -795,7 +807,7 @@ where
     overall_measuring.start_time = Instant::now();
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
-    let (num_pipeline_txns, staged_results, staged_events) = pipeline.join();
+    let (num_pipeline_txns, staged_results, staged_events, per_block_results) = pipeline.join();
 
     info!("Replayed workload {}", recorded.header.workload_name);
 
@@ -819,10 +831,12 @@ where
 
     OverallMeasurement::print_end_table(&staged_results, &overall_results);
     staged_events.print_end_table();
+    print_block_and_timer_tables(&overall_results, &per_block_results);
     SingleRunResults {
         measurements: overall_results,
         per_stage_measurements: staged_results,
         per_stage_events: staged_events,
+        per_block_measurements: per_block_results,
     }
 }
 
