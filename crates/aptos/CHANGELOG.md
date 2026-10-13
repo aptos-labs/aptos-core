@@ -11,7 +11,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - `aptos move clear-staging-area` does nothing when there is nothing to clear, instead of submitting a transaction that fails.
 - `--chunked-publish` now uses the `large_packages` module at `0x7` by default on every network except mainnet. Testnet no longer has the module at the previous default address, so chunked publishing there failed unless `--large-packages-module-address 0x7` was passed.
 - `--chunked-publish` now clears data left in the `StagingArea` by an incomplete chunked publish (after confirmation) instead of appending the new package to it, which made the publish fail after all staging transactions had been paid for.
-- `--chunked-publish` with `--session` now stops at the first failed transaction and exits with an error, instead of continuing and reporting success.
+- `--chunked-publish` with `--session` now stops at the first transaction that fails, or that is discarded (e.g. because the sender can't pay for it), and exits with an error, instead of continuing and reporting success.
 - Deprecate macOS x86_64 (Intel) CLI builds. This release still publishes an Intel binary and prints a deprecation warning on startup. The next macOS CLI release will be Apple Silicon (arm64) only.
 
 ## [9.6.0]

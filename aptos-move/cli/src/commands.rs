@@ -4,7 +4,7 @@
 use crate::{
     bytecode::{Decompile, Disassemble},
     coverage::{CoverageCommon, SummaryCoverage},
-    dispatch_transaction, dispatch_transactions, exchange,
+    did_not_succeed, dispatch_transaction, dispatch_transactions, exchange,
     fmt::Fmt,
     lint::LintPackage,
     local_simulation,
@@ -2140,10 +2140,12 @@ async fn clear_stale_staging_area(
 
     let payload = large_packages_cleanup_staging_area(large_packages_module_address);
     let tx_summary = dispatch_transaction(payload, txn_options, env).await?;
-    if tx_summary.success == Some(false) {
+    if did_not_succeed(&tx_summary) {
         return Err(CliError::SimulationError(format!(
             "{} (clearing the StagingArea, transaction {})",
-            tx_summary.vm_status.unwrap_or_default(),
+            tx_summary
+                .vm_status
+                .unwrap_or_else(|| "The transaction did not succeed".to_string()),
             tx_summary.transaction_hash,
         )));
     }
@@ -2205,28 +2207,28 @@ fn report_chunk_transaction(
     };
 
     let tx_hash = tx_summary.transaction_hash.to_string();
-    let status = tx_summary.success.map_or_else(String::new, |success| {
-        if success {
-            "Success".to_string()
-        } else {
-            "Failed".to_string()
-        }
-    });
+    let failed = did_not_succeed(&tx_summary);
+    let outcome = match tx_summary.success {
+        Some(true) => "executed: Success",
+        Some(false) => "executed: Failed",
+        None if failed => "was not executed",
+        None => "executed: ",
+    };
     if numbered {
-        println!(
-            "Transaction {} executed: {} ({})\n",
-            number, status, tx_hash
-        );
+        println!("Transaction {} {} ({})\n", number, outcome, tx_hash);
     } else {
-        println!("Transaction executed: {} ({})\n", status, tx_hash);
+        println!("Transaction {} ({})\n", outcome, tx_hash);
     }
 
     // Chain submission reports a failed transaction as an error, but simulation backends
-    // (e.g. `--session`) return it as a summary. Either way the remaining chunks can't succeed.
-    if tx_summary.success == Some(false) {
+    // (e.g. `--session`) return it as a summary, and one that they discard without a `success`.
+    // Either way the remaining chunks can't succeed.
+    if failed {
         return Err(CliError::SimulationError(format!(
             "{} (transaction {} of {}, {})",
-            tx_summary.vm_status.unwrap_or_default(),
+            tx_summary
+                .vm_status
+                .unwrap_or_else(|| "The transaction did not succeed".to_string()),
             number,
             total,
             tx_hash,

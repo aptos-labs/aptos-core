@@ -64,6 +64,16 @@ fn summary(success: bool) -> TransactionSummary {
     }
 }
 
+/// What a simulation, e.g. `--session`, returns for a transaction that it discarded: it has no
+/// `success`, and it isn't pending.
+fn discarded_summary() -> TransactionSummary {
+    TransactionSummary {
+        success: None,
+        vm_status: Some("Discarded: SEQUENCE_NUMBER_TOO_OLD".to_string()),
+        ..summary(true)
+    }
+}
+
 fn entry_function(payload: &TransactionPayload) -> &EntryFunction {
     let TransactionPayload::EntryFunction(entry_function) = payload else {
         panic!("expected an entry function payload, got {:?}", payload);
@@ -311,6 +321,52 @@ fn chunked_publish_stops_at_failed_transaction() {
     assert!(error.contains("Out of gas"), "{}", error);
     assert!(error.contains("transaction 2 of"), "{}", error);
     assert_eq!(names, vec!["stage_chunks", "stage_chunks"]);
+}
+
+#[test]
+fn chunked_publish_stops_at_discarded_transaction() {
+    // The second chunk is discarded, which a simulation reports without a `success`; nothing
+    // after it may be submitted.
+    let run = run_chunked_publish(&make_test_package(), Staged::Nothing, |call| {
+        if call == 2 {
+            discarded_summary()
+        } else {
+            summary(true)
+        }
+    });
+
+    let names = run.names();
+    let error = run.result.expect_err("chunked publish should fail");
+    assert!(error.contains("Discarded"), "{}", error);
+    assert!(error.contains("transaction 2 of"), "{}", error);
+    assert_eq!(names, vec!["stage_chunks", "stage_chunks"]);
+}
+
+#[test]
+fn chunked_publish_stops_when_clearing_the_staging_area_is_discarded() {
+    let run = run_chunked_publish(&make_test_package(), Staged::Garbage, |_| {
+        discarded_summary()
+    });
+
+    let names = run.names();
+    let error = run.result.expect_err("chunked publish should fail");
+    assert!(error.contains("Discarded"), "{}", error);
+    assert!(error.contains("clearing the StagingArea"), "{}", error);
+    assert_eq!(names, vec!["cleanup_staging_area"]);
+}
+
+#[test]
+fn discarded_transaction_did_not_succeed_but_pending_one_has_not_failed() {
+    let pending = TransactionSummary {
+        success: None,
+        pending: Some(true),
+        ..summary(true)
+    };
+
+    assert!(!crate::did_not_succeed(&summary(true)));
+    assert!(crate::did_not_succeed(&summary(false)));
+    assert!(crate::did_not_succeed(&discarded_summary()));
+    assert!(!crate::did_not_succeed(&pending));
 }
 
 #[test]

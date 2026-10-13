@@ -297,8 +297,20 @@ pub trait MoveDebugger: Send + Sync + 'static {
 type MoveDebuggerFactory =
     Box<dyn Fn(Client) -> anyhow::Result<Box<dyn MoveDebugger>> + Send + Sync>;
 
+/// Whether a transaction that was submitted did not succeed: it failed, or it was not executed.
+///
+/// A transaction that is committed has a `success`. A simulation (`--session`,
+/// `--local-simulation`, ...) has none for a transaction that it discards, or would retry, and
+/// that is only told from a transaction that is still pending by `pending`.
+pub(crate) fn did_not_succeed(summary: &TransactionSummary) -> bool {
+    match summary.success {
+        Some(success) => !success,
+        None => summary.pending != Some(true),
+    }
+}
+
 /// Submits the transactions one at a time, and stops at the first one that fails: that is, whose
-/// submission returns an error, or whose summary says that it was not successful. This is what
+/// submission returns an error, or that did not succeed (see [`did_not_succeed`]). This is what
 /// [`AptosContext::submit_transactions`] does by default.
 pub async fn submit_transactions_in_order<C: AptosContext + ?Sized>(
     context: &C,
@@ -308,9 +320,7 @@ pub async fn submit_transactions_in_order<C: AptosContext + ?Sized>(
     let mut outcomes = Vec::with_capacity(payloads.len());
     for payload in payloads {
         let outcome = context.submit_transaction(options, payload).await;
-        let failed = outcome
-            .as_ref()
-            .map_or(true, |summary| summary.success == Some(false));
+        let failed = outcome.as_ref().map_or(true, did_not_succeed);
         outcomes.push(outcome);
         if failed {
             break;
