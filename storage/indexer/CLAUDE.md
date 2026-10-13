@@ -9,7 +9,7 @@ This directory contains the `aptos-db-indexer` crate — the AptosDB **internal 
 ```bash
 cargo check -p aptos-db-indexer     # Quick compile check
 cargo build -p aptos-db-indexer
-cargo test -p aptos-db-indexer      # Note: crate has no in-crate unit tests (see Testing below)
+cargo test -p aptos-db-indexer      # In-crate unit tests: db_indexer.rs (event lookups), db_v2.rs (table info)
 ```
 
 New Rust files here use the Innovation-Enabling license header (`Copyright (c) Aptos Foundation` + license URL), matching existing files.
@@ -46,7 +46,7 @@ Module events (`ContractEventV2`) carry no event key or sequence number, but old
 
 ### Table info indexing (`db_v2.rs`)
 
-`IndexerAsyncV2` maps `TableHandle` → `TableInfo` (key/value type tags) by running `AptosValueAnnotator` over write sets. Nested tables create an ordering problem — a table item may appear before its parent's type info is known — handled by parking raw bytes in the `pending_on` map and re-parsing when the parent's info arrives. `get_table_info_with_retry` spins (10ms sleeps) because readers may race the async parser.
+`IndexerAsyncV2` maps `TableHandle` → `TableInfo` (key/value type tags) by running `AptosValueAnnotator` over write sets. Nested tables create an ordering problem — a table item may appear before its parent's type info is known — handled by parking raw bytes in the `pending_on` map and re-parsing when the parent's info arrives. `get_table_info_with_retry` retries (10ms sleeps) because readers may race the async parser, but gives up with `Ok(None)` after `TABLE_INFO_RETRY_TIMEOUT` (1s): the info of some handles is never indexed (the tables a *simulated* transaction creates are in no committed transaction, and `finalize_batch` drops handles it can't resolve). A handle that was given up on isn't waited for again for `TABLE_INFO_GIVE_UP_MEMORY` (10s, at most `MAX_GIVEN_UP_TABLES` of them), since a simulated transaction can write many items to a table it creates and each item looks up its info.
 
 The driver (`TableInfoService`) also lives in `ecosystem/indexer-grpc/indexer-grpc-table-info`; it fetches transactions via the API `Context` and the fullnode stream coordinator machinery, gated by `IndexerTableInfoConfig` (`table_info_service_mode`, `parser_task_count`, `parser_batch_size`).
 
@@ -56,7 +56,7 @@ The driver (`TableInfoService`) also lives in `ecosystem/indexer-grpc/indexer-gr
 
 ## Testing
 
-There are no unit tests in this crate. Coverage lives in:
+In-crate unit tests cover the event lookups of `db_indexer.rs` and the table info lookups of `db_v2.rs` (`new_test_indexer` opens an `IndexerAsyncV2` on a temp DB). Wider coverage lives in:
 
 - `execution/executor/tests/internal_indexer_test.rs` — end-to-end indexing over executed blocks
 - `storage/db-tool/src/tests.rs` — restore-path tests
