@@ -180,9 +180,13 @@ Table representation (2026-10-13): a table is an owned value of its handle
 and contents, the contents a hidden last field of the owner's type in the
 denotation, erased at the runtime boundary and related to native storage
 there; all table roles have contracts, and identity equality compares
-handles. Tables behind type parameters are not carried; tables are to become
-values in the runtime semantics as well (decision 2026-10-13); see
-`intrinsic-maps.md`, "Owned Table values".
+handles. Tables behind type parameters are not carried. The runtime keeps
+tables in native storage behind their handles, reconciled with the verifier's
+values by the agreement (decision 2026-10-13, revised; the boundary stays);
+open there: a runtime semantics of the table natives, and the `stored` clause
+of the boundary, which admits no table only a frame value holds; see
+`intrinsic-maps.md`, "Owned Table values" and "Tables in the runtime
+semantics".
 
 Scalar internal bit-vector support (2026-10-07): opaque `bv_internal` bodies
 can use scalar executable bitwise operations without classifying their ordinary

@@ -2,8 +2,9 @@
 
 Status: 2026-10-13, stage 2 implemented: a table is an owned value of its
 handle and contents, read and written through the roles ("Owned Table
-values"); tables are to become values in the runtime semantics as well
-("Tables in the runtime semantics").
+values"); the runtime keeps a table's entries in native storage behind its
+handle, and the agreement reconciles the two representations ("Tables in
+the runtime semantics").
 Stage 1 (2026-09-30): `ordered_map` verifies (its own iterator tests and a
 client module); `simple_map` and `pool_u64` in part.
 
@@ -244,10 +245,60 @@ callee's meaning; a value holding tables has no encoding without its
 storage, so `lendsEncoded` (reference-free and table-free) gates them, as
 `refFree` alone did, and `lentFlat` likewise.
 
-**Tables in the runtime semantics (decision 2026-10-13).** A table has no
-`copy`, so its contents are part of its owner's value; the runtime semantics
-is to represent it as a value as well, its natives operating on the value as
-in the Move Prover's map model. The erasing boundary above is then removed.
+**Tables in the runtime semantics (decision 2026-10-13, revised the same
+day).** The verifier represents a table as a value, as above. The runtime
+and the big-step semantics keep the representation the VM has: the physical
+value is the handle (and a cached length), the entries live in native storage
+at the slot of the owner's type and handle (`NativeTableStorage`), an entry
+borrow is a loan into that slot (`LoanTarget.table`), and the allocation
+history outlives every table. A value representation is not adequate there:
+a table in a resource under a mutable global borrow would carry its entries
+inside a hole-bearing value, an entry borrow would be a loan into a nested
+value, a fresh handle needs a history no value holds, and a table behind a
+type parameter would give a generic function's physical values a shape that
+depends on the instantiation. The two representations are reconciled by the
+agreement (`compileFunction_agrees`), whose runtime side is
+`propheticMeaning`: the erasing boundary above (`StorageEncodes`, `Encloses`,
+`ReturnedEncloses`) is the statement of that reconciliation and stays. The
+earlier decision of 2026-10-13 to represent tables as values in the runtime
+as well and to remove the boundary is withdrawn.
+
+Open on the runtime side, found on revisiting the implementation
+(2026-10-13):
+
+- The runtime has no semantics of the table natives: `BigStep.nativeCall` is
+  opaque and the interpreter calls it, so no program with a table runs. The
+  primitives over native storage exist with their laws, allocation at a
+  fresh handle, add, remove, and retire (`Semantics/TableOperations.lean`)
+  and entry borrows (`Semantics/TableLoans.lean`), but nothing calls them
+  (only `Tests/TableLoans.lean`). The Move profile is to bind the natives
+  behind the table roles (`new_table_handle`, `add_box`, `borrow_box`,
+  `borrow_box_mut`, `contains_box`, `remove_box`, `destroy_empty_box`) to
+  them, so that the agreement has a runtime side to relate the role
+  contracts to, and the interpreter and the MonoVM differential tests run
+  table programs.
+- `TablesEncode.stored` requires every slot of native storage to hold a
+  table some global of the memory holds (`MemoryTable`). A table a frame
+  value holds alone, a local after `new`, or a by-value or reference
+  parameter whose owner is a caller's local, is in native storage but
+  reachable from no global, so no state encloses it (`Encloses.held`
+  requires it in storage, `stored` then requires it in a global, `Encodes`
+  requires that global in the runtime's globals, where it is not). The
+  runtime form of a contract (`Contract.prophetic`) then has a false
+  precondition for such a call, and `GlobalsPreserved` fails for a run that
+  allocates, since the exit storage holds the new table and the exit memory
+  cannot. Callers reason through contracts (`wp_call`), so nothing is
+  unsound, but the runtime-form theorems cover only runs whose argument
+  tables are stored in globals, and a function that allocates has none. The
+  clause is to be weakened: storage holds at least the memory's tables and
+  the tables the frame encloses, at entry the arguments', at exit the
+  results' and the mutated arguments'. Its uses are `TablesEncode.unique`
+  and `TablesEncode.plain`; the memory a state encodes stays unique through
+  `held`, and what rested on the storage being unique per memory (runs from
+  one memory differing only in their loans) needs instead that a run does
+  not reach a table its arguments and the globals do not hold.
+- Tables behind type parameters (nested tables, roles at table-bearing
+  instances) remain not carried.
 
 **Fixtures.** `Check/Storage/TableReads.lean` (membership, shared lookup,
 a generic lookup, an opaque caller's `old`, an aggregate payload, and two

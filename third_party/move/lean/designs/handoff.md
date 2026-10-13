@@ -1,9 +1,10 @@
 # Handoff
 
-Status 2026-10-13. Branch `wrwg/proof-files`, PR #20746 on main: proof files as
-Lean files (`proof-file-editing.md`, P1–P3) and Table owners as owned values
-(`intrinsic-maps.md`, stage 2). #20710 (Prover parity, authored proofs, the rename
-Leaner → Verex) is merged. The session notes up to 2026-10-11 are in
+Status 2026-10-13. #20746 (proof files as Lean files, `proof-file-editing.md`,
+P1–P3; Table owners as owned values, `intrinsic-maps.md`, stage 2) and #20710
+(Prover parity, authored proofs, the rename Leaner → Verex) are merged. Branch
+`wrwg/lean-tables`: tables in the runtime semantics (`intrinsic-maps.md`,
+"Tables in the runtime semantics"). The session notes up to 2026-10-11 are in
 [`historical/handoff-2026-10.md`](historical/handoff-2026-10.md).
 
 ## Where the state is
@@ -32,8 +33,13 @@ Leaner → Verex) is merged. The session notes up to 2026-10-11 are in
 
 - 2026-10-13: a table owner's type has a hidden last field holding its contents;
   the runtime boundary erases it (`intrinsic-maps.md`, "Owned Table values").
-  Tables behind type parameters are not carried. Decision 2026-10-13: tables
-  are values in the runtime semantics too; the erasing boundary is to be removed.
+  Tables behind type parameters are not carried. Decision 2026-10-13, revised
+  the same day: the verifier represents tables as values; the runtime and the
+  big-step semantics keep native storage behind handles, since a value
+  representation is not adequate there; the agreement reconciles the two, so
+  the erasing boundary stays (`intrinsic-maps.md`, "Tables in the runtime
+  semantics"). The earlier decision to make tables runtime values and remove
+  the boundary is withdrawn.
 - 2026-10-12: the default budget is 1000 thousand `maxHeartbeats`, about thirty
   seconds; the registry runs with it (was 25 thousand).
 - 2026-10-12: an authored proof is kept only where the automatic run fails, or
@@ -111,6 +117,13 @@ costs.
 
 ## Open findings not yet in a design
 
+- Tables (2026-10-13, in `intrinsic-maps.md`, "Tables in the runtime
+  semantics"): the runtime has no semantics of the table natives
+  (`nativeCall` is opaque; `TableOperations.lean` and `TableLoans.lean` are
+  unused), and `TablesEncode.stored` admits no state enclosing a table only a
+  frame value holds, so the runtime form of a contract has a false
+  precondition at such calls and `GlobalsPreserved` fails for a run that
+  allocates. Read from the definitions; no Lean build was run.
 - The InfoView works on Move proof files since 2026-10-12
   (`proof-file-editing.md`, P1–P3). Rust `.spec.lean` files (P4: contracts
   attached after registration, or an explicit deferral) and renderings as
