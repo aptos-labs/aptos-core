@@ -507,7 +507,9 @@ def create_repair_disk_and_its_snapshot(
     # Execute tasks in parallel
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [executor.submit(create_final_snapshot, *task) for task in tasks]
-        for future in concurrent.futures.as_completed(futures, timeout=3600):
+        # 4 hours timeout, matching the snapshot polling timeout in create_snapshot_with_gcloud.
+        # Disk restore + xfs repair + final snapshot of mainnet takes ~70 min and growing.
+        for future in concurrent.futures.as_completed(futures, timeout=14400):
             try:
                 result = future.result()
                 logger.info(f"Task result: {result}")
