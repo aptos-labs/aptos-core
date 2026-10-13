@@ -386,6 +386,31 @@ private def operationFact? (goal : MVarId) (reads : DivisionReads) (sub : Lean.E
   -- A map's size is a count, and a key's position lies within it.
   if sub.isAppOfArity ``VerexIR.Maps.size 1 then
     let map := sub.getArg! 0
+    -- Setting entries keeps a map's entries and adds at most one per key set.
+    if map.isAppOfArity ``VerexIR.Maps.updateAll 5 then
+      let keys := map.getArg! 3
+      let values := map.getArg! 4
+      if keys.isAppOfArity ``VerexIR.Maps.keysOf 1 && values.isAppOfArity ``VerexIR.Maps.valuesOf 1
+          && keys.appArg! == values.appArg! then
+        let other := keys.appArg!
+        let bounds ← mkAppM ``VerexIR.Maps.size_updateAll_append_bounds
+          #[map.getArg! 0, map.getArg! 1, map.getArg! 2, other]
+        -- The appended map holds the appended entries, where those are valid.
+        let valid? ← goal.withContext do
+          (← getLCtx).findDeclM? fun decl => do
+            if decl.isImplementationDetail then return none
+            let ty ← instantiateMVars decl.type
+            unless ty.isAppOfArity ``VerexIR.Maps.Valid 2 do return none
+            unless ← isDefEq (ty.getArg! 0) (map.getArg! 1) do return none
+            unless ← isDefEq (ty.getArg! 1) other do return none
+            return some decl.toExpr
+        if let some valid := valid? then
+          let lower ← mkAppM ``VerexIR.Maps.size_other_le_updateAll_append
+            #[map.getArg! 0, map.getArg! 1, map.getArg! 2, valid]
+          return some (← mkAppM ``And.intro #[bounds, lower])
+        return some bounds
+      return some (← mkAppM ``VerexIR.Maps.size_updateAll_bounds
+        #[map.getArg! 0, map.getArg! 1, map.getArg! 2, keys, values])
     if map.isAppOfArity ``VerexIR.RuntimeValue.nominal 3 then
       if let some #[field] := (map.getArg! 2).arrayLit?.map (·.2.toArray) then
         if field.isAppOfArity ``VerexIR.RuntimeValue.vector 1 then
@@ -2833,6 +2858,41 @@ encoded, are the encodings of their first fields. -/
   simp only [NTy.codec_encode, NTy.encode_struct, HList.encode_cons]
   exact roundTrip element.1
 
+/-- The keys of a map held as the hidden contents of a table owner, encoded,
+are the encodings of the entries' keys; the owner's other fields precede the
+contents. -/
+theorem keysRead_encode_table_at [Carriers] {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (fields : Array RuntimeValue) (key value : NTy) (entries : (NTy.table key value).carrier)
+    (roundTrip : ∀ element : key.carrier, write (read (key.encode element)) = key.encode element) :
+    Maps.KeysRead read write (.nominal owner variant (fields.push (NTy.encode (.table key value) entries))) := by
+  intro entry mem
+  simp only [Maps.entriesOf, Array.back?_push, NTy.encode_table, List.map_map, List.mem_map, Function.comp_def] at mem
+  obtain ⟨pair, _, rfl⟩ := mem
+  exact roundTrip pair.1
+
+@[vir_denote_side] theorem keysRead_encode_table [Carriers] {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (key value : NTy) (entries : (NTy.table key value).carrier)
+    (roundTrip : ∀ element : key.carrier, write (read (key.encode element)) = key.encode element) :
+    Maps.KeysRead read write (.nominal owner variant #[NTy.encode (.table key value) entries]) :=
+  keysRead_encode_table_at owner variant #[] key value entries roundTrip
+
+@[vir_denote_side] theorem keysRead_encode_table_one [Carriers] {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (first : RuntimeValue) (key value : NTy) (entries : (NTy.table key value).carrier)
+    (roundTrip : ∀ element : key.carrier, write (read (key.encode element)) = key.encode element) :
+    Maps.KeysRead read write (.nominal owner variant #[first, NTy.encode (.table key value) entries]) :=
+  keysRead_encode_table_at owner variant #[first] key value entries roundTrip
+
+@[vir_denote_side] theorem keysRead_encode_table_two [Carriers] {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (first second : RuntimeValue) (key value : NTy) (entries : (NTy.table key value).carrier)
+    (roundTrip : ∀ element : key.carrier, write (read (key.encode element)) = key.encode element) :
+    Maps.KeysRead read write
+      (.nominal owner variant #[first, second, NTy.encode (.table key value) entries]) :=
+  keysRead_encode_table_at owner variant #[first, second] key value entries roundTrip
+
 /-- The ground positions a map is read at: the positions of its keys the
 context reads, and the ranks of keys in it. -/
 private def mapPositions (terms : Array Lean.Expr) (map : Lean.Expr) : MetaM (Array Lean.Expr) := do
@@ -2865,11 +2925,12 @@ each integer the map lacks; the keys of a valid ordered map ascend with their
 positions; and a hypothesis quantified over the positions of a map holds at
 each position the context reads it at. -/
 private def mapPositionFacts (goal : MVarId) : TacticM (Array (Lean.Expr × Lean.Expr)) := do
-  let (terms, absent, present, ordered, quantified) ← goal.withContext do
+  let (terms, absent, present, ordered, valids, quantified) ← goal.withContext do
     let mut terms := #[← instantiateMVars (← goal.getType)]
     let mut absent : Array (Lean.Expr × Lean.Expr × Lean.Expr) := #[]
     let mut present : Array (Lean.Expr × Lean.Expr × Lean.Expr) := #[]
     let mut ordered : Array (Lean.Expr × Lean.Expr) := #[]
+    let mut valids : Array (Lean.Expr × Lean.Expr) := #[]
     let mut quantified : Array (Lean.Expr × Lean.Expr) := #[]
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
@@ -2883,13 +2944,57 @@ private def mapPositionFacts (goal : MVarId) : TacticM (Array (Lean.Expr × Lean
             absent := absent.push (lhs.getArg! 0, key.getArg! 0, decl.toExpr)
         if rhs.isConstOf ``Bool.true && lhs.isAppOfArity ``VerexIR.Maps.hasKey 2 then
           present := present.push (lhs.getArg! 0, lhs.getArg! 1, decl.toExpr)
-      if ty.isAppOfArity ``VerexIR.Maps.Valid 2 &&
-          (ty.getArg! 0).isAppOfArity ``VerexIR.Maps.Discipline.ordered 1 then
-        ordered := ordered.push (ty.getArg! 1, decl.toExpr)
+      if ty.isAppOfArity ``VerexIR.Maps.Valid 2 then
+        valids := valids.push (ty.getArg! 1, decl.toExpr)
+        if (ty.getArg! 0).isAppOfArity ``VerexIR.Maps.Discipline.ordered 1 then
+          ordered := ordered.push (ty.getArg! 1, decl.toExpr)
       if ty.isForall && (ty.find? (·.isConstOf ``VerexIR.Maps.keyAt)).isSome then
         quantified := quantified.push (decl.toExpr, ty)
-    pure (terms, absent, present, ordered, quantified)
+    pure (terms, absent, present, ordered, valids, quantified)
   let mut facts : Array (Lean.Expr × Lean.Expr) := #[]
+  -- The key at a position within a map a bulk operation built is one of
+  -- its keys, at that position: stated ahead of the laws that rewrite
+  -- membership in such a map, which would hide the position. The map is
+  -- valid as the map it is built from is.
+  let validityOf (map : Lean.Expr) : MetaM (Option Lean.Expr) := do
+    let source := if map.isAppOfArity ``VerexIR.Maps.updateAll 5 then map.getArg! 2
+      else map.getArg! 1
+    let sourceValid? ← if source.isAppOfArity ``VerexIR.Maps.empty 1 then
+        if map.isAppOfArity ``VerexIR.Maps.updateAll 5 then
+          some <$> mkAppM ``VerexIR.Maps.valid_empty #[source.appArg!, map.getArg! 1]
+        else pure none
+      else (valids.findM? fun (other, _) => isDefEq other source) <&> (·.map (·.2))
+    let some sourceValid := sourceValid? | return none
+    if map.isAppOfArity ``VerexIR.Maps.updateAll 5 then
+      some <$> mkAppM ``VerexIR.Maps.valid_updateAll
+        #[map.getArg! 0, sourceValid, map.getArg! 3, map.getArg! 4]
+    else if map.isAppOfArity ``VerexIR.Maps.takeEntries 3 then
+      some <$> mkAppM ``VerexIR.Maps.valid_takeEntries #[map.getArg! 0, sourceValid, map.getArg! 2]
+    else if map.isAppOfArity ``VerexIR.Maps.dropEntries 3 then
+      some <$> mkAppM ``VerexIR.Maps.valid_dropEntries #[map.getArg! 0, sourceValid, map.getArg! 2]
+    else return none
+  let built (map : Lean.Expr) : Bool :=
+    map.isAppOfArity ``VerexIR.Maps.updateAll 5 || map.isAppOfArity ``VerexIR.Maps.takeEntries 3 ||
+      map.isAppOfArity ``VerexIR.Maps.dropEntries 3 || map.isAppOfArity ``VerexIR.Maps.replaceKey 4
+  let mut readMaps : Array Lean.Expr := #[]
+  for site in sitesWhere (fun e => !e.hasLooseBVars && e.isAppOfArity ``VerexIR.Maps.keyAt 2 &&
+      built (e.getArg! 0)) terms do
+    let map := site.getArg! 0
+    if ← goal.withContext (readMaps.anyM fun other => isDefEq other map) then continue
+    readMaps := readMaps.push map
+    let valid? ← goal.withContext (validityOf map)
+    for position in ← goal.withContext (mapPositions terms map) do
+      if position.isAppOfArity ``VerexIR.Maps.rank 2 then continue
+      let positionFacts ← goal.withContext do
+        let some low ← omegaProof? goal (← mkAppM ``LE.le #[mkIntLit 0, position]) | return #[]
+        let some high ← omegaProof? goal
+            (← mkAppM ``LT.lt #[position, ← mkAppM ``VerexIR.Maps.size #[map]]) | return #[]
+        let mut positionFacts := #[← mkAppM ``VerexIR.Maps.hasKey_keyAt #[low, high]]
+        if let some valid := valid? then
+          positionFacts := positionFacts.push (← mkAppM ``VerexIR.Maps.rank_keyAt #[valid, low, high])
+        return positionFacts
+      for fact in positionFacts do
+        facts := facts.push (← goal.withContext (inferType fact), fact)
   -- A key the map has sits at its rank, within the map.
   for (map, key, found) in present do
     let located ← goal.withContext (mkAppM ``VerexIR.Maps.keyAt_rank #[found])
@@ -6892,6 +6997,7 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   List.getElem?_nil List.getElem?_cons_zero List.getElem?_cons_succ
   Int.toNat_natCast VerexIR.Proofs.Denote.vectorLength_val
   VerexIR.Proofs.Denote.NTy.encode_vector VerexIR.Proofs.Denote.NTy.eqb_vector_decide
+  VerexIR.Proofs.Denote.NTy.eqb_table_decide
   VerexIR.Proofs.Denote.NTy.refFree VerexIR.Proofs.Denote.NRow.refFree
   VerexIR.Proofs.Denote.NRows.refFree VerexIR.Proofs.Denote.NTy.lendsEncoded
   VerexIR.Proofs.Denote.NRow.lendsEncoded VerexIR.Proofs.Denote.NTy.tableFree
@@ -8883,18 +8989,23 @@ private def namedCall (goal : MVarId) (throughContract : Bool) : TacticM MVarId 
   -- The named run reads the call's run from the start holding the memory's
   -- tables alone (`TablesLocal`), which every theorem takes.
   let some tablesLocal ← hypothesis? ``VerexIR.Proofs.TablesLocal | return goal
-  let localSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax tablesLocal)
+  -- The syntax of each hypothesis is made within the attempt: an attempt
+  -- restores the state it started from, which forgets the syntax made
+  -- before it.
   if let some shifts := shifts? then
     for typed in [``VerexIR.Proofs.wp_named_typed, ``VerexIR.Proofs.wp_named_mut_typed] do
       try
         setGoals [goal]
         let shiftsSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax shifts)
+        let localSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax tablesLocal)
         let rule ← atFrame typed
         -- A rule whose row conditions fail must fail here, not elaborate
         -- them as `sorry`.
         Term.withoutErrToSorry <| withoutRecover <|
           evalTactic (← `(tactic| refine $rule $shiftsSyntax $localSyntax (by decide) (by decide) ?_))
-        let [named] ← getGoals | throwError "the typed named call leaves one goal"
+        let [named] ← getGoals
+          | throwError m!"the typed named call leaves one goal, not {(← getGoals).length}: \
+              {← (← getGoals).mapM fun goal => do pure (← goal.getType)}"
         return ← if throughContract then markNamedRead named else pure named
       catch failure =>
         saved.restore
@@ -8904,9 +9015,12 @@ private def namedCall (goal : MVarId) (throughContract : Bool) : TacticM MVarId 
     try
       setGoals [goal]
       let rule ← atFrame untyped
+      let localSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax tablesLocal)
       Term.withoutErrToSorry <| withoutRecover <|
         evalTactic (← `(tactic| refine $rule $localSyntax (by decide) (by decide) ?_))
-      let [named] ← getGoals | throwError "the named call leaves one goal"
+      let [named] ← getGoals
+        | throwError m!"the named call leaves one goal, not {(← getGoals).length}: \
+            {← (← getGoals).mapM fun goal => do pure (← goal.getType)}"
       return ← if throughContract then markNamedRead named else pure named
     catch failure =>
       saved.restore

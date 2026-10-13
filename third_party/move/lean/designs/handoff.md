@@ -90,10 +90,13 @@ costs.
    from expansion guards over struct fields, vector elements and other
    specification results. Recovery: bound the fields and elements of typed values
    statically, or change how leaves decide inline guards.
-3. Registry gaps by size: V7 intrinsic maps (empty abstract map owners;
-   tables behind type parameters, `intrinsic-maps.md`), C8 `update`
-   of a specification variable (9), V16 natives, V1 `update_field` rendering (11
-   messages). Vector reverse preparation is the next proof lead
+3. Registry gaps by size: C8 ghost fields (9 tests; the analysis and the
+   proposed route are under "Open findings"), V16 natives, V1
+   `update_field` rendering (11 messages); tables behind type parameters
+   (`intrinsic-maps.md`, "Stages"). V7 is closed (2026-10-13): the abstract
+   map owners of the Prover's tests are placeholder layouts, and the bulk
+   roles have their laws; what the five tests still fail is listed at the
+   registry entry. Vector reverse preparation is the next proof lead
    (`perf-notes.md`).
 4. S4: `unmodified_memory_at_label::swap` needs a decision on reads of removed
    resource contents (`state-labels.md`).
@@ -120,6 +123,26 @@ costs.
 8. Awaiting a user decision: `int2bv` at a type parameter.
 
 ## Open findings not yet in a design
+
+- C8 is ghost *fields*, not specification variables (2026-10-13 analysis).
+  Eight of its nine tests, and `loop_memory_havoc.move`'s last cases, use
+  `spec S { ghost g: T; }`: a model-only field of every value of the struct
+  or enum, fresh at pack unless initialized, carried by copy, move and
+  borrow, excluded from equality, written by `update x.g = e` in an inline
+  specification block (through a mutable reference too), read in
+  specifications. The exchange (`move-model/exchange`) exports no ghost
+  fields: the `update_target` and the reads are `select` operations naming a
+  field the exported struct lacks, which the frontend rejects at
+  `Encode.lean`'s `ghostUpdate`. Specification variables (`global gcount`)
+  already work as ghost memory. Proposed route, for a decision: (1) export
+  ghost fields (name, type, initializer) with the struct, versioned; (2) in
+  the denotation, give the owner's native type hidden trailing ghost fields,
+  as a table owner has a hidden contents field, erased at the runtime
+  boundary, nondeterministic at pack (a fresh value of the type, as the
+  Prover's `$Arbitrary_value_of`), written by `update` through the
+  reference, and ignored by `eqb` and `identityRuntime`; (3) render them in
+  VerexSL. The route touches the Rust exchange, VIR, the denotation and the
+  rendering; it was not started.
 
 - Tables (2026-10-13, `intrinsic-maps.md`, "Tables in the runtime
   semantics", "Open"): `TablesLocal` and `GlobalsPreserved` are hypotheses to

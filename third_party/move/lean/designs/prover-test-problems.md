@@ -49,6 +49,15 @@ relative to `tests/sources`.
 
 ## Summary
 
+Placeholder map layouts and the laws of the bulk roles (2026-10-13): the
+abstract map owners of the Prover's tests are placeholder layouts of the
+table view, and the solver reads the bulk roles (`new_from`, `add_all`,
+`upsert_all`, `append`, `trim`, `replace_key_inplace`) by their laws, with
+the position view holding of the maps they build. `intrinsic_map_rank`,
+`intrinsic_map_rank_bulk` and `intrinsic_map_insertion_order` fail exactly
+the functions the Prover fails; `ghost_field_intrinsic_map_ops` verifies
+nine of its sixteen functions (V7).
+
 Tables as owned values (2026-10-13): a table owner's value holds its
 entries, and every executable and specification role is available for table
 layouts ([`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table values").
@@ -1155,17 +1164,42 @@ no denotation for `test_type_info_symbolic`: a literal of this type is not carri
 
 Tests: `functional/closures/closure_refs.move`, `functional/fun_field_nested_ability_variants.move`, `functional/fun_type_unused_ctor.move`, `functional/type_reflection.move`, `regression/fun_type_arity_injectivity.move`.
 
-### V7. Intrinsic map representation not carried
+### V7. Intrinsic map representation not carried — placeholder layouts carried
 
-5 tests, 31 messages.
+The abstract map owners the Prover's tests declare (`struct Map<K, V> {}`,
+whose one field is the Boolean placeholder `dummy_field` the compilers give
+an empty struct) are placeholder layouts of the table view: their entries
+are the owner's hidden contents field, their identity is their entries, and
+every role, the bulk roles included, is available to them
+([`intrinsic-maps.md`](intrinsic-maps.md), "Views", "Laws of the bulk
+roles"). `intrinsic_map_rank`, `intrinsic_map_rank_bulk` and
+`intrinsic_map_insertion_order` fail exactly the functions the Prover fails
+(`rank_wrong`, `build_wrong`, `same_entries_not_equal` and `canary`).
+
+Still failing, 2 tests, 22 messages:
+
+- `ghost_field_intrinsic_map_ops.move`: `map_spec_iter_preserved` is not
+  carried (3 messages; iterator validity is stage 3 of the design), so
+  `borrow_write`, `add_preserved_bad` and `addall_preserved_bad` are not
+  verified, where the Prover fails the latter two; `app_disjoint`'s
+  `aborts_if ∃ k: u64 …` needs the existential over a map's keys read at
+  the key type; `tr` does not establish that the trimmed map and the
+  returned rest are disjoint, and `rk` (`replace_key_inplace` under
+  `aborts_if_is_partial`) does not establish its continuation. The other
+  nine functions verify.
+- `closures/inline/folds_of_map_intrinsic.move`: the `spec_fold` loop
+  invariants over `spec_set` and `spec_remove` are not preserved by an
+  iteration (`collect`, `collect_distinct`, `remove_all`,
+  `remove_all_must_exist`, and the canary `collect_wrong`, which the Prover
+  fails too).
 
 Example (`functional/ghost_field_intrinsic_map_ops.move:6`):
 
 ```text
-the intrinsic map role `map_spec_get` belongs to a map whose representation is not carried
+the intrinsic map role `map_spec_iter_preserved` is not carried
 ```
 
-Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/ghost_field_intrinsic_map_ops.move`, `functional/intrinsic_map_insertion_order.move`, `functional/intrinsic_map_rank.move`, `functional/intrinsic_map_rank_bulk.move`.
+Tests: `functional/closures/inline/folds_of_map_intrinsic.move`, `functional/ghost_field_intrinsic_map_ops.move`.
 
 ### V10. Other elaboration errors in the rendering
 

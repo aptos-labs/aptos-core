@@ -4762,6 +4762,17 @@ theorem NTy.eqb_vector_decide (element : NTy) (free : element.refFree = true)
   · rw [@decide_eq_false _ (NTy.decEq (.vector element) left right) equal]
     exact Bool.eq_false_iff.mpr (fun h => equal (this.mp h))
 
+/-- The same for tables over reference-free key and value types. -/
+theorem NTy.eqb_table_decide (key value : NTy) (free : (NTy.table key value).refFree = true)
+    (left right : (NTy.table key value).carrier) :
+    NTy.eqb (.table key value) left right =
+      @decide (left = right) (NTy.decEq (.table key value) left right) := by
+  have := NTy.eqb_iff (.table key value) free left right
+  by_cases equal : left = right
+  · rw [@decide_eq_true _ (NTy.decEq (.table key value) left right) equal]; exact this.mpr equal
+  · rw [@decide_eq_false _ (NTy.decEq (.table key value) left right) equal]
+    exact Bool.eq_false_iff.mpr (fun h => equal (this.mp h))
+
 /-- A value that does not encode to a runtime value is not what it decodes to. -/
 theorem NTy.decode?_ne_of_encode_ne (τ : NTy) {value : τ.carrier} {raw : RuntimeValue}
     (different : τ.encode value ≠ raw) : τ.codec.decode? raw ≠ some value :=

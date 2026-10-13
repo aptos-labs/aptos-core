@@ -85,7 +85,9 @@ which the registry already constrains:
   cached length (the registry's `extensions::table::Table`), or nothing (an
   abstract map of the Prover's tests, whose one field is then the Boolean
   placeholder `dummy_field` Move's compilers give an empty struct, kept as a
-  table keeps its handle), and the runtime keeps its entries in native
+  table keeps its handle, though it is no table: it has no handle, so its
+  identity is its entries and its pure `spec_new` is the empty map), and the
+  runtime keeps its entries in native
   storage behind the handle. In the
   denotation, the owner's type has one hidden last field holding the entries
   ("Owned Table values" below), so its model is read as an entries layout's,
@@ -139,7 +141,9 @@ value is valid wherever it appears, in fields (a variant's fields under its
 variant), vector elements, and map values. A function assumes it of its
 inputs and establishes it of what it returns and modifies, and a loop keeps
 it. The laws carry it through every role that produces a map
-(`valid_update`, `valid_remove`).
+(`valid_update`, `valid_remove`, `valid_updateAll`, `valid_takeEntries`,
+`valid_dropEntries`, and `valid_replaceKey` where the replacement does not
+abort).
 
 ## Roles
 
@@ -238,9 +242,35 @@ history. The history is a slot no Move specification names, so the frame of
 a function that allocates a table, itself or through a callee at any depth
 (`Contract.allocatesTables`), leaves that slot open and keeps every other
 resource as its `modifies` clauses say; a function that allocates none keeps
-the whole memory. A pure `map_spec_new` of a table is rejected: a
-specification function has no allocation to take its identity from, and an
-identity it would invent cannot be related to the executable one.
+the whole memory. A pure `map_spec_new` of a table with a handle is
+rejected: a specification function has no allocation to take its identity
+from, and an identity it would invent cannot be related to the executable
+one; a placeholder layout has no handle, and its `map_spec_new` is the empty
+map.
+
+**Laws of the bulk roles (2026-10-13).** The solver reads the bulk
+operations as the single ones: membership after `updateAll` is membership
+in the keys set or in the map (`hasKey_updateAll_add_all`, `_upsert_all`,
+`_new_from`, each under the role's abort condition, which the leaf holds
+negated; `hasKey_updateAll_append` for an appended map); the size of an
+appended or bulk-updated map lies between the map's and the sum of both
+(`size_updateAll_bounds`, `size_updateAll_append_bounds`, the appended
+map's size as a lower bound where the appended map is valid), as bounds the
+leaf asserts of every `size` of such a map; an exact size where every key
+is fresh (`size_updateAll_add_all`, `_new_from`, `_append_disjoint`).
+`takeEntries` and `dropEntries` split a map at a position: an entry is in
+the prefix exactly when its rank lies below the count (`hasKey_takeEntries`,
+`hasKey_dropEntries`), with the sizes `min` and the difference; `replaceKey`
+keeps the size and moves one key (`hasKey_replaceKey`). The keys of a built
+map are read back as the keys it was built from (`keysRead_updateAll` and
+its siblings), so the position view (`spec_key_at`, `spec_rank`) holds of it
+as of its source; the solver states of every position such a map is read
+at that the key there is one of its keys, at that position
+(`mapPositionFacts`), ahead of the membership laws, which would otherwise
+rewrite the membership of that key into its sources and lose the position.
+The abort conditions of the bulk roles at literal vectors evaluate
+(`AbortsNewFrom_toArray` and its siblings): a symbolic vector is a mapped
+array, which they leave to the role's hypothesis.
 
 **Equality.** A specification's equality between values of a type holding
 table contents compares `NTy.identityRuntime` of both operands
@@ -249,7 +279,11 @@ cached length, which an insertion changes, is not part of the identity), a
 handle-less owner is structural, and the identity recurses through fields,
 elements, entries, and references. Lean equality of the values stays
 available to the denotation, where two values of one identity differ by
-their contents, as `old(t)` and `t` across a mutation do.
+their contents, as `old(t)` and `t` across a mutation do. Code equality
+(`==`, which no actual table type admits) of a placeholder-layout value
+compares its hidden contents structurally (`NTy.eqb_table_decide`, as
+vectors compare), so a map equals itself and two maps holding the same
+entries in different orders do not.
 
 **Behavioral predicates and named calls** lend a value's encoding to a
 callee's meaning; a value holding tables has no encoding without its

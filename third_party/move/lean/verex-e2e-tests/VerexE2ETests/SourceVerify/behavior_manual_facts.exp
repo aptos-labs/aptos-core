@@ -1,6 +1,7 @@
 VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:17:43: error: incorrect final counter value
 case ensures_3
 executable✝ : Validation.ExecutableUnit unit
+tablesLocal : Proofs.TablesLocal executable✝
 nativesTyped : NativesTyped executable✝
 nativesShift : NativesShift executable✝
 verexAgree : Proofs.TypesAgree unit

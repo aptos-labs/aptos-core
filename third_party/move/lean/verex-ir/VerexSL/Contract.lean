@@ -2097,7 +2097,7 @@ where
           is not carried"
     -- A table's identity is its allocated handle, which no pure constructor
     -- has (`designs/intrinsic-maps.md`, "Equality and order").
-    if model.table && role == "map_spec_new" then
+    if model.handle && role == "map_spec_new" then
       throwError "a pure Table constructor's logical identity is not carried"
     let aggregate (index : Nat) : MetaM Lean.Expr := do runtimeAggregate (← operand index)
     let value (index : Nat) : MetaM Lean.Expr := do runtimeOperand (← operand index)
