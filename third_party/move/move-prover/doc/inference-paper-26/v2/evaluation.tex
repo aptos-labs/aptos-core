@@ -16,10 +16,8 @@ Twenty-four are extracted from public Move code of the Aptos framework at a pinn
 The other two are written for the corpus.
 Function bodies are copied unchanged except for a few reductions documented in the module headers, and the package includes everything the targets depend on.
 No target has a specification upstream.
-A model may have seen the code during training, but it cannot recall a contract that was never written, so it has to infer one.
-Every target is classified by the features (strata) its contract has to account for --- loops, early returns and breaks, arithmetic overflow and underflow, options and enums, global state, tables and maps, mutable references and in-place permutation, function values, quantifiers, composition through a callee's contract, and others, 32 in all.
-Thirteen targets have a loop that needs an invariant, and three are deliberately guessable as controls.
-Each target has a hand-written reference specification that proves within 20 seconds, and six \emph{mutants} in two disjoint sets of three --- patches to the implementation, one per obligation the contract has to pin --- each shown to be killed by the reference.
+Thirteen targets have a loop that needs an invariant.
+Each target has a hand-written reference specification that verifies within 20 seconds, and six \emph{mutants} in two disjoint sets of three: patches to the implementation, one per obligation the contract has to pin, each shown to be killed by the reference.
 A task starts from the package with the reference contracts of every function the target calls; the contracts of the target and of all other functions are withheld, since a caller's contract can restate what the target does.
 With 3 arms and 4 replicates, a model round has \textbf{312 cells}.
 
@@ -29,10 +27,10 @@ Two rounds use two models of one family through the same runtime, the Codex CLI 
 Each session has a budget of 100k output tokens, one hour of wall time, and 40 seconds of solver time per verification condition.
 
 \Paragraph{Scoring}
-A cell reaches \emph{operational success} when a judge outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present --- |pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions --- the bytecode is unchanged, and the required contract categories are present.
+A cell reaches \emph{operational success} when a judge outside the agent's workspace confirms that the package compiles, the requested scope verifies, no weakening construct is present (|pragma verify = false|, partial abort contracts, vacuous postconditions, invented preconditions), the bytecode is unchanged, and the required contract categories are present.
 The agent's own claim is never a score, and the agent receives only this acceptance feedback: the mutants are withheld until generation has ended, and a contract is never handed back for strengthening.
 Operational success is necessary but weak: a vaguer contract passes it more easily.
-Completeness --- postconditions as strong as the behavior --- has no deductive check in general; \WP guarantees it only given complete loop invariants and callee contracts.
+Completeness, postconditions as strong as the behavior, has no deductive check in general; \WP guarantees it only given complete loop invariants and callee contracts.
 The second level is therefore \emph{mutation adequacy}: after the round, each withheld mutant is applied to the implementation, and the prover is rerun against the inferred specification.
 A cell is \emph{complete} when its specification kills all six mutants and \emph{failed} when one survives; a cell in which a mutant reached no verdict within the solver's time limit is \emph{unmeasured}.
 All 624 cells reached operational success, so the outcome of a cell is decided by the withheld mutants alone.
@@ -72,7 +70,7 @@ Table~\ref{tab:summary} summarizes both rounds, Fig.~\ref{fig:cells} shows every
 \begin{tikzpicture}
 \begin{groupplot}[
   group style={group size=3 by 1, horizontal sep=2.5mm, yticklabels at=edge left},
-  scale only axis, width=2.5cm, height=8.4cm,
+  scale only axis, width=2.5cm, height=7.4cm,
   xmode=log, xmin=0.04, xmax=2.2, log ticks with fixed point,
   xtick={0.1,0.3,1}, xticklabels={0.1,0.3,1},
   minor xtick={0.05,0.2,0.5,2}, minor tick style={draw=none},
@@ -103,12 +101,12 @@ Table~\ref{tab:summary} summarizes both rounds, Fig.~\ref{fig:cells} shows every
 Under both models the hybrids cost less than agent-only: 0.86$\times$ and 0.87$\times$ under Sol~5.6 and 0.79$\times$ and 0.89$\times$ under Terra~5.6 (hybrid-guided, hybrid-flexible).
 Over all targets, only the interval of Sol's hybrid-flexible excludes parity, but the targets split into two clear groups.
 On the 13 targets without a loop that needs an invariant, \WP derives the complete contract and the agent only has to check it: the hybrids cost 0.36--0.60$\times$ agent-only, and every interval lies below 0.75.
-On the 13 loop targets they cost 1.09--1.22$\times$: the agent still has to find the invariant, and the quantified \WP output adds to the context it re-reads on every turn.
+On the 13 loop targets they cost 1.09--1.22$\times$: the agent still has to find the invariant, and the quantified \WP output adds to the context it re-reads on every turn --- on these targets the hybrids read 1.2--1.4$\times$ the input of agent-only (415--513k against 357--385k tokens per cell), on the loop-free ones 0.25--0.45$\times$.
 Overall the hybrids read less input than agent-only (288k and 280k against 333k tokens per cell under Sol~5.6, 289k and 335k against 367k under Terra~5.6) and write less output.
 
 \Paragraph{Completeness}
-The tactics do not change completeness measurably: under both models, both preregistered contrasts have Holm $p = 1.00$.
-Agent-only completes 103 of 104 cells under Sol~5.6 and 97 under Terra~5.6, the hybrids 98 and 98, and 97 and 98.
+Measured completeness is about the same under all three tactics: agent-only completes 103 of 104 cells under Sol~5.6 and 97 under Terra~5.6, the hybrids 98 and 98, and 97 and 98, and under both models both preregistered contrasts have Holm $p = 1.00$.
+This is what one would expect: the loop invariants and specification helpers that decide the hard targets have to be found by the agent under every tactic.
 All failures but one Terra~5.6 agent-only cell occur on three loop targets.
 |partition|, an in-place partition, is the one target whose contract needs a permutation argument proved with lemmas; it fails in every arm, and in every failure a mutant that overwrites an element instead of swapping it survives: the contract does not state that the result is a rearrangement of the input.
 On the two scans |upsert_provider_jwks| and |cancel_at_price_level|, which leave the loop early, only hybrid cells fail (5 under Sol~5.6, 6 under Terra~5.6): the agent added invariants for the scanned prefix, accepted the quantified contract that \WP derived from them once it verified, and a withheld mutant on the exit path survived.
@@ -121,7 +119,7 @@ Terra~5.6 costs 0.57$\times$ Sol~5.6 under agent-only and 0.53$\times$ and 0.59$
 These ratios are close to the price ratio of 0.5 for input and 0.6 for output: the two models spend about the same number of tokens per cell, Terra~5.6 up to a fifth more input, and Terra~5.6 is slower (143--153 against 115--126 seconds).
 Completeness differs on one target.
 Outside |partition|, Terra~5.6 fails one agent-only cell and, under the hybrids, the same two scans as Sol~5.6; on the partition it fails 10 of 12 cells, Sol~5.6 3 of 12.
-The frontier model's advantage is therefore the lemma-based permutation argument, not the loop invariants, compositions, and global state that make up the rest of the corpus.
+The frontier model's advantage therefore lies in the lemma-based permutation argument; on the loop invariants, compositions, and global state that make up the rest of the corpus the two models are even.
 The one target on which Terra~5.6 costs about as much as Sol~5.6 is |select|, whose contract needs a recursive specification function over a function value; there it writes 1.5--2.0$\times$ Sol's output.
 With \WP, Terra's first-check acceptance (63--65\%) approaches Sol's (68--71\%), and Terra~5.6 under hybrid-guided completes 97 of 104 cells at 46\% of the cost of Sol~5.6 under agent-only, which completes 103.
 
