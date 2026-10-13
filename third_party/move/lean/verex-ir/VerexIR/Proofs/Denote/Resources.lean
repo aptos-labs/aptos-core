@@ -102,20 +102,28 @@ def MemoryTable (unit : ValidatedUnit) (memory : Memory unit)
     runtimeResourceOf unit namespaceId typeId = some resource ∧
     memory resource key = some value ∧ table ∈ resource.tables (unit := unit) value
 
-/-- Native table storage holding exactly the tables the values of a typed
-memory hold, each at the slot of its owner's type and handle (`tableSlot?`),
-in slot order, and the allocation history at its resource. The memory
-determines it. -/
-structure TablesEncode (unit : ValidatedUnit) (memory : Memory unit)
+/-- Native table storage holding the tables the values of a typed memory
+hold, each at the slot of its owner's type and handle (`tableSlot?`), in
+slot order and without loans, and the allocation history at its resource.
+It may hold further tables, which no global reaches: those the frames of a
+run hold (`designs/intrinsic-maps.md`, "Tables in the runtime semantics").
+The storage determines the memory, not the memory the storage. -/
+structure TablesHeld (unit : ValidatedUnit) (memory : Memory unit)
     (storage : NativeTableStorage) : Prop where
   sorted : storage.contents.Sorted
   held : ∀ table, MemoryTable unit memory table →
     ∃ key, tableSlot? unit table.1 table.2.1 = some key ∧
       storage.contents.lookup key = some table.2.2
-  stored : ∀ slot ∈ storage.contents.entries, ∃ table, MemoryTable unit memory table ∧
-    tableSlot? unit table.1 table.2.1 = some slot.key ∧ slot.value = table.2.2
+  plain : ∀ slot ∈ storage.contents.entries, SemanticOperations.Plain slot.value
   allocated : ∀ key, memory TableMemory.allocationResource key =
     if key = .unit then some (TableMemory.encodeAllocated storage.allocated) else none
+
+/-- Native table storage holding exactly the tables the values of a typed
+memory hold: held as above, and nothing else. The memory determines it. -/
+structure TablesEncode (unit : ValidatedUnit) (memory : Memory unit)
+    (storage : NativeTableStorage) : Prop extends TablesHeld unit memory storage where
+  stored : ∀ slot ∈ storage.contents.entries, ∃ table, MemoryTable unit memory table ∧
+    tableSlot? unit table.1 table.2.1 = some slot.key ∧ slot.value = table.2.2
 
 /-- A key some slot of a store publishes is a stored slot. -/
 theorem _root_.VerexIR.GlobalMap.mem_of_lookup {globals : GlobalMap} {key : GlobalKey}
@@ -171,14 +179,13 @@ theorem TablesEncode.unique {memory : Memory unit} {left right : NativeTableStor
   cases allocated
   rfl
 
-/-- Stored table entries hold no loan at an observation boundary. -/
-theorem TablesEncode.plain {memory : Memory unit} {storage : NativeTableStorage}
-    (encodes : TablesEncode unit memory storage) :
-    ∀ slot ∈ storage.contents.entries, SemanticOperations.Plain slot.value := by
-  intro slot member
-  obtain ⟨table, ⟨_, _, resource, _, value, _, _, held⟩, _, stored⟩ := encodes.stored slot member
-  rw [stored]
-  exact resource.tables_plain value table held
+/-- The observable runtime stores hold a typed memory: the globals encode it
+and the Table storage holds its tables, and possibly tables of other frames.
+Loan registries remain separate. -/
+structure StorageHolds (unit : ValidatedUnit) (memory : Memory unit)
+    (state : RuntimeState) : Prop where
+  globals : Encodes unit memory state.globals
+  tables : TablesHeld unit memory state.tables
 
 /-- The observable runtime stores encode one typed memory. Loan registries
 remain separate; Table allocation history is observable even after destruction. -/
@@ -186,6 +193,11 @@ structure StorageEncodes (unit : ValidatedUnit) (memory : Memory unit)
     (state : RuntimeState) : Prop where
   globals : Encodes unit memory state.globals
   tables : TablesEncode unit memory state.tables
+
+/-- Stores encoding a memory hold it. -/
+theorem StorageEncodes.holds {memory : Memory unit} {state : RuntimeState}
+    (encodes : StorageEncodes unit memory state) : StorageHolds unit memory state :=
+  ⟨encodes.globals, encodes.tables.toTablesHeld⟩
 
 /-- A memory determines both observable stores, independently of loan IDs. -/
 theorem StorageEncodes.unique {memory : Memory unit} {left right : RuntimeState}
@@ -195,16 +207,17 @@ theorem StorageEncodes.unique {memory : Memory unit} {left right : RuntimeState}
   ⟨leftEncodes.globals.unique rightEncodes.globals,
    leftEncodes.tables.unique rightEncodes.tables⟩
 
-/-- A run's start: stores encoding the memory, and the tables the arguments
-hold, at the frame, in native storage. -/
+/-- A run's start: stores holding the memory, and the tables the arguments
+hold, at the frame, in native storage. The storage may hold more: the
+tables the caller's and its ancestors' other values hold. -/
 structure Encloses (unit : ValidatedUnit) [Skolems unit] (memory : Memory unit)
     (state : RuntimeState) (tables : List (NTy × String × RuntimeValue)) : Prop where
-  stores : StorageEncodes unit memory state
+  stores : StorageHolds unit memory state
   held : TableMemory.TablesIn unit tables state.tables
 
-/-- Stores encoding a memory enclose no table. -/
+/-- Stores holding a memory enclose no table. -/
 theorem Encloses.of_nil [Skolems unit] {memory : Memory unit} {state : RuntimeState}
-    (stores : StorageEncodes unit memory state) {tables : List (NTy × String × RuntimeValue)}
+    (stores : StorageHolds unit memory state) {tables : List (NTy × String × RuntimeValue)}
     (nil : tables = []) : Encloses unit memory state tables :=
   ⟨stores, nil ▸ TableMemory.TablesIn.nil state.tables⟩
 

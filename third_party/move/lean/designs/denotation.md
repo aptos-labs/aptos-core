@@ -504,9 +504,11 @@ stating that the native evaluation of the verified checker
 `Std.Tactic.BVDecide.Reflect.verifyBVExpr` on its certificate is `true`:
 such a proof trusts the Lean compiler for that evaluation, as the Move
 Prover trusts its SMT solver. The audit accepts them for such a function
-only. Nothing else is admitted. The public theorem states two assumptions
+only. Nothing else is admitted. The public theorem states three assumptions
 as hypotheses that no proof discharges: `GlobalsPreserved`, which static
-typing is to establish, and, for a function whose proof reads `result_of`
+typing is to establish, `TablesLocal`, that a run reads no table its globals
+and arguments do not reach (`intrinsic-maps.md`, "Tables in the runtime
+semantics"), and, for a function whose proof reads `result_of`
 of a known function value, `Terminating`: runs of the unit's functions
 end, as the Move Prover assumes of every function (decided 2026-10-02).
 A function stating an in-body `assume` is verified of the reading in which

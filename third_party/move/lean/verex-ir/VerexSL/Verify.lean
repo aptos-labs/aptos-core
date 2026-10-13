@@ -2871,9 +2871,14 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) : CommandElabM Unit
         -- Then the assumed steps of the lemmas it applies.
         let trusted := ((lemmaTrustDependencies.getState env).find? base).getD #[]
         let hypotheses := hypotheses ++ trusted.map mkConst
-        -- The public theorem takes that the unit's runs keep memory typed.
+        -- The public theorem takes that the unit's runs keep memory typed,
+        -- and, where it reads a named run, that they read no table they do
+        -- not reach.
+        let locality ← if Contract.assumesLocality unit ⟨namespaceIndex⟩ ns declaration then
+            pure #[← mkAppM ``VerexIR.Proofs.TablesLocal #[executable]]
+          else pure #[]
         let hypotheses := #[← mkAppM ``VerexIR.Proofs.Denote.GlobalsPreserved #[executable]] ++
-          hypotheses
+          locality ++ hypotheses
         -- A theorem assuming typing takes what the natives preserve, last,
         -- and one resolving `result_of` that the unit's runs end.
         let assumesTermination := Contract.assumesTermination unit ⟨namespaceIndex⟩ ns declaration
@@ -3221,6 +3226,14 @@ private def nativeBinderOf (unit : ValidatedUnit) (segments : Array String)
   let declaration? := declarationOf? unit entry.1
   nativeBinder segments unit entry (declaration?.any isGeneric)
     (declaration?.any fun declaration => declaration.body != .absent)
+
+/-- The hypothesis that the unit's runs read no table they do not reach
+(`TablesLocal`), which every theorem takes. -/
+private def tablesLocalBinder : CommandElabM (TSyntax ``Lean.Parser.Term.bracketedBinder) := do
+  let name := mkIdent `tablesLocal
+  `(bracketedBinder| ($name : VerexIR.Proofs.TablesLocal executable))
+
+private def tablesLocalArg : Term := ⟨mkIdent `tablesLocal⟩
 
 /-- The hypothesis that a function's in-body assumptions hold
 (`AssumptionsHold`), at every family and instantiation. -/
@@ -4220,6 +4233,13 @@ private def verifyMember (reference : Syntax) (segments : Array String) (functio
     let nativeBinders := nativeBinders ++ (← assumptionDeps.mapM (assumptionBinderOf segments unit)) ++
       (← trustDeps.mapM trustBinderOf)
     let nativeArgs := nativeArgs ++ assumptionArgs assumptionDeps ++ trustArgs trustDeps
+    -- A theorem reading a named run takes that the unit's runs read no
+    -- table they do not reach (`TablesLocal`), first among what it assumes
+    -- of the runtime.
+    let (nativeBinders, nativeArgs) ←
+      if Contract.assumesLocality unit ⟨namespaceIndex⟩ ns declaration then
+        pure (#[← tablesLocalBinder] ++ nativeBinders, #[tablesLocalArg] ++ nativeArgs)
+      else pure (nativeBinders, nativeArgs)
     -- A theorem assuming typing takes what the natives preserve: typing,
     -- and agreement up to the loans they mint.
     -- A theorem resolving `result_of` of a known function value takes that
@@ -4583,9 +4603,16 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
     let nativeBinders ← natives.mapM (nativeBinderOf unit segments)
     let nativeBinders := nativeBinders ++ (← assumptionDeps.mapM (assumptionBinderOf segments unit)) ++
       (← trustDeps.mapM trustBinderOf)
+    -- A cycle with a member reading a named run takes `TablesLocal`.
+    let locality := members.any fun (_, name) =>
+      (findFunction? unit name).any fun (namespaceIndex, ns, _, declaration) =>
+        Contract.assumesLocality unit ⟨namespaceIndex⟩ ns declaration
+    let nativeBinders ← if locality then pure (#[← tablesLocalBinder] ++ nativeBinders)
+      else pure nativeBinders
     let nativeArgs (entries : Array (FunctionHandle × String) × Array (FunctionHandle × String) ×
         Array Name) : Array Term :=
-      entries.1.map (fun entry => ⟨mkIdent (Name.mkSimple s!"native_{entry.2}")⟩) ++
+      (if locality then #[tablesLocalArg] else #[]) ++
+        entries.1.map (fun entry => ⟨mkIdent (Name.mkSimple s!"native_{entry.2}")⟩) ++
         assumptionArgs entries.2.1 ++ trustArgs entries.2.2
     let artifactsOf (name : String) := Name.str namespaceName name
     let compiledAt (name : String) := mkIdent (Name.mkSimple s!"compiledAt_{name}")

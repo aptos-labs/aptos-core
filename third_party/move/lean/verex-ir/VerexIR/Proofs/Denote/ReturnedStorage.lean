@@ -167,7 +167,20 @@ def Proofs.Denote.StorageEncodesReturned (unit : Validation.ValidatedUnit)
   Proofs.Denote.StorageEncodes unit memory (state.resolveReturned results)
 
 /-- A run's exit, its returned loans resolved at the row supplied: stores
-encoding the final memory, and the tables the results and the arguments'
+holding the final memory, and possibly tables of other frames. -/
+def Proofs.Denote.StorageHoldsReturned (unit : Validation.ValidatedUnit)
+    (memory : Proofs.Denote.Memory unit) (state : RuntimeState)
+    (results : Array RuntimeValue) : Prop :=
+  Proofs.Denote.StorageHolds unit memory (state.resolveReturned results)
+
+theorem Proofs.Denote.StorageEncodesReturned.holds {unit : Validation.ValidatedUnit}
+    {memory : Proofs.Denote.Memory unit} {state : RuntimeState} {results : Array RuntimeValue}
+    (encodes : Proofs.Denote.StorageEncodesReturned unit memory state results) :
+    Proofs.Denote.StorageHoldsReturned unit memory state results :=
+  Proofs.Denote.StorageEncodes.holds encodes
+
+/-- A run's exit, its returned loans resolved at the row supplied: stores
+holding the final memory, and the tables the results and the arguments'
 prophecies hold in native storage. -/
 def Proofs.Denote.ReturnedEncloses (unit : Validation.ValidatedUnit) [Proofs.Denote.Skolems unit]
     (memory : Proofs.Denote.Memory unit) (state : RuntimeState) (results : Array RuntimeValue)
@@ -178,13 +191,13 @@ theorem Proofs.Denote.ReturnedEncloses.stores {unit : Validation.ValidatedUnit}
     [Proofs.Denote.Skolems unit] {memory : Proofs.Denote.Memory unit} {state : RuntimeState}
     {results : Array RuntimeValue} {tables : List (Proofs.Denote.NTy × String × RuntimeValue)}
     (held : Proofs.Denote.ReturnedEncloses unit memory state results tables) :
-    Proofs.Denote.StorageEncodesReturned unit memory state results :=
+    Proofs.Denote.StorageHoldsReturned unit memory state results :=
   Proofs.Denote.Encloses.stores held
 
 theorem Proofs.Denote.ReturnedEncloses.of_nil {unit : Validation.ValidatedUnit}
     [Proofs.Denote.Skolems unit] {memory : Proofs.Denote.Memory unit} {state : RuntimeState}
     {results : Array RuntimeValue}
-    (stores : Proofs.Denote.StorageEncodesReturned unit memory state results)
+    (stores : Proofs.Denote.StorageHoldsReturned unit memory state results)
     {tables : List (Proofs.Denote.NTy × String × RuntimeValue)} (nil : tables = []) :
     Proofs.Denote.ReturnedEncloses unit memory state results tables :=
   Proofs.Denote.Encloses.of_nil stores nil

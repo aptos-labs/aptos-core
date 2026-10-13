@@ -1127,6 +1127,10 @@ private structure SpecReads where
   /-- `aborts_of` or `result_of`: what holds of them rests on the
   determinism of runs from typed memory. -/
   determinism : Bool := false
+  /-- A named run of a function value (`ensures_of`, `aborts_of`,
+  `result_of`): what holds of it rests on the runs reading no table they
+  do not reach (`TablesLocal`). -/
+  behavior : Bool := false
   /-- `result_of`: what holds of it at a known function value rests on its
   runs ending. -/
   result : Bool := false
@@ -1163,7 +1167,7 @@ private def readsFrom (unit : ValidatedUnit) (start : List (VerexIR.NamespaceId 
         | .operation (.specification (.behavior .requiresOf _)) .. =>
             reads := { reads with requires := true, state := true }
         | .operation (.specification (.behavior kind range)) .. =>
-            reads := { reads with unit := true, state := true
+            reads := { reads with unit := true, state := true, behavior := true
                                   determinism := reads.determinism ||
                                     (kind matches .abortsOf | .resultOf) ||
                                     (kind == .ensuresOf && range.post.isSome)
@@ -1196,7 +1200,7 @@ private def invariantReads (unit : ValidatedUnit) (namespaceId : VerexIR.Namespa
     (declaration.contract.conditions.filter (·.kind == .structInvariant)).toList.map
       fun condition => (namespaceId, condition.expression)
   if (unit.namespaces[namespaceId.index]?).any (VerexIR.Proofs.Denote.declarationHasClosureFields · declaration) then
-    { reads with unit := true, determinism := true }
+    { reads with unit := true, determinism := true, behavior := true }
   else reads
 
 /-- Whether a data invariant of the unit states a behavioral predicate: the
@@ -5314,6 +5318,36 @@ def assumesTermination (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId
         (readsFrom unit [(namespaceId, condition.expression)]).result) then
       return true
     if (bodyReads unit namespaceId declaration).result then return true
+    for callee in directCallees unit namespaceId ns declaration do
+      let some calleeNs := unit.namespaces[callee.namespaceId.index]? | continue
+      let some calleeDeclaration := calleeNs.functions[callee.functionId.index]? | continue
+      pending := pending.push (callee.namespaceId, calleeNs, calleeDeclaration)
+  return false
+
+/-- Whether a function's theorem reads a named run of a function value: its
+contract, its data invariants, or a verified body's inner specifications
+state `ensures_of`, `aborts_of`, or `result_of`, itself or through verified
+callees, or it assumes typing or termination, which invoke function values
+the proof does not see. It then takes that the unit's runs read no table
+they do not reach (`TablesLocal`, `designs/intrinsic-maps.md`, "Tables in
+the runtime semantics"); any other theorem takes nothing new. -/
+def assumesLocality (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool := Id.run do
+  if assumesTyping unit namespaceId ns declaration ||
+      assumesTermination unit namespaceId ns declaration then return true
+  let mut pending := #[(namespaceId, ns, declaration)]
+  let mut visited : Array (Nat × Nat) := #[]
+  while let some (namespaceId, ns, declaration) := pending.back? do
+    pending := pending.pop
+    if visited.contains (namespaceId.index, declaration.name.index) then continue
+    visited := visited.push (namespaceId.index, declaration.name.index)
+    if invariantNeeds unit ns declaration (·.behavior) then return true
+    if declaration.contract.conditions.any (fun condition =>
+        (readsFrom unit [(namespaceId, condition.expression)]).behavior) then
+      return true
+    if (bodyReads unit namespaceId declaration).behavior then return true
+    unless verifiedBody declaration do continue
     for callee in directCallees unit namespaceId ns declaration do
       let some calleeNs := unit.namespaces[callee.namespaceId.index]? | continue
       let some calleeDeclaration := calleeNs.functions[callee.functionId.index]? | continue

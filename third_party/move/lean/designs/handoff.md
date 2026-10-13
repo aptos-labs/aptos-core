@@ -39,7 +39,11 @@ P1–P3; Table owners as owned values, `intrinsic-maps.md`, stage 2) and #20710
   representation is not adequate there; the agreement reconciles the two, so
   the erasing boundary stays (`intrinsic-maps.md`, "Tables in the runtime
   semantics"). The earlier decision to make tables runtime values and remove
-  the boundary is withdrawn.
+  the boundary is withdrawn. Implemented the same day: the runtime provides
+  the table roles over native storage; the call boundary holds the tables of
+  other frames, and the `TablesLocal` hypothesis joins it to the behavioral
+  predicates' encoding starts. Rejected: the native storage as a ghost slot
+  of the memory, which would have put a runtime artifact into every frame.
 - 2026-10-12: the default budget is 1000 thousand `maxHeartbeats`, about thirty
   seconds; the registry runs with it (was 25 thousand).
 - 2026-10-12: an authored proof is kept only where the automatic run fails, or
@@ -117,13 +121,11 @@ costs.
 
 ## Open findings not yet in a design
 
-- Tables (2026-10-13, in `intrinsic-maps.md`, "Tables in the runtime
-  semantics"): the runtime has no semantics of the table natives
-  (`nativeCall` is opaque; `TableOperations.lean` and `TableLoans.lean` are
-  unused), and `TablesEncode.stored` admits no state enclosing a table only a
-  frame value holds, so the runtime form of a contract has a false
-  precondition at such calls and `GlobalsPreserved` fails for a run that
-  allocates. Read from the definitions; no Lean build was run.
+- Tables (2026-10-13, `intrinsic-maps.md`, "Tables in the runtime
+  semantics", "Open"): `TablesLocal` and `GlobalsPreserved` are hypotheses to
+  prove; a role at an instantiation the type table lacks has no run
+  (`RequiredTypes` interns what a body consults, not a role's owner); the
+  MonoVM differential tests run no table program.
 - The InfoView works on Move proof files since 2026-10-12
   (`proof-file-editing.md`, P1–P3). Rust `.spec.lean` files (P4: contracts
   attached after registration, or an explicit deferral) and renderings as

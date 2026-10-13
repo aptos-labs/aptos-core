@@ -8874,11 +8874,16 @@ private def namedCall (goal : MVarId) (throughContract : Bool) : TacticM MVarId 
     Lean.Elab.Term.exprToSyntax (mkApp3 (mkConst rule) (meaning.getArg! 0) (meaning.getArg! 1)
       (meaning.getArg! 2))
   let saved ← saveState
-  let shifts? ← goal.withContext do
+  let hypothesis? (constant : Name) : TacticM (Option Lean.Expr) := goal.withContext do
     (← getLCtx).findDeclM? fun declaration => do
       if declaration.isImplementationDetail then return none
       let type ← instantiateMVars declaration.type
-      return if type.isAppOfArity ``VerexIR.NativesShift 2 then some declaration.toExpr else none
+      return if type.isAppOfArity constant 2 then some declaration.toExpr else none
+  let shifts? ← hypothesis? ``VerexIR.NativesShift
+  -- The named run reads the call's run from the start holding the memory's
+  -- tables alone (`TablesLocal`), which every theorem takes.
+  let some tablesLocal ← hypothesis? ``VerexIR.Proofs.TablesLocal | return goal
+  let localSyntax ← goal.withContext (Lean.Elab.Term.exprToSyntax tablesLocal)
   if let some shifts := shifts? then
     for typed in [``VerexIR.Proofs.wp_named_typed, ``VerexIR.Proofs.wp_named_mut_typed] do
       try
@@ -8888,7 +8893,7 @@ private def namedCall (goal : MVarId) (throughContract : Bool) : TacticM MVarId 
         -- A rule whose row conditions fail must fail here, not elaborate
         -- them as `sorry`.
         Term.withoutErrToSorry <| withoutRecover <|
-          evalTactic (← `(tactic| refine $rule $shiftsSyntax (by decide) (by decide) ?_))
+          evalTactic (← `(tactic| refine $rule $shiftsSyntax $localSyntax (by decide) (by decide) ?_))
         let [named] ← getGoals | throwError "the typed named call leaves one goal"
         return ← if throughContract then markNamedRead named else pure named
       catch failure =>
@@ -8900,7 +8905,7 @@ private def namedCall (goal : MVarId) (throughContract : Bool) : TacticM MVarId 
       setGoals [goal]
       let rule ← atFrame untyped
       Term.withoutErrToSorry <| withoutRecover <|
-        evalTactic (← `(tactic| refine $rule (by decide) (by decide) ?_))
+        evalTactic (← `(tactic| refine $rule $localSyntax (by decide) (by decide) ?_))
       let [named] ← getGoals | throwError "the named call leaves one goal"
       return ← if throughContract then markNamedRead named else pure named
     catch failure =>
@@ -9897,6 +9902,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           let native ← forallTelescope (← instantiateMVars (← id.getType)) fun _ body =>
             pure (body.isAppOf ``VerexIR.Proofs.Satisfies ||
               body.isAppOf ``VerexIR.NativesTyped || body.isAppOf ``VerexIR.NativesShift ||
+              body.isAppOf ``VerexIR.Proofs.TablesLocal ||
               body.isAppOf ``VerexIR.Proofs.Terminating ||
               body.isAppOf ``VerexIR.Proofs.AssumptionsHold ||
               -- An assumed step of a lemma the callee applies.

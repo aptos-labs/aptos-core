@@ -183,7 +183,7 @@ theorem lendArguments_lendsEncoded {σs : NRow} (free : σs.lendsEncoded = true)
 /-- A run of an invocation is one `ensures_of` states: from a start at the
 initial state, on the encoded arguments, returning the encoded result. -/
 theorem closureMeaning_ok_ensuresOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {closure : ClosureValue}
+    [Skolems unit] (tablesLocal : TablesLocal executable) {closure : ClosureValue}
     {σs : NRow} {shape : ResultShape} {args : HList σs} (free : σs.lendsEncoded = true)
     (shapeFree : shape.row.lendsEncoded = true) {initial final : Memory unit}
     {result : shape.carrier}
@@ -197,28 +197,32 @@ theorem closureMeaning_ok_ensuresOf {unit : ValidatedUnit} {executable : Executa
   rw [ResultShape.lend_refFree_view shape (NRow.refFree_of_lendsEncoded shapeFree), lend_false] at lend_true
   have sameRow : prophecyRow = results := (Option.some.inj lend_true).symm
   subst prophecyRow
-  refine ⟨results, lend_false, start, exit, ⟨globals_eq.stores, admissible⟩, ?_, encoded.stores,
-    agree⟩
+  obtain ⟨start', exit', exact, storageLoans, nextLoan, -, step', -, mirror⟩ :=
+    tablesLocal.runs _ _ _ _ _ _ _ globals_eq.stores step
+  refine ⟨results, lend_false, start', exit', ⟨exact, admissible.ofLoans storageLoans nextLoan⟩, ?_,
+    mirror _ _ encoded.stores, agree⟩
   simp only [ClosureValue.encode, invocationSpec]
   simp only at compose_eq
   rw [compose_eq]
-  exact step
+  exact step'
 
 /-- An abort of an invocation is one `aborts_of` states. -/
 theorem closureMeaning_aborts_abortsOf {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {closure : ClosureValue}
+    [Skolems unit] (tablesLocal : TablesLocal executable) {closure : ClosureValue}
     {σs : NRow} {shape : ResultShape} {args : HList σs} (free : σs.lendsEncoded = true)
     {initial : Memory unit} {error : Failure}
     (aborted : (closureMeaning executable closure σs shape args).aborts initial error) :
     AbortsOf executable closure.encode (HList.encode args) initial := by
   obtain ⟨start, loans, supplied, arguments, globals_eq, admissible, lend_eq, compose_eq,
-    step⟩ := aborted
+    ⟨exit, step⟩⟩ := aborted
   obtain ⟨rfl, rfl⟩ := lendArguments_lendsEncoded free lend_eq
-  refine ⟨start, error, ⟨globals_eq.stores, admissible⟩, ?_⟩
+  obtain ⟨start', exit', exact, storageLoans, nextLoan, -, step', -, -⟩ :=
+    tablesLocal.runs _ _ _ _ _ _ _ globals_eq.stores step
+  refine ⟨start', error, ⟨exact, admissible.ofLoans storageLoans nextLoan⟩, ?_⟩
   simp only [ClosureValue.encode, invocationSpec]
   simp only at compose_eq
   rw [compose_eq]
-  exact step
+  exact ⟨exit', step'⟩
 
 /-- An invocation of a typed closure on typed arguments from typed global
 memory has no undefined outcome: every run of its target returns results
@@ -838,7 +842,8 @@ does not hold, and the results are `result_of`; an abort is one
 `aborts_of` names. -/
 theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
-    (shifts : NativesShift executable) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
+    (shifts : NativesShift executable) (tablesLocal : TablesLocal executable)
+    (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     {parameters results : List SemTy}
     (typed : ClosureTyped unit closure.function closure.mask closure.typeInstantiation
@@ -859,8 +864,8 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} (executable : Executable
   refine (wp_closureMeaning_typed executable natives closure args free shapeFree typed argumentsTyped
     decodes globals ensures aborts).mpr
     ⟨fun result final run => ?_, fun error aborted => fails error
-      (closureMeaning_aborts_abortsOf free aborted)⟩
-  obtain ⟨values, lent, ensuresOf⟩ := closureMeaning_ok_ensuresOf free shapeFree run
+      (closureMeaning_aborts_abortsOf tablesLocal free aborted)⟩
+  obtain ⟨values, lent, ensuresOf⟩ := closureMeaning_ok_ensuresOf tablesLocal free shapeFree run
   obtain ⟨start, exit, starts, ok, encoded, agree⟩ := id ensuresOf
   exact returns result final values lent ensuresOf
     (not_abortsOf_of_ok shifts callable_plain arguments_plain starts ok)
@@ -1143,7 +1148,7 @@ theorem Denote.ResultShape.lend_encode : (shape : ResultShape) → shape.row.len
 abort of the function value naming the target, and is the result
 `result_of` reads of it. -/
 theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit) [Skolems unit]
-    (shifts : NativesShift executable)
+    (shifts : NativesShift executable) (tablesLocal : TablesLocal executable)
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
     {shape : ResultShape} (fullFree : full.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -1176,7 +1181,7 @@ theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
   have argumentsPlain : ∀ argument ∈ HList.encode args, SemanticOperations.Plain argument :=
     rowCodec_plain full args
   ⟨fun result final execution => by
-      have ensuresOf := ensuresOf_of_run fullFree shapeFree execution
+      have ensuresOf := ensuresOf_of_run tablesLocal fullFree shapeFree execution
       obtain ⟨start, exit, starts, ok, encoded, agree⟩ := id ensuresOf
       have resultsPlain := ResultShape.lend_plain shape (NRow.refFree_of_lendsEncoded shapeFree)
         (ResultShape.lend_encode shape shapeFree result)
@@ -1185,7 +1190,8 @@ theorem wp_named_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
         (resultOf_eq_of_ok shifts callablePlain argumentsPlain starts ok encoded agree
           resultsPlain)
         (stateOf_eq_of_ensuresOf shifts callablePlain argumentsPlain ensuresOf),
-    fun error execution => named.2.1 error execution (abortsOf_of_abort fullFree execution),
+    fun error execution =>
+      named.2.1 error execution (abortsOf_of_abort tablesLocal fullFree execution),
     named.2.2⟩
 
 /-- The entry values of a row of arguments hold no loan. -/
@@ -1201,7 +1207,7 @@ theorem HList.entries_plain : (row : NRow) → (values : HList row) →
 abort of the function value naming the target and, with its returned
 reference settled, is the result `result_of` reads of it. -/
 theorem wp_named_mut_typed {unit : ValidatedUnit} (executable : ExecutableUnit unit)
-    [Skolems unit] (shifts : NativesShift executable)
+    [Skolems unit] (shifts : NativesShift executable) (tablesLocal : TablesLocal executable)
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
     {shape : ResultShape} (fullFlat : full.lentFlat = true) (shapeFlat : shape.row.lentFlat = true)
     {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -1233,7 +1239,7 @@ theorem wp_named_mut_typed {unit : ValidatedUnit} (executable : ExecutableUnit u
       (σs := .nil) ()).plain
   have entriesPlain := HList.entries_plain full args
   ⟨fun result final execution => by
-      have ensuresOf := ensuresOfMut_of_run fullFlat shapeFlat execution
+      have ensuresOf := ensuresOfMut_of_run tablesLocal fullFlat shapeFlat execution
       have notAborts : ¬AbortsOfMut executable (ClosureValue.encode (closureOf handle
           (Weave.supplying full).mask typeInstantiation (σs := .nil) ()))
           full.mutable (HList.entries args) initial := by
@@ -1242,14 +1248,17 @@ theorem wp_named_mut_typed {unit : ValidatedUnit} (executable : ExecutableUnit u
         obtain ⟨lentRow, lends, rfl⟩ := lendArguments_lentFlat fullFlat lent
         obtain ⟨-, invocation⟩ := invocationSpec_closureOf_lent (Weave.supplying full) rfl fullFlat
           typeInstantiation () args (executable := executable) (handle := handle) lends
-        refine not_abortsOfMut_of_ok shifts callablePlain entriesPlain globals.stores admissible lends
-          (returned := results) (exit := exit) ?_
+        obtain ⟨start', exit', exact, storageLoans, nextLoan, -, ran', -, -⟩ :=
+          tablesLocal.runs _ _ _ _ _ _ _ globals.stores ran
+        refine not_abortsOfMut_of_ok shifts callablePlain entriesPlain exact
+          (admissible.ofLoans storageLoans nextLoan) lends (returned := results) (exit := exit') ?_
         rw [invocation, HList.encode_nil, Weave.composeList_supplying]
-        exact ran
+        exact ran'
       exact named.1 result final execution ensuresOf notAborts fun settled =>
         resultOfMut_eq_of_ensuresOfMut shifts callablePlain entriesPlain (ensuresOf settled)
           (ResultShape.current_plain shape result),
-    fun error execution => named.2.1 error execution (abortsOfMut_of_abort fullFlat execution),
+    fun error execution =>
+      named.2.1 error execution (abortsOfMut_of_abort tablesLocal fullFlat execution),
     named.2.2⟩
 
 /-- The rule at an invocation of a function value of rows of scalars and type
@@ -1258,7 +1267,8 @@ decoding its typing states, stated at the function value's encoding and its
 results' as a contract spells them. -/
 theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
-    (shifts : NativesShift executable) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
+    (shifts : NativesShift executable) (tablesLocal : TablesLocal executable)
+    (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
     (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     (typed : ClosureTypedAt unit σs shape.row closure)
@@ -1278,7 +1288,8 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : Executa
     wp (closureMeaning executable closure σs shape args) ensures aborts initial := by
   obtain ⟨parameterTypes, resultTypes, targetTypes, observed, typed, rowTyped, decodes⟩ :=
     typed invocable shapeInvocable
-  refine wp_closureMeaning_unseen executable natives shifts closure args free shapeFree typed
+  refine wp_closureMeaning_unseen executable natives shifts tablesLocal closure args free shapeFree
+    typed
     (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals
     (fun result final values lent ensured unaborted resulted state => ?_) fails
   rw [ResultShape.lend_encode shape shapeFree result, Option.some.injEq] at lent
@@ -1289,7 +1300,8 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} (executable : Executa
 stated at the value's encoding, as a contract spells the value. -/
 theorem wp_closureMeaning_unseen_native {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
-    (shifts : NativesShift executable) {parameters : NRow} {shared : List Bool} {results : NRow}
+    (shifts : NativesShift executable) (tablesLocal : TablesLocal executable)
+    {parameters : NRow} {shared : List Bool} {results : NRow}
     (function : (NTy.function parameters shared results).carrier) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
     (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
@@ -1311,8 +1323,8 @@ theorem wp_closureMeaning_unseen_native {unit : ValidatedUnit} (executable : Exe
         (HList.encode args) initial →
       aborts error) :
     wp (closureMeaning executable function.val σs shape args) ensures aborts initial :=
-  wp_closureMeaning_unseen_at executable natives shifts function.val args invocable shapeInvocable
-    free shapeFree typed globals returns fails
+  wp_closureMeaning_unseen_at executable natives shifts tablesLocal function.val args invocable
+    shapeInvocable free shapeFree typed globals returns fails
 
 /-- Runs of the unit's functions end, at a family: an invocation of a typed
 closure on typed arguments from typed global memory returns or aborts. -/
@@ -1339,7 +1351,8 @@ abort returns, where runs end: a run `ensures_of` names, whose results
 `result_of` reads. -/
 theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     [Skolems unit] (terminating : Terminating executable)
-    (shifts : NativesShift executable) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
+    (shifts : NativesShift executable) (tablesLocal : TablesLocal executable)
+    (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (args : HList σs) (invocable : σs.invocable = true) (shapeInvocable : shape.row.invocable = true)
     (free : σs.lendsEncoded = true) (shapeFree : shape.row.lendsEncoded = true)
     (typed : ClosureTypedAt unit σs shape.row closure)
@@ -1360,8 +1373,8 @@ theorem returns_of_terminating {unit : ValidatedUnit} (executable : ExecutableUn
   rcases terminating ‹_› closure σs shape args targetTypes resultTypes initial free shapeFree
       typed (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals with
     ⟨_, aborted⟩ | ⟨result, final, run⟩
-  · exact absurd (closureMeaning_aborts_abortsOf free aborted) unaborted
-  · obtain ⟨values, lent, ensuresOf⟩ := closureMeaning_ok_ensuresOf free shapeFree run
+  · exact absurd (closureMeaning_aborts_abortsOf tablesLocal free aborted) unaborted
+  · obtain ⟨values, lent, ensuresOf⟩ := closureMeaning_ok_ensuresOf tablesLocal free shapeFree run
     obtain ⟨_, _, starts, ok, encoded, agree⟩ := id ensuresOf
     have resulted := resultOf_eq_of_ok shifts callable_plain arguments_plain starts ok encoded
       agree (ResultShape.lend_plain shape (NRow.refFree_of_lendsEncoded shapeFree) lent)
@@ -1550,14 +1563,14 @@ theorem ok_or_undefined_of_ensuresOf_closureOf {unit : ValidatedUnit}
   by_cases decodes : ∃ result, shape.lend false result [] = some results
   · obtain ⟨result, resultLent⟩ := decodes
     refine .inl ⟨result, coherent, start, [], _, results, exit, [], results,
-      Encloses.of_nil globals (none false captures args), admissible,
+      Encloses.of_nil globals.holds (none false captures args), admissible,
       lent, runs, resultLent, (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans resultLent,
-      ?_, ReturnedEncloses.of_nil encoded (by
+      ?_, ReturnedEncloses.of_nil encoded.holds (by
         rw [none, ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
         rfl), agree⟩
     exact (weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded capturedFree) captures args [] _ _).mpr
       (argumentsResolve_refFree supplied (NRow.refFree_of_lendsEncoded suppliedFree) args _ _)
-  · refine .inr ⟨coherent, start, [], _, results, exit, Encloses.of_nil globals (none false captures args),
+  · refine .inr ⟨coherent, start, [], _, results, exit, Encloses.of_nil globals.holds (none false captures args),
       admissible, lent, runs, ?_⟩
     rintro ⟨result, returnedLoans, -, resultLent, -, -, -, -, -⟩
     obtain rfl := ResultShape.lend_refFree_loans shape (NRow.refFree_of_lendsEncoded shapeFree) resultLent
@@ -1583,10 +1596,10 @@ theorem ensuresOf_closureOf_shape {unit : ValidatedUnit} {executable : Executabl
   rw [invocationSpec_closureOf] at runs
   have lent := ResultShape.lend_encode shape shapeFree result
   have none := weave.tables_nil capturedFree suppliedFree
-  refine ⟨coherent, start, [], _, _, exit, [], _, Encloses.of_nil globals (none false captures args),
+  refine ⟨coherent, start, [], _, _, exit, [], _, Encloses.of_nil globals.holds (none false captures args),
     admissible, lendArguments_weave weave capturedFree suppliedFree captures args, runs, lent,
     (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans lent, ?_,
-    ReturnedEncloses.of_nil encoded (by
+    ReturnedEncloses.of_nil encoded.holds (by
       rw [none, ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
       rfl), agree⟩
   exact (weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded capturedFree) captures args [] _ _).mpr
@@ -1647,10 +1660,10 @@ theorem ensuresOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUn
   rw [invocation] at runs
   have resultLent := ResultShape.lend_encode shape shapeFree result
   have none := weave.tables_nil_of_lentFlat capturedFree suppliedFlat
-  refine ⟨coherent, start, loans, _, _, exit, [], _, Encloses.of_nil globals (none false captures args),
+  refine ⟨coherent, start, loans, _, _, exit, [], _, Encloses.of_nil globals.holds (none false captures args),
     admissible, lentArguments, runs, resultLent,
     (ResultShape.lend_refFree shape (NRow.refFree_of_lendsEncoded shapeFree) result).trans resultLent, ?_,
-    ReturnedEncloses.of_nil encoded (by
+    ReturnedEncloses.of_nil encoded.holds (by
       rw [none, ResultShape.tables_eq_nil true shape (NRow.tableFree_of_lendsEncoded shapeFree)]
       rfl), agree⟩
   exact (weave.argumentsResolve_compose (NRow.refFree_of_lendsEncoded capturedFree) captures args loans _ _).mpr
@@ -1677,7 +1690,7 @@ theorem abortsOfMut_closureOf {unit : ValidatedUnit} {executable : ExecutableUni
       (executable := executable) (handle := handle) lends
   rw [invocation] at runs
   exact ⟨failure, coherent, start, loans, _,
-    Encloses.of_nil globals (weave.tables_nil_of_lentFlat capturedFree suppliedFlat false captures args),
+    Encloses.of_nil globals.holds (weave.tables_nil_of_lentFlat capturedFree suppliedFlat false captures args),
     admissible, lentArguments, runs⟩
 
 /-- `ensures_of` of a closure taking mutable references whose target is

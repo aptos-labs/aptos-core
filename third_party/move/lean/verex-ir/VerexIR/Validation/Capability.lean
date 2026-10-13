@@ -9,6 +9,7 @@ import VerexIR.Validation.PlaceIndex
 import VerexIR.Validation.Eliminate
 import VerexIR.Validation.IndexedArena
 import VerexIR.Validation.StaticTyping
+import VerexIR.Validation.TableRoles
 
 /-!
 # VIR semantic capability preparation
@@ -4490,7 +4491,7 @@ private def scanNamespaceInvariant (registry : SemanticsRegistry) (unit : Valida
 
 private def scanFunction (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace)
-    (function : FunctionDecl FunctionBody) : Array Diagnostic :=
+    (function : FunctionDecl FunctionBody) (neverRun : Bool := false) : Array Diagnostic :=
   let context : ScanContext := {
     locals := function.locals
     results := function.signature.results
@@ -4515,8 +4516,10 @@ private def scanFunction (registry : SemanticsRegistry) (unit : ValidatedUnit)
         function.signature.generics) #[]
   let profileErrors := function.profileData.foldl (fun ds value =>
     ds ++ profileDiagnostics registry unit mode .property function.loc value) #[]
+  -- A native only the bodies of table roles call, which the runtime
+  -- provides instead of running, is never run (`Validation.calledFromRuns`).
   let bodyErrors := match function.body with
-    | .absent => if mode matches .typing then #[] else
+    | .absent => if (mode matches .typing) || ((mode matches .execution) && neverRun) then #[] else
         #[.at (unsupportedCode mode)
           "absent function bodies require an external semantic implementation" function.loc]
     | .structured root =>
@@ -4544,9 +4547,12 @@ private def ownedBy (ns : ValidatedNamespace) (kind : String) (name : NameId)
 
 private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
     (mode : PreparationMode) (ns : ValidatedNamespace) : Array Diagnostic :=
-  let functionErrors := ns.functions.foldl (fun ds function =>
+  let called := if mode matches .execution then calledFromRuns unit else #[]
+  let functionErrors := (ns.functions.zipIdx).foldl (fun ds (function, index) =>
+    let neverRun := (mode matches .execution) &&
+      !called.contains (ns.identity.index, index)
     ds ++ ownedBy ns "fun" function.name
-      (scanFunction registry unit mode ns function)) #[]
+      (scanFunction registry unit mode ns function neverRun)) #[]
   let constantErrors := ns.constants.foldl (fun ds constant =>
     let ds := ds ++ scanType registry unit mode ns constant.type.loc constant.type.typeId ++
       scanExpr registry unit mode ns { profile := ns.profile.getD .move } constant.value
@@ -4596,8 +4602,12 @@ private def scanNamespace (registry : SemanticsRegistry) (unit : ValidatedUnit)
         (scanLemma registry unit mode ns declaration)) ds
     ns.invariants.foldl (fun ds declaration =>
       ds ++ scanNamespaceInvariant registry unit mode ns declaration) ds
+  -- A map's roles run by their bodies, or, at a table owner, as the runtime
+  -- provides them (`designs/intrinsic-maps.md`, "Tables in the runtime
+  -- semantics").
   let intrinsicErrors := if ns.intrinsics.isEmpty || (mode matches .typing) then #[] else
     ns.intrinsics.foldl (fun ds declaration =>
+      if (mode matches .execution) && declaration.model == "map" then ds else
       ds.push <| .at (unsupportedCode mode)
         "intrinsic semantic models are not implemented" declaration.loc) #[]
   let metadataErrors := ns.profileMetadata.foldl (fun ds value =>

@@ -132,12 +132,15 @@ Tables (2026-10-13; [`intrinsic-maps.md`](intrinsic-maps.md), "Owned Table
 values"): a table owner's type has a hidden last field holding its entries,
 so a memory holds tables as values. The runtime keeps them in native storage
 beside the physical values, with a persistent allocation history;
-`StorageEncodes` relates a memory to a runtime state by the erased values
-(`Encodes`) and the tables at their owner's slot (`TablesEncode`,
-`tableSlot?`), and a call's start and exit states enclose the tables its
-arguments and results hold (`Encloses`, `ReturnedEncloses`). `ResourceType`
-distinguishes ordinary values from unbounded native collections, which the
-allocation history uses.
+`StorageHolds` relates a memory to a runtime state by the erased values
+(`Encodes`) and the tables at their owner's slot (`TablesHeld`,
+`tableSlot?`), the storage possibly holding tables of other frames, and a
+call's start and exit states enclose the tables its arguments and results
+hold (`Encloses`, `ReturnedEncloses`); `StorageEncodes` is the exact form
+the behavioral predicates read, joined to the former by the `TablesLocal`
+hypothesis (`intrinsic-maps.md`, "Tables in the runtime semantics").
+`ResourceType` distinguishes ordinary values from unbounded native
+collections, which the allocation history uses.
 
 An escaping reference leaves a heap hole. At a successful call boundary,
 `StorageEncodesReturned` observes globals and Table contents by resolving

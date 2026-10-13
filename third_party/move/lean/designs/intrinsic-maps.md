@@ -3,8 +3,8 @@
 Status: 2026-10-13, stage 2 implemented: a table is an owned value of its
 handle and contents, read and written through the roles ("Owned Table
 values"); the runtime keeps a table's entries in native storage behind its
-handle, and the agreement reconciles the two representations ("Tables in
-the runtime semantics").
+handle and runs the roles over it, and the agreement reconciles the two
+representations ("Tables in the runtime semantics").
 Stage 1 (2026-09-30): `ordered_map` verifies (its own iterator tests and a
 client module); `simple_map` and `pool_u64` in part.
 
@@ -198,20 +198,28 @@ and `t` are two values of one identity.
 **The runtime boundary.** The runtime keeps a table's entries outside its
 value, in native storage. The boundary erases: `NTy.erase` is the physical
 value, the hidden fields dropped, and `NTy.tables` lists the tables a value
-holds, each its owner type, handle, and physical entries. A memory encodes
-as a runtime state when its globals encode erased (`Encodes`) and its tables
-are the state's native storage (`TablesEncode`: the entries at the slot of
+holds, each its owner type, handle, and physical entries. A runtime state
+holds a memory when its globals encode it erased (`Encodes`) and its native
+storage holds the memory's tables (`TablesHeld`: the entries at the slot of
 the owner's type and handle, `tableSlot?`, resolved in the declaring
-namespace; the allocation history at `TableMemory.allocationResource`);
-`StorageEncodes` is both. A call starts from a state enclosing its
-arguments' tables (`Encloses`) and ends in one enclosing the results' and
-the mutated arguments' (`ReturnedEncloses`, through the returned row);
-`propheticRun`, closure invocation, and the behavioral predicates state
-these. Erasure is injective on the values a memory encloses
+namespace, every entry loan-free; the allocation history at
+`TableMemory.allocationResource`); `StorageHolds` is both. The storage may
+hold more: the tables that only the frames of a run hold, a local after
+`new` or a parameter whose owner is a caller's local, which no global
+reaches. A call starts from a state holding the memory and enclosing its
+arguments' tables (`Encloses`) and ends in one holding the final memory and
+enclosing the results' and the mutated arguments' (`ReturnedEncloses`,
+through the returned row); `propheticRun`, closure invocation, and the
+runtime form of a contract state these. A state holding a memory
+determines it: erasure is injective on the values a memory encloses
 (`NTy.eq_of_erase_eq`, `TablesAt`), which `memory_eq_of_encodes` rests on.
-The runtime has no semantics of the table natives (`BigStep.nativeCall` is
-opaque); the role contracts below are hypotheses of the typed theorems, as
-every native's contract is.
+The behavioral predicates (`ensures_of`, `aborts_of`, `result_of`, the
+labeled state) read a function value's runs from the starts *encoding* the
+memory (`StorageEncodes`: held, and nothing else, `TablesEncode.stored`),
+which the memory determines in turn, so that runs from one memory differ
+only in their loans and the predicates are functions of the memory. The two
+start classes meet in `TablesLocal`, below. The role contracts are
+hypotheses of the typed theorems, as every native's contract is.
 
 **Roles.** `Maps.Layout` names the owner, the variant, the entry structure
 of an entries layout, and whether a table layout holds a handle and a cached
@@ -246,59 +254,88 @@ storage, so `lendsEncoded` (reference-free and table-free) gates them, as
 `refFree` alone did, and `lentFlat` likewise.
 
 **Tables in the runtime semantics (decision 2026-10-13, revised the same
-day).** The verifier represents a table as a value, as above. The runtime
-and the big-step semantics keep the representation the VM has: the physical
-value is the handle (and a cached length), the entries live in native storage
-at the slot of the owner's type and handle (`NativeTableStorage`), an entry
-borrow is a loan into that slot (`LoanTarget.table`), and the allocation
-history outlives every table. A value representation is not adequate there:
-a table in a resource under a mutable global borrow would carry its entries
-inside a hole-bearing value, an entry borrow would be a loan into a nested
-value, a fresh handle needs a history no value holds, and a table behind a
-type parameter would give a generic function's physical values a shape that
-depends on the instantiation. The two representations are reconciled by the
-agreement (`compileFunction_agrees`), whose runtime side is
-`propheticMeaning`: the erasing boundary above (`StorageEncodes`, `Encloses`,
-`ReturnedEncloses`) is the statement of that reconciliation and stays. The
-earlier decision of 2026-10-13 to represent tables as values in the runtime
-as well and to remove the boundary is withdrawn.
+day; implemented 2026-10-13).** The verifier represents a table as a value,
+as above, and reads it as any other intrinsic map (`mapModel?`: the table
+layout under the sequence discipline, every role available; what is
+particular to tables is the identity equality and the allocation history,
+both decided, and the `lendsEncoded` gate of the behavioral predicates,
+which lend encodings and a table-holding value has none without its
+storage). The runtime and the big-step semantics keep the representation
+the VM has: the physical value is the handle (and a cached length), the
+entries live in native storage at the slot of the owner's type and handle
+(`NativeTableStorage`), an entry borrow is a loan into that slot
+(`LoanTarget.table`), and the allocation history outlives every table. A
+value representation is not adequate there: a table in a resource under a
+mutable global borrow would carry its entries inside a hole-bearing value,
+an entry borrow would be a loan into a nested value, a fresh handle needs a
+history no value holds, and a table behind a type parameter would give a
+generic function's physical values a shape that depends on the
+instantiation. The two representations are reconciled by the agreement
+(`compileFunction_agrees`), whose runtime side is `propheticMeaning`: the
+erasing boundary above is the statement of that reconciliation and stays.
+The earlier decision of 2026-10-13 to represent tables as values in the
+runtime as well and to remove the boundary is withdrawn.
 
-Open on the runtime side, found on revisiting the implementation
-(2026-10-13):
+*The roles' runtime semantics* (`Semantics/TableRoles.lean`). A function
+bound to an executable role of a table owner with a handle (`tableRole?`)
+is provided by the runtime, not run from its body, as the verifier reads it
+through the role's contract: `BigStep.runtimeProvided` names it beside the
+bodiless natives, `BigStep.nativeCall` runs it by `tableRoleCall` and every
+other native by the opaque `hostCall`, and the interpreter follows. The
+twelve roles the production `table` and `table_with_length` bind have a run:
+`new` allocates at the first handle `table-n` the history lacks (read from
+the history alone, so that runs from storages differing in tables they do
+not reach allocate alike), `destroy_empty`, `len`, `is_empty`, `has_key`,
+`borrow`, `borrow_with_default`, `borrow_mut` (an entry loan,
+`borrowTableEntry?`), `borrow_mut_with_default`, `add_no_override`,
+`add_override_if_exists`, and `del_must_exist`; a present or absent key
+aborts with the natives' codes (100, 101), a nonempty table on destruction
+with 102. A mutable map argument is exported at exit as a body exports its
+mutable parameters, its cached length changed where the size changes. The
+owner's closed type is the role's parameter type (its result type for
+`new`) at the frame's instantiation, canonicalized to the first identifier
+denoting it (`canonicalTypeId?`), the slot the boundary names; a role at an
+open owner type, or one the runtime does not provide (`upsert`,
+`remove_or_none`, enumeration), has no run. The owner's layout is one
+notion (`tableLayout?`); the hidden contents field keeps its own kernel-evaluated reading (`tableOwner`), unchanged.
 
-- The runtime has no semantics of the table natives: `BigStep.nativeCall` is
-  opaque and the interpreter calls it, so no program with a table runs. The
-  primitives over native storage exist with their laws, allocation at a
-  fresh handle, add, remove, and retire (`Semantics/TableOperations.lean`)
-  and entry borrows (`Semantics/TableLoans.lean`), but nothing calls them
-  (only `Tests/TableLoans.lean`). The Move profile is to bind the natives
-  behind the table roles (`new_table_handle`, `add_box`, `borrow_box`,
-  `borrow_box_mut`, `contains_box`, `remove_box`, `destroy_empty_box`) to
-  them, so that the agreement has a runtime side to relate the role
-  contracts to, and the interpreter and the MonoVM differential tests run
-  table programs.
-- `TablesEncode.stored` requires every slot of native storage to hold a
-  table some global of the memory holds (`MemoryTable`). A table a frame
-  value holds alone, a local after `new`, or a by-value or reference
-  parameter whose owner is a caller's local, is in native storage but
-  reachable from no global, so no state encloses it (`Encloses.held`
-  requires it in storage, `stored` then requires it in a global, `Encodes`
-  requires that global in the runtime's globals, where it is not). The
-  runtime form of a contract (`Contract.prophetic`) then has a false
-  precondition for such a call, and `GlobalsPreserved` fails for a run that
-  allocates, since the exit storage holds the new table and the exit memory
-  cannot. Callers reason through contracts (`wp_call`), so nothing is
-  unsound, but the runtime-form theorems cover only runs whose argument
-  tables are stored in globals, and a function that allocates has none. The
-  clause is to be weakened: storage holds at least the memory's tables and
-  the tables the frame encloses, at entry the arguments', at exit the
-  results' and the mutated arguments'. Its uses are `TablesEncode.unique`
-  and `TablesEncode.plain`; the memory a state encodes stays unique through
-  `held`, and what rested on the storage being unique per memory (runs from
-  one memory differing only in their loans) needs instead that a run does
-  not reach a table its arguments and the globals do not hold.
+*The boundary* was found, on revisiting, to admit no table only a frame
+value holds: `TablesEncode.stored` required every slot of native storage to
+hold a table some global holds, so no state enclosed a local after `new` or
+a parameter whose owner is a caller's local, the runtime form of a contract
+(`Contract.prophetic`) had a false precondition at such calls, and
+`GlobalsPreserved` failed for a run that allocates. Callers reason through
+contracts (`wp_call`), so nothing was unsound; the runtime-form theorems
+covered only runs whose argument tables were stored in globals. The call
+boundary now holds the memory (`StorageHolds`, `Encloses`) and the storage
+may hold more; the behavioral predicates keep the encoding starts
+(`StorageEncodes`), which a memory determines. What joins them is
+`TablesLocal`, a property of the unit's runs stated as a hypothesis of the
+public theorem beside `GlobalsPreserved`: a run from a start holding a
+memory is also a run from the start encoding it, with the same outcome and
+loan bookkeeping, whose exit encodes every memory the original exit holds,
+since a run reads no table its globals and arguments do not reach. Only a
+theorem reading a named run takes it (`Contract.assumesLocality`: a
+behavioral predicate in its contract, invariants or body, itself or through
+verified callees, or an invocation of a function value it does not see);
+every other theorem is as it was, at its cost. The solver takes it from
+the theorem's context at every named run (`wp_named`, `wp_named_mut`, their
+typed forms, the unseen invocations, `returns_of_terminating`). Rejected (2026-10-13): making the native storage
+a ghost slot of the memory, which keeps the boundary exact but leaks a
+runtime artifact into every contract's frame.
+
+Open:
+
+- Proving `TablesLocal`, by induction on the runs as the loan renaming
+  (`LoanIndependence`) is, with `NativesShift` and `NativesTyped` for the
+  roles' runs, which the primitives' mirror lemmas
+  (`Semantics/TableOperations.lean`) prepare; and `GlobalsPreserved`.
+- A role at a frame reads the owner's closed type from the type table; a
+  call whose instantiation the table lacks (`RequiredTypes` interns the
+  types a body consults, not a role's owner) has no run.
 - Tables behind type parameters (nested tables, roles at table-bearing
-  instances) remain not carried.
+  instances) remain not carried; the MonoVM differential tests run no
+  table program yet.
 
 **Fixtures.** `Check/Storage/TableReads.lean` (membership, shared lookup,
 a generic lookup, an opaque caller's `old`, an aggregate payload, and two
@@ -340,7 +377,9 @@ deciding the positions by omega:
    Gate: `simple_map`, `pool_u64`, `ordered_map`.
 2. Table owners as owned values: the hidden contents field, the erasing
    runtime boundary, all roles for table layouts, identity equality
-   (2026-10-13, above). Gate: `verify_table`, `bitwise_table`,
+   (2026-10-13, above); the roles' runtime semantics and the boundary
+   holding tables of other frames (2026-10-13, "Tables in the runtime
+   semantics"). Gate: `verify_table`, `bitwise_table`,
    `table_option`, `data_invariant_in_map`, `table_contais_to_length`;
    then `table`, `table_with_length`, `smart_table`, `big_vector`,
    `smart_vector`, `storage_slots_allocator`, `pool_u64_unbound`,

@@ -181,10 +181,10 @@ and contents, the contents a hidden last field of the owner's type in the
 denotation, erased at the runtime boundary and related to native storage
 there; all table roles have contracts, and identity equality compares
 handles. Tables behind type parameters are not carried. The runtime keeps
-tables in native storage behind their handles, reconciled with the verifier's
-values by the agreement (decision 2026-10-13, revised; the boundary stays);
-open there: a runtime semantics of the table natives, and the `stored` clause
-of the boundary, which admits no table only a frame value holds; see
+tables in native storage behind their handles and runs the table roles over
+it, reconciled with the verifier's values by the agreement (decision
+2026-10-13, revised; the boundary stays and holds the tables of other
+frames; `TablesLocal` joins it to the behavioral predicates); see
 `intrinsic-maps.md`, "Owned Table values" and "Tables in the runtime
 semantics".
 
@@ -266,8 +266,9 @@ Open:
   decided 2026-10-02; S1–S5 done 2026-10-02). The denotation's global
   memory is one typed memory per resource type, related to runtime globals
   once, in the agreement; nothing about memory typing is proved per
-  function. Open: proving `GlobalsPreserved`, which the public theorem
-  takes, from `preservation`, and the gaps the design's status lists.
+  function. Open: proving `GlobalsPreserved` and `TablesLocal`, which the
+  public theorem takes, from `preservation` and an induction on the runs,
+  and the gaps the design's status lists.
 - **The agreement theorem.** `compileFunction_agrees` and
   `compileFunction_least_cycle` are axioms by decision; proving them by
   induction over `compileFunction` removes the last project-specific
@@ -439,11 +440,15 @@ Open:
   the map model's contracts; `new` allocates a handle the allocation history
   lacks. The snapshot carrier, the separate contents memory and its slot
   modules, and the stored collection invariants are replaced by the hidden
-  contents field and the erasing runtime boundary (`StorageEncodes`,
-  `Encloses`). Open: tables behind type parameters (nested tables, roles at
-  table-bearing instances), on which `smart_table`, `big_vector`,
-  `smart_vector`, `storage_slots_allocator`, `pool_u64_unbound` and
-  `big_ordered_map` wait.
+  contents field and the erasing runtime boundary (`StorageHolds`,
+  `Encloses`). The runtime provides the twelve roles the production table
+  modules bind over native storage (`tableRoleCall`), and the boundary
+  holds the tables of other frames, joined to the behavioral predicates'
+  encoding starts by the `TablesLocal` hypothesis (2026-10-13, "Tables in
+  the runtime semantics"). Open: tables behind type parameters (nested
+  tables, roles at table-bearing instances), on which `smart_table`,
+  `big_vector`, `smart_vector`, `storage_slots_allocator`,
+  `pool_u64_unbound` and `big_ordered_map` wait.
 - **Closed (2026-09-30): discarded statement values.** A Move branch that
   discards a value (`v.remove(index);` in `capability::remove_element`,
   `pool_u64::deduct_shares`) failed with VEREX-TYPE-MISMATCH. The exchange

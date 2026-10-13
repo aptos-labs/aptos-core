@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Semantics.Operations
+import VerexIR.Semantics.TableRoles
 
 /-!
 # Declarative big-step semantics for structured VIR
@@ -19,11 +20,32 @@ open Validation
 
 open SemanticOperations
 
-/-- The runtime's implementation of a function without a body: the final
-state and outcome of a native call, where the runtime provides one. It is
-fixed but unknown, so a proof about a caller assumes the native's contract. -/
-opaque nativeCall {unit : ValidatedUnit} : ExecutableUnit unit → FunctionHandle →
+/-- The host's implementation of a function without a body the runtime does
+not provide: the final state and outcome of its call, where the host
+provides one. It is fixed but unknown, so a proof about a caller assumes
+the native's contract. -/
+opaque hostCall {unit : ValidatedUnit} : ExecutableUnit unit → FunctionHandle →
     Array (TypeId × TypeId) → RuntimeState → Array RuntimeValue → Option (RuntimeState × Outcome)
+
+/-- The runtime's implementation of a function it provides: a role of a
+table owner by its meaning over native storage (`tableRoleCall`), any
+other native by the host. -/
+@[irreducible] def nativeCall {unit : ValidatedUnit} (executable : ExecutableUnit unit)
+    (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (state : RuntimeState)
+    (arguments : Array RuntimeValue) : Option (RuntimeState × Outcome) :=
+  match tableRole? unit handle with
+  | some (role, layout) =>
+      tableRoleCall unit handle role layout typeInstantiation state arguments
+  | none => hostCall executable handle typeInstantiation state arguments
+
+/-- Whether the runtime provides a function: it has no body, or it plays a
+role of a table owner, whose body the runtime does not run
+(`designs/intrinsic-maps.md`, "Tables in the runtime semantics"). -/
+def runtimeProvided (unit : ValidatedUnit) (handle : FunctionHandle)
+    (declaration : FunctionDecl FunctionBody) : Bool :=
+  match declaration.body with
+  | .absent => true
+  | .structured _ => (tableRole? unit handle).isSome
 
 /-- Control which must propagate through ordinary expression sequencing. -/
 inductive Abrupt : Control → Prop where
@@ -849,6 +871,7 @@ inductive EvalFunction {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       finalState control outcome)
       (namespace_eq : unit.namespaces[handle.namespaceId.index]? = some ns)
       (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
+      (provided_eq : runtimeProvided unit handle declaration = false)
       (frame_eq : initialFrame? declaration arguments typeInstantiation = some frame)
       (body_eq : declaration.body = .structured root)
       (body_step : EvalExprWith executable (EvalFunction executable) handle.namespaceId frame initialState root
@@ -862,7 +885,7 @@ inductive EvalFunction {unit : ValidatedUnit} (executable : ExecutableUnit unit)
       (namespace_eq : unit.namespaces[handle.namespaceId.index]? = some ns)
       (declaration_eq : ns.functions[handle.functionId.index]? = some declaration)
       (arity_eq : arguments.size = declaration.signature.parameters.size)
-      (body_eq : declaration.body = .absent)
+      (provided_eq : runtimeProvided unit handle declaration = true)
       (native_eq : nativeCall executable handle typeInstantiation initialState arguments =
         some (finalState, outcome))
       (hole_free : outcome.holeFree = true) :
@@ -921,6 +944,7 @@ def EvalFunctionWith {unit : ValidatedUnit} (executable : ExecutableUnit unit)
   (∃ ns declaration frame root finalFrame evaluatedState control,
     unit.namespaces[handle.namespaceId.index]? = some ns ∧
     ns.functions[handle.functionId.index]? = some declaration ∧
+    runtimeProvided unit handle declaration = false ∧
     initialFrame? declaration arguments typeInstantiation = some frame ∧
     declaration.body = .structured root ∧
     EvalExprWith executable callee handle.namespaceId frame initialState root
@@ -933,7 +957,7 @@ def EvalFunctionWith {unit : ValidatedUnit} (executable : ExecutableUnit unit)
     unit.namespaces[handle.namespaceId.index]? = some ns ∧
     ns.functions[handle.functionId.index]? = some declaration ∧
     arguments.size = declaration.signature.parameters.size ∧
-    declaration.body = .absent ∧
+    runtimeProvided unit handle declaration = true ∧
     nativeCall executable handle typeInstantiation initialState arguments = some (finalState, outcome) ∧
     outcome.holeFree = true)
 
@@ -948,17 +972,17 @@ theorem EvalFunction_iff {unit : ValidatedUnit} (executable : ExecutableUnit uni
   constructor
   · intro step
     cases step
-    · exact .inl ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
+    · exact .inl ⟨_, _, _, _, _, _, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
     · exact .inr ⟨_, _, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩
   · rintro (⟨ns, declaration, frame, root, finalFrame, evaluatedState, control,
-      namespace_eq, declaration_eq, frame_eq, body_eq, body_step, outcome_eq, hole_free,
-      finalize_eq⟩ | ⟨ns, declaration, namespace_eq, declaration_eq, arity_eq, body_eq, native_eq,
-      hole_free⟩)
+      namespace_eq, declaration_eq, provided_eq, frame_eq, body_eq, body_step, outcome_eq,
+      hole_free, finalize_eq⟩ | ⟨ns, declaration, namespace_eq, declaration_eq, arity_eq,
+      provided_eq, native_eq, hole_free⟩)
     · exact .body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-        evaluatedState finalState control outcome namespace_eq declaration_eq
+        evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq
         frame_eq body_eq body_step outcome_eq hole_free finalize_eq
     · exact .native handle typeInstantiation initialState arguments ns declaration finalState outcome
-        namespace_eq declaration_eq arity_eq body_eq native_eq hole_free
+        namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
 
 
 /-- A source-independent function meaning over the declarative relation. -/
