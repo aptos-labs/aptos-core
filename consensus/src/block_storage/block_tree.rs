@@ -632,11 +632,13 @@ impl BlockTree {
     }
 
     /// The number of pruned blocks that are still available in memory
+    #[cfg(test)]
     pub(super) fn pruned_blocks_in_mem(&self) -> usize {
         self.pruned_block_ids.len()
     }
 
     /// Returns the window root
+    #[cfg(test)]
     pub(super) fn window_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.window_root_id)
             .expect("Window root not found")
