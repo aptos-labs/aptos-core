@@ -15,7 +15,10 @@ use aptos_storage_interface::state_store::{
 };
 use aptos_types::{
     block_executor::transaction_slice_metadata::TransactionSliceMetadata,
-    transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
+    transaction::{
+        AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput,
+        Version,
+    },
 };
 use aptos_vm::VMBlockExecutor;
 use once_cell::sync::Lazy;
@@ -32,50 +35,65 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
-pub trait TransactionChunk {
-    fn first_version(&self) -> Version;
-
-    fn len(&self) -> usize;
-
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    fn into_output<V: VMBlockExecutor>(
-        self,
-        parent_state: &LedgerState,
-        parent_positions: Option<PositionParent<'_>>,
-        state_view: CachedStateView,
-    ) -> Result<ExecutionOutput>;
-}
-
-pub struct ChunkToExecute {
+pub struct TransactionChunk {
+    pub first_version: Version,
     pub transactions: Vec<Transaction>,
     pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
-    pub first_version: Version,
+    /// What the results of the transactions must match.
+    pub transaction_infos: Vec<TransactionInfo>,
+    /// Applied as is if present, otherwise the transactions are executed.
+    pub transaction_outputs: Option<Vec<TransactionOutput>>,
 }
 
-impl TransactionChunk for ChunkToExecute {
-    fn first_version(&self) -> Version {
-        self.first_version
-    }
-
-    fn len(&self) -> usize {
+impl TransactionChunk {
+    pub fn len(&self) -> usize {
         self.transactions.len()
     }
 
-    fn into_output<V: VMBlockExecutor>(
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn into_output<V: VMBlockExecutor>(
         self,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
-        let ChunkToExecute {
+        let Self {
+            first_version: _,
             transactions,
             persisted_aux_info,
-            first_version: _,
+            transaction_infos: _,
+            transaction_outputs,
         } = self;
 
+        match transaction_outputs {
+            Some(transaction_outputs) => Self::apply(
+                transactions,
+                transaction_outputs,
+                persisted_aux_info,
+                parent_state,
+                parent_positions,
+                state_view,
+            ),
+            None => Self::execute::<V>(
+                transactions,
+                persisted_aux_info,
+                parent_state,
+                parent_positions,
+                state_view,
+            ),
+        }
+    }
+
+    fn execute<V: VMBlockExecutor>(
+        transactions: Vec<Transaction>,
+        persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
+        parent_state: &LedgerState,
+        parent_positions: Option<PositionParent<'_>>,
+        state_view: CachedStateView,
+    ) -> Result<ExecutionOutput> {
         assert_eq!(
             transactions.len(),
             persisted_aux_info.len(),
@@ -113,37 +131,15 @@ impl TransactionChunk for ChunkToExecute {
             TransactionSliceMetadata::unknown(),
         )
     }
-}
 
-pub struct ChunkToApply {
-    pub transactions: Vec<Transaction>,
-    pub transaction_outputs: Vec<TransactionOutput>,
-    pub persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
-    pub first_version: Version,
-}
-
-impl TransactionChunk for ChunkToApply {
-    fn first_version(&self) -> Version {
-        self.first_version
-    }
-
-    fn len(&self) -> usize {
-        self.transactions.len()
-    }
-
-    fn into_output<V: VMBlockExecutor>(
-        self,
+    fn apply(
+        transactions: Vec<Transaction>,
+        transaction_outputs: Vec<TransactionOutput>,
+        persisted_aux_info: Vec<PersistedAuxiliaryInfo>,
         parent_state: &LedgerState,
         parent_positions: Option<PositionParent<'_>>,
         state_view: CachedStateView,
     ) -> Result<ExecutionOutput> {
-        let Self {
-            transactions,
-            transaction_outputs,
-            persisted_aux_info,
-            first_version: _,
-        } = self;
-
         let onchain_config = chunk_onchain_config(&state_view)?;
         DoGetExecutionOutput::by_transaction_output(
             transactions,
