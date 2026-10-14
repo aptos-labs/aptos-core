@@ -312,6 +312,10 @@ impl<S: TShare> RandStore<S> {
         self.highest_known_round = std::cmp::max(self.highest_known_round, round);
     }
 
+    pub fn replace_result_sender(&mut self, sender: Sender<AggregationResult>) {
+        self.result_tx = sender;
+    }
+
     pub fn reset(&mut self, round: u64) {
         self.update_highest_known_round(round);
         // remove future rounds items in case they're already decided
@@ -388,7 +392,6 @@ impl<S: TShare> RandStore<S> {
 #[cfg(test)]
 mod tests {
     use crate::rand::rand_gen::{
-        block_queue::QueueItem,
         rand_store::{AggregationResult, RandCheckFuture, RandItem, RandStore, ShareAggregator},
         test_utils::{create_ordered_blocks, create_share, create_share_for_round},
         types::{MockShare, RandConfig},
@@ -515,6 +518,16 @@ mod tests {
     }
 
     /// Create an already-resolved rand_check future for tests.
+    fn block_metadata(
+        blocks: &crate::pipeline::commit_pipeline::OrderedBlocks,
+    ) -> Vec<FullRandMetadata> {
+        blocks
+            .ordered_blocks
+            .iter()
+            .map(|block| FullRandMetadata::from(block.block()))
+            .collect()
+    }
+
     fn resolved_rand_check(needs_rand: bool) -> RandCheckFuture {
         futures::future::ready(needs_rand).boxed().shared()
     }
@@ -605,10 +618,10 @@ mod tests {
         );
 
         let rounds = [vec![1], vec![2, 3], vec![5, 8, 13]];
-        let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()), None);
-        let blocks_2 = QueueItem::new(create_ordered_blocks(rounds[1].clone()), None);
-        let metadata_1 = blocks_1.all_rand_metadata();
-        let metadata_2 = blocks_2.all_rand_metadata();
+        let blocks_1 = create_ordered_blocks(rounds[0].clone());
+        let blocks_2 = create_ordered_blocks(rounds[1].clone());
+        let metadata_1 = block_metadata(&blocks_1);
+        let metadata_2 = block_metadata(&blocks_2);
 
         // shares come before metadata
         for share in ctxt.authors[0..5]
@@ -618,7 +631,7 @@ mod tests {
             rand_store.add_share(share).unwrap();
         }
         assert!(result_rx.try_next().is_err());
-        for metadata in blocks_1.all_rand_metadata() {
+        for metadata in block_metadata(&blocks_1) {
             rand_store.add_rand_metadata(metadata, Some(resolved_rand_check(true)));
         }
         assert!(matches!(
@@ -627,7 +640,7 @@ mod tests {
         ));
 
         // metadata come after shares
-        for metadata in blocks_2.all_rand_metadata() {
+        for metadata in block_metadata(&blocks_2) {
             rand_store.add_rand_metadata(metadata, Some(resolved_rand_check(true)));
         }
         assert!(result_rx.try_next().is_err());
@@ -645,6 +658,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn reset_replaces_the_inflight_decision_channel() {
+        let context = TestContext::new(vec![100; 4], 0);
+        let (old_sender, mut old_receiver) = unbounded();
+        let mut store = RandStore::<MockShare>::new(
+            context.target_epoch,
+            context.authors[0],
+            context.rand_config,
+            old_sender.clone(),
+        );
+        // An aggregation task retains the channel selected before reset.
+        let (release, wait) = futures_channel::oneshot::channel::<()>();
+        let task = tokio::spawn(async move {
+            wait.await.unwrap();
+            old_sender
+                .unbounded_send(AggregationResult::Skip { round: 5 })
+                .unwrap();
+        });
+        let (new_sender, mut new_receiver) = unbounded();
+        store.reset(5);
+        store.replace_result_sender(new_sender);
+        release.send(()).unwrap();
+        task.await.unwrap();
+        assert!(matches!(
+            old_receiver.next().await,
+            Some(AggregationResult::Skip { round: 5 })
+        ));
+        assert!(new_receiver.try_next().is_err());
+    }
+
+    #[tokio::test]
     async fn test_deferred_aggregation_signal_after_threshold() {
         let ctxt = TestContext::new(vec![100; 7], 0);
         let (result_tx, mut result_rx) = unbounded::<AggregationResult>();
@@ -655,8 +698,8 @@ mod tests {
             result_tx,
         );
 
-        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
-        let metadata = blocks.all_rand_metadata();
+        let blocks = create_ordered_blocks(vec![1]);
+        let metadata = block_metadata(&blocks);
 
         // Add metadata with a pending future — aggregation will await this before proceeding
         let (resolve_tx, future) = pending_rand_check();
@@ -694,8 +737,8 @@ mod tests {
             result_tx,
         );
 
-        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
-        let metadata = blocks.all_rand_metadata();
+        let blocks = create_ordered_blocks(vec![1]);
+        let metadata = block_metadata(&blocks);
 
         // Add metadata with resolved future
         for m in metadata.iter() {
@@ -728,8 +771,8 @@ mod tests {
             result_tx,
         );
 
-        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
-        let metadata = blocks.all_rand_metadata();
+        let blocks = create_ordered_blocks(vec![1]);
+        let metadata = block_metadata(&blocks);
 
         // Add metadata with future signaling no randomness needed
         for m in metadata.iter() {
@@ -759,8 +802,8 @@ mod tests {
             result_tx,
         );
 
-        let blocks = QueueItem::new(create_ordered_blocks(vec![1]), None);
-        let metadata = blocks.all_rand_metadata();
+        let blocks = create_ordered_blocks(vec![1]);
+        let metadata = block_metadata(&blocks);
 
         // Add shares first (they go to PendingMetadata state, no future yet)
         for share in ctxt.authors[0..5]
@@ -793,18 +836,18 @@ mod tests {
             result_tx,
         );
 
-        let blocks_1 = QueueItem::new(create_ordered_blocks(vec![1]), None);
-        let blocks_2 = QueueItem::new(create_ordered_blocks(vec![2]), None);
-        let blocks_5 = QueueItem::new(create_ordered_blocks(vec![5]), None);
+        let blocks_1 = create_ordered_blocks(vec![1]);
+        let blocks_2 = create_ordered_blocks(vec![2]);
+        let blocks_5 = create_ordered_blocks(vec![5]);
 
         rand_store.update_highest_known_round(5);
-        for m in blocks_1.all_rand_metadata() {
+        for m in block_metadata(&blocks_1) {
             rand_store.add_rand_metadata(m, Some(resolved_rand_check(true)));
         }
-        for m in blocks_2.all_rand_metadata() {
+        for m in block_metadata(&blocks_2) {
             rand_store.add_rand_metadata(m, Some(resolved_rand_check(false)));
         }
-        for m in blocks_5.all_rand_metadata() {
+        for m in block_metadata(&blocks_5) {
             rand_store.add_rand_metadata(m, Some(resolved_rand_check(true)));
         }
 
@@ -812,9 +855,9 @@ mod tests {
         rand_store.reset(3);
 
         // Round 5 was cleared, so adding it back should not crash
-        let blocks_5b = QueueItem::new(create_ordered_blocks(vec![5]), None);
+        let blocks_5b = create_ordered_blocks(vec![5]);
         rand_store.update_highest_known_round(5);
-        for m in blocks_5b.all_rand_metadata() {
+        for m in block_metadata(&blocks_5b) {
             rand_store.add_rand_metadata(m, Some(resolved_rand_check(false)));
         }
     }

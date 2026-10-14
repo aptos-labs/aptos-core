@@ -47,9 +47,13 @@ Reset drains executor/storage futures and queued blocks, drops observation futur
 broadcast guards, and acknowledges only after pending commit publication completes.
 Verification completions carry a local reset generation to reject stale results.
 
-Randomness and secret-share managers currently resolve their inputs before ordered
-batches reach the certificate service. Their share stores and durable recovery data
-remain separate from pipeline stage progression.
+Ordered batches fan out directly to the certificate service and enabled share services.
+Share services retain only weak per-block subscriptions and retry handles; they resolve
+randomness/key inputs independently, without ordered-prefix queues or a readiness
+coordinator. Parent futures enforce execution order. Disabled services resolve explicit
+absent inputs during ordering. Share aggregation, metadata checks and durable self-share
+recovery remain external. Reset rotates result channels so old aggregation tasks cannot
+resolve new subscriptions at reused rounds.
 
 ## Validation
 

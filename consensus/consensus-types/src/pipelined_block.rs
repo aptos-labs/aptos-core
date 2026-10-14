@@ -512,7 +512,7 @@ impl PipelinedBlock {
     /// Stores the randomness on the block and eagerly sends it via the pipeline channel
     /// to unblock the execution phase as early as possible. Without this, later blocks
     /// in the same ordering batch deadlock: their has_rand_txns_fut waits for earlier
-    /// blocks' execute_fut, which waits for rand_rx. The execution_schedule_phase also
+    /// blocks' execute_fut, which waits for rand_rx. Disabled share services also
     /// sends via this channel as a fallback (using take(), so only one send actually occurs).
     pub fn set_randomness(&self, randomness: Randomness) {
         assert!(self.randomness.set(randomness).is_ok());
@@ -525,7 +525,7 @@ impl PipelinedBlock {
     }
 
     /// Stores the decryption key on the block and eagerly sends it via the pipeline channel
-    /// to unblock the decryption phase as early as possible. The execution_schedule_phase also
+    /// to unblock the decryption phase as early as possible. Disabled share services also
     /// sends via this channel as a fallback (using take(), so only one send actually occurs).
     pub fn set_decryption_key(&self, key: SecretSharedKey) {
         assert!(self.secret_shared_key.set(key.clone()).is_ok());
