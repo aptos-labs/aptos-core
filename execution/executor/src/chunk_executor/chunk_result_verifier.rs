@@ -5,22 +5,19 @@ use anyhow::{ensure, Result};
 use aptos_executor_types::LedgerUpdateOutput;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_types::{
-    epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryTransactionAccumulator, TransactionInfoListWithProof},
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionInfoListWithProof, transaction::Version,
 };
 
 pub struct StateSyncChunkVerifier {
+    pub first_version: Version,
     pub txn_infos_with_proof: TransactionInfoListWithProof,
     pub verified_target_li: LedgerInfoWithSignatures,
     pub epoch_change_li: Option<LedgerInfoWithSignatures>,
 }
 
 impl StateSyncChunkVerifier {
-    pub fn verify_extends_ledger(
-        &self,
-        parent_accumulator: &InMemoryTransactionAccumulator,
-    ) -> Result<()> {
+    pub fn verify_extends_ledger(&self, ledger_update_output: &LedgerUpdateOutput) -> Result<()> {
         // In consensus-only mode, we cannot verify the proof extends the ledger,
         // because the proof returned by the remote peer is an empty one.
         if cfg!(feature = "consensus-only-perf-test") {
@@ -28,14 +25,19 @@ impl StateSyncChunkVerifier {
         }
 
         THREAD_MANAGER.get_exe_cpu_pool().install(|| {
-            let first_version = parent_accumulator.num_leaves();
+            // The chunk can be executed after a partial block carried over from the previous
+            // chunk, so the ledger it extends is the parent with that partial block.
+            let num_carried_over =
+                (self.first_version - ledger_update_output.first_version()) as usize;
+            let accumulator = ledger_update_output
+                .parent_accumulator
+                .append(&ledger_update_output.transaction_info_hashes[..num_carried_over]);
 
-            // Verify the chunk extends the parent accumulator.
-            let parent_root_hash = parent_accumulator.root_hash();
+            // Verify the chunk extends the accumulator.
             let num_overlap = self.txn_infos_with_proof.verify_extends_ledger(
-                first_version,
-                parent_root_hash,
-                Some(first_version),
+                accumulator.num_leaves(),
+                accumulator.root_hash(),
+                Some(self.first_version),
             )?;
             assert_eq!(num_overlap, 0, "overlapped chunks");
 
