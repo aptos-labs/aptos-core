@@ -19,13 +19,16 @@ use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
-    stream::{FusedStream, Stream, StreamExt},
+    stream::{FusedStream, FuturesUnordered, Stream, StreamExt},
     task::{Context, Poll},
 };
 use futures_util::ready;
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{cmp::min, fmt::Debug, future, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    cmp::min, collections::HashSet, fmt::Debug, future, marker::PhantomData, pin::Pin, sync::Arc,
+    time::Duration,
+};
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -214,19 +217,17 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
         // Determine the number of parallel deserialization tasks to use
         let max_parallel_deserialization_tasks = max_parallel_deserialization_tasks.unwrap_or(1);
 
-        let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
-            tokio::task::spawn_blocking(move || received_message_to_event(notification))
-        });
-
         let data_event_stream: Pin<
             Box<dyn Stream<Item = Event<TMessage>> + Send + Sync + 'static>,
         > = if allow_out_of_order_delivery {
-            Box::pin(
-                data_event_stream
-                    .buffer_unordered(max_parallel_deserialization_tasks)
-                    .filter_map(|res| future::ready(res.expect("JoinError from spawn blocking"))),
-            )
+            Box::pin(PeerFairDeserializationStream::new(
+                peer_mgr_notifs_rx,
+                max_parallel_deserialization_tasks,
+            ))
         } else {
+            let data_event_stream = peer_mgr_notifs_rx.map(|notification| {
+                tokio::task::spawn_blocking(move || received_message_to_event(notification))
+            });
             Box::pin(
                 data_event_stream
                     .buffered(max_parallel_deserialization_tasks)
@@ -238,6 +239,75 @@ impl<TMessage: Message + Send + Sync + 'static> NewNetworkEvents for NetworkEven
             event_stream: data_event_stream,
             done: false,
             _marker: PhantomData,
+        }
+    }
+}
+
+/// Schedules at most one blocking deserialization per peer while retaining the
+/// configured global parallelism across different peers. Messages from active
+/// peers stay in the lower network queue with its configured capacity and
+/// eviction policy, so normal bursts are not dropped by the scheduler.
+struct PeerFairDeserializationStream<TMessage> {
+    input: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+    in_flight: FuturesUnordered<tokio::task::JoinHandle<(PeerId, Option<Event<TMessage>>)>>,
+    active_peers: HashSet<PeerId>,
+    max_in_flight: usize,
+    input_done: bool,
+}
+
+impl<TMessage: Message + Send + 'static> PeerFairDeserializationStream<TMessage> {
+    fn new(
+        input: aptos_channel::Receiver<(PeerId, ProtocolId), ReceivedMessage>,
+        max_in_flight: usize,
+    ) -> Self {
+        Self {
+            input,
+            in_flight: FuturesUnordered::new(),
+            active_peers: HashSet::new(),
+            max_in_flight: max_in_flight.max(1),
+            input_done: false,
+        }
+    }
+}
+
+impl<TMessage: Message + Send + 'static> Stream for PeerFairDeserializationStream<TMessage> {
+    type Item = Event<TMessage>;
+
+    fn poll_next(self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        loop {
+            // Only dequeue when a worker is available, skipping active peers.
+            // The channel's round-robin selection serves other peers without
+            // draining or discarding an active peer's backlog.
+            while !this.input_done && this.in_flight.len() < this.max_in_flight {
+                match this
+                    .input
+                    .poll_next_filtered(context, |(peer, _)| !this.active_peers.contains(peer))
+                {
+                    Poll::Ready(Some(message)) => {
+                        let peer = message.sender.peer_id();
+                        assert!(this.active_peers.insert(peer));
+                        this.in_flight.push(tokio::task::spawn_blocking(move || {
+                            (peer, received_message_to_event(message))
+                        }));
+                    },
+                    Poll::Ready(None) => this.input_done = true,
+                    Poll::Pending => break,
+                }
+            }
+
+            // Poll newly-created tasks to register their completion wakers.
+            match this.in_flight.poll_next_unpin(context) {
+                Poll::Ready(Some(result)) => {
+                    let (peer, event) = result.expect("JoinError from spawn blocking");
+                    assert!(this.active_peers.remove(&peer));
+                    if let Some(event) = event {
+                        return Poll::Ready(Some(event));
+                    }
+                },
+                Poll::Ready(None) if this.input_done => return Poll::Ready(None),
+                Poll::Ready(None) | Poll::Pending => return Poll::Pending,
+            }
         }
     }
 }
@@ -480,5 +550,205 @@ pub trait SerializedRequest {
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]
     fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
         self.protocol_id().from_bytes(self.data())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocols::wire::messaging::v1::DirectSendMsg;
+    use aptos_channels::message_queues::QueueStyle;
+    use aptos_config::network_id::NetworkId;
+    use serde::{Deserialize, Deserializer};
+
+    #[derive(Debug, Eq, PartialEq, Serialize)]
+    struct DelayedMessage {
+        delay_ms: u64,
+        id: u8,
+    }
+
+    impl<'de> Deserialize<'de> for DelayedMessage {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct WireMessage {
+                delay_ms: u64,
+                id: u8,
+            }
+
+            let message = WireMessage::deserialize(deserializer)?;
+            std::thread::sleep(Duration::from_millis(message.delay_ms));
+            Ok(Self {
+                delay_ms: message.delay_ms,
+                id: message.id,
+            })
+        }
+    }
+
+    fn received_message_with_protocol(
+        peer: PeerId,
+        message: DelayedMessage,
+        protocol: ProtocolId,
+    ) -> ReceivedMessage {
+        let raw_msg = protocol.to_bytes(&message).unwrap();
+        ReceivedMessage::new(
+            NetworkMessage::DirectSendMsg(DirectSendMsg {
+                protocol_id: protocol,
+                priority: 0,
+                raw_msg,
+            }),
+            PeerNetworkId::new(NetworkId::Validator, peer),
+        )
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn busy_peer_cannot_fill_all_deserialization_slots() {
+        assert_peer_isolation(ProtocolId::ConsensusDirectSendBcs).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn consensus_observer_peers_are_isolated() {
+        assert_peer_isolation(ProtocolId::ConsensusObserver).await;
+    }
+
+    async fn assert_peer_isolation(protocol: ProtocolId) {
+        let attacker = PeerId::random();
+        let honest_peer = PeerId::random();
+        let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let mut events = NetworkEvents::<DelayedMessage>::new(receiver, Some(2), true);
+
+        sender
+            .push(
+                (attacker, protocol),
+                received_message_with_protocol(
+                    attacker,
+                    DelayedMessage {
+                        delay_ms: 250,
+                        id: 1,
+                    },
+                    protocol,
+                ),
+            )
+            .unwrap();
+        sender
+            .push(
+                (attacker, protocol),
+                received_message_with_protocol(
+                    attacker,
+                    DelayedMessage {
+                        delay_ms: 250,
+                        id: 2,
+                    },
+                    protocol,
+                ),
+            )
+            .unwrap();
+
+        // Poll once so the first attacker message starts deserializing before
+        // the honest message arrives. The second must remain queued.
+        let next_event = events.next();
+        tokio::pin!(next_event);
+        tokio::select! {
+            event = &mut next_event => panic!("slow attacker unexpectedly completed: {event:?}"),
+            _ = tokio::time::sleep(Duration::from_millis(25)) => {},
+        }
+
+        sender
+            .push(
+                (honest_peer, protocol),
+                received_message_with_protocol(
+                    honest_peer,
+                    DelayedMessage { delay_ms: 0, id: 3 },
+                    protocol,
+                ),
+            )
+            .unwrap();
+
+        let event = tokio::time::timeout(Duration::from_millis(100), &mut next_event)
+            .await
+            .expect("honest peer should use the other deserialization slot")
+            .expect("network event stream ended unexpectedly");
+        assert_eq!(
+            event,
+            Event::Message(honest_peer, DelayedMessage { delay_ms: 0, id: 3 },)
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn peer_burst_is_not_dropped_during_deserialization() {
+        for parallelism in [1, 2] {
+            let peer = PeerId::random();
+            let protocol = ProtocolId::ConsensusDirectSendBcs;
+            let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 50, None);
+            let mut events =
+                NetworkEvents::<DelayedMessage>::new(receiver, Some(parallelism), true);
+            for id in 0..50 {
+                sender
+                    .push(
+                        (peer, protocol),
+                        received_message_with_protocol(
+                            peer,
+                            DelayedMessage { delay_ms: 5, id },
+                            protocol,
+                        ),
+                    )
+                    .unwrap();
+            }
+            drop(sender);
+            let mut ids = Vec::new();
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while let Some(event) = events.next().await {
+                    let Event::Message(sender, message) = event else {
+                        panic!("expected a direct-send message");
+                    };
+                    assert_eq!(sender, peer);
+                    ids.push(message.id);
+                }
+            })
+            .await
+            .expect("queued messages should drain after the sender closes");
+            assert_eq!(ids, (0..50).collect::<Vec<_>>());
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn consensus_observer_preserves_publisher_order() {
+        let peer = PeerId::random();
+        let protocol = ProtocolId::ConsensusObserver;
+        let (sender, receiver) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let mut events = NetworkEvents::<DelayedMessage>::new(receiver, Some(2), true);
+        for message in [
+            DelayedMessage {
+                delay_ms: 50,
+                id: 1,
+            },
+            DelayedMessage { delay_ms: 0, id: 2 },
+        ] {
+            sender
+                .push(
+                    (peer, protocol),
+                    received_message_with_protocol(peer, message, protocol),
+                )
+                .unwrap();
+        }
+        drop(sender);
+        let messages = tokio::time::timeout(Duration::from_secs(2), async {
+            let mut messages = Vec::new();
+            while let Some(event) = events.next().await {
+                messages.push(event);
+            }
+            messages
+        })
+        .await
+        .expect("the stream should drain after the sender closes");
+        assert_eq!(messages, vec![
+            Event::Message(peer, DelayedMessage {
+                delay_ms: 50,
+                id: 1
+            }),
+            Event::Message(peer, DelayedMessage { delay_ms: 0, id: 2 }),
+        ]);
     }
 }
