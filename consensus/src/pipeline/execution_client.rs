@@ -11,11 +11,10 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_manager::TPayloadManager,
     pipeline::{
-        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
-        decoupled_execution_utils::prepare_phases_and_buffer_manager,
+        commit_pipeline::{CommitPipeline, OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
+        commit_signer::CommitSignerProvider,
         errors::Error,
         pipeline_builder::PipelineBuilder,
-        signing_phase::CommitSignerProvider,
     },
     rand::{
         rand_gen::{
@@ -119,7 +118,7 @@ pub trait TExecutionClient: Send + Sync {
     /// Synchronize to a commit that is not present locally.
     async fn sync_to_target(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError>;
 
-    /// Resets the internal state of the rand and buffer managers.
+    /// Resets the internal state of the rand and commit pipelines.
     async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()>;
 
     /// Shutdown the current processor at the end of the epoch.
@@ -129,21 +128,21 @@ pub trait TExecutionClient: Send + Sync {
     fn pipeline_builder(&self, signer: Arc<ValidatorSigner>) -> PipelineBuilder;
 }
 
-struct BufferManagerHandle {
+struct PipelineHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
     pub commit_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
-    pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
+    pub reset_tx_to_commit_pipeline: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     pub reset_tx_to_secret_share_manager: Option<UnboundedSender<ResetRequest>>,
 }
 
-impl BufferManagerHandle {
+impl PipelineHandle {
     pub fn new() -> Self {
         Self {
             execute_tx: None,
             commit_tx: None,
-            reset_tx_to_buffer_manager: None,
+            reset_tx_to_commit_pipeline: None,
             reset_tx_to_rand_manager: None,
             reset_tx_to_secret_share_manager: None,
         }
@@ -153,13 +152,13 @@ impl BufferManagerHandle {
         &mut self,
         execute_tx: UnboundedSender<OrderedBlocks>,
         commit_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>,
-        reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
+        reset_tx_to_commit_pipeline: UnboundedSender<ResetRequest>,
         reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
         maybe_reset_tx_to_secret_share_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
         self.execute_tx = Some(execute_tx);
         self.commit_tx = Some(commit_tx);
-        self.reset_tx_to_buffer_manager = Some(reset_tx_to_buffer_manager);
+        self.reset_tx_to_commit_pipeline = Some(reset_tx_to_commit_pipeline);
         self.reset_tx_to_rand_manager = reset_tx_to_rand_manager;
         self.reset_tx_to_secret_share_manager = maybe_reset_tx_to_secret_share_manager;
     }
@@ -172,13 +171,13 @@ impl BufferManagerHandle {
         Option<UnboundedSender<ResetRequest>>,
     ) {
         let reset_tx_to_rand_manager = self.reset_tx_to_rand_manager.take();
-        let reset_tx_to_buffer_manager = self.reset_tx_to_buffer_manager.take();
+        let reset_tx_to_commit_pipeline = self.reset_tx_to_commit_pipeline.take();
         let reset_tx_to_secret_share_manager = self.reset_tx_to_secret_share_manager.take();
         self.execute_tx = None;
         self.commit_tx = None;
         (
             reset_tx_to_rand_manager,
-            reset_tx_to_buffer_manager,
+            reset_tx_to_commit_pipeline,
             reset_tx_to_secret_share_manager,
         )
     }
@@ -191,8 +190,8 @@ pub struct ExecutionProxyClient {
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     bounded_executor: BoundedExecutor,
-    // channels to buffer manager
-    handle: Arc<RwLock<BufferManagerHandle>>,
+    // channels to commit pipeline
+    handle: Arc<RwLock<PipelineHandle>>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     secret_share_storage: Arc<dyn SecretShareStorage>,
     consensus_observer_config: ConsensusObserverConfig,
@@ -219,7 +218,7 @@ impl ExecutionProxyClient {
             self_sender,
             network_sender,
             bounded_executor,
-            handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
+            handle: Arc::new(RwLock::new(PipelineHandle::new())),
             rand_storage,
             secret_share_storage,
             consensus_observer_config,
@@ -395,7 +394,7 @@ impl ExecutionProxyClient {
     fn spawn_decoupled_execution(
         &self,
         consensus_sk: Arc<PrivateKey>,
-        commit_signer_provider: Arc<dyn CommitSignerProvider>,
+        _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
@@ -407,7 +406,7 @@ impl ExecutionProxyClient {
         consensus_publisher: Option<Arc<ConsensusPublisher>>,
         network_sender: Arc<NetworkSender>,
     ) {
-        let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
+        let (reset_commit_pipeline_tx, reset_commit_pipeline_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
             aptos_channel::new::<AccountAddress, (AccountAddress, IncomingCommitRequest)>(
@@ -503,24 +502,17 @@ impl ExecutionProxyClient {
         self.handle.write().init(
             execution_ready_block_tx,
             commit_msg_tx,
-            reset_buffer_manager_tx,
+            reset_commit_pipeline_tx,
             maybe_reset_tx_to_rand_manager,
             maybe_reset_tx_to_secret_share_manager,
         );
 
-        let (
-            execution_schedule_phase,
-            execution_wait_phase,
-            signing_phase,
-            persisting_phase,
-            buffer_manager,
-        ) = prepare_phases_and_buffer_manager(
+        let commit_pipeline = CommitPipeline::new(
             self.author,
-            commit_signer_provider,
             network_sender,
             commit_msg_rx,
             execution_ready_block_rx,
-            reset_buffer_manager_rx,
+            reset_commit_pipeline_rx,
             epoch_state,
             self.bounded_executor.clone(),
             onchain_consensus_config.order_vote_enabled(),
@@ -530,12 +522,7 @@ impl ExecutionProxyClient {
             self.consensus_config
                 .max_pending_rounds_in_commit_vote_cache,
         );
-
-        tokio::spawn(execution_schedule_phase.start());
-        tokio::spawn(execution_wait_phase.start());
-        tokio::spawn(signing_phase.start());
-        tokio::spawn(persisting_phase.start());
-        tokio::spawn(buffer_manager.start());
+        tokio::spawn(commit_pipeline.start());
     }
 }
 
@@ -639,7 +626,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let mut execute_tx = match self.handle.read().execute_tx.clone() {
             Some(tx) => tx,
             None => {
-                debug!("Failed to send to buffer manager, maybe epoch ends");
+                debug!("Failed to send to commit pipeline, maybe epoch ends");
                 return Ok(());
             },
         };
@@ -665,7 +652,7 @@ impl TExecutionClient for ExecutionProxyClient {
             .await
             .is_err()
         {
-            debug!("Failed to send to buffer manager, maybe epoch ends");
+            debug!("Failed to send to commit pipeline, maybe epoch ends");
         }
         Ok(())
     }
@@ -679,7 +666,7 @@ impl TExecutionClient for ExecutionProxyClient {
             tx.push(peer_id, (peer_id, commit_msg))
         } else {
             counters::EPOCH_MANAGER_ISSUES_DETAILS
-                .with_label_values(&["buffer_manager_not_started"])
+                .with_label_values(&["commit_pipeline_not_started"])
                 .inc();
             warn!("Buffer manager not started");
             Ok(())
@@ -697,7 +684,7 @@ impl TExecutionClient for ExecutionProxyClient {
         // Sync for the specified duration
         let result = self.execution_proxy.sync_for_duration(duration).await;
 
-        // Reset the rand and buffer managers to the new synced round
+        // Reset the rand and commit pipelines to the new synced round
         if let Ok(latest_synced_ledger_info) = &result {
             self.reset(latest_synced_ledger_info).await?;
         }
@@ -710,11 +697,11 @@ impl TExecutionClient for ExecutionProxyClient {
             Err(anyhow::anyhow!("Injected error in sync_to_target").into())
         });
 
-        // Reset the rand and buffer managers to the target round
+        // Reset the rand and commit pipelines to the target round
         self.reset(&target).await?;
 
         // TODO: handle the state sync error (e.g., re-push the ordered
-        // blocks to the buffer manager when it's reset but sync fails).
+        // blocks to the commit pipeline when it's reset but sync fails).
         self.execution_proxy.sync_to_target(target).await
     }
 
@@ -722,13 +709,13 @@ impl TExecutionClient for ExecutionProxyClient {
         let (
             reset_tx_to_rand_manager,
             reset_tx_to_secret_share_manager,
-            reset_tx_to_buffer_manager,
+            reset_tx_to_commit_pipeline,
         ) = {
             let handle = self.handle.read();
             (
                 handle.reset_tx_to_rand_manager.clone(),
                 handle.reset_tx_to_secret_share_manager.clone(),
-                handle.reset_tx_to_buffer_manager.clone(),
+                handle.reset_tx_to_commit_pipeline.clone(),
             )
         };
 
@@ -756,7 +743,7 @@ impl TExecutionClient for ExecutionProxyClient {
             ack_rx.await.map_err(|_| Error::RandResetDropped)?;
         }
 
-        if let Some(mut reset_tx) = reset_tx_to_buffer_manager {
+        if let Some(mut reset_tx) = reset_tx_to_commit_pipeline {
             // reset execution phase and commit phase
             let (tx, rx) = oneshot::channel::<ResetAck>();
             reset_tx
@@ -775,7 +762,7 @@ impl TExecutionClient for ExecutionProxyClient {
     async fn end_epoch(&self) {
         let (
             reset_tx_to_rand_manager,
-            reset_tx_to_buffer_manager,
+            reset_tx_to_commit_pipeline,
             reset_tx_to_secret_share_manager,
         ) = {
             let mut handle = self.handle.write();
@@ -808,17 +795,17 @@ impl TExecutionClient for ExecutionProxyClient {
                 .expect("[EpochManager] Fail to drop secret share manager");
         }
 
-        if let Some(mut tx) = reset_tx_to_buffer_manager {
+        if let Some(mut tx) = reset_tx_to_commit_pipeline {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
                 signal: ResetSignal::Stop,
             })
             .await
-            .expect("[EpochManager] Fail to drop buffer manager");
+            .expect("[EpochManager] Fail to drop commit pipeline");
             ack_rx
                 .await
-                .expect("[EpochManager] Fail to drop buffer manager");
+                .expect("[EpochManager] Fail to drop commit pipeline");
         }
         self.execution_proxy.end_epoch();
     }

@@ -21,7 +21,7 @@ use aptos_types::{
     block_info::BlockInfo,
     contract_event::ContractEvent,
     decryption::{BlockTxnDecryptionKey, DecryptionPayload},
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     randomness::Randomness,
     secret_sharing::{SecretShare, SecretSharedKey},
     transaction::{
@@ -132,6 +132,24 @@ pub type PrepareResult = (
 pub type RandResult = (Option<Option<Randomness>>, bool);
 pub type ExecuteResult = Duration;
 pub type LedgerUpdateResult = (StateComputeResult, Duration, Option<u64>);
+
+/// Canonical execution result used for both local votes and certificate matching.
+pub fn execution_ledger_info(
+    block: &Block,
+    result: &StateComputeResult,
+    epoch_end_timestamp: Option<u64>,
+    consensus_data_hash: HashValue,
+) -> LedgerInfo {
+    let mut info = block.gen_block_info(
+        result.root_hash(),
+        result.last_version_or_0(),
+        result.epoch_state().clone(),
+    );
+    if let Some(timestamp) = epoch_end_timestamp {
+        info.change_timestamp(timestamp);
+    }
+    LedgerInfo::new(info, consensus_data_hash)
+}
 pub type PostLedgerUpdateResult = ();
 pub type CommitVoteResult = CommitVote;
 pub type PreCommitResult = StateComputeResult;

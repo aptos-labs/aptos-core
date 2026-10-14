@@ -13,7 +13,7 @@ use crate::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::commit_pipeline::OrderedBlocks,
 };
 use anyhow::{anyhow, bail, format_err};
 use aptos_bitvec::BitVec;

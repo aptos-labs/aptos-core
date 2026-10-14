@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::commit_pipeline::OrderedBlocks,
     rand::rand_gen::types::{MockShare, RandShare},
 };
 use aptos_consensus_types::{

@@ -111,22 +111,6 @@ pub fn prepare_executed_blocks_with_ledger_info(
     (executed_blocks, li_sig, proposals)
 }
 
-pub fn prepare_executed_blocks_with_executed_ledger_info(
-    signer: &ValidatorSigner,
-) -> (Vec<Arc<PipelinedBlock>>, LedgerInfoWithSignatures) {
-    let genesis_qc = certificate_for_genesis();
-    let (executed_blocks, li_sig, _) = prepare_executed_blocks_with_ledger_info(
-        signer,
-        1,
-        HashValue::random(),
-        HashValue::from_u64(0xBEEF),
-        None,
-        Some(genesis_qc),
-        0,
-    );
-    (executed_blocks, li_sig)
-}
-
 pub fn prepare_executed_blocks_with_ordered_ledger_info(
     signer: &ValidatorSigner,
 ) -> (Vec<Arc<PipelinedBlock>>, LedgerInfoWithSignatures) {

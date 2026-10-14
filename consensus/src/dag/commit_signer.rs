@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::pipeline::signing_phase::CommitSignerProvider;
+use crate::pipeline::commit_signer::CommitSignerProvider;
 use aptos_crypto::bls12381;
 use aptos_types::validator_signer::ValidatorSigner;
 use std::sync::Arc;

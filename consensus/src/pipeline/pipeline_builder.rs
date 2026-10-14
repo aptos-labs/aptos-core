@@ -22,11 +22,11 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        CommitLedgerResult, CommitVoteResult, DecryptionOutcome, DecryptionResult, ExecuteResult,
-        LedgerUpdateResult, MaterializeResult, NotifyStateSyncResult, OrderedBlocksForObserver,
-        PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult,
-        PostLedgerUpdateResult, PreCommitResult, PrepareResult, RandResult, TaskError, TaskFuture,
-        TaskResult,
+        execution_ledger_info, CommitLedgerResult, CommitVoteResult, DecryptionOutcome,
+        DecryptionResult, ExecuteResult, LedgerUpdateResult, MaterializeResult,
+        NotifyStateSyncResult, OrderedBlocksForObserver, PipelineFutures, PipelineInputRx,
+        PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult, PreCommitResult,
+        PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -1232,20 +1232,12 @@ impl PipelineBuilder {
         }
         tracker.start_working();
 
-        let mut block_info = block.gen_block_info(
-            compute_result.root_hash(),
-            compute_result.last_version_or_0(),
-            compute_result.epoch_state().clone(),
+        let ledger_info = execution_ledger_info(
+            &block,
+            &compute_result,
+            epoch_end_timestamp,
+            consensus_data_hash,
         );
-        if let Some(timestamp) = epoch_end_timestamp {
-            info!(
-                "[Pipeline] update block timestamp from {} to epoch end timestamp {}",
-                block_info.timestamp_usecs(),
-                timestamp
-            );
-            block_info.change_timestamp(timestamp);
-        }
-        let ledger_info = LedgerInfo::new(block_info, consensus_data_hash);
         info!("[Pipeline] Signed ledger info {ledger_info}");
         let signature = signer.sign(&ledger_info).expect("Signing should succeed");
         let commit_vote = CommitVote::new_with_signature(signer.author(), ledger_info, signature);
