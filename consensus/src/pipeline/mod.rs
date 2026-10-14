@@ -9,6 +9,8 @@ pub mod commit_signer;
 pub mod decryption_pipeline_builder;
 pub mod errors;
 pub mod execution_client;
+pub mod ordering_pipeline;
 pub mod pipeline_builder;
 #[cfg(test)]
 mod tests;
+pub mod voting_authority;

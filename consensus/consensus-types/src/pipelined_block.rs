@@ -4,9 +4,12 @@
 use crate::{
     block::Block,
     common::{Payload, Round},
+    order_vote::OrderVote,
     order_vote_proposal::OrderVoteProposal,
     pipeline::commit_vote::CommitVote,
     quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    vote::Vote,
     vote_proposal::VoteProposal,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
@@ -64,7 +67,7 @@ impl Display for TaskError {
 impl TaskError {
     /// Returns true if this error is (or propagates from) a cancelled task —
     /// i.e. expected pipeline teardown (the block was dropped or a
-    /// buffer_manager reset aborted the pipeline) rather than a genuine
+    /// a reset aborted the pipeline) rather than a genuine
     /// failure. A panicked `JoinError` is a real failure and returns false.
     pub fn is_cancellation(&self) -> bool {
         match self {
@@ -160,6 +163,8 @@ pub type SecretShareResult = Option<SecretShare>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
+    pub proposal_vote_fut: TaskFuture<Option<Vote>>,
+    pub order_vote_fut: TaskFuture<Option<OrderVote>>,
     pub decryption_fut: TaskFuture<DecryptionResult>,
     pub prepare_fut: TaskFuture<PrepareResult>,
     pub has_rand_txns_fut: TaskFuture<bool>,
@@ -191,9 +196,10 @@ impl PipelineFutures {
 }
 
 pub struct PipelineInputTx {
+    pub proposal_vote_tx: Option<oneshot::Sender<ProposalVoteInput>>,
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
-    pub order_vote_tx: Option<oneshot::Sender<()>>,
+    pub order_vote_tx: Option<oneshot::Sender<OrderVoteInput>>,
     pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
     pub ordered_blocks_for_observer_tx: Option<oneshot::Sender<OrderedBlocksForObserver>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
@@ -201,13 +207,25 @@ pub struct PipelineInputTx {
 }
 
 pub struct PipelineInputRx {
+    pub proposal_vote_rx: oneshot::Receiver<ProposalVoteInput>,
     pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
-    pub order_vote_rx: oneshot::Receiver<()>,
+    pub order_vote_rx: oneshot::Receiver<OrderVoteInput>,
     pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
     pub ordered_blocks_for_observer_fut: TaskFuture<OrderedBlocksForObserver>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
     pub secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+}
+
+pub struct ProposalVoteInput {
+    pub vote: Vote,
+    pub sync_info: SyncInfo,
+    pub recipient: Option<crate::common::Author>,
+}
+
+pub struct OrderVoteInput {
+    pub vote: OrderVote,
+    pub qc: Arc<QuorumCert>,
 }
 
 #[derive(Clone)]
