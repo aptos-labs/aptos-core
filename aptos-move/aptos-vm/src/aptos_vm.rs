@@ -2426,8 +2426,7 @@ impl AptosVM {
                     txn_limits_request,
                     meter_balance,
                     &NoopBlockSynchronizationKillSwitch {},
-                    self.timed_features()
-                        .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+                    self.timed_features(),
                 ))
             },
             auxiliary_info,
@@ -2461,8 +2460,7 @@ impl AptosVM {
                     txn_limits_request,
                     meter_balance,
                     block_synchronization_kill_switch,
-                    self.timed_features()
-                        .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+                    self.timed_features(),
                 )
             },
             auxiliary_info,
@@ -2897,10 +2895,7 @@ impl AptosVM {
             type_args,
             arguments,
             max_gas_amount,
-            |gas_feature_version,
-             vm_gas_params,
-             storage_gas_params,
-             meter_value_nodes_on_deserialize| {
+            |gas_feature_version, vm_gas_params, storage_gas_params, timed_features| {
                 make_prod_gas_meter(
                     gas_feature_version,
                     vm_gas_params,
@@ -2908,7 +2903,7 @@ impl AptosVM {
                     None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
-                    meter_value_nodes_on_deserialize,
+                    timed_features,
                 )
             },
         );
@@ -2947,10 +2942,7 @@ impl AptosVM {
             type_args,
             arguments,
             max_gas_amount,
-            |gas_feature_version,
-             vm_gas_params,
-             storage_gas_params,
-             meter_value_nodes_on_deserialize| {
+            |gas_feature_version, vm_gas_params, storage_gas_params, timed_features| {
                 let gas_meter = make_prod_gas_meter_impl::<_, M>(
                     gas_feature_version,
                     vm_gas_params,
@@ -2958,7 +2950,7 @@ impl AptosVM {
                     None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
-                    meter_value_nodes_on_deserialize,
+                    timed_features,
                 );
                 modify_gas_meter(gas_meter)
             },
@@ -2978,7 +2970,7 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
-        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters, bool) -> G,
+        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters, &TimedFeatures) -> G,
     ) -> (ViewFunctionOutput, Option<G>) {
         let env = AptosEnvironment::new(state_view);
         let vm = AptosVM::new(&env);
@@ -3016,8 +3008,7 @@ impl AptosVM {
             vm.gas_feature_version(),
             vm_gas_params,
             storage_gas_params,
-            vm.timed_features()
-                .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+            vm.timed_features(),
         );
 
         let resolver = state_view.as_move_resolver();
@@ -3599,8 +3590,7 @@ impl VMValidator for AptosVM {
             txn_data.txn_limits.as_ref(),
             initial_balance,
             &NoopBlockSynchronizationKillSwitch {},
-            self.timed_features()
-                .is_enabled(TimedFeatureFlag::MeterValueNodesOnDeserialize),
+            self.timed_features(),
         );
         let storage = TraversalStorage::new();
 
