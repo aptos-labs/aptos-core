@@ -31,6 +31,14 @@ on:
       - "crates/transaction-workloads-lib/src/prebuilt_packages.rs"
       - ".github/workflows/prebuilt-workloads-check.yaml"
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner for the manual comparison; PRs always use AWS"
+        type: choice
+        default: aws
+        options:
+          - aws
+          - github-hosted
 
 concurrency:
   group: prebuilt-workloads-check-${{ github.event.pull_request.number || github.ref }}
@@ -47,12 +55,14 @@ env:
 
 jobs:
   regenerate:
-    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '64cpu-gh-ubuntu22-x64' || format('runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/rust-setup
+        with:
+          ADDITIONAL_KEY: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && 'hosted-runner-trial' || '' }}
 
       - name: Regenerate the prebuilt bundle
         run: ./testsuite/benchmark-workloads/generate.py
