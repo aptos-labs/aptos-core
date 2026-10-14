@@ -9,6 +9,7 @@ use crate::{
             manifest::{TransactionBackup, TransactionChunk, TransactionChunkFormat},
         },
     },
+    metadata::view::MetadataView,
     metrics::{
         restore::{TRANSACTION_REPLAY_VERSION, TRANSACTION_SAVE_VERSION},
         verify::VERIFY_TRANSACTION_VERSION,
@@ -206,6 +207,45 @@ impl LoadedChunk {
 
         (txns, persisted_aux_info, txn_infos, event_vecs, write_sets)
     }
+}
+
+/// Extends `version` to the end of its block, i.e. the first version since `version` whose
+/// `TransactionInfo` has a state checkpoint hash, as transactions are replayed in whole blocks.
+/// If the backups end before the block does, `version` is returned as is, and the replay stops
+/// at the previous block end.
+pub async fn extend_to_block_end(
+    storage: &Arc<dyn BackupStorage>,
+    metadata_view: &MetadataView,
+    version: Version,
+) -> Result<Version> {
+    let mut next_version = version;
+    while let Some(backup) = metadata_view
+        .select_transaction_backups(next_version, next_version)?
+        .pop()
+    {
+        let manifest: TransactionBackup = storage.load_json_file(&backup.manifest).await?;
+        manifest.verify()?;
+        for chunk in manifest.chunks {
+            if chunk.last_version < version {
+                continue;
+            }
+            let chunk = LoadedChunk::load(chunk, storage, None).await?;
+            let block_end = (chunk.manifest.first_version..)
+                .zip(&chunk.txn_infos)
+                .find(|(v, txn_info)| *v >= version && txn_info.has_state_checkpoint_hash())
+                .map(|(v, _)| v);
+            if let Some(block_end) = block_end {
+                return Ok(block_end);
+            }
+        }
+        next_version = backup.last_version + 1;
+    }
+
+    warn!(
+        version = version,
+        "The block of the version is not fully backed up, so it won't be replayed."
+    );
+    Ok(version)
 }
 
 impl TransactionRestoreController {
@@ -725,7 +765,7 @@ impl TransactionRestoreBatchController {
                     tokio::task::spawn_blocking(move || {
                         let v = chunk_replayer.commit()?;
 
-                        let total_replayed = v - first_version + 1;
+                        let total_replayed = v + 1 - first_version;
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(
                             version = v,

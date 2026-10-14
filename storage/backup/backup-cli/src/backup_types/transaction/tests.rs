@@ -4,8 +4,9 @@
 use crate::{
     backup_types::transaction::{
         backup::{TransactionBackupController, TransactionBackupOpt},
-        restore::TransactionRestoreBatchController,
+        restore::{extend_to_block_end, TransactionRestoreBatchController},
     },
+    metadata::{view::MetadataView, Metadata},
     storage::{local_fs::LocalFs, BackupStorage},
     utils::{
         backup_service_client::BackupServiceClient,
@@ -174,6 +175,98 @@ fn end_to_end() {
             })
             .take(target_version as usize)
             .collect::<Vec<_>>()
+    );
+
+    rt.shutdown_timeout(Duration::from_secs(1));
+}
+
+#[test]
+fn test_extend_to_block_end() {
+    let (_src_db_dir, src_db, blocks) = tmp_db_with_random_content();
+    let backup_dir = TempPath::new();
+    backup_dir.create_as_dir().unwrap();
+    let store: Arc<dyn BackupStorage> = Arc::new(LocalFs::new(backup_dir.path().to_path_buf()));
+
+    let (rt, port) = start_local_backup_service(Arc::clone(&src_db));
+    let client = Arc::new(BackupServiceClient::new(format!(
+        "http://localhost:{}",
+        port
+    )));
+
+    let block_ends = blocks
+        .iter()
+        .scan(0, |num_txns, (txns, _li)| {
+            *num_txns += txns.len() as Version;
+            Some(*num_txns - 1)
+        })
+        .collect::<Vec<_>>();
+    let num_txns = block_ends.last().unwrap() + 1;
+    // Split the backups at the end of a block with more than one transaction, so that the block
+    // spans both.
+    let split_version = *block_ends
+        .iter()
+        .zip(block_ends.iter().skip(1))
+        .find(|(prev_end, end)| **end > **prev_end + 1)
+        .unwrap()
+        .1;
+    // A small chunk size, for blocks to span chunks.
+    let max_chunk_size = blocks
+        .iter()
+        .flat_map(|(txns, _li)| txns)
+        .map(|txn_to_commit| bcs::serialized_size(txn_to_commit.transaction()).unwrap())
+        .max()
+        .unwrap() // biggest txn
+        + 115 // size of a serialized TransactionInfo
+        + size_of::<u32>(); // record len header
+
+    let backup = |start_version, end_version| {
+        let manifest = rt
+            .block_on(
+                TransactionBackupController::new(
+                    TransactionBackupOpt {
+                        start_version,
+                        num_transactions: (end_version - start_version) as usize,
+                    },
+                    GlobalBackupOpt {
+                        max_chunk_size,
+                        concurrent_data_requests: 2,
+                    },
+                    client.clone(),
+                    Arc::clone(&store),
+                )
+                .run(),
+            )
+            .unwrap();
+        move || Metadata::new_transaction_backup(start_version, end_version - 1, manifest.clone())
+    };
+    let first_backup = backup(0, split_version);
+    let second_backup = backup(split_version, num_txns);
+
+    let metadata_view = MetadataView::new(vec![first_backup(), second_backup()], vec![]);
+    for version in 0..num_txns {
+        let block_end = *block_ends.iter().find(|v| **v >= version).unwrap();
+        assert_eq!(
+            rt.block_on(extend_to_block_end(&store, &metadata_view, version))
+                .unwrap(),
+            block_end,
+        );
+    }
+    assert_eq!(
+        rt.block_on(extend_to_block_end(&store, &metadata_view, num_txns))
+            .unwrap(),
+        num_txns,
+    );
+
+    // The block isn't fully backed up.
+    let metadata_view = MetadataView::new(vec![first_backup()], vec![]);
+    assert_eq!(
+        rt.block_on(extend_to_block_end(
+            &store,
+            &metadata_view,
+            split_version - 1
+        ))
+        .unwrap(),
+        split_version - 1,
     );
 
     rt.shutdown_timeout(Duration::from_secs(1));

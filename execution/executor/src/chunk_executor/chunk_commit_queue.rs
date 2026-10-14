@@ -4,8 +4,10 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    chunk_executor::chunk_result_verifier::ChunkResultVerifier,
-    metrics::CHUNK_OTHER_TIMERS,
+    chunk_executor::{
+        chunk_result_verifier::StateSyncChunkVerifier, transaction_chunk::TransactionChunk,
+    },
+    metrics::{CHUNK_OTHER_TIMERS, CHUNK_PARTIAL_BLOCK_TXNS},
     types::{
         executed_chunk::ExecutedChunk, partial_state_compute_result::PartialStateComputeResult,
     },
@@ -20,21 +22,26 @@ use aptos_storage_interface::{
     },
     DbReader, LedgerSummary,
 };
-use aptos_types::{proof::accumulator::InMemoryTransactionAccumulator, transaction::Version};
+use aptos_types::{
+    proof::accumulator::InMemoryTransactionAccumulator,
+    transaction::{TransactionInfo, Version},
+};
 use std::{collections::VecDeque, sync::Arc};
 
 pub(crate) struct ChunkToUpdateLedger {
     pub output: PartialStateComputeResult,
+    pub transaction_infos: Vec<TransactionInfo>,
 
     /// from the input -- can be checked / used only after the transaction accumulator
-    /// is updated.
-    pub chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
+    /// is updated. `None` for replayed chunks, which come without a proof, or if nothing is
+    /// executed.
+    pub chunk_verifier: Option<StateSyncChunkVerifier>,
 }
 
-/// It's a two stage pipeline:
+/// It's a two stage pipeline, fed with whole blocks only:
 ///           (front)     (front)
 ///          /           /
-///    ... | to_commit | to_update_ledger | ---> (txn version increases)
+///    ... | to_commit | to_update_ledger | partial_block | ---> (txn version increases)
 ///                     \                \
 ///                      \                latest_state
 ///                       latest_state_summary
@@ -64,6 +71,9 @@ pub struct ChunkCommitQueue {
     latest_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     to_commit: VecDeque<Option<ExecutedChunk>>,
     to_update_ledger: VecDeque<Option<ChunkToUpdateLedger>>,
+    /// Transactions after the last block end, held back until the next chunk completes the
+    /// block.
+    partial_block: Option<TransactionChunk>,
 }
 
 impl ChunkCommitQueue {
@@ -75,6 +85,7 @@ impl ChunkCommitQueue {
             position_state_summary,
             positions,
         } = db.get_pre_committed_ledger_summary()?;
+        CHUNK_PARTIAL_BLOCK_TXNS.set(0);
 
         Ok(Self {
             latest_state: state,
@@ -85,6 +96,7 @@ impl ChunkCommitQueue {
             latest_txn_accumulator: transaction_accumulator,
             to_commit: VecDeque::new(),
             to_update_ledger: VecDeque::new(),
+            partial_block: None,
         })
     }
 
@@ -93,12 +105,24 @@ impl ChunkCommitQueue {
     }
 
     pub(crate) fn expecting_version(&self) -> Version {
-        self.latest_state.next_version()
+        self.partial_block.as_ref().map_or_else(
+            || self.latest_state.next_version(),
+            TransactionChunk::next_version,
+        )
+    }
+
+    pub(crate) fn partial_block(&self) -> Option<&TransactionChunk> {
+        self.partial_block.as_ref()
+    }
+
+    pub(crate) fn take_partial_block(&mut self) -> Option<TransactionChunk> {
+        self.partial_block.take()
     }
 
     pub(crate) fn enqueue_for_ledger_update(
         &mut self,
         chunk_to_update_ledger: ChunkToUpdateLedger,
+        partial_block: Option<TransactionChunk>,
     ) -> Result<()> {
         let _timer = CHUNK_OTHER_TIMERS.timer_with(&["enqueue_for_ledger_update"]);
 
@@ -111,6 +135,9 @@ impl ChunkCommitQueue {
         self.latest_positions = chunk_to_update_ledger.output.result_positions().cloned();
         self.to_update_ledger
             .push_back(Some(chunk_to_update_ledger));
+        CHUNK_PARTIAL_BLOCK_TXNS
+            .set(partial_block.as_ref().map_or(0, TransactionChunk::len) as i64);
+        self.partial_block = partial_block;
         Ok(())
     }
 
