@@ -1847,17 +1847,70 @@ where
     ///
     /// The check uses `max_depth - 1` because the closure being packed adds one additional level
     /// of nesting on top of its captured values.
-    fn check_depth_of_closure_captured_values(&self, captured: &[Value]) -> PartialVMResult<()> {
+    ///
+    /// Values whose type bounds their depth within the limit are not traversed. Traversed values
+    /// are charged for.
+    fn meter_and_check_depth_of_closure_captured_values(
+        &self,
+        gas_meter: &mut impl GasMeter,
+        function: &LoadedFunction,
+        mask: ClosureMask,
+        captured: &[Value],
+    ) -> PartialVMResult<()> {
         if !self.vm_config.enable_closure_depth_check {
             return Ok(());
         }
         if let Some(max_depth) = self.vm_config.max_value_nest_depth {
             let limit = max_depth.saturating_sub(1);
-            for v in captured.iter() {
+            let captured_tys = mask.extract(function.param_tys(), true);
+            if captured_tys.len() != captured.len() {
+                return Err(PartialVMError::new_invariant_violation(
+                    "number of captured values does not match closure mask",
+                ));
+            }
+            let traversed = captured
+                .iter()
+                .zip(captured_tys)
+                .filter(|(_, ty)| {
+                    plain_value_depth(ty, &function.ty_args).is_none_or(|depth| depth > limit)
+                })
+                .map(|(v, _)| v);
+            gas_meter.charge_pack_closure_captured_values(traversed.clone())?;
+            for v in traversed {
                 v.check_depth_of_value(limit)?;
             }
         }
         Ok(())
+    }
+}
+
+/// Returns the depth of the deepest value of `ty` (0 for a primitive) if the type determines it,
+/// i.e., values cannot contain structs or closures. Otherwise returns `None`.
+fn plain_value_depth(ty: &Type, ty_args: &[Type]) -> Option<u64> {
+    match ty {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address => Some(0),
+        Type::Vector(elem_ty) => plain_value_depth(elem_ty, ty_args)?.checked_add(1),
+        Type::TyParam(idx) => plain_value_depth(ty_args.get(*idx as usize)?, &[]),
+        // Signer values are enum variants holding addresses.
+        Type::Signer
+        | Type::Struct { .. }
+        | Type::StructInstantiation { .. }
+        | Type::Function { .. }
+        | Type::Reference(_)
+        | Type::MutableReference(_) => None,
     }
 }
 
@@ -2733,7 +2786,9 @@ impl Frame {
                         }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        interpreter.meter_and_check_depth_of_closure_captured_values(
+                            gas_meter, &function, *mask, &captured,
+                        )?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
@@ -2788,7 +2843,9 @@ impl Frame {
                         }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        interpreter.meter_and_check_depth_of_closure_captured_values(
+                            gas_meter, &function, *mask, &captured,
+                        )?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,

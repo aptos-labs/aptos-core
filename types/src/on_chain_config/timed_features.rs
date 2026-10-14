@@ -71,6 +71,10 @@ pub enum TimedFeatureFlag {
     /// Include the cost of a closure's type arguments in its abstract value
     /// size, instead of charging a flat amount for any closure.
     MeterClosureTypeArguments,
+
+    /// Charge closure packing per abstract value unit of the captured values,
+    /// which the closure depth check traverses.
+    MeterPackClosureCapturedValues,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -132,7 +136,8 @@ impl TimedFeatureOverride {
                 | RevalidateResolvedClosures
                 | MeterBcsByValueSize
                 | MeterValueNodesOnDeserialize
-                | MeterClosureTypeArguments,
+                | MeterClosureTypeArguments
+                | MeterPackClosureCapturedValues,
             ) => None,
         }
     }
@@ -329,6 +334,22 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (MeterClosureTypeArguments, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 9, 18, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Security fix: charge for the captured values traversed by the closure depth check.
+            // Note: Set to a future date so forge's framework-upgrade compat test runs
+            // with this feature off (see MeterClosureTypeArguments).
+            (MeterPackClosureCapturedValues, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 11, 9, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterPackClosureCapturedValues, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 10, 29, 14, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (MeterPackClosureCapturedValues, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 11, 4, 14, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

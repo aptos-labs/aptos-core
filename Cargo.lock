@@ -3075,6 +3075,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-keygen",
+ "aptos-memory-usage-tracker",
  "aptos-proptest-helpers",
  "aptos-rest-client",
  "aptos-temppath",
