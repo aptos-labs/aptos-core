@@ -55,7 +55,6 @@ use futures::{channel::mpsc, executor::block_on};
 use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
-use tokio::runtime::Runtime;
 
 // This generates a proposal for round 1
 pub fn generate_corpus_proposal() -> Vec<u8> {
@@ -75,8 +74,6 @@ pub fn generate_corpus_proposal() -> Vec<u8> {
     })
 }
 
-// optimization for the fuzzer
-static STATIC_RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 static FUZZING_SIGNER: Lazy<ValidatorSigner> = Lazy::new(|| ValidatorSigner::from_int(1));
 
 // helpers
