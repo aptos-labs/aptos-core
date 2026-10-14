@@ -4,7 +4,7 @@
 use crate::{
     backup_types::{
         state_snapshot::restore::{StateSnapshotRestoreController, StateSnapshotRestoreOpt},
-        transaction::restore::TransactionRestoreBatchController,
+        transaction::restore::{extend_to_block_end, TransactionRestoreBatchController},
     },
     metadata,
     metadata::cache::MetadataCacheOpt,
@@ -113,6 +113,8 @@ impl ReplayVerifyCoordinator {
                 self.start_version, self.end_version
             )));
         }
+        let end_version =
+            extend_to_block_end(&self.storage, &metadata_view, self.end_version).await?;
 
         let run_mode = Arc::new(RestoreRunMode::Restore {
             restore_handler: self.restore_handler,
@@ -160,10 +162,10 @@ impl ReplayVerifyCoordinator {
             // transaction info at the snapshot must be restored otherwise the db will be confused
             // about the latest version after snapshot is restored.
             next_txn_version.saturating_sub(1),
-            self.end_version,
+            end_version,
         )?;
         let global_opt = GlobalRestoreOptions {
-            target_version: self.end_version,
+            target_version: end_version,
             trusted_waypoints: Arc::new(self.trusted_waypoints_opt.verify()?),
             run_mode,
             concurrent_downloads: self.concurrent_downloads,
