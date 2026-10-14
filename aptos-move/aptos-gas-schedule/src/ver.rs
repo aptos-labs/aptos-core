@@ -11,6 +11,7 @@
 /// - V54:
 ///   - New `txn.min_module_bytecode_version` parameter gating module publishing on a minimum
 ///     bytecode version
+///   - Charge closure packing per abstract value unit of the captured values
 /// - V50:
 ///   - Raise the abstract value size of a closure from 40 to 200
 ///   - Include the cost of a closure's type arguments in its abstract value size
