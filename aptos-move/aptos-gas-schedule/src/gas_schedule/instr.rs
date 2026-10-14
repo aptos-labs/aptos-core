@@ -4,7 +4,9 @@
 //! This module defines the gas parameters for all Move instructions.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_40},
+    gas_feature_versions::{
+        RELEASE_V1_18, RELEASE_V1_33, RELEASE_V1_38, RELEASE_V1_40, RELEASE_V1_50,
+    },
     gas_schedule::VMGasParameters,
 };
 use aptos_gas_algebra::{
@@ -97,6 +99,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [pack_closure_per_arg: InternalGasPerArg,  { RELEASE_V1_33.. => "pack.closure.per_arg" }, 1470],
         [pack_closure_generic_base: InternalGas,  { RELEASE_V1_33.. => "pack_closure_generic.base" }, 9080],
         [pack_closure_generic_per_arg: InternalGasPerArg,  { RELEASE_V1_33.. => "pack_closure_generic.per_arg" }, 1470],
+        [
+            pack_closure_per_abs_val_unit: InternalGasPerAbstractValueUnit,
+            { RELEASE_V1_50.. => "pack_closure.per_abs_val_unit" },
+            140
+        ],
         // ref
         [read_ref_base: InternalGas, "read_ref.base", 7350],
         [read_ref_per_abs_val_unit: InternalGasPerAbstractValueUnit, "read_ref.per_abs_val_unit", 140],
