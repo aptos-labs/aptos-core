@@ -231,14 +231,16 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             proof: txn_infos_with_proof,
         } = txn_list_with_proof;
 
+        let first_version = v.ok_or_else(|| anyhow!("first version is None"))?;
         let chunk = TransactionChunk {
             transactions,
             persisted_aux_info,
             transaction_infos: txn_infos_with_proof.transaction_infos.clone(),
             transaction_outputs: None,
-            first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
+            first_version,
         };
         let chunk_verifier = StateSyncChunkVerifier {
+            first_version,
             txn_infos_with_proof,
             verified_target_li: verified_target_li.clone(),
             epoch_change_li: epoch_change_li.cloned(),
@@ -246,7 +248,12 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         // Call the shared implementation.
         self.with_inner("enqueue_by_execution", |inner| {
-            inner.enqueue_chunk(chunk, Some(chunk_verifier), "execute")
+            inner.enqueue_chunk(
+                chunk,
+                Some(chunk_verifier),
+                "execute",
+                /* flush_partial_block = */ false,
+            )
         })
     }
 
@@ -280,14 +287,16 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         } = txn_output_list_with_proof;
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
+        let first_version = v.ok_or_else(|| anyhow!("first version is None"))?;
         let chunk = TransactionChunk {
             transactions,
             transaction_outputs: Some(transaction_outputs),
             persisted_aux_info,
             transaction_infos: txn_infos_with_proof.transaction_infos.clone(),
-            first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
+            first_version,
         };
         let chunk_verifier = StateSyncChunkVerifier {
+            first_version,
             txn_infos_with_proof,
             verified_target_li: verified_target_li.clone(),
             epoch_change_li: epoch_change_li.cloned(),
@@ -295,7 +304,12 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
 
         // Call the shared implementation.
         self.with_inner("enqueue_by_outputs", |inner| {
-            inner.enqueue_chunk(chunk, Some(chunk_verifier), "apply")
+            inner.enqueue_chunk(
+                chunk,
+                Some(chunk_verifier),
+                "apply",
+                /* flush_partial_block = */ false,
+            )
         })
     }
 
@@ -401,9 +415,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     // ************************* Chunk Executor Implementation *************************
     fn enqueue_chunk(
         &self,
-        mut chunk: TransactionChunk,
+        chunk: TransactionChunk,
         chunk_verifier: Option<StateSyncChunkVerifier>,
         mode_for_log: &'static str,
+        flush_partial_block: bool,
     ) -> Result<()> {
         let parent_state = self.commit_queue.lock().latest_state().clone();
 
@@ -418,12 +433,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .advance_position_base(committed.as_ref())
             .map_err(anyhow::Error::from)?;
 
-        let first_version = parent_state.next_version();
+        let first_version = chunk.first_version;
+        let expecting_version = self.commit_queue.lock().expecting_version();
         ensure!(
-            chunk.first_version == parent_state.next_version(),
+            first_version == expecting_version,
             "Chunk carries unexpected first version. Expected: {}, got: {}",
-            parent_state.next_version(),
-            chunk.first_version,
+            expecting_version,
+            first_version,
         );
 
         let num_txns = chunk.len();
@@ -434,25 +450,45 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .as_ref()
             .zip(position_floor.as_ref())
             .map(|(overlay, floor)| PositionParent { overlay, floor });
+
+        // Hold back partial blocks until the next chunk completes them or they are flushed.
+        let mut chunk = match self.commit_queue.lock().take_partial_block() {
+            Some(mut partial_block) => {
+                partial_block.append(chunk);
+                partial_block
+            },
+            None => chunk,
+        };
+        let partial_block = if flush_partial_block {
+            None
+        } else {
+            chunk.split_off_partial_block()
+        };
+        let num_txns_held_back = partial_block.as_ref().map_or(0, TransactionChunk::len);
+        // If no block is completed, nothing is executed for the proof to be verified against.
+        let chunk_verifier = chunk_verifier.filter(|_| !chunk.is_empty());
+
         let transaction_infos = std::mem::take(&mut chunk.transaction_infos);
         let execution_output =
             chunk.into_output::<V>(&parent_state, parent_positions, state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
 
         // Enqueue for next stage.
-        self.commit_queue
-            .lock()
-            .enqueue_for_ledger_update(ChunkToUpdateLedger {
+        self.commit_queue.lock().enqueue_for_ledger_update(
+            ChunkToUpdateLedger {
                 output,
                 transaction_infos,
                 chunk_verifier,
-            })?;
+            },
+            partial_block,
+        )?;
 
         info!(
             LogSchema::new(LogEntry::ChunkExecutor)
                 .first_version_in_request(Some(first_version))
                 .num_txns_in_request(num_txns),
             mode = mode_for_log,
+            num_txns_held_back = num_txns_held_back,
             "Enqueued transaction chunk!",
         );
 
@@ -514,13 +550,13 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         let ledger_update_output = DoLedgerUpdate::run(
             &output.execution_output,
             &state_checkpoint_output,
-            parent_accumulator.clone(),
+            parent_accumulator,
         )?;
 
         ledger_update_output.ensure_transaction_infos_match(&txn_infos)?;
         let ledger_info_opt = match chunk_verifier {
             Some(chunk_verifier) => {
-                chunk_verifier.verify_extends_ledger(&parent_accumulator)?;
+                chunk_verifier.verify_extends_ledger(&ledger_update_output)?;
                 chunk_verifier.maybe_select_chunk_ending_ledger_info(
                     &ledger_update_output,
                     output.execution_output.next_epoch_state.as_ref(),
@@ -554,7 +590,15 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
         let _timer = COMMIT_CHUNK.start_timer();
         let executed_chunk = self.commit_chunk_impl()?;
-        self.has_pending_pre_commit.store(false, Ordering::Release);
+        // Nothing is verified against the pre-committed ledger if no block was completed.
+        if executed_chunk
+            .output
+            .execution_output
+            .num_transactions_to_commit()
+            != 0
+        {
+            self.has_pending_pre_commit.store(false, Ordering::Release);
+        }
 
         let commit_notification = {
             let _timer =
@@ -598,6 +642,13 @@ impl<V: VMBlockExecutor> TransactionReplayer for ChunkExecutor<V> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "commit"]);
 
         self.with_inner("replayer_commit", |inner| inner.commit())
+    }
+
+    fn flush(&self) -> Result<Option<Version>> {
+        let _guard = CONCURRENCY_GAUGE.concurrency_with(&["replayer", "flush"]);
+
+        self.maybe_initialize("replayer_flush")?;
+        self.with_inner("replayer_flush", |inner| inner.flush())
     }
 }
 
@@ -668,6 +719,35 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         );
 
         Ok(output.expect_last_version())
+    }
+
+    fn flush(&self) -> Result<Option<Version>> {
+        let partial_block = {
+            let mut commit_queue = self.commit_queue.lock();
+            ensure!(
+                commit_queue.is_empty(),
+                "Drain the chunk pipeline before flushing"
+            );
+            if let Some(partial_block) = commit_queue.partial_block() {
+                ensure!(
+                    partial_block.transaction_outputs.is_some(),
+                    "Flushing a partial block requires transaction outputs"
+                );
+            }
+            commit_queue.take_partial_block()
+        };
+        let Some(partial_block) = partial_block else {
+            return Ok(None);
+        };
+
+        self.enqueue_chunk(
+            partial_block,
+            None,
+            "flush",
+            /* flush_partial_block = */ true,
+        )?;
+        self.update_ledger()?;
+        self.commit().map(Some)
     }
 
     /// Remove `end_version - begin_version` transactions from the mutable input arguments and replay.
@@ -758,8 +838,25 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         end_version: Version,
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<Version> {
-        // Execute transactions.
-        let parent_state = self.commit_queue.lock().latest_state().clone();
+        // Execute on top of the partial block held back, which is applied rather than executed,
+        // in case it has transactions known to be broken.
+        let (latest_state, partial_block) = {
+            let commit_queue = self.commit_queue.lock();
+            (
+                commit_queue.latest_state().clone(),
+                commit_queue.partial_block().cloned(),
+            )
+        };
+        let parent_state = match partial_block {
+            Some(partial_block) => {
+                let state_view = self.state_view(latest_state.latest())?;
+                partial_block
+                    .into_output::<V>(&latest_state, None, state_view)?
+                    .result_state
+                    .clone()
+            },
+            None => latest_state,
+        };
         let state_view = self.state_view(parent_state.latest())?;
         let txns = transactions
             .iter()
@@ -854,7 +951,9 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             transaction_infos: txn_infos,
             first_version: begin_version,
         };
-        self.enqueue_chunk(chunk, None, "replay")?;
+        self.enqueue_chunk(
+            chunk, None, "replay", /* flush_partial_block = */ false,
+        )?;
 
         Ok(())
     }

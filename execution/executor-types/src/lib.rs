@@ -261,6 +261,10 @@ pub trait TransactionReplayer: Send {
     ) -> Result<usize>;
 
     fn commit(&self) -> Result<Version>;
+
+    /// Commits the partial block held back. All enqueued chunks must have been committed. Returns
+    /// the last version committed, or `None` if nothing is held back.
+    fn flush(&self) -> Result<Option<Version>>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
