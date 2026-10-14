@@ -54,19 +54,16 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use chunk_commit_queue::{ChunkCommitQueue, ChunkToUpdateLedger};
-use chunk_result_verifier::{ChunkResultVerifier, ReplayChunkVerifier, StateSyncChunkVerifier};
+use chunk_result_verifier::StateSyncChunkVerifier;
 use fail::fail_point;
 use itertools::{multizip, Itertools};
 use std::{
     iter::once,
     marker::PhantomData,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, Ordering},
     time::Instant,
 };
-use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
+use transaction_chunk::TransactionChunk;
 
 pub mod chunk_commit_queue;
 pub mod chunk_result_verifier;
@@ -234,20 +231,22 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
             proof: txn_infos_with_proof,
         } = txn_list_with_proof;
 
-        let chunk = ChunkToExecute {
+        let chunk = TransactionChunk {
             transactions,
             persisted_aux_info,
+            transaction_infos: txn_infos_with_proof.transaction_infos.clone(),
+            transaction_outputs: None,
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
-        let chunk_verifier = Arc::new(StateSyncChunkVerifier {
+        let chunk_verifier = StateSyncChunkVerifier {
             txn_infos_with_proof,
             verified_target_li: verified_target_li.clone(),
             epoch_change_li: epoch_change_li.cloned(),
-        });
+        };
 
         // Call the shared implementation.
         self.with_inner("enqueue_by_execution", |inner| {
-            inner.enqueue_chunk(chunk, chunk_verifier, "execute")
+            inner.enqueue_chunk(chunk, Some(chunk_verifier), "execute")
         })
     }
 
@@ -281,21 +280,22 @@ impl<V: VMBlockExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         } = txn_output_list_with_proof;
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
-        let chunk = ChunkToApply {
+        let chunk = TransactionChunk {
             transactions,
-            transaction_outputs,
+            transaction_outputs: Some(transaction_outputs),
             persisted_aux_info,
+            transaction_infos: txn_infos_with_proof.transaction_infos.clone(),
             first_version: v.ok_or_else(|| anyhow!("first version is None"))?,
         };
-        let chunk_verifier = Arc::new(StateSyncChunkVerifier {
+        let chunk_verifier = StateSyncChunkVerifier {
             txn_infos_with_proof,
             verified_target_li: verified_target_li.clone(),
             epoch_change_li: epoch_change_li.cloned(),
-        });
+        };
 
         // Call the shared implementation.
         self.with_inner("enqueue_by_outputs", |inner| {
-            inner.enqueue_chunk(chunk, chunk_verifier, "apply")
+            inner.enqueue_chunk(chunk, Some(chunk_verifier), "apply")
         })
     }
 
@@ -399,10 +399,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
     }
 
     // ************************* Chunk Executor Implementation *************************
-    fn enqueue_chunk<Chunk: TransactionChunk + Sync>(
+    fn enqueue_chunk(
         &self,
-        chunk: Chunk,
-        chunk_verifier: Arc<dyn ChunkResultVerifier + Send + Sync>,
+        mut chunk: TransactionChunk,
+        chunk_verifier: Option<StateSyncChunkVerifier>,
         mode_for_log: &'static str,
     ) -> Result<()> {
         let parent_state = self.commit_queue.lock().latest_state().clone();
@@ -420,10 +420,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
 
         let first_version = parent_state.next_version();
         ensure!(
-            chunk.first_version() == parent_state.next_version(),
+            chunk.first_version == parent_state.next_version(),
             "Chunk carries unexpected first version. Expected: {}, got: {}",
             parent_state.next_version(),
-            chunk.first_version(),
+            chunk.first_version,
         );
 
         let num_txns = chunk.len();
@@ -434,6 +434,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .as_ref()
             .zip(position_floor.as_ref())
             .map(|(overlay, floor)| PositionParent { overlay, floor });
+        let transaction_infos = std::mem::take(&mut chunk.transaction_infos);
         let execution_output =
             chunk.into_output::<V>(&parent_state, parent_positions, state_view)?;
         let output = PartialStateComputeResult::new(execution_output);
@@ -443,6 +444,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .lock()
             .enqueue_for_ledger_update(ChunkToUpdateLedger {
                 output,
+                transaction_infos,
                 chunk_verifier,
             })?;
 
@@ -464,10 +466,10 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             self.commit_queue.lock().next_chunk_to_update_ledger()?;
         let ChunkToUpdateLedger {
             output,
+            transaction_infos: txn_infos,
             chunk_verifier,
         } = chunk;
 
-        let txn_infos = chunk_verifier.transaction_infos();
         let known_state_checkpoints = Some(
             txn_infos
                 .iter()
@@ -515,12 +517,17 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             parent_accumulator.clone(),
         )?;
 
-        chunk_verifier.verify_chunk_result(&parent_accumulator, &ledger_update_output)?;
-
-        let ledger_info_opt = chunk_verifier.maybe_select_chunk_ending_ledger_info(
-            &ledger_update_output,
-            output.execution_output.next_epoch_state.as_ref(),
-        )?;
+        ledger_update_output.ensure_transaction_infos_match(&txn_infos)?;
+        let ledger_info_opt = match chunk_verifier {
+            Some(chunk_verifier) => {
+                chunk_verifier.verify_extends_ledger(&parent_accumulator)?;
+                chunk_verifier.maybe_select_chunk_ending_ledger_info(
+                    &ledger_update_output,
+                    output.execution_output.next_epoch_state.as_ref(),
+                )?
+            },
+            None => None,
+        };
         output.set_state_checkpoint_output(state_checkpoint_output);
         output.set_ledger_update_output(ledger_update_output);
 
@@ -840,16 +847,14 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
         })
         .multiunzip();
 
-        let chunk = ChunkToApply {
+        let chunk = TransactionChunk {
             transactions,
-            transaction_outputs,
+            transaction_outputs: Some(transaction_outputs),
             persisted_aux_info,
+            transaction_infos: txn_infos,
             first_version: begin_version,
         };
-        let chunk_verifier = Arc::new(ReplayChunkVerifier {
-            transaction_infos: txn_infos,
-        });
-        self.enqueue_chunk(chunk, chunk_verifier, "replay")?;
+        self.enqueue_chunk(chunk, None, "replay")?;
 
         Ok(())
     }
