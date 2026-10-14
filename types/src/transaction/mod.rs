@@ -1587,6 +1587,30 @@ impl SignedTransaction {
         Ok(())
     }
 
+    /// Check the encrypted payload representation allowed at mempool admission
+    /// and batch creation. Internal Decrypted and FailedDecryption states are
+    /// never valid submissions, even when their signatures verify.
+    pub fn verify_encrypted_payload_for_submission(&self) -> Result<()> {
+        let Some(payload) = self.payload().as_encrypted_payload() else {
+            return Ok(());
+        };
+        ensure!(
+            payload.is_encrypted(),
+            "Encrypted transaction not in Encrypted state"
+        );
+        ensure!(
+            !payload.extra_config().is_multisig(),
+            "Encrypted transactions do not support multisig"
+        );
+        let signer_auth_keys = self
+            .authenticator_ref()
+            .all_signer_auth_keys(self.sender())
+            .context("Encrypted transactions are not supported with this authenticator type")?;
+        payload
+            .verify(self.sender(), signer_auth_keys)
+            .context("Encrypted transaction ciphertext verification failed")
+    }
+
     pub fn contains_duplicate_signers(&self) -> bool {
         let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
         all_signer_addresses.push(self.sender());
