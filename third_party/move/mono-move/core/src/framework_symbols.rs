@@ -10,6 +10,7 @@ use crate::{
     Interner,
 };
 use aptos_types::{
+    account_config::AccountResource,
     jwks::{FederatedJWKs, PatchedJWKs},
     on_chain_config::{ApprovedExecutionHashes, CurrentTimeMicroseconds, OnChainConfig},
 };
@@ -33,6 +34,7 @@ pub struct FrameworkSymbols {
     /// `0x1::transaction_validation`.
     pub transaction_validation: InternedModuleId,
     pub versioned_prologue: InternedIdentifier,
+    pub versioned_metered_prologue: InternedIdentifier,
     pub versioned_epilogue: InternedIdentifier,
 
     /// `0x1::object`, whose `Object<T>` arguments the VM checks against the
@@ -45,6 +47,9 @@ pub struct FrameworkSymbols {
 
     /// The on-chain configs and resources the executor reads.
     pub approved_execution_hashes: InternedType,
+    /// `0x1::account::Account`, read to tell whether the sender's first
+    /// transaction will create it.
+    pub account_resource: InternedType,
     pub current_time_microseconds: InternedType,
     pub patched_jwks: InternedType,
     pub federated_jwks: InternedType,
@@ -66,6 +71,7 @@ impl FrameworkSymbols {
 
             transaction_validation: module(ident_str!("transaction_validation")),
             versioned_prologue: identifier(ident_str!("versioned_prologue")),
+            versioned_metered_prologue: identifier(ident_str!("versioned_metered_prologue")),
             versioned_epilogue: identifier(ident_str!("versioned_epilogue")),
 
             object,
@@ -77,6 +83,7 @@ impl FrameworkSymbols {
             ),
 
             approved_execution_hashes: config_type::<ApprovedExecutionHashes>(interner),
+            account_resource: resource_type::<AccountResource>(interner),
             current_time_microseconds: config_type::<CurrentTimeMicroseconds>(interner),
             patched_jwks: config_type::<PatchedJWKs>(interner),
             federated_jwks: resource_type::<FederatedJWKs>(interner),

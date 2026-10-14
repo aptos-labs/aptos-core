@@ -1,19 +1,19 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Unmetered calls into the transaction prologue and epilogue
+//! Calls into the transaction prologue, metered prologue, and epilogue
 //! (`0x1::transaction_validation`), with Rust-built arguments. Only the
 //! versioned validation path is supported; the many legacy prologue/epilogue
 //! variants are intentionally not ported.
 
 use super::metadata::TxnMetadata;
 use crate::{
-    calls::call_system_function_unmetered,
+    calls::{call_system_function, call_system_function_unmetered},
     errors::{call_result, MoveExecutionFailure},
 };
 use aptos_types::{
     fee_statement::FeeStatement,
-    transaction::{EpilogueArgs, PrologueArgs},
+    transaction::{EpilogueArgs, MeteredPrologueArgs, PrologueArgs},
 };
 use mono_move_core::{
     interner::InternedIdentifier, types::EMPTY_TYPE_LIST, FrameworkSymbols, VMInternalError,
@@ -37,7 +37,27 @@ impl ValidationSigners {
     }
 }
 
-/// Calls `0x1::transaction_validation::<function>(sender, fee_payer, args)`.
+/// Calls `0x1::transaction_validation::<function>(sender, fee_payer, args)`,
+/// metered against the transaction's gas budget.
+fn call_validation_function<'a>(
+    interp: &mut InterpreterContext<'a>,
+    symbols: &FrameworkSymbols,
+    function: InternedIdentifier,
+    signers: &ValidationSigners,
+    args: &impl MoveValueView,
+) -> Result<RuntimeStatus, VMInternalError> {
+    call_system_function(
+        interp,
+        symbols.transaction_validation,
+        function,
+        EMPTY_TYPE_LIST,
+        &[signers.sender, signers.fee_payer],
+        |call| call.arg(args),
+    )
+}
+
+/// Calls `0x1::transaction_validation::<function>(sender, fee_payer, args)`
+/// without consuming the transaction's gas budget.
 fn call_validation_function_unmetered<'a>(
     interp: &mut InterpreterContext<'a>,
     symbols: &FrameworkSymbols,
@@ -79,6 +99,29 @@ pub(crate) fn run_prologue<'a>(
         interp,
         symbols,
         symbols.versioned_prologue,
+        signers,
+        &args,
+    )
+    .map_err(MoveExecutionFailure::RuntimeError)?;
+    call_result(status)
+}
+
+/// Runs the metered half of the prologue, which puts in place the state the
+/// payload needs (today: the sender's account on its first transaction). The
+/// caller decides whether it is metered.
+pub(crate) fn run_metered_prologue<'a>(
+    interp: &mut InterpreterContext<'a>,
+    symbols: &FrameworkSymbols,
+    signers: &ValidationSigners,
+    txn_data: &TxnMetadata,
+) -> Result<(), MoveExecutionFailure> {
+    let args = MeteredPrologueArgs::V1 {
+        replay_protector: txn_data.replay_protector,
+    };
+    let status = call_validation_function(
+        interp,
+        symbols,
+        symbols.versioned_metered_prologue,
         signers,
         &args,
     )

@@ -10,7 +10,7 @@ use super::{
     metadata::TxnMetadata,
     pre_execution_checks::PreExecutionChecker,
     script::run_script,
-    validation::{run_epilogue, run_prologue, ValidationSigners},
+    validation::{run_epilogue, run_metered_prologue, run_prologue, ValidationSigners},
 };
 use crate::{
     errors::{call_result, DiscardReason, ExecutionStage, ExecutionStatus, MoveExecutionFailure},
@@ -24,7 +24,8 @@ use aptos_types::{
     on_chain_config::ApprovedExecutionHashes,
     state_store::state_storage_usage::StateStorageUsage,
     transaction::{
-        AuxiliaryInfo, EntryFunction, Script, SignedTransaction, TransactionExecutableRef,
+        AuxiliaryInfo, EntryFunction, ReplayProtector, Script, SignedTransaction,
+        TransactionExecutableRef,
     },
 };
 use mono_move_core::{
@@ -140,14 +141,16 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                     ))
                 })?
         };
-        PreExecutionChecker::new(
+        let checker = PreExecutionChecker::new(
             gas_params,
             self.env.gas_feature_version(),
             approved_gov_scripts.as_ref(),
+            self.env.features(),
             txn_data,
-        )
-        .run_checks()
-        .map_err(DiscardReason::PreExecutionCheck)?;
+        );
+        checker
+            .run_checks()
+            .map_err(DiscardReason::PreExecutionCheck)?;
 
         // TODO(completeness): multisig payloads. Refused for now, since the
         // inner executable must run as the multisig account, not the sender.
@@ -174,6 +177,27 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         let signers = ValidationSigners::new(txn_data);
 
+        // The sender's first transaction may come from an address holding no
+        // `Account` resource yet. The metered prologue creates it, so the budget
+        // must cover that. The read is unmetered, like V1's.
+        let creates_sender_account = txn_data.replay_protector
+            == ReplayProtector::SequenceNumber(0)
+            && interp
+                .unmetered(|interp| {
+                    interp.read_resource(txn_data.sender, self.symbols.account_resource)
+                })
+                .map_err(|e| {
+                    DiscardReason::InvariantViolation(format!(
+                        "the sender's account is unreadable: {e}"
+                    ))
+                })?
+                .is_none();
+        if creates_sender_account {
+            checker
+                .check_gas_budget_covers_account_creation()
+                .map_err(DiscardReason::PreExecutionCheck)?;
+        }
+
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
         run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
@@ -182,17 +206,39 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                 failure,
             }
         })?;
-        // A failed payload rolls back to here, so prologue effects (e.g. nonce insertion) survive.
+
+        // ======================== Metered prologue ==========================
+        // A second prologue stage for checks and state changes that may cost
+        // real gas (e.g. creating the sender's account on its first transaction).
+        // It runs once the fee payer is validated, so the work is paid for, and
+        // before the checkpoint below, so its effects survive a failed payload.
+        //
+        // Contract: this stage is expected to succeed. The pre-execution checks
+        // and the prologue must have ruled out every failure beforehand; one
+        // here means a check is missing, and discards the transaction.
+        //
+        // TODO(cleanup, correctness): revisit discarding. The fee payer is
+        // validated by this point, so a failure here could commit and charge
+        // like a failed payload (rolling back to a checkpoint taken after the
+        // prologue). That would let this stage host user-triggerable checks,
+        // e.g. multisig validation, which AptosVM keeps and charges.
+        self.run_metered(interp, |interp| {
+            run_metered_prologue(interp, self.symbols, &signers, txn_data)
+        })
+        .map_err(|failure| DiscardReason::Failure {
+            stage: ExecutionStage::MeteredPrologue,
+            failure,
+        })?;
+        // A failed payload rolls back to here, so the effects of both prologue
+        // halves (e.g. nonce insertion, the created account) survive.
         checkpoint(interp)?;
 
         // ========================== User payload ============================
         // An unmetered payload leaves the balance untouched, making the
         // epilogue charge nothing.
-        let payload_result = if self.unmetered {
-            interp.unmetered(|interp| self.execute_payload(interp, txn_data, &executable, ty_args))
-        } else {
+        let payload_result = self.run_metered(interp, |interp| {
             self.execute_payload(interp, txn_data, &executable, ty_args)
-        };
+        });
         let gas_remaining = interp.gas_balance();
         let gas_used = max_gas.saturating_sub(gas_remaining);
 
@@ -295,6 +341,20 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         };
 
         call_result(status)
+    }
+
+    /// Runs `f` metered against the transaction's budget, or unmetered if the
+    /// executor was built `without_metering`.
+    fn run_metered<R>(
+        &self,
+        interp: &mut InterpreterContext<'guard>,
+        f: impl FnOnce(&mut InterpreterContext<'guard>) -> R,
+    ) -> R {
+        if self.unmetered {
+            interp.unmetered(f)
+        } else {
+            f(interp)
+        }
     }
 }
 

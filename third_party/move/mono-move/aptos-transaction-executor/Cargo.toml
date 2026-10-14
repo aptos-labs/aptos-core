@@ -18,6 +18,7 @@ aptos-gas-schedule = { workspace = true }
 aptos-keyless-validation = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
+aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 mono-move-core = { workspace = true }

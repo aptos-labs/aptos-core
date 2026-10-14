@@ -1,9 +1,9 @@
 # aptos-transaction-executor
 
 The AptosVM transaction-execution layer on the MonoMove VM. User transactions
-run prologue → payload → epilogue and produce an unmaterialized `TxnOutcome`;
-system transactions run unmetered and fee-free. Block-level coordination lives
-above this crate.
+run prologue → metered prologue → payload → epilogue and produce an
+unmaterialized `TxnOutcome`; system transactions run unmetered and fee-free.
+Block-level coordination lives above this crate.
 
 ## Working assumptions
 
@@ -18,7 +18,11 @@ above this crate.
   storage fees are none of them charged. The pre-execution checks still bound
   the budget against those costs. Do not treat a gas mismatch against the
   legacy VM as a regression.
-- Past the prologue, a transaction always commits and charges the fee.
+- Past the prologue, a transaction always commits and charges the fee. The one
+  exception is a failure in the metered prologue (today: creating the sender's
+  account), which discards as in AptosVM. The metered prologue is Move code in
+  `transaction_validation`, so new pre-payload state setup goes there, not in
+  the executor.
 - Materialization is optional. Nothing on the execution path may call into
   `materialize/` -- it is up to the higher-level coordinator to decide when to
   call it.
