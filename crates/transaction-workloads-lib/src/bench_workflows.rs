@@ -665,6 +665,7 @@ mod lending_market {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -928,6 +929,7 @@ mod clob_avl {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -1216,6 +1218,7 @@ mod clmm_swap {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -1641,6 +1644,7 @@ mod stableswap {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -2014,6 +2018,7 @@ mod bridge_relay {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -2446,6 +2451,7 @@ mod airdrop_fanout {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -2849,6 +2855,7 @@ mod oracle_batch {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -3239,6 +3246,7 @@ mod cdp_liquidation {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -3643,6 +3651,7 @@ mod dex_aggregator {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {
@@ -4046,6 +4055,7 @@ mod nft_mint_market {
             &mut self,
             package: &Package,
             publisher: &LocalAccount,
+            _root_account: &dyn RootAccountHandle,
             txn_factory: &TransactionFactory,
             _rng: &mut StdRng,
         ) -> Vec<SignedTransaction> {

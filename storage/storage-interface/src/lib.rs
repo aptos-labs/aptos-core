@@ -389,7 +389,7 @@ pub trait DbReader: Send + Sync {
         /// merklized position summary, used by execution as the freeze base and
         /// proof source for computing the position state root. Errors when the
         /// feature is on but native-position storage is absent (i.e.
-        /// `ENABLE_TRADING_NATIVE` is off).
+        /// `enable_trading_native` is off).
         fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary>;
 
         /// The pre-committed position tip (latest + last_checkpoint), including
