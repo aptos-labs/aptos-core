@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-pub mod block_queue;
 pub mod network_messages;
 mod persisted_self_shares;
 pub mod reliable_broadcast_state;

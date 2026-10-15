@@ -41,7 +41,7 @@ use aptos_consensus_types::{
     pipelined_block::{OrderedBlocksForObserver, PipelinedBlock},
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::{bls12381::PrivateKey, HashValue};
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -58,16 +58,11 @@ use aptos_types::{
 use fail::fail_point;
 use futures::{
     channel::{mpsc::UnboundedSender, oneshot},
-    SinkExt, StreamExt,
+    SinkExt,
 };
-use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+use futures_channel::mpsc::unbounded;
 use move_core_types::account_address::AccountAddress;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    sync::Arc,
-    time::Duration,
-};
-use tokio::select;
+use std::{sync::Arc, time::Duration};
 
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
@@ -130,6 +125,8 @@ pub trait TExecutionClient: Send + Sync {
 
 struct PipelineHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
+    pub rand_input_tx: Option<UnboundedSender<OrderedBlocks>>,
+    pub secret_input_tx: Option<UnboundedSender<OrderedBlocks>>,
     pub commit_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingCommitRequest)>>,
     pub reset_tx_to_commit_pipeline: Option<UnboundedSender<ResetRequest>>,
@@ -141,6 +138,8 @@ impl PipelineHandle {
     pub fn new() -> Self {
         Self {
             execute_tx: None,
+            rand_input_tx: None,
+            secret_input_tx: None,
             commit_tx: None,
             reset_tx_to_commit_pipeline: None,
             reset_tx_to_rand_manager: None,
@@ -174,6 +173,8 @@ impl PipelineHandle {
         let reset_tx_to_commit_pipeline = self.reset_tx_to_commit_pipeline.take();
         let reset_tx_to_secret_share_manager = self.reset_tx_to_secret_share_manager.take();
         self.execute_tx = None;
+        self.rand_input_tx = None;
+        self.secret_input_tx = None;
         self.commit_tx = None;
         (
             reset_tx_to_rand_manager,
@@ -236,11 +237,9 @@ impl ExecutionProxyClient {
         consensus_sk: Arc<PrivateKey>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
-        UnboundedReceiver<OrderedBlocks>,
         UnboundedSender<ResetRequest>,
     ) {
         let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
-        let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
         let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
 
@@ -251,7 +250,6 @@ impl ExecutionProxyClient {
             epoch_state.clone(),
             signer,
             rand_config,
-            rand_ready_block_tx,
             network_sender.clone(),
             self.rand_storage.clone(),
             self.bounded_executor.clone(),
@@ -266,11 +264,7 @@ impl ExecutionProxyClient {
             highest_committed_round,
         ));
 
-        (
-            ordered_block_tx,
-            rand_ready_block_rx,
-            reset_tx_to_rand_manager,
-        )
+        (ordered_block_tx, reset_tx_to_rand_manager)
     }
 
     fn make_secret_sharing_manager(
@@ -282,11 +276,9 @@ impl ExecutionProxyClient {
         network_sender: &Arc<NetworkSender>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
-        futures_channel::mpsc::UnboundedReceiver<OrderedBlocks>,
         UnboundedSender<ResetRequest>,
     ) {
         let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
-        let (secret_ready_block_tx, secret_ready_block_rx) = unbounded::<OrderedBlocks>();
 
         let (reset_tx_to_secret_share_manager, reset_secret_share_manager_rx) =
             unbounded::<ResetRequest>();
@@ -302,7 +294,6 @@ impl ExecutionProxyClient {
             self.author,
             epoch_state.clone(),
             verifier,
-            secret_ready_block_tx,
             network_sender.clone(),
             self.secret_share_storage.clone(),
             highest_committed_round,
@@ -320,74 +311,7 @@ impl ExecutionProxyClient {
             highest_committed_round,
         ));
 
-        (
-            ordered_block_tx,
-            secret_ready_block_rx,
-            reset_tx_to_secret_share_manager,
-        )
-    }
-
-    fn make_coordinator(
-        mut rand_manager_input_tx: UnboundedSender<OrderedBlocks>,
-        mut rand_ready_block_rx: UnboundedReceiver<OrderedBlocks>,
-        mut secret_share_manager_input_tx: UnboundedSender<OrderedBlocks>,
-        mut secret_ready_block_rx: UnboundedReceiver<OrderedBlocks>,
-    ) -> (
-        UnboundedSender<OrderedBlocks>,
-        futures_channel::mpsc::UnboundedReceiver<OrderedBlocks>,
-    ) {
-        let (ordered_block_tx, mut ordered_block_rx) = unbounded::<OrderedBlocks>();
-        let (mut ready_block_tx, ready_block_rx) = unbounded::<OrderedBlocks>();
-
-        tokio::spawn(async move {
-            let mut inflight_block_tracker: HashMap<
-                HashValue,
-                (
-                    OrderedBlocks,
-                    /* rand_ready */ bool,
-                    /* secret ready */ bool,
-                ),
-            > = HashMap::new();
-            loop {
-                let entry = select! {
-                    Some(ordered_blocks) = ordered_block_rx.next() => {
-                        let _ = rand_manager_input_tx.send(ordered_blocks.clone()).await;
-                        let _ = secret_share_manager_input_tx.send(ordered_blocks.clone()).await;
-                        let first_block_id = ordered_blocks.ordered_blocks.first().expect("Cannot be empty").id();
-                        debug!("Coordinator: sent to managers: {}", first_block_id);
-                        inflight_block_tracker.insert(first_block_id, (ordered_blocks, false, false));
-                        inflight_block_tracker.entry(first_block_id)
-                    },
-                    Some(rand_ready_block) = rand_ready_block_rx.next() => {
-                        let first_block_id = rand_ready_block.ordered_blocks.first().expect("Cannot be empty").id();
-                        debug!("Coordinator: rand_ready: {}", first_block_id);
-                        inflight_block_tracker.entry(first_block_id).and_modify(|result| {
-                            result.1 = true;
-                        })
-                    },
-                    Some(secret_ready_block) = secret_ready_block_rx.next() => {
-                        let first_block_id = secret_ready_block.ordered_blocks.first().expect("Cannot be empty").id();
-                        debug!("Coordinator: secret_ready: {}", first_block_id);
-                        inflight_block_tracker.entry(first_block_id).and_modify(|result| {
-                            result.2 = true;
-                        })
-                    },
-                    else => {
-                        info!("Randomness/Secret Sharing Coordinator loop exitting");
-                        break
-                    },
-                };
-                let Entry::Occupied(o) = entry else {
-                    unreachable!("Entry must exist");
-                };
-                if o.get().1 && o.get().2 {
-                    let (_, (ordered_blocks, _, _)) = o.remove_entry();
-                    let _ = ready_block_tx.send(ordered_blocks).await;
-                }
-            }
-        });
-
-        (ordered_block_tx, ready_block_rx)
+        (ordered_block_tx, reset_tx_to_secret_share_manager)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -415,97 +339,44 @@ impl ExecutionProxyClient {
                 Some(&counters::BUFFER_MANAGER_MSGS),
             );
 
-        let (
-            execution_ready_block_tx,
-            execution_ready_block_rx,
-            maybe_reset_tx_to_rand_manager,
-            maybe_reset_tx_to_secret_share_manager,
-        ) = match (rand_config, secret_share_verifier) {
-            (Some(rand_config), Some(secret_share_verifier)) => {
-                let (rand_manager_input_tx, rand_ready_block_rx, reset_tx_to_rand_manager) = self
-                    .make_rand_manager(
-                        &epoch_state,
-                        rand_msg_rx,
-                        highest_committed_round,
-                        &network_sender,
-                        rand_config,
-                        consensus_sk,
-                    );
-
-                let (
-                    secret_share_manager_input_tx,
-                    secret_ready_block_rx,
-                    reset_tx_to_secret_share_manager,
-                ) = self.make_secret_sharing_manager(
-                    &epoch_state,
-                    secret_share_verifier,
-                    secret_sharing_msg_rx,
-                    highest_committed_round,
-                    &network_sender,
-                );
-
-                let (ordered_block_tx, ready_block_rx) = Self::make_coordinator(
-                    rand_manager_input_tx,
-                    rand_ready_block_rx,
-                    secret_share_manager_input_tx,
-                    secret_ready_block_rx,
-                );
-
-                (
-                    ordered_block_tx,
-                    ready_block_rx,
-                    Some(reset_tx_to_rand_manager),
-                    Some(reset_tx_to_secret_share_manager),
-                )
-            },
-            (Some(rand_config), None) => {
-                let (ordered_block_tx, rand_ready_block_rx, reset_tx_to_rand_manager) = self
-                    .make_rand_manager(
-                        &epoch_state,
-                        rand_msg_rx,
-                        highest_committed_round,
-                        &network_sender,
-                        rand_config,
-                        consensus_sk,
-                    );
-
-                (
-                    ordered_block_tx,
-                    rand_ready_block_rx,
-                    Some(reset_tx_to_rand_manager),
-                    None,
-                )
-            },
-            (None, Some(secret_sharing_config)) => {
-                let (ordered_block_tx, secret_ready_block_rx, reset_tx_to_secret_share_manager) =
-                    self.make_secret_sharing_manager(
-                        &epoch_state,
-                        secret_sharing_config,
-                        secret_sharing_msg_rx,
-                        highest_committed_round,
-                        &network_sender,
-                    );
-
-                (
-                    ordered_block_tx,
-                    secret_ready_block_rx,
-                    None,
-                    Some(reset_tx_to_secret_share_manager),
-                )
-            },
-            (None, None) => {
-                let (ordered_block_tx, ordered_block_rx) = unbounded();
-                (ordered_block_tx, ordered_block_rx, None, None)
-            },
+        let (execution_ready_block_tx, execution_ready_block_rx) = unbounded();
+        let (rand_input_tx, rand_reset_tx) = if let Some(config) = rand_config {
+            let (input, reset) = self.make_rand_manager(
+                &epoch_state,
+                rand_msg_rx,
+                highest_committed_round,
+                &network_sender,
+                config,
+                consensus_sk,
+            );
+            (Some(input), Some(reset))
+        } else {
+            (None, None)
         };
-
-        self.handle.write().init(
-            execution_ready_block_tx,
-            commit_msg_tx,
-            reset_commit_pipeline_tx,
-            maybe_reset_tx_to_rand_manager,
-            maybe_reset_tx_to_secret_share_manager,
-        );
+        let (secret_input_tx, secret_reset_tx) = if let Some(verifier) = secret_share_verifier {
+            let (input, reset) = self.make_secret_sharing_manager(
+                &epoch_state,
+                verifier,
+                secret_sharing_msg_rx,
+                highest_committed_round,
+                &network_sender,
+            );
+            (Some(input), Some(reset))
+        } else {
+            (None, None)
+        };
+        {
+            let mut handle = self.handle.write();
+            handle.init(
+                execution_ready_block_tx,
+                commit_msg_tx,
+                reset_commit_pipeline_tx,
+                rand_reset_tx,
+                secret_reset_tx,
+            );
+            handle.rand_input_tx = rand_input_tx;
+            handle.secret_input_tx = secret_input_tx;
+        }
 
         let commit_pipeline = CommitPipeline::new(
             self.author,
@@ -623,12 +494,16 @@ impl TExecutionClient for ExecutionProxyClient {
         ordered_proof: WrappedLedgerInfo,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
-        let mut execute_tx = match self.handle.read().execute_tx.clone() {
-            Some(tx) => tx,
-            None => {
-                debug!("Failed to send to commit pipeline, maybe epoch ends");
-                return Ok(());
-            },
+        let (execute_tx, rand_input_tx, secret_input_tx) = {
+            let handle = self.handle.read();
+            (
+                handle.execute_tx.clone(),
+                handle.rand_input_tx.clone(),
+                handle.secret_input_tx.clone(),
+            )
+        };
+        let Some(mut execute_tx) = execute_tx else {
+            return Ok(());
         };
 
         let ordered_blocks_for_observer = OrderedBlocksForObserver::new(&blocks);
@@ -641,18 +516,30 @@ impl TExecutionClient for ExecutionProxyClient {
                 tx.ordered_blocks_for_observer_tx
                     .take()
                     .map(|tx| tx.send(ordered_blocks_for_observer.clone()));
+                if rand_input_tx.is_none() {
+                    if let Some(sender) = tx.rand_tx.take() {
+                        let _ = sender.send(None);
+                    }
+                }
+                if secret_input_tx.is_none() {
+                    if let Some(sender) = tx.secret_shared_key_tx.take() {
+                        let _ = sender.send(None);
+                    }
+                }
             }
         }
 
-        if execute_tx
-            .send(OrderedBlocks {
-                ordered_blocks: blocks,
-                ordered_proof: ordered_proof.ledger_info().clone(),
-            })
-            .await
-            .is_err()
-        {
-            debug!("Failed to send to commit pipeline, maybe epoch ends");
+        let ordered = OrderedBlocks {
+            ordered_blocks: blocks,
+            ordered_proof: ordered_proof.ledger_info().clone(),
+        };
+        for mut sender in [rand_input_tx, secret_input_tx].into_iter().flatten() {
+            if sender.send(ordered.clone()).await.is_err() {
+                debug!("Share service stopped during ordering");
+            }
+        }
+        if execute_tx.send(ordered).await.is_err() {
+            debug!("Commit service stopped during ordering");
         }
         Ok(())
     }

@@ -222,15 +222,6 @@ impl CommitPipeline {
                     aptos_transaction_tracing::types::TransactionStage::BlockOrdered,
                 );
             }
-            // Until share queues are removed, they have already resolved these values.
-            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                if let Some(sender) = tx.rand_tx.take() {
-                    let _ = sender.send(block.randomness().cloned());
-                }
-                if let Some(sender) = tx.secret_shared_key_tx.take() {
-                    let _ = sender.send(block.secret_shared_key().cloned());
-                }
-            }
         }
         let mut certificate = CommitCertificate::new(blocks.ordered_proof.commit_info().clone());
         if let Some(votes) = self.pending_votes.remove(&round) {

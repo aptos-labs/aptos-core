@@ -430,6 +430,10 @@ impl SecretShareStore {
         self.highest_known_round = std::cmp::max(self.highest_known_round, round);
     }
 
+    pub fn replace_result_sender(&mut self, sender: Sender<SecretShareAggregationResult>) {
+        self.decision_tx = sender;
+    }
+
     pub fn reset(&mut self, round: u64) {
         self.update_highest_known_round(round);
         // remove future rounds items in case they're already decided

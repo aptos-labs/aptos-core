@@ -2,20 +2,23 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     counters::RAND_QUEUE_SIZE,
     logging::{LogEvent, LogSchema},
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
     pipeline::commit_pipeline::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
-    rand::rand_gen::{
-        aug_data_store::AugDataStore,
-        block_queue::{BlockQueue, QueueItem},
-        network_messages::{RandMessage, RpcRequest},
-        rand_store::{AggregationResult, RandCheckFuture, RandStore},
-        reliable_broadcast_state::{
-            AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
+    rand::{
+        input_subscriptions::InputSubscriptions,
+        rand_gen::{
+            aug_data_store::AugDataStore,
+            network_messages::{RandMessage, RpcRequest},
+            rand_store::{AggregationResult, RandCheckFuture, RandStore},
+            reliable_broadcast_state::{
+                AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
+            },
+            storage::interface::RandStorage,
+            types::{RandConfig, RequestShare, TAugmentedData, TShare},
         },
-        storage::interface::RandStorage,
-        types::{RandConfig, RequestShare, TAugmentedData, TShare},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -33,7 +36,6 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
-use fail::fail_point;
 use futures::{
     future::{AbortHandle, Abortable},
     FutureExt, StreamExt,
@@ -58,12 +60,10 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // local channel received from rand_store for aggregation results
     decision_rx: Receiver<AggregationResult>,
-    // downstream channels
-    outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     rand_store: Arc<Mutex<RandStore<S>>>,
     aug_data_store: AugDataStore<D>,
-    block_queue: BlockQueue,
+    inputs: InputSubscriptions,
 
     // sender for aggregation results, shared with rand_store and skip listeners
     decision_tx: Sender<AggregationResult>,
@@ -75,7 +75,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         epoch_state: Arc<EpochState>,
         signer: Arc<ValidatorSigner>,
         config: RandConfig,
-        outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         db: Arc<dyn RandStorage<D>>,
         bounded_executor: BoundedExecutor,
@@ -112,11 +111,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             network_sender,
 
             decision_rx,
-            outgoing_blocks,
 
             rand_store,
             aug_data_store,
-            block_queue: BlockQueue::new(),
+            inputs: InputSubscriptions::default(),
 
             decision_tx,
         }
@@ -130,6 +128,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         // Uses has_rand_txns_fut which resolves early (before randomness aggregation)
         // to avoid deadlock: rand_check_fut waits for randomness, but aggregation
         // waits for rand_check_fut to know if randomness is needed.
+        for block in &blocks.ordered_blocks {
+            observe_block(block.timestamp_usecs(), BlockStage::RAND_ENTER);
+            self.inputs.register(block);
+        }
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -163,8 +165,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 self.process_incoming_metadata(metadata, rand_check_future)
             })
             .collect();
-        let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
-        self.block_queue.push_back(queue_item);
+        for (block, guard) in blocks.ordered_blocks.iter().zip(broadcast_handles) {
+            self.inputs.hold_request(block.round(), guard);
+        }
     }
 
     fn process_incoming_metadata(
@@ -189,31 +192,21 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         self.spawn_aggregate_shares_task(metadata.metadata)
     }
 
-    fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
-        let rounds: Vec<u64> = ready_blocks
-            .iter()
-            .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
-            .collect();
-        fail_point!("rand_manager::process_ready_blocks", |_| {});
-        debug!(rounds = rounds, "Processing rand-ready blocks.");
-
-        for blocks in ready_blocks {
-            let _ = self.outgoing_blocks.unbounded_send(blocks);
-        }
-    }
-
     fn process_reset(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
         let target_round = match signal {
             ResetSignal::Stop => 0,
             ResetSignal::TargetRound(round) => round,
         };
-        self.block_queue = BlockQueue::new();
-        self.rand_store.lock().reset(target_round);
-        // Drain stale decision messages (Success/Skip) from previously spawned
-        // aggregation tasks and shared futures to prevent them from affecting
-        // new blocks that may arrive at the same rounds after reset.
-        while matches!(self.decision_rx.try_next(), Ok(Some(_))) {}
+        self.inputs.clear();
+        // Old aggregation/check tasks keep the old sender; after reset their
+        // results cannot resolve a new subscriber at the same consensus round.
+        let (decision_tx, decision_rx) = unbounded();
+        self.decision_tx = decision_tx.clone();
+        self.decision_rx = decision_rx;
+        let mut store = self.rand_store.lock();
+        store.reset(target_round);
+        store.replace_result_sender(decision_tx);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -225,8 +218,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             rand = rand,
             "Processing decisioned randomness."
         );
-        if let Some(block) = self.block_queue.item_mut(randomness.round()) {
-            block.set_randomness(randomness.round(), randomness);
+        if let Some(block) = self.inputs.resolve(randomness.round()) {
+            observe_block(block.timestamp_usecs(), BlockStage::RAND_ADD_DECISION);
+            block.set_randomness(randomness);
+            observe_block(block.timestamp_usecs(), BlockStage::RAND_READY);
         }
     }
 
@@ -421,8 +416,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             self.process_randomness(randomness);
                         },
                         AggregationResult::Skip { round, .. } => {
-                            if let Some(item) = self.block_queue.item_mut(round) {
-                                item.set_randomness(round, Randomness::default());
+                            if let Some(block) = self.inputs.resolve(round) {
+                                observe_block(block.timestamp_usecs(), BlockStage::RAND_ADD_DECISION);
+                                block.set_randomness(Randomness::default());
+                                observe_block(block.timestamp_usecs(), BlockStage::RAND_READY);
                             }
                         },
                     }
@@ -502,16 +499,11 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     self.observe_queue();
                 },
             }
-            let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
-            if !maybe_ready_blocks.is_empty() {
-                self.process_ready_blocks(maybe_ready_blocks);
-            }
         }
         info!("RandManager stopped");
     }
 
     pub fn observe_queue(&self) {
-        let queue = &self.block_queue.queue();
-        RAND_QUEUE_SIZE.set(queue.len() as i64);
+        RAND_QUEUE_SIZE.set(self.inputs.len() as i64);
     }
 }

@@ -2,19 +2,22 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     counters::{DEC_QUEUE_SIZE, SECRET_SHARE_RECOVERY_COUNT},
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
     pipeline::commit_pipeline::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
-    rand::secret_sharing::{
-        block_queue::{BlockQueue, QueueItem},
-        network_messages::{SecretShareMessage, SecretShareRpc},
-        persisted_self_shares::PersistedSelfShares,
-        reliable_broadcast_state::SecretShareAggregateState,
-        secret_share_store::{SecretShareAggregationResult, SecretShareStore},
-        storage::SecretShareStorage,
-        types::RequestSecretShare,
-        verifier::SecretShareVerifier,
+    rand::{
+        input_subscriptions::InputSubscriptions,
+        secret_sharing::{
+            network_messages::{SecretShareMessage, SecretShareRpc},
+            persisted_self_shares::PersistedSelfShares,
+            reliable_broadcast_state::SecretShareAggregateState,
+            secret_share_store::{SecretShareAggregationResult, SecretShareStore},
+            storage::SecretShareStorage,
+            types::RequestSecretShare,
+            verifier::SecretShareVerifier,
+        },
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -60,12 +63,10 @@ pub struct SecretShareManager {
 
     // local channel received from dec_store
     decision_rx: Receiver<SecretShareAggregationResult>,
-    // downstream channels
-    outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
     persisted_self_shares: PersistedSelfShares,
-    block_queue: BlockQueue,
+    inputs: InputSubscriptions,
     pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
 
@@ -74,7 +75,6 @@ impl SecretShareManager {
         author: Author,
         epoch_state: Arc<EpochState>,
         verifier: Arc<SecretShareVerifier>,
-        outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         secret_share_storage: Arc<dyn SecretShareStorage>,
         highest_committed_round: Round,
@@ -122,11 +122,10 @@ impl SecretShareManager {
             secret_share_request_delay_ms,
 
             decision_rx,
-            outgoing_blocks,
 
             secret_share_store: dec_store,
             persisted_self_shares,
-            block_queue: BlockQueue::new(),
+            inputs: InputSubscriptions::default(),
             pending_derives: FuturesUnordered::new(),
         }
     }
@@ -142,10 +141,11 @@ impl SecretShareManager {
         );
 
         for block in blocks.ordered_blocks.iter() {
+            observe_block(block.timestamp_usecs(), BlockStage::SECRET_SHARING_ENTER);
+            self.inputs.register(block);
             self.enqueue_self_derive(block)?;
         }
 
-        self.block_queue.push_back(QueueItem::new(blocks));
         Ok(())
     }
 
@@ -178,14 +178,19 @@ impl SecretShareManager {
                     "Self-share derive returned None (no encrypted txns), resolving round"
                 );
                 self.prune_expired_self_shares(round);
-                if let Some(item) = self.block_queue.item_mut(round) {
-                    item.resolve_round_without_key(round);
+                if let Some(block) = self.inputs.resolve(round) {
+                    observe_block(block.timestamp_usecs(), BlockStage::SECRET_SHARING_READY);
+                    if let Some(tx) = block.pipeline_tx().lock().as_mut() {
+                        if let Some(sender) = tx.secret_shared_key_tx.take() {
+                            let _ = sender.send(None);
+                        }
+                    }
                 }
                 self.secret_share_store.lock().mark_round_skipped(round);
                 return;
             },
             Err(e) if e.is_cancellation() => {
-                // Expected teardown: the block was dropped or a buffer_manager
+                // Expected teardown: the block was dropped or a pipeline
                 // reset aborted the pipeline, cancelling the derive future. Not
                 // a failure, so log at debug and don't surface it as an error.
                 debug!(round = round, "Self-share derive cancelled: {:?}", e);
@@ -218,14 +223,7 @@ impl SecretShareManager {
             .broadcast_secret_share(SecretShareMessage::Share(share).into_network_message());
 
         let guard = self.spawn_share_requester_task(metadata);
-        if let Some(item) = self.block_queue.item_mut(round) {
-            item.push_share_requester_handle(guard);
-        } else {
-            warn!(
-                round = round,
-                "Secret share item not found for round {}", round
-            );
-        }
+        self.inputs.hold_request(round, guard);
     }
 
     fn prune_expired_self_shares(&mut self, latest_round: Round) {
@@ -279,23 +277,6 @@ impl SecretShareManager {
         }
     }
 
-    fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
-        let rounds: Vec<u64> = ready_blocks
-            .iter()
-            .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
-            .collect();
-        info!(rounds = rounds, "Processing secret share ready blocks.");
-
-        for blocks in ready_blocks {
-            if let Err(e) = self.outgoing_blocks.unbounded_send(blocks) {
-                error!(
-                    "[SecretShareManager] Failed to send ready blocks downstream: {}",
-                    e
-                );
-            }
-        }
-    }
-
     fn process_reset(&mut self, request: ResetRequest) {
         let ResetRequest { tx, signal } = request;
         let target_round = match signal {
@@ -308,9 +289,13 @@ impl SecretShareManager {
                 round
             },
         };
-        self.block_queue = BlockQueue::new();
+        self.inputs.clear();
         self.pending_derives = FuturesUnordered::new();
-        self.secret_share_store.lock().reset(target_round);
+        let (decision_tx, decision_rx) = unbounded();
+        self.decision_rx = decision_rx;
+        let mut store = self.secret_share_store.lock();
+        store.reset(target_round);
+        store.replace_result_sender(decision_tx);
         let _ = tx.send(ResetAck::default());
     }
 
@@ -321,8 +306,13 @@ impl SecretShareManager {
                 self.secret_share_store
                     .lock()
                     .handle_aggregation_success(round);
-                if let Some(item) = self.block_queue.item_mut(round) {
-                    item.set_secret_shared_key(round, secret_share_key);
+                if let Some(block) = self.inputs.resolve(round) {
+                    observe_block(
+                        block.timestamp_usecs(),
+                        BlockStage::SECRET_SHARING_ADD_DECISION,
+                    );
+                    block.set_decryption_key(secret_share_key);
+                    observe_block(block.timestamp_usecs(), BlockStage::SECRET_SHARING_READY);
                 }
             },
             SecretShareAggregationResult::Failure {
@@ -352,9 +342,7 @@ impl SecretShareManager {
                     if !targets.is_empty() {
                         let guard =
                             self.spawn_share_requester_for_targets(metadata, Some(targets), 0);
-                        if let Some(item) = self.block_queue.item_mut(round) {
-                            item.push_share_requester_handle(guard);
-                        }
+                        self.inputs.hold_request(round, guard);
                     }
                 }
             },
@@ -566,17 +554,12 @@ impl SecretShareManager {
                     self.observe_queue();
                 },
             }
-            let maybe_ready_blocks = self.block_queue.dequeue_ready_prefix();
-            if !maybe_ready_blocks.is_empty() {
-                self.process_ready_blocks(maybe_ready_blocks);
-            }
         }
         info!("SecretShareManager stopped");
     }
 
     pub fn observe_queue(&self) {
-        let queue = &self.block_queue.queue();
-        DEC_QUEUE_SIZE.set(queue.len() as i64);
+        DEC_QUEUE_SIZE.set(self.inputs.len() as i64);
     }
 }
 
@@ -673,7 +656,6 @@ mod tests {
             self_sender,
             ctx.validator_verifier.clone(),
         ));
-        let (outgoing_blocks, _) = unbounded();
         let bounded_executor = BoundedExecutor::new(4, tokio::runtime::Handle::current());
         let manager = SecretShareManager::new(
             ctx.authors[local_index],
@@ -685,7 +667,6 @@ mod tests {
                 ctx.secret_share_config.clone(),
                 true,
             )),
-            outgoing_blocks,
             network_sender,
             storage,
             highest_committed_round,
