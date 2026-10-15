@@ -8,9 +8,8 @@ use crate::{
     },
     counters::{
         self, ORDER_CERT_CREATED_WITHOUT_BLOCK_IN_BLOCK_STORE, ORDER_VOTE_ADDED,
-        ORDER_VOTE_BROADCASTED, ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS,
-        PROPOSAL_VOTE_ADDED, PROPOSAL_VOTE_BROADCASTED, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT,
-        QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
+        ORDER_VOTE_NOT_IN_RANGE, ORDER_VOTE_OTHER_ERRORS, PROPOSAL_VOTE_ADDED, PROPOSED_VTXN_BYTES,
+        PROPOSED_VTXN_COUNT, QC_AGGREGATED_FROM_VOTES, SYNC_INFO_RECEIVED_WITH_NEWER_CERT,
     },
     error::{error_kind, VerifyError},
     liveness::{
@@ -28,6 +27,10 @@ use crate::{
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
     pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
+    pipeline::{
+        ordering_pipeline::{release_order_vote, release_proposal_vote},
+        voting_authority::{authorize_order_vote, authorize_proposal_vote},
+    },
     quorum_store::types::BatchMsg,
     util::is_vtxn_expected,
 };
@@ -40,9 +43,8 @@ use aptos_consensus_types::{
     common::{Author, Round},
     opt_block_data::OptBlockData,
     opt_proposal_msg::OptProposalMsg,
-    order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
-    pipelined_block::PipelinedBlock,
+    pipelined_block::{OrderVoteInput, ProposalVoteInput},
     proof_of_store::{BatchInfo, BatchInfoExt, ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
@@ -1550,22 +1552,24 @@ impl RoundManager {
 
         let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
-        let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
-
-        if self.local_config.broadcast_vote {
-            info!(self.new_log(LogEvent::Vote), "{}", vote);
-            PROPOSAL_VOTE_BROADCASTED.inc();
-            self.network.broadcast_vote(vote_msg).await;
+        let block = self
+            .block_store
+            .get_block(vote.vote_data().proposed().id())
+            .context("Voted block disappeared before publication")?;
+        let recipient = if self.local_config.broadcast_vote {
+            None
         } else {
-            let recipient = self
-                .proposer_election
-                .get_valid_proposer(proposal_round + 1);
-            info!(
-                self.new_log(LogEvent::Vote).remote_peer(recipient),
-                "{}", vote
-            );
-            self.network.send_vote(vote_msg, vec![recipient]).await;
-        }
+            Some(
+                self.proposer_election
+                    .get_valid_proposer(proposal_round + 1),
+            )
+        };
+        release_proposal_vote(&block, &self.network, ProposalVoteInput {
+            vote: vote.clone(),
+            sync_info: self.block_store.sync_info(),
+            recipient,
+        })
+        .await?;
 
         if let Err(e) = self.start_next_opt_round(vote, parent_qc) {
             debug!("Cannot start next opt round: {}", e);
@@ -1647,49 +1651,19 @@ impl RoundManager {
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
     async fn vote_block(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
-        let block_arc = self
+        let block = self
             .block_store
             .insert_block(proposed_block)
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
-
-        // Short circuit if already voted.
-        ensure!(
-            self.round_state.vote_sent().is_none(),
-            "[RoundManager] Already vote on this round {}",
-            self.round_state.current_round()
-        );
-
-        ensure!(
-            !self.sync_only(),
-            "[RoundManager] sync_only flag is set, stop voting"
-        );
-
-        let vote_proposal = block_arc.vote_proposal();
-        let vote_result = self.safety_rules.lock().construct_and_sign_vote_two_chain(
-            &vote_proposal,
+        authorize_proposal_vote(
+            &block,
+            &self.round_state,
+            self.sync_only(),
             self.block_store.highest_2chain_timeout_cert().as_deref(),
-        );
-        let vote = vote_result.context(format!(
-            "[RoundManager] SafetyRules Rejected {}",
-            block_arc.block()
-        ))?;
-        if !block_arc.block().is_nil_block() {
-            observe_block(block_arc.block().timestamp_usecs(), BlockStage::VOTED);
-        }
-
-        if block_arc.block().is_opt_block() {
-            observe_block(
-                block_arc.block().timestamp_usecs(),
-                BlockStage::VOTED_OPT_BLOCK,
-            );
-        }
-
-        self.storage
-            .save_vote(&vote)
-            .context("[RoundManager] Fail to persist last vote")?;
-
-        Ok(vote)
+            &self.safety_rules,
+            self.storage.as_ref(),
+        )
     }
 
     async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
@@ -1772,67 +1746,18 @@ impl RoundManager {
         Ok(())
     }
 
-    async fn create_order_vote(
-        &mut self,
-        block: Arc<PipelinedBlock>,
-        qc: Arc<QuorumCert>,
-    ) -> anyhow::Result<OrderVote> {
-        let order_vote_proposal = block.order_vote_proposal(qc);
-        let order_vote_result = self
-            .safety_rules
-            .lock()
-            .construct_and_sign_order_vote(&order_vote_proposal);
-        let order_vote = order_vote_result.context(format!(
-            "[RoundManager] SafetyRules Rejected {} for order vote",
-            block.block()
-        ))?;
-
-        fail_point!("consensus::create_invalid_order_vote", |_| {
-            use aptos_crypto::bls12381;
-            let faulty_order_vote = OrderVote::new_with_signature(
-                order_vote.author(),
-                order_vote.ledger_info().clone(),
-                bls12381::Signature::dummy_signature(),
-            );
-            Ok(faulty_order_vote)
-        });
-        Ok(order_vote)
-    }
-
     async fn broadcast_order_vote(
         &mut self,
         vote: &Vote,
         qc: Arc<QuorumCert>,
     ) -> anyhow::Result<()> {
-        if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
-            // Generate an order vote with ledger_info = proposed_block
-            let order_vote = self
-                .create_order_vote(proposed_block.clone(), qc.clone())
-                .await?;
-            if !proposed_block.block().is_nil_block() {
-                observe_block(
-                    proposed_block.block().timestamp_usecs(),
-                    BlockStage::ORDER_VOTED,
-                );
-            }
-            if proposed_block.block().is_opt_block() {
-                observe_block(
-                    proposed_block.block().timestamp_usecs(),
-                    BlockStage::ORDER_VOTED_OPT_BLOCK,
-                );
-            }
-            let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
-            info!(
-                self.new_log(LogEvent::BroadcastOrderVote),
-                "{}", order_vote_msg
-            );
-            self.network.broadcast_order_vote(order_vote_msg).await;
-            if proposed_block.pipeline_futs().is_some() {
-                if let Some(tx) = proposed_block.pipeline_tx().lock().as_mut() {
-                    let _ = tx.order_vote_tx.take().map(|tx| tx.send(()));
-                }
-            }
-            ORDER_VOTE_BROADCASTED.inc();
+        if let Some(block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+            let order_vote = authorize_order_vote(&block, qc.clone(), &self.safety_rules)?;
+            release_order_vote(&block, &self.network, OrderVoteInput {
+                vote: order_vote,
+                qc,
+            })
+            .await?;
         }
         Ok(())
     }

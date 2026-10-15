@@ -24,6 +24,20 @@ proof target writes the final ledger info; its ancestors finish as committed pre
 Observer publication, mempool feedback, state-sync notifications and block-tree/payload
 notifications remain graph branches with their existing dependencies.
 
+## Ordering publication
+
+The graph owns proposal-vote and order-vote publication futures. Their inputs contain
+already-authorized signed votes. `RoundManager` serializes admission, current-round and
+timeout checks, SafetyRules authorization and proposal-vote persistence/recording before
+releasing publication. Ordinary proposal voting does not wait for execution.
+
+Successful order-vote publication is itself the early commit-signing dependency; the
+old unit channel poked after broadcasting is gone. Order proofs and commit proofs remain
+alternative authorization signals. QC/TC/order-certificate accumulation, pacemaker,
+proposer selection, optimistic proposal generation and synchronization remain controller
+or auxiliary responsibilities. Test/fuzzing block stores without pipeline futures use
+the same publication functions directly.
+
 ## Auxiliary certificate and prefix state
 
 `CommitPipeline` owns an inbox for early commit votes/decisions, certificate accumulators,

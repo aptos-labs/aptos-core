@@ -3,7 +3,7 @@
 
 use crate::{
     network::{IncomingCommitRequest, NetworkSender},
-    network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     pipeline::{
         commit_pipeline::{CommitPipeline, OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
         commit_reliable_broadcast::CommitMessage,
@@ -80,6 +80,8 @@ pub(in crate::pipeline) fn attach_pipeline(
         .boxed()
         .shared();
     block.set_pipeline_futs(PipelineFutures {
+        proposal_vote_fut: ready(None),
+        order_vote_fut: ready(None),
         decryption_fut: ready(DecryptionResult {
             decrypted_txns: vec![],
             retry_txns: vec![],
@@ -103,6 +105,7 @@ pub(in crate::pipeline) fn attach_pipeline(
         secret_sharing_derive_self_fut: ready(None),
     });
     block.set_pipeline_tx(PipelineInputTx {
+        proposal_vote_tx: None,
         qc_tx: None,
         rand_tx: None,
         order_vote_tx: None,
@@ -119,6 +122,16 @@ pub(in crate::pipeline) fn network(
     signer: &ValidatorSigner,
     verifier: Arc<aptos_types::validator_verifier::ValidatorVerifier>,
 ) -> Arc<NetworkSender> {
+    network_with_events(signer, verifier).0
+}
+
+pub(super) fn network_with_events(
+    signer: &ValidatorSigner,
+    verifier: Arc<aptos_types::validator_verifier::ValidatorVerifier>,
+) -> (
+    Arc<NetworkSender>,
+    aptos_channels::UnboundedReceiver<network::Event<ConsensusMsg>>,
+) {
     let (requests, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connections, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let sender = network::NetworkSender::new(
@@ -131,13 +144,16 @@ pub(in crate::pipeline) fn network(
         hashmap! {NetworkId::Validator => sender},
         PeersAndMetadata::new(&[NetworkId::Validator]),
     );
-    let (self_sender, _) = aptos_channels::new_unbounded_test();
-    Arc::new(NetworkSender::new(
-        signer.author(),
-        ConsensusNetworkClient::new(client),
-        self_sender,
-        verifier,
-    ))
+    let (self_sender, events) = aptos_channels::new_unbounded_test();
+    (
+        Arc::new(NetworkSender::new(
+            signer.author(),
+            ConsensusNetworkClient::new(client),
+            self_sender,
+            verifier,
+        )),
+        events,
+    )
 }
 
 #[tokio::test]

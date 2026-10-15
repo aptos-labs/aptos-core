@@ -576,12 +576,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    /// Hand a commit certificate for an epoch ending block to our own buffer manager and wait for
-    /// the buffer manager to acknowledge it, so that the shutdown that follows is ordered after
+    /// Hand a commit certificate for an epoch ending block to our own commit pipeline and wait for
+    /// the commit pipeline to acknowledge it, so that the shutdown that follows is ordered after
     /// any commit the certificate triggers.
     ///
     /// A locally generated `EpochChangeProof` is only produced after persisting (see
-    /// `PersistingPhase`), so `initiate_new_epoch` could assume the certified state is durable
+    /// `CommitPipeline` awaiting `commit_ledger_fut`), so `initiate_new_epoch` could assume the certified state is durable
     /// somewhere. A proof received from a peer carries no such guarantee: `pre_commit` deliberately
     /// waits for the commit proof on reconfiguration blocks, so a quorum of commit votes can exist
     /// while no validator has written the result to storage. Committing locally first restores that

@@ -164,7 +164,7 @@ pub struct PipelineBuilder {
     enable_v2_observer_messages: bool,
 }
 
-fn spawn_shared_fut<
+pub(super) fn spawn_shared_fut<
     T: Send + Clone + 'static,
     F: Future<Output = TaskResult<T>> + Send + 'static,
 >(
@@ -189,7 +189,7 @@ fn spawn_shared_fut<
     .shared()
 }
 
-fn spawn_ready_fut<T: Send + Clone + 'static>(f: T) -> TaskFuture<T> {
+pub(super) fn spawn_ready_fut<T: Send + Clone + 'static>(f: T) -> TaskFuture<T> {
     async move { Ok(f) }.boxed().shared()
 }
 
@@ -326,6 +326,7 @@ impl PipelineBuilder {
     }
 
     fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
+        let (proposal_vote_tx, proposal_vote_rx) = oneshot::channel();
         let (qc_tx, qc_rx) = oneshot::channel();
         let (rand_tx, rand_rx) = oneshot::channel();
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
@@ -359,6 +360,7 @@ impl PipelineBuilder {
         let (secret_shared_key_tx, secret_shared_key_rx) = oneshot::channel();
         (
             PipelineInputTx {
+                proposal_vote_tx: Some(proposal_vote_tx),
                 qc_tx: Some(qc_tx),
                 rand_tx: Some(rand_tx),
                 order_vote_tx: Some(order_vote_tx),
@@ -368,6 +370,7 @@ impl PipelineBuilder {
                 secret_shared_key_tx: Some(secret_shared_key_tx),
             },
             PipelineInputRx {
+                proposal_vote_rx,
                 qc_rx,
                 rand_rx,
                 order_vote_rx,
@@ -435,6 +438,8 @@ impl PipelineBuilder {
         let secret_sharing_derive_self_fut = spawn_ready_fut(None);
         let has_rand_txns_fut = spawn_ready_fut(false);
         PipelineFutures {
+            proposal_vote_fut: spawn_ready_fut(None),
+            order_vote_fut: spawn_ready_fut(None),
             decryption_fut,
             prepare_fut,
             has_rand_txns_fut,
@@ -521,6 +526,7 @@ impl PipelineBuilder {
         let enable_observer_publish = self.consensus_publisher.is_some();
         let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
+            proposal_vote_rx,
             qc_rx,
             rand_rx,
             order_vote_rx,
@@ -529,6 +535,16 @@ impl PipelineBuilder {
             commit_proof_fut,
             secret_shared_key_rx,
         } = rx;
+
+        let (proposal_vote_fut, order_vote_fut) =
+            crate::pipeline::ordering_pipeline::build_publication_futures(
+                self.network_sender.clone(),
+                block.clone(),
+                proposal_vote_rx,
+                order_vote_rx,
+                observer_enabled,
+                &mut abort_handles,
+            );
 
         let (derived_self_key_share_tx, derived_self_key_share_rx) = oneshot::channel();
         let secret_sharing_derive_self_fut = spawn_shared_fut(
@@ -632,7 +648,7 @@ impl PipelineBuilder {
             spawn_shared_fut(
                 Self::sign_and_broadcast_commit_vote(
                     ledger_update_fut.clone(),
-                    order_vote_rx,
+                    order_vote_fut.clone(),
                     order_proof_fut.clone(),
                     commit_proof_fut.clone(),
                     self.signer.clone(),
@@ -708,6 +724,8 @@ impl PipelineBuilder {
         );
 
         let all_fut = PipelineFutures {
+            proposal_vote_fut,
+            order_vote_fut,
             decryption_fut,
             prepare_fut,
             has_rand_txns_fut,
@@ -1203,7 +1221,7 @@ impl PipelineBuilder {
     /// What it does: Sign the commit vote with execution result and broadcast, it needs to update the timestamp for reconfig suffix blocks
     async fn sign_and_broadcast_commit_vote(
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
-        order_vote_rx: oneshot::Receiver<()>,
+        order_vote_fut: TaskFuture<Option<aptos_consensus_types::order_vote::OrderVote>>,
         order_proof_fut: TaskFuture<WrappedLedgerInfo>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         signer: Arc<ValidatorSigner>,
@@ -1214,7 +1232,7 @@ impl PipelineBuilder {
         let mut tracker = Tracker::start_waiting("sign_commit_vote", &block);
         let (compute_result, _, epoch_end_timestamp) = ledger_update_fut.await?;
         let mut consensus_data_hash = select! {
-            Ok(_) = order_vote_rx => {
+            Ok(Some(_)) = order_vote_fut => {
                 HashValue::zero()
             }
             Ok(li) = order_proof_fut => {
@@ -1418,6 +1436,8 @@ impl PipelineBuilder {
 
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
+            proposal_vote_fut: _,
+            order_vote_fut: _,
             decryption_fut: _,
             prepare_fut,
             has_rand_txns_fut: _,
