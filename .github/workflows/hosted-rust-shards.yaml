@@ -1,4 +1,5 @@
 name: Hosted Rust Sharding Trial
+run-name: Four-shard hosted Rust trial at ${{ github.sha }}
 
 on:
   workflow_dispatch:
