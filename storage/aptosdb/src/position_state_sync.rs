@@ -99,13 +99,28 @@ pub fn get_position_snapshot_receiver(
     version: Version,
     expected_root_hash: HashValue,
 ) -> Result<Box<dyn StateSnapshotReceiver<StateKey, StateValue>>> {
-    let value_writer = Arc::new(PositionStateValueWriter::new(position_db));
-    Ok(Box::new(StateSnapshotRestore::new(
+    Ok(Box::new(new_position_snapshot_restore(
+        position_db,
+        position_merkle_db,
+        version,
+        expected_root_hash,
+    )?))
+}
+
+/// Position snapshots have no KV-only/tree-only split: the value rows and
+/// the tree land together, always in `Default` mode.
+pub(crate) fn new_position_snapshot_restore(
+    position_db: &Arc<PositionDb>,
+    position_merkle_db: &Arc<PositionMerkleDb>,
+    version: Version,
+    expected_root_hash: HashValue,
+) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
+    StateSnapshotRestore::new(
         Arc::clone(position_merkle_db),
-        value_writer,
+        Arc::new(PositionStateValueWriter::new(position_db)),
         version,
         expected_root_hash,
         false, /* async_commit */
         StateSnapshotRestoreMode::Default,
-    )?))
+    )
 }

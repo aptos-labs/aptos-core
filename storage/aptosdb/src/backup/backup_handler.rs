@@ -2,11 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    db::PositionBundle,
     ledger_db::LedgerDb,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
         BACKUP_TXN_VERSION,
     },
+    position_state_sync::get_position_state_item_count,
     state_store::StateStore,
 };
 use aptos_crypto::hash::HashValue;
@@ -36,13 +38,19 @@ fn no_cache_read_opts() -> ReadOptions {
 pub struct BackupHandler {
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
+    position: Option<Arc<PositionBundle>>,
 }
 
 impl BackupHandler {
-    pub(crate) fn new(state_store: Arc<StateStore>, ledger_db: Arc<LedgerDb>) -> Self {
+    pub(crate) fn new(
+        state_store: Arc<StateStore>,
+        ledger_db: Arc<LedgerDb>,
+        position: Option<Arc<PositionBundle>>,
+    ) -> Self {
         Self {
             state_store,
             ledger_db,
+            position,
         }
     }
 
@@ -195,6 +203,66 @@ impl BackupHandler {
     ) -> Result<SparseMerkleRangeProof> {
         self.state_store
             .get_value_range_proof(rightmost_key, version)
+    }
+
+    fn position(&self) -> Result<&Arc<PositionBundle>> {
+        self.position.as_ref().ok_or_else(|| {
+            AptosDbError::Other("native-position storage is not enabled on this node".into())
+        })
+    }
+
+    /// Position snapshots are taken sparsely; the one at or before `version`
+    /// carries the same root as `version`. `None` when no position state was
+    /// ever committed, i.e. the empty tree.
+    fn position_snapshot_version(&self, version: Version) -> Result<Option<Version>> {
+        self.position()?
+            .merkle_db
+            .latest_snapshot_version_at_or_before(version)
+    }
+
+    /// Gets the number of positions in the snapshot at `version`.
+    pub fn get_position_state_item_count(&self, version: Version) -> Result<usize> {
+        match self.position_snapshot_version(version)? {
+            Some(snapshot_version) => {
+                get_position_state_item_count(&self.position()?.merkle_db, snapshot_version)
+            },
+            None => Ok(0),
+        }
+    }
+
+    /// Iterate through positions in the snapshot at `version`.
+    pub fn get_position_state_item_iter(
+        &self,
+        version: Version,
+        start_idx: usize,
+        limit: usize,
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync>> {
+        let Some(snapshot_version) = self.position_snapshot_version(version)? else {
+            return Ok(Box::new(std::iter::empty()));
+        };
+        let position = self.position()?;
+        Ok(Box::new(position.merkle_db.iter_active_leaves_chunk(
+            Arc::clone(&position.kv_db),
+            snapshot_version,
+            start_idx,
+            limit,
+        )?))
+    }
+
+    /// Gets the proof that proves a range of positions.
+    pub fn get_position_state_range_proof(
+        &self,
+        rightmost_key: HashValue,
+        version: Version,
+    ) -> Result<SparseMerkleRangeProof> {
+        let snapshot_version = self.position_snapshot_version(version)?.ok_or_else(|| {
+            AptosDbError::NotFound(format!(
+                "no native-position snapshot at or before version {version}"
+            ))
+        })?;
+        self.position()?
+            .merkle_db
+            .get_range_proof(rightmost_key, snapshot_version)
     }
 
     /// Gets the epoch, committed version, and synced version of the DB.

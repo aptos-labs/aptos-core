@@ -194,6 +194,7 @@ impl AptosDB {
                 &env,
                 &block_cache,
                 readonly,
+                empty_buffered_state_for_restore,
             )?;
         }
 

@@ -662,7 +662,7 @@ impl TransactionRestoreBatchController {
         >,
     ) -> Result<()> {
         let (first_version, _) = self.replay_from_version.unwrap();
-        restore_handler.reset_state_store();
+        restore_handler.reset_state_store()?;
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db));
