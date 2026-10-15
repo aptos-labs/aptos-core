@@ -5,7 +5,7 @@
 use crate::dkg::DKGTranscriptMetadata;
 use crate::{
     dkg::{chunky_dkg::CertifiedChunkyDKGOutput, DKGTranscript},
-    jwks,
+    jwks, trust_observation,
     validator_verifier::ValidatorVerifier,
 };
 use anyhow::Context;
@@ -20,6 +20,7 @@ pub enum ValidatorTransaction {
     DKGResult(DKGTranscript),
     ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
     ChunkyDKGResult(CertifiedChunkyDKGOutput),
+    ObservedTrustUpdate(trust_observation::QuorumCertifiedUpdate),
 }
 
 impl ValidatorTransaction {
@@ -45,6 +46,9 @@ impl ValidatorTransaction {
                 "validator_transaction__observed_jwk_update"
             },
             ValidatorTransaction::ChunkyDKGResult(_) => "validator_transaction__chunky_dkg_result",
+            ValidatorTransaction::ObservedTrustUpdate(_) => {
+                "validator_transaction__observed_trust_update"
+            },
         }
     }
 
@@ -57,6 +61,17 @@ impl ValidatorTransaction {
             ValidatorTransaction::ChunkyDKGResult(_) => {
                 // TODO: Implement verification for ChunkyDKGResult
                 Ok(())
+            },
+            ValidatorTransaction::ObservedTrustUpdate(update) => {
+                let authors = update
+                    .multi_sig
+                    .get_signers_addresses(&verifier.get_ordered_account_addresses());
+                verifier
+                    .check_voting_power(authors.iter(), true)
+                    .context("ObservedTrustUpdate lacks quorum voting power")?;
+                verifier
+                    .verify_multi_signatures(&update.update, &update.multi_sig)
+                    .context("ObservedTrustUpdate quorum signature verification failed")
             },
         }
     }
@@ -72,4 +87,5 @@ pub enum Topic {
         kid: jwks::KID,
     },
     ChunkyDKG,
+    TRUST_OBSERVATION(trust_observation::TargetId),
 }

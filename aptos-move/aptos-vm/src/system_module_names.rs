@@ -60,6 +60,15 @@ pub static JWKS_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const UPSERT_INTO_OBSERVED_JWKS: &IdentStr = ident_str!("upsert_into_observed_jwks");
 
+pub static TRUST_OBSERVATION_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("trust_observation").to_owned(),
+    )
+});
+
+pub const UPSERT_OBSERVED_VALUE: &IdentStr = ident_str!("upsert_observed_value");
+
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,

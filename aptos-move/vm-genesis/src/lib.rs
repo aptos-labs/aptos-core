@@ -82,6 +82,7 @@ const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
 const JWKS_MODULE_NAME: &str = "jwks";
+const TRUST_OBSERVATION_MODULE_NAME: &str = "trust_observation";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
 const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
@@ -190,6 +191,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         &execution_config,
         &gas_schedule,
     );
+    initialize_trust_observation(&mut session, &module_storage, &mut traversal_context);
     initialize_features(
         &mut session,
         &module_storage,
@@ -393,6 +395,7 @@ pub fn encode_genesis_change_set(
         chain_id,
         genesis_config,
     );
+    initialize_trust_observation(&mut session, &module_storage, &mut traversal_context);
     initialize_keyless_accounts(
         &mut session,
         &module_storage,
@@ -979,6 +982,22 @@ fn initialize_jwks_with_defaults(
             providers.as_move_value(),
             patches.as_move_value(),
         ]),
+    );
+}
+
+fn initialize_trust_observation(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        TRUST_OBSERVATION_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 }
 

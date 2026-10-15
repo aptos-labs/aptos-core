@@ -476,6 +476,7 @@ impl NodeSetup {
             local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
+            aptos_types::trust_observation::Config::default(),
             OnChainChunkyDKGConfig::default_disabled(),
             Arc::new(MockPastProposalStatusTracker {}),
             opt_proposal_loopback_tx,

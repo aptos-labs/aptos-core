@@ -53,6 +53,7 @@ use aptos_types::{
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
         ValidatorTxnConfig,
     },
+    trust_observation::Config as TrustObservationConfig,
     validator_signer::ValidatorSigner,
 };
 use async_trait::async_trait;
@@ -338,6 +339,7 @@ pub struct DagBootstrapper {
     vtxn_config: ValidatorTxnConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
+    trust_observation_config: TrustObservationConfig,
     executor: BoundedExecutor,
 }
 
@@ -362,6 +364,7 @@ impl DagBootstrapper {
         vtxn_config: ValidatorTxnConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
+        trust_observation_config: TrustObservationConfig,
         executor: BoundedExecutor,
     ) -> Self {
         Self {
@@ -383,6 +386,7 @@ impl DagBootstrapper {
             vtxn_config,
             randomness_config,
             jwk_consensus_config,
+            trust_observation_config,
             executor,
         }
     }
@@ -658,6 +662,7 @@ impl DagBootstrapper {
             self.vtxn_config.clone(),
             self.randomness_config.clone(),
             self.jwk_consensus_config.clone(),
+            self.trust_observation_config.clone(),
             health_backoff,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
@@ -763,6 +768,7 @@ pub(super) fn bootstrap_dag_for_test(
         ValidatorTxnConfig::default_enabled(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
+        TrustObservationConfig::default(),
         BoundedExecutor::new(2, Handle::current()),
     );
 

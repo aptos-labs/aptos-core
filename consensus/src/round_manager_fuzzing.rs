@@ -219,6 +219,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         ConsensusConfig::default(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
+        aptos_types::trust_observation::Config::default(),
         OnChainChunkyDKGConfig::default_disabled(),
         Arc::new(MockPastProposalStatusTracker {}),
         opt_proposal_loopback_tx,

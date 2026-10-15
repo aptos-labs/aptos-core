@@ -68,6 +68,7 @@ use aptos_types::{
         OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ValidatorTxnConfig,
     },
+    trust_observation::Config as TrustObservationConfig,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -440,6 +441,7 @@ pub struct RoundManager {
     local_config: ConsensusConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
+    trust_observation_config: TrustObservationConfig,
     chunky_dkg_config: OnChainChunkyDKGConfig,
     // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
@@ -468,6 +470,7 @@ impl RoundManager {
         local_config: ConsensusConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
+        trust_observation_config: TrustObservationConfig,
         chunky_dkg_config: OnChainChunkyDKGConfig,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
         opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
@@ -498,6 +501,7 @@ impl RoundManager {
             local_config,
             randomness_config,
             jwk_consensus_config,
+            trust_observation_config,
             chunky_dkg_config,
             pending_order_votes: PendingOrderVotes::new(),
             futures: FuturesUnordered::new(),
@@ -1253,6 +1257,7 @@ impl RoundManager {
                     is_vtxn_expected(
                         &self.randomness_config,
                         &self.jwk_consensus_config,
+                        &self.trust_observation_config,
                         &self.chunky_dkg_config,
                         vtxn
                     ),

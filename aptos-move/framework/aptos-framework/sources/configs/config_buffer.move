@@ -32,6 +32,7 @@ module aptos_framework::config_buffer {
     friend aptos_framework::randomness_api_v0_config;
     friend aptos_framework::randomness_config;
     friend aptos_framework::randomness_config_seqnum;
+    friend aptos_framework::trust_observation;
     friend aptos_framework::version;
 
     /// Config buffer operations failed with permission denied.

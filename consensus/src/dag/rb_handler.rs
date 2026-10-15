@@ -28,6 +28,7 @@ use aptos_types::{
         OnChainChunkyDKGConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
     },
+    trust_observation::Config as TrustObservationConfig,
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
 };
@@ -51,6 +52,7 @@ pub(crate) struct NodeBroadcastHandler {
     vtxn_config: ValidatorTxnConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
+    trust_observation_config: TrustObservationConfig,
     chunky_dkg_config: OnChainChunkyDKGConfig,
     health_backoff: HealthBackoff,
 }
@@ -67,6 +69,7 @@ impl NodeBroadcastHandler {
         vtxn_config: ValidatorTxnConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
+        trust_observation_config: TrustObservationConfig,
         health_backoff: HealthBackoff,
     ) -> Self {
         let epoch = epoch_state.epoch;
@@ -85,6 +88,7 @@ impl NodeBroadcastHandler {
             vtxn_config,
             randomness_config,
             jwk_consensus_config,
+            trust_observation_config,
             chunky_dkg_config: OnChainChunkyDKGConfig::Off,
             health_backoff,
         }
@@ -130,6 +134,7 @@ impl NodeBroadcastHandler {
                 is_vtxn_expected(
                     &self.randomness_config,
                     &self.jwk_consensus_config,
+                    &self.trust_observation_config,
                     &self.chunky_dkg_config,
                     vtxn
                 ),

@@ -111,8 +111,11 @@ pub fn create_event_subscription_service(
             .subscribe_to_reconfigurations()
             .expect("JWK consensus must subscribe to reconfigurations");
         let jwk_updated_events = event_subscription_service
-            .subscribe_to_events(vec![], vec!["0x1::jwks::ObservedJWKsUpdated".to_string()])
-            .expect("JWK consensus must subscribe to DKG events");
+            .subscribe_to_events(vec![], vec![
+                "0x1::jwks::ObservedJWKsUpdated".to_string(),
+                "0x1::trust_observation::ObservedTrustDataUpdated".to_string(),
+            ])
+            .expect("JWK and trust observation consensus must subscribe to update events");
         Some((reconfig_events, jwk_updated_events))
     } else {
         None

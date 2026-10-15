@@ -58,6 +58,8 @@ pub mod mode;
 pub mod network;
 pub mod network_interface;
 pub mod observation_aggregation;
+pub mod trust_manager;
+pub mod trust_observer;
 pub mod types;
 pub mod update_certifier;
 

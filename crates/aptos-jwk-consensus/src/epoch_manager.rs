@@ -6,6 +6,7 @@ use crate::{
     jwk_manager_per_key::KeyLevelConsensusManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::JWKConsensusNetworkClient,
+    trust_manager::TrustObservationManager,
     types::JWKConsensusMsg,
     update_certifier::UpdateCertifier,
     TConsensusManager,
@@ -32,6 +33,9 @@ use aptos_types::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, ValidatorSet,
     },
+    trust_observation::{
+        Config as TrustObservationConfig, ObservedTrustData, ObservedTrustDataUpdated,
+    },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::StreamExt;
@@ -56,6 +60,10 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     jwk_rpc_msg_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     jwk_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
+    trust_updated_event_tx: Option<aptos_channel::Sender<(), ObservedTrustDataUpdated>>,
+    trust_rpc_msg_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
+    trust_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 
     // network utils
     self_sender: aptos_channels::Sender<Event<JWKConsensusMsg>>,
@@ -87,6 +95,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             jwk_updated_event_txs: None,
             jwk_rpc_msg_tx: None,
             jwk_manager_close_tx: None,
+            trust_updated_event_tx: None,
+            trust_rpc_msg_tx: None,
+            trust_manager_close_tx: None,
         }
     }
 
@@ -97,7 +108,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rpc_request: IncomingRpcRequest,
     ) -> Result<()> {
         if Some(rpc_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
-            if let Some(tx) = &self.jwk_rpc_msg_tx {
+            let is_trust_request = matches!(
+                &rpc_request.msg,
+                JWKConsensusMsg::TrustObservationRequest(_)
+                    | JWKConsensusMsg::TrustObservationResponse(_)
+            );
+            let tx = if is_trust_request {
+                &self.trust_rpc_msg_tx
+            } else {
+                &self.jwk_rpc_msg_tx
+            };
+            if let Some(tx) = tx {
                 let _ = tx.push(peer_id, (peer_id, rpc_request));
             }
         }
@@ -113,6 +134,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             if let Ok(jwk_event) = ObservedJWKsUpdated::try_from(&event) {
                 if let Some(tx) = self.jwk_updated_event_txs.as_ref() {
                     let _ = tx.push((), jwk_event);
+                }
+            }
+            if let Ok(trust_event) = ObservedTrustDataUpdated::try_from(&event) {
+                if let Some(tx) = self.trust_updated_event_tx.as_ref() {
+                    let _ = tx.push((), trust_event);
                 }
             }
         }
@@ -172,6 +198,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let features = payload.get::<Features>().unwrap_or_default();
         let jwk_consensus_config = payload.get::<OnChainJWKConsensusConfig>();
         let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
+        let trust_config = payload.get::<TrustObservationConfig>().ok();
+        let onchain_observed_trust = payload.get::<ObservedTrustData>().unwrap_or_default();
         let onchain_consensus_config = payload.get::<OnChainConsensusConfig>().unwrap_or_default();
 
         let (jwk_manager_should_run, oidc_providers) = match jwk_consensus_config {
@@ -254,6 +282,55 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ));
             info!(epoch = epoch_state.epoch, "JWKManager spawned.",);
         }
+        if my_index.is_some() && onchain_consensus_config.is_vtxn_enabled() {
+            if let Some(config) = trust_config.filter(|config| !config.targets.is_empty()) {
+                let network_sender = NetworkSender::new(
+                    self.my_addr,
+                    self.network_sender.clone(),
+                    self.self_sender.clone(),
+                );
+                let rb = ReliableBroadcast::new(
+                    "trust_observation",
+                    self.my_addr,
+                    epoch_state.verifier.get_ordered_account_addresses(),
+                    Arc::new(network_sender),
+                    ExponentialBackoff::from_millis(5),
+                    aptos_time_service::TimeService::real(),
+                    Duration::from_millis(1000),
+                    BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+                );
+                let my_pk = epoch_state
+                    .verifier
+                    .get_public_key(&self.my_addr)
+                    .ok_or_else(|| anyhow!("my pk not found in validator set"))?;
+                let my_sk = self
+                    .key_storage
+                    .consensus_sk_by_pk(my_pk)
+                    .map_err(|error| {
+                        anyhow!("trust observation consensus key unavailable: {error}")
+                    })?;
+                let (event_tx, event_rx) = aptos_channel::new(QueueStyle::KLAST, 100, None);
+                let (rpc_tx, rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+                let (close_tx, close_rx) = oneshot::channel();
+                self.trust_updated_event_tx = Some(event_tx);
+                self.trust_rpc_msg_tx = Some(rpc_tx);
+                self.trust_manager_close_tx = Some(close_tx);
+                let manager = TrustObservationManager::new(
+                    self.my_addr,
+                    epoch_state.clone(),
+                    Arc::new(my_sk),
+                    rb,
+                    self.vtxn_pool.clone(),
+                    config,
+                    onchain_observed_trust,
+                );
+                tokio::spawn(manager.run(event_rx, rpc_rx, close_rx));
+                info!(
+                    epoch = epoch_state.epoch,
+                    "Trust observation manager spawned"
+                );
+            }
+        }
         Ok(())
     }
 
@@ -271,6 +348,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let _ = ack_rx.await;
         }
 
+        if let Some(tx) = self.trust_manager_close_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            let _ = tx.send(ack_tx);
+            let _ = ack_rx.await;
+        }
+
         self.jwk_updated_event_txs = None;
+        self.jwk_rpc_msg_tx = None;
+        self.trust_updated_event_tx = None;
+        self.trust_rpc_msg_tx = None;
     }
 }

@@ -32,6 +32,14 @@ impl AptosVM {
                 session_id,
                 jwk_update,
             ),
+            ValidatorTransaction::ObservedTrustUpdate(update) => self
+                .process_observed_trust_update(
+                    resolver,
+                    module_storage,
+                    log_context,
+                    session_id,
+                    update,
+                ),
             ValidatorTransaction::ChunkyDKGResult(dkg_output) => self.process_chunky_dkg_result(
                 resolver,
                 module_storage,
@@ -46,3 +54,4 @@ impl AptosVM {
 mod chunky_dkg;
 mod dkg;
 mod jwk;
+mod trust_observation;

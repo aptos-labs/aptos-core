@@ -2874,7 +2874,9 @@ dependencies = [
  "futures-util",
  "move-core-types",
  "once_cell",
+ "reqwest 0.11.23",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-retry",
 ]

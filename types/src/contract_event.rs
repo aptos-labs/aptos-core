@@ -10,6 +10,7 @@ use crate::{
     event::EventKey,
     jwks::ObservedJWKsUpdated,
     transaction::Version,
+    trust_observation::ObservedTrustDataUpdated,
 };
 use anyhow::{bail, ensure, Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -396,6 +397,24 @@ impl TryFrom<&ContractEvent> for ObservedJWKsUpdated {
             ContractEvent::V2(v2) => {
                 if v2.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
                     bail!("conversion to `ObservedJWKsUpdated` failed with wrong type tag");
+                }
+                bcs::from_bytes(&v2.event_data).map_err(Into::into)
+            },
+        }
+    }
+}
+
+impl TryFrom<&ContractEvent> for ObservedTrustDataUpdated {
+    type Error = Error;
+
+    fn try_from(event: &ContractEvent) -> Result<Self> {
+        match event {
+            ContractEvent::V1(_) => {
+                bail!("conversion to `ObservedTrustDataUpdated` failed with wrong event version")
+            },
+            ContractEvent::V2(v2) => {
+                if v2.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
+                    bail!("conversion to `ObservedTrustDataUpdated` failed with wrong type tag");
                 }
                 bcs::from_bytes(&v2.event_data).map_err(Into::into)
             },

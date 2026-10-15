@@ -23,6 +23,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::stake::{Self, validator_consensus_infos_from_validator_set};
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::trust_observation;
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
@@ -104,6 +105,7 @@ module aptos_framework::reconfiguration_with_dkg {
         features::on_new_epoch(framework);
         jwk_consensus_config::on_new_epoch(framework);
         jwks::on_new_epoch(framework);
+        trust_observation::on_new_epoch(framework);
         keyless_account::on_new_epoch(framework);
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);

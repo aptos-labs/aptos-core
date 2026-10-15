@@ -80,6 +80,7 @@ async fn test_node_broadcast_receiver_succeed() {
         ValidatorTxnConfig::default_disabled(),
         OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_disabled(),
+        aptos_types::trust_observation::Config::default(),
         health_backoff,
     );
 
@@ -132,6 +133,7 @@ async fn test_node_broadcast_receiver_failure() {
                 ValidatorTxnConfig::default_disabled(),
                 OnChainRandomnessConfig::default_disabled(),
                 OnChainJWKConsensusConfig::default_disabled(),
+                aptos_types::trust_observation::Config::default(),
                 HealthBackoff::new(
                     epoch_state.clone(),
                     NoChainHealth::new(),
@@ -224,6 +226,7 @@ async fn test_node_broadcast_receiver_storage() {
         ValidatorTxnConfig::default_disabled(),
         OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_disabled(),
+        aptos_types::trust_observation::Config::default(),
         HealthBackoff::new(
             epoch_state.clone(),
             NoChainHealth::new(),
@@ -248,6 +251,7 @@ async fn test_node_broadcast_receiver_storage() {
         ValidatorTxnConfig::default_disabled(),
         OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_disabled(),
+        aptos_types::trust_observation::Config::default(),
         HealthBackoff::new(
             epoch_state,
             NoChainHealth::new(),

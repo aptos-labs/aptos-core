@@ -115,6 +115,7 @@ use aptos_types::{
     },
     randomness::{RandKeys, WvufPP, WVUF},
     secret_sharing::SecretShareConfig,
+    trust_observation::Config as TrustObservationConfig,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
@@ -923,6 +924,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+        trust_observation_config: TrustObservationConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
         features: Features,
         network_sender: Arc<NetworkSender>,
@@ -1106,6 +1108,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.clone(),
             onchain_randomness_config,
             onchain_jwk_consensus_config,
+            trust_observation_config,
             onchain_chunky_dkg_config,
             failures_tracker,
             opt_proposal_loopback_tx,
@@ -1348,6 +1351,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let randomness_config_move_struct: anyhow::Result<RandomnessConfigMoveStruct> =
             payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
+        let trust_observation_config = payload.get::<TrustObservationConfig>().unwrap_or_default();
         let mut dkg_state = payload.get::<DKGState>();
         let mut chunky_dkg_state = payload.get::<ChunkyDKGState>();
         let chunky_dkg_config_move_struct: anyhow::Result<ChunkyDKGConfigMoveStruct> =
@@ -1554,6 +1558,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 execution_config,
                 onchain_randomness_config,
                 jwk_consensus_config,
+                trust_observation_config,
                 onchain_chunky_dkg_config,
                 features,
                 network_sender,
@@ -1572,6 +1577,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 execution_config,
                 onchain_randomness_config,
                 jwk_consensus_config,
+                trust_observation_config,
                 onchain_chunky_dkg_config,
                 features,
                 network_sender,
@@ -1631,6 +1637,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
+        trust_observation_config: TrustObservationConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
         features: Features,
         network_sender: NetworkSender,
@@ -1655,6 +1662,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     execution_config,
                     onchain_randomness_config,
                     jwk_consensus_config,
+                    trust_observation_config,
                     onchain_chunky_dkg_config,
                     features,
                     Arc::new(network_sender),
@@ -1689,6 +1697,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         on_chain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+        trust_observation_config: TrustObservationConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
         features: Features,
         network_sender: NetworkSender,
@@ -1773,6 +1782,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.effective_validator_txn_config(),
             onchain_randomness_config,
             onchain_jwk_consensus_config,
+            trust_observation_config,
             self.bounded_executor.clone(),
         );
 

@@ -1105,6 +1105,10 @@ fn convert_validator_transaction(
                 // TODO(ibalajiarun): Support indexer
                 None
             },
+            ApiValidatorTransactionEnum::ObservedTrustUpdate(_) => {
+                // TODO: Add a protobuf variant for observed external trust updates.
+                None
+            },
         },
         events: convert_events(api_validator_txn.events()),
     })

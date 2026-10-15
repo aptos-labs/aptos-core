@@ -35,6 +35,9 @@ use aptos_types::{
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
+    trust_observation::{
+        ObservedValue as InternalObservedValue, QuorumCertifiedUpdate as TrustQuorumCertifiedUpdate,
+    },
 };
 use bcs::to_bytes;
 use once_cell::sync::Lazy;
@@ -815,6 +818,7 @@ pub enum ValidatorTransaction {
     ObservedJwkUpdate(JWKUpdateTransaction),
     DkgResult(DKGResultTransaction),
     ChunkyDKGResult(ChunkyDKGResultTransaction),
+    ObservedTrustUpdate(ObservedTrustUpdateTransaction),
 }
 
 impl ValidatorTransaction {
@@ -825,6 +829,9 @@ impl ValidatorTransaction {
             },
             ValidatorTransaction::DkgResult(_) => "validator_transaction__dkg_result",
             ValidatorTransaction::ChunkyDKGResult(_) => "validator_transaction__chunky_dkg_result",
+            ValidatorTransaction::ObservedTrustUpdate(_) => {
+                "validator_transaction__observed_trust_update"
+            },
         }
     }
 
@@ -833,6 +840,7 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.info,
             ValidatorTransaction::DkgResult(t) => &t.info,
             ValidatorTransaction::ChunkyDKGResult(t) => &t.info,
+            ValidatorTransaction::ObservedTrustUpdate(t) => &t.info,
         }
     }
 
@@ -841,6 +849,7 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJwkUpdate(t) => &mut t.info,
             ValidatorTransaction::DkgResult(t) => &mut t.info,
             ValidatorTransaction::ChunkyDKGResult(t) => &mut t.info,
+            ValidatorTransaction::ObservedTrustUpdate(t) => &mut t.info,
         }
     }
 
@@ -849,6 +858,7 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJwkUpdate(t) => t.timestamp,
             ValidatorTransaction::DkgResult(t) => t.timestamp,
             ValidatorTransaction::ChunkyDKGResult(t) => t.timestamp,
+            ValidatorTransaction::ObservedTrustUpdate(t) => t.timestamp,
         }
     }
 
@@ -857,6 +867,7 @@ impl ValidatorTransaction {
             ValidatorTransaction::ObservedJwkUpdate(t) => &t.events,
             ValidatorTransaction::DkgResult(t) => &t.events,
             ValidatorTransaction::ChunkyDKGResult(t) => &t.events,
+            ValidatorTransaction::ObservedTrustUpdate(t) => &t.events,
         }
     }
 }
@@ -903,6 +914,14 @@ impl
                     encryption_key: HexEncodedBytes::from(dkg_output.encryption_key),
                 })
             },
+            aptos_types::validator_txn::ValidatorTransaction::ObservedTrustUpdate(update) => {
+                Self::ObservedTrustUpdate(ObservedTrustUpdateTransaction {
+                    info,
+                    events,
+                    timestamp: U64::from(timestamp),
+                    quorum_certified_update: update.into(),
+                })
+            },
         }
     }
 }
@@ -915,6 +934,52 @@ pub struct JWKUpdateTransaction {
     pub events: Vec<Event>,
     pub timestamp: U64,
     pub quorum_certified_update: ExportedQuorumCertifiedUpdate,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ObservedTrustUpdateTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub events: Vec<Event>,
+    pub timestamp: U64,
+    pub quorum_certified_update: ExportedTrustQuorumCertifiedUpdate,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedTrustQuorumCertifiedUpdate {
+    pub update: ExportedObservedValue,
+    pub multi_sig: ExportedAggregateSignature,
+}
+
+impl From<TrustQuorumCertifiedUpdate> for ExportedTrustQuorumCertifiedUpdate {
+    fn from(update: TrustQuorumCertifiedUpdate) -> Self {
+        Self {
+            update: update.update.into(),
+            multi_sig: update.multi_sig.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ExportedObservedValue {
+    pub target_id: HexEncodedBytes,
+    pub config_version: U64,
+    pub epoch: U64,
+    pub version: U64,
+    pub value: HexEncodedBytes,
+}
+
+impl From<InternalObservedValue> for ExportedObservedValue {
+    fn from(value: InternalObservedValue) -> Self {
+        Self {
+            target_id: value.target_id.into(),
+            config_version: value.config_version.into(),
+            epoch: value.epoch.into(),
+            version: value.version.into(),
+            value: value.value.into(),
+        }
+    }
 }
 
 /// A more API-friendly representation of the on-chain `aptos_types::jwks::QuorumCertifiedUpdate`.

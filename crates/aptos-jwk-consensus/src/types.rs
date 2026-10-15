@@ -7,6 +7,7 @@ use aptos_reliable_broadcast::RBMessage;
 use aptos_types::{
     account_address::AccountAddress,
     jwks::{Issuer, KeyLevelUpdate, ProviderJWKs, QuorumCertifiedUpdate, KID},
+    trust_observation::ObservedValue,
 };
 use aptos_validator_transaction_pool::TxnGuard;
 use futures_util::future::AbortHandle;
@@ -19,6 +20,8 @@ pub enum JWKConsensusMsg {
     ObservationResponse(ObservedUpdateResponse),
     KeyLevelObservationRequest(ObservedKeyLevelUpdateRequest),
     // In per-key mode we can reuse `ObservationResponse` and don't have a `KeyLevelObservationResponse`.
+    TrustObservationRequest(TrustObservationRequest),
+    TrustObservationResponse(TrustObservationResponse),
 }
 
 impl JWKConsensusMsg {
@@ -27,6 +30,8 @@ impl JWKConsensusMsg {
             JWKConsensusMsg::ObservationRequest(_) => "ObservationRequest",
             JWKConsensusMsg::ObservationResponse(_) => "ObservationResponse",
             JWKConsensusMsg::KeyLevelObservationRequest(_) => "KeyLevelObservationResponse",
+            JWKConsensusMsg::TrustObservationRequest(_) => "TrustObservationRequest",
+            JWKConsensusMsg::TrustObservationResponse(_) => "TrustObservationResponse",
         }
     }
 
@@ -35,11 +40,30 @@ impl JWKConsensusMsg {
             JWKConsensusMsg::ObservationRequest(request) => request.epoch,
             JWKConsensusMsg::ObservationResponse(response) => response.epoch,
             JWKConsensusMsg::KeyLevelObservationRequest(request) => request.epoch,
+            JWKConsensusMsg::TrustObservationRequest(request) => request.epoch,
+            JWKConsensusMsg::TrustObservationResponse(response) => response.epoch,
         }
     }
 }
 
 impl RBMessage for JWKConsensusMsg {}
+
+/// A request is bound to the governed target configuration and proposed on-chain version.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct TrustObservationRequest {
+    pub epoch: u64,
+    pub target_id: Vec<u8>,
+    pub config_version: u64,
+    pub version: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct TrustObservationResponse {
+    pub epoch: u64,
+    pub author: AccountAddress,
+    pub observed: ObservedValue,
+    pub signature: Signature,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
 pub struct ObservedUpdate {
