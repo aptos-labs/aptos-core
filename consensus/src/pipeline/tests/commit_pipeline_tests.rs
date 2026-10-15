@@ -45,25 +45,29 @@ fn ready<T: Send + Clone + 'static>(value: T) -> TaskFuture<T> {
     async move { Ok(value) }.boxed().shared()
 }
 
-fn attach_pipeline(
+pub(in crate::pipeline) fn attach_pipeline(
     block: &Arc<PipelinedBlock>,
     parent: Option<TaskFuture<Option<LedgerInfoWithSignatures>>>,
 ) -> TaskFuture<Option<LedgerInfoWithSignatures>> {
     let (proof_tx, proof_rx) = oneshot::channel();
+    // Match PipelineBuilder: the proof input is abortable, but storage itself
+    // must finish and may still be waiting on its parent's storage future.
+    let proof_task = tokio::spawn(proof_rx);
+    let proof_abort = proof_task.abort_handle();
     let result = block.compute_result().clone();
     let id = block.id();
     let commit_task = tokio::spawn(async move {
         if let Some(parent) = parent {
             parent.await?;
         }
-        let proof: LedgerInfoWithSignatures = proof_rx
+        let proof: LedgerInfoWithSignatures = proof_task
             .await
+            .map_err(|e| anyhow::anyhow!(e))?
             .map_err(|_| anyhow::anyhow!("proof cancelled"))?;
         Ok::<_, aptos_consensus_types::pipelined_block::TaskError>(
             (proof.commit_info().id() == id).then_some(proof),
         )
     });
-    let commit_abort = commit_task.abort_handle();
     let commit = async move { commit_task.await.map_err(|e| anyhow::anyhow!(e))? }
         .boxed()
         .shared();
@@ -107,11 +111,11 @@ fn attach_pipeline(
         commit_proof_tx: Some(proof_tx),
         secret_shared_key_tx: None,
     });
-    block.set_pipeline_abort_handles(vec![commit_abort, vote_abort]);
+    block.set_pipeline_abort_handles(vec![proof_abort, vote_abort]);
     commit
 }
 
-fn network(
+pub(in crate::pipeline) fn network(
     signer: &ValidatorSigner,
     verifier: Arc<aptos_types::validator_verifier::ValidatorVerifier>,
 ) -> Arc<NetworkSender> {
