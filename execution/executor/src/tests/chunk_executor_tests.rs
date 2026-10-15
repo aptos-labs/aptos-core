@@ -14,7 +14,9 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_db::AptosDB;
-use aptos_executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
+use aptos_executor_types::{
+    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
+};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -22,6 +24,7 @@ use aptos_types::{
     transaction::{TransactionListWithProofV2, TransactionOutputListWithProofV2, Version},
 };
 use rand::Rng;
+use std::ops::RangeInclusive;
 
 pub struct TestExecutor {
     _path: aptos_temppath::TempPath,
@@ -202,17 +205,8 @@ fn test_finished_executor_rejects_chunks_without_panicking() {
 
 #[test]
 fn test_executor_execute_and_commit_chunk_restart() {
-    let first_batch_size = 30;
-    let second_batch_size = 40;
-
-    let (chunks, ledger_info) = {
-        let first_batch_start = 1;
-        let second_batch_start = first_batch_start + first_batch_size;
-        create_transaction_chunks(vec![
-            first_batch_start..=first_batch_start + first_batch_size - 1,
-            second_batch_start..=second_batch_start + second_batch_size - 1,
-        ])
-    };
+    let (blocks, chunks) = create_blocks_and_chunks(vec![1..=20, 21..=70], vec![1..=30, 21..=70]);
+    let ledger_info = blocks.last().unwrap().2.clone();
 
     let TestExecutor {
         _path,
@@ -220,18 +214,21 @@ fn test_executor_execute_and_commit_chunk_restart() {
         executor,
     } = TestExecutor::new();
 
-    // First we simulate syncing the first chunk of transactions.
+    // First we simulate syncing the first chunk of transactions, which commits only the first
+    // block.
     {
         executor
             .execute_chunk(chunks[0].clone(), &ledger_info, None)
             .unwrap();
         executor.commit_chunk().unwrap();
+        assert_eq!(db.reader.expect_synced_version(), 20);
         let li = db.reader.get_latest_ledger_info().unwrap();
         assert_eq!(li.ledger_info().version(), 0);
         assert_eq!(li.ledger_info().consensus_block_id(), HashValue::zero());
     }
 
-    // Then we restart executor and resume to the next chunk.
+    // Then we restart executor, which drops the partial block held back, and resume from what's
+    // committed.
     {
         let executor = ChunkExecutor::<MockVM>::new(db.clone());
 
@@ -417,6 +414,24 @@ fn test_panic_on_mismatch_with_pre_committed() {
 }
 
 #[test]
+#[should_panic(expected = "Hit error with pending pre-committed ledger, panicking.")]
+fn test_panic_on_mismatch_with_pre_committed_after_partial_block() {
+    // See comments on `commit_1_pre_commit_2_return_3()`
+    let (db, _chunk3, _ledger_info2, _ledger_info3) = commit_1_pre_commit_2_return_3();
+
+    let (bad_chunks, bad_ledger_info) = create_transaction_chunks(vec![1..=7, 8..=9, 10..=12]);
+
+    let chunk_executor = ChunkExecutor::<MockVM>::new(db);
+    // Txn 8-9 don't complete a block, so committing them verifies nothing about the pre-committed
+    // txns, and the mismatch is only found with txn 10-12.
+    chunk_executor
+        .execute_chunk(bad_chunks[1].clone(), &bad_ledger_info, None)
+        .unwrap();
+    chunk_executor.commit_chunk().unwrap();
+    let _res = chunk_executor.execute_chunk(bad_chunks[2].clone(), &bad_ledger_info, None);
+}
+
+#[test]
 fn test_continue_from_pre_committed() {
     // See comments on `commit_1_pre_commit_2_return_3()`
     let (db, chunk3, _ledger_info2, ledger_info3) = commit_1_pre_commit_2_return_3();
@@ -435,4 +450,269 @@ fn test_continue_from_pre_committed() {
     assert!(chunk_executor
         .execute_chunk(bad_chunk, &bad_ledger_info, None)
         .is_err());
+}
+
+/// A ledger of blocks of the given version ranges. All transactions mint to the same account, so
+/// that each depends on the ones before it.
+struct TestLedger {
+    source: tests::TestExecutor,
+    ledger_info: LedgerInfoWithSignatures,
+}
+
+impl TestLedger {
+    fn new(block_ranges: &[RangeInclusive<Version>]) -> Self {
+        let source = tests::TestExecutor::new();
+        let account = tests::gen_address(0);
+
+        let mut parent_block_id = source.committed_block_id();
+        let mut ledger_info = None;
+        for range in block_ranges {
+            let version = *range.end();
+            let block_id = tests::gen_block_id(version);
+            // The block epilogue takes the last version.
+            let txns = (*range.start()..version)
+                .map(|v| encode_mint_transaction(account, v))
+                .collect();
+            let output = source
+                .execute_block(
+                    (block_id, block(txns)).into(),
+                    parent_block_id,
+                    TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
+                )
+                .unwrap();
+            assert_eq!(output.expect_last_version(), version);
+            source.pre_commit_block(block_id).unwrap();
+            ledger_info = Some(tests::gen_ledger_info(
+                version,
+                output.root_hash(),
+                block_id,
+                version,
+            ));
+            parent_block_id = block_id;
+        }
+        let ledger_info = ledger_info.unwrap();
+        source.commit_ledger(ledger_info.clone()).unwrap();
+
+        Self {
+            source,
+            ledger_info,
+        }
+    }
+
+    fn version(&self) -> Version {
+        self.ledger_info.ledger_info().version()
+    }
+
+    fn transactions(&self, range: &RangeInclusive<Version>) -> TransactionListWithProofV2 {
+        let num_txns = range.end() - range.start() + 1;
+        self.source
+            .db
+            .reader
+            .get_transactions(*range.start(), num_txns, self.version(), false)
+            .unwrap()
+    }
+
+    fn outputs(&self, range: &RangeInclusive<Version>) -> TransactionOutputListWithProofV2 {
+        let num_txns = range.end() - range.start() + 1;
+        self.source
+            .db
+            .reader
+            .get_transaction_outputs(*range.start(), num_txns, self.version())
+            .unwrap()
+    }
+}
+
+#[test]
+fn test_executor_executes_whole_blocks() {
+    let ledger = TestLedger::new(&[1..=10, 11..=25, 26..=40]);
+    // Chunks and the versions synced after committing them, i.e. up to the last block end.
+    let chunks = [(1..=5, 0), (6..=18, 10), (19..=22, 10), (23..=40, 40)];
+
+    for by_execution in [
+        [true, true, true, true],
+        [false, false, false, false],
+        [true, false, true, false],
+        [false, true, false, true],
+    ] {
+        let TestExecutor {
+            _path,
+            db,
+            executor,
+        } = TestExecutor::new();
+
+        // Enqueue all before updating the ledger, as state sync pipelines them.
+        for ((range, _), by_execution) in chunks.iter().zip(by_execution) {
+            if by_execution {
+                executor
+                    .enqueue_chunk_by_execution(
+                        ledger.transactions(range),
+                        &ledger.ledger_info,
+                        None,
+                    )
+                    .unwrap();
+            } else {
+                executor
+                    .enqueue_chunk_by_transaction_outputs(
+                        ledger.outputs(range),
+                        &ledger.ledger_info,
+                        None,
+                    )
+                    .unwrap();
+            }
+        }
+
+        let mut synced_version = 0;
+        for (_, expected_synced_version) in &chunks {
+            executor.update_ledger().unwrap();
+            let notification = executor.commit_chunk().unwrap();
+            assert_eq!(
+                notification.committed_transactions.len() as Version,
+                expected_synced_version - synced_version,
+            );
+            synced_version = db.reader.expect_synced_version();
+            assert_eq!(synced_version, *expected_synced_version);
+        }
+        assert!(executor.is_empty());
+        assert_eq!(
+            db.reader.get_latest_ledger_info().unwrap(),
+            ledger.ledger_info
+        );
+    }
+}
+
+#[test]
+fn test_replayer_executes_whole_blocks() {
+    let ledger = TestLedger::new(&[1..=10, 11..=25, 26..=40]);
+    let TestExecutor {
+        _path,
+        db,
+        executor,
+    } = TestExecutor::new();
+
+    // Both the batches and the transaction skipping verification split blocks, so verification
+    // has to happen on top of the partial block held back.
+    let verify_execution_mode = VerifyExecutionMode::verify_except(vec![15]);
+    let mut num_chunks = 0;
+    for range in [1..=18, 19..=40] {
+        let (txn_list, persisted_aux_info) = ledger.transactions(&range).into_parts();
+        let num_txns = range.end() - range.start() + 1;
+        let reader = &ledger.source.db.reader;
+        let write_sets = reader
+            .get_write_set_iterator(*range.start(), num_txns)
+            .unwrap()
+            .map(|write_set| write_set.unwrap())
+            .collect();
+        let event_vecs = reader
+            .get_events_iterator(*range.start(), num_txns)
+            .unwrap()
+            .map(|events| events.unwrap())
+            .collect();
+        num_chunks += executor
+            .enqueue_chunks(
+                txn_list.transactions,
+                persisted_aux_info,
+                txn_list.proof.transaction_infos,
+                write_sets,
+                event_vecs,
+                &verify_execution_mode,
+            )
+            .unwrap();
+    }
+
+    for _ in 0..num_chunks {
+        executor.update_ledger().unwrap();
+        executor.commit().unwrap();
+    }
+    assert!(executor.is_empty());
+    assert_eq!(db.reader.expect_synced_version(), ledger.version());
+    assert_eq!(
+        db.reader
+            .get_accumulator_root_hash(ledger.version())
+            .unwrap(),
+        ledger
+            .ledger_info
+            .ledger_info()
+            .transaction_accumulator_hash(),
+    );
+}
+
+#[test]
+fn test_replayer_commit_partial_block() {
+    let ledger = TestLedger::new(&[1..=10, 11..=25, 26..=40]);
+    for (target_version, block_end) in [(5, 0), (18, 10), (25, 25)] {
+        for verify_execution_mode in [
+            VerifyExecutionMode::NoVerify,
+            VerifyExecutionMode::verify_except(vec![15]),
+        ] {
+            let TestExecutor {
+                _path,
+                db,
+                executor,
+            } = TestExecutor::new();
+            assert_eq!(executor.commit_partial_block().unwrap(), None);
+
+            let (txn_list, persisted_aux_info) =
+                ledger.transactions(&(1..=target_version)).into_parts();
+            let reader = &ledger.source.db.reader;
+            let write_sets = reader
+                .get_write_set_iterator(1, target_version)
+                .unwrap()
+                .map(|write_set| write_set.unwrap())
+                .collect();
+            let event_vecs = reader
+                .get_events_iterator(1, target_version)
+                .unwrap()
+                .map(|events| events.unwrap())
+                .collect();
+            let num_chunks = executor
+                .enqueue_chunks(
+                    txn_list.transactions,
+                    persisted_aux_info,
+                    txn_list.proof.transaction_infos,
+                    write_sets,
+                    event_vecs,
+                    &verify_execution_mode,
+                )
+                .unwrap();
+
+            // Committing the partial block early is rejected, keeping what's held back.
+            assert!(executor.commit_partial_block().is_err());
+            for _ in 0..num_chunks {
+                executor.update_ledger().unwrap();
+            }
+            assert!(executor.commit_partial_block().is_err());
+            for _ in 0..num_chunks {
+                executor.commit().unwrap();
+            }
+            assert_eq!(db.reader.expect_synced_version(), block_end);
+
+            assert_eq!(
+                executor.commit_partial_block().unwrap(),
+                (target_version != block_end).then_some(target_version),
+            );
+            assert_eq!(db.reader.expect_synced_version(), target_version);
+            assert_eq!(
+                db.reader.get_accumulator_root_hash(target_version).unwrap(),
+                reader.get_accumulator_root_hash(target_version).unwrap(),
+            );
+            assert!(executor.is_empty());
+            assert_eq!(executor.commit_partial_block().unwrap(), None);
+
+            // A new executor must be able to resume from the committed partial block.
+            executor.finish();
+            let executor = ChunkExecutor::<MockVM>::new(db.clone());
+            executor
+                .execute_chunk(
+                    ledger.transactions(&(target_version + 1..=ledger.version())),
+                    &ledger.ledger_info,
+                    None,
+                )
+                .unwrap();
+            executor.commit_chunk().unwrap();
+            assert_eq!(
+                db.reader.get_latest_ledger_info().unwrap(),
+                ledger.ledger_info,
+            );
+        }
+    }
 }
