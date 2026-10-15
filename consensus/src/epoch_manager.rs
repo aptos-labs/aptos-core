@@ -1328,6 +1328,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .map(|s| s.metadata.dealer_epoch)
                 },
                 self.storage.aptos_db().as_ref(),
+                self.config.dkg_recovery_bundle_path.as_deref(),
             ) {
                 error!(
                     epoch = epoch_state.epoch,
@@ -1395,6 +1396,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .map(|s| s.metadata.dealer_epoch)
                 },
                 self.storage.aptos_db().as_ref(),
+                self.config.dkg_recovery_bundle_path.as_deref(),
             ) {
                 error!(
                     epoch = epoch_state.epoch,
