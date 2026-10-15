@@ -52,8 +52,9 @@ jobs:
         run: |
           cargo nextest archive --profile ci --cargo-profile ci --locked --workspace \
             --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit \
-            --exclude aptos-batch-encryption --archive-file unit-tests.tar.zst
+            --exclude aptos-batch-encryption --archive-file unit-tests.tar.zst --zstd-level 6
           ls -lh unit-tests.tar.zst
+          du -ah target/ci | sort -rh | head -30 || true
       - name: Record eligible test inventory
         run: |
           cargo nextest list --archive-file unit-tests.tar.zst --workspace-remap . \
@@ -72,8 +73,46 @@ jobs:
           retention-days: 3
           if-no-files-found: error
 
-  unit-test-shards:
+  archive-probes:
     needs: build-archive
+    runs-on: ${{ '64cpu-gh-ubuntu22-x64' }}
+    timeout-minutes: 30
+    env:
+      RUST_MIN_STACK: "4297152"
+      MVP_TEST_ON_CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust-setup
+        with:
+          ADDITIONAL_KEY: hosted-rust-unit-tests-trial
+      - uses: actions/download-artifact@v4
+        with:
+          name: hosted-unit-test-archive
+      - name: Restore archive and offline dependency sources
+        run: |
+          cargo nextest list --archive-file unit-tests.tar.zst --extract-to "$GITHUB_WORKSPACE" \
+            --extract-overwrite --workspace-remap . --profile ci --message-format json > restored.json
+          test -x target/ci/aptos-cargo-cli
+          cargo fetch --locked --target x86_64-unknown-linux-gnu
+      - name: Reproduce archive failures before full matrix
+        run: |
+          set -o pipefail
+          cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json \
+            --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . --profile ci \
+            -E 'binary(aptos-cargo-cli::selection_cli) | (package(aptos-enum-conversion-derive) & test(test_enum_conversion_derive_invalid)) | (package(aptos-network) & test(ping_success_resets_fail_counter))' \
+            --retries 0 --no-fail-fast 2>&1 | tee archive-probes.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: hosted-archive-probes
+          path: archive-probes.log
+          retention-days: 3
+          if-no-files-found: error
+
+  unit-test-shards:
+    needs: [build-archive, archive-probes]
     runs-on: ${{ '64cpu-gh-ubuntu22-x64' }}
     timeout-minutes: 180
     strategy:
@@ -102,14 +141,22 @@ jobs:
           name: hosted-unit-test-archive
       - name: Start private Postgres
         run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - name: Restore archive into original build paths
+        run: |
+          cargo nextest list --archive-file unit-tests.tar.zst --extract-to "$GITHUB_WORKSPACE" \
+            --extract-overwrite --workspace-remap . --profile ci --message-format json > restored.json
+          test -x target/ci/aptos-cargo-cli
+          cargo fetch --locked --target x86_64-unknown-linux-gnu
       - name: List shard inventory
         run: |
-          cargo nextest list --archive-file unit-tests.tar.zst --workspace-remap . \
+          cargo nextest list --binaries-metadata target/nextest/binaries-metadata.json \
+            --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . \
             --profile ci --partition "slice:$SHARD/4" --message-format json > "inventory-$SHARD.json"
       - name: Run shard
         run: |
           set -o pipefail
-          cargo nextest run --archive-file unit-tests.tar.zst --workspace-remap . \
+          cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json \
+            --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . \
             --profile ci --partition "slice:$SHARD/4" --retries 3 --no-fail-fast \
             2>&1 | tee "tests-$SHARD.log"
       - name: Preserve shard JUnit
@@ -130,7 +177,7 @@ jobs:
           if-no-files-found: error
 
   verify-results:
-    needs: [vm-and-doc-tests, build-archive, unit-test-shards]
+    needs: [vm-and-doc-tests, build-archive, archive-probes, unit-test-shards]
     if: ${{ always() }}
     runs-on: ${{ '2cpu-gh-ubuntu24-x64' }}
     timeout-minutes: 10
@@ -138,6 +185,7 @@ jobs:
       CHECKS_RESULT: ${{ needs.vm-and-doc-tests.result }}
       BUILD_RESULT: ${{ needs.build-archive.result }}
       SHARDS_RESULT: ${{ needs.unit-test-shards.result }}
+      PROBES_RESULT: ${{ needs.archive-probes.result }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -147,6 +195,7 @@ jobs:
           test "$CHECKS_RESULT" = success
           test "$BUILD_RESULT" = success
           test "$SHARDS_RESULT" = success
+          test "$PROBES_RESULT" = success
       - uses: actions/download-artifact@v4
         with:
           name: hosted-unit-test-inventory
