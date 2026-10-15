@@ -59,10 +59,6 @@ impl CommitCertificate {
         self.signatures = Some(signatures);
     }
 
-    pub fn has_execution_result(&self) -> bool {
-        self.signatures.is_some()
-    }
-
     pub fn certificate(
         &mut self,
         verifier: &ValidatorVerifier,

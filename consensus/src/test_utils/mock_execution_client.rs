@@ -6,7 +6,7 @@ use crate::{
     network::{IncomingCommitRequest, IncomingRandGenRequest, IncomingSecretShareRequest},
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
     pipeline::{
-        commit_pipeline::OrderedBlocks, commit_signer::CommitSignerProvider,
+        buffer_manager::OrderedBlocks, commit_signer::CommitSignerProvider,
         execution_client::TExecutionClient, pipeline_builder::PipelineBuilder,
     },
     rand::{rand_gen::types::RandConfig, secret_sharing::verifier::SecretShareVerifier},

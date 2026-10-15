@@ -5,7 +5,7 @@ use crate::{
     counters::RAND_QUEUE_SIZE,
     logging::{LogEvent, LogSchema},
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
-    pipeline::commit_pipeline::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
+    pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::rand_gen::{
         aug_data_store::AugDataStore,
         block_queue::{BlockQueue, QueueItem},

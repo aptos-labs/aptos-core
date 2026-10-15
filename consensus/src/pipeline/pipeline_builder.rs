@@ -12,6 +12,7 @@ use crate::{
     monitor,
     network::NetworkSender,
     payload_manager::TPayloadManager,
+    pipeline::commit_pipeline_futures::CommitPipelineRuntime,
     txn_notifier::TxnNotifier,
     IntGaugeGuard,
 };
@@ -22,8 +23,8 @@ use aptos_consensus_types::{
     common::{Author, Round},
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
-        execution_ledger_info, CommitLedgerResult, CommitVoteResult, DecryptionOutcome,
-        DecryptionResult, ExecuteResult, LedgerUpdateResult, MaterializeResult,
+        execution_ledger_info, CommitLedgerResult, CommitPipelineFutures, CommitVoteResult,
+        DecryptionOutcome, DecryptionResult, ExecuteResult, LedgerUpdateResult, MaterializeResult,
         NotifyStateSyncResult, OrderedBlocksForObserver, PipelineFutures, PipelineInputRx,
         PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult, PreCommitResult,
         PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
@@ -125,7 +126,8 @@ impl PreCommitStatus {
 /// Currently, the pipeline phases and their dependencies are:
 ///
 ///   External inputs (via PipelineInputTx channels):
-///     qc, rand, order_vote, order_proof, commit_proof, secret_shared_key
+///     qc, rand, order_vote, order_proof, verified commit messages, secret_shared_key
+///     (legacy DAG/observer adapters also supply commit_proof directly)
 ///
 ///   Critical path:
 ///     qc -> materialize -> decrypt -> prepare -> has_rand_txns -> rand_check -> execute -> ledger_update -> pre_commit -> commit_ledger
@@ -137,12 +139,17 @@ impl PreCommitStatus {
 ///     prepare + ledger_update           -> post_ledger_update
 ///     ledger_update + order_vote + order_proof + commit_proof -> commit_vote
 ///     ledger_update + order_proof                             -> pre_commit
+///     ledger_update + order_proof + verified messages         -> certificate
+///     certificate + ancestor path from BlockTree              -> commit_proof inputs
+///     commit_vote                                             -> reliable broadcast until commit proof
 ///     pre_commit + commit_proof                               -> commit_ledger
 ///     pre_commit + commit_ledger                              -> notify_state_sync
 ///     pre_commit + order_proof + commit_ledger + notify_state_sync -> post_commit
+///     commit_ledger + post_commit                             -> epoch suffix drain + epoch notification
 ///
 #[derive(Clone)]
 pub struct PipelineBuilder {
+    commit_runtime: Option<Arc<CommitPipelineRuntime>>,
     block_preparer: Arc<BlockPreparer>,
     executor: Arc<dyn BlockExecutorTrait>,
     validators: Arc<[AccountAddress]>,
@@ -164,7 +171,7 @@ pub struct PipelineBuilder {
     enable_v2_observer_messages: bool,
 }
 
-fn spawn_shared_fut<
+pub(super) fn spawn_shared_fut<
     T: Send + Clone + 'static,
     F: Future<Output = TaskResult<T>> + Send + 'static,
 >(
@@ -293,6 +300,7 @@ impl PipelineBuilder {
     ) -> Self {
         let module_cache = Arc::new(Mutex::new(None));
         Self {
+            commit_runtime: None,
             block_preparer,
             executor,
             validators,
@@ -312,6 +320,26 @@ impl PipelineBuilder {
             secret_share_config,
             consensus_publisher,
             enable_v2_observer_messages,
+        }
+    }
+
+    pub fn with_commit_runtime(mut self, runtime: Option<Arc<CommitPipelineRuntime>>) -> Self {
+        self.commit_runtime = runtime;
+        self
+    }
+
+    pub(crate) fn bind_commit_tree(
+        &self,
+        tree: &Arc<aptos_infallible::RwLock<crate::block_storage::block_tree::BlockTree>>,
+    ) {
+        if let Some(runtime) = &self.commit_runtime {
+            runtime.bind_tree(tree);
+        }
+    }
+
+    pub(crate) fn deliver_commit_inputs(&self, block: &PipelinedBlock) {
+        if let Some(runtime) = &self.commit_runtime {
+            runtime.deliver_cached(block);
         }
     }
 
@@ -359,6 +387,7 @@ impl PipelineBuilder {
         let (secret_shared_key_tx, secret_shared_key_rx) = oneshot::channel();
         (
             PipelineInputTx {
+                commit_messages_tx: None,
                 qc_tx: Some(qc_tx),
                 rand_tx: Some(rand_tx),
                 order_vote_tx: Some(order_vote_tx),
@@ -435,6 +464,7 @@ impl PipelineBuilder {
         let secret_sharing_derive_self_fut = spawn_ready_fut(None);
         let has_rand_txns_fut = spawn_ready_fut(false);
         PipelineFutures {
+            commit_pipeline: None,
             decryption_fut,
             prepare_fut,
             has_rand_txns_fut,
@@ -519,7 +549,7 @@ impl PipelineBuilder {
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
         let enable_observer_publish = self.consensus_publisher.is_some();
-        let (tx, rx) = Self::channel(&mut abort_handles);
+        let (mut tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             qc_rx,
             rand_rx,
@@ -666,7 +696,7 @@ impl PipelineBuilder {
         let commit_ledger_fut = spawn_shared_fut(
             Self::commit_ledger(
                 pre_commit_fut.clone(),
-                commit_proof_fut,
+                commit_proof_fut.clone(),
                 parent.commit_ledger_fut.clone(),
                 self.executor.clone(),
                 block.clone(),
@@ -696,7 +726,7 @@ impl PipelineBuilder {
         let post_commit_fut = spawn_shared_fut(
             Self::post_commit_ledger(
                 pre_commit_fut.clone(),
-                order_proof_fut,
+                order_proof_fut.clone(),
                 commit_ledger_fut.clone(),
                 notify_state_sync_fut.clone(),
                 parent.post_commit_fut.clone(),
@@ -707,7 +737,77 @@ impl PipelineBuilder {
             None,
         );
 
+        let commit_pipeline = self
+            .commit_runtime
+            .as_ref()
+            .filter(|_| !observer_enabled)
+            .map(|runtime| {
+                let (message_tx, message_rx) =
+                    tokio::sync::mpsc::channel(self.validators.len() * 2 + 100);
+                tx.commit_messages_tx = Some(message_tx);
+                let runtime_certificate = runtime.clone();
+                let certificate_block = block.clone();
+                let certificate_execution = ledger_update_fut.clone();
+                let certificate_order = order_proof_fut.clone();
+                let order_vote_enabled = self.order_vote_enabled;
+                let certificate_fut = spawn_shared_fut(
+                    async move {
+                        runtime_certificate
+                            .certificate(
+                                certificate_block,
+                                certificate_execution,
+                                certificate_order,
+                                message_rx,
+                                order_vote_enabled,
+                            )
+                            .await
+                    },
+                    Some(&mut abort_handles),
+                );
+                let runtime_broadcast = runtime.clone();
+                let vote = commit_vote_fut.clone();
+                let proof = commit_proof_fut.clone();
+                let broadcast_order = order_proof_fut.clone();
+                let broadcast_fut = spawn_shared_fut(
+                    async move {
+                        runtime_broadcast
+                            .broadcast_vote(vote, proof, broadcast_order)
+                            .await
+                    },
+                    Some(&mut abort_handles),
+                );
+                let runtime_certify = runtime.clone();
+                let certificate = certificate_fut.clone();
+                let certify_ancestors_fut = spawn_shared_fut(
+                    async move {
+                        let result = runtime_certify.certify_ancestors(certificate).await;
+                        if let Err(error) = &result {
+                            if !error.is_cancellation() {
+                                warn!("Commit certificate pipeline failed: {}", error);
+                            }
+                        }
+                        result
+                    },
+                    Some(&mut abort_handles),
+                );
+                let runtime_epoch = runtime.clone();
+                let commit = commit_ledger_fut.clone();
+                let post_commit = post_commit_fut.clone();
+                let epoch_change_fut = spawn_shared_fut(
+                    async move { runtime_epoch.epoch_change(commit, post_commit).await },
+                    None,
+                );
+                CommitPipelineFutures {
+                    commit_proof_fut,
+                    broadcast_fut,
+                    certificate_fut,
+                    certify_ancestors_fut,
+                    epoch_change_fut,
+                }
+            });
+
         let all_fut = PipelineFutures {
+            commit_pipeline,
             decryption_fut,
             prepare_fut,
             has_rand_txns_fut,
@@ -1418,6 +1518,7 @@ impl PipelineBuilder {
 
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
+            commit_pipeline: _,
             decryption_fut: _,
             prepare_fut,
             has_rand_txns_fut: _,

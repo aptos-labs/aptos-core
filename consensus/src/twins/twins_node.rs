@@ -8,7 +8,7 @@ use crate::{
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::DirectMempoolPayloadManager,
-    pipeline::commit_pipeline::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
     rand::rand_gen::storage::in_memory::InMemRandDb,
     test_utils::{mock_execution_client::MockExecutionClient, MockStorage},

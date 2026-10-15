@@ -29,6 +29,7 @@ pub mod mock_execution_client;
 #[cfg(any(test, feature = "fuzzing"))]
 mod mock_payload_manager;
 pub mod mock_quorum_store_sender;
+mod mock_state_computer;
 mod mock_storage;
 
 use crate::{
@@ -46,6 +47,8 @@ use aptos_types::{
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
 };
 pub use mock_payload_manager::MockPayloadManager;
+#[cfg(test)]
+pub use mock_state_computer::RandomComputeResultStateComputer;
 pub use mock_storage::{EmptyStorage, MockStorage};
 use move_core_types::account_address::AccountAddress;
 

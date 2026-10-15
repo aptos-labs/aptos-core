@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    pipeline::commit_pipeline::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
 };
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_reliable_broadcast::DropGuard;

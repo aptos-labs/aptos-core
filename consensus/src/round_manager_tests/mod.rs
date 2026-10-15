@@ -21,7 +21,7 @@ use crate::{
         TQuorumStoreCommitNotifier,
     },
     persistent_liveness_storage::RecoveryData,
-    pipeline::commit_pipeline::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
     quorum_store::batch_store::BatchReader,
     round_manager::RoundManager,
     test_utils::{

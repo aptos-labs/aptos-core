@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    pipeline::commit_pipeline::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
 };
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_reliable_broadcast::DropGuard;
@@ -247,6 +247,7 @@ mod tests {
         for block in &ordered_blocks.ordered_blocks {
             let (rand_tx, rand_rx) = oneshot::channel();
             block.set_pipeline_tx(PipelineInputTx {
+                commit_messages_tx: None,
                 qc_tx: None,
                 rand_tx: Some(rand_tx),
                 order_vote_tx: None,

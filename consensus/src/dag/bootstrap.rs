@@ -33,7 +33,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::TPayloadManager,
-    pipeline::{commit_pipeline::OrderedBlocks, execution_client::TExecutionClient},
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{

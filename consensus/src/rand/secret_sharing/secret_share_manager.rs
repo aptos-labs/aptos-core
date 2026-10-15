@@ -5,7 +5,7 @@ use crate::{
     counters::{DEC_QUEUE_SIZE, SECRET_SHARE_RECOVERY_COUNT},
     logging::{LogEvent, LogSchema},
     network::{IncomingSecretShareRequest, NetworkSender, TConsensusMsg},
-    pipeline::commit_pipeline::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
+    pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::secret_sharing::{
         block_queue::{BlockQueue, QueueItem},
         network_messages::{SecretShareMessage, SecretShareRpc},

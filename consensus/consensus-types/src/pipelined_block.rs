@@ -158,8 +158,26 @@ pub type CommitLedgerResult = Option<LedgerInfoWithSignatures>;
 pub type PostCommitResult = ();
 pub type SecretShareResult = Option<SecretShare>;
 
+/// Verified network inputs to a block's certificate future.
+#[derive(Clone)]
+pub enum CommitInput {
+    Vote(CommitVote),
+    Decision(LedgerInfoWithSignatures),
+}
+
+/// Consensus commit stages. DAG and observers retain their existing adapters.
+#[derive(Clone)]
+pub struct CommitPipelineFutures {
+    pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
+    pub broadcast_fut: TaskFuture<()>,
+    pub certificate_fut: TaskFuture<LedgerInfoWithSignatures>,
+    pub certify_ancestors_fut: TaskFuture<()>,
+    pub epoch_change_fut: TaskFuture<()>,
+}
+
 #[derive(Clone)]
 pub struct PipelineFutures {
+    pub commit_pipeline: Option<CommitPipelineFutures>,
     pub decryption_fut: TaskFuture<DecryptionResult>,
     pub prepare_fut: TaskFuture<PrepareResult>,
     pub has_rand_txns_fut: TaskFuture<bool>,
@@ -191,6 +209,7 @@ impl PipelineFutures {
 }
 
 pub struct PipelineInputTx {
+    pub commit_messages_tx: Option<tokio::sync::mpsc::Sender<CommitInput>>,
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
