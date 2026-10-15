@@ -55,6 +55,4 @@ warp = { workspace = true }
 [dev-dependencies]
 claims = { workspace = true }
 ed25519-dalek = { workspace = true }
-hex = { workspace = true }
 httpmock = { workspace = true }
-urlencoding = "2.1"

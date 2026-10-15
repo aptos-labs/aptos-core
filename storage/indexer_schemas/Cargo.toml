@@ -34,9 +34,7 @@ proptest-derive = { workspace = true, optional = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-aptos-proptest-helpers = { workspace = true }
 aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-rand = { workspace = true }

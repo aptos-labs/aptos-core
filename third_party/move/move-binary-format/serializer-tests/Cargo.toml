@@ -16,5 +16,4 @@ fuzzing = ["move-binary-format/fuzzing"]
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
-proptest-derive = { workspace = true }
 similar-asserts = "1.7.0"

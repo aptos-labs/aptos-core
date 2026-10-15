@@ -17,7 +17,6 @@ either = { workspace = true }
 git2 = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true }
-tokio = { workspace = true }
 toml = { workspace = true }
 url = { workspace = true }
 
@@ -30,6 +29,7 @@ aptos-rest-client = { workspace = true }
 [dev-dependencies]
 datatest-stable = { workspace = true }
 move-prover-test-utils = { workspace = true }
+tokio = { workspace = true }
 
 [[test]]
 name = "resolver_tests_offline"

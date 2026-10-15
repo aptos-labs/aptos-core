@@ -9,8 +9,5 @@ publish = false
 
 [features]
 
-[dependencies]
-
 [dev-dependencies]
 move-prover = { workspace = true }
-move-stdlib = { path = "../move-stdlib" }

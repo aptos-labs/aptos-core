@@ -19,5 +19,4 @@ move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-bytecode-verifier = { workspace = true }
 move-bytecode-verifier-invalid-mutations = { workspace = true }
 move-core-types = { workspace = true }
-petgraph = { workspace = true }
 proptest = { workspace = true }

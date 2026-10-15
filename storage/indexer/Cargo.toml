@@ -34,8 +34,6 @@ move-core-types = { workspace = true }
 once_cell = { workspace = true }
 
 [dev-dependencies]
-aptos-proptest-helpers = { workspace = true }
 aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
-rand = { workspace = true }

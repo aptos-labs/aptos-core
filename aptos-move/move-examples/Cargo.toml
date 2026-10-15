@@ -13,18 +13,17 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-framework = { workspace = true }
-aptos-gas-schedule = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true, features = ["testing"] }
 clap = { workspace = true }
-move-model = { workspace = true }
 move-package = { workspace = true }
-move-prover = { workspace = true }
-move-unit-test = { workspace = true }
-move-vm-runtime = { workspace = true }
 
 [dev-dependencies]
 aptos-framework = { workspace = true, features = ["testing"] }
+aptos-gas-schedule = { workspace = true }
+aptos-vm = { workspace = true, features = ["testing"] }
 mono-move-testsuite = { workspace = true }
+move-model = { workspace = true }
+move-prover = { workspace = true }
+move-unit-test = { workspace = true }
+move-vm-runtime = { workspace = true }
 tempfile = { workspace = true }

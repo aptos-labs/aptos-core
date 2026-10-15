@@ -16,6 +16,9 @@ rust-version = { workspace = true }
 # `move-value-view` is only named inside the `MoveValueView` derive's expansion.
 ignored = ['move-value-view', 'poem-openapi']
 
+[package.metadata.cargo-shear]
+ignored = ["move-value-view", "poem-openapi"]
+
 [features]
 default = []
 testing = ["aptos-crypto/fuzzing"]

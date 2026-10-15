@@ -34,5 +34,4 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
-aptos-crypto-derive = { workspace = true }
 rand = { workspace = true }

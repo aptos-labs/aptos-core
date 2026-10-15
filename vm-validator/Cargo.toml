@@ -38,5 +38,4 @@ aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
-move-vm-types = { workspace = true, features = ["testing"] }
 rand = { workspace = true }

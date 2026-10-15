@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes", "ark-std"]
 
+[package.metadata.cargo-shear]
+ignored = ["ark-std"]
+
 [features]
 default = []
 fuzzing = [
@@ -110,15 +113,14 @@ tokio-retry = { workspace = true }
 tokio-stream = { workspace = true }
 
 [dev-dependencies]
-aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
-aptos-executor-test-helpers = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-netcore = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-safety-rules = { workspace = true, features = ["testing"] }
+aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm = { workspace = true, features = ["fuzzing"] }
@@ -127,7 +129,6 @@ mockall = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-tempfile = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"

@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["aptos-crypto", "aptos-move-stdlib"]
 
+[package.metadata.cargo-shear]
+ignored = ["aptos-crypto", "aptos-move-stdlib"]
+
 [lib]
 doctest = false
 
@@ -31,7 +34,6 @@ testing = [
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework-natives = { workspace = true }
-aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-release-bundle = { workspace = true }
 aptos-sdk-builder = { workspace = true }
@@ -55,7 +57,6 @@ move-prover-boogie-backend = { workspace = true }
 move-prover-bytecode-pipeline = { workspace = true }
 move-prover-lab = { workspace = true }
 move-stackless-bytecode = { workspace = true }
-move-vm-runtime = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
@@ -63,14 +64,12 @@ tempfile = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-crypto = { workspace = true, features = ["fuzzing"] }
-aptos-gas-meter = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
-claims = { workspace = true }
 move-prover = { workspace = true }
 move-prover-test-utils = { workspace = true }
 move-unit-test = { workspace = true }
-move-vm-types = { workspace = true, features = ["testing"] }
+move-vm-runtime = { workspace = true }
 regex = { workspace = true }

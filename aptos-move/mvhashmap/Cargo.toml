@@ -38,6 +38,5 @@ fail = { workspace = true, features = ["failpoints"] }
 move-vm-runtime = { workspace = true }
 num_cpus = { workspace = true }
 proptest = { workspace = true }
-proptest-derive = { workspace = true }
 rayon = { workspace = true }
 test-case = { workspace = true }

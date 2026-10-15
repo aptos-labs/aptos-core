@@ -15,6 +15,9 @@ rust-version = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["bcs"]
 
+[package.metadata.cargo-shear]
+ignored = ["bcs"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }

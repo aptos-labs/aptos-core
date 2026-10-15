@@ -34,11 +34,9 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-time-service = { workspace = true, features = ["testing"] }
-claims = { workspace = true }
 maplit = { workspace = true }
 mockall = { workspace = true }
 rand = { workspace = true }

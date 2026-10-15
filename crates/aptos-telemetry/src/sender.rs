@@ -457,7 +457,7 @@ mod tests {
         mock.assert();
 
         // Should call the server once and cache the key
-        assert_eq!(mock.hits(), 1);
+        assert_eq!(mock.calls(), 1);
         assert!(result1.is_ok());
         assert_eq!(result1.unwrap(), private_key.public_key());
         assert!(result2.is_ok());
@@ -466,7 +466,7 @@ mod tests {
         client.reset_token();
 
         let result3 = client.server_public_key().await;
-        assert_eq!(mock.hits(), 2);
+        assert_eq!(mock.calls(), 2);
         assert!(result3.is_ok());
         assert_eq!(result3.unwrap(), private_key.public_key());
     }
@@ -557,7 +557,7 @@ mod tests {
             .try_send_custom_metrics(event_name.into(), telemetry_dump)
             .await;
 
-        mock.assert_hits(1);
+        mock.assert_calls(1);
         assert_eq!(
             APTOS_TELEMETRY_SERVICE_SUCCESS
                 .with_label_values(&[event_name])
@@ -601,7 +601,7 @@ mod tests {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
                 .path("/api/v1/ingest/metrics")
-                .body(String::from_utf8_lossy(&expected_compressed_bytes));
+                .is_true(move |req| req.body_ref() == expected_compressed_bytes.as_slice());
             then.status(200);
         });
 
@@ -636,7 +636,7 @@ mod tests {
             when.method("POST")
                 .header("Authorization", "Bearer SECRET_JWT_TOKEN")
                 .path("/api/v1/ingest/logs")
-                .body(String::from_utf8_lossy(&expected_compressed_bytes));
+                .is_true(move |req| req.body_ref() == expected_compressed_bytes.as_slice());
             then.status(200);
         });
 

@@ -29,6 +29,5 @@ thiserror = { workspace = true }
 ureq = { workspace = true }
 
 [dev-dependencies]
-aptos-proptest-helpers = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }

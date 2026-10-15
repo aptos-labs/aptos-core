@@ -29,7 +29,4 @@ serde_yaml = { workspace = true }
 textwrap = { workspace = true }
 
 [dev-dependencies]
-aptos-cached-packages = { workspace = true }
-aptos-framework = { workspace = true }
 tempfile = { workspace = true }
-which = { workspace = true }

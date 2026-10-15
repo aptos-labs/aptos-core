@@ -43,4 +43,3 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 maplit = { workspace = true }
-tokio-stream = { workspace = true }
