@@ -440,19 +440,27 @@ impl CommitPipeline {
         for block in self.pending_commit_blocks.values() {
             block.wait_for_commit_ledger().await;
         }
+        // Storage futures are not abortable and can still await their parents.
+        // Cancel the entire suffix (including queued blocks) before waiting:
+        // entries are unordered, so waiting on a child here can prevent us from
+        // ever reaching the parent whose cancellation would unblock it.
+        let mut aborted = vec![];
         for entry in self.entries.values() {
             for block in &entry.blocks {
                 if let Some(futures) = block.abort_pipeline() {
-                    futures.wait_until_finishes().await;
+                    aborted.push(futures);
                 }
             }
         }
         while let Ok(Some(blocks)) = self.block_rx.try_next() {
             for block in blocks.ordered_blocks {
                 if let Some(futures) = block.abort_pipeline() {
-                    futures.wait_until_finishes().await;
+                    aborted.push(futures);
                 }
             }
+        }
+        for futures in aborted {
+            futures.wait_until_finishes().await;
         }
         // Cancel only observation of execution/signing; these never own storage work.
         self.completions = FuturesUnordered::new();
@@ -619,3 +627,7 @@ fn reply(
         let _ = sender.send(Ok(bytes.into()));
     }
 }
+
+#[cfg(test)]
+#[path = "tests/commit_pipeline_reset_tests.rs"]
+mod reset_tests;
