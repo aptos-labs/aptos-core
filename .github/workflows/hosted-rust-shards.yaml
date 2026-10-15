@@ -101,7 +101,7 @@ jobs:
           set -o pipefail
           cargo nextest run --binaries-metadata target/nextest/binaries-metadata.json \
             --cargo-metadata target/nextest/cargo-metadata.json --workspace-remap . --profile ci \
-            -E 'binary(aptos-cargo-cli::selection_cli) | (package(aptos-enum-conversion-derive) & test(test_enum_conversion_derive_invalid)) | (package(aptos-network) & test(ping_success_resets_fail_counter))' \
+            -E '(package(aptos-cargo-cli) & binary(selection_cli)) | (package(aptos-enum-conversion-derive) & test(test_enum_conversion_derive_invalid)) | (package(aptos-network) & test(ping_success_resets_fail_counter))' \
             --retries 0 --no-fail-fast 2>&1 | tee archive-probes.log
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
