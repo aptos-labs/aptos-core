@@ -29,11 +29,14 @@
 \maketitle
 
 \begin{abstract}
-Formal verification suffers from the cost of specification: to establish high-level facts, contracts have to be written for supporting functions, many of them mechanical and low-level.
-Specification inference promises to automatically derive such contracts from the program.
-We present a hybrid of agentic and mechanical inference for Move, a smart contract language similar to Rust, integrated with the Move Prover.
-An agent controls inference and verification through a tool that, besides calling the Move Prover, derives specifications from code by weakest-precondition analysis (\WP).
-We evaluate the approach on 26 non-trivial verification targets, 24 of them extracted from public Move code of the Aptos framework that has no specification, under a frontier model and a mid-tier model of the same family (Sol~5.6 and Terra~5.6). With and without \WP, the agent completes over 90\% of the tasks, so agentic inference is effective on its own; adding \WP\ lowers its cost by 11--21\% overall and by 40--64\% on targets without loops.
+Adoption of formal verification has long been hindered by the cost of manual specification.
+To prove high-level properties, one must also write contracts for supporting functions, many of which are mechanical and low-level.
+Specification inference automatically derives such contracts from the program.
+We present a hybrid of mechanical and agentic inference for Move, a smart contract language, integrated into its verifier, the Move Prover.
+A large language model (LLM) agent drives inference and verification through a tool that calls the Move Prover and derives specifications from code by weakest-precondition (\WP) analysis.
+We evaluate our approach on 26 targets, 24 of them extracted from public Move functions of the Aptos framework that have no specifications, under a frontier model and a mid-tier model of the same family (Sol~5.6 and Terra~5.6).
+With and without \WP, the agent completes over 90\% of its runs, so agentic inference is effective on its own.
+Adding \WP\ lowers its cost by 11--21\% overall and by 40--64\% on targets without loops.
 
 	\keywords{Specification inference \and Weakest precondition \and Reference elimination \and LLM agents \and Move Prover}
 \end{abstract}
@@ -46,7 +49,7 @@ We evaluate the approach on 26 non-trivial verification targets, 24 of them extr
 \input{conclusion}
 
 \subsubsection*{Data Availability Statement.}
-The corpus is published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}: the package extracted from a pinned commit of the Aptos repository, the reference specifications, and both mutant sets.
+The corpus is published with the inference plugin at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}: the package extracted from a pinned commit of the Aptos repository, the reference specifications, and the mutants.
 The round archives behind every table and figure --- per-cell costs, token counters, wall times, and mutant outcomes --- and the scripts that produce them from the archives are published there as well; \Anon{\cite{SpecInferenceCorpus}}{\cite{MoveFlowAnon}} explains how to verify the corpus, re-score a round, and rerun the experiment.
 
 \subsubsection*{Use of AI Tools.}
@@ -58,13 +61,13 @@ Parts of the text of this paper were drafted and edited with a coding agent\Anon
 \Section{Per-Target Results}
 \label{sec:appendix}
 
-Tables~\ref{tab:sol} and~\ref{tab:terra} give, for each target and arm, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification killed every withheld mutant in all four replicates (\Checkmark) or a mutant survived (\XSolidBrush, subscripted with the count where more than one replicate failed); $\circ$ marks an unmeasured cell.
+Tables~\ref{tab:sol} and~\ref{tab:terra} give, for each target and tactic, the mean cost per cell over the four replicates, mean input/output tokens in thousands (I/O k), the hybrid mean cost as a percentage of agent-only (vs. agent), and whether the specification killed every withheld mutant in all four replicates (\Checkmark) or a mutant survived (\XSolidBrush, subscripted with the count where more than one replicate failed); $\circ$ marks an unmeasured cell.
 Input counts include cached tokens.
 The targets above the middle rule have no loop that needs an invariant.
 
 \begin{sidewaystable}
 \centering
-\caption{Sol~5.6 by target. Summed over the 26 targets the arms cost \$36.72, \$31.67, and \$31.81.}
+\caption{Sol~5.6 by target. Summed over the 26 targets, the tactics cost \$36.72, \$31.67, and \$31.81.}
 \label{tab:sol}
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}
@@ -73,7 +76,7 @@ The targets above the middle rule have no loop that needs an invariant.
 
 \begin{sidewaystable}
 \centering
-\caption{Terra~5.6 by target. Summed over the 26 targets the arms cost \$21.05, \$16.71, and \$18.79.}
+\caption{Terra~5.6 by target. Summed over the 26 targets, the tactics cost \$21.05, \$16.71, and \$18.79.}
 \label{tab:terra}
 \scriptsize
 \setlength{\tabcolsep}{2.2pt}

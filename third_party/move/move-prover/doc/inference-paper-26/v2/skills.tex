@@ -1,14 +1,14 @@
 % !TEX root = main.tex
-\Section{The Agent Side}
+\Section{Agentic Inference}
 \label{sec:skills}
 
-The agentic side of the workflow is a plugin for a coding agent: skills that instruct it, hooks that check generated Move as it is written, and the Move toolchain exposed via a local MCP server. The hooks run after every edit of a Move file: they parse the file, check its specification expressions, reject deprecated Move~1 constructs, and format the source, so that syntactic slips are caught before a verification run is spent on them. The plugin is rendered per tactic from one source; the setup is at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}, and the evaluation of Sec.~\ref{sec:evaluation} runs the rendered plugin under the Codex CLI, which receives the skills inline with the task and the tools through the MCP server. We summarize the design.
+The agentic side of the workflow is a plugin for a coding agent: skills that instruct it, hooks that check generated Move as it is written, and the Move toolchain exposed via a local MCP server. The hooks run after every edit of a Move file: they parse the file, check its specification expressions, reject deprecated Move~1 constructs, and format the source, so that syntactic slips are caught before a verification run is spent on them. The plugin is rendered per tactic from one source; the setup is at~\Anon{\cite{MoveFlow}}{\cite{MoveFlowAnon}}, and the evaluation of \S~\ref{sec:evaluation} runs the rendered plugin under the Codex CLI, which receives the skills inline with the task and the tools through the MCP server. We summarize the design.
 
 \Paragraph{Inference tactics}
 Inference runs in one of three \emph{tactics}, which differ in whether the \WP tool is available and who decides when to use it.
 \begin{Itemize}
 \item \emph{agent-only:} \WP is unavailable. The contract and any loop invariants are derived directly from the implementation and the contracts of its dependencies, checked as the work proceeds.
-\item \emph{hybrid-guided:} the workflow of Sec.~\ref{sec:example}, prescribed as a fixed order --- run \WP over the scope, take one warned function and write an invariant from the loop-invariant evidence (Sec.~\ref{sec:diagnostics}), rerun \WP on that function alone until the warning is gone, then check.
+\item \emph{hybrid-guided:} the workflow of \S~\ref{sec:example}, prescribed as a fixed order --- run \WP over the scope, take one warned function and write an invariant from the loop-invariant evidence (\S~\ref{sec:diagnostics}), rerun \WP on that function alone until the warning is gone, then check.
 \item \emph{hybrid-flexible:} \WP is available as a tool, and the agent decides whether and when to call it and how to combine it with its own reasoning.
 \end{Itemize}
 
