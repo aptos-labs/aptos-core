@@ -32,8 +32,20 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
+      run_freshness: ${{ steps.classify_event.outputs.run_freshness }}
+      run_targeted_tests: ${{ steps.classify_event.outputs.run_targeted_tests }}
+      run_full_tests: ${{ steps.classify_event.outputs.run_full_tests }}
     steps:
       - uses: actions/checkout@v4
+      - name: Test Lint+Test event classification
+        run: python3 -m unittest discover -s .github/scripts -p 'test_classify_lint_event.py'
+      - name: Classify Lint+Test event
+        id: classify_event
+        run: python3 .github/scripts/classify_lint_event.py
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_REF_NAME: ${{ github.ref_name }}
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -87,12 +99,9 @@ jobs:
       - run: echo "Skipping cargo deny! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Check the freshness of the merge base. This is a PR required job.
+  # Skip release freshness checks: cherry-picks don't advance the merge base.
   rust-check-merge-base:
-    if: | # Don't run on release branches
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
+    if: needs.file_change_determinator.outputs.run_freshness == 'true'
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
@@ -106,12 +115,8 @@ jobs:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run only the targeted rust unit tests. This is a PR required job.
   rust-targeted-unit-tests:
-    if: | # Don't run on release branches. Instead, all unit tests will be triggered.
-      (
-        !contains(github.event.pull_request.base.ref, '-release-')
-      )
+    if: needs.file_change_determinator.outputs.run_targeted_tests == 'true'
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
@@ -131,14 +136,9 @@ jobs:
           DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  # Run all rust unit tests. This is not a PR required job.
   rust-unit-tests:
-    if: | # Only run when an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.base.ref, '-release-')
-      )
+    needs: file_change_determinator
+    if: needs.file_change_determinator.outputs.run_full_tests == 'true'
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
