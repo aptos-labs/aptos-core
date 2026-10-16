@@ -37,11 +37,9 @@ jobs:
       run_full_tests: ${{ steps.classify_event.outputs.run_full_tests }}
     steps:
       - uses: actions/checkout@v4
-      - name: Test Lint+Test event classification
-        run: python3 -m unittest discover -s .github/scripts -p 'test_classify_lint_event.py'
       - name: Classify Lint+Test event
         id: classify_event
-        run: python3 .github/scripts/classify_lint_event.py
+        run: python3 .github/actions/lint-test-classifier/classify_lint_event.py
         env:
           CI_EVENT_NAME: ${{ github.event_name }}
           CI_BASE_REF: ${{ github.base_ref }}
