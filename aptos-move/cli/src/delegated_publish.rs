@@ -3,7 +3,7 @@
 
 use aptos_cli_common::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
-use aptos_framework::chunked_publish::PositionedChunk;
+use aptos_framework::chunked_publish::{PositionedChunk, CHUNK_SIZE_IN_BYTES};
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
@@ -39,13 +39,17 @@ pub(crate) fn open_staging(
 
 /// Stage only the selected chunks (possibly the missing subset of a resumed upload).
 /// Never appends a publish transaction: finalization is separately signed by B.
-/// Size accounting matches the existing positional splitter: sum of chunk bytes per batch.
+/// The limit is on raw chunk bytes per batch (not the serialized transaction size),
+/// as in the existing positional splitter. The latter adds BCS and entry-function overhead.
 pub(crate) fn stage_chunks(
     address: AccountAddress,
     chunks: Vec<PositionedChunk>,
     chunk_size: usize,
 ) -> Vec<TransactionPayload> {
-    assert!(chunk_size > 0, "chunk size must be nonzero");
+    assert!(
+        (1..=CHUNK_SIZE_IN_BYTES).contains(&chunk_size),
+        "chunk size must be in 1..={CHUNK_SIZE_IN_BYTES}"
+    );
     let mut result = Vec::new();
     let mut parts = Vec::new();
     let mut indices = Vec::new();
@@ -254,6 +258,36 @@ mod tests {
                 .map(|c| (c.part, c.index))
                 .collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn delegated_publish_batches_respect_raw_chunk_budget_at_boundary() {
+        let module = address("0xcafe");
+        let chunks = vec![
+            PositionedChunk {
+                part: 0,
+                index: 0,
+                bytes: vec![1; CHUNK_SIZE_IN_BYTES],
+            },
+            PositionedChunk {
+                part: 1,
+                index: 0,
+                bytes: vec![2; 1],
+            },
+        ];
+        let payloads = stage_chunks(module, chunks, CHUNK_SIZE_IN_BYTES);
+        assert_eq!(payloads.len(), 2);
+        for (payload, expected) in payloads.iter().zip([CHUNK_SIZE_IN_BYTES, 1]) {
+            let args = entry(payload, module, "stage_chunks").args();
+            let bytes: Vec<Vec<u8>> = bcs::from_bytes(&args[2]).unwrap();
+            assert_eq!(bytes.iter().map(Vec::len).sum::<usize>(), expected);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "chunk size must be in")]
+    fn delegated_publish_rejects_oversized_batch_budget() {
+        stage_chunks(address("0xcafe"), vec![], CHUNK_SIZE_IN_BYTES + 1);
     }
 
     #[test]
