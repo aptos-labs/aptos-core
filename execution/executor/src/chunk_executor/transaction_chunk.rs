@@ -3,7 +3,7 @@
 
 use crate::{
     chunk_executor::chunk_onchain_config,
-    metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
+    metrics::{CHUNK_DISCARDED_OUTPUTS, CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},
     workflow::do_get_execution_output::DoGetExecutionOutput,
 };
 use anyhow::Result;
@@ -35,6 +35,7 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
+#[derive(Clone)]
 pub struct TransactionChunk {
     pub first_version: Version,
     pub transactions: Vec<Transaction>,
@@ -52,6 +53,57 @@ impl TransactionChunk {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    pub fn next_version(&self) -> Version {
+        self.first_version + self.len() as Version
+    }
+
+    /// Appends the transactions that immediately follow.
+    pub fn append(&mut self, other: Self) {
+        assert_eq!(self.next_version(), other.first_version);
+
+        self.transactions.extend(other.transactions);
+        self.persisted_aux_info.extend(other.persisted_aux_info);
+        self.transaction_infos.extend(other.transaction_infos);
+        self.transaction_outputs =
+            match (self.transaction_outputs.take(), other.transaction_outputs) {
+                (Some(mut outputs), Some(other_outputs)) => {
+                    outputs.extend(other_outputs);
+                    Some(outputs)
+                },
+                // Without outputs for all the transactions, they all have to be executed.
+                (outputs, other_outputs) => {
+                    let num_discarded =
+                        outputs.map_or(0, |o| o.len()) + other_outputs.map_or(0, |o| o.len());
+                    CHUNK_DISCARDED_OUTPUTS.inc_by(num_discarded as u64);
+                    None
+                },
+            };
+    }
+
+    /// Splits off the transactions after the last block end, i.e. the last `TransactionInfo`
+    /// with a state checkpoint hash. They can't be executed until the rest of the block comes.
+    pub fn split_off_partial_block(&mut self) -> Option<Self> {
+        let num_txns_in_blocks = self
+            .transaction_infos
+            .iter()
+            .rposition(TransactionInfo::has_state_checkpoint_hash)
+            .map_or(0, |idx| idx + 1);
+        (num_txns_in_blocks < self.len()).then(|| self.split_off(num_txns_in_blocks))
+    }
+
+    fn split_off(&mut self, at: usize) -> Self {
+        Self {
+            first_version: self.first_version + at as Version,
+            transactions: self.transactions.split_off(at),
+            persisted_aux_info: self.persisted_aux_info.split_off(at),
+            transaction_infos: self.transaction_infos.split_off(at),
+            transaction_outputs: self
+                .transaction_outputs
+                .as_mut()
+                .map(|outputs| outputs.split_off(at)),
+        }
     }
 
     pub fn into_output<V: VMBlockExecutor>(
