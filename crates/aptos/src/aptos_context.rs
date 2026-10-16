@@ -932,9 +932,16 @@ mod tests {
             } else {
                 payload
             };
+            // SDK builders set the raw sequence to MAX for an orderless transaction;
+            // the sequence argument is only a hint supplied to the signer.
+            let raw_sequence = if self.nonce_mode {
+                u64::MAX
+            } else {
+                sequence_number
+            };
             let transaction = RawTransaction::new(
                 AccountAddress::ONE,
-                sequence_number,
+                raw_sequence,
                 payload,
                 max_gas,
                 100,
@@ -1083,9 +1090,34 @@ mod tests {
             .unwrap();
         assert!(outcomes.iter().all(|outcome| outcome.is_ok()));
         assert_eq!(chain.calls().signed, vec![(FIRST, 5000); 4]);
+        assert_eq!(chain.calls().submitted, vec![u64::MAX; 4]);
         let nonces: std::collections::HashSet<u64> =
             chain.calls().submitted_nonces.iter().copied().collect();
         assert_eq!(nonces.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn nonce_group_estimates_each_payload_independently() {
+        let chain = FakeChain {
+            nonce_mode: true,
+            ..FakeChain::new()
+        };
+        let settings = GroupSettings {
+            replay_protection_type: ReplayProtectionType::Nonce,
+            ..settings(None)
+        };
+        let outcomes = submit_group(&chain, &settings, FIRST, payloads(3))
+            .await
+            .unwrap();
+        assert!(outcomes.iter().all(|outcome| outcome.is_ok()));
+        assert_eq!(chain.calls().estimated, vec![0, 1, 2]);
+        assert_eq!(chain.calls().signed, vec![
+            (FIRST, 2000),
+            (FIRST, 2001),
+            (FIRST, 2002)
+        ]);
+        assert_eq!(chain.calls().submitted, vec![u64::MAX; 3]);
+        assert_eq!(chain.calls().submitted_nonces.len(), 3);
     }
 
     #[tokio::test]
