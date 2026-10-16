@@ -1,10 +1,14 @@
-/// A one-use, multi-transaction verifier for Tinfoil v3 envelopes carrying
-/// legacy FormatV2 (`codeReferences`) collateral. The newer FormatV3
-/// (`configReferences`) protocol needs separate verifier stages and is rejected
-/// by the native parser until those stages are implemented.
-/// Each uploaded fragment is untrusted evidence. Intel and Sigstore roots come only
-/// from effective quorum-observed chain state, and repositories are approved
-/// by Aptos framework governance.
+/// An object-based, multi-transaction verifier for Tinfoil v3 envelopes
+/// carrying legacy FormatV2 (`codeReferences`) collateral. Each object stores
+/// one complete submitted report; `advance_verification` performs one bounded
+/// proof stage and records CONTINUE, FAIL or PASS. The older challenge and
+/// fragment entry points remain available for compatibility.
+/// The newer FormatV3 (`configReferences`) protocol needs separate verifier
+/// stages and is rejected by the native parser until implemented. Intel and
+/// Sigstore roots come only from quorum-observed chain state, and repositories
+/// are approved by Aptos framework governance.
+/// A business contract must bind the authenticated TLS/HPKE key and challenge
+/// to its worker identity. Any account can submit a copy of another report.
 module aptos_framework::tinfoil_v3 {
     use std::bcs;
     use std::error;
@@ -15,6 +19,7 @@ module aptos_framework::tinfoil_v3 {
     use aptos_std::table_with_length::TableWithLength;
     use aptos_framework::chain_id;
     use aptos_framework::event::emit;
+    use aptos_framework::object;
     use aptos_framework::randomness;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -34,6 +39,8 @@ module aptos_framework::tinfoil_v3 {
     const ENOT_READY_FOR_CLEANUP: u64 = 11;
     const EWRONG_STAGE: u64 = 12;
     const ETRUST_ROOT_CHANGED: u64 = 13;
+    const EUNKNOWN_VERIFICATION: u64 = 14;
+    const EVERIFICATION_NOT_PASSED: u64 = 15;
 
     const INTEL_ROOT_TARGET: vector<u8> = b"intel_sgx_root_ca";
     const SIGSTORE_ROOT_TARGET: vector<u8> = b"sigstore_trusted_root";
@@ -43,6 +50,11 @@ module aptos_framework::tinfoil_v3 {
     const TLS_SPKI_SHA256_BYTES: u64 = 32;
     const MAX_CHUNK_BYTES: u64 = 48 * 1024;
     const MAX_DOCUMENT_BYTES: u64 = 4 * 1024 * 1024;
+    /// Native verification charges for the complete object on each advance.
+    /// Larger inputs cannot fit the normal transaction execution gas budget.
+    const MAX_VERIFICATION_BYTES: u64 = 256 * 1024;
+    const MAX_INLINE_VERIFICATION_BYTES: u64 = 48 * 1024;
+    const MAX_VERIFICATION_CHUNKS: u64 = 6;
     const MAX_STAGE_BYTES: u64 = 1024 * 1024;
     const MAX_CHUNKS: u64 = 96;
     const MAX_CLEANUP_CHUNKS_PER_CALL: u64 = 8;
@@ -54,6 +66,70 @@ module aptos_framework::tinfoil_v3 {
     const STAGE_PLATFORM: u8 = 3;
     const STAGE_PLATFORM_FRESHNESS: u8 = 4;
     const STAGE_COMPLETE: u8 = 5;
+    const STAGE_UPLOAD: u8 = 6;
+    const VERIFICATION_CONTINUE: u8 = 0;
+    const VERIFICATION_FAIL: u8 = 1;
+    const VERIFICATION_PASS: u8 = 2;
+
+    /// Result codes carried by `VerificationAdvanced`. These are diagnostic;
+    /// consumers should make authorization decisions from the status and
+    /// authenticated fields, not from this code.
+    const REASON_NONE: u8 = 0;
+    const REASON_INVALID_PROOF: u8 = 1;
+    const REASON_REPOSITORY_REVOKED: u8 = 2;
+    const REASON_TRUST_ROOT_CHANGED: u8 = 3;
+    const REASON_UNSUPPORTED_GPU_BINDING: u8 = 4;
+    const REASON_EXPIRED: u8 = 5;
+
+    /// The first stage returns both the authenticated CPU quote and the
+    /// untrusted routing hints extracted from the same full document. A later
+    /// Sigstore stage must authenticate `claimed_repo` before it is a claim.
+    struct QuoteOutcome has drop {
+        nonce: vector<u8>,
+        claimed_repo: vector<u8>,
+        quote: QuoteStage,
+    }
+
+    /// A sticky, untransferable object created by `new_verification`. The
+    /// submitted bytes and creator never change. Only the verifier's own stage
+    /// state advances. No object capability is retained by the creator.
+    struct Verification has key {
+        creator: address,
+        /// A small, one-transaction report lives inline. Larger reports live
+        /// in distinct table entries, each below the per-write state limit.
+        attestation: vector<u8>,
+        chunks: TableWithLength<u64, vector<u8>>,
+        attestation_sha3_256: vector<u8>,
+        expected_bytes: u64,
+        uploaded_chunks: u64,
+        uploaded_bytes: u64,
+        status: u8,
+        stage: u8,
+        proof_time_secs: u64,
+        nonce: vector<u8>,
+        claimed_repo: vector<u8>,
+        intel_root_sha3_256: vector<u8>,
+        sigstore_root_sha3_256: vector<u8>,
+        quote: Option<QuoteStage>,
+        code: Option<CodeStage>,
+        platform: Option<PlatformStage>,
+        result: Option<VerifiedTinfoilV3Result>,
+    }
+
+    #[event]
+    struct VerificationCreated has drop, store {
+        creator: address,
+        verification: address,
+        attestation_sha3_256: vector<u8>,
+    }
+
+    #[event]
+    struct VerificationAdvanced has drop, store {
+        verification: address,
+        status: u8,
+        next_stage: u8,
+        reason: u8,
+    }
 
     struct ChallengeMaterial has drop {
         domain: vector<u8>,
@@ -194,6 +270,532 @@ module aptos_framework::tinfoil_v3 {
         owner: address,
         request_id: u64,
         completed_stage: u8,
+    }
+
+    /// Submit one complete Atlas attestation up to 48 KiB. The event exposes the address
+    /// of the untransferable object containing these exact bytes and its
+    /// verification state. Larger reports use the chunked constructor below.
+    /// Accepted package bytes are either bare Tinfoil JSON or
+    /// `b"APTOS-TINFOIL-V3\0" || bcs(PackageV1 { version: 1,
+    /// tinfoil_document: vector<u8>, nras_detached_eat: vector<u8> })`.
+    /// Callers do not choose the object's address.
+    public entry fun new_verification(creator: &signer, attestation: vector<u8>) {
+        assert!(!attestation.is_empty()
+            && attestation.length() <= MAX_INLINE_VERIFICATION_BYTES,
+            error::invalid_argument(EINVALID_REQUEST));
+        let bytes = attestation.length();
+        let digest = hash::sha3_256(copy attestation);
+        create_verification(creator, attestation, bytes, digest, STAGE_QUOTE);
+    }
+
+    /// Start the same object flow when a report exceeds the transaction size.
+    /// The declared byte length and digest are fixed at creation. Only the
+    /// creator may append chunks; no verification can start until sealing.
+    public entry fun new_verification_chunked(
+        creator: &signer, expected_bytes: u64, expected_sha3_256: vector<u8>,
+    ) {
+        assert!(expected_bytes > 0 && expected_bytes <= MAX_VERIFICATION_BYTES
+            && expected_sha3_256.length() == 32,
+            error::invalid_argument(EINVALID_REQUEST));
+        create_verification(
+            creator, vector[], expected_bytes, expected_sha3_256, STAGE_UPLOAD,
+        );
+    }
+
+    fun create_verification(
+        creator: &signer,
+        attestation: vector<u8>,
+        expected_bytes: u64,
+        attestation_sha3_256: vector<u8>,
+        stage: u8,
+    ): address {
+        let creator_address = creator.address_of();
+        let constructor = object::create_sticky_object(creator_address);
+        let verification = constructor.address_from_constructor_ref();
+        constructor.set_untransferable();
+        let object_signer = constructor.generate_signer();
+        move_to(&object_signer, Verification {
+            creator: creator_address,
+            attestation,
+            chunks: table_with_length::new(),
+            attestation_sha3_256: copy attestation_sha3_256,
+            expected_bytes,
+            uploaded_chunks: 0,
+            uploaded_bytes: if (stage == STAGE_QUOTE) { expected_bytes } else { 0 },
+            status: VERIFICATION_CONTINUE,
+            stage,
+            proof_time_secs: 0,
+            nonce: vector[],
+            claimed_repo: vector[],
+            intel_root_sha3_256: vector[],
+            sigstore_root_sha3_256: vector[],
+            quote: option::none(),
+            code: option::none(),
+            platform: option::none(),
+            result: option::none(),
+        });
+        emit(VerificationCreated { creator: creator_address, verification, attestation_sha3_256 });
+        verification
+    }
+
+    /// Append one bounded chunk to an unsealed report. The report becomes
+    /// immutable after `seal_verification` verifies its declared digest.
+    public entry fun append_verification_chunk(
+        creator: &signer, verification: address, chunk: vector<u8>,
+    ) {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        assert!(!chunk.is_empty() && chunk.length() <= MAX_CHUNK_BYTES,
+            error::invalid_argument(EINVALID_REQUEST));
+        let state = &mut Verification[verification];
+        assert!(state.creator == creator.address_of() && state.stage == STAGE_UPLOAD
+            && state.status == VERIFICATION_CONTINUE,
+            error::permission_denied(EINVALID_REQUEST));
+        assert!(state.uploaded_chunks < MAX_VERIFICATION_CHUNKS
+            && state.uploaded_bytes + chunk.length() <= state.expected_bytes,
+            error::resource_exhausted(EINVALID_REQUEST));
+        state.uploaded_bytes += chunk.length();
+        state.chunks.add(state.uploaded_chunks, chunk);
+        state.uploaded_chunks += 1;
+    }
+
+    /// Seal the uploaded bytes, or durably FAIL if they do not match the
+    /// declared digest. The object then uses exactly `advance_verification`.
+    public entry fun seal_verification(creator: &signer, verification: address) {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        let state = &Verification[verification];
+        assert!(state.creator == creator.address_of() && state.stage == STAGE_UPLOAD
+            && state.status == VERIFICATION_CONTINUE,
+            error::permission_denied(EINVALID_REQUEST));
+        assert!(state.uploaded_bytes == state.expected_bytes,
+            error::invalid_state(EINVALID_REQUEST));
+        let digest = hash::sha3_256(full_attestation(state));
+        if (digest != state.attestation_sha3_256) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        Verification[verification].stage = STAGE_QUOTE;
+        emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+    }
+
+    /// Execute exactly one bounded verification stage. Anyone may advance an
+    /// object, so progress does not depend on its creator staying online.
+    /// `VerificationAdvanced` tells the submitter to continue, or that the
+    /// object has reached a durable FAIL/PASS state.
+    public entry fun advance_verification(_caller: &signer, verification: address) {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        let status = Verification[verification].status;
+        if (status != VERIFICATION_CONTINUE) {
+            emit_progress(verification, status, REASON_NONE);
+            return
+        };
+        let stage = Verification[verification].stage;
+        if (stage == STAGE_UPLOAD) {
+            emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+        } else if (stage == STAGE_QUOTE) {
+            advance_quote_verification(verification);
+        } else if (stage == STAGE_CODE) {
+            advance_code_verification(verification);
+        } else if (stage == STAGE_CODE_FRESHNESS) {
+            advance_code_freshness_verification(verification);
+        } else if (stage == STAGE_PLATFORM) {
+            advance_platform_verification(verification);
+        } else if (stage == STAGE_PLATFORM_FRESHNESS) {
+            advance_platform_freshness_verification(verification);
+        } else {
+            fail_verification(verification, REASON_INVALID_PROOF);
+        };
+    }
+
+    fun advance_quote_verification(verification: address) {
+        let intel_opt = trust_observation::get_effective_value(INTEL_ROOT_TARGET);
+        let sigstore_opt = trust_observation::get_effective_value(SIGSTORE_ROOT_TARGET);
+        if (intel_opt.is_none() || sigstore_opt.is_none()) {
+            emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+            return
+        };
+        let intel_root = intel_opt.extract();
+        let sigstore_root = sigstore_opt.extract();
+        if (intel_root.is_empty() || sigstore_root.is_empty()) {
+            emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+            return
+        };
+        let proof_time_secs = timestamp::now_seconds();
+        let attestation = full_attestation(&Verification[verification]);
+        let outcome_opt = try_verify_tinfoil_v3_quote(
+            attestation, proof_time_secs, copy intel_root,
+        );
+        if (outcome_opt.is_none()) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        let QuoteOutcome { nonce, claimed_repo, quote } = outcome_opt.extract();
+        if (nonce.length() != 32 || claimed_repo.is_empty()
+            || claimed_repo.length() > MAX_REPOSITORY_BYTES || !valid_quote_claims(&quote)) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        if (!is_repository_approved(copy claimed_repo)) {
+            fail_verification(verification, REASON_REPOSITORY_REVOKED);
+            return
+        };
+        let state = &mut Verification[verification];
+        state.nonce = nonce;
+        state.claimed_repo = claimed_repo;
+        state.proof_time_secs = proof_time_secs;
+        state.intel_root_sha3_256 = hash::sha3_256(intel_root);
+        state.sigstore_root_sha3_256 = hash::sha3_256(sigstore_root);
+        state.quote.fill(quote);
+        state.stage = STAGE_CODE;
+        emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+    }
+
+    fun advance_code_verification(verification: address) {
+        if (!object_policy_still_valid(verification)) { return };
+        let state = &Verification[verification];
+        let sigstore_root = trust_observation::get_effective_value(SIGSTORE_ROOT_TARGET).extract();
+        let code_opt = try_verify_tinfoil_v3_code(
+            full_attestation(state), state.nonce, state.claimed_repo, sigstore_root,
+            *state.quote.borrow(),
+        );
+        if (code_opt.is_none()) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        let code = code_opt.extract();
+        if (code.repo != state.claimed_repo || code.digest.length() != 32
+            || code.tag.is_empty() || code.commit.length() != 40) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        let state = &mut Verification[verification];
+        state.code.fill(code);
+        state.stage = STAGE_CODE_FRESHNESS;
+        emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+    }
+
+    fun advance_code_freshness_verification(verification: address) {
+        if (!object_policy_still_valid(verification)) { return };
+        let state = &Verification[verification];
+        let sigstore_root = trust_observation::get_effective_value(SIGSTORE_ROOT_TARGET).extract();
+        let valid = try_verify_tinfoil_v3_code_freshness(
+            full_attestation(state), state.nonce, state.proof_time_secs, sigstore_root,
+            *state.quote.borrow(), *state.code.borrow(),
+        );
+        if (!valid) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        Verification[verification].stage = STAGE_PLATFORM;
+        emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+    }
+
+    fun advance_platform_verification(verification: address) {
+        if (!object_policy_still_valid(verification)) { return };
+        let state = &Verification[verification];
+        let sigstore_root = trust_observation::get_effective_value(SIGSTORE_ROOT_TARGET).extract();
+        let platform_opt = try_verify_tinfoil_v3_platform(
+            full_attestation(state), state.nonce, state.proof_time_secs, sigstore_root,
+            *state.quote.borrow(), *state.code.borrow(),
+        );
+        if (platform_opt.is_none()) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        let platform = platform_opt.extract();
+        if (platform.digest.length() != 32 || platform.measurement_id.is_empty()) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        let state = &mut Verification[verification];
+        state.platform.fill(platform);
+        state.stage = STAGE_PLATFORM_FRESHNESS;
+        emit_progress(verification, VERIFICATION_CONTINUE, REASON_NONE);
+    }
+
+    fun advance_platform_freshness_verification(verification: address) {
+        if (!object_policy_still_valid(verification)) { return };
+        let state = &Verification[verification];
+        let sigstore_root = trust_observation::get_effective_value(SIGSTORE_ROOT_TARGET).extract();
+        let valid = try_verify_tinfoil_v3_platform_freshness(
+            full_attestation(state), state.nonce, state.proof_time_secs, sigstore_root,
+            *state.quote.borrow(), *state.platform.borrow(),
+        );
+        if (!valid) {
+            fail_verification(verification, REASON_INVALID_PROOF);
+            return
+        };
+        let quote = *state.quote.borrow();
+        let code = *state.code.borrow();
+        let platform = *state.platform.borrow();
+        // An NRAS EAT has no signed digest of the CPU-bound raw GPU evidence.
+        // Until a sound binding is specified, GPU-bearing reports fail closed.
+        if (code.shape_gpus > 0) {
+            fail_verification(verification, REASON_UNSUPPORTED_GPU_BINDING);
+            return
+        };
+        let claims = VerifiedTinfoilV3Claims {
+            tls_spki_sha256: quote.tls_spki_sha256,
+            hpke_key: quote.hpke_key,
+            release_digest: code.digest,
+            trusted_repo: code.repo,
+            nonce: state.nonce,
+            mrtd: quote.mrtd,
+            rtmr0: quote.rtmr0,
+            rtmr1: quote.rtmr1,
+            rtmr2: quote.rtmr2,
+            rtmr3: quote.rtmr3,
+            tcb_status: quote.tcb_status,
+            release_tag: code.tag,
+            release_commit: code.commit,
+            platform_measurement_id: platform.measurement_id,
+            shape_gpus: code.shape_gpus,
+        };
+        let result = VerifiedTinfoilV3Result {
+            request_id: 0,
+            verified_at_secs: state.proof_time_secs,
+            intel_root_sha3_256: state.intel_root_sha3_256,
+            sigstore_root_sha3_256: state.sigstore_root_sha3_256,
+            claims,
+        };
+        let state = &mut Verification[verification];
+        state.result.fill(result);
+        state.stage = STAGE_COMPLETE;
+        state.status = VERIFICATION_PASS;
+        emit_progress(verification, VERIFICATION_PASS, REASON_NONE);
+    }
+
+    fun object_policy_still_valid(verification: address): bool {
+        let proof_time_secs = Verification[verification].proof_time_secs;
+        let now = timestamp::now_seconds();
+        if (now < proof_time_secs || now - proof_time_secs > MAX_RESULT_AGE_SECS) {
+            fail_verification(verification, REASON_EXPIRED);
+            return false
+        };
+        if (!object_roots_match(verification)) {
+            fail_verification(verification, REASON_TRUST_ROOT_CHANGED);
+            return false
+        };
+        if (!is_repository_approved(Verification[verification].claimed_repo)) {
+            fail_verification(verification, REASON_REPOSITORY_REVOKED);
+            return false
+        };
+        true
+    }
+
+    fun object_roots_match(verification: address): bool {
+        let state = &Verification[verification];
+        let intel_opt = trust_observation::get_effective_value(INTEL_ROOT_TARGET);
+        let sigstore_opt = trust_observation::get_effective_value(SIGSTORE_ROOT_TARGET);
+        if (intel_opt.is_none() || sigstore_opt.is_none()) { return false };
+        hash::sha3_256(intel_opt.extract()) == state.intel_root_sha3_256
+            && hash::sha3_256(sigstore_opt.extract()) == state.sigstore_root_sha3_256
+    }
+
+    fun full_attestation(state: &Verification): vector<u8> {
+        if (state.uploaded_chunks == 0) { return *(&state.attestation) };
+        let bytes = vector[];
+        let index = 0;
+        while (index < state.uploaded_chunks) {
+            bytes.append(*state.chunks.borrow(index));
+            index += 1;
+        };
+        bytes
+    }
+
+    fun valid_quote_claims(quote: &QuoteStage): bool {
+        quote.report_data.length() == 64
+            && quote.tls_spki_sha256.length() == 32
+            && quote.hpke_key.length() == 32
+            && quote.quote_sha256.length() == 32
+            && quote.mrtd.length() == 48
+            && quote.rtmr0.length() == 48
+            && quote.rtmr1.length() == 48
+            && quote.rtmr2.length() == 48
+            && quote.rtmr3.length() == 48
+    }
+
+    fun fail_verification(verification: address, reason: u8) {
+        Verification[verification].status = VERIFICATION_FAIL;
+        emit_progress(verification, VERIFICATION_FAIL, reason);
+    }
+
+    fun emit_progress(verification: address, status: u8, reason: u8) {
+        emit(VerificationAdvanced {
+            verification,
+            status,
+            next_stage: Verification[verification].stage,
+            reason,
+        });
+    }
+
+    #[view]
+    /// 0 = CONTINUE, 1 = FAIL, 2 = PASS. Unknown addresses abort.
+    public fun verification_status(verification: address): u8 {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        Verification[verification].status
+    }
+
+    #[view]
+    /// Next internal stage. Stage 6 means a chunked report is still uploading.
+    public fun verification_stage(verification: address): u8 {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        Verification[verification].stage
+    }
+
+    #[view]
+    public fun verification_creator(verification: address): address {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        Verification[verification].creator
+    }
+
+    #[view]
+    /// This commits to the submitted bytes. It does not authenticate them.
+    public fun submitted_attestation_sha3_256(verification: address): vector<u8> {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        Verification[verification].attestation_sha3_256
+    }
+
+    #[view]
+    /// The bytes are available through the object and this bounded chunk view.
+    /// Index zero returns the inline document for a one-transaction object.
+    public fun submitted_attestation_chunk(verification: address, index: u64): vector<u8> {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        let state = &Verification[verification];
+        if (state.uploaded_chunks == 0) {
+            assert!(index == 0 && !state.attestation.is_empty(),
+                error::invalid_argument(EINVALID_REQUEST));
+            *(&state.attestation)
+        } else {
+            assert!(index < state.uploaded_chunks,
+                error::invalid_argument(EINVALID_REQUEST));
+            *state.chunks.borrow(index)
+        }
+    }
+
+    #[view]
+    public fun submitted_attestation_chunk_count(verification: address): u64 {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        let state = &Verification[verification];
+        if (state.uploaded_chunks == 0 && !state.attestation.is_empty()) {
+            1
+        } else {
+            state.uploaded_chunks
+        }
+    }
+
+    #[view]
+    /// True only while the PASS result is recent and its observed roots and
+    /// repository approval still match the values used by verification.
+    public fun is_current_verification(verification: address, max_age_secs: u64): bool {
+        if (max_age_secs > MAX_RESULT_AGE_SECS || !exists<Verification>(verification)
+            || Verification[verification].status != VERIFICATION_PASS) { return false };
+        let state = &Verification[verification];
+        let result = state.result.borrow();
+        let now = timestamp::now_seconds();
+        now >= result.verified_at_secs
+            && now - result.verified_at_secs <= max_age_secs
+            && is_repository_approved(result.claims.trusted_repo)
+            && object_roots_match(verification)
+    }
+
+    fun passed_result(verification: address): VerifiedTinfoilV3Result {
+        assert!(exists<Verification>(verification),
+            error::not_found(EUNKNOWN_VERIFICATION));
+        assert!(Verification[verification].status == VERIFICATION_PASS
+            && Verification[verification].result.is_some(),
+            error::invalid_state(EVERIFICATION_NOT_PASSED));
+        assert!(is_current_verification(verification, MAX_RESULT_AGE_SECS),
+            error::invalid_state(EVERIFICATION_NOT_PASSED));
+        *Verification[verification].result.borrow()
+    }
+
+    #[view]
+    public fun verified_report(verification: address): VerifiedTinfoilV3Result {
+        passed_result(verification)
+    }
+
+    #[view]
+    public fun verified_tls_spki_sha256(verification: address): vector<u8> {
+        passed_result(verification).claims.tls_spki_sha256
+    }
+
+    #[view]
+    public fun verified_hpke_key(verification: address): vector<u8> {
+        passed_result(verification).claims.hpke_key
+    }
+
+    #[view]
+    public fun verified_release_digest(verification: address): vector<u8> {
+        passed_result(verification).claims.release_digest
+    }
+
+    #[view]
+    public fun verified_trusted_repo(verification: address): vector<u8> {
+        passed_result(verification).claims.trusted_repo
+    }
+
+    #[view]
+    public fun verified_nonce(verification: address): vector<u8> {
+        passed_result(verification).claims.nonce
+    }
+
+    #[view]
+    public fun verified_mrtd(verification: address): vector<u8> {
+        passed_result(verification).claims.mrtd
+    }
+
+    #[view]
+    public fun verified_rtmr0(verification: address): vector<u8> {
+        passed_result(verification).claims.rtmr0
+    }
+
+    #[view]
+    public fun verified_rtmr1(verification: address): vector<u8> {
+        passed_result(verification).claims.rtmr1
+    }
+
+    #[view]
+    public fun verified_rtmr2(verification: address): vector<u8> {
+        passed_result(verification).claims.rtmr2
+    }
+
+    #[view]
+    public fun verified_rtmr3(verification: address): vector<u8> {
+        passed_result(verification).claims.rtmr3
+    }
+
+    #[view]
+    public fun verified_tcb_status(verification: address): vector<u8> {
+        passed_result(verification).claims.tcb_status
+    }
+
+    #[view]
+    public fun verified_release_tag(verification: address): vector<u8> {
+        passed_result(verification).claims.release_tag
+    }
+
+    #[view]
+    public fun verified_release_commit(verification: address): vector<u8> {
+        passed_result(verification).claims.release_commit
+    }
+
+    #[view]
+    public fun verified_platform_measurement_id(verification: address): vector<u8> {
+        passed_result(verification).claims.platform_measurement_id
+    }
+
+    #[view]
+    public fun verified_shape_gpus(verification: address): u64 {
+        passed_result(verification).claims.shape_gpus
     }
 
     /// Governance explicitly enables or revokes a GitHub repository. This
@@ -685,6 +1287,50 @@ module aptos_framework::tinfoil_v3 {
         intel_root_der: vector<u8>,
     ): QuoteStage;
 
+    /// These object-flow natives return ordinary invalid evidence as none or
+    /// false, allowing `advance_verification` to persist a FAIL state. Runtime
+    /// failures such as exhausted gas still abort the transaction.
+    native fun try_verify_tinfoil_v3_quote(
+        attestation: vector<u8>,
+        proof_time_secs: u64,
+        intel_root_der: vector<u8>,
+    ): Option<QuoteOutcome>;
+
+    native fun try_verify_tinfoil_v3_code(
+        attestation: vector<u8>,
+        nonce: vector<u8>,
+        trusted_repo: vector<u8>,
+        sigstore_root_json: vector<u8>,
+        quote: QuoteStage,
+    ): Option<CodeStage>;
+
+    native fun try_verify_tinfoil_v3_code_freshness(
+        attestation: vector<u8>,
+        nonce: vector<u8>,
+        proof_time_secs: u64,
+        sigstore_root_json: vector<u8>,
+        quote: QuoteStage,
+        code: CodeStage,
+    ): bool;
+
+    native fun try_verify_tinfoil_v3_platform(
+        attestation: vector<u8>,
+        nonce: vector<u8>,
+        proof_time_secs: u64,
+        sigstore_root_json: vector<u8>,
+        quote: QuoteStage,
+        code: CodeStage,
+    ): Option<PlatformStage>;
+
+    native fun try_verify_tinfoil_v3_platform_freshness(
+        attestation: vector<u8>,
+        nonce: vector<u8>,
+        proof_time_secs: u64,
+        sigstore_root_json: vector<u8>,
+        quote: QuoteStage,
+        platform: PlatformStage,
+    ): bool;
+
     native fun verify_tinfoil_v3_code(
         fragment: vector<u8>,
         nonce: vector<u8>,
@@ -893,5 +1539,71 @@ module aptos_framework::tinfoil_v3 {
         assert!(first != second, 5);
         set_repository_approved(framework, b"tinfoilsh/example", false);
         assert!(!is_repository_approved(b"tinfoilsh/example"), 6);
+    }
+
+    #[test(creator = @0x42)]
+    fun test_verification_object_contains_immutable_inline_report(creator: &signer) {
+        let document = b"a small submitted report";
+        let digest = hash::sha3_256(copy document);
+        let address = create_verification(
+            creator, copy document, document.length(), copy digest, STAGE_QUOTE,
+        );
+        assert!(verification_creator(address) == creator.address_of(), 1);
+        assert!(verification_status(address) == VERIFICATION_CONTINUE, 2);
+        assert!(submitted_attestation_sha3_256(address) == digest, 3);
+        assert!(submitted_attestation_chunk(address, 0) == document, 4);
+        assert!(submitted_attestation_chunk_count(address) == 1, 5);
+        assert!(object::address_to_object<Verification>(address).is_untransferable(), 6);
+    }
+
+    #[test(creator = @0x42)]
+    fun test_chunked_object_stores_separate_entries(creator: &signer) {
+        let chunk = filled_byte(7, MAX_CHUNK_BYTES);
+        let document = vector[];
+        for (_i in 0..5) { document.append(copy chunk); };
+        let digest = hash::sha3_256(copy document);
+        let address = create_verification(
+            creator, vector[], document.length(), digest, STAGE_UPLOAD,
+        );
+        for (_i in 0..5) {
+            append_verification_chunk(creator, address, copy chunk);
+        };
+        assert!(Verification[address].attestation.is_empty(), 1);
+        assert!(submitted_attestation_chunk_count(address) == 5, 2);
+        assert!(submitted_attestation_chunk(address, 4) == chunk, 3);
+        seal_verification(creator, address);
+        assert!(verification_stage(address) == STAGE_QUOTE, 4);
+        assert!(verification_status(address) == VERIFICATION_CONTINUE, 5);
+    }
+
+    #[test(creator = @0x42)]
+    #[expected_failure(abort_code = 0x10008, location = Self)]
+    fun test_chunked_object_rejects_unadvanceable_size(creator: &signer) {
+        new_verification_chunked(
+            creator, MAX_VERIFICATION_BYTES + 1, filled_byte(0, 32),
+        );
+    }
+
+    #[test(framework = @aptos_framework, creator = @0x42)]
+    fun test_invalid_object_proof_is_durable_fail(framework: &signer, creator: &signer) {
+        setup_roots_for_test(framework);
+        let document = b"malformed attestation";
+        let address = create_verification(
+            creator, copy document, document.length(), hash::sha3_256(document), STAGE_QUOTE,
+        );
+        advance_verification(creator, address);
+        assert!(verification_status(address) == VERIFICATION_FAIL, 1);
+        advance_verification(creator, address);
+        assert!(verification_status(address) == VERIFICATION_FAIL, 2);
+    }
+
+    #[test(creator = @0x42)]
+    #[expected_failure(abort_code = 0x3000F, location = Self)]
+    fun test_verified_getter_rejects_unfinished_object(creator: &signer) {
+        let document = b"not verified";
+        let address = create_verification(
+            creator, copy document, document.length(), hash::sha3_256(document), STAGE_QUOTE,
+        );
+        verified_tls_spki_sha256(address);
     }
 }
