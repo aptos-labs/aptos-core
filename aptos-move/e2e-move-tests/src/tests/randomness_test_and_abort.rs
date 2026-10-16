@@ -11,10 +11,147 @@ use aptos_types::{
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
 use claims::assert_ok;
-use move_core_types::{ident_str, language_storage::ModuleId, vm_status::AbortLocation};
+use move_core_types::{
+    ident_str,
+    language_storage::{ModuleId, TypeTag},
+    parser::parse_struct_tag,
+    vm_status::AbortLocation,
+};
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 // Error codes from randomness module.
 const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
+
+#[derive(Serialize)]
+struct ApprovedRepositories {
+    entries: Vec<Vec<u8>>,
+}
+
+#[derive(Deserialize)]
+struct TinfoilChallengeIssued {
+    owner: AccountAddress,
+    request_id: u64,
+    nonce: Vec<u8>,
+    trusted_repo: Vec<u8>,
+    expires_at_secs: u64,
+}
+
+#[derive(Deserialize)]
+struct GoogleSpaceChallengeIssued {
+    owner: AccountAddress,
+    request_id: u64,
+    nonce: Vec<u8>,
+    expires_at_secs: u64,
+}
+
+#[test]
+fn tinfoil_v3_private_random_begin_transaction() {
+    let mut h = MoveHarness::new();
+    set_randomness_seed(&mut h);
+    h.set_default_gas_unit_price(100);
+    h.set_max_gas_per_txn(100_000);
+
+    let repo = b"tinfoilsh/example".to_vec();
+    h.set_resource(
+        AccountAddress::ONE,
+        parse_struct_tag("0x1::tinfoil_v3::ApprovedRepositories").unwrap(),
+        &ApprovedRepositories {
+            entries: vec![repo.clone()],
+        },
+    );
+    let owner = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let event_tag = TypeTag::from_str("0x1::tinfoil_v3::ChallengeIssued").unwrap();
+
+    let issue_challenge = |h: &mut MoveHarness| {
+        let txn = h.create_entry_function(
+            &owner,
+            "0x1::tinfoil_v3::begin_entry".parse().unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(&repo).unwrap(),
+                bcs::to_bytes(&vec![1u8; 32]).unwrap(),
+                bcs::to_bytes(&60u64).unwrap(),
+            ],
+        );
+        let output = h.run_raw(txn);
+        assert_success!(output.status().to_owned());
+        let event = output
+            .events()
+            .iter()
+            .find(|event| event.type_tag() == &event_tag)
+            .expect("begin_entry must emit a challenge");
+        bcs::from_bytes::<TinfoilChallengeIssued>(event.v2().unwrap().event_data()).unwrap()
+    };
+
+    let first = issue_challenge(&mut h);
+    assert_eq!(first.owner, *owner.address());
+    assert_eq!(first.request_id, 0);
+    assert_eq!(first.nonce.len(), 32);
+    assert_eq!(first.trusted_repo, repo);
+    assert!(first.expires_at_secs > 0);
+
+    assert_success!(h.run_entry_function(
+        &owner,
+        "0x1::tinfoil_v3::cancel".parse().unwrap(),
+        vec![],
+        vec![],
+    ));
+    let second = issue_challenge(&mut h);
+    assert_eq!(second.request_id, 1);
+    assert_eq!(second.nonce.len(), 32);
+    assert_ne!(first.nonce, second.nonce);
+}
+
+#[test]
+fn google_space_private_random_begin_transaction() {
+    let mut h = MoveHarness::new();
+    set_randomness_seed(&mut h);
+    h.set_default_gas_unit_price(100);
+    h.set_max_gas_per_txn(100_000);
+
+    let owner = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let event_tag = TypeTag::from_str("0x1::google_space::ChallengeIssued").unwrap();
+    let issue_challenge = |h: &mut MoveHarness| {
+        let txn = h.create_entry_function(
+            &owner,
+            "0x1::google_space::begin_entry".parse().unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(&b"test-audience".to_vec()).unwrap(),
+                bcs::to_bytes(&b"sha256:test-image".to_vec()).unwrap(),
+                bcs::to_bytes(&vec![1u8; 32]).unwrap(),
+                bcs::to_bytes(&60u64).unwrap(),
+            ],
+        );
+        let output = h.run_raw(txn);
+        assert_success!(output.status().to_owned());
+        let event = output
+            .events()
+            .iter()
+            .find(|event| event.type_tag() == &event_tag)
+            .expect("begin_entry must emit a challenge");
+        bcs::from_bytes::<GoogleSpaceChallengeIssued>(event.v2().unwrap().event_data()).unwrap()
+    };
+
+    let first = issue_challenge(&mut h);
+    assert_eq!(first.owner, *owner.address());
+    assert_eq!(first.request_id, 0);
+    assert_eq!(first.nonce.len(), 64);
+    assert!(first.nonce.iter().all(u8::is_ascii_hexdigit));
+    assert!(first.expires_at_secs > 0);
+
+    assert_success!(h.run_entry_function(
+        &owner,
+        "0x1::google_space::cancel".parse().unwrap(),
+        vec![],
+        vec![],
+    ));
+    let second = issue_challenge(&mut h);
+    assert_eq!(second.request_id, 1);
+    assert_eq!(second.nonce.len(), 64);
+    assert_ne!(first.nonce, second.nonce);
+}
 
 #[test]
 fn test_and_abort_defense_is_sound_and_correct() {
