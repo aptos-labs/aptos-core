@@ -1,0 +1,123 @@
+% Slide-deck prelude.
+% Palette, fonts, and listing styles follow the FMCAD'26 deck in
+% third_party/move/move-prover/doc/higher-order-paper-26/talk.
+
+\usepackage{xcolor}
+% Deck palette: one primary blue, used for title bars, boxes, and keywords.
+\definecolor{mBlue}{RGB}{28,73,137}
+\definecolor{mNavy}{RGB}{16,42,88}   % full-bleed frames: cover and standout
+\definecolor{mRust}{RGB}{176,84,32}  % Rust-side components in diagrams
+\definecolor{mRed}{RGB}{190,30,45}   % agreement (semantic equivalence) in diagrams
+\colorlet{codebg}{mBlue!9}           % frameless tinted background for listings
+\usepackage{listings}
+\usepackage[T1]{fontenc}
+\usepackage[sfdefault,lining]{FiraSans}
+\usepackage[scale=0.85,lining]{FiraMono}
+% Code in the medium weight of Fira Mono, so listings hold up against Fira Sans.
+\newcommand{\codefont}{\ttfamily\fontseries{medium}\selectfont}
+\usepackage{amsmath,amssymb,array}
+\usepackage{xspace}
+\usepackage{tikz}
+\usepackage{fontawesome5}
+\usetikzlibrary{arrows.meta,positioning,shapes.misc,calc,fit,backgrounds}
+
+% Names
+\newcommand{\LIR}{\textsf{VIR}\xspace}
+\newcommand{\MVP}{\textsf{MVP}\xspace}
+
+% Diagram styles. Rounded boxes are processes, sharp boxes are artifacts;
+% blue is Lean (Verex), rust is the Rust code base, grey is external.
+\tikzset{
+  proc/.style={draw=mBlue, thick, rounded corners=3pt, fill=mBlue!15,
+               minimum height=7mm, minimum width=1.9cm, align=center, inner sep=3pt},
+  rproc/.style={proc, draw=mRust, fill=mRust!12},
+  ext/.style={proc, draw=black!55, fill=black!8},
+  art/.style={draw=mBlue, thick, fill=white, minimum height=6mm,
+              minimum width=1.6cm, align=center, inner sep=2pt, font=\scriptsize},
+  rart/.style={art, draw=mRust},
+  arr/.style={-{Latex[length=2mm]}, thick, mNavy},
+  rarr/.style={arr, mRust},
+  feed/.style={arr, dashed},
+  lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+  group/.style={draw=mBlue, dashed, rounded corners=4pt, inner sep=5pt},
+  rgroup/.style={group, draw=mRust},
+  gtitle/.style={font=\scriptsize\bfseries, mNavy},
+  rgtitle/.style={gtitle, text=mRust},
+  swatch/.style={draw=mBlue, thick, minimum height=3mm, minimum width=3mm, inner sep=0pt},
+  legend/.style={font=\scriptsize, anchor=west, inner sep=2pt},
+}
+
+% Code
+\lstdefinestyle{CodeStyle}{
+    basicstyle=\codefont,
+    keywordstyle=\color{mBlue},
+    commentstyle=\color{gray}\normalfont\itshape,
+    escapechar=@,
+    breaklines=true, upquote=true,
+    columns=fullflexible, keepspaces=true,
+    literate={<=}{{$\leq$}}2 {>=}{{$\geq$}}2 {!=}{{$\neq$}}2 {==>}{{$\Longrightarrow$}}3,
+}
+
+\lstdefinelanguage{Move}{
+    morekeywords={
+        abort, aborts_if, acquires, address, as, assert, assume, break, const,
+        continue, copy, drop, else, ensures, exists, false, forall, friend, fun,
+        global, has, if, in, invariant, key, let, loop, match, modifies, module,
+        move, mut, native, old, pragma, public, requires, return, spec, store,
+        struct, true, u8, u64, u128, u256, use, while},
+    sensitive=true,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+}
+
+\lstdefinelanguage{Rust}{
+    morekeywords={fn, pub, if, else, let, mut, return, while, loop, match, struct, enum, impl, u8, u32, u64, bool},
+    sensitive=true,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+}
+
+\lstdefinelanguage{Lean}{
+    morekeywords={
+        theorem, def, by, fun, let, have, show, from, at, with, match, do,
+        leaner, module, namespace, where, struct, entry, public, spec, verify, requires,
+        ensures, aborts_if, modifies, case, exists, global, old, simp, omega},
+    sensitive=true,
+    morecomment=[l]{--},
+}
+
+% Only | as short inline delimiter, without keyword highlighting since it also
+% sets commands and paths; frames using it must be fragile.
+\lstMakeShortInline[style=CodeStyle]|
+
+% Frameless tinted box around display listings.
+\lstdefinestyle{CodeBox}{
+    backgroundcolor=\color{codebg},
+    frame=single, framerule=0pt, rulecolor=\color{codebg},
+    framesep=3pt, xleftmargin=3pt, xrightmargin=3pt,
+    aboveskip=\smallskipamount, belowskip=\smallskipamount,
+}
+
+\lstnewenvironment{MoveSmall}{
+    \lstset{language=Move, style=CodeStyle, style=CodeBox, basicstyle=\scriptsize\codefont}
+}{}
+
+\lstnewenvironment{LeanSmall}{
+    \lstset{language=Lean, style=CodeStyle, style=CodeBox, basicstyle=\scriptsize\codefont}
+}{}
+
+\lstnewenvironment{RustSmall}{
+    \lstset{language=Rust, style=CodeStyle, style=CodeBox, basicstyle=\scriptsize\codefont}
+}{}
+
+\lstnewenvironment{ShellSmall}{
+    \lstset{style=CodeStyle, style=CodeBox, basicstyle=\scriptsize\codefont, keywordstyle=\color{black}}
+}{}
+
+% Highlight box for take-aways.
+\newcommand{\takeaway}[2][0.9\textwidth]{%
+  \par\smallskip
+  \centerline{\begin{tikzpicture}
+    \node[draw=mBlue, thick, rounded corners, inner sep=5pt,
+          text width=#1, fill=mBlue!8]{#2};
+  \end{tikzpicture}}\par}

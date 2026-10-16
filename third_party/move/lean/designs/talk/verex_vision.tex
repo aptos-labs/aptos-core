@@ -1,0 +1,322 @@
+% Move Summit 2026, internal: the Verex vision, after the whitepaper
+% "Verex: Verified Execution" (verex_doc.pdf).
+% Build: latexmk verex_vision.tex
+\documentclass[aspectratio=169,11pt]{beamer}
+\usetheme[progressbar=frametitle,numbering=fraction,block=fill]{metropolis}
+\input{prelude-talk.tex}
+
+\setbeamercolor{frametitle}{bg=mNavy, fg=white}
+\setbeamercolor{progress bar}{fg=mBlue!70!white, bg=mBlue!15}
+\makeatletter\setlength{\metropolis@progressinheadfoot@linewidth}{2.5pt}\makeatother
+\setbeamercolor{palette primary}{bg=mNavy, fg=white}
+\setbeamercolor{normal text}{fg=mBlue!25!black}
+\setbeamercolor{alerted text}{fg=mBlue}
+\setbeamerfont{frametitle}{size=\large}
+% Metropolis sizes the title page to \paperheight, which overfills the frame by
+% a fixed amount; use \textheight instead.
+\makeatletter
+\setbeamertemplate{title page}{
+  \begin{minipage}[b][\dimexpr\textheight-12pt\relax]{\textwidth}
+    \vfill%
+    \ifx\inserttitle\@empty\else\usebeamertemplate*{title}\fi
+    \ifx\insertsubtitle\@empty\else\usebeamertemplate*{subtitle}\fi
+    \usebeamertemplate*{title separator}
+    \ifx\beamer@shortauthor\@empty\else\usebeamertemplate*{author}\fi
+    \ifx\insertdate\@empty\else\usebeamertemplate*{date}\fi
+    \ifx\insertinstitute\@empty\else\usebeamertemplate*{institute}\fi
+    \vfill
+  \end{minipage}
+}
+\makeatother
+\setbeamertemplate{title}{\centering\linespread{1.0}\inserttitle\par\vspace*{0.5em}}
+\setbeamertemplate{subtitle}{\centering\insertsubtitle\par\vspace*{0.5em}}
+\setbeamertemplate{author}{\vspace*{2em}\centering\insertauthor\par\vspace*{0.25em}}
+\setbeamertemplate{institute}{\vspace*{3mm}\centering\insertinstitute\par}
+\setbeamersize{text margin left=1.5em,text margin right=1.5em}
+% No footline; the frame number sits right-aligned in the title bar.
+\setbeamertemplate{footline}{}
+\setbeamertemplate{navigation symbols}{}
+\usepackage{appendixnumberbeamer}
+\makeatletter
+% Metropolis resets the frametitle template at \appendix, so the template is
+% wrapped in a macro and re-applied there.
+\newcommand{\talkframetitle}{%
+  \setbeamertemplate{frametitle}{%
+    \nointerlineskip%
+  \begin{beamercolorbox}[wd=\paperwidth, sep=0pt,
+      leftskip=\metropolis@frametitle@padding, rightskip=\metropolis@frametitle@padding]{frametitle}%
+  \metropolis@frametitlestrut@start%
+  \insertframetitle%
+  \nolinebreak%
+  \hfill{\normalfont\small\insertframenumber/\inserttotalframenumber}%
+  \metropolis@frametitlestrut@end%
+  \end{beamercolorbox}%
+  }%
+  \addtobeamertemplate{frametitle}{}{\usebeamertemplate*{progress bar in head/foot}}%
+}
+\makeatother
+\talkframetitle
+
+% Table columns: ragged-right paragraph of a given width.
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\yes}{\textcolor{mBlue}{\faCheck}}
+\newcommand{\no}{\textcolor{black!45}{\faTimes}}
+\newcommand{\partly}{\textcolor{mRust}{\faAdjust}}
+
+\title{Verex: Verified Execution}
+\subtitle{\small Vision\quad$\cdot$\quad Move Summit 2026 (internal)}
+\author{Wolfgang Grieskamp}
+\institute{Aptos Labs}
+\date{}
+
+\begin{document}
+
+{
+  \setbeamercolor{background canvas}{bg=mNavy}
+  \setbeamercolor{normal text}{fg=white}
+  \setbeamercolor{title separator}{fg=mNavy!40!white}
+  \usebeamercolor[fg]{normal text}
+  \maketitle
+}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{The problem}
+  \begin{itemize}\setlength{\itemsep}{6pt}
+    \item Critical software is produced faster than people can review it: AI writes it, agents run it, AI-assisted auditing finds every flaw.
+    \item Assurance today is a chain of trusted components: developer, reviewer, compiler, analysis tools, runtime. Each is a single point of failure.
+    \item Memory-safe languages trust the compiler. Sandboxes see untyped bytes. Verifiers say nothing about bugs in compiler or runtime.
+  \end{itemize}
+  \takeaway{How to run code nobody fully trusts, with guarantees that survive a bug in any one component?}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{The product: Verex}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item Teams write ordinary Rust; Verex verifies and runs it.
+        \item Any language with ownership and borrowing; Move, the origin, included.
+        \item Proofs before deployment, independent checks during execution.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{What owners get}
+      \begin{itemize}\setlength{\itemsep}{2pt}\small
+        \item Mathematical proofs, not only tests
+        \item Independent redundancy of the checks
+        \item Containment of untrusted code
+        \item Defined failure instead of silent corruption
+        \item Reproducible execution, bit for bit
+        \item Bounded, metered resources
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \takeaway{Run code you do not trust, and know what it can and cannot do.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Design principle: no single trusted component}
+  \begingroup\centering
+  \begin{tikzpicture}[font=\scriptsize, x=1cm, y=1cm,
+      stage/.style={proc, minimum width=2.3cm, minimum height=8mm}]
+    \node[art, draw=black!60, minimum width=2.0cm, minimum height=8mm] (src) at (0,0) {Source\\Move or Rust};
+    \node[ext, minimum width=2.0cm, minimum height=8mm] (cc) at (2.7,0) {Compiler\\\emph{untrusted}};
+    \node[stage] (bv) at (5.6,0) {Bytecode verifier\\at load time};
+    \node[stage] (rc) at (8.5,0) {Runtime checks\\during execution};
+    \node[stage] (vm) at (11.4,0) {MonoVM\\deterministic, metered};
+    \node[stage] (pv) at (2.7,1.3) {Prover\\before deployment};
+    \draw[arr] (src) -- (cc);
+    \draw[arr] (cc) -- (bv);
+    \draw[arr] (bv) -- (rc);
+    \draw[arr] (rc) -- (vm);
+    \draw[arr] (src.north) |- (pv.west);
+    \draw[feed] (pv.east) -| node[pos=0.25, lbl] {proved properties} (vm.north);
+  \end{tikzpicture}
+  \par\endgroup
+  \medskip
+  \begin{itemize}\setlength{\itemsep}{4pt}
+    \item Every safety invariant (typing, resources, references, memory) is established at least twice, by independent implementations.
+    \item The bytecode verifier trusts nothing from the compiler; the runtime checks trust nothing from the verifier.
+    \item Possible because the type system makes safety checkable on bytecode, and references never alias.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Supply chain attacks and deployment modes}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Injected code}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item Arrives through the tools the platform does not trust.
+        \item Cannot forge an authorization token, duplicate an asset, or reach a value it holds no reference to.
+        \item Type and resource safety bound the damage.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{Two deployment modes}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item \textbf{MonoVM}: all layers in place.
+        \item \textbf{Native}: for real-time loops and numeric kernels; proofs hold, the native compiler is trusted.
+        \item MonoVM stays for simulation, differential testing and shadow execution.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{The platform today}
+  Implemented and open source in the Aptos code base; years of production with billions of dollars at stake.
+  \medskip
+  \begin{itemize}\setlength{\itemsep}{4pt}
+    \item \textbf{Move}: Rust-like types, first-class functions, linear resources, borrow discipline.
+    \item \textbf{Move Prover}: contracts and invariants, SMT and Lean, fast enough for CI.
+    \item \textbf{Bytecode verifier}: typing, abilities and references at load time.
+    \item \textbf{Runtime safety checks}: the same, with separate code; stopped real exploits that passed the verifier.
+    \item \textbf{MonoVM}: monomorphized code, flat values, 30--50$\times$ faster; validated by mainnet replay.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Extending the platform to Rust}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Why it fits}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item Sequential safe Rust and Move enforce the same aliasing rule.
+        \item So Rust compiles to bytecode whose safety stays checkable; Wasm and native code discard it.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{The subset}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item Sequential and deterministic, including floating point.
+        \item Recursive types, interior mutability and raw pointers included.
+        \item Everything else is rejected with a diagnostic.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \medskip
+  \textbf{Four bytecode extensions}, from borrow-checked MIR
+  \begin{itemize}\setlength{\itemsep}{2pt}\small
+    \item References inside structs: lifetime parameters, checked by the verifier.
+    \item Recursive types through |Box| and |Rc|, heap objects in MonoVM.
+    \item Interior mutability: native cells with dynamic borrow state.
+    \item Raw pointers with checked semantics.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[fragile]{Unsafe code under a checked memory model}
+  Native Rust: raw-pointer misuse is undefined behavior. Verex: every raw-pointer operation is checked.
+  \medskip
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item Strict provenance, allocation identities never reused, typed allocations.
+        \item Use after free, double free, out of bounds, invalid reinterpretation: a located abort.
+        \item Raw pointer to reference is a dynamic reborrow, checked like any reference.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}\setlength{\itemsep}{4pt}
+        \item The prover discharges the same conditions; where no check can fail, the VM skips it.
+        \item Purpose: reuse existing Rust crates without rewriting them.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Verification for Rust and numeric code}
+  \begin{itemize}\setlength{\itemsep}{6pt}
+    \item \textbf{Automated}: the Move Prover's methods carry over, since they rest on the shared reference discipline; SMT in CI.
+    \item \textbf{Kernel-checked}: the Lean-based verifier proves a contract as a theorem about the program's semantics; absence of undefined behavior included.
+    \item \textbf{Specification inference}: abort and postconditions inferred mechanically, invariants and intent with AI. People review specifications instead of writing them.
+    \item \textbf{Numeric code}: specified over the reals with error bounds; deterministic floating point makes results reproducible.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Evidence to date}
+  \begin{itemize}\setlength{\itemsep}{6pt}
+    \item Prover in CI on the Aptos framework: block prologue, staking, metering, code deployment.
+    \item Runtime checks stopped proof-of-concept exploits that passed the static verifier.
+    \item Reference checker replayed billions of transactions without a false alarm.
+    \item Runtime check cost: about 10\% for types and abilities; 26--29\% for references, before optimization.
+    \item MonoVM: 30--50$\times$ the current Move VM on recorded blocks.
+  \end{itemize}
+  \medskip
+  Comparisons with WebAssembly runtimes and native Rust are in preparation.
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Application domains}
+  \begin{itemize}\setlength{\itemsep}{3pt}
+    \item \textbf{Agent-generated code}: metered, isolated, replayable, with inferred and proved properties.
+    \item \textbf{Financial logic}: settlement, clearing, risk limits, pricing; resources model assets, invariants express conservation.
+    \item \textbf{Safety-critical and defense}: proved control laws, bounded resources, reproducible numerics.
+    \item \textbf{Multi-party computation}: run a partner's or regulator's code without trusting their toolchain.
+    \item \textbf{Existing Rust}: plugins and libraries with unsafe internals, hardened without rewriting.
+  \end{itemize}
+  \takeaway{Adoption starts with one component where failure is most expensive, run next to the existing system.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Relation to existing approaches}
+  \small
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{@{}P{0.34\textwidth}cccc@{}}
+    & \textbf{Proves} & \textbf{Checks at load} & \textbf{Runtime checks} & \textbf{Deterministic} \\
+    \hline
+    \textbf{Verex} & \yes & \yes & \yes & \yes \\
+    Wasm runtimes & \no & \partly & \partly & \partly \\
+    JVM, CLR & \no & \yes & \partly & \no \\
+    Rust verifiers (Verus, Kani, \ldots) & \yes & \no & \no & \no \\
+    SPARK / Ada & \yes & \no & \partly & \no \\
+    K framework & \yes & \no & \partly & \partly \\
+    Miri & \no & \no & \partly & \no \\
+    zkVMs & \no & \no & \no & \yes \\
+  \end{tabular}
+  \par\medskip
+  \begin{itemize}\setlength{\itemsep}{2pt}
+    \item zkVMs prove that code ran, not that it is correct; complementary.
+    \item Specialized, not generic: every layer relies on the ownership discipline.
+  \end{itemize}
+  \par
+  {\footnotesize \yes\ yes\quad \partly\ partial, e.g.\ memory bounds only, or left to the embedder\quad \no\ no}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Roadmap}
+  \renewcommand{\arraystretch}{1.3}
+  \begin{tabular}{@{}P{0.16\textwidth}P{0.78\textwidth}@{}}
+    \textbf{0--4 months} & Rust Stage 0 pipeline; deterministic floating point; checked raw pointers in the Lean verifier; MonoVM standalone; benchmarks against Wasm and native; first design partners \\
+    \textbf{4--8 months} & Lifetime-annotated bytecode and recursive types; checked raw pointers in the VM; prover for the Rust subset; production reference checker; specification inference as a product \\
+    \textbf{8--14 months} & Lifetime-checked verifier for untrusted Rust bytecode; verified library models; compiler correctness for core fragments; ahead-of-time compilation; tool qualification groundwork \\
+  \end{tabular}
+  \par\medskip
+  {\small Assumes sufficient staffing.}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}{Open problems}
+  \begin{itemize}\setlength{\itemsep}{6pt}
+    \item \textbf{Sound lifetime checking of adversarial bytecode}: a new verifier algorithm is needed.
+    \item \textbf{Ecosystem coverage}: how much real Rust fits the subset.
+    \item \textbf{Fidelity for unsafe code}: no normative Rust memory model exists.
+    \item \textbf{Performance against native}: JIT or AOT from verified bytecode that keeps the runtime checks.
+    \item \textbf{Specification effort}: loop invariants and numeric error bounds remain hardest.
+    \item \textbf{Certification}: tool qualification and long-term support.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------------
+\begin{frame}[standout]
+  Questions?
+  \vspace{0.8em}
+
+  \small
+  Whitepaper: \emph{Verex: Verified Execution}, draft of Oct 6, 2026
+\end{frame}
+
+\end{document}
