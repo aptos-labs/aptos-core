@@ -1,7 +1,6 @@
 import json
 import shutil
 import subprocess
-import tarfile
 import tempfile
 import unittest
 from pathlib import Path
