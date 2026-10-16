@@ -90,13 +90,25 @@ PASS object alone does not prove who submitted or controls the attested keys.
 
 The currently supported Tinfoil input is the **v3 envelope with FormatV2
 collateral used by Atlas**. Newer `collateral_format=v3` config/runtime
-reports need separate verification logic. GPU-shaped reports do not reach
-`PASS` yet: an NVIDIA NRAS EAT signs an appraisal result and GPU identities,
-but the current producer does not bind those identities or the appraised raw
-GPU evidence to the raw GPU evidence in the CPU quote. Checking only a shared
-nonce and GPU count would allow evidence substitution. The offline NRAS EAT
-signature verifier is available as a building block; this cross-evidence
-binding must be established before the chain reports GPU verification.
+reports need separate verification logic. The NVIDIA appraisal is optional:
+a report with no detached NRAS EAT can reach `PASS` after CPU quote, code,
+platform, and quote-bound device-topology verification, even when its signed
+VM shape declares GPUs. In that case `verified_nvidia_gpu_attestation` returns
+`false`. The signed `shape_gpus` count and quote-bound raw device section do
+not by themselves establish NVIDIA GPU authenticity. A consuming contract
+that requires an independently authenticated GPU must check the NVIDIA flag,
+not just `shape_gpus`.
+
+If the caller supplies a nonempty detached NRAS EAT, the current object flow
+ends in `FAIL` with `REASON_UNSUPPORTED_GPU_BINDING`. An NVIDIA EAT signs an
+appraisal result and GPU identities, but the current producer does not bind
+those identities or the appraised raw GPU evidence to the raw GPU evidence in
+the CPU quote. Checking only a shared nonce and GPU count would allow evidence
+substitution. The offline NRAS EAT signature verifier is available as a
+building block; the cross-evidence binding and chain-observed NRAS JWKS are
+required before this path can report NVIDIA GPU verification. Omitting raw
+device evidence required by the signed VM shape still fails CPU-stage
+verification; the optional input is the detached NVIDIA appraisal.
 
 The older `begin_entry` / `append_chunk` / `verify_*` entry points remain
 available for existing callers during this API transition.
