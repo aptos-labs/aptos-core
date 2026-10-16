@@ -39,7 +39,9 @@ const MAX_REPO_BYTES: usize = 200;
 const MAX_STAGE_BYTES: usize = 1024 * 1024;
 const MAX_DOCUMENT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_EAT_BYTES: usize = 1024 * 1024;
-const MAX_ATTESTATION_BYTES: usize = MAX_DOCUMENT_BYTES + MAX_EAT_BYTES;
+// The object flow reads and verifies the full stored package in one advance.
+// Keep this under the per-transaction gas ceiling at the current byte rate.
+const MAX_ATTESTATION_BYTES: usize = 256 * 1024;
 const MAX_STAGE_STATE_BYTES: usize = 4096;
 const ATTESTATION_PACKAGE_MAGIC: &[u8] = b"APTOS-TINFOIL-V3\0";
 const ATTESTATION_PACKAGE_VERSION: u8 = 1;
@@ -120,10 +122,13 @@ fn charge_document(
     root: &[u8],
     extra_len: usize,
 ) -> SafeNativeResult<()> {
+    // Over-limit evidence is rejected below as a FAIL outcome. Meter no more
+    // than the maximum work this native will actually perform on it.
     let len = document
         .len()
-        .saturating_add(root.len())
-        .saturating_add(extra_len);
+        .min(MAX_ATTESTATION_BYTES)
+        .saturating_add(root.len().min(MAX_ROOT_BYTES))
+        .saturating_add(extra_len.min(MAX_STAGE_STATE_BYTES));
     context.charge(TINFOIL_V3_VERIFY_BASE + TINFOIL_V3_VERIFY_PER_BYTE * NumBytes::new(len as u64))
 }
 
@@ -807,6 +812,15 @@ mod tests {
         wrapped.push(0);
         assert!(tinfoil_document(&wrapped).is_err());
         assert!(tinfoil_document(b"bad input").is_err());
+    }
+
+    #[test]
+    fn object_attestation_size_cap_is_a_failed_attempt() {
+        let root = b"root";
+        let at_limit = vec![0; MAX_ATTESTATION_BYTES];
+        assert!(check_attestation_args(&at_limit, root, 0).is_ok());
+        let over_limit = vec![0; MAX_ATTESTATION_BYTES + 1];
+        assert!(native_ok(attempted(|| check_attestation_args(&over_limit, root, 0))).is_none());
     }
 
     #[test]
