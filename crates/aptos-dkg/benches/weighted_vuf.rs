@@ -27,10 +27,10 @@ use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Scalar};
 use core::iter::zip;
 use criterion::{
-    black_box, criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
+    criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, Criterion,
 };
 use rand::{rngs::ThreadRng, thread_rng};
-use std::time::Instant;
+use std::{hint::black_box, time::Instant};
 
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 

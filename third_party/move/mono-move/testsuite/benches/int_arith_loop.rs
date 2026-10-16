@@ -5,7 +5,8 @@
 //! `i64_loop` run the same loop, so the u64 (specialized) vs i64
 //! (unspecialized) delta is the per-op dispatch difference.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, SamplingMode};
+use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
+use std::hint::black_box;
 
 const ITERS: u64 = 1_000;
 
