@@ -3,13 +3,14 @@
 //! This module handles DSSE envelope signature verification, including
 //! certificate validation and SCT (Signed Certificate Timestamp) verification.
 
-use der::Decode;
-use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
-use x509_cert::Certificate;
-
 use super::{certificate, fulcio, transparency, trust};
-use crate::error::{Error, Result};
-use crate::util::decode_b64;
+use crate::{
+    error::{Error, Result},
+    util::decode_b64,
+};
+use der::Decode;
+use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+use x509_cert::Certificate;
 
 /// Compute DSSE Pre-Authentication Encoding (PAE)
 ///

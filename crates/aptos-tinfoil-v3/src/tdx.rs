@@ -39,13 +39,11 @@
 //!   carries no member holding that log — so replay is not implementable at
 //!   this layer today, and pinning is the only available control.
 
-use dcap_qvl::quote::Report;
-use dcap_qvl::{QuoteCollateralV3, QuotePolicy, TcbStatus};
-
 use super::envelope::{
     Document, IntelPcsCollateral, PcsResponse, COLLATERAL_INTEL_PCS_V1_FORMAT, SUBJECT_CPU,
 };
 use crate::AttestationConfig;
+use dcap_qvl::{quote::Report, QuoteCollateralV3, QuotePolicy, TcbStatus};
 
 /// Smallest plausible TD quote. Purely a cheap sanity bound before handing the
 /// bytes to the verifier; `dcap-qvl` does the real structural parsing.

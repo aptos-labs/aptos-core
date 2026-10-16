@@ -4,11 +4,12 @@
 //! which contains Fulcio CA certificates, Rekor transparency log keys, and
 //! Certificate Transparency log keys.
 
-use serde::Deserialize;
-
 use super::keyring::Keyring;
-use crate::error::{Error, Result};
-use crate::util::decode_b64;
+use crate::{
+    error::{Error, Result},
+    util::decode_b64,
+};
+use serde::Deserialize;
 
 /// Test fixture only. Production callers supply the effective chain root.
 #[cfg(test)]
@@ -128,7 +129,7 @@ pub fn load_rekor_keys_from_json(json: &str) -> Result<Vec<RekorKey>> {
                     .map(|e| parse_rfc3339_to_unix(e))
                     .transpose()?;
                 (Some(from), until)
-            }
+            },
             None => (None, None),
         };
 
@@ -174,7 +175,7 @@ pub fn load_ctlog_keyring() -> Result<Keyring> {
                     .map(|e| parse_rfc3339_to_unix(e))
                     .transpose()?;
                 (Some(from), until)
-            }
+            },
             None => (None, None),
         };
 
@@ -212,7 +213,7 @@ pub fn load_ctlog_keyring_from_json(json: &str) -> Result<Keyring> {
                     .map(|e| parse_rfc3339_to_unix(e))
                     .transpose()?;
                 (Some(from), until)
-            }
+            },
             None => (None, None),
         };
 
@@ -267,8 +268,7 @@ pub fn load_fulcio_cas_from_json(json: &str) -> Result<Vec<FulcioCa>> {
 
 /// Parse RFC3339 timestamp to Unix timestamp.
 pub fn parse_rfc3339_to_unix(s: &str) -> Result<u64> {
-    use time::OffsetDateTime;
-    use time::format_description::well_known::Rfc3339;
+    use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
     let dt = OffsetDateTime::parse(s, &Rfc3339).map_err(|e| {
         Error::SigstoreVerification(format!("Invalid RFC3339 timestamp '{}': {}", s, e))

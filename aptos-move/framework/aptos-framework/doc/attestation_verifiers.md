@@ -23,13 +23,21 @@ verification stages and trust material.
 1. The account that will hold the verification result calls
    `google_space::begin_entry(audience, expected_image_digest,
    key_commitment, lifetime_secs)`. The module emits a one-use lowercase-hex
-   nonce and exposes it through `pending_nonce`.
+   nonce from validator randomness and exposes it through `pending_nonce`.
+   This entry approves only empty command arguments and environment claims.
+   For a workload with explicit launch settings, call the private transaction
+   entry `begin_entry_with_launch_claims` with a JSON object containing the
+   exact expected `args`, `cmd_override`, `env`, and `env_override` values.
+   Real workloads commonly have nonempty `args` or `env`; configure those
+   expectations explicitly rather than relying on the strict empty policy.
 2. The workload requests a Google Confidential Space token using that exact
    nonce and audience. It submits the token with `verify_entry` before the
    challenge or token expires.
 3. The native checks the RS256 signature against the **current chain JWKS**,
-   issuer, audience, nonce, chain time, Confidential Space claims, and image
-   digest. The module records and emits the verified claims. Consumers can use
+   issuer, audience, nonce, issuance time after the challenge, chain time,
+   Confidential Space claims, image digest, and approved launch settings. It
+   rejects signed memory monitoring. The module records and emits the verified
+   claims. Consumers can use
    `last_verified` and `is_current` and should compare the result's program
    identity with their own policy.
 
@@ -43,7 +51,7 @@ requested the token and verify possession before trusting the registration.
 Governance first approves the expected GitHub repository through
 `tinfoil_v3::set_repository_approved`. The requesting account calls
 `begin_entry(trusted_repo, expected_tls_spki_sha256, lifetime_secs)` and reads
-the 32-byte nonce from `pending_nonce` or the emitted event. The workload
+the 32-byte validator-random nonce from `pending_nonce` or the emitted event. The workload
 obtains a document for that nonce.
 
 The document is split into five fragments with
@@ -81,3 +89,10 @@ worker or define a c26t policy. Gas coefficients are provisional until measured
 against representative full-size reports. A production deployment also needs
 a valid end-to-end Tinfoil fixture for the exact collateral format and device
 profile it intends to accept.
+
+These natives are disabled before gas feature version 55. Version 55 adds four
+attestation verification gas keys. A network must install a version 55 gas
+schedule containing all four keys as part of its coordinated gas upgrade before
+publishing and using these modules. Existing version 54 schedules remain valid
+when nodes load this binary; the natives fail closed there rather than execute
+expensive cryptography without a gas charge.

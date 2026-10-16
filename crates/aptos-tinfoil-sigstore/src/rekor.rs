@@ -3,12 +3,15 @@
 //! This module verifies that signatures and certificates were logged in
 //! Rekor, Sigstore's transparency log, providing an immutable audit trail.
 
-use super::checkpoint::SignedCheckpoint;
-use super::merkle::rfc6962::Rfc6269HasherTrait;
-use super::merkle::{MerkleProofVerifier, Rfc6269Default};
-use super::trust;
-use crate::error::{Error, Result};
-use crate::util::decode_b64;
+use super::{
+    checkpoint::SignedCheckpoint,
+    merkle::{rfc6962::Rfc6269HasherTrait, MerkleProofVerifier, Rfc6269Default},
+    trust,
+};
+use crate::{
+    error::{Error, Result},
+    util::decode_b64,
+};
 use digest::Output;
 use sha2::{Digest, Sha256};
 
@@ -371,7 +374,7 @@ fn verify_signed_entry_timestamp_with_root(
                         "Signed entry timestamp signature verification failed".into(),
                     )
                 })
-        }
+        },
         "PKIX_ED25519" => {
             crate::checkpoint::verify_ed25519(payload.as_bytes(), &signature, &key.key_der).map_err(
                 |_| {
@@ -380,7 +383,7 @@ fn verify_signed_entry_timestamp_with_root(
                     )
                 },
             )
-        }
+        },
         other => Err(Error::SigstoreVerification(format!(
             "Unsupported Rekor key type for signed entry timestamp: {other}"
         ))),
@@ -433,7 +436,7 @@ fn verify_certificate_binding(bundle: &serde_json::Value, canonicalized_body: &[
 
             // Parse PEM to get DER
             parse_pem_certificate(&verifier_pem)?
-        }
+        },
         "hashedrekord" => {
             // hashedrekord format: spec.signature.publicKey.content contains raw PEM
             let rekor_cert_pem = entry
@@ -447,13 +450,13 @@ fn verify_certificate_binding(bundle: &serde_json::Value, canonicalized_body: &[
                 ))?;
 
             parse_pem_certificate(rekor_cert_pem)?
-        }
+        },
         _ => {
             return Err(Error::SigstoreVerification(format!(
                 "Unknown Rekor entry kind: {}. Expected 'dsse' or 'hashedrekord'",
                 kind
             )));
-        }
+        },
     };
 
     // Get certificate from bundle (base64-encoded DER in verificationMaterial.certificate.rawBytes)
@@ -523,7 +526,7 @@ fn verify_signature_binding(bundle: &serde_json::Value, canonicalized_body: &[u8
             decode_b64(sig_b64).map_err(|e| {
                 Error::SigstoreVerification(format!("Failed to decode Rekor signature: {}", e))
             })?
-        }
+        },
         "hashedrekord" => {
             // hashedrekord format: spec.signature.content contains base64-encoded signature
             let sig_b64 = entry
@@ -541,13 +544,13 @@ fn verify_signature_binding(bundle: &serde_json::Value, canonicalized_body: &[u8
             decode_b64(sig_b64).map_err(|e| {
                 Error::SigstoreVerification(format!("Failed to decode Rekor signature: {}", e))
             })?
-        }
+        },
         _ => {
             return Err(Error::SigstoreVerification(format!(
                 "Unknown Rekor entry kind: {}. Expected 'dsse' or 'hashedrekord'",
                 kind
             )));
-        }
+        },
     };
 
     // Get signature from bundle's DSSE envelope
@@ -589,7 +592,7 @@ fn verify_kind_version(entry: &serde_json::Value, canonicalized_body: &[u8]) -> 
             return Err(Error::SigstoreVerification(
                 "Missing kindVersion in tlog entry metadata".into(),
             ));
-        }
+        },
     };
 
     let expected_kind = kind_version.get("kind").and_then(|k| k.as_str());
@@ -635,7 +638,7 @@ fn verify_payload_hash_binding(
             return Err(Error::SigstoreVerification(
                 "DSSE Rekor entry missing required payloadHash field".into(),
             ));
-        }
+        },
     };
 
     let expected_hash = match payload_hash_obj.get("value").and_then(|v| v.as_str()) {
@@ -644,7 +647,7 @@ fn verify_payload_hash_binding(
             return Err(Error::SigstoreVerification(
                 "Malformed payloadHash: object present but missing 'value' field".into(),
             ));
-        }
+        },
     };
 
     let algorithm = payload_hash_obj
@@ -721,8 +724,7 @@ mod tests {
         verify_rekor_entry_with_root(&bundle, CERT_NOT_BEFORE, CERT_NOT_AFTER, trusted_root)
             .expect("fixture verifies against the supplied Sigstore root");
         assert!(
-            verify_rekor_entry_with_root(&bundle, CERT_NOT_BEFORE, CERT_NOT_AFTER, "{}")
-                .is_err(),
+            verify_rekor_entry_with_root(&bundle, CERT_NOT_BEFORE, CERT_NOT_AFTER, "{}").is_err(),
             "no embedded trust root may be used after a supplied root fails"
         );
     }
@@ -784,8 +786,8 @@ mod tests {
     fn test_modified_checkpoint() {
         let mut bundle = parse_bundle();
         // Corrupt the checkpoint envelope
-        bundle["verificationMaterial"]["tlogEntries"][0]["inclusionProof"]["checkpoint"]["envelope"] =
-            serde_json::Value::String("corrupted checkpoint".to_string());
+        bundle["verificationMaterial"]["tlogEntries"][0]["inclusionProof"]["checkpoint"]
+            ["envelope"] = serde_json::Value::String("corrupted checkpoint".to_string());
         assert!(
             verify_rekor_entry(&bundle, CERT_NOT_BEFORE, CERT_NOT_AFTER).is_err(),
             "modified checkpoint should fail checkpoint signature"

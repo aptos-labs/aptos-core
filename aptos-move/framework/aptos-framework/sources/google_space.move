@@ -2,13 +2,12 @@
 /// The signing keys are the effective, quorum-observed trust value; the token and
 /// the caller's expected program identity are never treated as trust anchors.
 module aptos_framework::google_space {
-    use std::bcs;
     use std::error;
     use std::hash;
     use std::option;
     use std::option::Option;
-    use aptos_framework::chain_id;
     use aptos_framework::event::emit;
+    use aptos_framework::randomness;
     use aptos_framework::timestamp;
     use aptos_framework::trust_observation;
 
@@ -22,21 +21,14 @@ module aptos_framework::google_space {
     const EWRONG_PROGRAM: u64 = 7;
 
     const GOOGLE_SPACE_JWKS_TARGET: vector<u8> = b"google_space_jwks";
-    const CHALLENGE_DOMAIN: vector<u8> = b"aptos.google_space.v1";
+    const STRICT_LAUNCH_CLAIMS: vector<u8> = b"{\"args\":[],\"cmd_override\":[],\"env\":{},\"env_override\":{}}";
     const MAX_AUDIENCE_BYTES: u64 = 512;
     const MAX_IMAGE_DIGEST_BYTES: u64 = 128;
     const KEY_COMMITMENT_BYTES: u64 = 32;
     const MAX_TOKEN_BYTES: u64 = 32 * 1024;
+    const MAX_LAUNCH_CLAIMS_BYTES: u64 = 16 * 1024;
     const MAX_REQUEST_LIFETIME_SECS: u64 = 3600;
     const MAX_RESULT_AGE_SECS: u64 = 3600;
-
-    struct ChallengeMaterial has drop {
-        domain: vector<u8>,
-        chain_id: u8,
-        owner: address,
-        request_id: u64,
-        key_commitment: vector<u8>,
-    }
 
     /// This request is owned by the account that will consume the result.
     struct PendingRequest has copy, drop, store {
@@ -45,6 +37,8 @@ module aptos_framework::google_space {
         key_commitment: vector<u8>,
         audience: vector<u8>,
         expected_image_digest: vector<u8>,
+        expected_launch_claims: vector<u8>,
+        started_at_secs: u64,
         expires_at_secs: u64,
     }
 
@@ -63,6 +57,7 @@ module aptos_framework::google_space {
         not_before: u64,
         expires_at: u64,
         signed_payload: vector<u8>,
+        launch_claims: vector<u8>,
     }
 
     struct State has key {
@@ -71,7 +66,7 @@ module aptos_framework::google_space {
         last_verified: Option<VerifiedGoogleSpaceResult>,
     }
 
-    /// The signed program claims and the worker key commitment included in
+    /// The signed program claims and the worker key commitment associated with
     /// the signed challenge. The Google token does not itself prove possession
     /// of that key; applications must obtain the token from a workload that
     /// derives and controls the key, rather than blindly relaying a nonce.
@@ -100,17 +95,19 @@ module aptos_framework::google_space {
         key_commitment: vector<u8>,
     }
 
-    /// Starts a one-use request. The challenge encodes the chain, owner and
-    /// monotonically increasing request ID, so a consumed nonce cannot return.
+    /// Records a one-use request with an unpredictable 32-byte challenge from
+    /// the private `#[randomness]` entry point. This function is never public.
     /// `expected_image_digest` is the exact `submods.container.image_digest`
     /// that the calling application accepts. `key_commitment` is a 32-byte
     /// digest of the worker key the application plans to register.
-    public fun begin(
+    fun begin_with_challenge(
         owner: &signer,
         audience: vector<u8>,
         expected_image_digest: vector<u8>,
         key_commitment: vector<u8>,
         lifetime_secs: u64,
+        expected_launch_claims: vector<u8>,
+        challenge: vector<u8>,
     ): vector<u8> {
         assert!(audience.length() > 0 && audience.length() <= MAX_AUDIENCE_BYTES,
             error::invalid_argument(EINVALID_REQUEST));
@@ -118,6 +115,11 @@ module aptos_framework::google_space {
             && expected_image_digest.length() <= MAX_IMAGE_DIGEST_BYTES,
             error::invalid_argument(EINVALID_REQUEST));
         assert!(key_commitment.length() == KEY_COMMITMENT_BYTES,
+            error::invalid_argument(EINVALID_REQUEST));
+        assert!(challenge.length() == KEY_COMMITMENT_BYTES,
+            error::invalid_argument(EINVALID_REQUEST));
+        assert!(expected_launch_claims.length() > 0
+            && expected_launch_claims.length() <= MAX_LAUNCH_CLAIMS_BYTES,
             error::invalid_argument(EINVALID_REQUEST));
         assert!(lifetime_secs > 0 && lifetime_secs <= MAX_REQUEST_LIFETIME_SECS,
             error::invalid_argument(EINVALID_REQUEST));
@@ -132,19 +134,12 @@ module aptos_framework::google_space {
         };
         let state = &mut State[addr];
         if (state.pending.is_some()) {
-            assert!(state.pending.borrow().expires_at_secs < now,
+            assert!(state.pending.borrow().expires_at_secs <= now,
                 error::invalid_state(EREQUEST_PENDING));
             state.pending.extract();
         };
         let request_id = state.next_request_id;
         state.next_request_id += 1;
-        let challenge = hash::sha3_256(bcs::to_bytes(&ChallengeMaterial {
-            domain: CHALLENGE_DOMAIN,
-            chain_id: chain_id::get(),
-            owner: addr,
-            request_id,
-            key_commitment: copy key_commitment,
-        }));
         let nonce = hex_encode(&challenge);
         let expires_at_secs = now + lifetime_secs;
         state.pending.fill(PendingRequest {
@@ -153,22 +148,43 @@ module aptos_framework::google_space {
             key_commitment,
             audience,
             expected_image_digest,
+            expected_launch_claims,
+            started_at_secs: now,
             expires_at_secs,
         });
         emit(ChallengeIssued { owner: addr, request_id, nonce: copy nonce, expires_at_secs });
         nonce
     }
 
+    #[randomness]
     /// Transaction entry point; the nonce is emitted and available through
     /// `pending_nonce` after this transaction commits.
-    public entry fun begin_entry(
+    entry fun begin_entry(
         owner: &signer,
         audience: vector<u8>,
         expected_image_digest: vector<u8>,
         key_commitment: vector<u8>,
         lifetime_secs: u64,
     ) {
-        begin(owner, audience, expected_image_digest, key_commitment, lifetime_secs);
+        begin_with_challenge(owner, audience, expected_image_digest, key_commitment,
+            lifetime_secs, STRICT_LAUNCH_CLAIMS, randomness::bytes(32));
+    }
+
+    #[randomness]
+    /// Starts a request that approves the exact signed `args`, `cmd_override`,
+    /// `env`, and `env_override` claims. The JSON object must have those four
+    /// fields with array/object types. All environment keys and values must
+    /// match exactly; unspecified additions are rejected.
+    entry fun begin_entry_with_launch_claims(
+        owner: &signer,
+        audience: vector<u8>,
+        expected_image_digest: vector<u8>,
+        key_commitment: vector<u8>,
+        lifetime_secs: u64,
+        expected_launch_claims: vector<u8>,
+    ) {
+        begin_with_challenge(owner, audience, expected_image_digest, key_commitment,
+            lifetime_secs, expected_launch_claims, randomness::bytes(32));
     }
 
     /// Cancels a pending request. The request counter still advances, so its
@@ -190,7 +206,7 @@ module aptos_framework::google_space {
             error::invalid_argument(EINVALID_REQUEST));
         let pending = *State[addr].pending.borrow();
         let now = timestamp::now_seconds();
-        assert!(now <= pending.expires_at_secs, error::invalid_state(EEXPIRED_REQUEST));
+        assert!(now < pending.expires_at_secs, error::invalid_state(EEXPIRED_REQUEST));
         let jwks = trust_observation::get_effective_value(GOOGLE_SPACE_JWKS_TARGET);
         assert!(jwks.is_some(), error::invalid_state(ETRUST_ROOT_UNAVAILABLE));
         let nonce = hex_encode(&pending.challenge);
@@ -201,8 +217,10 @@ module aptos_framework::google_space {
             jwks_value,
             pending.audience,
             copy nonce,
+            pending.expected_launch_claims,
             now,
         );
+        assert!(claims.issued_at >= pending.started_at_secs, EINVALID_GOOGLE_PROOF);
         assert!(claims.image_digest == pending.expected_image_digest,
             error::permission_denied(EWRONG_PROGRAM));
         assert!(claims.audience == pending.audience && claims.nonce == nonce,
@@ -254,7 +272,7 @@ module aptos_framework::google_space {
             || State[owner].last_verified.is_none()) { return false };
         let result = State[owner].last_verified.borrow();
         let now = timestamp::now_seconds();
-        if (now < result.verified_at_secs || now > result.claims.expires_at
+        if (now < result.verified_at_secs || now >= result.claims.expires_at
             || now - result.verified_at_secs > max_age_secs) { return false };
         let jwks = trust_observation::get_effective_value(GOOGLE_SPACE_JWKS_TARGET);
         jwks.is_some() && hash::sha3_256(jwks.extract()) == result.jwks_sha3_256
@@ -294,6 +312,8 @@ module aptos_framework::google_space {
 
     public fun signed_payload(self: &VerifiedGoogleSpaceClaims): &vector<u8> { &self.signed_payload }
 
+    public fun launch_claims(self: &VerifiedGoogleSpaceClaims): &vector<u8> { &self.launch_claims }
+
     fun hex_encode(bytes: &vector<u8>): vector<u8> {
         let digits = b"0123456789abcdef";
         let result = vector[];
@@ -312,6 +332,7 @@ module aptos_framework::google_space {
         trusted_jwks: vector<u8>,
         expected_audience: vector<u8>,
         expected_nonce: vector<u8>,
+        expected_launch_claims: vector<u8>,
         now_secs: u64,
     ): VerifiedGoogleSpaceClaims;
 
@@ -322,14 +343,15 @@ module aptos_framework::google_space {
     #[test_only]
     const TEST_NONCE: vector<u8> = b"50e85d9420776fd6a5126aaff7afd3a830f1802b0d1e897d350045b4c0052b59";
     #[test_only]
+    const TEST_CHALLENGE: vector<u8> = x"50e85d9420776fd6a5126aaff7afd3a830f1802b0d1e897d350045b4c0052b59";
+    #[test_only]
     const TEST_IMAGE_DIGEST: vector<u8> = b"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     #[test_only]
     fun setup_test(framework: &signer) {
         aptos_framework::account::create_account_for_test(@aptos_framework);
-        chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
-        timestamp::update_global_time_for_test_secs(1700000000);
+        timestamp::update_global_time_for_test_secs(1699999990);
         aptos_framework::config_buffer::initialize(framework);
         aptos_framework::reconfiguration::initialize_for_test(framework);
         trust_observation::initialize(framework);
@@ -347,7 +369,8 @@ module aptos_framework::google_space {
         setup_test(framework);
         let key_commitment = vector[];
         for (_i in 0..32) { key_commitment.push_back(1); };
-        let challenge = begin(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST, copy key_commitment, 60);
+        let challenge = begin_with_challenge(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST,
+            copy key_commitment, 60, STRICT_LAUNCH_CLAIMS, TEST_CHALLENGE);
         assert!(challenge == TEST_NONCE, 1);
         let result = verify(owner, TEST_TOKEN);
         assert!(*result.key_commitment() == key_commitment, 2);
@@ -356,6 +379,7 @@ module aptos_framework::google_space {
         assert!(*claims.project_id() == b"example", 4);
         assert!(*claims.instance_id() == b"123", 5);
         assert!(*claims.nonce() == TEST_NONCE, 6);
+        assert!(*claims.launch_claims() == STRICT_LAUNCH_CLAIMS, 10);
         assert!(pending_nonce(owner.address_of()).is_none(), 7);
         assert!(is_current(owner.address_of(), 60), 8);
         trust_observation::set_removal_patch(framework, GOOGLE_SPACE_JWKS_TARGET);
@@ -368,7 +392,8 @@ module aptos_framework::google_space {
         setup_test(framework);
         let other_key = vector[];
         for (_i in 0..32) { other_key.push_back(2); };
-        begin(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST, other_key, 60);
+        begin_with_challenge(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST,
+            other_key, 60, STRICT_LAUNCH_CLAIMS, x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         verify(owner, TEST_TOKEN);
     }
 
@@ -378,7 +403,8 @@ module aptos_framework::google_space {
         setup_test(framework);
         let key_commitment = vector[];
         for (_i in 0..32) { key_commitment.push_back(1); };
-        begin(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST, key_commitment, 60);
+        begin_with_challenge(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST,
+            key_commitment, 60, STRICT_LAUNCH_CLAIMS, TEST_CHALLENGE);
         let token = TEST_TOKEN;
         let old = token[1100];
         token[1100] = if (old == 65) { 66 } else { 65 };
@@ -387,16 +413,41 @@ module aptos_framework::google_space {
 
     #[test(framework = @aptos_framework, owner = @0x42)]
     fun test_challenge_lifecycle(framework: &signer, owner: &signer) {
-        chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
         let key_commitment = vector[];
         for (i in 0..32) { key_commitment.push_back(1); };
-        let first = begin(owner, b"audience", b"sha256:digest", copy key_commitment, 60);
+        let first = begin_with_challenge(owner, b"audience", b"sha256:digest",
+            copy key_commitment, 60, STRICT_LAUNCH_CLAIMS, x"0101010101010101010101010101010101010101010101010101010101010101");
         assert!(first.length() == 64, 1);
         assert!(pending_nonce(owner.address_of()).extract() == first, 2);
         cancel(owner);
         assert!(pending_nonce(owner.address_of()).is_none(), 3);
-        let second = begin(owner, b"audience", b"sha256:digest", key_commitment, 60);
+        let second = begin_with_challenge(owner, b"audience", b"sha256:digest",
+            key_commitment, 60, STRICT_LAUNCH_CLAIMS, x"0202020202020202020202020202020202020202020202020202020202020202");
         assert!(second != first, 4);
+    }
+
+    #[test(framework = @aptos_framework, owner = @0x42)]
+    #[expected_failure(abort_code = EINVALID_GOOGLE_PROOF, location = Self)]
+    fun test_reject_token_issued_before_request(framework: &signer, owner: &signer) {
+        setup_test(framework);
+        timestamp::update_global_time_for_test_secs(1700000000);
+        let key_commitment = vector[];
+        for (_i in 0..32) { key_commitment.push_back(1); };
+        begin_with_challenge(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST,
+            key_commitment, 60, STRICT_LAUNCH_CLAIMS, TEST_CHALLENGE);
+        verify(owner, TEST_TOKEN);
+    }
+
+    #[test(framework = @aptos_framework, owner = @0x42)]
+    fun test_is_current_rejects_exact_expiry(framework: &signer, owner: &signer) {
+        setup_test(framework);
+        let key_commitment = vector[];
+        for (_i in 0..32) { key_commitment.push_back(1); };
+        begin_with_challenge(owner, b"aptos-attestation-test", TEST_IMAGE_DIGEST,
+            key_commitment, 60, STRICT_LAUNCH_CLAIMS, TEST_CHALLENGE);
+        verify(owner, TEST_TOKEN);
+        timestamp::update_global_time_for_test_secs(1700003600);
+        assert!(!is_current(owner.address_of(), 3600), 1);
     }
 }

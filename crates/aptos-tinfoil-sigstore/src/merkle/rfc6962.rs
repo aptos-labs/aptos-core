@@ -37,12 +37,14 @@ where
     fn empty_root() -> Output<T> {
         T::new().finalize()
     }
+
     fn hash_leaf(leaf: impl AsRef<[u8]>) -> Output<T> {
         T::new()
             .chain_update([RFC6962LeafHashPrefix as u8])
             .chain_update(leaf)
             .finalize()
     }
+
     fn hash_children(left: impl AsRef<[u8]>, right: impl AsRef<[u8]>) -> Output<T> {
         T::new()
             .chain_update([RFC6962NodeHashPrefix as u8])

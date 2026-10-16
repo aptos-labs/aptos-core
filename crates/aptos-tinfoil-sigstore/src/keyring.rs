@@ -20,11 +20,10 @@
 //! This module provides a keyring for Certificate Transparency log public keys,
 //! adapted to use the p256 crate instead of aws-lc-rs.
 
-use std::collections::HashMap;
-
 use der::{Decode, Encode};
-use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use thiserror::Error;
 use x509_cert::spki::SubjectPublicKeyInfoOwned;
 
@@ -196,8 +195,10 @@ impl Keyring {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use p256::ecdsa::{SigningKey, signature::Signer};
-    use p256::pkcs8::EncodePublicKey;
+    use p256::{
+        ecdsa::{signature::Signer, SigningKey},
+        pkcs8::EncodePublicKey,
+    };
 
     fn test_signing_key() -> SigningKey {
         // Well-known test scalar (RFC 6979 A.2.5)

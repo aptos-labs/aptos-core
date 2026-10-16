@@ -41,17 +41,18 @@
 //! control — so the name inside the payload is evidence of nothing until it is
 //! checked against the name the operator configured.
 
+use super::{
+    envelope::{
+        Document, COLLATERAL_SIGSTORE_CODE_V1_FORMAT, COLLATERAL_SIGSTORE_PLATFORM_V1_FORMAT,
+        FRESHNESS_COLLATERAL_ID_CODE, FRESHNESS_COLLATERAL_ID_PLATFORM,
+    },
+    tdx::AuthenticatedQuote,
+};
 use aptos_tinfoil_sigstore::provenance::{
     authenticate_code_with_root, authenticate_freshness_with_root,
     authenticate_platform_endorsements_with_root, AuthenticatedArtifact, Code,
 };
 use serde::Deserialize;
-
-use super::envelope::{
-    Document, COLLATERAL_SIGSTORE_CODE_V1_FORMAT, COLLATERAL_SIGSTORE_PLATFORM_V1_FORMAT,
-    FRESHNESS_COLLATERAL_ID_CODE, FRESHNESS_COLLATERAL_ID_PLATFORM,
-};
-use super::tdx::AuthenticatedQuote;
 
 /// Number of hex characters in a 48-byte measurement register.
 const REGISTER_HEX_LEN: usize = 96;
@@ -483,13 +484,10 @@ mod tests {
     fn a_mismatched_register_is_refused() {
         let err = compare_register("RTMR1", &register("ab"), &register("cd")).unwrap_err();
         assert!(
-            matches!(
-                err,
-                ProvenanceError::MeasurementMismatch {
-                    register: "RTMR1",
-                    ..
-                }
-            ),
+            matches!(err, ProvenanceError::MeasurementMismatch {
+                register: "RTMR1",
+                ..
+            }),
             "got {err}"
         );
         // The message names both values so an operator can diagnose it.

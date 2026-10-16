@@ -5,10 +5,9 @@
 //! them. What they cannot forge is Intel's signature over a TDX quote, which is
 //! precisely the property the verifier tests rely on.
 
+use super::envelope;
 use base64::Engine;
 use sha2::{Digest, Sha256};
-
-use super::envelope;
 
 /// SHA-256 SPKI fingerprint used as the endorsed TLS key in fixtures.
 pub const TLS_FP: &str = "1111111111111111111111111111111111111111111111111111111111111111";

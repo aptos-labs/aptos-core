@@ -1,8 +1,7 @@
 //! Small helpers the vendored modules expect from their parent crate.
 
-use base64::Engine;
-
 use crate::error::{Error, Result};
+use base64::Engine;
 
 /// Decode standard base64.
 ///

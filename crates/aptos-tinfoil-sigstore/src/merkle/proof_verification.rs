@@ -10,9 +10,9 @@
 //     http://www.apache.org/licenses/LICENSE-2.0
 
 use super::rfc6962::Rfc6269HasherTrait;
-use MerkleProofError::*;
 use digest::{Digest, Output};
 use std::fmt::Debug;
+use MerkleProofError::*;
 
 #[derive(Debug)]
 pub enum MerkleProofError {
@@ -30,16 +30,16 @@ impl std::fmt::Display for MerkleProofError {
         match self {
             MismatchedRoot { expected, got } => {
                 write!(f, "root hash mismatch: expected {expected}, got {got}")
-            }
+            },
             IndexGtTreeSize => write!(f, "leaf index >= tree size"),
             UnexpectedNonEmptyProof => write!(f, "unexpected non-empty proof"),
             UnexpectedEmptyProof => write!(f, "unexpected empty proof"),
             NewTreeSmaller { new, old } => {
                 write!(f, "new tree size {new} < old tree size {old}")
-            }
+            },
             WrongProofSize { got, want } => {
                 write!(f, "wrong proof size: got {got}, want {want}")
-            }
+            },
             WrongEmptyTreeHash => write!(f, "wrong empty tree hash"),
         }
     }
@@ -96,8 +96,8 @@ where
                     got: proof_hashes.len() as u64,
                     want: inner + border,
                 });
-            }
-            _ => {}
+            },
+            _ => {},
         }
         let res_left = Self::chain_inner(leaf_hash, &proof_hashes[..inner as usize], index);
         let res = Self::chain_border_right(&res_left, &proof_hashes[inner as usize..]);
@@ -126,22 +126,22 @@ where
                     new: new_size,
                     old: old_size,
                 });
-            }
+            },
             (Ordering::Equal, _, true) => {
                 return Self::verify_match(old_root, new_root).map_err(|_| MismatchedRoot {
                     got: hex::encode(new_root.as_ref()),
                     expected: hex::encode(old_root.as_ref()),
                 });
-            }
+            },
             (Ordering::Equal, _, false) | (Ordering::Less, true, false) => {
                 return Err(UnexpectedNonEmptyProof);
-            }
+            },
             (Ordering::Less, true, true) => {
                 return Self::verify_match(old_root, &Self::empty_root())
                     .map_err(|_| WrongEmptyTreeHash);
-            }
+            },
             (Ordering::Less, false, true) => return Err(UnexpectedEmptyProof),
-            (Ordering::Less, false, false) => {}
+            (Ordering::Less, false, false) => {},
         }
 
         let shift = old_size.trailing_zeros() as u64;
@@ -156,7 +156,7 @@ where
 
         match (proof_hashes.len() as u64, start + inner + border) {
             (got, want) if got != want => return Err(WrongProofSize { got, want }),
-            _ => {}
+            _ => {},
         }
 
         let proof = &proof_hashes[start as usize..];
@@ -244,8 +244,7 @@ impl<T> MerkleProofVerifier<Output<T>> for T where T: Digest {}
 #[cfg(test)]
 mod test_verify {
     use super::*;
-    use crate::merkle::Rfc6269Default;
-    use crate::merkle::rfc6962::Rfc6269HasherTrait;
+    use crate::merkle::{rfc6962::Rfc6269HasherTrait, Rfc6269Default};
     use hex_literal::hex;
 
     #[derive(Debug)]

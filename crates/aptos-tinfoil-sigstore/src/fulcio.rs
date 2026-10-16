@@ -3,11 +3,10 @@
 //! This module verifies that signing certificates were issued by a trusted
 //! Fulcio Certificate Authority from the Sigstore public-good instance.
 
-use der::{Decode, Encode};
-use x509_cert::Certificate;
-
 use super::trust;
 use crate::error::{Error, Result};
+use der::{Decode, Encode};
+use x509_cert::Certificate;
 
 /// OID for P-256 curve (secp256r1): 1.2.840.10045.3.1.7
 const OID_SECP256R1: &str = "1.2.840.10045.3.1.7";
@@ -23,10 +22,7 @@ pub fn find_issuer_spki(cert: &Certificate) -> Result<Vec<u8>> {
     find_issuer_spki_with_root(cert, include_str!("../assets/trusted_root.json"))
 }
 
-pub fn find_issuer_spki_with_root(
-    cert: &Certificate,
-    trusted_root_json: &str,
-) -> Result<Vec<u8>> {
+pub fn find_issuer_spki_with_root(cert: &Certificate, trusted_root_json: &str) -> Result<Vec<u8>> {
     let fulcio_cas = trust::load_fulcio_cas_from_json(trusted_root_json)?;
 
     // Try each Fulcio CA to find the matching issuer
@@ -179,7 +175,7 @@ fn verify_issued_by(child: &Certificate, issuer: &Certificate, context: &str) ->
                 "{} issuer uses unsupported curve",
                 context
             )));
-        }
+        },
     };
 
     if !verified {
@@ -193,7 +189,7 @@ fn verify_issued_by(child: &Certificate, issuer: &Certificate, context: &str) ->
 
 /// Verify ECDSA P-256 signature over TBS certificate bytes.
 fn verify_ecdsa_p256(tbs_bytes: &[u8], sig_bytes: &[u8], pubkey_bytes: &[u8]) -> bool {
-    use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+    use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 
     let Some(key) = VerifyingKey::from_sec1_bytes(pubkey_bytes).ok() else {
         return false;
@@ -206,12 +202,9 @@ fn verify_ecdsa_p256(tbs_bytes: &[u8], sig_bytes: &[u8], pubkey_bytes: &[u8]) ->
 
 /// Verify ECDSA P-384 signature over TBS certificate bytes.
 fn verify_ecdsa_p384(tbs_bytes: &[u8], sig_bytes: &[u8], pubkey_bytes: &[u8]) -> bool {
-    ring::signature::UnparsedPublicKey::new(
-        &ring::signature::ECDSA_P384_SHA384_ASN1,
-        pubkey_bytes,
-    )
-    .verify(tbs_bytes, sig_bytes)
-    .is_ok()
+    ring::signature::UnparsedPublicKey::new(&ring::signature::ECDSA_P384_SHA384_ASN1, pubkey_bytes)
+        .verify(tbs_bytes, sig_bytes)
+        .is_ok()
 }
 
 #[cfg(test)]

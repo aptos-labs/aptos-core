@@ -23,11 +23,9 @@
 //!                          measurements[ref]   -> MRTD, RTMR0    (per VM shape)
 //! ```
 
-use std::collections::{BTreeMap, BTreeSet};
-
-use serde::Deserialize;
-
 use crate::error::{Error, Result};
+use serde::Deserialize;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Required `format` of a platform-endorsements artifact.
 pub const ARTIFACT_FORMAT: &str = "https://tinfoil.sh/predicate/platform-endorsements/v1";
@@ -273,17 +271,17 @@ impl TdxPolicy {
             decode_hex(name, value, want)?;
         }
         match self.minimum_tcb_evaluation_data_number {
-            Some(n) if n >= 0 => {}
+            Some(n) if n >= 0 => {},
             Some(n) => {
                 return Err(Error::SigstoreVerification(format!(
                     "minimum_tcb_evaluation_data_number must be non-negative, got {n}"
                 )));
-            }
+            },
             None => {
                 return Err(Error::SigstoreVerification(
                     "minimum_tcb_evaluation_data_number is required".into(),
                 ));
-            }
+            },
         }
         if self.platform_measurements.is_empty() {
             return Err(Error::SigstoreVerification(
@@ -439,7 +437,7 @@ impl Artifact {
                             "policy {name:?}: platform sev-snp requires exactly the sev_snp block"
                         )));
                     }
-                }
+                },
                 PLATFORM_TDX => {
                     let Some(tdx) = &policy.tdx else {
                         return Err(Error::SigstoreVerification(format!(
@@ -466,12 +464,12 @@ impl Artifact {
                             )));
                         }
                     }
-                }
+                },
                 other => {
                     return Err(Error::SigstoreVerification(format!(
                         "policy {name:?}: unsupported platform {other:?}"
                     )));
-                }
+                },
             }
         }
 
@@ -619,7 +617,11 @@ fn is_lower_hex(value: &str) -> bool {
 }
 
 fn trunc_id(id: &str) -> &str {
-    if id.len() > 16 { &id[..16] } else { id }
+    if id.len() > 16 {
+        &id[..16]
+    } else {
+        id
+    }
 }
 
 /// Reject duplicate object member names anywhere in a JSON document.
@@ -666,21 +668,27 @@ fn reject_duplicate_members(bytes: &[u8]) -> Result<()> {
                 fn visit_unit<E>(self) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_none<E>(self) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_bool<E>(self, _: bool) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_i64<E>(self, _: i64) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_u64<E>(self, _: u64) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_f64<E>(self, _: f64) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_str<E>(self, _: &str) -> std::result::Result<DupCheck, E> {
                     Ok(DupCheck)
                 }

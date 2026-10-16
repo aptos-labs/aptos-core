@@ -20,13 +20,12 @@
 //! Adapted from sigstore-rs to use typed extension parsing via x509-cert
 //! instead of manual byte manipulation.
 
+use crate::error::{Error, Result};
 use const_oid::db::rfc5912::ID_KP_CODE_SIGNING;
 use x509_cert::{
-    Certificate,
     ext::pkix::{ExtendedKeyUsage, KeyUsage},
+    Certificate,
 };
-
-use crate::error::{Error, Result};
 
 /// Verification certificate info extracted from bundle
 ///
@@ -137,7 +136,7 @@ pub fn validate_certificate_extensions(cert: &Certificate) -> Result<()> {
             Error::SigstoreVerification("Certificate missing ExtendedKeyUsage extension".into())
         })?;
 
-    if !ext_key_usage.1.0.contains(&ID_KP_CODE_SIGNING) {
+    if !ext_key_usage.1 .0.contains(&ID_KP_CODE_SIGNING) {
         return Err(Error::SigstoreVerification(
             "Certificate ExtendedKeyUsage does not include codeSigning".into(),
         ));
@@ -203,29 +202,29 @@ pub fn extract_certificate_info(cert: &Certificate) -> Result<CertificateInfo> {
                 fulcio_oids::OIDC_ISSUER_V2 => {
                     // V2 takes priority over V1
                     issuer = value;
-                }
+                },
                 fulcio_oids::OIDC_ISSUER_V1 if issuer.is_empty() => {
                     // V1 is used only if V2 was not found
                     issuer = value;
-                }
+                },
                 fulcio_oids::BUILD_SIGNER_URI => {
                     subject_workflow = value;
-                }
+                },
                 fulcio_oids::BUILD_SIGNER_DIGEST => {
                     build_signer_digest = value;
-                }
+                },
                 fulcio_oids::RUNNER_ENVIRONMENT => {
                     runner_environment = value;
-                }
+                },
                 fulcio_oids::SOURCE_REPOSITORY_DIGEST => {
                     source_repository_digest = value;
-                }
+                },
                 fulcio_oids::SOURCE_REPOSITORY_REF => {
                     source_repository_ref = value;
-                }
+                },
                 fulcio_oids::GITHUB_WORKFLOW_REPOSITORY => {
                     repository = value;
-                }
+                },
                 fulcio_oids::SOURCE_REPOSITORY_URI if repository.is_empty() => {
                     // V2 fallback: extract repo name from URI
                     // SOURCE_REPOSITORY_URI is "https://github.com/owner/repo"
@@ -234,8 +233,8 @@ pub fn extract_certificate_info(cert: &Certificate) -> Result<CertificateInfo> {
                         .strip_prefix("https://github.com/")
                         .unwrap_or(&value)
                         .to_string();
-                }
-                _ => {}
+                },
+                _ => {},
             }
         }
     }

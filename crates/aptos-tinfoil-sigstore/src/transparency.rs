@@ -20,22 +20,21 @@
 //! Adapted from sigstore-rs transparency.rs to use x509-cert's SCT types
 //! and our keyring implementation.
 
-use der::{Decode, Encode, asn1::BitString};
+use super::keyring::{Keyring, KeyringError};
+use der::{asn1::BitString, Decode, Encode};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tls_codec::{SerializeBytes, TlsByteVecU16, TlsByteVecU24, TlsSerializeBytes, TlsSize};
 use x509_cert::{
-    AlgorithmIdentifier, Certificate, SubjectPublicKeyInfo,
     ext::{
-        Extensions,
         pkix::sct::{SignedCertificateTimestamp, SignedCertificateTimestampList, Version},
+        Extensions,
     },
     name::Name,
     serial_number::SerialNumber,
     time::Validity,
+    AlgorithmIdentifier, Certificate, SubjectPublicKeyInfo,
 };
-
-use super::keyring::{Keyring, KeyringError};
 
 /// OID for CT Precert SCTs extension (1.3.6.1.4.1.11129.2.4.2)
 const CT_PRECERT_SCTS_OID: &str = "1.3.6.1.4.1.11129.2.4.2";
@@ -64,7 +63,7 @@ impl From<x509_cert::ext::pkix::sct::Error> for CertificateErrorKind {
             x509_cert::ext::pkix::sct::Error::Der(e) => CertificateErrorKind::Der(e),
             x509_cert::ext::pkix::sct::Error::Tls(e) => {
                 CertificateErrorKind::Tls(format!("{:?}", e))
-            }
+            },
         }
     }
 }
@@ -325,9 +324,10 @@ fn parse_scts_from_cert(cert: &Certificate) -> Result<Vec<SignedCertificateTimes
 mod tests {
     use super::*;
     use der::DecodePem;
-    use p256::ecdsa::VerifyingKey;
-    use p256::pkcs8::DecodePublicKey;
-    use p256::pkcs8::EncodePublicKey;
+    use p256::{
+        ecdsa::VerifyingKey,
+        pkcs8::{DecodePublicKey, EncodePublicKey},
+    };
 
     // Test data from sigstore-rs
     #[test]

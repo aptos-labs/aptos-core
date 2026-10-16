@@ -6,8 +6,9 @@
 //! by the parser. All roots, time, and policy inputs come from Move state;
 //! no network or host-clock access is permitted.
 
-use aptos_gas_schedule::gas_params::natives::aptos_framework::{
-    TINFOIL_V3_VERIFY_BASE, TINFOIL_V3_VERIFY_PER_BYTE,
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_51,
+    gas_params::natives::aptos_framework::{TINFOIL_V3_VERIFY_BASE, TINFOIL_V3_VERIFY_PER_BYTE},
 };
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
@@ -32,6 +33,13 @@ const MAX_STAGE_STATE_BYTES: usize = 4096;
 
 fn invalid() -> SafeNativeError {
     SafeNativeError::abort(EINVALID_TINFOIL_PROOF)
+}
+
+fn require_gas_feature_version(context: &SafeNativeContext) -> SafeNativeResult<()> {
+    if context.gas_feature_version() < RELEASE_V1_51 {
+        return Err(invalid());
+    }
+    Ok(())
 }
 
 /// Third-party DER/JSON verifiers contain a few guarded `expect` paths. A
@@ -307,6 +315,7 @@ fn native_verify_tinfoil_v3_quote(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 4);
+    require_gas_feature_version(context)?;
     let intel_root = safely_pop_arg!(args, Vec<u8>);
     let proof_time = safely_pop_arg!(args, u64);
     let nonce = safely_pop_arg!(args, Vec<u8>);
@@ -325,6 +334,7 @@ fn native_verify_tinfoil_v3_code(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 5);
+    require_gas_feature_version(context)?;
     let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
     let sigstore_root = safely_pop_arg!(args, Vec<u8>);
     let repo = stage_repo(safely_pop_arg!(args, Vec<u8>))?;
@@ -350,6 +360,7 @@ fn native_verify_tinfoil_v3_code_freshness(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 6);
+    require_gas_feature_version(context)?;
     let code = code_from_move(safely_pop_arg!(args, Struct))?;
     let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
     let sigstore_root = safely_pop_arg!(args, Vec<u8>);
@@ -377,6 +388,7 @@ fn native_verify_tinfoil_v3_platform(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 6);
+    require_gas_feature_version(context)?;
     let code = code_from_move(safely_pop_arg!(args, Struct))?;
     let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
     let sigstore_root = safely_pop_arg!(args, Vec<u8>);
@@ -404,6 +416,7 @@ fn native_verify_tinfoil_v3_platform_freshness(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(args.len(), 6);
+    require_gas_feature_version(context)?;
     let platform = platform_from_move(safely_pop_arg!(args, Struct))?;
     let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
     let sigstore_root = safely_pop_arg!(args, Vec<u8>);

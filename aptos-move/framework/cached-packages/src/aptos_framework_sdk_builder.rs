@@ -574,6 +574,37 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Transaction entry point; the nonce is emitted and available through
+    /// `pending_nonce` after this transaction commits.
+    GoogleSpaceBeginEntry {
+        audience: Vec<u8>,
+        expected_image_digest: Vec<u8>,
+        key_commitment: Vec<u8>,
+        lifetime_secs: u64,
+    },
+
+    /// Starts a request that approves the exact signed `args`, `cmd_override`,
+    /// `env`, and `env_override` claims. The JSON object must have those four
+    /// fields with array/object types. All environment keys and values must
+    /// match exactly; unspecified additions are rejected.
+    GoogleSpaceBeginEntryWithLaunchClaims {
+        audience: Vec<u8>,
+        expected_image_digest: Vec<u8>,
+        key_commitment: Vec<u8>,
+        lifetime_secs: u64,
+        expected_launch_claims: Vec<u8>,
+    },
+
+    /// Cancels a pending request. The request counter still advances, so its
+    /// challenge is never reused.
+    GoogleSpaceCancel {},
+
+    /// Transaction entry point; verified claims are emitted and saved for a
+    /// short-lived read through `last_verified` and `is_current`.
+    GoogleSpaceVerifyEntry {
+        token: Vec<u8>,
+    },
+
     /// This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
     /// be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
     ///
@@ -1193,6 +1224,50 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    /// Uploads one stage's fragment in transaction-sized chunks. A stage
+    /// transition seals its current fragment; subsequent chunks belong only
+    /// to the next stage.
+    TinfoilV3AppendChunk {
+        chunk: Vec<u8>,
+    },
+
+    /// Transaction entry point; reads the nonce from `pending_nonce` or the event.
+    /// It is private so a caller cannot inspect and abort on the random result.
+    TinfoilV3BeginEntry {
+        trusted_repo: Vec<u8>,
+        expected_tls_spki_sha256: Vec<u8>,
+        lifetime_secs: u64,
+    },
+
+    /// Closes a request. Its chunks can be removed in bounded transactions with
+    /// `clean_up`, including by a third party after the request expires.
+    TinfoilV3Cancel {},
+
+    /// Frees at most eight staged chunks. Anyone can clean up an expired or
+    /// completed request; no untrusted caller can erase an active one.
+    TinfoilV3CleanUp {
+        owner: AccountAddress,
+        max_chunks: u64,
+    },
+
+    /// Stage 1: authenticate the code-release Sigstore bundle and compare its
+    /// reference values with the already authenticated TDX measurements.
+    TinfoilV3VerifyCode {},
+
+    /// Stage 2: authenticate the freshness witness for the code release.
+    TinfoilV3VerifyCodeFreshness {},
+
+    /// Transaction entry point; a successful result is stored and emitted.
+    TinfoilV3VerifyEntry {},
+
+    /// Stage 3: authenticate the platform endorsement and match its reference
+    /// measurements and platform identity to the TDX quote.
+    TinfoilV3VerifyPlatform {},
+
+    /// Stage 0: verify the TDX quote and Intel collateral, then pin both
+    /// effective roots and the chain time used for every later stage.
+    TinfoilV3VerifyQuote {},
+
     TransactionFeeConvertToAptosFaBurnRef {},
 
     /// Migrate an existing chain from the legacy `AptosCoinMintCapability` (coin `MintCapability`)
@@ -1631,6 +1706,32 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            GoogleSpaceBeginEntry {
+                audience,
+                expected_image_digest,
+                key_commitment,
+                lifetime_secs,
+            } => google_space_begin_entry(
+                audience,
+                expected_image_digest,
+                key_commitment,
+                lifetime_secs,
+            ),
+            GoogleSpaceBeginEntryWithLaunchClaims {
+                audience,
+                expected_image_digest,
+                key_commitment,
+                lifetime_secs,
+                expected_launch_claims,
+            } => google_space_begin_entry_with_launch_claims(
+                audience,
+                expected_image_digest,
+                key_commitment,
+                lifetime_secs,
+                expected_launch_claims,
+            ),
+            GoogleSpaceCancel {} => google_space_cancel(),
+            GoogleSpaceVerifyEntry { token } => google_space_verify_entry(token),
             JwksUpdateFederatedJwkSet {
                 iss,
                 kid_vec,
@@ -2000,6 +2101,19 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            TinfoilV3AppendChunk { chunk } => tinfoil_v3_append_chunk(chunk),
+            TinfoilV3BeginEntry {
+                trusted_repo,
+                expected_tls_spki_sha256,
+                lifetime_secs,
+            } => tinfoil_v3_begin_entry(trusted_repo, expected_tls_spki_sha256, lifetime_secs),
+            TinfoilV3Cancel {} => tinfoil_v3_cancel(),
+            TinfoilV3CleanUp { owner, max_chunks } => tinfoil_v3_clean_up(owner, max_chunks),
+            TinfoilV3VerifyCode {} => tinfoil_v3_verify_code(),
+            TinfoilV3VerifyCodeFreshness {} => tinfoil_v3_verify_code_freshness(),
+            TinfoilV3VerifyEntry {} => tinfoil_v3_verify_entry(),
+            TinfoilV3VerifyPlatform {} => tinfoil_v3_verify_platform(),
+            TinfoilV3VerifyQuote {} => tinfoil_v3_verify_quote(),
             TransactionFeeConvertToAptosFaBurnRef {} => {
                 transaction_fee_convert_to_aptos_fa_burn_ref()
             },
@@ -3579,6 +3693,98 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Transaction entry point; the nonce is emitted and available through
+/// `pending_nonce` after this transaction commits.
+pub fn google_space_begin_entry(
+    audience: Vec<u8>,
+    expected_image_digest: Vec<u8>,
+    key_commitment: Vec<u8>,
+    lifetime_secs: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("google_space").to_owned(),
+        ),
+        ident_str!("begin_entry").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&audience).unwrap(),
+            bcs::to_bytes(&expected_image_digest).unwrap(),
+            bcs::to_bytes(&key_commitment).unwrap(),
+            bcs::to_bytes(&lifetime_secs).unwrap(),
+        ],
+    ))
+}
+
+/// Starts a request that approves the exact signed `args`, `cmd_override`,
+/// `env`, and `env_override` claims. The JSON object must have those four
+/// fields with array/object types. All environment keys and values must
+/// match exactly; unspecified additions are rejected.
+pub fn google_space_begin_entry_with_launch_claims(
+    audience: Vec<u8>,
+    expected_image_digest: Vec<u8>,
+    key_commitment: Vec<u8>,
+    lifetime_secs: u64,
+    expected_launch_claims: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("google_space").to_owned(),
+        ),
+        ident_str!("begin_entry_with_launch_claims").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&audience).unwrap(),
+            bcs::to_bytes(&expected_image_digest).unwrap(),
+            bcs::to_bytes(&key_commitment).unwrap(),
+            bcs::to_bytes(&lifetime_secs).unwrap(),
+            bcs::to_bytes(&expected_launch_claims).unwrap(),
+        ],
+    ))
+}
+
+/// Cancels a pending request. The request counter still advances, so its
+/// challenge is never reused.
+pub fn google_space_cancel() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("google_space").to_owned(),
+        ),
+        ident_str!("cancel").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Transaction entry point; verified claims are emitted and saved for a
+/// short-lived read through `last_verified` and `is_current`.
+pub fn google_space_verify_entry(token: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("google_space").to_owned(),
+        ),
+        ident_str!("verify_entry").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&token).unwrap()],
     ))
 }
 
@@ -5342,6 +5548,169 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
+/// Uploads one stage's fragment in transaction-sized chunks. A stage
+/// transition seals its current fragment; subsequent chunks belong only
+/// to the next stage.
+pub fn tinfoil_v3_append_chunk(chunk: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("append_chunk").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&chunk).unwrap()],
+    ))
+}
+
+/// Transaction entry point; reads the nonce from `pending_nonce` or the event.
+/// It is private so a caller cannot inspect and abort on the random result.
+pub fn tinfoil_v3_begin_entry(
+    trusted_repo: Vec<u8>,
+    expected_tls_spki_sha256: Vec<u8>,
+    lifetime_secs: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("begin_entry").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&trusted_repo).unwrap(),
+            bcs::to_bytes(&expected_tls_spki_sha256).unwrap(),
+            bcs::to_bytes(&lifetime_secs).unwrap(),
+        ],
+    ))
+}
+
+/// Closes a request. Its chunks can be removed in bounded transactions with
+/// `clean_up`, including by a third party after the request expires.
+pub fn tinfoil_v3_cancel() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("cancel").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Frees at most eight staged chunks. Anyone can clean up an expired or
+/// completed request; no untrusted caller can erase an active one.
+pub fn tinfoil_v3_clean_up(owner: AccountAddress, max_chunks: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("clean_up").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&owner).unwrap(),
+            bcs::to_bytes(&max_chunks).unwrap(),
+        ],
+    ))
+}
+
+/// Stage 1: authenticate the code-release Sigstore bundle and compare its
+/// reference values with the already authenticated TDX measurements.
+pub fn tinfoil_v3_verify_code() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("verify_code").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Stage 2: authenticate the freshness witness for the code release.
+pub fn tinfoil_v3_verify_code_freshness() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("verify_code_freshness").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Transaction entry point; a successful result is stored and emitted.
+pub fn tinfoil_v3_verify_entry() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("verify_entry").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Stage 3: authenticate the platform endorsement and match its reference
+/// measurements and platform identity to the TDX quote.
+pub fn tinfoil_v3_verify_platform() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("verify_platform").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// Stage 0: verify the TDX quote and Intel collateral, then pin both
+/// effective roots and the chain time used for every later stage.
+pub fn tinfoil_v3_verify_quote() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("verify_quote").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 pub fn transaction_fee_convert_to_aptos_fa_burn_ref() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -6601,6 +6970,53 @@ mod decoder {
         }
     }
 
+    pub fn google_space_begin_entry(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::GoogleSpaceBeginEntry {
+                audience: bcs::from_bytes(script.args().get(0)?).ok()?,
+                expected_image_digest: bcs::from_bytes(script.args().get(1)?).ok()?,
+                key_commitment: bcs::from_bytes(script.args().get(2)?).ok()?,
+                lifetime_secs: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn google_space_begin_entry_with_launch_claims(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::GoogleSpaceBeginEntryWithLaunchClaims {
+                audience: bcs::from_bytes(script.args().get(0)?).ok()?,
+                expected_image_digest: bcs::from_bytes(script.args().get(1)?).ok()?,
+                key_commitment: bcs::from_bytes(script.args().get(2)?).ok()?,
+                lifetime_secs: bcs::from_bytes(script.args().get(3)?).ok()?,
+                expected_launch_claims: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn google_space_cancel(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::GoogleSpaceCancel {})
+        } else {
+            None
+        }
+    }
+
+    pub fn google_space_verify_entry(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::GoogleSpaceVerifyEntry {
+                token: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn jwks_update_federated_jwk_set(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7595,6 +8011,89 @@ mod decoder {
         }
     }
 
+    pub fn tinfoil_v3_append_chunk(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3AppendChunk {
+                chunk: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_begin_entry(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3BeginEntry {
+                trusted_repo: bcs::from_bytes(script.args().get(0)?).ok()?,
+                expected_tls_spki_sha256: bcs::from_bytes(script.args().get(1)?).ok()?,
+                lifetime_secs: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_cancel(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TinfoilV3Cancel {})
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_clean_up(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3CleanUp {
+                owner: bcs::from_bytes(script.args().get(0)?).ok()?,
+                max_chunks: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_verify_code(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TinfoilV3VerifyCode {})
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_verify_code_freshness(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TinfoilV3VerifyCodeFreshness {})
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_verify_entry(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TinfoilV3VerifyEntry {})
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_verify_platform(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TinfoilV3VerifyPlatform {})
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_verify_quote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::TinfoilV3VerifyQuote {})
+        } else {
+            None
+        }
+    }
+
     pub fn transaction_fee_convert_to_aptos_fa_burn_ref(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -8122,6 +8621,22 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_withdraw),
         );
         map.insert(
+            "google_space_begin_entry".to_string(),
+            Box::new(decoder::google_space_begin_entry),
+        );
+        map.insert(
+            "google_space_begin_entry_with_launch_claims".to_string(),
+            Box::new(decoder::google_space_begin_entry_with_launch_claims),
+        );
+        map.insert(
+            "google_space_cancel".to_string(),
+            Box::new(decoder::google_space_cancel),
+        );
+        map.insert(
+            "google_space_verify_entry".to_string(),
+            Box::new(decoder::google_space_verify_entry),
+        );
+        map.insert(
             "jwks_update_federated_jwk_set".to_string(),
             Box::new(decoder::jwks_update_federated_jwk_set),
         );
@@ -8427,6 +8942,42 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "tinfoil_v3_append_chunk".to_string(),
+            Box::new(decoder::tinfoil_v3_append_chunk),
+        );
+        map.insert(
+            "tinfoil_v3_begin_entry".to_string(),
+            Box::new(decoder::tinfoil_v3_begin_entry),
+        );
+        map.insert(
+            "tinfoil_v3_cancel".to_string(),
+            Box::new(decoder::tinfoil_v3_cancel),
+        );
+        map.insert(
+            "tinfoil_v3_clean_up".to_string(),
+            Box::new(decoder::tinfoil_v3_clean_up),
+        );
+        map.insert(
+            "tinfoil_v3_verify_code".to_string(),
+            Box::new(decoder::tinfoil_v3_verify_code),
+        );
+        map.insert(
+            "tinfoil_v3_verify_code_freshness".to_string(),
+            Box::new(decoder::tinfoil_v3_verify_code_freshness),
+        );
+        map.insert(
+            "tinfoil_v3_verify_entry".to_string(),
+            Box::new(decoder::tinfoil_v3_verify_entry),
+        );
+        map.insert(
+            "tinfoil_v3_verify_platform".to_string(),
+            Box::new(decoder::tinfoil_v3_verify_platform),
+        );
+        map.insert(
+            "tinfoil_v3_verify_quote".to_string(),
+            Box::new(decoder::tinfoil_v3_verify_quote),
         );
         map.insert(
             "transaction_fee_convert_to_aptos_fa_burn_ref".to_string(),

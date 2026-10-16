@@ -26,13 +26,11 @@
 //! quote signs — which is how the nonce, the TLS key fingerprint and the device
 //! evidence all become part of one hardware-authenticated statement.
 
-use std::collections::BTreeSet;
-
+use crate::NONCE_SIZE;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
-use crate::NONCE_SIZE;
+use std::collections::BTreeSet;
 
 pub const ATTESTATION_V3_FORMAT: &str = "https://tinfoil.sh/predicate/attestation/v3";
 pub const REPORT_DATA_V1_ALGORITHM: &str = "https://tinfoil.sh/report-data/v1";
@@ -590,21 +588,27 @@ fn reject_duplicate_members(bytes: &[u8]) -> Result<(), EnvelopeError> {
                 fn visit_bool<E>(self, _: bool) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_i64<E>(self, _: i64) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_u64<E>(self, _: u64) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_f64<E>(self, _: f64) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_str<E>(self, _: &str) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_none<E>(self) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
+
                 fn visit_unit<E>(self) -> Result<DupCheck, E> {
                     Ok(DupCheck)
                 }
@@ -733,7 +737,7 @@ mod tests {
     fn rejects_non_lowercase_hex_and_non_canonical_base64() {
         // A nonce whose hex spelling actually contains letters, so that
         // uppercasing it is a meaningful change.
-        let doc = testdata::DocumentBuilder::new().nonce([0xab; 32]).build();
+        let doc = testdata::DocumentBuilder::new().nonce([0xAB; 32]).build();
         assert_ne!(doc.nonce_hex, doc.nonce_hex.to_uppercase());
 
         let upper = doc
@@ -765,10 +769,9 @@ mod tests {
         // sets unused padding bits. Accepting both would give one byte string
         // two spellings — and the endorsed hash covers the *bytes*, so a second
         // spelling is a second document that hashes differently.
-        assert_eq!(
-            decode_canonical_base64("section", "ZQ==").unwrap(),
-            vec![0x65]
-        );
+        assert_eq!(decode_canonical_base64("section", "ZQ==").unwrap(), vec![
+            0x65
+        ]);
         assert!(matches!(
             decode_canonical_base64("section", "ZZ=="),
             Err(EnvelopeError::Base64(_))

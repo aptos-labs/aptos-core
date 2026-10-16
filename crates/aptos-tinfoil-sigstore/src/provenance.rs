@@ -32,13 +32,16 @@
 //! `RTMR2`) and which it does not (`MRTD`, `RTMR0` — those come from the
 //! platform endorsement artifact).
 
+use crate::{
+    certificate::{self, CertificateInfo, ExpectedIdentity, TAG_REF_PREFIX},
+    dsse,
+    error::{Error, Result},
+    fulcio,
+    policy::{self, Artifact},
+    rekor,
+    types::Measurement,
+};
 use serde::Deserialize;
-
-use crate::certificate::{self, CertificateInfo, ExpectedIdentity, TAG_REF_PREFIX};
-use crate::error::{Error, Result};
-use crate::policy::{self, Artifact};
-use crate::types::Measurement;
-use crate::{dsse, fulcio, rekor};
 
 /// A bundle whose signatures and signing identity have all verified.
 ///
@@ -100,12 +103,8 @@ fn verify_bundle_with_identity_and_root(
     //    not verifiable after the fact. Yields the log's own timestamp, which
     //    is what dates a freshness witness — and which is covered by Rekor's
     //    signed entry timestamp, so it is attested rather than merely asserted.
-    let logged_at = rekor::verify_rekor_entry_with_root(
-        &bundle,
-        not_before,
-        not_after,
-        trusted_root_json,
-    )?;
+    let logged_at =
+        rekor::verify_rekor_entry_with_root(&bundle, not_before, not_after, trusted_root_json)?;
 
     // 4. The signing certificate must chain to the embedded Fulcio root.
     fulcio::verify_fulcio_chain_with_root(&cert_der, not_before, trusted_root_json)?;
@@ -851,15 +850,12 @@ mod tests {
         let predicate = serde_json::json!({
             "vm_shape": { "cpus": 8, "memory_mb": 16384, "gpus": 1, "disks": 2 }
         });
-        assert_eq!(
-            shape_from_predicate(&predicate).unwrap(),
-            Shape {
-                cpus: 8,
-                memory_mb: 16384,
-                gpus: 1,
-                disks: 2
-            }
-        );
+        assert_eq!(shape_from_predicate(&predicate).unwrap(), Shape {
+            cpus: 8,
+            memory_mb: 16384,
+            gpus: 1,
+            disks: 2
+        });
     }
 
     /// A partial shape must be refused rather than defaulted: a wrong shape
@@ -956,14 +952,11 @@ mod tests {
             &digest,
         )
         .unwrap();
-        assert_eq!(
-            measurements,
-            vec![HardwareMeasurement {
-                name: format!("large_1d_v011@{digest}"),
-                mrtd: "11".repeat(48),
-                rtmr0: "22".repeat(48),
-            }]
-        );
+        assert_eq!(measurements, vec![HardwareMeasurement {
+            name: format!("large_1d_v011@{digest}"),
+            mrtd: "11".repeat(48),
+            rtmr0: "22".repeat(48),
+        }]);
     }
 
     #[test]

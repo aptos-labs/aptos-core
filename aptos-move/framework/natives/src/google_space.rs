@@ -9,8 +9,11 @@
 //! inspect claims that are not promoted to fields of `VerifiedGoogleSpaceClaims`.
 
 use anyhow::{bail, ensure, Context, Result};
-use aptos_gas_schedule::gas_params::natives::aptos_framework::{
-    GOOGLE_SPACE_VERIFY_BASE, GOOGLE_SPACE_VERIFY_PER_BYTE,
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_51,
+    gas_params::natives::aptos_framework::{
+        GOOGLE_SPACE_VERIFY_BASE, GOOGLE_SPACE_VERIFY_PER_BYTE,
+    },
 };
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
@@ -24,15 +27,16 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 
 const GOOGLE_ISSUER: &str = "https://confidentialcomputing.googleapis.com";
 const MAX_TOKEN_BYTES: usize = 60 * 1024;
 const MAX_JWKS_BYTES: usize = 60 * 1024;
 const MAX_AUDIENCE_BYTES: usize = 512;
 const MAX_NONCE_BYTES: usize = 88;
+const MAX_LAUNCH_CLAIMS_BYTES: usize = 16 * 1024;
 const EINVALID_ATTESTATION: u64 = 1;
 
 /// Field order matches `0x1::google_space::VerifiedGoogleSpaceClaims`.
@@ -50,6 +54,7 @@ pub struct VerifiedGoogleSpaceClaims {
     pub not_before: u64,
     pub expires_at: u64,
     pub signed_payload: Vec<u8>,
+    pub launch_claims: Vec<u8>,
 }
 
 impl VerifiedGoogleSpaceClaims {
@@ -67,6 +72,7 @@ impl VerifiedGoogleSpaceClaims {
             Value::u64(self.not_before),
             Value::u64(self.expires_at),
             Value::vector_u8(self.signed_payload),
+            Value::vector_u8(self.launch_claims),
         ]))
     }
 }
@@ -132,6 +138,8 @@ struct Claims {
 struct Submods {
     container: Container,
     gce: Gce,
+    #[serde(default)]
+    confidential_space: Option<ConfidentialSpace>,
 }
 
 #[derive(Deserialize)]
@@ -139,6 +147,35 @@ struct Container {
     image_digest: String,
     #[serde(default)]
     image_reference: String,
+    #[serde(default)]
+    args: Vec<String>,
+    #[serde(default)]
+    cmd_override: Vec<String>,
+    #[serde(default)]
+    env: BTreeMap<String, String>,
+    #[serde(default)]
+    env_override: BTreeMap<String, String>,
+}
+
+#[derive(Deserialize)]
+struct ConfidentialSpace {
+    #[serde(default)]
+    monitoring_enabled: Option<MonitoringEnabled>,
+}
+
+#[derive(Deserialize)]
+struct MonitoringEnabled {
+    memory: bool,
+}
+
+/// The exact command and environment claims approved by the requester.
+#[derive(Deserialize, Serialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct LaunchClaims {
+    args: Vec<String>,
+    cmd_override: Vec<String>,
+    env: BTreeMap<String, String>,
+    env_override: BTreeMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -158,6 +195,7 @@ pub fn verify_google_space_token(
     trusted_jwks: &[u8],
     expected_audience: &[u8],
     expected_nonce: &[u8],
+    expected_launch_claims: &[u8],
     now_secs: u64,
 ) -> Result<VerifiedGoogleSpaceClaims> {
     ensure!(
@@ -175,6 +213,11 @@ pub fn verify_google_space_token(
     ensure!(
         !expected_nonce.is_empty() && expected_nonce.len() <= MAX_NONCE_BYTES,
         "Google nonce has invalid length"
+    );
+    ensure!(
+        !expected_launch_claims.is_empty()
+            && expected_launch_claims.len() <= MAX_LAUNCH_CLAIMS_BYTES,
+        "Google launch policy has invalid length"
     );
     let token = std::str::from_utf8(token).context("Google token is not UTF-8")?;
     let expected_audience =
@@ -242,6 +285,15 @@ pub fn verify_google_space_token(
         "inconsistent Google JWT validity window"
     );
     ensure!(
+        !claims
+            .submods
+            .confidential_space
+            .as_ref()
+            .and_then(|space| space.monitoring_enabled.as_ref())
+            .is_some_and(|monitoring| monitoring.memory),
+        "Google workload memory monitoring is enabled"
+    );
+    ensure!(
         claims.swname == "CONFIDENTIAL_SPACE",
         "not a Confidential Space image"
     );
@@ -273,6 +325,21 @@ pub fn verify_google_space_token(
         "Google JWT has no valid container image digest"
     );
 
+    let launch_claims = LaunchClaims {
+        args: claims.submods.container.args,
+        cmd_override: claims.submods.container.cmd_override,
+        env: claims.submods.container.env,
+        env_override: claims.submods.container.env_override,
+    };
+    let expected_launch_claims: LaunchClaims = serde_json::from_slice(expected_launch_claims)
+        .context("invalid expected Google launch claims")?;
+    ensure!(
+        launch_claims == expected_launch_claims,
+        "Google workload command or environment does not match approved launch policy"
+    );
+    let launch_claims =
+        serde_json::to_vec(&launch_claims).context("failed to encode Google launch claims")?;
+
     let mut segments = token.split('.');
     let _header = segments.next();
     let payload = segments.next().context("Google JWT has no payload")?;
@@ -299,6 +366,7 @@ pub fn verify_google_space_token(
         not_before: claims.nbf,
         expires_at: claims.exp,
         signed_payload,
+        launch_claims,
     })
 }
 
@@ -308,9 +376,13 @@ fn native_verify_google_space_token(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 0);
-    safely_assert_eq!(args.len(), 5);
+    safely_assert_eq!(args.len(), 6);
+    if context.gas_feature_version() < RELEASE_V1_51 {
+        return Err(SafeNativeError::abort(EINVALID_ATTESTATION));
+    }
 
     let now_secs = safely_pop_arg!(args, u64);
+    let expected_launch_claims = safely_pop_arg!(args, Vec<u8>);
     let expected_nonce = safely_pop_arg!(args, Vec<u8>);
     let expected_audience = safely_pop_arg!(args, Vec<u8>);
     let trusted_jwks = safely_pop_arg!(args, Vec<u8>);
@@ -320,7 +392,8 @@ fn native_verify_google_space_token(
         .len()
         .saturating_add(trusted_jwks.len())
         .saturating_add(expected_audience.len())
-        .saturating_add(expected_nonce.len());
+        .saturating_add(expected_nonce.len())
+        .saturating_add(expected_launch_claims.len());
     context.charge(
         GOOGLE_SPACE_VERIFY_BASE + GOOGLE_SPACE_VERIFY_PER_BYTE * NumBytes::new(input_len as u64),
     )?;
@@ -330,6 +403,7 @@ fn native_verify_google_space_token(
         &trusted_jwks,
         &expected_audience,
         &expected_nonce,
+        &expected_launch_claims,
         now_secs,
     )
     .map_err(|_| SafeNativeError::abort(EINVALID_ATTESTATION))?;
@@ -356,6 +430,8 @@ mod tests {
     const JWKS: &[u8] = include_bytes!("../../../../types/src/jwks/rsa/insecure_test_jwk.json");
     const AUDIENCE: &[u8] = b"aptos-attestation-test";
     const NONCE: &[u8] = b"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const STRICT_LAUNCH_CLAIMS: &[u8] =
+        br#"{"args":[],"cmd_override":[],"env":{},"env_override":{}}"#;
     const NOW: u64 = 1_800_000_000;
 
     fn claims() -> Value {
@@ -395,7 +471,7 @@ mod tests {
     }
 
     fn verify(token: &[u8]) -> Result<VerifiedGoogleSpaceClaims> {
-        verify_google_space_token(token, JWKS, AUDIENCE, NONCE, NOW)
+        verify_google_space_token(token, JWKS, AUDIENCE, NONCE, STRICT_LAUNCH_CLAIMS, NOW)
     }
 
     #[test]
@@ -412,6 +488,7 @@ mod tests {
         );
         let signed: Value = serde_json::from_slice(&verified.signed_payload).unwrap();
         assert_eq!(signed["submods"]["gce"]["project_id"], "example");
+        assert_eq!(verified.launch_claims, STRICT_LAUNCH_CLAIMS);
     }
 
     #[test]
@@ -426,16 +503,38 @@ mod tests {
         assert!(verify(&token).is_err());
 
         let token = sign(&claims());
-        assert!(
-            verify_google_space_token(&token, br#"{"keys":[]}"#, AUDIENCE, NONCE, NOW).is_err()
-        );
+        assert!(verify_google_space_token(
+            &token,
+            br#"{"keys":[]}"#,
+            AUDIENCE,
+            NONCE,
+            STRICT_LAUNCH_CLAIMS,
+            NOW,
+        )
+        .is_err());
     }
 
     #[test]
     fn rejects_wrong_audience_nonce_and_issuer() {
         let token = sign(&claims());
-        assert!(verify_google_space_token(&token, JWKS, b"other", NONCE, NOW).is_err());
-        assert!(verify_google_space_token(&token, JWKS, AUDIENCE, b"other", NOW).is_err());
+        assert!(verify_google_space_token(
+            &token,
+            JWKS,
+            b"other",
+            NONCE,
+            STRICT_LAUNCH_CLAIMS,
+            NOW,
+        )
+        .is_err());
+        assert!(verify_google_space_token(
+            &token,
+            JWKS,
+            AUDIENCE,
+            b"other",
+            STRICT_LAUNCH_CLAIMS,
+            NOW,
+        )
+        .is_err());
         let mut claims = claims();
         claims["iss"] = json!("https://accounts.google.com");
         assert!(verify(&sign(&claims)).is_err());
@@ -458,5 +557,40 @@ mod tests {
         claims["secboot"] = json!(true);
         claims["hwmodel"] = json!("GCP_SHIELDED_VM");
         assert!(verify(&sign(&claims)).is_err());
+    }
+
+    #[test]
+    fn launch_claims_must_match_exactly() {
+        let mut claims = claims();
+        claims["submods"]["container"]["args"] = json!(["/app/worker"]);
+        claims["submods"]["container"]["env"] = json!({"OUTPUT_URL": "attacker.example"});
+        let token = sign(&claims);
+        assert!(verify(&token).is_err());
+
+        let approved = br#"{"args":["/app/worker"],"cmd_override":[],"env":{"OUTPUT_URL":"attacker.example"},"env_override":{}}"#;
+        let verified =
+            verify_google_space_token(&token, JWKS, AUDIENCE, NONCE, approved, NOW).unwrap();
+        assert_eq!(verified.launch_claims, approved);
+        let wrong_env = br#"{"args":["/app/worker"],"cmd_override":[],"env":{"OUTPUT_URL":"trusted.example"},"env_override":{}}"#;
+        assert!(verify_google_space_token(&token, JWKS, AUDIENCE, NONCE, wrong_env, NOW).is_err());
+
+        claims["submods"]["container"]["cmd_override"] = json!(["--unsafe"]);
+        claims["submods"]["container"]["env_override"] = json!({"MODE": "unsafe"});
+        let token = sign(&claims);
+        assert!(verify_google_space_token(&token, JWKS, AUDIENCE, NONCE, approved, NOW).is_err());
+        let approved_overrides = br#"{"args":["/app/worker"],"cmd_override":["--unsafe"],"env":{"OUTPUT_URL":"attacker.example"},"env_override":{"MODE":"unsafe"}}"#;
+        assert!(
+            verify_google_space_token(&token, JWKS, AUDIENCE, NONCE, approved_overrides, NOW,)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_memory_monitoring() {
+        let mut claims = claims();
+        claims["submods"]["confidential_space"] = json!({"monitoring_enabled": {"memory": true}});
+        assert!(verify(&sign(&claims)).is_err());
+        claims["submods"]["confidential_space"]["monitoring_enabled"]["memory"] = json!(false);
+        assert!(verify(&sign(&claims)).is_ok());
     }
 }

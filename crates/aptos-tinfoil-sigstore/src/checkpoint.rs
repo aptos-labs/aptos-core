@@ -12,12 +12,9 @@
 // Modifications: replaced CosignVerificationKey with direct p256/ed25519-dalek
 // verification, removed serde impls and is_valid_for_proof.
 
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
-use std::fmt::Write;
-use std::fmt::{Display, Formatter};
-
 use crate::error::{Error, Result};
+use base64::{prelude::BASE64_STANDARD, Engine};
+use std::fmt::{Display, Formatter, Write};
 
 /// A checkpoint (also known as a signed tree head) that is served by the log.
 /// The `note` field stores the tree state, and its authenticity can be verified
@@ -256,8 +253,10 @@ impl CheckpointSignature {
 
 /// Verify ECDSA P-256 signature over a message.
 pub(crate) fn verify_ecdsa_p256(message: &[u8], signature: &[u8], key_der: &[u8]) -> Result<()> {
-    use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
-    use p256::pkcs8::DecodePublicKey;
+    use p256::{
+        ecdsa::{signature::Verifier, Signature, VerifyingKey},
+        pkcs8::DecodePublicKey,
+    };
 
     let verifying_key = VerifyingKey::from_public_key_der(key_der).map_err(|e| {
         Error::SigstoreVerification(format!("Invalid Rekor ECDSA public key: {}", e))
@@ -308,8 +307,10 @@ pub(crate) fn verify_ed25519(message: &[u8], signature: &[u8], key_der: &[u8]) -
 #[cfg(test)]
 mod test {
     mod test_checkpoint_note {
-        use crate::checkpoint::Checkpoint;
-        use crate::checkpoint::OtherContent::{KeyValue, Value};
+        use crate::checkpoint::{
+            Checkpoint,
+            OtherContent::{KeyValue, Value},
+        };
 
         #[test]
         fn test_marshal() {

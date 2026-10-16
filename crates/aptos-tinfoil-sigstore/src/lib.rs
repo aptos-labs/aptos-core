@@ -53,13 +53,12 @@ pub mod trust;
 pub mod types;
 pub mod util;
 
-use der::Decode;
-use serde::Deserialize;
-use x509_cert::Certificate;
-
 pub use certificate::CertificateInfo;
+use der::Decode;
 pub use error::{Error, Result};
+use serde::Deserialize;
 pub use types::{Measurement, PredicateType};
+use x509_cert::Certificate;
 
 /// The OIDC issuer every GitHub Actions signing certificate must carry.
 pub const GITHUB_OIDC_ISSUER: &str = "https://token.actions.githubusercontent.com";

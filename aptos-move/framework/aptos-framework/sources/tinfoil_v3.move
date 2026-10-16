@@ -15,6 +15,7 @@ module aptos_framework::tinfoil_v3 {
     use aptos_std::table_with_length::TableWithLength;
     use aptos_framework::chain_id;
     use aptos_framework::event::emit;
+    use aptos_framework::randomness;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::trust_observation;
@@ -59,6 +60,7 @@ module aptos_framework::tinfoil_v3 {
         chain_id: u8,
         owner: address,
         request_id: u64,
+        entropy: vector<u8>,
     }
 
     /// The framework allowlist is empty until governance explicitly adds a
@@ -217,9 +219,10 @@ module aptos_framework::tinfoil_v3 {
             && ApprovedRepositories[@aptos_framework].entries.contains(&repo)
     }
 
-    /// Creates an on-chain nonce bound to this chain, account and monotonically
-    /// increasing request ID. The v3 document must quote exactly these 32 bytes.
-    public fun begin(
+    /// Creates a fresh nonce from validator randomness, scoped to this chain,
+    /// account and request ID. The v3 document must quote exactly these 32 bytes.
+    /// This must only be called by the private `#[randomness]` entry point.
+    fun begin(
         owner: &signer,
         trusted_repo: vector<u8>,
         expected_tls_spki_sha256: vector<u8>,
@@ -248,6 +251,7 @@ module aptos_framework::tinfoil_v3 {
             chain_id: chain_id::get(),
             owner: addr,
             request_id,
+            entropy: randomness::bytes(32),
         }));
         let expires_at_secs = timestamp::now_seconds() + lifetime_secs;
         state.pending.fill(PendingRequest {
@@ -275,8 +279,10 @@ module aptos_framework::tinfoil_v3 {
         nonce
     }
 
+    #[randomness]
     /// Transaction entry point; reads the nonce from `pending_nonce` or the event.
-    public entry fun begin_entry(
+    /// It is private so a caller cannot inspect and abort on the random result.
+    entry fun begin_entry(
         owner: &signer,
         trusted_repo: vector<u8>,
         expected_tls_spki_sha256: vector<u8>,
@@ -714,10 +720,21 @@ module aptos_framework::tinfoil_v3 {
     }
 
     #[test_only]
+    /// The former challenge preimage, retained to catch a return to a
+    /// predictable nonce derived solely from public request fields.
+    struct PredictableChallengeMaterial has drop {
+        domain: vector<u8>,
+        chain_id: u8,
+        owner: address,
+        request_id: u64,
+    }
+
+    #[test_only]
     fun setup_roots_for_test(framework: &signer) {
         aptos_framework::account::create_account_for_test(@aptos_framework);
         chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
         aptos_framework::config_buffer::initialize(framework);
         aptos_framework::reconfiguration::initialize_for_test(framework);
         trust_observation::initialize(framework);
@@ -734,10 +751,28 @@ module aptos_framework::tinfoil_v3 {
     }
 
     #[test(framework = @aptos_framework, owner = @0x42)]
+    fun test_nonce_requires_unpredictable_entropy(framework: &signer, owner: &signer) {
+        chain_id::initialize_for_test(framework, 4);
+        timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
+        set_repository_approved(framework, b"tinfoilsh/example", true);
+        let predictable = hash::sha3_256(bcs::to_bytes(&PredictableChallengeMaterial {
+            domain: CHALLENGE_DOMAIN,
+            chain_id: chain_id::get(),
+            owner: owner.address_of(),
+            request_id: 0,
+        }));
+        let issued = begin(owner, b"tinfoilsh/example", filled_byte(1, 32), 60);
+        assert!(issued != predictable, 1);
+        assert!(pending_nonce(owner.address_of()).extract() == issued, 2);
+    }
+
+    #[test(framework = @aptos_framework, owner = @0x42)]
     #[expected_failure(abort_code = 0x3000C, location = Self)]
     fun test_reject_stage_out_of_order(framework: &signer, owner: &signer) {
         chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
         set_repository_approved(framework, b"tinfoilsh/example", true);
         begin(owner, b"tinfoilsh/example", filled_byte(1, 32), 60);
         append_chunk(owner, b"untrusted code fragment");
@@ -749,6 +784,7 @@ module aptos_framework::tinfoil_v3 {
     fun test_revocation_blocks_in_flight_request(framework: &signer, owner: &signer) {
         chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
         set_repository_approved(framework, b"tinfoilsh/example", true);
         begin(owner, b"tinfoilsh/example", filled_byte(1, 32), 60);
         append_chunk(owner, b"untrusted quote fragment");
@@ -777,6 +813,7 @@ module aptos_framework::tinfoil_v3 {
     fun test_quote_key_must_match_request(framework: &signer, owner: &signer) {
         chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
         set_repository_approved(framework, b"tinfoilsh/example", true);
         begin(owner, b"tinfoilsh/example", filled_byte(1, 32), 60);
         let quote = QuoteStage {
@@ -806,6 +843,7 @@ module aptos_framework::tinfoil_v3 {
     fun test_code_repo_must_match_request(framework: &signer, owner: &signer) {
         chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
         set_repository_approved(framework, b"tinfoilsh/example", true);
         begin(owner, b"tinfoilsh/example", filled_byte(1, 32), 60);
         let code = CodeStage {
@@ -829,6 +867,7 @@ module aptos_framework::tinfoil_v3 {
     fun test_chunked_lifecycle(framework: &signer, owner: &signer) {
         chain_id::initialize_for_test(framework, 4);
         timestamp::set_time_has_started_for_testing(framework);
+        randomness::initialize_for_testing(framework);
         set_repository_approved(framework, b"tinfoilsh/example", true);
         let tls_spki = vector[];
         for (i in 0..32) { tls_spki.push_back(1); };
