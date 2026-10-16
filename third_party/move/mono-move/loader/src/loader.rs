@@ -23,14 +23,15 @@ use crate::{
     read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use mono_move_core::{
+    check_well_formedness,
     interner::{
         script_module_id, view_module_id, InternedIdentifier, InternedModuleId, SCRIPT_MAIN,
     },
     native::NativeResolver,
     types::{view_name, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    verify_function, DescriptorId, ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols,
-    Function, FunctionPtr, GasMeter, Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider,
-    VMInternalError, VMResult, ValueLayout,
+    DescriptorId, ErrorLocation, FieldTypes, FrameOffset, FrameworkSymbols, Function, FunctionPtr,
+    GasMeter, Interner, LayoutId, LayoutProvider, ModuleId, ModuleProvider, VMInternalError,
+    VMResult, ValueLayout,
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
@@ -106,7 +107,7 @@ pub struct Loader<'guard, 'ctx> {
     natives: &'guard dyn NativeResolver,
 }
 
-/// Preserves the verifier's error details, including its location.
+/// Preserves the checker's error details, including its location.
 fn script_verification_failed(error: VMError) -> VMInternalError {
     VMInternalError::new(LoaderError::ScriptVerificationFailed { error })
 }
@@ -435,7 +436,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
-        // TODO(metering): the lowering work, including micro-op verification
+        // TODO(metering): the lowering work, including the well-formedness check
         // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
         let descriptors = try_discover_types_for_lowering_in_function(
@@ -483,11 +484,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }))
             },
         };
-        // Verify once per lowering, before the function is leaked into a
-        // cache: a rejected function is dropped here and never executed.
-        let errors = verify_function(&function, self.guard);
+        // Check well-formedness once per lowering, before the function is
+        // leaked into a cache: a rejected function is dropped here and never
+        // executed.
+        let errors = check_well_formedness(&function, self.guard, &module.ir().module);
         if !errors.is_empty() {
-            invariant_violation!(MicroOpVerificationFailed { errors });
+            invariant_violation!(NotWellFormed { errors });
         }
         Ok((function, function_ms))
     }

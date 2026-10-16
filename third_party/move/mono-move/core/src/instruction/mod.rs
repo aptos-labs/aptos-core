@@ -127,7 +127,9 @@ use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
+mod operands;
 mod unspecialized;
+pub use operands::{OperandKind, UnknownOperandLayout};
 pub use unspecialized::{
     CmpKind, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp, IntOperand, IntShiftOp, IntTy,
     JumpIntCmpOp, JumpValueCmpOp, JumpValueRefCmpOp, ShiftOperand, ValueCmpOp, ValueRefCmpOp,
@@ -193,6 +195,14 @@ pub struct SizedSlot {
     pub offset: FrameOffset,
     pub size: u32,
     pub align: u32,
+}
+
+impl SizedSlot {
+    /// One past the slot's last byte. Two `u32`s widened to `usize` cannot
+    /// overflow on a 64-bit target.
+    pub fn end(&self) -> usize {
+        self.offset.0 as usize + self.size as usize
+    }
 }
 
 /// Reference to the target function of a closure.
@@ -2210,6 +2220,120 @@ pub fn captured_values_size(slots: impl IntoIterator<Item = (u32, u32)>) -> u32 
 }
 
 impl MicroOp {
+    /// Returns `true` if the dispatch loop does not fall through to `pc + 1`
+    /// after this op within the current frame: it leaves the function or
+    /// jumps. Calls do not qualify, since they return to `pc + 1`.
+    pub fn is_terminator(&self) -> bool {
+        match self {
+            MicroOp::Return
+            | MicroOp::Abort { .. }
+            | MicroOp::AbortMsg { .. }
+            | MicroOp::Jump { .. } => true,
+            MicroOp::StoreImm1 { .. }
+            | MicroOp::StoreImm2 { .. }
+            | MicroOp::StoreImm4 { .. }
+            | MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
+            | MicroOp::Move8 { .. }
+            | MicroOp::Move { .. }
+            | MicroOp::AddU64 { .. }
+            | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
+            | MicroOp::SubU64Imm { .. }
+            | MicroOp::RSubU64Imm { .. }
+            | MicroOp::MulU64 { .. }
+            | MicroOp::MulU64Imm { .. }
+            | MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
+            | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
+            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::IntAdd(_)
+            | MicroOp::IntSub(_)
+            | MicroOp::IntMul(_)
+            | MicroOp::IntDiv(_)
+            | MicroOp::IntMod(_)
+            | MicroOp::IntBitAnd(_)
+            | MicroOp::IntBitOr(_)
+            | MicroOp::IntBitXor(_)
+            | MicroOp::IntShl(_)
+            | MicroOp::IntShr(_)
+            | MicroOp::IntNegate(_)
+            | MicroOp::IntCast(_)
+            | MicroOp::IntCmp(_)
+            | MicroOp::ValueCmp(_)
+            | MicroOp::ValueRefCmp(_)
+            | MicroOp::BoolNot { .. }
+            | MicroOp::BoolAnd { .. }
+            | MicroOp::BoolOr { .. }
+            | MicroOp::CallIndirect { .. }
+            | MicroOp::CallDirect { .. }
+            | MicroOp::CallNative { .. }
+            | MicroOp::JumpNotZeroU64 { .. }
+            | MicroOp::JumpNotZeroByte { .. }
+            | MicroOp::JumpZeroByte { .. }
+            | MicroOp::JumpIntCmp(_)
+            | MicroOp::JumpValueCmp(_)
+            | MicroOp::JumpValueRefCmp(_)
+            | MicroOp::JumpGreaterEqualU64Imm { .. }
+            | MicroOp::JumpLessU64Imm { .. }
+            | MicroOp::JumpGreaterU64Imm { .. }
+            | MicroOp::JumpLessEqualU64Imm { .. }
+            | MicroOp::JumpLessU64 { .. }
+            | MicroOp::JumpGreaterEqualU64 { .. }
+            | MicroOp::JumpNotEqualU64 { .. }
+            | MicroOp::VecNew { .. }
+            | MicroOp::VecLen { .. }
+            | MicroOp::VecPushBack { .. }
+            | MicroOp::VecPopBack { .. }
+            | MicroOp::VecLoadElem { .. }
+            | MicroOp::VecStoreElem { .. }
+            | MicroOp::VecPack(_)
+            | MicroOp::VecUnpack(_)
+            | MicroOp::VecSwap { .. }
+            | MicroOp::StoreImmVec { .. }
+            | MicroOp::SlotBorrow { .. }
+            | MicroOp::VecBorrow { .. }
+            | MicroOp::HeapBorrow { .. }
+            | MicroOp::ReadRef { .. }
+            | MicroOp::WriteRef { .. }
+            | MicroOp::HeapReadOffset { .. }
+            | MicroOp::HeapWriteOffset { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
+            | MicroOp::HeapNew { .. }
+            | MicroOp::HeapMoveFrom8 { .. }
+            | MicroOp::HeapMoveFrom { .. }
+            | MicroOp::HeapMoveTo8 { .. }
+            | MicroOp::HeapMoveToImm8 { .. }
+            | MicroOp::HeapMoveTo { .. }
+            | MicroOp::Exists { .. }
+            | MicroOp::BorrowGlobal { .. }
+            | MicroOp::BorrowGlobalMut { .. }
+            | MicroOp::MoveFrom { .. }
+            | MicroOp::MoveTo { .. }
+            | MicroOp::StoreRandomU64 { .. }
+            | MicroOp::ForceGC
+            | MicroOp::PackClosure(_)
+            | MicroOp::CallClosure(_)
+            | MicroOp::EnumTestTag { .. }
+            | MicroOp::EnumBorrowVariantFieldByTag { .. }
+            | MicroOp::EnumCheckVariant { .. }
+            | MicroOp::EnumNew { .. }
+            | MicroOp::EnumReadVariantFieldByTag { .. }
+            | MicroOp::EnumWriteVariantFieldByTag { .. }
+            | MicroOp::DeepCopyHeapPtrs { .. } => false,
+        }
+    }
+
     /// Returns `true` if this op can trigger GC in the current frame.
     pub fn is_allocating(&self) -> bool {
         match self {
