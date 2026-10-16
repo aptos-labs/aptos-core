@@ -389,6 +389,9 @@ pub struct ProposalGenerator {
     max_block_txns_after_filtering: u64,
     // Max number of inline transactions (count, bytes) to be added to a proposed block.
     max_inline_txns: PayloadTxnsSize,
+    // Max number of batch entries (proofs, inline batches and opt batches) to be
+    // added to a proposed block.
+    max_block_batch_entries: u64,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
 
@@ -421,6 +424,7 @@ impl ProposalGenerator {
         max_block_txns: PayloadTxnsSize,
         max_block_txns_after_filtering: u64,
         max_inline_txns: PayloadTxnsSize,
+        max_block_batch_entries: u64,
         max_failed_authors_to_store: usize,
         min_max_txns_in_block_after_filtering_from_backpressure: u64,
         max_block_gas_limit: Option<u64>,
@@ -440,6 +444,7 @@ impl ProposalGenerator {
             max_block_txns_after_filtering,
             min_max_txns_in_block_after_filtering_from_backpressure,
             max_inline_txns,
+            max_block_batch_entries,
             max_failed_authors_to_store,
             max_block_gas_limit,
             pipeline_backpressure_config,
@@ -654,6 +659,7 @@ impl ProposalGenerator {
                     soft_max_txns_after_filtering: max_txns_from_block_to_execute
                         .unwrap_or(max_block_txns_after_filtering),
                     max_inline_txns: self.max_inline_txns,
+                    max_num_batch_entries: self.max_block_batch_entries,
                     maybe_optqs_payload_pull_params,
                     user_txn_filter: payload_filter,
                     pending_ordering,

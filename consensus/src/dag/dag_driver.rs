@@ -264,6 +264,8 @@ impl DagDriver {
                     max_txns_after_filtering: max_txns,
                     soft_max_txns_after_filtering: max_txns,
                     max_inline_txns: PayloadTxnsSize::new(100, 100 * 1024),
+                    // DAG nodes are not subject to the proposal batch entry limit
+                    max_num_batch_entries: u64::MAX,
                     maybe_optqs_payload_pull_params: None,
                     user_txn_filter: payload_filter,
                     pending_ordering: false,

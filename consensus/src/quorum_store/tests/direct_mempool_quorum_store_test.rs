@@ -35,6 +35,7 @@ async fn test_block_request_no_txns() {
             max_txns_after_filtering: 100,
             soft_max_txns_after_filtering: 100,
             max_inline_txns: PayloadTxnsSize::new(50, 500),
+            max_num_batch_entries: u64::MAX,
             return_non_full: true,
             filter: PayloadFilter::DirectMempool(vec![]),
             callback: consensus_callback,

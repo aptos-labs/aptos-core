@@ -21,6 +21,8 @@ pub struct GetPayloadRequest {
     pub maybe_optqs_payload_pull_params: Option<OptQSPayloadPullParams>,
     // max number of inline transactions (transactions without a proof of store)
     pub max_inline_txns: PayloadTxnsSize,
+    // max number of batch entries (proofs, inline batches and opt batches) in the block
+    pub max_num_batch_entries: u64,
     // return non full
     pub return_non_full: bool,
     // block payloads to exclude from the requested block
@@ -41,8 +43,8 @@ impl fmt::Display for GetPayloadCommand {
         match self {
             GetPayloadCommand::GetPayloadRequest(request) => {
                 write!(f,
-                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, soft_max_txns_after_filtering: {}, max_inline_txns: {}, return_non_full: {}, block_timestamp: {:?}]",
-                    request.max_txns, request.max_txns_after_filtering, request.soft_max_txns_after_filtering, request.max_inline_txns, request.return_non_full, request.block_timestamp
+                    "GetPayloadRequest [max_txns: {}, max_txns_after_filtering: {}, soft_max_txns_after_filtering: {}, max_inline_txns: {}, max_num_batch_entries: {}, return_non_full: {}, block_timestamp: {:?}]",
+                    request.max_txns, request.max_txns_after_filtering, request.soft_max_txns_after_filtering, request.max_inline_txns, request.max_num_batch_entries, request.return_non_full, request.block_timestamp
                 )
             },
         }
