@@ -285,13 +285,13 @@ pub fn verify_google_space_token(
         "inconsistent Google JWT validity window"
     );
     ensure!(
-        !claims
+        claims
             .submods
             .confidential_space
             .as_ref()
             .and_then(|space| space.monitoring_enabled.as_ref())
-            .is_some_and(|monitoring| monitoring.memory),
-        "Google workload memory monitoring is enabled"
+            .is_some_and(|monitoring| !monitoring.memory),
+        "Google workload memory monitoring must be explicitly disabled"
     );
     ensure!(
         claims.swname == "CONFIDENTIAL_SPACE",
@@ -449,6 +449,7 @@ mod tests {
             "swname": "CONFIDENTIAL_SPACE",
             "dbgstat": "disabled-since-boot",
             "submods": {
+                "confidential_space": {"monitoring_enabled": {"memory": false}},
                 "container": {
                     "image_digest": format!("sha256:{}", "a".repeat(64)),
                     "image_reference": "example.com/workload:latest"
@@ -592,5 +593,10 @@ mod tests {
         assert!(verify(&sign(&claims)).is_err());
         claims["submods"]["confidential_space"]["monitoring_enabled"]["memory"] = json!(false);
         assert!(verify(&sign(&claims)).is_ok());
+        claims["submods"]
+            .as_object_mut()
+            .unwrap()
+            .remove("confidential_space");
+        assert!(verify(&sign(&claims)).is_err());
     }
 }

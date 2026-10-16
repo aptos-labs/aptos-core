@@ -73,6 +73,10 @@
 //! feature pulls in the async PCCS collateral client (`reqwest` + `tokio`); drop
 //! it for offline verification on size-constrained targets.
 
+// This offline vendored build removes upstream optional feature dependencies,
+// while leaving their disabled cfg blocks intact. Workspace -Wunexpected_cfgs
+// would otherwise reject those upstream-only feature names under -Dwarnings.
+#![allow(unexpected_cfgs)]
 #![cfg_attr(all(not(test), not(feature = "std")), no_std)]
 
 #[macro_use]
