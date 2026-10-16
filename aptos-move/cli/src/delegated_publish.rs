@@ -392,3 +392,249 @@ mod tests {
         }
     }
 }
+
+/// Upload a package under the signing account; publication requires a separate B-signed command.
+#[derive(clap::Parser)]
+pub struct StageDelegatedPackage {
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    module_address: AccountAddress,
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    publisher: AccountAddress,
+    #[clap(flatten)]
+    move_options: crate::move_types::MovePackageOptions,
+    #[clap(flatten)]
+    included_artifacts: crate::commands::IncludedArtifactsArgs,
+    #[clap(flatten)]
+    txn_options: TransactionOptions,
+    #[clap(long, value_enum, default_value = "auto")]
+    stage_mode: StageMode,
+    #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
+    chunk_size: usize,
+    #[clap(long, default_value_t = 10, value_parser = clap::value_parser!(u16).range(1..=100))]
+    parallelism: u16,
+    #[clap(skip)]
+    pub env: std::sync::Arc<crate::MoveEnv>,
+}
+
+impl crate::WithMoveEnv for StageDelegatedPackage {
+    fn attach_env(mut self, env: std::sync::Arc<crate::MoveEnv>) -> Self {
+        self.env = env;
+        self
+    }
+}
+
+/// An incompatible or absent contract cannot be used as a staging target.
+async fn check_delegated_module(
+    options: &TransactionOptions,
+    address: AccountAddress,
+) -> CliTypedResult<()> {
+    use aptos_api_types::AptosErrorCode;
+    use aptos_rest_client::error::RestError;
+    use aptos_transaction_simulation_session::Session;
+    use aptos_types::state_store::{state_key::StateKey, TStateView};
+    use move_binary_format::access::ModuleAccess;
+
+    let bytes = if let Some(path) = &options.session {
+        Session::load(path)?
+            .state_store()
+            .get_state_value_bytes(&StateKey::module(
+                &address,
+                ident_str!("delegated_packages"),
+            ))
+            .map_err(|e| {
+                CliError::UnexpectedError(format!("Failed to read delegated module: {e}"))
+            })?
+    } else {
+        match options
+            .rest_client()?
+            .get_account_module_bcs(address, "delegated_packages")
+            .await
+        {
+            Ok(response) => Some(response.into_inner()),
+            Err(RestError::Api(response))
+                if response.error.error_code == AptosErrorCode::ModuleNotFound =>
+            {
+                None
+            },
+            Err(error) => return Err(CliError::from(error)),
+        }
+    };
+    let unsupported = || {
+        CliError::CommandArgumentError(format!(
+        "Unsupported delegated_packages module at {address}: expected open_staging and stage_chunks entry functions"
+    ))
+    };
+    let bytes = bytes.ok_or_else(unsupported)?;
+    let module =
+        move_binary_format::CompiledModule::deserialize(&bytes).map_err(|_| unsupported())?;
+    let entries: std::collections::HashSet<_> = module
+        .function_defs()
+        .iter()
+        .filter(|def| def.is_entry)
+        .map(|def| {
+            module
+                .identifier_at(module.function_handle_at(def.function).name)
+                .as_str()
+        })
+        .collect();
+    if !entries.contains("open_staging") || !entries.contains("stage_chunks") {
+        return Err(unsupported());
+    }
+    Ok(())
+}
+
+/// First-run only: never clear or overwrite an unverified staging area.
+async fn ensure_no_staging_area(
+    options: &TransactionOptions,
+    module: AccountAddress,
+) -> CliTypedResult<()> {
+    use aptos_api_types::AptosErrorCode;
+    use aptos_rest_client::error::RestError;
+    use aptos_transaction_simulation_session::Session;
+    use aptos_types::state_store::{state_key::StateKey, TStateView};
+    use move_core_types::language_storage::StructTag;
+    use std::str::FromStr;
+
+    let name = format!("{module}::delegated_packages::StagingArea");
+    let sender = options.get_public_key_and_address()?.1;
+    let exists = if let Some(path) = &options.session {
+        let key = StateKey::resource(
+            &sender,
+            &StructTag::from_str(&name).map_err(|e| CliError::UnexpectedError(e.to_string()))?,
+        )
+        .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
+        Session::load(path)?
+            .state_store()
+            .get_state_value_bytes(&key)
+            .map_err(|e| CliError::UnexpectedError(format!("Failed to read staging area: {e}")))?
+            .is_some()
+    } else {
+        match options
+            .rest_client()?
+            .get_account_resource(sender, &name)
+            .await
+        {
+            Ok(response) => response.into_inner().is_some(),
+            Err(RestError::Api(response))
+                if response.error.error_code == AptosErrorCode::ResourceNotFound =>
+            {
+                false
+            },
+            Err(error) => return Err(CliError::from(error)),
+        }
+    };
+    if exists {
+        return Err(CliError::CommandArgumentError(format!(
+            "StagingArea already exists under {sender}; refusing to overwrite or clean it. Resume is not supported by this first version. Clean it explicitly before restaging."
+        )));
+    }
+    Ok(())
+}
+
+// A pending, failed, or discarded transaction is not proof of commitment.
+fn committed(
+    outcome: CliTypedResult<aptos_cli_common::TransactionSummary>,
+) -> CliTypedResult<aptos_cli_common::TransactionSummary> {
+    let summary = outcome?;
+    if summary.success != Some(true) {
+        return Err(CliError::SimulationError(summary.vm_status.unwrap_or_else(
+            || "Staging transaction was not confirmed successful".into(),
+        )));
+    }
+    Ok(summary)
+}
+
+async fn submit_stage_batches(
+    payloads: Vec<TransactionPayload>,
+    options: &TransactionOptions,
+    env: &crate::MoveEnv,
+    parallelism: usize,
+) -> CliTypedResult<usize> {
+    let total = payloads.len();
+    let mut submitted = 0;
+    for group in payloads.chunks(parallelism) {
+        let outcomes = crate::dispatch_transactions(group.to_vec(), options, env).await?;
+        // The submitter may stop early. Never treat missing outcomes as success.
+        let incomplete = outcomes.len() != group.len();
+        let mut failure = None;
+        for outcome in outcomes {
+            if let Err(error) = committed(outcome) {
+                failure.get_or_insert(error);
+            }
+        }
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        if incomplete {
+            return Err(CliError::UnexpectedError(
+                "Some staging transactions were not submitted".into(),
+            ));
+        }
+        submitted += group.len();
+    }
+    debug_assert_eq!(submitted, total);
+    Ok(submitted)
+}
+
+#[async_trait::async_trait]
+impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
+    fn command_name(&self) -> &'static str {
+        "StageDelegatedPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use aptos_cli_common::ReplayProtectionType;
+        use aptos_framework::chunked_publish::PositionalChunks;
+        let options = &self.txn_options;
+        // Offline simulation cannot attest to the chain's nonce feature flag.
+        let offline =
+            options.session.is_some() || options.local || options.benchmark || options.profile_gas;
+        let enabled = if offline {
+            false
+        } else {
+            chain_orderless_enabled(options).await?
+        };
+        let mode = resolve_stage_mode(self.stage_mode, enabled, offline)?;
+        if !(1..=CHUNK_SIZE_IN_BYTES).contains(&self.chunk_size) {
+            return Err(CliError::CommandArgumentError(format!(
+                "--chunk-size must be between 1 and {CHUNK_SIZE_IN_BYTES}"
+            )));
+        }
+        check_delegated_module(options, self.module_address).await?;
+        ensure_no_staging_area(options, self.module_address).await?;
+        let package = crate::commands::build_package_options(
+            &self.move_options,
+            &self.included_artifacts,
+            &self.env,
+        )
+        .map_err(|e| CliError::MoveCompilationError(format!("{e:#}")))?;
+        let metadata = bcs::to_bytes(&package.extract_metadata()?)?;
+        let code = package.extract_code();
+        let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
+        let payloads = stage_chunks(self.module_address, chunks.chunks, self.chunk_size);
+        let mut txn_options = options.clone();
+        // Open in its own A-signed committed transaction before any chunk can be sent.
+        txn_options.replay_protection_type = ReplayProtectionType::Seqnum;
+        committed(
+            crate::dispatch_transaction(
+                open_staging(self.module_address, self.publisher),
+                &txn_options,
+                &self.env,
+            )
+            .await,
+        )?;
+        txn_options.replay_protection_type = match mode {
+            StageMode::Nonce => ReplayProtectionType::Nonce,
+            StageMode::Seqnum => ReplayProtectionType::Seqnum,
+            StageMode::Auto => unreachable!("mode is resolved"),
+        };
+        let count = submit_stage_batches(
+            payloads,
+            &txn_options,
+            &self.env,
+            usize::from(self.parallelism),
+        )
+        .await?;
+        Ok(format!("Staged {count} chunk transactions under the signing account for publisher {}. Finalization requires the publisher's signature.", self.publisher))
+    }
+}
