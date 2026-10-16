@@ -15,21 +15,44 @@ use aptos_native_interface::{
     SafeNativeError, SafeNativeResult,
 };
 use aptos_tinfoil_sigstore::provenance::{AuthenticatedArtifact, Shape};
-use aptos_tinfoil_v3::{tdx::AuthenticatedQuote, CodeStage, PlatformStage, QuoteStage};
-use move_core_types::gas_algebra::NumBytes;
+use aptos_tinfoil_v3::{
+    envelope::{Document, COLLATERAL_SIGSTORE_CODE_V1_FORMAT},
+    tdx::AuthenticatedQuote,
+    CodeStage, PlatformStage, QuoteStage,
+};
+use move_core_types::{
+    gas_algebra::NumBytes,
+    language_storage::{OPTION_NONE_TAG, OPTION_SOME_TAG},
+};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
 };
+use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{borrow::Cow, collections::VecDeque};
 
 const EINVALID_TINFOIL_PROOF: u64 = 1;
 const MAX_ROOT_BYTES: usize = 60 * 1024;
 const MAX_REPO_BYTES: usize = 200;
 const MAX_STAGE_BYTES: usize = 1024 * 1024;
+const MAX_DOCUMENT_BYTES: usize = 4 * 1024 * 1024;
+const MAX_EAT_BYTES: usize = 1024 * 1024;
+const MAX_ATTESTATION_BYTES: usize = MAX_DOCUMENT_BYTES + MAX_EAT_BYTES;
 const MAX_STAGE_STATE_BYTES: usize = 4096;
+const ATTESTATION_PACKAGE_MAGIC: &[u8] = b"APTOS-TINFOIL-V3\0";
+const ATTESTATION_PACKAGE_VERSION: u8 = 1;
+
+/// BCS fields follow the magic prefix in this exact order. The EAT is kept
+/// verbatim in the Move object for future GPU verification; no GPU claim is
+/// currently accepted without a quote-bound device identity correlation.
+#[derive(Deserialize)]
+struct AttestationPackageV1 {
+    version: u8,
+    tinfoil_document: Vec<u8>,
+    nras_detached_eat: Vec<u8>,
+}
 
 fn invalid() -> SafeNativeError {
     SafeNativeError::abort(EINVALID_TINFOIL_PROOF)
@@ -51,6 +74,99 @@ fn verified<T>(
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(f))
         .map_err(|_| invalid())?
         .map_err(|_| invalid())
+}
+
+/// Evidence rejection is a value in the object workflow, so Move can store
+/// FAIL and emit its outcome event. VM limits and invariant errors still abort.
+fn attempted<T>(f: impl FnOnce() -> SafeNativeResult<T>) -> SafeNativeResult<Option<T>> {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(Ok(value)) => Ok(Some(value)),
+        Ok(Err(SafeNativeError::Abort { abort_code, .. }))
+            if abort_code == EINVALID_TINFOIL_PROOF =>
+        {
+            Ok(None)
+        },
+        Ok(Err(err)) => Err(err),
+        Err(_) => Ok(None),
+    }
+}
+
+fn option_to_move(context: &SafeNativeContext, value: Option<Value>) -> SafeNativeResult<Value> {
+    let enum_enabled = context.get_feature_flags().is_enum_option_enabled();
+    match (enum_enabled, value) {
+        (true, Some(value)) => Ok(Value::struct_(Struct::pack_variant(
+            OPTION_SOME_TAG,
+            vec![value],
+        ))),
+        (true, None) => Ok(Value::struct_(Struct::pack_variant(
+            OPTION_NONE_TAG,
+            vec![],
+        ))),
+        (false, Some(value)) => Ok(Value::struct_(Struct::pack(vec![Value::vector_unchecked(
+            vec![value],
+        )?]))),
+        (false, None) => Ok(Value::struct_(Struct::pack(vec![Value::vector_unchecked(
+            vec![],
+        )?]))),
+    }
+}
+
+/// Full documents are stored once in a verification object and read by each
+/// advance transaction. Charge for all bytes parsed by that stage, including
+/// the root and authenticated state supplied by Move.
+fn charge_document(
+    context: &mut SafeNativeContext,
+    document: &[u8],
+    root: &[u8],
+    extra_len: usize,
+) -> SafeNativeResult<()> {
+    let len = document
+        .len()
+        .saturating_add(root.len())
+        .saturating_add(extra_len);
+    context.charge(TINFOIL_V3_VERIFY_BASE + TINFOIL_V3_VERIFY_PER_BYTE * NumBytes::new(len as u64))
+}
+
+fn check_attestation_args(
+    attestation: &[u8],
+    root: &[u8],
+    extra_len: usize,
+) -> SafeNativeResult<()> {
+    if attestation.is_empty()
+        || attestation.len() > MAX_ATTESTATION_BYTES
+        || root.is_empty()
+        || root.len() > MAX_ROOT_BYTES
+        || extra_len > MAX_STAGE_STATE_BYTES
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+fn tinfoil_document(attestation: &[u8]) -> SafeNativeResult<Cow<'_, [u8]>> {
+    if attestation
+        .iter()
+        .copied()
+        .find(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+        == Some(b'{')
+    {
+        if attestation.len() > MAX_DOCUMENT_BYTES {
+            return Err(invalid());
+        }
+        return Ok(Cow::Borrowed(attestation));
+    }
+    let package_bytes = attestation
+        .strip_prefix(ATTESTATION_PACKAGE_MAGIC)
+        .ok_or_else(invalid)?;
+    let package: AttestationPackageV1 = bcs::from_bytes(package_bytes).map_err(|_| invalid())?;
+    if package.version != ATTESTATION_PACKAGE_VERSION
+        || package.tinfoil_document.is_empty()
+        || package.tinfoil_document.len() > MAX_DOCUMENT_BYTES
+        || package.nras_detached_eat.len() > MAX_EAT_BYTES
+    {
+        return Err(invalid());
+    }
+    Ok(Cow::Owned(package.tinfoil_document))
 }
 
 fn charge_stage(
@@ -434,6 +550,178 @@ fn native_verify_tinfoil_v3_platform_freshness(
     Ok(smallvec![])
 }
 
+/// The repository in the envelope is a *claim*, not a trust root. Move checks
+/// its governance allowlist before passing it to the code verifier, which then
+/// authenticates the Sigstore certificate identity against that exact name.
+fn claimed_repo_and_nonce(document: &[u8]) -> SafeNativeResult<(String, [u8; 32])> {
+    let parsed = Document::parse(document).map_err(|_| invalid())?;
+    let nonce = fixed::<32>(lower_hex(&parsed.raw.challenge.nonce, 32)?)?;
+    let code = parsed
+        .reference_values_collateral(COLLATERAL_SIGSTORE_CODE_V1_FORMAT)
+        .ok_or_else(invalid)?;
+    let repo = code
+        .data
+        .get("repo")
+        .and_then(|value| value.as_str())
+        .ok_or_else(invalid)?;
+    Ok((stage_repo(repo.as_bytes().to_vec())?, nonce))
+}
+
+/// First advancement of an object-style verification. The full envelope is
+/// kept in the object; no caller-selected fragment is allowed to substitute
+/// a different collateral entry later in the workflow.
+fn native_try_verify_tinfoil_v3_quote(
+    context: &mut SafeNativeContext,
+    ty_args: &[Type],
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(ty_args.len(), 0);
+    safely_assert_eq!(args.len(), 3);
+    require_gas_feature_version(context)?;
+    let intel_root = safely_pop_arg!(args, Vec<u8>);
+    let proof_time = safely_pop_arg!(args, u64);
+    let attestation = safely_pop_arg!(args, Vec<u8>);
+    charge_document(context, &attestation, &intel_root, 0)?;
+    let outcome = attempted(|| {
+        check_attestation_args(&attestation, &intel_root, 0)?;
+        let document = tinfoil_document(&attestation)?;
+        let (repo, nonce) = claimed_repo_and_nonce(&document)?;
+        let quote = verified(|| {
+            aptos_tinfoil_v3::verify_quote_stage(&document, &nonce, proof_time, &intel_root)
+        })?;
+        Ok(Value::struct_(Struct::pack(vec![
+            Value::vector_u8(nonce.to_vec()),
+            Value::vector_u8(repo.into_bytes()),
+            quote_to_move(quote)?,
+        ])))
+    })?;
+    Ok(smallvec![option_to_move(context, outcome)?])
+}
+
+fn native_try_verify_tinfoil_v3_code(
+    context: &mut SafeNativeContext,
+    ty_args: &[Type],
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(ty_args.len(), 0);
+    safely_assert_eq!(args.len(), 5);
+    require_gas_feature_version(context)?;
+    let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
+    let sigstore_root = safely_pop_arg!(args, Vec<u8>);
+    let repo = stage_repo(safely_pop_arg!(args, Vec<u8>))?;
+    let nonce = safely_pop_arg!(args, Vec<u8>);
+    let attestation = safely_pop_arg!(args, Vec<u8>);
+    charge_document(context, &attestation, &sigstore_root, repo.len() + 1024)?;
+    let stage = attempted(|| {
+        check_attestation_args(&attestation, &sigstore_root, repo.len() + 1024)?;
+        let document = tinfoil_document(&attestation)?;
+        let code = verified(|| {
+            aptos_tinfoil_v3::verify_code_stage(&document, &nonce, &repo, &sigstore_root, &quote)
+        })?;
+        code_to_move(code)
+    })?;
+    Ok(smallvec![option_to_move(context, stage)?])
+}
+
+fn native_try_verify_tinfoil_v3_code_freshness(
+    context: &mut SafeNativeContext,
+    ty_args: &[Type],
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(ty_args.len(), 0);
+    safely_assert_eq!(args.len(), 6);
+    require_gas_feature_version(context)?;
+    let code = code_from_move(safely_pop_arg!(args, Struct))?;
+    let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
+    let sigstore_root = safely_pop_arg!(args, Vec<u8>);
+    let proof_time = safely_pop_arg!(args, u64);
+    let nonce = safely_pop_arg!(args, Vec<u8>);
+    let attestation = safely_pop_arg!(args, Vec<u8>);
+    charge_document(context, &attestation, &sigstore_root, 2048)?;
+    let passed = attempted(|| {
+        check_attestation_args(&attestation, &sigstore_root, 2048)?;
+        let document = tinfoil_document(&attestation)?;
+        verified(|| {
+            aptos_tinfoil_v3::verify_code_freshness_stage(
+                &document,
+                &nonce,
+                proof_time,
+                &sigstore_root,
+                &quote,
+                &code,
+            )
+        })
+    })?
+    .is_some();
+    Ok(smallvec![Value::bool(passed)])
+}
+
+fn native_try_verify_tinfoil_v3_platform(
+    context: &mut SafeNativeContext,
+    ty_args: &[Type],
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(ty_args.len(), 0);
+    safely_assert_eq!(args.len(), 6);
+    require_gas_feature_version(context)?;
+    let code = code_from_move(safely_pop_arg!(args, Struct))?;
+    let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
+    let sigstore_root = safely_pop_arg!(args, Vec<u8>);
+    let proof_time = safely_pop_arg!(args, u64);
+    let nonce = safely_pop_arg!(args, Vec<u8>);
+    let attestation = safely_pop_arg!(args, Vec<u8>);
+    charge_document(context, &attestation, &sigstore_root, 2048)?;
+    let stage = attempted(|| {
+        check_attestation_args(&attestation, &sigstore_root, 2048)?;
+        let document = tinfoil_document(&attestation)?;
+        let platform = verified(|| {
+            aptos_tinfoil_v3::verify_platform_stage(
+                &document,
+                &nonce,
+                proof_time,
+                &sigstore_root,
+                &quote,
+                &code,
+            )
+        })?;
+        platform_to_move(platform)
+    })?;
+    Ok(smallvec![option_to_move(context, stage)?])
+}
+
+fn native_try_verify_tinfoil_v3_platform_freshness(
+    context: &mut SafeNativeContext,
+    ty_args: &[Type],
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    safely_assert_eq!(ty_args.len(), 0);
+    safely_assert_eq!(args.len(), 6);
+    require_gas_feature_version(context)?;
+    let platform = platform_from_move(safely_pop_arg!(args, Struct))?;
+    let quote = quote_from_move(safely_pop_arg!(args, Struct))?;
+    let sigstore_root = safely_pop_arg!(args, Vec<u8>);
+    let proof_time = safely_pop_arg!(args, u64);
+    let nonce = safely_pop_arg!(args, Vec<u8>);
+    let attestation = safely_pop_arg!(args, Vec<u8>);
+    charge_document(context, &attestation, &sigstore_root, 2048)?;
+    let passed = attempted(|| {
+        check_attestation_args(&attestation, &sigstore_root, 2048)?;
+        let document = tinfoil_document(&attestation)?;
+        verified(|| {
+            aptos_tinfoil_v3::verify_platform_freshness_stage(
+                &document,
+                &nonce,
+                proof_time,
+                &sigstore_root,
+                &quote,
+                &platform,
+            )
+        })
+    })?
+    .is_some();
+    Ok(smallvec![Value::bool(passed)])
+}
+
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
@@ -458,6 +746,26 @@ pub fn make_all(
             "verify_tinfoil_v3_platform_freshness",
             native_verify_tinfoil_v3_platform_freshness as RawSafeNative,
         ),
+        (
+            "try_verify_tinfoil_v3_quote",
+            native_try_verify_tinfoil_v3_quote as RawSafeNative,
+        ),
+        (
+            "try_verify_tinfoil_v3_code",
+            native_try_verify_tinfoil_v3_code as RawSafeNative,
+        ),
+        (
+            "try_verify_tinfoil_v3_code_freshness",
+            native_try_verify_tinfoil_v3_code_freshness as RawSafeNative,
+        ),
+        (
+            "try_verify_tinfoil_v3_platform",
+            native_try_verify_tinfoil_v3_platform as RawSafeNative,
+        ),
+        (
+            "try_verify_tinfoil_v3_platform_freshness",
+            native_try_verify_tinfoil_v3_platform_freshness as RawSafeNative,
+        ),
     ])
 }
 
@@ -470,6 +778,35 @@ mod tests {
             Ok(value) => value,
             Err(_) => panic!("native stage conversion failed"),
         }
+    }
+
+    #[test]
+    fn evidence_rejection_is_a_result_for_the_object_workflow() {
+        assert!(native_ok(attempted::<()>(|| Err(invalid()))).is_none());
+        assert_eq!(native_ok(attempted(|| Ok(7u64))), Some(7));
+    }
+
+    #[test]
+    fn package_parser_requires_magic_version_and_exact_bcs() {
+        assert_eq!(
+            native_ok(tinfoil_document(b"{}")),
+            Cow::Borrowed(&b"{}"[..])
+        );
+        assert_eq!(native_ok(tinfoil_document(b" \n{}")).as_ref(), b" \n{}");
+
+        let package = bcs::to_bytes(&(1u8, b"{}".to_vec(), b"eat".to_vec())).unwrap();
+        let mut wrapped = ATTESTATION_PACKAGE_MAGIC.to_vec();
+        wrapped.extend_from_slice(&package);
+        assert_eq!(native_ok(tinfoil_document(&wrapped)).as_ref(), b"{}");
+
+        let mut bad_version = ATTESTATION_PACKAGE_MAGIC.to_vec();
+        bad_version
+            .extend_from_slice(&bcs::to_bytes(&(2u8, b"{}".to_vec(), Vec::<u8>::new())).unwrap());
+        assert!(tinfoil_document(&bad_version).is_err());
+
+        wrapped.push(0);
+        assert!(tinfoil_document(&wrapped).is_err());
+        assert!(tinfoil_document(b"bad input").is_err());
     }
 
     #[test]
