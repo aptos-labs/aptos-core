@@ -1192,6 +1192,31 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         ret
     }
 
+    /// Returns the layout the base value for `key` was pinned under, if that
+    /// base carries delayed fields. The delayed field ids for a key are created
+    /// under this layout, so any layout used to later exchange the key must be
+    /// compatible with it, or the delayed fields shift byte offset or width.
+    /// Returns `None` if the key has no base value or the base has no layout.
+    pub(crate) fn base_value_layout(&self, key: &T::Key) -> Option<TriompheArc<MoveTypeLayout>> {
+        let value = match &self.latest_view {
+            // The base value is retained at the storage version (index 0), so
+            // read that entry directly rather than the latest write.
+            ViewState::Sync(state) => match state.versioned_map.data().fetch_data_no_record(key, 0)
+            {
+                Ok(MVDataOutput::Versioned(_, value)) => value,
+                Err(_) => return None,
+            },
+            // The unsync map holds a single entry per key, so the latest write
+            // overwrites the base. That entry is what the current transaction
+            // read, so its layout is the one to check against.
+            ViewState::Unsync(state) => state.unsync_map.fetch_data(key)?,
+        };
+        match value {
+            ValueWithLayout::Exchanged(_, Some(layout)) => Some(layout),
+            ValueWithLayout::Exchanged(_, None) | ValueWithLayout::RawFromStorage(_) => None,
+        }
+    }
+
     fn patch_base_value(
         &self,
         value: &T::Value,
@@ -1403,6 +1428,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         delayed_write_set_ids: &HashSet<DelayedFieldID>,
         skip: &HashSet<T::Key>,
     ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
+        // TODO: apply the same base-layout compatibility check to the group
+        // exchange path (here and in the sequential variant below). A group
+        // member's base layout lives in group_data keyed by (group_key, tag), so
+        // it needs its own lookup before the check in filter_value_for_exchange
+        // can move into does_value_need_exchange and cover both resources and
+        // groups.
         let reads_with_delayed_fields = parallel_state
             .captured_reads
             .borrow()
@@ -3294,6 +3325,111 @@ mod test {
             ))),
             Some(layout),
         );
+    }
+
+    // Builds a resource value carrying one delayed field id, plus the id and the
+    // layout it must be exchanged under.
+    fn exchange_test_value() -> (ValueType, DelayedFieldID, MoveTypeLayout) {
+        let id = DelayedFieldID::new_with_width(1000, 8);
+        let storage_layout =
+            create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
+        let value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
+        let state_value = create_state_value(&value, &storage_layout);
+        let test_value = TransactionWrite::from_state_value(Some(state_value));
+        let exchange_layout = create_struct_layout(create_aggregator_layout_u64());
+        (test_value, id, exchange_layout)
+    }
+
+    #[test]
+    fn filter_value_for_exchange_checks_base_layout_sequential() {
+        let (test_value, id, exchange_layout) = exchange_test_value();
+        let exchange_layout = TriompheArc::new(exchange_layout);
+        let ids = HashSet::from([id]);
+        let key = KeyType::<u32>(1);
+
+        // A base pinned under an incompatible layout must fail the check.
+        let holder = Holder::new(HashMap::new(), 1000);
+        holder.unsync_map.set_base_value(
+            key,
+            ValueWithLayout::Exchanged(
+                TriompheArc::new(test_value.clone()),
+                Some(TriompheArc::new(MoveTypeLayout::U64)),
+            ),
+        );
+        let view = create_sequential_latest_view(&holder);
+        assert!(matches!(
+            view.filter_value_for_exchange(&test_value, &exchange_layout, &ids, &key),
+            Some(Err(_))
+        ));
+
+        // A base pinned under a distinct but compatible layout must pass.
+        let holder = Holder::new(HashMap::new(), 1000);
+        holder.unsync_map.set_base_value(
+            key,
+            ValueWithLayout::Exchanged(
+                TriompheArc::new(test_value.clone()),
+                Some(TriompheArc::new(create_struct_layout(
+                    create_aggregator_layout_u64(),
+                ))),
+            ),
+        );
+        let view = create_sequential_latest_view(&holder);
+        assert!(matches!(
+            view.filter_value_for_exchange(&test_value, &exchange_layout, &ids, &key),
+            Some(Ok(_))
+        ));
+    }
+
+    #[test]
+    fn filter_value_for_exchange_checks_base_layout_parallel() {
+        let (test_value, id, exchange_layout) = exchange_test_value();
+        let exchange_layout = TriompheArc::new(exchange_layout);
+        let ids = HashSet::from([id]);
+        let key = KeyType::<u32>(1);
+
+        // A base pinned under an incompatible layout must fail the check.
+        let holder = ComparisonHolder::new(HashMap::new(), 1000);
+        holder.versioned_map.data().set_base_value(
+            key,
+            ValueWithLayout::Exchanged(
+                TriompheArc::new(test_value.clone()),
+                Some(TriompheArc::new(MoveTypeLayout::U64)),
+            ),
+            |_, _| {},
+        );
+        let views = holder.new_view();
+        assert!(matches!(
+            views.latest_view_par.filter_value_for_exchange(
+                &test_value,
+                &exchange_layout,
+                &ids,
+                &key
+            ),
+            Some(Err(_))
+        ));
+
+        // A base pinned under a distinct but compatible layout must pass.
+        let holder = ComparisonHolder::new(HashMap::new(), 1000);
+        holder.versioned_map.data().set_base_value(
+            key,
+            ValueWithLayout::Exchanged(
+                TriompheArc::new(test_value.clone()),
+                Some(TriompheArc::new(create_struct_layout(
+                    create_aggregator_layout_u64(),
+                ))),
+            ),
+            |_, _| {},
+        );
+        let views = holder.new_view();
+        assert!(matches!(
+            views.latest_view_par.filter_value_for_exchange(
+                &test_value,
+                &exchange_layout,
+                &ids,
+                &key
+            ),
+            Some(Ok(_))
+        ));
     }
 
     #[test]

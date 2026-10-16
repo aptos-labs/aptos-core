@@ -307,6 +307,24 @@ impl MoveTypeLayout {
     pub fn unfolded_node_count(&self) -> u64 {
         layout_unfolded_node_count(self, &mut LayoutCountCache::new())
     }
+
+    /// Returns true if `self` is the same layout as `other`, or if `self` only
+    /// differs by having extra enum variants added at the end, at any nesting
+    /// depth. Variants added at the end do not move any existing field, so bytes
+    /// written under `other` can still be read under `self`.
+    ///
+    /// This check is not symmetric. If `other` is a layout and `self` is that
+    /// same layout with one more variant added at the end, then
+    /// `self.is_compatible_with(other)` is true but
+    /// `other.is_compatible_with(self)` is false. Pass the newer layout as
+    /// `self` and the older pinned layout as `other`.
+    ///
+    /// Only the runtime struct forms (`Runtime`, `RuntimeVariants`) are
+    /// supported. The decorated forms are used for display and never reach
+    /// serialization, so they are always treated as incompatible.
+    pub fn is_compatible_with(&self, other: &Self) -> bool {
+        layout_compat(self, other, &mut LayoutCompatCache::new())
+    }
 }
 
 type LayoutCountCache = HashMap<*const MoveStructLayout, u64>;
@@ -539,6 +557,111 @@ fn variant_layout_eq(
             .iter()
             .zip(&b.fields)
             .all(|(x, y)| field_layout_eq(x, y, cache))
+}
+
+// Directional compatibility on the layout DAG, memoized the same way as
+// `layout_eq`. `a` (the newer layout) is compatible with `b` (the older pinned
+// layout) when they are identical, or when `a` only adds enum variants at the
+// end at any nesting depth. Since the relation is not symmetric, the cache key
+// keeps the argument order instead of normalizing it like the equality cache.
+type LayoutCompatCache = HashSet<(*const MoveStructLayout, *const MoveStructLayout)>;
+
+fn layout_compat(a: &MoveTypeLayout, b: &MoveTypeLayout, cache: &mut LayoutCompatCache) -> bool {
+    use MoveTypeLayout::*;
+    match (a, b) {
+        (Bool, Bool)
+        | (Address, Address)
+        | (Signer, Signer)
+        | (Function, Function)
+        | (U8, U8)
+        | (U16, U16)
+        | (U32, U32)
+        | (U64, U64)
+        | (U128, U128)
+        | (U256, U256)
+        | (I8, I8)
+        | (I16, I16)
+        | (I32, I32)
+        | (I64, I64)
+        | (I128, I128)
+        | (I256, I256) => true,
+        (Vector(x), Vector(y)) => layout_compat(x, y, cache),
+        (Native(ka, x), Native(kb, y)) => ka == kb && layout_compat(x, y, cache),
+        (Struct(x), Struct(y)) => arc_struct_layout_compat(x, y, cache),
+        // Listed exhaustively so adding a new variant forces an update here.
+        (Bool, _)
+        | (Address, _)
+        | (Signer, _)
+        | (Function, _)
+        | (U8, _)
+        | (U16, _)
+        | (U32, _)
+        | (U64, _)
+        | (U128, _)
+        | (U256, _)
+        | (I8, _)
+        | (I16, _)
+        | (I32, _)
+        | (I64, _)
+        | (I128, _)
+        | (I256, _)
+        | (Vector(_), _)
+        | (Native(_, _), _)
+        | (Struct(_), _) => false,
+    }
+}
+
+fn arc_struct_layout_compat(
+    a: &Arc<MoveStructLayout>,
+    b: &Arc<MoveStructLayout>,
+    cache: &mut LayoutCompatCache,
+) -> bool {
+    if Arc::ptr_eq(a, b) {
+        return true;
+    }
+    // Keep the argument order in the key. The relation is directional, so
+    // `(a, b)` and `(b, a)` are different queries.
+    let key = (Arc::as_ptr(a), Arc::as_ptr(b));
+    if cache.contains(&key) {
+        return true;
+    }
+    let result = struct_layout_compat(a, b, cache);
+    if result {
+        cache.insert(key);
+    }
+    result
+}
+
+fn struct_layout_compat(
+    a: &MoveStructLayout,
+    b: &MoveStructLayout,
+    cache: &mut LayoutCompatCache,
+) -> bool {
+    use MoveStructLayout::*;
+    match (a, b) {
+        (Runtime(xs), Runtime(ys)) => {
+            // No appended struct fields: the field count must match exactly.
+            xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| layout_compat(x, y, cache))
+        },
+        (RuntimeVariants(xs), RuntimeVariants(ys)) => {
+            // `a` may add variants at the end but must not drop any. Every
+            // variant `b` has must match the same-index variant in `a`; extra
+            // trailing variants in `a` are allowed and left unchecked.
+            xs.len() >= ys.len()
+                && xs.iter().zip(ys).all(|(vx, vy)| {
+                    vx.len() == vy.len()
+                        && vx.iter().zip(vy).all(|(x, y)| layout_compat(x, y, cache))
+                })
+        },
+        // Only the runtime forms reach serialization. The decorated forms are
+        // for display, so treat them as incompatible. Listed exhaustively so
+        // adding a new variant forces an update here.
+        (Runtime(_), _)
+        | (RuntimeVariants(_), _)
+        | (WithFields(_), _)
+        | (WithTypes { .. }, _)
+        | (WithVariants { .. }, _) => false,
+    }
 }
 
 impl MoveValue {
@@ -1217,5 +1340,172 @@ mod unfolded_node_count_tests {
             let layout = build(n);
             assert_eq!(layout.unfolded_node_count(), 3u64 * (1u64 << n) - 1);
         }
+    }
+}
+
+#[cfg(test)]
+mod is_compatible_with_tests {
+    use super::*;
+    use MoveTypeLayout::{Bool, U64, U8};
+
+    fn runtime(fields: Vec<MoveTypeLayout>) -> MoveTypeLayout {
+        MoveTypeLayout::new_struct(MoveStructLayout::Runtime(fields))
+    }
+
+    fn enum_layout(variants: Vec<Vec<MoveTypeLayout>>) -> MoveTypeLayout {
+        MoveTypeLayout::new_struct(MoveStructLayout::RuntimeVariants(variants))
+    }
+
+    /// Identical layouts are compatible in both directions, and scalars only
+    /// match themselves.
+    #[test]
+    fn identical_is_compatible_both_ways() {
+        let a = runtime(vec![U8, U64]);
+        let b = runtime(vec![U8, U64]);
+        assert!(a.is_compatible_with(&b));
+        assert!(b.is_compatible_with(&a));
+
+        assert!(U8.is_compatible_with(&U8));
+        assert!(!U8.is_compatible_with(&U64));
+    }
+
+    /// Vectors and native markers recurse into the element, and native marker
+    /// kinds must match.
+    #[test]
+    fn vectors_and_natives_recurse() {
+        let a = MoveTypeLayout::Vector(Box::new(U8));
+        let b = MoveTypeLayout::Vector(Box::new(U8));
+        assert!(a.is_compatible_with(&b));
+
+        let c = MoveTypeLayout::Vector(Box::new(U64));
+        assert!(!a.is_compatible_with(&c));
+
+        let agg = MoveTypeLayout::Native(IdentifierMappingKind::Aggregator, Box::new(U64));
+        let agg2 = MoveTypeLayout::Native(IdentifierMappingKind::Aggregator, Box::new(U64));
+        let snap = MoveTypeLayout::Native(IdentifierMappingKind::Snapshot, Box::new(U64));
+        assert!(agg.is_compatible_with(&agg2));
+        assert!(!agg.is_compatible_with(&snap));
+    }
+
+    /// A layout with extra trailing variants is compatible with the shorter one,
+    /// but not the other way round.
+    #[test]
+    fn appended_trailing_variant_is_directional() {
+        let base = enum_layout(vec![vec![U8], vec![U64]]);
+        let extended = enum_layout(vec![vec![U8], vec![U64], vec![Bool]]);
+        assert!(extended.is_compatible_with(&base));
+        assert!(!base.is_compatible_with(&extended));
+    }
+
+    /// Changing an existing field's type breaks compatibility both ways.
+    #[test]
+    fn changed_field_type_is_incompatible() {
+        let a = runtime(vec![U8, U64]);
+        let b = runtime(vec![U8, Bool]);
+        assert!(!a.is_compatible_with(&b));
+        assert!(!b.is_compatible_with(&a));
+    }
+
+    /// Appending a struct field moves later bytes, so it is incompatible both
+    /// ways (unlike appending an enum variant).
+    #[test]
+    fn appended_struct_field_is_incompatible() {
+        let a = runtime(vec![U8]);
+        let b = runtime(vec![U8, U64]);
+        assert!(!a.is_compatible_with(&b));
+        assert!(!b.is_compatible_with(&a));
+    }
+
+    /// Reordering fields breaks compatibility both ways.
+    #[test]
+    fn reordered_fields_are_incompatible() {
+        let a = runtime(vec![U8, U64]);
+        let b = runtime(vec![U64, U8]);
+        assert!(!a.is_compatible_with(&b));
+        assert!(!b.is_compatible_with(&a));
+    }
+
+    /// Dropping a variant that is not the last one changes the tag mapping, so
+    /// it is incompatible both ways.
+    #[test]
+    fn removed_non_trailing_variant_is_incompatible() {
+        let base = enum_layout(vec![vec![U8], vec![U64], vec![Bool]]);
+        let removed_middle = enum_layout(vec![vec![U8], vec![Bool]]);
+        assert!(!base.is_compatible_with(&removed_middle));
+        assert!(!removed_middle.is_compatible_with(&base));
+    }
+
+    /// Adding a field inside an existing variant moves bytes, so it is
+    /// incompatible both ways.
+    #[test]
+    fn variant_field_count_change_is_incompatible() {
+        let base = enum_layout(vec![vec![U8], vec![U64]]);
+        let changed = enum_layout(vec![vec![U8], vec![U64, Bool]]);
+        assert!(!base.is_compatible_with(&changed));
+        assert!(!changed.is_compatible_with(&base));
+    }
+
+    /// A struct and an enum never match.
+    #[test]
+    fn runtime_struct_vs_enum_is_incompatible() {
+        let s = runtime(vec![U8]);
+        let e = enum_layout(vec![vec![U8]]);
+        assert!(!s.is_compatible_with(&e));
+        assert!(!e.is_compatible_with(&s));
+    }
+
+    /// Trailing-variant growth nested inside a vector inside a struct is still
+    /// directional.
+    #[test]
+    fn nested_trailing_variant_growth_is_directional() {
+        fn build(extra: bool) -> MoveTypeLayout {
+            let mut variants = vec![vec![U8], vec![U64]];
+            if extra {
+                variants.push(vec![Bool]);
+            }
+            let inner_enum = enum_layout(variants);
+            let vec_of_enum = MoveTypeLayout::Vector(Box::new(inner_enum));
+            runtime(vec![U8, vec_of_enum])
+        }
+        let base = build(false);
+        let extended = build(true);
+        assert!(extended.is_compatible_with(&base));
+        assert!(!base.is_compatible_with(&extended));
+    }
+
+    /// A shared-`Arc` doubling DAG compared against a structurally-equal but
+    /// pointer-distinct copy stays linear. Without memoization this would expand
+    /// to `2^n` comparisons and never finish.
+    #[test]
+    fn doubling_dag_stays_linear() {
+        fn build(n: usize) -> MoveTypeLayout {
+            let mut current = Arc::new(MoveStructLayout::Runtime(vec![U8]));
+            for _ in 0..n {
+                let child = MoveTypeLayout::Struct(current);
+                current = Arc::new(MoveStructLayout::Runtime(vec![child; 2]));
+            }
+            MoveTypeLayout::Struct(current)
+        }
+        let a = build(40);
+        let b = build(40);
+        assert!(a.is_compatible_with(&b));
+        assert!(b.is_compatible_with(&a));
+    }
+
+    /// Decorated forms never reach serialization, so they are treated as
+    /// incompatible even against an identical copy.
+    #[test]
+    fn decorated_forms_are_incompatible() {
+        let field = MoveFieldLayout::new(Identifier::new("x").unwrap(), U8);
+        let a = MoveTypeLayout::new_struct(MoveStructLayout::WithFields(vec![field.clone()]));
+        // Distinct `Arc` with identical content, so the pointer fast path does
+        // not fire.
+        let b = MoveTypeLayout::new_struct(MoveStructLayout::WithFields(vec![field]));
+        assert!(!a.is_compatible_with(&b));
+        assert!(!b.is_compatible_with(&a));
+
+        let runtime_layout = runtime(vec![U8]);
+        assert!(!runtime_layout.is_compatible_with(&a));
+        assert!(!a.is_compatible_with(&runtime_layout));
     }
 }
