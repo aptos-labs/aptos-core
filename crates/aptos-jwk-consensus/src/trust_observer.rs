@@ -205,7 +205,7 @@ fn write_canonical_json(value: &Value, out: &mut Vec<u8>) -> Result<()> {
         Value::Object(map) => {
             out.push(b'{');
             let mut entries: Vec<_> = map.iter().collect();
-            entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+            entries.sort_unstable_by_key(|(key, _)| *key);
             for (index, (key, value)) in entries.into_iter().enumerate() {
                 if index > 0 {
                     out.push(b',');
