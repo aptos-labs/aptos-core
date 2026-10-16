@@ -4,7 +4,7 @@
 
 ---
 
-[![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Innovation--Enabling-green.svg)](LICENSE)
 [![Lint+Test](https://github.com/aptos-labs/aptos-core/actions/workflows/lint-test.yaml/badge.svg)](https://github.com/aptos-labs/aptos-core/actions/workflows/lint-test.yaml)
 [![codecov](https://codecov.io/gh/aptos-labs/aptos-core/branch/main/graph/badge.svg?token=X01RKXSGDE)](https://codecov.io/gh/aptos-labs/aptos-core)
 [![Discord chat](https://img.shields.io/discord/945856774056083548?style=flat-square)](https://discord.gg/aptosnetwork)
