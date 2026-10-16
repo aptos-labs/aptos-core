@@ -148,6 +148,9 @@ version = "0.3.0"
 optional = true
 default-features = false
 
+[dev-dependencies.hex-literal]
+version = "1.1.0"
+
 [lints.clippy]
 arithmetic_side_effects = "deny"
 expect_used = "deny"

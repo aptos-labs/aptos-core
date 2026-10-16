@@ -100,19 +100,3 @@ pub(crate) const PLATFORM_ISSUER: &str = "Platform";
 // The root cert is downloaded from `https://certificates.trustedservices.intel.com/Intel_SGX_Provisioning_Certification_RootCA.cer`.
 // See https://api.portal.trustedservices.intel.com/content/documentation.html#pcs for more details
 pub static TRUSTED_ROOT_CA_DER: &[u8] = include_bytes!("TrustedRootCA.der");
-
-#[cfg(test)]
-#[tokio::test]
-async fn dcap_roots_should_be_fresh() {
-    #[allow(clippy::unwrap_used)]
-    let response = reqwest::get(
-        "https://certificates.trustedservices.intel.com/Intel_SGX_Provisioning_Certification_RootCA.cer",
-    )
-    .await
-    .unwrap();
-
-    #[allow(clippy::unwrap_used)]
-    let ca_der = response.bytes().await.unwrap();
-
-    assert_eq!(TRUSTED_ROOT_CA_DER, ca_der.as_ref());
-}

@@ -8440,6 +8440,7 @@ dependencies = [
  "der 0.8.1",
  "derive_more 2.1.1",
  "hex",
+ "hex-literal 1.1.0",
  "parity-scale-codec",
  "pem 3.0.4",
  "ring 0.17.7",
