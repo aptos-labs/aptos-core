@@ -82,6 +82,11 @@ pub(crate) fn open_staging(
     .expect("address serializes")])
 }
 
+/// A-signed explicit cleanup for a staging area, including one targeting another package.
+fn cleanup_staging(address: AccountAddress) -> TransactionPayload {
+    payload(address, ident_str!("cleanup_staging"), vec![])
+}
+
 /// Stage only the selected chunks (possibly the missing subset of a resumed upload).
 /// Never appends a publish transaction: finalization is separately signed by B.
 /// The limit is on raw chunk bytes per batch (not the serialized transaction size),
@@ -263,6 +268,9 @@ mod tests {
         let module = address("0xcafe");
         let publisher = address("0xb");
         let open = open_staging(module, publisher);
+        assert!(entry(&cleanup_staging(module), module, "cleanup_staging")
+            .args()
+            .is_empty());
         let args = entry(&open, module, "open_staging").args();
         assert_eq!(args.len(), 1);
         assert_eq!(
@@ -1008,5 +1016,42 @@ async fn publisher_sequence_number(
             .get_resource::<AccountResource>(publisher)?
             .map_or(0, |account| account.sequence_number)),
         None => aptos_cli_common::get_sequence_number(&options.rest_client()?, publisher).await,
+    }
+}
+
+/// Discard an incomplete delegated package. Only its stager's signer can do this.
+#[derive(clap::Parser)]
+pub struct CleanupDelegatedStaging {
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    module_address: AccountAddress,
+    #[clap(flatten)]
+    txn_options: TransactionOptions,
+    #[clap(skip)]
+    pub env: std::sync::Arc<crate::MoveEnv>,
+}
+
+impl crate::WithMoveEnv for CleanupDelegatedStaging {
+    fn attach_env(mut self, env: std::sync::Arc<crate::MoveEnv>) -> Self {
+        self.env = env;
+        self
+    }
+}
+
+#[async_trait::async_trait]
+impl aptos_cli_common::CliCommand<String> for CleanupDelegatedStaging {
+    fn command_name(&self) -> &'static str {
+        "CleanupDelegatedStaging"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use aptos_cli_common::ReplayProtectionType;
+        check_delegated_module(&self.txn_options, self.module_address).await?;
+        let mut options = self.txn_options;
+        options.replay_protection_type = ReplayProtectionType::Seqnum;
+        committed(
+            crate::dispatch_transaction(cleanup_staging(self.module_address), &options, &self.env)
+                .await,
+        )?;
+        Ok("Signing stager's delegated staging area cleaned up".into())
     }
 }

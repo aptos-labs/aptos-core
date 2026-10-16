@@ -133,6 +133,7 @@ pub enum MoveTool {
     Run(RunFunction),
     StageDelegatedPackage(crate::delegated_publish::StageDelegatedPackage),
     FinalizeDelegatedPackage(crate::delegated_publish::FinalizeDelegatedPackage),
+    CleanupDelegatedStaging(crate::delegated_publish::CleanupDelegatedStaging),
     RunScript(RunScript),
     Simulate(Simulate),
     #[clap(subcommand, hide = true)]
@@ -167,6 +168,9 @@ impl MoveTool {
                 tool.attach_env(env).execute_serialized().await
             },
             MoveTool::FinalizeDelegatedPackage(tool) => {
+                tool.attach_env(env).execute_serialized().await
+            },
+            MoveTool::CleanupDelegatedStaging(tool) => {
                 tool.attach_env(env).execute_serialized().await
             },
             MoveTool::Run(tool) => tool.attach_env(env).execute_serialized().await,
