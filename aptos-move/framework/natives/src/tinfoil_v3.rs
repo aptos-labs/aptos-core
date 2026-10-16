@@ -47,8 +47,8 @@ const ATTESTATION_PACKAGE_MAGIC: &[u8] = b"APTOS-TINFOIL-V3\0";
 const ATTESTATION_PACKAGE_VERSION: u8 = 1;
 
 /// BCS fields follow the magic prefix in this exact order. The EAT is kept
-/// verbatim in the Move object for future GPU verification; no GPU claim is
-/// currently accepted without a quote-bound device identity correlation.
+/// verbatim in the Move object for future GPU verification. Its presence is
+/// reported to Move so a supplied EAT is never silently ignored.
 #[derive(Deserialize)]
 struct AttestationPackageV1 {
     version: u8,
@@ -147,7 +147,9 @@ fn check_attestation_args(
     Ok(())
 }
 
-fn tinfoil_document(attestation: &[u8]) -> SafeNativeResult<Cow<'_, [u8]>> {
+fn tinfoil_document_and_eat_presence(
+    attestation: &[u8],
+) -> SafeNativeResult<(Cow<'_, [u8]>, bool)> {
     if attestation
         .iter()
         .copied()
@@ -157,7 +159,7 @@ fn tinfoil_document(attestation: &[u8]) -> SafeNativeResult<Cow<'_, [u8]>> {
         if attestation.len() > MAX_DOCUMENT_BYTES {
             return Err(invalid());
         }
-        return Ok(Cow::Borrowed(attestation));
+        return Ok((Cow::Borrowed(attestation), false));
     }
     let package_bytes = attestation
         .strip_prefix(ATTESTATION_PACKAGE_MAGIC)
@@ -170,7 +172,14 @@ fn tinfoil_document(attestation: &[u8]) -> SafeNativeResult<Cow<'_, [u8]>> {
     {
         return Err(invalid());
     }
-    Ok(Cow::Owned(package.tinfoil_document))
+    Ok((
+        Cow::Owned(package.tinfoil_document),
+        !package.nras_detached_eat.is_empty(),
+    ))
+}
+
+fn tinfoil_document(attestation: &[u8]) -> SafeNativeResult<Cow<'_, [u8]>> {
+    Ok(tinfoil_document_and_eat_presence(attestation)?.0)
 }
 
 fn charge_stage(
@@ -588,7 +597,7 @@ fn native_try_verify_tinfoil_v3_quote(
     charge_document(context, &attestation, &intel_root, 0)?;
     let outcome = attempted(|| {
         check_attestation_args(&attestation, &intel_root, 0)?;
-        let document = tinfoil_document(&attestation)?;
+        let (document, nras_eat_present) = tinfoil_document_and_eat_presence(&attestation)?;
         let (repo, nonce) = claimed_repo_and_nonce(&document)?;
         let quote = verified(|| {
             aptos_tinfoil_v3::verify_quote_stage(&document, &nonce, proof_time, &intel_root)
@@ -597,6 +606,7 @@ fn native_try_verify_tinfoil_v3_quote(
             Value::vector_u8(nonce.to_vec()),
             Value::vector_u8(repo.into_bytes()),
             quote_to_move(quote)?,
+            Value::bool(nras_eat_present),
         ])))
     })?;
     Ok(smallvec![option_to_move(context, outcome)?])
@@ -797,11 +807,25 @@ mod tests {
             Cow::Borrowed(&b"{}"[..])
         );
         assert_eq!(native_ok(tinfoil_document(b" \n{}")).as_ref(), b" \n{}");
+        let (document, eat_present) = native_ok(tinfoil_document_and_eat_presence(b" \n{}"));
+        assert_eq!(document.as_ref(), b" \n{}");
+        assert!(!eat_present);
 
         let package = bcs::to_bytes(&(1u8, b"{}".to_vec(), b"eat".to_vec())).unwrap();
         let mut wrapped = ATTESTATION_PACKAGE_MAGIC.to_vec();
         wrapped.extend_from_slice(&package);
         assert_eq!(native_ok(tinfoil_document(&wrapped)).as_ref(), b"{}");
+        let (document, eat_present) = native_ok(tinfoil_document_and_eat_presence(&wrapped));
+        assert_eq!(document.as_ref(), b"{}");
+        assert!(eat_present);
+
+        let package_without_eat = bcs::to_bytes(&(1u8, b"{}".to_vec(), Vec::<u8>::new())).unwrap();
+        let mut wrapped_without_eat = ATTESTATION_PACKAGE_MAGIC.to_vec();
+        wrapped_without_eat.extend_from_slice(&package_without_eat);
+        let (document, eat_present) =
+            native_ok(tinfoil_document_and_eat_presence(&wrapped_without_eat));
+        assert_eq!(document.as_ref(), b"{}");
+        assert!(!eat_present);
 
         let mut bad_version = ATTESTATION_PACKAGE_MAGIC.to_vec();
         bad_version
