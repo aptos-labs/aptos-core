@@ -1,13 +1,54 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_cli_common::{CliError, CliTypedResult};
+use aptos_cli_common::{CliError, CliTypedResult, TransactionOptions};
 use aptos_crypto::HashValue;
 use aptos_framework::chunked_publish::{PositionedChunk, CHUNK_SIZE_IN_BYTES};
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
+use aptos_types::{
+    on_chain_config::Features,
+    transaction::{EntryFunction, TransactionPayload},
+};
+use clap::ValueEnum;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
 };
+
+/// Replay protection for the staging transactions only. Finalization chooses independently.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub(crate) enum StageMode {
+    Auto,
+    Nonce,
+    Seqnum,
+}
+
+/// Decide from the *verified* chain feature flag; a failed lookup is an error, not `false`.
+/// Offline sessions cannot attest to nonce support, so auto uses sequence numbers there.
+pub(crate) fn resolve_stage_mode(
+    requested: StageMode,
+    chain_enabled: bool,
+    is_session: bool,
+) -> CliTypedResult<StageMode> {
+    match requested {
+        StageMode::Seqnum => Ok(StageMode::Seqnum),
+        StageMode::Nonce if chain_enabled && !is_session => Ok(StageMode::Nonce),
+        StageMode::Nonce => Err(CliError::CommandArgumentError(
+            "Orderless staging requires an online chain with ORDERLESS_TRANSACTIONS enabled".into(),
+        )),
+        StageMode::Auto if chain_enabled && !is_session => Ok(StageMode::Nonce),
+        StageMode::Auto => Ok(StageMode::Seqnum),
+    }
+}
+
+/// Query the chain's on-chain feature bitset; never infer lack of support from a REST error.
+pub(crate) async fn chain_orderless_enabled(options: &TransactionOptions) -> CliTypedResult<bool> {
+    let features = options
+        .rest_client()?
+        .get_account_resource_bcs::<Features>(AccountAddress::ONE, "0x1::features::Features")
+        .await
+        .map_err(|err| CliError::ApiError(format!("Failed to read orderless feature flag: {err}")))?
+        .into_inner();
+    Ok(features.is_orderless_txns_enabled())
+}
 
 /// SHA3-256 of the BCS encoding of (metadata bytes, ordered module byte vectors).
 /// This is byte-for-byte the BCS encoding of Move's two-field PackagePreimage.
@@ -158,6 +199,29 @@ mod tests {
         assert_eq!(entry.function().as_str(), function);
         assert!(entry.ty_args().is_empty());
         entry
+    }
+
+    #[test]
+    fn delegated_publish_resolves_stage_mode_from_verified_features() {
+        for (requested, enabled, session, expected) in [
+            (StageMode::Auto, true, false, StageMode::Nonce),
+            (StageMode::Auto, false, false, StageMode::Seqnum),
+            (StageMode::Auto, true, true, StageMode::Seqnum),
+            (StageMode::Seqnum, true, false, StageMode::Seqnum),
+            (StageMode::Seqnum, false, true, StageMode::Seqnum),
+            (StageMode::Nonce, true, false, StageMode::Nonce),
+        ] {
+            assert_eq!(
+                resolve_stage_mode(requested, enabled, session).unwrap(),
+                expected
+            );
+        }
+        for (enabled, session) in [(false, false), (true, true)] {
+            assert!(resolve_stage_mode(StageMode::Nonce, enabled, session)
+                .unwrap_err()
+                .to_string()
+                .contains("ORDERLESS_TRANSACTIONS"));
+        }
     }
 
     #[test]
