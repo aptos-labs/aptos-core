@@ -1,0 +1,592 @@
+{
+  "run_id": 38967167300,
+  "url": "https://github.com/aptos-labs/aptos-core/actions/runs/38967167300",
+  "head_sha": "38ef306822f3273c9569a86512172af825dc9d02",
+  "conclusion": "success",
+  "image": "aptos-runner-image-ubuntu22-x64 1.0.0",
+  "verified_test_count": 14942,
+  "partition_counts": [
+    3740,
+    3719,
+    3727,
+    3756
+  ],
+  "jobs": [
+    {
+      "name": "build-archive",
+      "started_at": "2026-10-16T21:09:40Z",
+      "completed_at": "2026-10-16T21:26:06Z",
+      "conclusion": "success",
+      "runner_name": "64cpu-aptos-image-ubuntu22-x64-1001663207",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:09:41Z",
+          "completed_at": "2026-10-16T21:09:42Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:09:42Z",
+          "completed_at": "2026-10-16T21:09:50Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:09:50Z",
+          "completed_at": "2026-10-16T21:10:09Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build unit-test archive",
+          "started_at": "2026-10-16T21:10:09Z",
+          "completed_at": "2026-10-16T21:20:51Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Record eligible test inventory",
+          "started_at": "2026-10-16T21:20:51Z",
+          "completed_at": "2026-10-16T21:22:13Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Package stripped shard runtime copies",
+          "started_at": "2026-10-16T21:22:13Z",
+          "completed_at": "2026-10-16T21:24:45Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:24:45Z",
+          "completed_at": "2026-10-16T21:24:59Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:24:59Z",
+          "completed_at": "2026-10-16T21:25:13Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:25:13Z",
+          "completed_at": "2026-10-16T21:25:27Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:25:27Z",
+          "completed_at": "2026-10-16T21:25:41Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:25:41Z",
+          "completed_at": "2026-10-16T21:25:41Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:25:41Z",
+          "completed_at": "2026-10-16T21:26:04Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:26:04Z",
+          "completed_at": "2026-10-16T21:26:04Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:26:04Z",
+          "completed_at": "2026-10-16T21:26:04Z",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "vm-and-doc-tests",
+      "started_at": "2026-10-16T21:07:40Z",
+      "completed_at": "2026-10-16T21:18:15Z",
+      "conclusion": "success",
+      "runner_name": "64cpu-aptos-image-ubuntu22-x64-1001663208",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:07:41Z",
+          "completed_at": "2026-10-16T21:07:41Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:07:41Z",
+          "completed_at": "2026-10-16T21:07:48Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:07:48Z",
+          "completed_at": "2026-10-16T21:07:51Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check VM features",
+          "started_at": "2026-10-16T21:07:51Z",
+          "completed_at": "2026-10-16T21:11:39Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run doc tests",
+          "started_at": "2026-10-16T21:11:39Z",
+          "completed_at": "2026-10-16T21:17:54Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:17:54Z",
+          "completed_at": "2026-10-16T21:18:13Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:18:13Z",
+          "completed_at": "2026-10-16T21:18:14Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:18:14Z",
+          "completed_at": "2026-10-16T21:18:14Z",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "unit-test-shards (1)",
+      "started_at": "2026-10-16T21:27:31Z",
+      "completed_at": "2026-10-16T21:36:55Z",
+      "conclusion": "success",
+      "runner_name": "64cpu-aptos-image-ubuntu22-x64-1001663318",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:27:31Z",
+          "completed_at": "2026-10-16T21:27:32Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:27:32Z",
+          "completed_at": "2026-10-16T21:27:39Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:27:39Z",
+          "completed_at": "2026-10-16T21:27:42Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v4",
+          "started_at": "2026-10-16T21:27:42Z",
+          "completed_at": "2026-10-16T21:29:32Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start private Postgres",
+          "started_at": "2026-10-16T21:29:32Z",
+          "completed_at": "2026-10-16T21:29:45Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Restore archive into original build paths",
+          "started_at": "2026-10-16T21:29:45Z",
+          "completed_at": "2026-10-16T21:30:19Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "List shard inventory",
+          "started_at": "2026-10-16T21:30:19Z",
+          "completed_at": "2026-10-16T21:30:20Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run shard",
+          "started_at": "2026-10-16T21:30:20Z",
+          "completed_at": "2026-10-16T21:36:44Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve shard JUnit",
+          "started_at": "2026-10-16T21:36:44Z",
+          "completed_at": "2026-10-16T21:36:44Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:36:44Z",
+          "completed_at": "2026-10-16T21:36:45Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:36:45Z",
+          "completed_at": "2026-10-16T21:36:53Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:36:53Z",
+          "completed_at": "2026-10-16T21:36:53Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:36:53Z",
+          "completed_at": "2026-10-16T21:36:53Z",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "unit-test-shards (4)",
+      "started_at": "2026-10-16T21:28:18Z",
+      "completed_at": "2026-10-16T21:36:30Z",
+      "conclusion": "success",
+      "runner_name": "64cpu-aptos-image-ubuntu22-x64-1001663319",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:28:19Z",
+          "completed_at": "2026-10-16T21:28:20Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:28:20Z",
+          "completed_at": "2026-10-16T21:28:27Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:28:27Z",
+          "completed_at": "2026-10-16T21:28:46Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v4",
+          "started_at": "2026-10-16T21:28:46Z",
+          "completed_at": "2026-10-16T21:29:15Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start private Postgres",
+          "started_at": "2026-10-16T21:29:15Z",
+          "completed_at": "2026-10-16T21:29:28Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Restore archive into original build paths",
+          "started_at": "2026-10-16T21:29:28Z",
+          "completed_at": "2026-10-16T21:30:01Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "List shard inventory",
+          "started_at": "2026-10-16T21:30:01Z",
+          "completed_at": "2026-10-16T21:30:01Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run shard",
+          "started_at": "2026-10-16T21:30:01Z",
+          "completed_at": "2026-10-16T21:36:20Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve shard JUnit",
+          "started_at": "2026-10-16T21:36:20Z",
+          "completed_at": "2026-10-16T21:36:21Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:36:21Z",
+          "completed_at": "2026-10-16T21:36:22Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:36:22Z",
+          "completed_at": "2026-10-16T21:36:28Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:36:28Z",
+          "completed_at": "2026-10-16T21:36:29Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:36:29Z",
+          "completed_at": "2026-10-16T21:36:29Z",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "unit-test-shards (3)",
+      "started_at": "2026-10-16T21:26:08Z",
+      "completed_at": "2026-10-16T21:34:13Z",
+      "conclusion": "success",
+      "runner_name": "64cpu-aptos-image-ubuntu22-x64-1001663320",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:26:09Z",
+          "completed_at": "2026-10-16T21:26:10Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:26:10Z",
+          "completed_at": "2026-10-16T21:26:17Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:26:17Z",
+          "completed_at": "2026-10-16T21:26:19Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v4",
+          "started_at": "2026-10-16T21:26:19Z",
+          "completed_at": "2026-10-16T21:26:42Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start private Postgres",
+          "started_at": "2026-10-16T21:26:42Z",
+          "completed_at": "2026-10-16T21:26:56Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Restore archive into original build paths",
+          "started_at": "2026-10-16T21:26:56Z",
+          "completed_at": "2026-10-16T21:27:30Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "List shard inventory",
+          "started_at": "2026-10-16T21:27:30Z",
+          "completed_at": "2026-10-16T21:27:30Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run shard",
+          "started_at": "2026-10-16T21:27:30Z",
+          "completed_at": "2026-10-16T21:33:57Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve shard JUnit",
+          "started_at": "2026-10-16T21:33:57Z",
+          "completed_at": "2026-10-16T21:33:57Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:33:57Z",
+          "completed_at": "2026-10-16T21:33:58Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:33:58Z",
+          "completed_at": "2026-10-16T21:34:11Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:34:11Z",
+          "completed_at": "2026-10-16T21:34:11Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:34:11Z",
+          "completed_at": "2026-10-16T21:34:11Z",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "unit-test-shards (2)",
+      "started_at": "2026-10-16T21:26:08Z",
+      "completed_at": "2026-10-16T21:34:22Z",
+      "conclusion": "success",
+      "runner_name": "64cpu-aptos-image-ubuntu22-x64-1001663321",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:26:09Z",
+          "completed_at": "2026-10-16T21:26:10Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:26:10Z",
+          "completed_at": "2026-10-16T21:26:17Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:26:17Z",
+          "completed_at": "2026-10-16T21:26:36Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v4",
+          "started_at": "2026-10-16T21:26:36Z",
+          "completed_at": "2026-10-16T21:27:09Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Start private Postgres",
+          "started_at": "2026-10-16T21:27:09Z",
+          "completed_at": "2026-10-16T21:27:21Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Restore archive into original build paths",
+          "started_at": "2026-10-16T21:27:21Z",
+          "completed_at": "2026-10-16T21:27:55Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "List shard inventory",
+          "started_at": "2026-10-16T21:27:55Z",
+          "completed_at": "2026-10-16T21:27:55Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run shard",
+          "started_at": "2026-10-16T21:27:55Z",
+          "completed_at": "2026-10-16T21:34:12Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve shard JUnit",
+          "started_at": "2026-10-16T21:34:12Z",
+          "completed_at": "2026-10-16T21:34:12Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "started_at": "2026-10-16T21:34:12Z",
+          "completed_at": "2026-10-16T21:34:13Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run ./.github/actions/rust-prebuilt-setup",
+          "started_at": "2026-10-16T21:34:13Z",
+          "completed_at": "2026-10-16T21:34:21Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:34:21Z",
+          "completed_at": "2026-10-16T21:34:21Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:34:21Z",
+          "completed_at": "2026-10-16T21:34:21Z",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "verify-results",
+      "started_at": "2026-10-16T21:36:57Z",
+      "completed_at": "2026-10-16T21:37:14Z",
+      "conclusion": "success",
+      "runner_name": "2cpu-gh-ubuntu24-x64-1001663349",
+      "steps": [
+        {
+          "name": "Set up job",
+          "started_at": "2026-10-16T21:36:57Z",
+          "completed_at": "2026-10-16T21:37:00Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:37:00Z",
+          "completed_at": "2026-10-16T21:37:10Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Require every phase to succeed",
+          "started_at": "2026-10-16T21:37:10Z",
+          "completed_at": "2026-10-16T21:37:10Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v4",
+          "started_at": "2026-10-16T21:37:10Z",
+          "completed_at": "2026-10-16T21:37:11Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/download-artifact@v4",
+          "started_at": "2026-10-16T21:37:11Z",
+          "completed_at": "2026-10-16T21:37:12Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify complete disjoint test execution",
+          "started_at": "2026-10-16T21:37:12Z",
+          "completed_at": "2026-10-16T21:37:12Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "started_at": "2026-10-16T21:37:12Z",
+          "completed_at": "2026-10-16T21:37:12Z",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "started_at": "2026-10-16T21:37:12Z",
+          "completed_at": "2026-10-16T21:37:12Z",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "saved_evidence_sha256": {
+    "full-run.log": "32ef554723b3d0c0873b20ddb6bc946eeb4b0fdba06812d4ae22f7bb4fb85972",
+    "verification.log": "34d68b02eece94aad40b2d751f0491eeb1efad4c73b7ae485443497369807481",
+    "run.json": "17c07856a16f16b38e6bc3627d206c174f61d78c6d11cf23f8ad86d0365ce48c",
+    "status.json": "be8524733dc7a7b08a6547f626493358d6fd9413e45b49765a5e7b284647a289",
+    "jobs.json": "55441a0b2676e7d0912d80524e1ae0a514ee34ea4b46920538e95b75879f3973",
+    "artifacts.json": "4620dfac593b98d2ec8f047a27b8451b4ae973f6fdb66af968503b74b1f53cb6",
+    "inventory/expected.json": "56fddc20e12fe5ee4b1db4eed394bfaabd167bdee59e0d6650aea1ecae15be39",
+    "artifacts/hosted-unit-test-results-1/junit-1.xml": "10eab2f349808a5ca8d8bda6fce5568f16a8c91ea7e064d1d847bf60f9f7e32d",
+    "artifacts/hosted-unit-test-results-1/inventory-1.json": "79088f7437d3eb059f921fcc449bed97b6bd4aa5fc3ce40dee91aaf0055974b6",
+    "artifacts/hosted-unit-test-results-1/tests-1.log": "21149d40b812c3c0f8a459c3f88c9e7c54c74a8c76187e2a04712954255d1ac4",
+    "artifacts/hosted-unit-test-results-2/junit-2.xml": "bc88523cafda733ce896d005e12cd0d6c584888b9eb6285c39c1ac2b68bd965b",
+    "artifacts/hosted-unit-test-results-2/tests-2.log": "dd46b567bc7bad1c6050f8c60816d9fc89de192282160658a8157c1e32ee9854",
+    "artifacts/hosted-unit-test-results-2/inventory-2.json": "e4108aa0a6e5a4dca289e01f8d2a98750fee26f0a1624aabf1ac063a926d1df8",
+    "artifacts/hosted-unit-test-results-4/junit-4.xml": "8a1eb301d32a0d2c859cba9149954bc5935c2950393294c7d28ebcf9bf252ec5",
+    "artifacts/hosted-unit-test-results-4/inventory-4.json": "1766f2b3795b9c2ca73770b7593591980d6bf5091f6ba2793d5d19afc02f593a",
+    "artifacts/hosted-unit-test-results-4/tests-4.log": "31a4c7ef54daaa0fa88848b548f158ca0a3d9e7d7bd9d427ac44e7c233c1be8a",
+    "artifacts/hosted-unit-test-results-3/junit-3.xml": "372930085a756dfc40a4c5e78be2f1bd1d2c593ede731f5bb10b59d881161bf3",
+    "artifacts/hosted-unit-test-results-3/tests-3.log": "1dc1a2d7c3a1e4975bee62a92da31cc79e506814cc733ea267c460a751b047bd",
+    "artifacts/hosted-unit-test-results-3/inventory-3.json": "a15c81854f33bccd729ccc339fe3be675abc04c7395ee84f29c1e56b88502997"
+  }
+}

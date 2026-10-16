@@ -11,6 +11,12 @@ on:
       - aptos-node-v*
       - aptos-release-v*
   workflow_dispatch:
+    inputs:
+      rust_ci_provider:
+        description: "Rust CI provider (default honors RUST_CI_PROVIDER, otherwise hosted)"
+        type: choice
+        default: default
+        options: [default, hosted, aws]
 
 env:
   HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
@@ -28,12 +34,31 @@ permissions:
 
 
 jobs:
+  rust-ci-provider:
+    runs-on: ${{ '2cpu-gh-ubuntu24-x64' }}
+    outputs:
+      provider: ${{ steps.select.outputs.provider }}
+    steps:
+      - id: select
+        env:
+          MANUAL_PROVIDER: ${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}
+          CONFIGURED_PROVIDER: ${{ vars.RUST_CI_PROVIDER }}
+        run: |
+          provider="${CONFIGURED_PROVIDER:-hosted}"
+          if [ "$MANUAL_PROVIDER" != default ]; then
+            provider="$MANUAL_PROVIDER"
+          fi
+          case "$provider" in
+            hosted|aws) printf 'provider=%s\n' "$provider" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::RUST_CI_PROVIDER must be hosted or aws"; exit 1 ;;
+          esac
+
   file_change_determinator:
-    runs-on: 2cpu-gh-ubuntu24-x64
+    runs-on: ${{ '2cpu-gh-ubuntu24-x64' }}
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -41,9 +66,9 @@ jobs:
   # Run all general lints (i.e., non-rust and docs lints). This is a PR required job.
   general-lints:
     needs: file_change_determinator
-    runs-on: 2cpu-gh-ubuntu24-x64
+    runs-on: ${{ '2cpu-gh-ubuntu24-x64' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because python-lint-tests requires it.
@@ -58,13 +83,17 @@ jobs:
 
   # Run all rust lints. This is a PR required job.
   rust-lints:
-    needs: file_change_determinator
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    needs: [file_change_determinator, rust-ci-provider]
+    runs-on: ${{ needs.rust-ci-provider.outputs.provider == 'hosted' && '64cpu-aptos-image-ubuntu22-x64' || format('runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id={0}', github.run_id) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ needs.file_change_determinator.outputs.only_docs_changed != 'true' && needs.rust-ci-provider.outputs.provider == 'hosted' }}
+        with:
+          cache-key: hosted-rust-lints
       - name: Run rust lints
         uses: ./.github/actions/rust-lints
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -76,9 +105,9 @@ jobs:
   # Run cargo deny. This is a PR required job.
   rust-cargo-deny:
     needs: file_change_determinator
-    runs-on: 2cpu-gh-ubuntu24-x64
+    runs-on: ${{ '2cpu-gh-ubuntu24-x64' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
       - uses: EmbarkStudios/cargo-deny-action@v2
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -96,7 +125,7 @@ jobs:
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
@@ -115,7 +144,7 @@ jobs:
     needs: file_change_determinator
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
@@ -139,15 +168,9 @@ jobs:
         github.event_name == 'push' ||
         contains(github.event.pull_request.base.ref, '-release-')
       )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-      # Install Move Prover tools
-      - name: Run dev_setup.sh
-        run: |
-          scripts/dev_setup.sh -b -y
-      - name: Run rust unit tests
-        uses: ./.github/actions/rust-unit-tests
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+    needs: rust-ci-provider
+    uses: ./.github/workflows/hosted-rust-unit-tests.yaml
+    with:
+      provider: ${{ needs.rust-ci-provider.outputs.provider }}
+    secrets:
+      TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
