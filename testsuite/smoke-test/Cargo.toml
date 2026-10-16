@@ -70,8 +70,8 @@ base64 = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
-openssl = "0.10.75"
 once_cell = { workspace = true }
+openssl = "0.10.75"
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
