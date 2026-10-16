@@ -1020,3 +1020,300 @@ mod verify {
         );
     }
 }
+
+/// Close/reopen cycles of a real `AptosDB` whose committed write sets carry
+/// native-position ops: what the position store holds after open.
+mod reopen {
+    use super::{exchange, position_bytes, position_key};
+    use crate::{native_state_reader::NativeStateReader, AptosDB};
+    use aptos_config::config::{
+        HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    };
+    use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+    use aptos_storage_interface::DbReader;
+    use aptos_temppath::TempPath;
+    use aptos_types::{
+        state_store::{native_position::NativePosition, state_key::StateKey},
+        transaction::{
+            BlockEndInfo, ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo,
+            TransactionToCommit, Version,
+        },
+        write_set::{NativePositionOp, WriteOp, WriteSet},
+    };
+    use std::collections::BTreeMap;
+
+    fn open(dir: &TempPath, enable_trading_native: bool) -> AptosDB {
+        AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        )
+        .expect("open")
+    }
+
+    /// A one-transaction block whose write set sets each `(key, tag)`;
+    /// its transaction info commits `position_root` when given.
+    fn block(writes: &[(StateKey, u64)], position_root: Option<HashValue>) -> TransactionToCommit {
+        let txn_info = TransactionInfo::builder_v1()
+            .transaction_hash(HashValue::random())
+            .state_change_hash(HashValue::random())
+            .event_root_hash(HashValue::random())
+            .state_checkpoint_hash(HashValue::random())
+            .gas_used(0)
+            .status(ExecutionStatus::Success)
+            .maybe_position_state_checkpoint_hash(position_root)
+            .build();
+        let positions: BTreeMap<_, _> = writes
+            .iter()
+            .map(|(key, tag)| {
+                let op = WriteOp::legacy_modification(position_bytes(*tag).into());
+                (key.clone(), NativePositionOp::from_write_op(op))
+            })
+            .collect();
+        let mut write_set = WriteSet::default().into_v1();
+        write_set.add_native_positions(positions);
+        TransactionToCommit::new(
+            Transaction::block_epilogue_v0(HashValue::zero(), BlockEndInfo::new_empty()),
+            txn_info,
+            write_set,
+            vec![],
+            false,
+            TransactionAuxiliaryData::default(),
+        )
+    }
+
+    fn commit(db: &AptosDB, version: Version, writes: &[(StateKey, u64)]) {
+        commit_with_root(db, version, writes, None);
+    }
+
+    fn commit_with_root(
+        db: &AptosDB,
+        version: Version,
+        writes: &[(StateKey, u64)],
+        position_root: Option<HashValue>,
+    ) {
+        db.save_transactions_for_test(&[block(writes, position_root)], version, None, true)
+            .expect("commit");
+    }
+
+    fn position_root(db: &AptosDB) -> HashValue {
+        db.get_pre_committed_position_state_summary()
+            .expect("position summary")
+            .latest()
+            .root_hash()
+    }
+
+    fn size_of(db: &AptosDB, account: u8) -> Option<u64> {
+        db.native_state_reader()
+            .expect("position storage attached")
+            .get_account_positions(exchange(1), super::account(account))
+            .into_iter()
+            .map(|(_market, p)| match p {
+                NativePosition::PerpV1 { size, .. } => size,
+            })
+            .next()
+    }
+
+    /// Flag on through v1, off for v2..=v3 (which rewrites the key), on again:
+    /// the reopened index and a later cold load must both see v3's value.
+    #[test]
+    fn reenabling_replays_the_gap_into_the_value_store() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[(position_key(2), 20)]);
+        }
+        {
+            let db = open(&dir, false);
+            commit(&db, 2, &[(position_key(1), 11)]);
+            commit(&db, 3, &[(position_key(1), 12)]);
+        }
+        {
+            let db = open(&dir, true);
+            assert_eq!(size_of(&db, 1), Some(12), "replayed overlay");
+            assert_eq!(size_of(&db, 2), Some(20));
+        }
+        // The replay above sync-committed a JMT snapshot at v3, so this open
+        // cold-loads from it, resolving each leaf's value from the KV store.
+        let db = open(&dir, true);
+        assert_eq!(size_of(&db, 1), Some(12), "cold load after replay");
+        assert_eq!(size_of(&db, 2), Some(20));
+    }
+
+    /// Fast sync to a target whose position root is the empty-tree
+    /// placeholder, then commit positions on top.
+    #[test]
+    fn fast_sync_to_an_empty_position_tree_then_commit() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit(&db, 0, &[]);
+            commit(&db, 1, &[]);
+        }
+        let db = open(&dir, true);
+        db.reset_position_after_fast_sync(1, *SPARSE_MERKLE_PLACEHOLDER_HASH)
+            .expect("reset");
+        commit(&db, 2, &[(position_key(1), 10)]);
+        assert_eq!(size_of(&db, 1), Some(10));
+        drop(db);
+        let db = open(&dir, true);
+        assert_eq!(size_of(&db, 1), Some(10), "cold load");
+    }
+
+    /// Position storage turned on for a node whose history already commits
+    /// a non-empty position root must refuse to open rather than start empty.
+    #[test]
+    fn enabling_on_a_ledger_with_unstored_positions_refuses_to_open() {
+        // Reference node with storage on throughout supplies the true root.
+        let reference_dir = TempPath::new();
+        let root = {
+            let db = open(&reference_dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            position_root(&db)
+        };
+
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_with_root(&db, 0, &[(position_key(1), 10)], Some(root));
+        }
+        let err = match AptosDB::open(
+            StorageDirPaths::from_path(dir.path()),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs {
+                enable_trading_native: true,
+                ..Default::default()
+            },
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            HotStateConfig::default(),
+        ) {
+            Ok(_) => panic!("open must fail"),
+            Err(err) => err,
+        };
+        assert!(
+            err.to_string().contains("disagrees with the position root"),
+            "{err}"
+        );
+    }
+
+    /// Enabling on a ledger whose committed position root is the empty tree
+    /// (feature on, no positions yet) is the normal rollout path and opens.
+    #[test]
+    fn enabling_on_a_ledger_with_an_empty_position_root_opens() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, false);
+            commit_with_root(&db, 0, &[], Some(*SPARSE_MERKLE_PLACEHOLDER_HASH));
+        }
+        let db = open(&dir, true);
+        commit(&db, 1, &[(position_key(1), 10)]);
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// A node with storage on throughout reopens cleanly against a ledger
+    /// that commits position roots.
+    #[test]
+    fn reopening_with_matching_committed_roots_succeeds() {
+        let dir = TempPath::new();
+        {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            let root = position_root(&db);
+            commit_with_root(&db, 1, &[], Some(root));
+        }
+        let db = open(&dir, true);
+        assert_eq!(size_of(&db, 1), Some(10));
+    }
+
+    /// Generated blocks commit position roots that the storage pipeline
+    /// reproduces, and reopen passes the open-time root check.
+    #[test]
+    fn generated_position_blocks_match_committed_roots() {
+        use crate::db::test_helper::arb_blocks_to_commit_with_positions;
+        use aptos_proptest_helpers::ValueGenerator;
+
+        let dir = TempPath::new();
+        let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_positions());
+        let mut last_root = None;
+        {
+            let db = open(&dir, true);
+            let mut version = 0;
+            for (txns, li) in &blocks {
+                db.save_transactions_for_test(txns, version, Some(li), true)
+                    .expect("commit");
+                version += txns.len() as Version;
+                last_root = txns
+                    .last()
+                    .unwrap()
+                    .transaction_info()
+                    .position_state_checkpoint_hash();
+            }
+            assert_eq!(Some(position_root(&db)), last_root);
+        }
+        let db = open(&dir, true);
+        assert_eq!(Some(position_root(&db)), last_root);
+    }
+
+    /// A restore-mode open leaves the position store where it was persisted;
+    /// the reset a replay runs first must bring it to the ledger tip, as a
+    /// resumed restore's replay continues from there.
+    #[test]
+    fn restore_reset_catches_positions_up_to_the_ledger() {
+        use crate::get_restore_handler::GetRestoreHandler;
+        use std::sync::Arc;
+
+        let dir = TempPath::new();
+        let root = {
+            let db = open(&dir, true);
+            commit(&db, 0, &[(position_key(1), 10)]);
+            commit(&db, 1, &[(position_key(2), 20)]);
+            commit(&db, 2, &[(position_key(1), 11)]);
+            position_root(&db)
+        };
+        // Lose the in-memory tip: only the oldest snapshot is on disk. The
+        // ledger past it stands in for what a previous restore run replayed.
+        {
+            let db = open(&dir, true);
+            let bundle = db.position().unwrap();
+            crate::utils::truncation_helper::truncate_position_merkle_db(&bundle.merkle_db, 0)
+                .unwrap();
+        }
+        let db = Arc::new(
+            AptosDB::open_kv_only(
+                StorageDirPaths::from_path(dir.path()),
+                false,
+                NO_OP_STORAGE_PRUNER_CONFIG,
+                RocksdbConfigs {
+                    enable_trading_native: true,
+                    ..Default::default()
+                },
+                BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                None,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            size_of(&db, 1),
+            Some(10),
+            "restore-mode open does not catch up"
+        );
+        db.get_restore_handler().reset_state_store().unwrap();
+        assert_eq!(position_root(&db), root);
+        assert_eq!(size_of(&db, 1), Some(11));
+        assert_eq!(size_of(&db, 2), Some(20));
+    }
+}

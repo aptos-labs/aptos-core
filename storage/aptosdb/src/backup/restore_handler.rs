@@ -4,13 +4,14 @@
 use crate::{
     backup::restore_utils,
     ledger_db::LedgerDb,
+    position_state_sync::new_position_snapshot_restore,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
     AptosDB,
 };
 use aptos_crypto::HashValue;
-use aptos_storage_interface::{DbReader, Result};
+use aptos_storage_interface::{AptosDbError, DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -54,8 +55,41 @@ impl RestoreHandler {
         )
     }
 
-    pub fn reset_state_store(&self) {
+    pub fn reset_state_store(&self) -> Result<()> {
         self.state_store.reset();
+        self.aptosdb.reset_position_store_to_ledger()
+    }
+
+    /// Whether this DB keeps native-position state, i.e. whether a restore
+    /// must bring positions along with the state snapshot.
+    pub fn has_position_store(&self) -> bool {
+        self.aptosdb.position.is_some()
+    }
+
+    pub fn get_position_restore_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
+        let position = self.aptosdb.position.as_ref().ok_or_else(|| {
+            AptosDbError::Other("native-position storage is not enabled on this DB".into())
+        })?;
+        new_position_snapshot_restore(
+            &position.kv_db,
+            &position.merkle_db,
+            version,
+            expected_root_hash,
+        )
+    }
+
+    /// Re-seat the position store on the snapshot just restored at `version`.
+    pub fn reset_position_store(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<()> {
+        self.aptosdb
+            .reset_position_after_fast_sync(version, expected_root_hash)
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {

@@ -67,40 +67,25 @@ impl DbReader for AptosDB {
 
     fn get_persisted_position_state_summary(&self) -> Result<PositionStateWithSummary> {
         gauged_api("get_persisted_position_state_summary", || {
-            // Only reached with the feature on; fail fast (don't fabricate an
-            // empty base) if position storage isn't initialized, so enabling
-            // without enable_trading_native errors here instead of halting later.
+            // Only reached with the feature on; fail fast rather than
+            // fabricate an empty base.
             self.position
                 .as_ref()
                 .and_then(|bundle| bundle.persisted.as_ref())
                 .map(|persisted| persisted.get())
-                .ok_or_else(|| {
-                    AptosDbError::Other(
-                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
-                         storage is not initialized (storage.rocksdb_configs.enable_trading_native is off)"
-                            .to_string(),
-                    )
-                })
+                .ok_or_else(|| self.position_storage_unavailable())
         })
     }
 
     fn get_pre_committed_position_state_summary(&self) -> Result<PositionLedgerStateWithSummary> {
         gauged_api("get_pre_committed_position_state_summary", || {
             // Pre-committed tip from the buffered state (includes committed
-            // writes not yet merklized). Fail fast like
-            // `get_persisted_position_state_summary` when position storage is
-            // absent, so enabling without enable_trading_native errors here.
+            // writes not yet merklized).
             self.position
                 .as_ref()
                 .and_then(|bundle| bundle.state_store.as_ref())
                 .map(|store| store.current_state().lock().clone())
-                .ok_or_else(|| {
-                    AptosDbError::Other(
-                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
-                         storage is not initialized (storage.rocksdb_configs.enable_trading_native is off)"
-                            .to_string(),
-                    )
-                })
+                .ok_or_else(|| self.position_storage_unavailable())
         })
     }
 
@@ -109,13 +94,7 @@ impl DbReader for AptosDB {
             self.position
                 .as_ref()
                 .map(|bundle| bundle.positions.lock().clone())
-                .ok_or_else(|| {
-                    AptosDbError::Other(
-                        "COMPUTE_TRADING_NATIVE_STATE_ROOTS is enabled but native-position \
-                         storage is not initialized (storage.rocksdb_configs.enable_trading_native is off)"
-                            .to_string(),
-                    )
-                })
+                .ok_or_else(|| self.position_storage_unavailable())
         })
     }
 
