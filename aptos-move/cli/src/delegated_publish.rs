@@ -3,7 +3,9 @@
 
 use aptos_cli_common::{CliError, CliTypedResult, TransactionOptions};
 use aptos_crypto::HashValue;
-use aptos_framework::chunked_publish::{PositionedChunk, CHUNK_SIZE_IN_BYTES};
+use aptos_framework::chunked_publish::{
+    chunk_position, PositionalChunks, PositionedChunk, CHUNK_SIZE_IN_BYTES,
+};
 use aptos_types::{
     on_chain_config::Features,
     transaction::{EntryFunction, TransactionPayload},
@@ -12,6 +14,8 @@ use clap::ValueEnum;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::ModuleId,
 };
+use serde::Deserialize;
+use std::{collections::HashSet, str::FromStr};
 
 /// Replay protection for the staging transactions only. Finalization chooses independently.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -355,6 +359,42 @@ mod tests {
     }
 
     #[test]
+    fn delegated_publish_resume_rejects_wrong_publisher_and_unexpected_positions() {
+        let publisher = address("0xb");
+        let package = PositionalChunks::new(b"metadata".to_vec(), vec![b"code".to_vec()], 4);
+        let mut area = DelegatedStagingAreaLayout {
+            publisher,
+            chunks: DelegatedTableWithLengthLayout {
+                inner: DelegatedTableLayout {
+                    handle: address("0xabc"),
+                },
+                length: 2,
+            },
+            keys: vec![0, 1u64 << 32],
+        };
+        assert_eq!(
+            staged_positions(&area, publisher, &package).unwrap().len(),
+            2
+        );
+        assert!(staged_positions(&area, address("0xc"), &package).is_err());
+        area.keys[1] = 5u64 << 32;
+        assert!(staged_positions(&area, publisher, &package).is_err());
+        area.keys[1] = 0;
+        assert!(staged_positions(&area, publisher, &package).is_err());
+        area.keys[1] = 1u64 << 32;
+        area.chunks.length = 3;
+        assert!(staged_positions(&area, publisher, &package).is_err());
+    }
+
+    #[test]
+    fn delegated_publish_resume_rejects_different_bytes() {
+        let package = PositionalChunks::new(b"metadata".to_vec(), vec![b"code".to_vec()], 4);
+        assert!(check_staged_bytes(&package, 0, 0, b"meta").is_ok());
+        assert!(check_staged_bytes(&package, 0, 0, b"evil").is_err());
+        assert!(check_staged_bytes(&package, 2, 0, b"evil").is_err());
+    }
+
+    #[test]
     fn delegated_publish_finalization_carries_only_stager_counts_digest_and_optional_object() {
         let module = address("0xcafe");
         let stager = address("0xa");
@@ -483,52 +523,162 @@ async fn check_delegated_module(
     Ok(())
 }
 
-/// First-run only: never clear or overwrite an unverified staging area.
-async fn ensure_no_staging_area(
+#[derive(Deserialize)]
+struct DelegatedStagingAreaLayout {
+    publisher: AccountAddress,
+    chunks: DelegatedTableWithLengthLayout,
+    keys: Vec<u64>,
+}
+
+#[derive(Deserialize)]
+struct DelegatedTableWithLengthLayout {
+    inner: DelegatedTableLayout,
+    length: u64,
+}
+
+#[derive(Deserialize)]
+struct DelegatedTableLayout {
+    handle: AccountAddress,
+}
+
+/// Reject a different publisher, out-of-package positions, duplicated keys, or an invalid length.
+fn staged_positions(
+    area: &DelegatedStagingAreaLayout,
+    publisher: AccountAddress,
+    package: &PositionalChunks,
+) -> CliTypedResult<Vec<(u64, u16, u16)>> {
+    let invalid = |reason: &str| {
+        CliError::CommandArgumentError(format!(
+            "Cannot resume delegated staging: {reason}. Clean the area explicitly to start again."
+        ))
+    };
+    if area.publisher != publisher {
+        return Err(invalid("the staged publisher differs"));
+    }
+    if area.chunks.length != area.keys.len() as u64 {
+        return Err(invalid("staged table length differs from its key list"));
+    }
+    let mut seen = HashSet::new();
+    area.keys
+        .iter()
+        .map(|key| {
+            let (part, index) =
+                chunk_position(*key).ok_or_else(|| invalid("invalid chunk position"))?;
+            if !seen.insert((part, index)) || package.get(part, index).is_none() {
+                return Err(invalid("duplicate or unexpected chunk position"));
+            }
+            Ok((*key, part, index))
+        })
+        .collect()
+}
+
+fn check_staged_bytes(
+    package: &PositionalChunks,
+    part: u16,
+    index: u16,
+    bytes: &[u8],
+) -> CliTypedResult<()> {
+    if package
+        .get(part, index)
+        .is_some_and(|chunk| chunk.bytes == bytes)
+    {
+        Ok(())
+    } else {
+        Err(CliError::CommandArgumentError(format!(
+            "Staged bytes at ({part}, {index}) differ from this package; clean the area explicitly to start again"
+        )))
+    }
+}
+
+/// Read the stager's resource and staged table items; no missing or corrupt entry is reused.
+async fn read_delegated_staging(
     options: &TransactionOptions,
     module: AccountAddress,
-) -> CliTypedResult<()> {
+    publisher: AccountAddress,
+    package: &PositionalChunks,
+) -> CliTypedResult<Option<HashSet<(u16, u16)>>> {
     use aptos_api_types::AptosErrorCode;
     use aptos_rest_client::error::RestError;
     use aptos_transaction_simulation_session::Session;
     use aptos_types::state_store::{state_key::StateKey, TStateView};
     use move_core_types::language_storage::StructTag;
-    use std::str::FromStr;
-
     let name = format!("{module}::delegated_packages::StagingArea");
     let sender = options.get_public_key_and_address()?.1;
-    let exists = if let Some(path) = &options.session {
+    if let Some(path) = &options.session {
         let key = StateKey::resource(
             &sender,
             &StructTag::from_str(&name).map_err(|e| CliError::UnexpectedError(e.to_string()))?,
         )
         .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
-        Session::load(path)?
-            .state_store()
+        let session = Session::load(path)?;
+        let store = session.state_store();
+        let Some(bytes) = store
             .get_state_value_bytes(&key)
             .map_err(|e| CliError::UnexpectedError(format!("Failed to read staging area: {e}")))?
-            .is_some()
+        else {
+            return Ok(None);
+        };
+        let area: DelegatedStagingAreaLayout = bcs::from_bytes(&bytes).map_err(|e| {
+            CliError::UnexpectedError(format!("Invalid delegated staging area: {e}"))
+        })?;
+        let positions = staged_positions(&area, publisher, package)?;
+        let mut staged = HashSet::new();
+        for (key, part, index) in positions {
+            let item = store
+                .get_state_value_bytes(&StateKey::table_item(
+                    &aptos_types::state_store::table::TableHandle(area.chunks.inner.handle),
+                    &bcs::to_bytes(&key)?,
+                ))
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!("Failed to read staged chunk: {e}"))
+                })?
+                .ok_or_else(|| {
+                    CliError::UnexpectedError(format!(
+                        "Staged chunk at ({part}, {index}) is missing"
+                    ))
+                })?;
+            let bytes: Vec<u8> = bcs::from_bytes(&item)
+                .map_err(|e| CliError::UnexpectedError(format!("Invalid staged chunk: {e}")))?;
+            check_staged_bytes(package, part, index, &bytes)?;
+            staged.insert((part, index));
+        }
+        Ok(Some(staged))
     } else {
-        match options
-            .rest_client()?
-            .get_account_resource(sender, &name)
+        let client = options.rest_client()?;
+        let area = match client
+            .get_account_resource_bcs::<DelegatedStagingAreaLayout>(sender, &name)
             .await
         {
-            Ok(response) => response.into_inner().is_some(),
+            Ok(response) => response.into_inner(),
             Err(RestError::Api(response))
                 if response.error.error_code == AptosErrorCode::ResourceNotFound =>
             {
-                false
+                return Ok(None);
             },
             Err(error) => return Err(CliError::from(error)),
+        };
+        let positions = staged_positions(&area, publisher, package)?;
+        let mut staged = HashSet::new();
+        for (key, part, index) in positions {
+            let bytes = client
+                .get_table_item_bcs::<String, Vec<u8>>(
+                    area.chunks.inner.handle,
+                    "u64",
+                    "vector<u8>",
+                    key.to_string(),
+                )
+                .await
+                .map_err(|e| {
+                    CliError::ApiError(format!(
+                        "Failed to read staged chunk at ({part}, {index}): {e}"
+                    ))
+                })?
+                .into_inner();
+            check_staged_bytes(package, part, index, &bytes)?;
+            staged.insert((part, index));
         }
-    };
-    if exists {
-        return Err(CliError::CommandArgumentError(format!(
-            "StagingArea already exists under {sender}; refusing to overwrite or clean it. Resume is not supported by this first version. Clean it explicitly before restaging."
-        )));
+        Ok(Some(staged))
     }
-    Ok(())
 }
 
 // A pending, failed, or discarded transaction is not proof of commitment.
@@ -601,7 +751,6 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
             )));
         }
         check_delegated_module(options, self.module_address).await?;
-        ensure_no_staging_area(options, self.module_address).await?;
         let package = crate::commands::build_package_options(
             &self.move_options,
             &self.included_artifacts,
@@ -611,18 +760,23 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
         let metadata = bcs::to_bytes(&package.extract_metadata()?)?;
         let code = package.extract_code();
         let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
-        let payloads = stage_chunks(self.module_address, chunks.chunks, self.chunk_size);
+        let staged =
+            read_delegated_staging(options, self.module_address, self.publisher, &chunks).await?;
+        let missing = chunks.missing(&staged.clone().unwrap_or_default());
+        let payloads = stage_chunks(self.module_address, missing, self.chunk_size);
         let mut txn_options = options.clone();
         // Open in its own A-signed committed transaction before any chunk can be sent.
-        txn_options.replay_protection_type = ReplayProtectionType::Seqnum;
-        committed(
-            crate::dispatch_transaction(
-                open_staging(self.module_address, self.publisher),
-                &txn_options,
-                &self.env,
-            )
-            .await,
-        )?;
+        if staged.is_none() {
+            txn_options.replay_protection_type = ReplayProtectionType::Seqnum;
+            committed(
+                crate::dispatch_transaction(
+                    open_staging(self.module_address, self.publisher),
+                    &txn_options,
+                    &self.env,
+                )
+                .await,
+            )?;
+        }
         txn_options.replay_protection_type = match mode {
             StageMode::Nonce => ReplayProtectionType::Nonce,
             StageMode::Seqnum => ReplayProtectionType::Seqnum,
