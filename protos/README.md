@@ -6,7 +6,7 @@ Make sure to install buf, e.g. for Mac:
 brew install bufbuild/buf/buf
 ```
 
-If you see unexpected changes, make sure the version of buf you have matches the version we use in CI, see [`.github/workflows/check-protos.yaml`](../.github/workflows/check-protos.yaml).
+If you see unexpected changes, make sure the version of buf you have matches the version we use in CI, see [`.github/workflows/indexer-protos-sdk-update.yaml`](../.github/workflows/indexer-protos-sdk-update.yaml).
 
 If you update the proto definitions in `proto/`, you can regenerate the code for all languages based on those protos by running this script:
 ```bash
