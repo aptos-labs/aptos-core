@@ -152,10 +152,10 @@ fn parse_json(bytes: &[u8]) -> Result<Value, NrasError> {
     serde_json::from_slice(bytes).map_err(|e| NrasError::Malformed(e.to_string()))
 }
 
-fn select_bundle<'a>(
-    value: &'a Value,
+fn select_bundle(
+    value: &Value,
     already_wrapped: bool,
-) -> Result<(&'a str, &'a Map<String, Value>), NrasError> {
+) -> Result<(&str, &Map<String, Value>), NrasError> {
     let parts = value
         .as_array()
         .filter(|v| v.len() == 2)
