@@ -288,7 +288,7 @@ impl TransactionTraceStore {
     /// block → traced txn hashes for efficient post-proposal stage recording.
     /// `parent_block_timestamp_usecs` is the proposal timestamp of the
     /// block's parent (used as a front-run-exposure bound).
-    /// Called from round_manager::process_proposal.
+    /// Called from block_store::insert_block_inner before the execution pipeline starts.
     pub fn process_proposed_block(
         &self,
         block_id: HashValue,
