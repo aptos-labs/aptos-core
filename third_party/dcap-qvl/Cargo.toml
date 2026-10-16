@@ -29,23 +29,17 @@ repository = "https://github.com/Phala-Network/dcap-qvl"
 # The dependency's library crate is named `webpki` in source imports.
 ignored = ["dcap-qvl-webpki"]
 
+[lib]
+name = "dcap_qvl"
+crate-type = ["cdylib", "staticlib", "rlib"]
+path = "src/lib.rs"
+
 [features]
 _anycrypto = []
 danger-allow-tcb-override = []
-default = [
-    "std",
-    "ring",
-    "default-x509",
-]
-default-x509 = [
-    "dep:der",
-    "dep:x509-cert",
-]
-ring = [
-    "dep:ring",
-    "dcap-qvl-webpki/ring",
-    "_anycrypto",
-]
+default = ["std", "ring", "default-x509"]
+default-x509 = ["dep:der", "dep:x509-cert"]
+ring = ["dep:ring", "dcap-qvl-webpki/ring", "_anycrypto"]
 std = [
     "serde/std",
     "scale/std",
@@ -55,15 +49,6 @@ std = [
     "serde_json",
     "urlencoding",
 ]
-
-[lib]
-name = "dcap_qvl"
-crate-type = [
-    "cdylib",
-    "staticlib",
-    "rlib",
-]
-path = "src/lib.rs"
 
 [dependencies.anyhow]
 version = "1.0.102"
@@ -76,10 +61,7 @@ default-features = false
 
 [dependencies.chrono]
 version = "0.4.44"
-features = [
-    "alloc",
-    "serde",
-]
+features = ["alloc", "serde"]
 default-features = false
 
 [dependencies.const-oid]
