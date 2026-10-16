@@ -285,8 +285,8 @@ class E2eSelectionTest(unittest.TestCase):
         )
         self.assertNotIn("rust-targeted-unit-tests", gated)
         self.assertNotIn("general-lints", gated)
-        # Release PRs run all unit tests on code changes only.
-        self.assertIn("'-release-'", self.workflow_job(static, "rust-unit-tests"))
+        # Full unit tests run from the classifier, which includes release PRs.
+        self.assertIn("run_full_tests == 'true'", self.workflow_job(static, "rust-unit-tests"))
         self.assertNotIn("  rust-unit-tests:", gated)
         self.assertIn("gated_file_change_determinator", gated)
         self.assertNotEqual(static.splitlines()[0], gated.splitlines()[0])
