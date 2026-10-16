@@ -18,7 +18,9 @@ use mono_move_core::{
     LayoutProvider, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena, DEFAULT_HEAP_SIZE};
+use mono_move_runtime::{
+    deserialize_into, unsupported_stored_value, Heap, SharedArena, DEFAULT_HEAP_SIZE,
+};
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::resolver::ResourceResolver;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull, sync::Arc};
@@ -149,7 +151,11 @@ fn materialize_one(
     // SAFETY: `obj` is a fresh allocation of the type's size, and `blob` is
     // the BCS encoding of a value of type `ty`.
     unsafe { deserialize_into(guard, heap, ty, blob, obj.as_ptr()) }.map_err(|err| {
-        ResourceProviderError::InvariantViolation(format!("a stored value does not decode: {err}"))
+        unsupported_stored_value(&err).unwrap_or_else(|| {
+            ResourceProviderError::InvariantViolation(format!(
+                "a stored value does not decode: {err}"
+            ))
+        })
     })?;
     Ok(obj)
 }

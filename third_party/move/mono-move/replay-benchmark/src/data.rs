@@ -16,6 +16,7 @@ use aptos_types::{
         TransactionBlock, TransactionExecutableRef, Version,
     },
 };
+use mono_move_replay_common::label;
 use std::{collections::HashMap, path::Path as FsPath, sync::Arc};
 
 /// The transaction kinds the benchmark replays.
@@ -42,39 +43,14 @@ impl BenchmarkTxn {
     /// `module::function<type args>`, or the block-metadata kind.
     pub fn label(&self) -> String {
         let entry_label = |txn: &SignedTransaction| match txn.executable_ref() {
-            Ok(TransactionExecutableRef::EntryFunction(entry)) => {
-                let mut label = format!(
-                    "{}::{}",
-                    entry.module().short_str_lossless(),
-                    entry.function()
-                );
-                if !entry.ty_args().is_empty() {
-                    let ty_args = entry
-                        .ty_args()
-                        .iter()
-                        .map(|t| t.to_canonical_string())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    label.push_str(&format!("<{}>", ty_args));
-                }
-                label
-            },
+            Ok(TransactionExecutableRef::EntryFunction(entry)) => label::entry_function(entry),
             _ => "<not an entry function>".to_string(),
         };
         match self {
             BenchmarkTxn::User(txn) => entry_label(txn),
             BenchmarkTxn::BlockMetadata(_) => "block_metadata".to_string(),
-            BenchmarkTxn::BlockMetadataExt(bme) => match bme {
-                BlockMetadataExt::V0(_) => "block_metadata_ext_v0".to_string(),
-                BlockMetadataExt::V1(_) => "block_metadata_ext_v1".to_string(),
-                BlockMetadataExt::V2(_) => "block_metadata_ext_v2".to_string(),
-                BlockMetadataExt::V3(_) => "block_metadata_ext_v3".to_string(),
-            },
-            BenchmarkTxn::BlockEpilogue(payload) => match payload {
-                BlockEpiloguePayload::V0 { .. } => "block_epilogue_v0".to_string(),
-                BlockEpiloguePayload::V1 { .. } => "block_epilogue_v1".to_string(),
-                BlockEpiloguePayload::V2 { .. } => "block_epilogue_v2".to_string(),
-            },
+            BenchmarkTxn::BlockMetadataExt(bme) => label::block_metadata_ext(bme).to_string(),
+            BenchmarkTxn::BlockEpilogue(payload) => label::block_epilogue(payload).to_string(),
         }
     }
 }
