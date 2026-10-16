@@ -31,6 +31,15 @@ validator code support; the target configuration cannot supply executable code.
 The DER check is structural. An attestation verifier still checks the
 certificate's signature, chain, validity period, and format-specific policy.
 
+FormatV3 attestation can use separate targets for separate signing roles. For
+example, `tinfoil_config_signing_keys` can carry a JSON key set (format `2`)
+while `tinfoil_artifact_freshness_signing_keys` can carry a binary key set
+(format `3`). These IDs are independent: rotating one source increments only
+that target's observation version. Changing its URL or format increments its
+configuration version and invalidates only its old observation and patch. The
+verifier must enforce each key's role and signature semantics; the observer
+only certifies the bytes fetched from the configured URL.
+
 Each validator verifies the target's HTTPS certificate with its normal system
 roots. Operators can add PEM-encoded roots through the local
 `jwk_consensus.trust_observation_extra_root_certificates_pem` node setting for
@@ -64,8 +73,10 @@ of `get_effective_value`; this change supplies their observed trust material.
 ## Smoke test
 
 `cargo test -p smoke-test trust_observation_consensus_smoke --lib -- --nocapture`
-starts four local validators and an HTTPS endpoint with a short-lived test CA
-generated at runtime. It checks two quorum-certified observations through the
-`ObservedTrustUpdate` transaction, then checks that governance patches affect
-the effective value without rewriting the observation and that target edits
-invalidate old state. The test does not contact an external trust source.
+starts four local validators and three HTTPS endpoints with a short-lived test
+CA generated at runtime. It checks independent DER, canonical JSON, and raw
+byte observations and rotations through `ObservedTrustUpdate` transactions.
+It then checks that governance patches affect the effective value without
+rewriting the observation, and that editing or removing the DER target leaves
+both signing-key targets intact. The fixtures are synthetic and the test does
+not contact an external trust source.

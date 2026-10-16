@@ -1,0 +1,202 @@
+cvm-sigstore
+============
+
+This crate contains source code vendored from, and newly ported from,
+third-party projects, all under the Apache License 2.0. A copy of that license
+is in ./LICENSE.
+
+Contents by origin:
+
+    item 1  files vendored from tinfoilsh/tinfoil-rs, with local modifications
+    item 2  portions deriving from sigstore/sigstore-rs, by way of tinfoil-rs
+    item 3  files newly ported from tinfoilsh/tinfoil-go (policy, provenance)
+    item 4  a genuine third-party Sigstore bundle kept as a test fixture
+
+The "Local modifications" list under item 1 is the auditable delta from
+upstream; it records removed and replaced APIs, not just additions.
+
+
+1. tinfoilsh/tinfoil-rs
+-----------------------
+
+Source:    https://github.com/tinfoilsh/tinfoil-rs
+Path:      src/verifier/sigstore/
+Revision:  main, retrieved 2026-08-27
+License:   Apache-2.0
+Copyright: Tinfoil, Inc.
+
+Vendored files:
+
+    src/certificate.rs
+    src/checkpoint.rs
+    src/dsse.rs
+    src/fulcio.rs
+    src/keyring.rs
+    src/merkle/mod.rs
+    src/merkle/proof_verification.rs
+    src/merkle/rfc6962.rs
+    src/rekor.rs
+    src/transparency.rs
+    src/trust.rs
+    src/lib.rs          (from src/verifier/sigstore/mod.rs)
+    assets/trusted_root.json
+
+Files NOT vendored from tinfoil-rs:
+
+    src/policy.rs       (36 KB)   new; ports tinfoil-go, see item 3
+    src/provenance.rs   (32 KB)   new; ports tinfoil-go, see item 3
+    src/error.rs, src/util.rs, src/types.rs      local adapters (below)
+    assets/rekor_test_bundle.json                test fixture (below)
+
+Upstream in turn notes that `keyring.rs`, `transparency.rs` and `merkle/` were
+adapted from sigstore/sigstore-rs (Apache-2.0); see item 2.
+
+Why vendored rather than depended upon:
+
+  * tinfoil-rs publishes the crate `tinfoil`, whose public API is an online
+    client (it fetches releases and bundles from GitHub over the network). The
+    offline verification primitives we need are internal to `src/verifier/`.
+  * The vault's `AttestationVerifier` contract forbids network access during
+    verification. All collateral must travel inside the attestation document.
+
+
+Local modifications
+~~~~~~~~~~~~~~~~~~~
+
+Recorded here so the delta from upstream stays auditable:
+
+  * Removed `verify_repo()` and the `github` module dependency. That is the
+    online entry point; this crate verifies bundles supplied by the caller.
+  * Replaced the parent-crate dependencies with a local adapter:
+      - `crate::error::{Error, Result}`      -> src/error.rs
+      - `crate::verifier::util::decode_b64`  -> src/util.rs
+      - `super::attestation::types::{Measurement, PredicateType}`
+                                             -> src/types.rs
+  * Rewrote intra-crate paths (`crate::verifier::sigstore::*` -> `crate::*`).
+
+  * `certificate.rs`: added the Fulcio OID extensions required by Tinfoil's v3
+    verifier and absent upstream -- 1.3.6.1.4.1.57264.1.10 (Build Signer
+    Digest), .1.11 (Runner Environment), .1.13 (Source Repository Digest) and
+    .1.14 (Source Repository Ref). The three checks below consume them.
+
+  * **Removed** upstream's `verify_certificate_identity()` (a private function
+    in upstream's `mod.rs`, i.e. our `lib.rs`) and replaced it with a new
+    public API in `certificate.rs`: `ExpectedIdentity` + `check_identity()`.
+
+    Upstream's took `(cert_info, expected_repo, expected_tag: &str)` and made
+    three checks -- OIDC issuer, repository, and one workflow-URI regex with
+    the tag interpolated into it, which made an exact tag mandatory.
+
+    The replacement carries the repository, a workflow-name regex, a ref regex
+    and an *optional* tag, so the three artifact kinds (code, platform
+    endorsements, freshness witness) each state their own identity through
+    `ExpectedIdentity::{code, platform_endorsements, freshness_witness}()`
+    rather than sharing one pattern. It keeps upstream's three checks and adds
+    three more, all mandatory:
+      - the build must have run on a GitHub-hosted runner (OID .1.11), refused
+        rather than assumed when the extension is absent;
+      - the ref is checked against OID .1.14 independently of the SAN pattern,
+        so a certificate cannot satisfy one while carrying something else in
+        the other, and must be a tag ref (freshness witnesses excepted, as
+        they are published continuously from a branch);
+      - the source repository digest (OID .1.13) must be a 40-hex commit SHA.
+
+  * `rekor.rs`: `verify_rekor_entry()`'s signature changed. Upstream's is
+    `(bundle, cert_not_before, cert_not_after) -> Result<()>`; this version
+    keeps the parameters and returns `Result<u64>`, yielding the entry's
+    verified `integratedTime`. The value has to leave the function because
+    freshness witnesses are dated by the log's timestamp rather than by
+    anything in their own payload.
+
+  * `rekor.rs`: added verification of Rekor's Signed Entry Timestamp
+    (`inclusionPromise.signedEntryTimestamp`), which upstream tinfoil-rs does
+    not perform -- its documented check list ends at step 8. Without it,
+    `integratedTime` is only constrained to fall inside the signing
+    certificate's ~10-minute validity window; with it, the timestamp is
+    covered by the log's own signature. A missing promise is refused rather
+    than treated as an opt-out.
+
+  * `lib.rs`: upstream's `extract_measurement_from_bundle(bundle,
+    expected_digest)` -- a private function doing three jobs at once
+    (validating the DSSE `payloadType`, checking `subject[0]`'s sha256 against
+    the expected digest, and extracting the measurement) -- was split into
+    three independently callable **public** functions:
+
+        parse_statement()            -> InTotoStatement
+        enforce_subject0_digest()    -> ()
+        measurement_from_statement() -> Measurement
+
+    The split is what lets the platform-endorsement and freshness paths reuse
+    the statement parsing while binding a different subject, instead of each
+    re-implementing it. Splitting it does not make the digest binding optional:
+    all three callers (code provenance, platform endorsements, freshness
+    witnesses) call `enforce_subject0_digest()`. It is a separate call, not a
+    separate policy.
+
+  * `checkpoint.rs`: `verify_ecdsa_p256()` and `verify_ed25519()` widened from
+    private to `pub(crate)` so `rekor.rs` can reuse them for the SET.
+
+`assets/trusted_root.json` is unmodified. It was verified to be byte-identical
+to `verifier/provenance/trusted_root.json` in tinfoilsh/tinfoil-go@feat/v3:
+
+    git blob  effb0a19e6a0b3f69b3f0a2c72b5c2a02a0ddeea
+    sha256    6494e21ea73fa7ee769f85f57d5a3e6a08725eae1e38c755fc3517c9e6bc0b66
+
+
+2. sigstore/sigstore-rs
+-----------------------
+
+Source:    https://github.com/sigstore/sigstore-rs
+License:   Apache-2.0
+Copyright: The Sigstore Authors
+
+Portions of src/keyring.rs, src/transparency.rs and src/merkle/ derive from
+this project, by way of tinfoil-rs.
+
+
+3. tinfoilsh/tinfoil-go
+-----------------------
+
+Source:    https://github.com/tinfoilsh/tinfoil-go
+Revision:  branch `feat/v3`
+License:   Apache-2.0
+Copyright: Tinfoil, Inc.
+
+Two substantial files in this crate -- roughly 70 KB together, about a third of
+the source -- are **not** from tinfoil-rs and were previously unrecorded here.
+They are new Rust ports of the corresponding Go packages in tinfoil-go, which
+is where the v3 verification model is defined:
+
+    src/provenance.rs  (32 KB)  <- verifier/provenance  (`AuthenticateCode`,
+                                   platform endorsements, freshness witnesses)
+    src/policy.rs      (36 KB)  <- verifier/policy      (machines map, TDX/SEV
+                                   appraisal, VM shape, measurement resolution)
+
+These are ports rather than vendored copies: the structure follows the Go
+packages and the security decisions are deliberately the same, but no Go source
+was translated line by line, and the error handling, type layout and tests are
+this crate's own.
+
+`src/attestation/envelope.rs` and `src/attestation/tdx.rs` in the sibling
+`cvm-vault` crate likewise port `verifier/envelope` and `verifier/quote/tdx`
+from the same branch. They are noted here because the wire formats they
+implement are defined by that project.
+
+
+4. Test fixture: assets/rekor_test_bundle.json
+----------------------------------------------
+
+A genuine, publicly logged Sigstore bundle, retained verbatim as a test
+fixture. It is third-party data rather than code, and is reproduced here
+because verification can only be meaningfully tested against real evidence:
+every signature in it -- the DSSE signature, the embedded SCTs, the Rekor
+inclusion proof, checkpoint and signed entry timestamp, and the Fulcio chain --
+is real and is checked by the tests.
+
+    Artifact:       tinfoilsh/confidential-model-router @ v0.0.75
+    Bundle format:  application/vnd.dev.sigstore.bundle.v0.3+json
+    Rekor logIndex: 1186330805
+    sha256:         de603b00072997dabfd7f7be899fe622ab63db6c200cca60f475ad4babe2212e
+
+The corresponding artifact and log entry are public records of the Sigstore
+transparency log. Copyright in the signed statement rests with Tinfoil, Inc.

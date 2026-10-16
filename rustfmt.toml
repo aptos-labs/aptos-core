@@ -5,6 +5,7 @@ imports_granularity = "Crate"
 format_macro_matchers = true
 group_imports = "One"
 hex_literal_case = "Upper"
+ignore = ["third_party/dcap-qvl"]
 match_block_trailing_comma = true
 newline_style = "Unix"
 overflow_delimited_expr = true

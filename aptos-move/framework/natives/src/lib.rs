@@ -15,6 +15,7 @@ pub mod debug;
 pub mod dispatchable_fungible_asset;
 pub mod event;
 pub mod function_info;
+pub mod google_space;
 pub mod hash;
 pub mod init;
 pub mod object;
@@ -23,6 +24,7 @@ pub mod randomness;
 pub mod state_storage;
 pub mod storage_slot;
 pub mod string_utils;
+pub mod tinfoil_v3;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
@@ -98,6 +100,8 @@ pub fn all_natives(
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
     add_natives_from_module!("consensus_config", consensus_config::make_all(builder));
     add_natives_from_module!("function_info", function_info::make_all(builder));
+    add_natives_from_module!("google_space", google_space::make_all(builder));
+    add_natives_from_module!("tinfoil_v3", tinfoil_v3::make_all(builder));
     add_natives_from_module!("init", init::make_all(builder));
     add_natives_from_module!("storage_slot", storage_slot::make_all(builder));
     add_natives_from_module!(

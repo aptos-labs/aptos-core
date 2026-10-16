@@ -13,7 +13,8 @@ use aptos_types::{
     on_chain_config::{OnChainChunkyDKGConfig, OnChainRandomnessConfig},
     trust_observation::{
         Config, EffectiveTrustData, ObservedTrustData, ObservedValue, Patches,
-        FORMAT_DER_CERTIFICATE, PATCH_REMOVE, PATCH_REPLACE,
+        FORMAT_CANONICAL_JSON, FORMAT_DER_CERTIFICATE, FORMAT_RAW_BYTES, PATCH_REMOVE,
+        PATCH_REPLACE,
     },
 };
 use hyper::{service::service_fn, Body, Request, Response};
@@ -42,6 +43,8 @@ use tokio_rustls::{
 };
 
 const TARGET_ID: &[u8] = b"smoke-intel-root";
+const CONFIG_KEYS_TARGET: &[u8] = b"tinfoil_config_signing_keys";
+const FRESHNESS_KEYS_TARGET: &[u8] = b"tinfoil_artifact_freshness_signing_keys";
 const RESOURCE_PREFIX: &str = "0x1::trust_observation::";
 
 /// Generate the fixture at test time: platform TLS libraries reject overly
@@ -272,11 +275,11 @@ async fn patches(client: &Client) -> Patches {
         .into_inner()
 }
 
-async fn wait_for_target_version(client: &Client, expected: Option<u64>) {
+async fn wait_for_target_version(client: &Client, target_id: &[u8], expected: Option<u64>) {
     timeout(Duration::from_secs(90), async {
         loop {
             let current = config(client).await;
-            if current.get(TARGET_ID).map(|target| target.config_version) == expected {
+            if current.get(target_id).map(|target| target.config_version) == expected {
                 return;
             }
             sleep(Duration::from_millis(500)).await;
@@ -286,11 +289,16 @@ async fn wait_for_target_version(client: &Client, expected: Option<u64>) {
     .expect("trust target configuration did not activate in the next epoch");
 }
 
-async fn wait_for_observation(client: &Client, version: u64, value: &[u8]) -> ObservedValue {
+async fn wait_for_observation(
+    client: &Client,
+    target_id: &[u8],
+    version: u64,
+    value: &[u8],
+) -> ObservedValue {
     timeout(Duration::from_secs(120), async {
         loop {
             let state = observed(client).await;
-            if let Some(entry) = state.get(TARGET_ID) {
+            if let Some(entry) = state.get(target_id) {
                 if entry.version == version && entry.value == value {
                     return entry.clone();
                 }
@@ -304,6 +312,7 @@ async fn wait_for_observation(client: &Client, version: u64, value: &[u8]) -> Ob
 
 async fn assert_committed_observation_txn(
     client: &Client,
+    target_id: &[u8],
     start_version: u64,
     expected_version: u64,
     expected_value: &[u8],
@@ -332,7 +341,7 @@ async fn assert_committed_observation_txn(
             ) = transaction
             {
                 let observed = &update.quorum_certified_update.update;
-                if observed.target_id.0 == TARGET_ID && observed.version.0 == expected_version {
+                if observed.target_id.0 == target_id && observed.version.0 == expected_version {
                     assert!(update.info.success);
                     assert_eq!(observed.value.0, expected_value);
                     assert!(
@@ -353,10 +362,11 @@ async fn assert_committed_observation_txn(
     panic!("no committed ObservedTrustUpdate validator transaction found");
 }
 
-/// Validators observe a loopback HTTPS root, quorum certify two versions,
-/// and commit them as validator transactions. Governance patches alter the
-/// verifier-facing value without changing the observation and are invalidated
-/// when the target configuration changes or is removed.
+/// Validators independently observe a DER root, JSON config-signing keys and
+/// raw artifact-freshness signing keys over loopback HTTPS. They quorum certify
+/// each target and commit validator transactions. Governance patches alter the
+/// verifier-facing value without changing the observation; changing or removing
+/// one target does not invalidate the other targets.
 #[test]
 fn trust_observation_consensus_smoke() {
     // Aptos CLI's Move script compilation needs more than libtest's 2 MiB
@@ -381,8 +391,19 @@ async fn trust_observation_consensus_smoke_inner() {
     let certificates = FixtureCertificates::generate();
     let ca_pem = certificates.ca_pem.clone();
     let server = FixtureHttpsServer::spawn(&certificates).await;
+    let config_keys_server = FixtureHttpsServer::spawn(&certificates).await;
+    let freshness_keys_server = FixtureHttpsServer::spawn(&certificates).await;
+    let config_keys_v1 = br#"{"signers":[{"key":"config-v1"}],"role":"config"}"#;
+    let config_keys_v1_canonical = br#"{"role":"config","signers":[{"key":"config-v1"}]}"#;
+    let config_keys_v2 = br#"{"role":"config","signers":[{"key":"config-v2"}]}"#;
+    let freshness_keys_v1 = b"freshness-key-v1\x00";
+    let freshness_keys_v2 = b"freshness-key-v2\x00";
+    config_keys_server.serve(config_keys_v1).await;
+    freshness_keys_server.serve(freshness_keys_v1).await;
     let first_url = format!("{}/root.cer", server.url);
     let second_url = format!("{}/rotated-root.cer", server.url);
+    let config_keys_url = format!("{}/config-keys.json", config_keys_server.url);
+    let freshness_keys_url = format!("{}/freshness-keys.bin", freshness_keys_server.url);
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(move |_, config, _| {
@@ -425,23 +446,114 @@ async fn trust_observation_consensus_smoke_inner() {
                 &framework, b"smoke-intel-root", utf8(b"{first_url}"),
                 {FORMAT_DER_CERTIFICATE}, 1024,
             );
+            trust_observation::upsert_target_for_next_epoch(
+                &framework, b"tinfoil_config_signing_keys", utf8(b"{config_keys_url}"),
+                {FORMAT_CANONICAL_JSON}, 1024,
+            );
+            trust_observation::upsert_target_for_next_epoch(
+                &framework, b"tinfoil_artifact_freshness_signing_keys", utf8(b"{freshness_keys_url}"),
+                {FORMAT_RAW_BYTES}, 1024,
+            );
             aptos_governance::reconfigure(&framework);"#
         ),
     )
     .await;
-    wait_for_target_version(&client, Some(1)).await;
-    let target = config(&client).await.get(TARGET_ID).unwrap().clone();
+    wait_for_target_version(&client, TARGET_ID, Some(1)).await;
+    wait_for_target_version(&client, CONFIG_KEYS_TARGET, Some(1)).await;
+    wait_for_target_version(&client, FRESHNESS_KEYS_TARGET, Some(1)).await;
+    let configured = config(&client).await;
+    assert_eq!(configured.targets.len(), 3);
+    let target = configured.get(TARGET_ID).unwrap().clone();
     assert_eq!(target.url, first_url);
     assert_eq!(target.format, FORMAT_DER_CERTIFICATE);
     assert_eq!(target.max_bytes, 1024);
-    let first = wait_for_observation(&client, 1, &certificates.ca_der).await;
+    assert_eq!(
+        configured.get(CONFIG_KEYS_TARGET).unwrap().format,
+        FORMAT_CANONICAL_JSON
+    );
+    assert_eq!(
+        configured.get(FRESHNESS_KEYS_TARGET).unwrap().format,
+        FORMAT_RAW_BYTES
+    );
+    let first = wait_for_observation(&client, TARGET_ID, 1, &certificates.ca_der).await;
     assert_eq!(first.config_version, 1);
     assert_eq!(effective(&client).await.get(TARGET_ID), Some(&first));
-    assert_committed_observation_txn(&client, first_transaction_version, 1, &certificates.ca_der)
-        .await;
+    assert_committed_observation_txn(
+        &client,
+        TARGET_ID,
+        first_transaction_version,
+        1,
+        &certificates.ca_der,
+    )
+    .await;
+
+    let config_keys_first =
+        wait_for_observation(&client, CONFIG_KEYS_TARGET, 1, config_keys_v1_canonical).await;
+    let freshness_keys_first =
+        wait_for_observation(&client, FRESHNESS_KEYS_TARGET, 1, freshness_keys_v1).await;
+    assert_eq!(config_keys_first.config_version, 1);
+    assert_eq!(freshness_keys_first.config_version, 1);
+    assert_eq!(observed(&client).await.entries.len(), 3);
+    assert_eq!(
+        effective(&client).await.get(CONFIG_KEYS_TARGET),
+        Some(&config_keys_first)
+    );
+    assert_eq!(
+        effective(&client).await.get(FRESHNESS_KEYS_TARGET),
+        Some(&freshness_keys_first)
+    );
+    assert_committed_observation_txn(
+        &client,
+        CONFIG_KEYS_TARGET,
+        first_transaction_version,
+        1,
+        config_keys_v1_canonical,
+    )
+    .await;
+    assert_committed_observation_txn(
+        &client,
+        FRESHNESS_KEYS_TARGET,
+        first_transaction_version,
+        1,
+        freshness_keys_v1,
+    )
+    .await;
+
+    config_keys_server.serve(config_keys_v2).await;
+    let config_keys_second =
+        wait_for_observation(&client, CONFIG_KEYS_TARGET, 2, config_keys_v2).await;
+    assert_eq!(config_keys_second.config_version, 1);
+    assert_eq!(
+        observed(&client).await.get(FRESHNESS_KEYS_TARGET),
+        Some(&freshness_keys_first)
+    );
+    freshness_keys_server.serve(freshness_keys_v2).await;
+    let freshness_keys_second =
+        wait_for_observation(&client, FRESHNESS_KEYS_TARGET, 2, freshness_keys_v2).await;
+    assert_eq!(freshness_keys_second.config_version, 1);
+    assert_eq!(
+        observed(&client).await.get(CONFIG_KEYS_TARGET),
+        Some(&config_keys_second)
+    );
+    assert_committed_observation_txn(
+        &client,
+        CONFIG_KEYS_TARGET,
+        first_transaction_version,
+        2,
+        config_keys_v2,
+    )
+    .await;
+    assert_committed_observation_txn(
+        &client,
+        FRESHNESS_KEYS_TARGET,
+        first_transaction_version,
+        2,
+        freshness_keys_v2,
+    )
+    .await;
 
     server.serve(&certificates.server_der).await;
-    let second = wait_for_observation(&client, 2, &certificates.server_der).await;
+    let second = wait_for_observation(&client, TARGET_ID, 2, &certificates.server_der).await;
     assert_eq!(second.config_version, 1);
     assert_eq!(effective(&client).await.get(TARGET_ID), Some(&second));
 
@@ -500,14 +612,31 @@ async fn trust_observation_consensus_smoke_inner() {
         ),
     )
     .await;
-    wait_for_target_version(&client, Some(2)).await;
+    wait_for_target_version(&client, TARGET_ID, Some(2)).await;
     assert_eq!(
         config(&client).await.get(TARGET_ID).unwrap().url,
         second_url
     );
     assert!(patches(&client).await.entries.is_empty());
     assert!(effective(&client).await.get(TARGET_ID).is_none());
-    assert!(observed(&client).await.entries.is_empty());
+    let observed_after_rotation = observed(&client).await;
+    assert!(observed_after_rotation.get(TARGET_ID).is_none());
+    assert_eq!(
+        observed_after_rotation.get(CONFIG_KEYS_TARGET),
+        Some(&config_keys_second)
+    );
+    assert_eq!(
+        observed_after_rotation.get(FRESHNESS_KEYS_TARGET),
+        Some(&freshness_keys_second)
+    );
+    assert_eq!(
+        effective(&client).await.get(CONFIG_KEYS_TARGET),
+        Some(&config_keys_second)
+    );
+    assert_eq!(
+        effective(&client).await.get(FRESHNESS_KEYS_TARGET),
+        Some(&freshness_keys_second)
+    );
 
     submit_framework_script(
         &cli,
@@ -518,9 +647,19 @@ async fn trust_observation_consensus_smoke_inner() {
         aptos_governance::reconfigure(&framework);"#,
     )
     .await;
-    wait_for_target_version(&client, None).await;
-    assert!(config(&client).await.targets.is_empty());
-    assert!(observed(&client).await.entries.is_empty());
-    assert!(effective(&client).await.entries.is_empty());
+    wait_for_target_version(&client, TARGET_ID, None).await;
+    assert_eq!(config(&client).await.targets.len(), 2);
+    assert_eq!(observed(&client).await.entries.len(), 2);
+    assert_eq!(effective(&client).await.entries.len(), 2);
+    assert_eq!(
+        effective(&client).await.get(CONFIG_KEYS_TARGET),
+        Some(&config_keys_second)
+    );
+    assert_eq!(
+        effective(&client).await.get(FRESHNESS_KEYS_TARGET),
+        Some(&freshness_keys_second)
+    );
     server.shutdown().await;
+    config_keys_server.shutdown().await;
+    freshness_keys_server.shutdown().await;
 }

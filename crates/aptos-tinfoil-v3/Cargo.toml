@@ -1,0 +1,22 @@
+[package]
+name = "aptos-tinfoil-v3"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Offline Tinfoil v3 attestation verification for Aptos"
+
+[features]
+testing = []
+
+[dependencies]
+aptos-tinfoil-sigstore = { path = "../aptos-tinfoil-sigstore" }
+base64 = "0.23"
+dcap-qvl = { path = "../../third_party/dcap-qvl", default-features = false, features = ["std", "ring", "default-x509"] }
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+sha2 = "0.10"
+thiserror = "2"
+
+[dev-dependencies]

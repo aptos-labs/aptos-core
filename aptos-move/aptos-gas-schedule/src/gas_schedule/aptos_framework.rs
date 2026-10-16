@@ -7,8 +7,8 @@ use crate::{
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_14, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
-        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_50, RELEASE_V1_8,
-        RELEASE_V1_9_SKIPPED,
+        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_50, RELEASE_V1_51,
+        RELEASE_V1_8, RELEASE_V1_9_SKIPPED,
     },
 };
 use aptos_gas_algebra::{
@@ -373,5 +373,46 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [storage_slot_borrow_per_byte_loaded: InternalGasPerByte, { RELEASE_V1_46.. => "storage_slot.borrow.per_byte_loaded" }, 1830],
         [storage_slot_borrow_mut_base: InternalGas, { RELEASE_V1_46.. => "storage_slot.borrow_mut.base" }, 9190],
         [storage_slot_borrow_mut_per_byte_loaded: InternalGasPerByte, { RELEASE_V1_46.. => "storage_slot.borrow_mut.per_byte_loaded" }, 1830],
+
+        // Attestation verification charges parsing and RSA signature work up
+        // front. The byte charge covers the entire token and observed JWKS.
+        [google_space_verify_base: InternalGas, { RELEASE_V1_51.. => "google_space.verify.base" }, 20_000_000],
+        [google_space_verify_per_byte: InternalGasPerByte, { RELEASE_V1_51.. => "google_space.verify.per_byte" }, 3_000],
+        // TDX quote, Intel PCS collateral, and Sigstore bundles are CPU heavy.
+        // This native additionally rejects inputs over its own hard size caps.
+        [tinfoil_v3_verify_base: InternalGas, { RELEASE_V1_51.. => "tinfoil_v3.verify.base" }, 100_000_000],
+        [tinfoil_v3_verify_per_byte: InternalGasPerByte, { RELEASE_V1_51.. => "tinfoil_v3.verify.per_byte" }, 20_000],
     ]
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+
+    #[test]
+    fn attestation_gas_keys_start_at_v1_51() {
+        let params = AptosFrameworkGasParameters::initial();
+        let old = params.to_on_chain_gas_schedule(RELEASE_V1_50);
+        let new = params.to_on_chain_gas_schedule(RELEASE_V1_51);
+        assert_eq!(new.len(), old.len() + 4);
+
+        let old: std::collections::BTreeMap<_, _> = old.into_iter().collect();
+        let loaded = AptosFrameworkGasParameters::from_on_chain_gas_schedule(&old, RELEASE_V1_50)
+            .expect("v1.50 gas schedule remains compatible");
+        assert_eq!(u64::from(loaded.google_space_verify_base), 0);
+        assert_eq!(u64::from(loaded.tinfoil_v3_verify_base), 0);
+
+        let new: std::collections::BTreeMap<_, _> = new.into_iter().collect();
+        for key in [
+            "aptos_framework.google_space.verify.base",
+            "aptos_framework.google_space.verify.per_byte",
+            "aptos_framework.tinfoil_v3.verify.base",
+            "aptos_framework.tinfoil_v3.verify.per_byte",
+        ] {
+            assert!(new.contains_key(key), "missing {key}");
+        }
+        AptosFrameworkGasParameters::from_on_chain_gas_schedule(&new, RELEASE_V1_51)
+            .expect("v1.51 gas schedule includes attestation charges");
+    }
+}
