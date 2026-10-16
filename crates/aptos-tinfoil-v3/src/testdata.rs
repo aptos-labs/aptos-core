@@ -88,6 +88,7 @@ pub struct DocumentBuilder {
     tamper_crypto_material: bool,
     forge_report_data: bool,
     collateral: Vec<serde_json::Value>,
+    device_items: Vec<serde_json::Value>,
 }
 
 impl Default for DocumentBuilder {
@@ -107,6 +108,7 @@ impl DocumentBuilder {
             tamper_crypto_material: false,
             forge_report_data: false,
             collateral: Vec::new(),
+            device_items: Vec::new(),
         }
     }
 
@@ -180,6 +182,12 @@ impl DocumentBuilder {
         self
     }
 
+    /// Add a device report before computing its CPU REPORTDATA commitment.
+    pub fn device_item(mut self, item: serde_json::Value) -> Self {
+        self.device_items.push(item);
+        self
+    }
+
     /// Rewrite the crypto_material section after hashing it, so the endorsed
     /// hash no longer matches the transmitted bytes.
     pub fn tamper_crypto_material(mut self) -> Self {
@@ -213,7 +221,7 @@ impl DocumentBuilder {
         });
         let device_section = serde_json::json!({
             "format": envelope::DEVICE_EVIDENCE_V1_FORMAT,
-            "items": [],
+            "items": self.device_items,
         });
 
         let crypto_bytes = serde_json::to_vec(&crypto_section).expect("serializable");

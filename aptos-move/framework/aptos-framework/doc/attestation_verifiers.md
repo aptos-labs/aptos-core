@@ -75,9 +75,18 @@ A change to either effective root or revocation of the approved repository
 invalidates the request or stored result. `clean_up` removes uploaded chunks
 in bounded calls after completion, cancellation, or expiry.
 
-The present verifier is **CPU-only**. It rejects GPU and NVSwitch device
-evidence, and any release whose authenticated VM shape requires GPUs. The
-hardware quote, collateral signatures, Sigstore signatures, trusted roots,
+For a GPU shape, the code stage checks that the CPU-quote-bound device section
+contains the matching GPU and NVSwitch topology, challenge nonce, and evidence
+status. The verified result exposes `shape_gpus`. This follows Tinfoil's
+**measured guest appraisal** model: the attested boot program runs NVIDIA's
+local verifier before enabling the GPUs. The chain does not independently
+verify NVIDIA device signatures, RIM signatures, or revocation collateral,
+and `shape_gpus` must not be presented as that stronger claim. The approved
+release repository and digest therefore remain material to a consumer's GPU
+policy. Independent chain verification would require the producer to include
+the signed NVIDIA collateral and additional observed trust roots.
+
+The hardware quote, collateral signatures, Sigstore signatures, trusted roots,
 freshness and workload measurements all need to verify before a result is
 published. An application must still pin the returned TLS certificate
 fingerprint or HPKE key to the connection it actually uses.

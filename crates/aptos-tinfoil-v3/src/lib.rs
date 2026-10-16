@@ -6,6 +6,7 @@
 
 mod config;
 
+pub mod device;
 pub mod envelope;
 pub mod provenance;
 pub mod tdx;
@@ -37,6 +38,9 @@ pub struct VerifiedV3 {
     pub release_tag: String,
     pub release_commit: String,
     pub platform_measurement_id: String,
+    /// Signed VM GPU count matched to TDX-bound device evidence. NVIDIA
+    /// signatures are appraised by the measured guest at boot, not here.
+    pub shape_gpus: u32,
 }
 
 /// Intel-authenticated quote and the key material bound into its REPORTDATA.
@@ -76,10 +80,8 @@ pub enum VerifyError {
     Envelope(#[from] envelope::EnvelopeError),
     #[error("unsupported CPU evidence format: {0}")]
     UnsupportedCpuEvidence(String),
-    #[error("device evidence appraisal is not implemented for this subformat")]
-    UnsupportedDeviceEvidence,
-    #[error("a GPU VM shape requires authenticated GPU device evidence")]
-    UnsupportedGpuShape,
+    #[error("Tinfoil GPU topology rejected: {0}")]
+    Device(#[from] device::DeviceError),
     #[error("stage fragment is bound to a different attestation REPORTDATA")]
     StageBindingMismatch,
     #[error("TDX evidence rejected: {0}")]
@@ -99,9 +101,9 @@ pub enum VerifyError {
 /// quorum-observed trust roots and chain time. No wall clock, network source,
 /// or bundled fallback root participates in this decision.
 ///
-/// This entry point accepts Intel TDX CPU evidence with no discrete device
-/// evidence. GPU/NVSwitch evidence requires a separate cryptographic device
-/// appraisal; silently treating a hash binding as appraisal would be unsafe.
+/// GPU topology is checked against the signed VM shape and CPU-bound evidence.
+/// NVIDIA signatures are not independently checked here; GPU confidentiality
+/// relies on the attested guest's boot-time local NVIDIA appraisal.
 pub fn verify_v3(
     document_bytes: &[u8],
     expected_nonce: &[u8],
@@ -129,9 +131,6 @@ pub fn verify_v3(
             document.raw.cpu_evidence.format,
         ));
     }
-    if !document.device_evidence.items.is_empty() {
-        return Err(VerifyError::UnsupportedDeviceEvidence);
-    }
 
     let config = AttestationConfig {
         // Signed platform endorsements constrain MRTD/RTMR0 and the TDX
@@ -154,9 +153,10 @@ pub fn verify_v3(
         now_secs,
         sigstore_root,
     )?;
-    if proven.shape.is_some_and(|shape| shape.gpus != 0) {
-        return Err(VerifyError::UnsupportedGpuShape);
-    }
+    let shape = proven
+        .shape
+        .ok_or(provenance::ProvenanceError::MissingShape)?;
+    device::validate_topology(&document, shape.gpus)?;
 
     Ok(VerifiedV3 {
         tls_spki_sha256: required_key(&document, "tls", KEY_SPKI_FP_SHA256_V1_FORMAT)?,
@@ -176,6 +176,7 @@ pub fn verify_v3(
         platform_measurement_id: proven.platform_measurement.ok_or(VerifyError::Provenance(
             provenance::ProvenanceError::MissingPlatformCollateral,
         ))?,
+        shape_gpus: shape.gpus,
     })
 }
 
@@ -225,9 +226,7 @@ pub fn verify_code_stage(
     let shape = code
         .shape
         .ok_or(provenance::ProvenanceError::MissingShape)?;
-    if shape.gpus != 0 {
-        return Err(VerifyError::UnsupportedGpuShape);
-    }
+    device::validate_topology(&document, shape.gpus)?;
     Ok(CodeStage {
         artifact: code.artifact,
         shape,
@@ -384,9 +383,6 @@ fn check_fragment(
         return Err(VerifyError::UnsupportedCpuEvidence(
             document.raw.cpu_evidence.format,
         ));
-    }
-    if !document.device_evidence.items.is_empty() {
-        return Err(VerifyError::UnsupportedDeviceEvidence);
     }
     if let Some((trusted_report_data, trusted_quote_sha256)) = quote_binding {
         let quote_sha256: [u8; 32] =

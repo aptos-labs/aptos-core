@@ -278,9 +278,6 @@ fn code_from_move(s: Struct) -> SafeNativeResult<CodeStage> {
         gpus: u32::try_from(next_u64(&mut f)?).map_err(|_| invalid())?,
         disks: u32::try_from(next_u64(&mut f)?).map_err(|_| invalid())?,
     };
-    if shape.gpus != 0 {
-        return Err(invalid());
-    }
     Ok(CodeStage { artifact, shape })
 }
 
@@ -535,6 +532,20 @@ mod tests {
         assert_eq!(code.artifact, artifact);
         assert_eq!(code.shape.cpus, 4);
         assert_eq!(code.shape.memory_mb, 8192);
+
+        let gpu_code = CodeStage {
+            artifact: artifact.clone(),
+            shape: Shape {
+                cpus: 32,
+                memory_mb: 512 * 1024,
+                gpus: 8,
+                disks: 4,
+            },
+        };
+        let gpu_code = native_ok(code_from_move(
+            native_ok(code_to_move(gpu_code)).value_as().unwrap(),
+        ));
+        assert_eq!(gpu_code.shape.gpus, 8);
 
         let platform = PlatformStage {
             artifact: artifact.clone(),

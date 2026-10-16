@@ -31,10 +31,15 @@ implemented here. The [official format registry](https://github.com/tinfoilsh/ti
 and [verifier dispatch](https://github.com/tinfoilsh/tinfoil-go/blob/main/verify/verifier.go)
 define the distinction.
 
-**CPU-only:** nonempty GPU/NVSwitch device evidence and a signed VM shape
-requesting GPUs are rejected. REPORTDATA commits to device evidence bytes, but
-this crate does not validate NVIDIA certificate chains or signatures. Atlas
-inference deployments with eight H200 GPUs therefore cannot pass this verifier.
+**GPU trust boundary:** the verifier checks the signed VM shape against the
+GPU/NVSwitch topology and nonce in the CPU-quote-bound device section. The
+measured [Tinfoil guest boot program](https://github.com/tinfoilsh/cvmimage/blob/ad1a411ed483ac249237bbaf11376dd1c2e9cc30/tinfoil/cmd/boot/gpuattest.go#L189-L249) performs local NVIDIA appraisal before it
+enables GPUs. This crate does not itself verify NVIDIA certificate chains,
+signatures, RIMs, or revocation. The returned GPU count means a verified guest
+release reported and bound that device evidence, not independent on-chain GPU
+attestation. A consumer must approve the guest release that performs the boot
+check. Strict independent hardware appraisal would require more signed device
+collateral in the report and separately observed NVIDIA device and RIM roots.
 
 ## Staged on-chain use
 

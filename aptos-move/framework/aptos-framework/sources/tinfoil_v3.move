@@ -139,7 +139,9 @@ module aptos_framework::tinfoil_v3 {
 
     /// Fields returned only after Rust validates all supported FormatV2
     /// collateral: TDX quote, Intel evidence, Sigstore provenance, freshness,
-    /// and the report-data join.
+    /// and the report-data join. `shape_gpus` is the signed VM shape matched
+    /// to CPU-bound device topology; the verifier relies on the measured guest
+    /// boot path for NVIDIA appraisal rather than checking NVIDIA signatures.
     struct VerifiedTinfoilV3Claims has copy, drop, store {
         tls_spki_sha256: vector<u8>,
         hpke_key: vector<u8>,
@@ -155,6 +157,7 @@ module aptos_framework::tinfoil_v3 {
         release_tag: vector<u8>,
         release_commit: vector<u8>,
         platform_measurement_id: vector<u8>,
+        shape_gpus: u64,
     }
 
     struct VerifiedTinfoilV3Result has copy, drop, store {
@@ -460,6 +463,7 @@ module aptos_framework::tinfoil_v3 {
             release_tag: code.tag,
             release_commit: code.commit,
             platform_measurement_id: platform.measurement_id,
+            shape_gpus: code.shape_gpus,
         };
         let result = VerifiedTinfoilV3Result {
             request_id: pending.request_id,
@@ -571,6 +575,10 @@ module aptos_framework::tinfoil_v3 {
     public fun platform_measurement_id(self: &VerifiedTinfoilV3Claims): &vector<u8> {
         &self.platform_measurement_id
     }
+
+    /// GPU count from the signed VM shape whose TDX-bound device topology
+    /// was checked. Device signatures are not independently verified on chain.
+    public fun shape_gpus(self: &VerifiedTinfoilV3Claims): u64 { self.shape_gpus }
 
     fun assert_open_stage(owner: address, stage: u8) {
         assert!(exists<State>(owner) && State[owner].pending.is_some(),
