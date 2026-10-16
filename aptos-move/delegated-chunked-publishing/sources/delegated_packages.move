@@ -1,10 +1,18 @@
 /// Standalone position-keyed chunk staging. Each area belongs to the signing stager;
 /// its designated publisher cannot be changed while that area exists.
 module delegated_packages::delegated_packages {
+    use std::bcs;
     use std::error;
+    use std::hash;
     use std::signer;
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
+    use aptos_framework::code;
+
+    #[test_only]
+    use std::string;
+    #[test_only]
+    use aptos_framework::event;
 
     /// No staging area exists for the signing stager (not found, 0x60001).
     const ENOT_OPEN: u64 = 1;
@@ -14,6 +22,21 @@ module delegated_packages::delegated_packages {
     const EPUBLISHER_MISMATCH: u64 = 3;
     /// Chunk positions and payloads have different lengths (invalid argument, 0x10004).
     const ELENGTH_MISMATCH: u64 = 4;
+
+    /// Signer does not match the publisher bound when the area was opened.
+    const EWRONG_PUBLISHER: u64 = 5;
+    /// The expected SHA3-256 digest is not the digest of the package preimage.
+    const EHASH_MISMATCH: u64 = 6;
+    /// At least one required chunk or part is missing.
+    const EMISSING_CHUNK: u64 = 7;
+    /// Staged chunks are not accounted for by the declared part counts.
+    const EUNEXPECTED_CHUNKS: u64 = 8;
+
+    /// BCS encoding of this struct commits to the ordered metadata and module bytes.
+    struct PackagePreimage has drop {
+        metadata: vector<u8>,
+        code: vector<vector<u8>>,
+    }
 
     struct StagingArea has key {
         publisher: address,
@@ -73,6 +96,169 @@ module delegated_packages::delegated_packages {
             table_with_length::remove(&mut chunks, key);
         };
         table_with_length::destroy_empty(chunks);
+    }
+
+    /// Assemble a staged package only for its designated publisher, verify its exact
+    /// contents and digest, and publish at the publisher's account. Any abort rolls
+    /// back removal of the area and its chunks.
+    public entry fun finalize_to_account(
+        publisher: &signer,
+        stager: address,
+        counts: vector<u16>,
+        expected_hash: vector<u8>,
+    ) acquires StagingArea {
+        let (metadata, code) =
+            take_verified(stager, signer::address_of(publisher), counts, expected_hash);
+        code::publish_package_txn(publisher, metadata, code);
+    }
+
+    /// Consume the staged area after checking publisher, complete parts, exact
+    /// membership and SHA3-256(BCS(PackagePreimage { metadata, code })).
+    fun take_verified(
+        stager: address,
+        publisher: address,
+        counts: vector<u16>,
+        expected_hash: vector<u8>,
+    ): (vector<u8>, vector<vector<u8>>) acquires StagingArea {
+        assert!(exists<StagingArea>(stager), error::not_found(ENOT_OPEN));
+        assert!(borrow_global<StagingArea>(stager).publisher == publisher,
+            error::invalid_argument(EWRONG_PUBLISHER));
+        assert!(vector::length(&counts) > 1, error::invalid_state(EMISSING_CHUNK));
+        let StagingArea { publisher: _, chunks, keys: _ } = move_from<StagingArea>(stager);
+        let metadata = take_part(&mut chunks, 0, *vector::borrow(&counts, 0));
+        let code = vector[];
+        let part = 1;
+        while (part < vector::length(&counts)) {
+            vector::push_back(&mut code,
+                take_part(&mut chunks, part, *vector::borrow(&counts, part)));
+            part = part + 1;
+        };
+        assert!(table_with_length::length(&chunks) == 0, error::invalid_state(EUNEXPECTED_CHUNKS));
+        table_with_length::destroy_empty(chunks);
+        assert!(vector::length(&expected_hash) == 32 &&
+            hash::sha3_256(bcs::to_bytes(&PackagePreimage {
+                metadata: copy metadata, code: copy code,
+            })) == expected_hash, error::invalid_argument(EHASH_MISMATCH));
+        (metadata, code)
+    }
+
+    fun take_part(chunks: &mut TableWithLength<u64, vector<u8>>, part: u64, count: u16): vector<u8> {
+        assert!(count > 0, error::invalid_state(EMISSING_CHUNK));
+        let bytes = vector[];
+        let index = 0;
+        while (index < (count as u64)) {
+            let key = (part << 32) | index;
+            assert!(table_with_length::contains(chunks, key), error::invalid_state(EMISSING_CHUNK));
+            vector::append(&mut bytes, table_with_length::remove(chunks, key));
+            index = index + 1;
+        };
+        bytes
+    }
+
+    #[test_only]
+    struct TestUpgradePolicy has copy, drop { policy: u8 }
+    #[test_only]
+    struct TestModuleMetadata has copy, drop {
+        name: string::String, source: vector<u8>, source_map: vector<u8>, extension: vector<u8>,
+    }
+    #[test_only]
+    struct TestPackageMetadata has copy, drop {
+        name: string::String, upgrade_policy: TestUpgradePolicy, upgrade_number: u64,
+        source_digest: string::String, manifest: vector<u8>,
+        modules: vector<TestModuleMetadata>, deps: vector<u8>, extension: vector<u8>,
+    }
+    #[test_only]
+    fun test_metadata(): vector<u8> {
+        bcs::to_bytes(&TestPackageMetadata {
+            name: string::utf8(b"delegated"), upgrade_policy: TestUpgradePolicy { policy: 1 },
+            upgrade_number: 0, source_digest: string::utf8(b""), manifest: vector[],
+            modules: vector[TestModuleMetadata {
+                name: string::utf8(b"module"), source: vector[], source_map: vector[], extension: vector[],
+            }], deps: vector[], extension: vector[],
+        })
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x10005, location = Self)]
+    fun test_wrong_publisher(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xc);
+        finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
+    }
+
+    #[test(publisher = @0xb)]
+    #[expected_failure(abort_code = 0x60001, location = Self)]
+    fun test_finalize_requires_open(publisher: &signer) {
+        finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x30007, location = Self)]
+    fun test_missing_metadata_part(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        finalize_to_account(publisher, @0xa, vector[], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x30007, location = Self)]
+    fun test_missing_module_part(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        finalize_to_account(publisher, @0xa, vector[1u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x30007, location = Self)]
+    fun test_zero_count(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        finalize_to_account(publisher, @0xa, vector[1u16, 0u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x30007, location = Self)]
+    fun test_missing_chunk(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 1u16], vector[b"meta", b"tail"]);
+        finalize_to_account(publisher, @0xa, vector[1u16, 2u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x30008, location = Self)]
+    fun test_extra_chunk(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[0u16, 1u16, 2u16], vector[0u16, 0u16, 0u16],
+            vector[b"meta", b"code", b"extra"]);
+        finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
+    fun test_short_digest(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
+        finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
+    fun test_bad_digest(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
+        finalize_to_account(publisher, @0xa, vector[1u16, 1u16], x"0000000000000000000000000000000000000000000000000000000000000000");
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    fun test_delegated_account_publish(stager: &signer, publisher: &signer) {
+        let metadata = test_metadata();
+        let split = vector::length(&metadata) / 2;
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[1u16, 0u16, 0u16], vector[0u16, 1u16, 0u16],
+            vector[b"code", vector::slice(&metadata, split, vector::length(&metadata)),
+                vector::slice(&metadata, 0, split)]);
+        let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
+            metadata, code: vector[b"code"],
+        }));
+        finalize_to_account(publisher, @0xa, vector[2u16, 1u16], digest);
+        assert!(!exists<StagingArea>(@0xa), 0);
+        assert!(vector::length(&event::emitted_events<code::PublishPackage>()) == 1, 1);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
