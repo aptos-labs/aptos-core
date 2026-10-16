@@ -25,30 +25,30 @@ env:
 
 jobs:
   vm-and-doc-tests:
-    runs-on: ${{ '64cpu-gh-ubuntu22-x64' }}
+    runs-on: ${{ '64cpu-aptos-image-ubuntu22-x64' }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: ./.github/actions/rust-setup
+      - uses: ./.github/actions/rust-prebuilt-setup
         with:
-          ADDITIONAL_KEY: hosted-rust-unit-tests-trial
+          cache-key: hosted-rust-unit-tests-image-trial
       - name: Check VM features
         run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
       - name: Run doc tests
         run: cargo test --profile ci --locked --doc --workspace
 
   build-archive:
-    runs-on: ${{ '64cpu-gh-ubuntu22-x64' }}
+    runs-on: ${{ '64cpu-aptos-image-ubuntu22-x64' }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: ./.github/actions/rust-setup
+      - uses: ./.github/actions/rust-prebuilt-setup
         with:
-          ADDITIONAL_KEY: hosted-rust-unit-tests-trial
+          cache-key: hosted-rust-unit-tests-image-trial
       - name: Build unit-test archive
         run: |
           cargo nextest archive --profile ci --cargo-profile ci --locked --workspace \
@@ -106,7 +106,7 @@ jobs:
 
   unit-test-shards:
     needs: build-archive
-    runs-on: ${{ '64cpu-gh-ubuntu22-x64' }}
+    runs-on: ${{ '64cpu-aptos-image-ubuntu22-x64' }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -126,9 +126,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: ./.github/actions/rust-setup
+      - uses: ./.github/actions/rust-prebuilt-setup
         with:
-          ADDITIONAL_KEY: hosted-rust-unit-tests-trial
+          cache-key: hosted-rust-unit-tests-image-trial
       - uses: actions/download-artifact@v4
         with:
           name: hosted-unit-test-archive-${{ matrix.shard }}
