@@ -387,6 +387,31 @@ mod tests {
     }
 
     #[test]
+    fn delegated_publish_object_seed_is_next_publisher_sequence() {
+        let publisher = address("0xb");
+        let expected =
+            aptos_types::object_address::create_object_code_deployment_address(publisher, 8);
+        assert_eq!(
+            validate_destination_sequence(DelegatedDestination::NewObject, Some(8), publisher)
+                .unwrap(),
+            Some(expected)
+        );
+        assert!(
+            validate_destination_sequence(DelegatedDestination::NewObject, None, publisher)
+                .is_err()
+        );
+        assert!(
+            validate_destination_sequence(DelegatedDestination::Account, Some(8), publisher)
+                .is_err()
+        );
+        assert!(
+            validate_destination_sequence(DelegatedDestination::Upgrade, None, publisher)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
     fn delegated_publish_resume_rejects_different_bytes() {
         let package = PositionalChunks::new(b"metadata".to_vec(), vec![b"code".to_vec()], 4);
         assert!(check_staged_bytes(&package, 0, 0, b"meta").is_ok());
@@ -440,6 +465,11 @@ pub struct StageDelegatedPackage {
     module_address: AccountAddress,
     #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
     publisher: AccountAddress,
+    #[clap(long, value_enum, default_value = "account")]
+    destination: DelegatedDestination,
+    /// For a new object: the publisher's current on-chain sequence number + 1.
+    #[clap(long)]
+    expected_publisher_sequence: Option<u64>,
     #[clap(flatten)]
     move_options: crate::move_types::MovePackageOptions,
     #[clap(flatten)]
@@ -594,6 +624,7 @@ fn check_staged_bytes(
 async fn read_delegated_staging(
     options: &TransactionOptions,
     module: AccountAddress,
+    stager: AccountAddress,
     publisher: AccountAddress,
     package: &PositionalChunks,
 ) -> CliTypedResult<Option<HashSet<(u16, u16)>>> {
@@ -603,10 +634,9 @@ async fn read_delegated_staging(
     use aptos_types::state_store::{state_key::StateKey, TStateView};
     use move_core_types::language_storage::StructTag;
     let name = format!("{module}::delegated_packages::StagingArea");
-    let sender = options.get_public_key_and_address()?.1;
     if let Some(path) = &options.session {
         let key = StateKey::resource(
-            &sender,
+            &stager,
             &StructTag::from_str(&name).map_err(|e| CliError::UnexpectedError(e.to_string()))?,
         )
         .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
@@ -646,7 +676,7 @@ async fn read_delegated_staging(
     } else {
         let client = options.rest_client()?;
         let area = match client
-            .get_account_resource_bcs::<DelegatedStagingAreaLayout>(sender, &name)
+            .get_account_resource_bcs::<DelegatedStagingAreaLayout>(stager, &name)
             .await
         {
             Ok(response) => response.into_inner(),
@@ -750,6 +780,11 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
                 "--chunk-size must be between 1 and {CHUNK_SIZE_IN_BYTES}"
             )));
         }
+        validate_destination_sequence(
+            self.destination,
+            self.expected_publisher_sequence,
+            self.publisher,
+        )?;
         check_delegated_module(options, self.module_address).await?;
         let package = crate::commands::build_package_options(
             &self.move_options,
@@ -760,9 +795,17 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
         let metadata = bcs::to_bytes(&package.extract_metadata()?)?;
         let code = package.extract_code();
         let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
-        let staged =
-            read_delegated_staging(options, self.module_address, self.publisher, &chunks).await?;
-        let missing = chunks.missing(&staged.clone().unwrap_or_default());
+        let stager = options.get_public_key_and_address()?.1;
+        let staged = read_delegated_staging(
+            options,
+            self.module_address,
+            stager,
+            self.publisher,
+            &chunks,
+        )
+        .await?;
+        let staged_positions = staged.as_ref().cloned().unwrap_or_default();
+        let missing = chunks.missing(&staged_positions);
         let payloads = stage_chunks(self.module_address, missing, self.chunk_size);
         let mut txn_options = options.clone();
         // Open in its own A-signed committed transaction before any chunk can be sent.
@@ -790,5 +833,180 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
         )
         .await?;
         Ok(format!("Staged {count} chunk transactions under the signing account for publisher {}. Finalization requires the publisher's signature.", self.publisher))
+    }
+}
+
+/// The separate B-signed transaction consuming exactly A's already staged package.
+#[derive(clap::Parser)]
+pub struct FinalizeDelegatedPackage {
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    module_address: AccountAddress,
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    stager: AccountAddress,
+    #[clap(long, value_enum, default_value = "account")]
+    destination: DelegatedDestination,
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    object_address: Option<AccountAddress>,
+    /// For a new object: the publisher's current on-chain sequence number + 1.
+    #[clap(long)]
+    expected_publisher_sequence: Option<u64>,
+    #[clap(flatten)]
+    move_options: crate::move_types::MovePackageOptions,
+    #[clap(flatten)]
+    included_artifacts: crate::commands::IncludedArtifactsArgs,
+    #[clap(flatten)]
+    txn_options: TransactionOptions,
+    #[clap(long, default_value_t = CHUNK_SIZE_IN_BYTES)]
+    chunk_size: usize,
+    #[clap(skip)]
+    pub env: std::sync::Arc<crate::MoveEnv>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum DelegatedDestination {
+    Account,
+    NewObject,
+    Upgrade,
+}
+
+impl crate::WithMoveEnv for FinalizeDelegatedPackage {
+    fn attach_env(mut self, env: std::sync::Arc<crate::MoveEnv>) -> Self {
+        self.env = env;
+        self
+    }
+}
+
+#[async_trait::async_trait]
+impl aptos_cli_common::CliCommand<String> for FinalizeDelegatedPackage {
+    fn command_name(&self) -> &'static str {
+        "FinalizeDelegatedPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<String> {
+        use aptos_cli_common::ReplayProtectionType;
+        let options = &self.txn_options;
+        if !(1..=CHUNK_SIZE_IN_BYTES).contains(&self.chunk_size) {
+            return Err(CliError::CommandArgumentError(format!(
+                "--chunk-size must be between 1 and {CHUNK_SIZE_IN_BYTES}"
+            )));
+        }
+        if self.destination == DelegatedDestination::Upgrade && self.object_address.is_none() {
+            return Err(CliError::CommandArgumentError(
+                "--object-address is required to upgrade a code object".into(),
+            ));
+        }
+        if self.destination != DelegatedDestination::Upgrade && self.object_address.is_some() {
+            return Err(CliError::CommandArgumentError(
+                "--object-address is only for --destination upgrade".into(),
+            ));
+        }
+        let publisher = options.get_public_key_and_address()?.1;
+        validate_destination_sequence(
+            self.destination,
+            self.expected_publisher_sequence,
+            publisher,
+        )?;
+        if let Some(expected) = self.expected_publisher_sequence {
+            let current = publisher_sequence_number(options, publisher).await?;
+            if current.checked_add(1) != Some(expected) {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Publisher sequence changed: expected next object seed {expected}, current sequence {current}. Staging remains intact."
+                )));
+            }
+        }
+        check_delegated_module(options, self.module_address).await?;
+        let package = crate::commands::build_package_options(
+            &self.move_options,
+            &self.included_artifacts,
+            &self.env,
+        )
+        .map_err(|e| CliError::MoveCompilationError(format!("{e:#}")))?;
+        let metadata = bcs::to_bytes(&package.extract_metadata()?)?;
+        let code = package.extract_code();
+        let digest = package_digest(&metadata, &code)?;
+        let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
+        let staged = read_delegated_staging(
+            options,
+            self.module_address,
+            self.stager,
+            publisher,
+            &chunks,
+        )
+        .await?
+        .ok_or_else(|| {
+            CliError::CommandArgumentError(format!("No delegated staging area at {}", self.stager))
+        })?;
+        if staged.len() != chunks.chunks.len() {
+            return Err(CliError::CommandArgumentError(format!(
+                "Delegated package is incomplete: {} of {} chunks staged",
+                staged.len(),
+                chunks.chunks.len()
+            )));
+        }
+        let payload = match self.destination {
+            DelegatedDestination::Account => finalize_to_account(
+                self.module_address,
+                self.stager,
+                &chunks.chunk_counts,
+                digest,
+            ),
+            DelegatedDestination::NewObject => finalize_to_object(
+                self.module_address,
+                self.stager,
+                &chunks.chunk_counts,
+                digest,
+            ),
+            DelegatedDestination::Upgrade => finalize_upgrade(
+                self.module_address,
+                self.stager,
+                &chunks.chunk_counts,
+                digest,
+                self.object_address.expect("checked above"),
+            ),
+        };
+        let mut final_options = options.clone();
+        final_options.replay_protection_type = ReplayProtectionType::Seqnum;
+        committed(crate::dispatch_transaction(payload, &final_options, &self.env).await)?;
+        Ok(format!(
+            "Publisher {publisher} verified and published package staged by {}",
+            self.stager
+        ))
+    }
+}
+
+/// The expected object seed is the publisher's current sequence number plus one.
+fn validate_destination_sequence(
+    destination: DelegatedDestination,
+    expected: Option<u64>,
+    publisher: AccountAddress,
+) -> CliTypedResult<Option<AccountAddress>> {
+    match (destination, expected) {
+        (DelegatedDestination::NewObject, Some(sequence)) if sequence > 0 => Ok(Some(
+            aptos_types::object_address::create_object_code_deployment_address(publisher, sequence),
+        )),
+        (DelegatedDestination::NewObject, _) => Err(CliError::CommandArgumentError(
+            "--expected-publisher-sequence (current sequence + 1) is required for a new object"
+                .into(),
+        )),
+        (_, Some(_)) => Err(CliError::CommandArgumentError(
+            "--expected-publisher-sequence is only valid with --destination new-object".into(),
+        )),
+        (_, None) => Ok(None),
+    }
+}
+
+async fn publisher_sequence_number(
+    options: &TransactionOptions,
+    publisher: AccountAddress,
+) -> CliTypedResult<u64> {
+    use aptos_transaction_simulation::SimulationStateStore;
+    use aptos_transaction_simulation_session::Session;
+    use aptos_types::account_config::AccountResource;
+    match &options.session {
+        Some(path) => Ok(Session::load(path)?
+            .state_store()
+            .get_resource::<AccountResource>(publisher)?
+            .map_or(0, |account| account.sequence_number)),
+        None => aptos_cli_common::get_sequence_number(&options.rest_client()?, publisher).await,
     }
 }
