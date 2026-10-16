@@ -46,50 +46,60 @@ token does not attest possession of that key by itself. An application that
 uses the result to register a worker must bind the key to the workload that
 requested the token and verify possession before trusting the registration.
 
-## Tinfoil v3 envelope with FormatV2 collateral
+## Tinfoil v3 verification objects
 
 Governance first approves the expected GitHub repository through
-`tinfoil_v3::set_repository_approved`. The requesting account calls
-`begin_entry(trusted_repo, expected_tls_spki_sha256, lifetime_secs)` and reads
-the 32-byte validator-random nonce from `pending_nonce` or the emitted event. The workload
-obtains a document for that nonce.
+`tinfoil_v3::set_repository_approved`. A CVM submits its complete attestation
+with `tinfoil_v3::new_verification(attestation)`. The
+`VerificationCreated` event gives the new object's address. A normal Aptos
+transaction is limited to 64 KiB by the default gas schedule, so this entry
+caps the report at 48 KiB. Reports up to 256 KiB use
+`new_verification_chunked`, repeated `append_verification_chunk` calls, and
+`seal_verification`. Both paths produce the same verification object. Chunks
+occupy separate table items because a single chain state item is limited to
+1 MiB. The 256 KiB bound keeps the per-byte native charge below the current
+execution gas ceiling; realistic reports still need end-to-end gas measurement.
+Larger reports require a stage-fragment object format and are rejected at
+creation.
 
-The document is split into five fragments with
-`aptos_tinfoil_v3::split_stage_fragments`. Each retains the same challenge,
-quote and quote-bound cryptographic material, but carries the collateral for
-one stage. For each fragment, the submitter uploads at most 48 KiB per
-`append_chunk` transaction, then calls the corresponding verification entry
-point:
+The CVM or any other account then calls
+`tinfoil_v3::advance_verification(verification_address)` until its
+`VerificationAdvanced` event reports `PASS` or `FAIL`. A `CONTINUE` event
+identifies that another transaction is needed. The object owns the exact
+submitted bytes, their hash, the current stage, authenticated intermediate
+claims, and the terminal outcome. An invalid proof produces a persistent
+`FAIL` rather than aborting the transaction and losing its outcome.
 
-1. `verify_quote`: Intel TDX quote, Intel PCS collateral, REPORTDATA, TLS and
-   HPKE keys. This stage pins the current Intel and Sigstore roots and chain
-   time for the request.
-2. `verify_code`: signed code release and measured code registers.
-3. `verify_code_freshness`: code-release freshness witness.
-4. `verify_platform`: signed platform policy and host measurements.
-5. `verify_entry`: platform-policy freshness witness; this commits the result.
+The stages check the Intel TDX quote and REPORTDATA, signed code release,
+code freshness, signed platform endorsement, and platform freshness. They use
+the effective Intel and Sigstore trust values observed in chain state and
+reject root changes or repository revocation during verification. A business
+contract takes the object address and calls the public `verified_report_*`
+getters. Those getters abort unless the object is `PASS`, recent, and still
+uses the effective roots and approved repository. The business contract must
+check the returned workload identity and key against its own policy. The event
+alone never authorizes a worker.
 
-The module keeps authenticated intermediate claims between transactions. Each
-later fragment must match the authenticated quote and REPORTDATA of stage 1.
-A change to either effective root or revocation of the approved repository
-invalidates the request or stored result. `clean_up` removes uploaded chunks
-in bounded calls after completion, cancellation, or expiry.
+The verifier consumes the attestation's 32-byte nonce without issuing its own
+challenge. An application that needs transaction-specific freshness can issue
+a challenge before the CVM creates its report, then compare that challenge
+with `verified_nonce` when consuming the PASS object. It must also bind the
+verified TLS or HPKE key to the registering CVM and check proof of possession.
+The verifier checks collateral and witness time against chain time, but a
+PASS object alone does not prove who submitted or controls the attested keys.
 
-For a GPU shape, the code stage checks that the CPU-quote-bound device section
-contains the matching GPU and NVSwitch topology, challenge nonce, and evidence
-status. The verified result exposes `shape_gpus`. This follows Tinfoil's
-**measured guest appraisal** model: the attested boot program runs NVIDIA's
-local verifier before enabling the GPUs. The chain does not independently
-verify NVIDIA device signatures, RIM signatures, or revocation collateral,
-and `shape_gpus` must not be presented as that stronger claim. The approved
-release repository and digest therefore remain material to a consumer's GPU
-policy. Independent chain verification would require the producer to include
-the signed NVIDIA collateral and additional observed trust roots.
+The currently supported Tinfoil input is the **v3 envelope with FormatV2
+collateral used by Atlas**. Newer `collateral_format=v3` config/runtime
+reports need separate verification logic. GPU-shaped reports do not reach
+`PASS` yet: an NVIDIA NRAS EAT signs an appraisal result and GPU identities,
+but the current producer does not bind those identities or the appraised raw
+GPU evidence to the raw GPU evidence in the CPU quote. Checking only a shared
+nonce and GPU count would allow evidence substitution. The offline NRAS EAT
+signature verifier is available as a building block; this cross-evidence
+binding must be established before the chain reports GPU verification.
 
-The hardware quote, collateral signatures, Sigstore signatures, trusted roots,
-freshness and workload measurements all need to verify before a result is
-published. An application must still pin the returned TLS certificate
-fingerprint or HPKE key to the connection it actually uses.
+The older `begin_entry` / `append_chunk` / `verify_*` entry points remain
+available for existing callers during this API transition.
 
 ## Integration status
 

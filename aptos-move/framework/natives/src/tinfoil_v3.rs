@@ -96,10 +96,9 @@ fn attempted<T>(f: impl FnOnce() -> SafeNativeResult<T>) -> SafeNativeResult<Opt
 fn option_to_move(context: &SafeNativeContext, value: Option<Value>) -> SafeNativeResult<Value> {
     let enum_enabled = context.get_feature_flags().is_enum_option_enabled();
     match (enum_enabled, value) {
-        (true, Some(value)) => Ok(Value::struct_(Struct::pack_variant(
-            OPTION_SOME_TAG,
-            vec![value],
-        ))),
+        (true, Some(value)) => Ok(Value::struct_(Struct::pack_variant(OPTION_SOME_TAG, vec![
+            value,
+        ]))),
         (true, None) => Ok(Value::struct_(Struct::pack_variant(
             OPTION_NONE_TAG,
             vec![],

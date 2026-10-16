@@ -1224,10 +1224,25 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
+    /// Execute exactly one bounded verification stage. Anyone may advance an
+    /// object, so progress does not depend on its creator staying online.
+    /// `VerificationAdvanced` tells the submitter to continue, or that the
+    /// object has reached a durable FAIL/PASS state.
+    TinfoilV3AdvanceVerification {
+        verification: AccountAddress,
+    },
+
     /// Uploads one stage's fragment in transaction-sized chunks. A stage
     /// transition seals its current fragment; subsequent chunks belong only
     /// to the next stage.
     TinfoilV3AppendChunk {
+        chunk: Vec<u8>,
+    },
+
+    /// Append one bounded chunk to an unsealed report. The report becomes
+    /// immutable after `seal_verification` verifies its declared digest.
+    TinfoilV3AppendVerificationChunk {
+        verification: AccountAddress,
         chunk: Vec<u8>,
     },
 
@@ -1248,6 +1263,31 @@ pub enum EntryFunctionCall {
     TinfoilV3CleanUp {
         owner: AccountAddress,
         max_chunks: u64,
+    },
+
+    /// Submit one complete Atlas attestation up to 48 KiB. The event exposes the address
+    /// of the untransferable object containing these exact bytes and its
+    /// verification state. Larger reports use the chunked constructor below.
+    /// Accepted package bytes are either bare Tinfoil JSON or
+    /// `b"APTOS-TINFOIL-V3\0" || bcs(PackageV1 { version: 1,
+    /// tinfoil_document: vector<u8>, nras_detached_eat: vector<u8> })`.
+    /// Callers do not choose the object's address.
+    TinfoilV3NewVerification {
+        attestation: Vec<u8>,
+    },
+
+    /// Start the same object flow when a report exceeds the transaction size.
+    /// The declared byte length and digest are fixed at creation. Only the
+    /// creator may append chunks; no verification can start until sealing.
+    TinfoilV3NewVerificationChunked {
+        expected_bytes: u64,
+        expected_sha3_256: Vec<u8>,
+    },
+
+    /// Seal the uploaded bytes, or durably FAIL if they do not match the
+    /// declared digest. The object then uses exactly `advance_verification`.
+    TinfoilV3SealVerification {
+        verification: AccountAddress,
     },
 
     /// Stage 1: authenticate the code-release Sigstore bundle and compare its
@@ -2101,7 +2141,14 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            TinfoilV3AdvanceVerification { verification } => {
+                tinfoil_v3_advance_verification(verification)
+            },
             TinfoilV3AppendChunk { chunk } => tinfoil_v3_append_chunk(chunk),
+            TinfoilV3AppendVerificationChunk {
+                verification,
+                chunk,
+            } => tinfoil_v3_append_verification_chunk(verification, chunk),
             TinfoilV3BeginEntry {
                 trusted_repo,
                 expected_tls_spki_sha256,
@@ -2109,6 +2156,14 @@ impl EntryFunctionCall {
             } => tinfoil_v3_begin_entry(trusted_repo, expected_tls_spki_sha256, lifetime_secs),
             TinfoilV3Cancel {} => tinfoil_v3_cancel(),
             TinfoilV3CleanUp { owner, max_chunks } => tinfoil_v3_clean_up(owner, max_chunks),
+            TinfoilV3NewVerification { attestation } => tinfoil_v3_new_verification(attestation),
+            TinfoilV3NewVerificationChunked {
+                expected_bytes,
+                expected_sha3_256,
+            } => tinfoil_v3_new_verification_chunked(expected_bytes, expected_sha3_256),
+            TinfoilV3SealVerification { verification } => {
+                tinfoil_v3_seal_verification(verification)
+            },
             TinfoilV3VerifyCode {} => tinfoil_v3_verify_code(),
             TinfoilV3VerifyCodeFreshness {} => tinfoil_v3_verify_code_freshness(),
             TinfoilV3VerifyEntry {} => tinfoil_v3_verify_entry(),
@@ -5548,6 +5603,25 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
+/// Execute exactly one bounded verification stage. Anyone may advance an
+/// object, so progress does not depend on its creator staying online.
+/// `VerificationAdvanced` tells the submitter to continue, or that the
+/// object has reached a durable FAIL/PASS state.
+pub fn tinfoil_v3_advance_verification(verification: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("advance_verification").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&verification).unwrap()],
+    ))
+}
+
 /// Uploads one stage's fragment in transaction-sized chunks. A stage
 /// transition seals its current fragment; subsequent chunks belong only
 /// to the next stage.
@@ -5563,6 +5637,29 @@ pub fn tinfoil_v3_append_chunk(chunk: Vec<u8>) -> TransactionPayload {
         ident_str!("append_chunk").to_owned(),
         vec![],
         vec![bcs::to_bytes(&chunk).unwrap()],
+    ))
+}
+
+/// Append one bounded chunk to an unsealed report. The report becomes
+/// immutable after `seal_verification` verifies its declared digest.
+pub fn tinfoil_v3_append_verification_chunk(
+    verification: AccountAddress,
+    chunk: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("append_verification_chunk").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&verification).unwrap(),
+            bcs::to_bytes(&chunk).unwrap(),
+        ],
     ))
 }
 
@@ -5625,6 +5722,69 @@ pub fn tinfoil_v3_clean_up(owner: AccountAddress, max_chunks: u64) -> Transactio
             bcs::to_bytes(&owner).unwrap(),
             bcs::to_bytes(&max_chunks).unwrap(),
         ],
+    ))
+}
+
+/// Submit one complete Atlas attestation up to 48 KiB. The event exposes the address
+/// of the untransferable object containing these exact bytes and its
+/// verification state. Larger reports use the chunked constructor below.
+/// Accepted package bytes are either bare Tinfoil JSON or
+/// `b"APTOS-TINFOIL-V3\0" || bcs(PackageV1 { version: 1,
+/// tinfoil_document: vector<u8>, nras_detached_eat: vector<u8> })`.
+/// Callers do not choose the object's address.
+pub fn tinfoil_v3_new_verification(attestation: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("new_verification").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&attestation).unwrap()],
+    ))
+}
+
+/// Start the same object flow when a report exceeds the transaction size.
+/// The declared byte length and digest are fixed at creation. Only the
+/// creator may append chunks; no verification can start until sealing.
+pub fn tinfoil_v3_new_verification_chunked(
+    expected_bytes: u64,
+    expected_sha3_256: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("new_verification_chunked").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&expected_bytes).unwrap(),
+            bcs::to_bytes(&expected_sha3_256).unwrap(),
+        ],
+    ))
+}
+
+/// Seal the uploaded bytes, or durably FAIL if they do not match the
+/// declared digest. The object then uses exactly `advance_verification`.
+pub fn tinfoil_v3_seal_verification(verification: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("tinfoil_v3").to_owned(),
+        ),
+        ident_str!("seal_verification").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&verification).unwrap()],
     ))
 }
 
@@ -8011,10 +8171,35 @@ mod decoder {
         }
     }
 
+    pub fn tinfoil_v3_advance_verification(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3AdvanceVerification {
+                verification: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn tinfoil_v3_append_chunk(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TinfoilV3AppendChunk {
                 chunk: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_append_verification_chunk(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3AppendVerificationChunk {
+                verification: bcs::from_bytes(script.args().get(0)?).ok()?,
+                chunk: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -8046,6 +8231,39 @@ mod decoder {
             Some(EntryFunctionCall::TinfoilV3CleanUp {
                 owner: bcs::from_bytes(script.args().get(0)?).ok()?,
                 max_chunks: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_new_verification(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3NewVerification {
+                attestation: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_new_verification_chunked(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3NewVerificationChunked {
+                expected_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                expected_sha3_256: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn tinfoil_v3_seal_verification(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::TinfoilV3SealVerification {
+                verification: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -8944,8 +9162,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::staking_proxy_set_voter),
         );
         map.insert(
+            "tinfoil_v3_advance_verification".to_string(),
+            Box::new(decoder::tinfoil_v3_advance_verification),
+        );
+        map.insert(
             "tinfoil_v3_append_chunk".to_string(),
             Box::new(decoder::tinfoil_v3_append_chunk),
+        );
+        map.insert(
+            "tinfoil_v3_append_verification_chunk".to_string(),
+            Box::new(decoder::tinfoil_v3_append_verification_chunk),
         );
         map.insert(
             "tinfoil_v3_begin_entry".to_string(),
@@ -8958,6 +9184,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "tinfoil_v3_clean_up".to_string(),
             Box::new(decoder::tinfoil_v3_clean_up),
+        );
+        map.insert(
+            "tinfoil_v3_new_verification".to_string(),
+            Box::new(decoder::tinfoil_v3_new_verification),
+        );
+        map.insert(
+            "tinfoil_v3_new_verification_chunked".to_string(),
+            Box::new(decoder::tinfoil_v3_new_verification_chunked),
+        );
+        map.insert(
+            "tinfoil_v3_seal_verification".to_string(),
+            Box::new(decoder::tinfoil_v3_seal_verification),
         );
         map.insert(
             "tinfoil_v3_verify_code".to_string(),
