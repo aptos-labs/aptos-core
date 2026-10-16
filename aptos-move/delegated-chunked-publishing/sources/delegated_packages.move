@@ -8,7 +8,13 @@ module delegated_packages::delegated_packages {
     use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use aptos_framework::code;
+    use aptos_framework::object::Object;
+    use aptos_framework::object_code_deployment;
 
+    #[test_only]
+    use aptos_framework::account;
+    #[test_only]
+    use aptos_framework::object;
     #[test_only]
     use std::string;
     #[test_only]
@@ -112,6 +118,33 @@ module delegated_packages::delegated_packages {
         code::publish_package_txn(publisher, metadata, code);
     }
 
+    /// Verify the staged package and publish it to a new code object owned by the
+    /// signing publisher. Any abort rolls back removal of the staged area.
+    public entry fun finalize_to_object(
+        publisher: &signer,
+        stager: address,
+        counts: vector<u16>,
+        expected_hash: vector<u8>,
+    ) acquires StagingArea {
+        let (metadata, code) =
+            take_verified(stager, signer::address_of(publisher), counts, expected_hash);
+        object_code_deployment::publish(publisher, metadata, code);
+    }
+
+    /// Verify the staged package and upgrade a code object owned by the signing
+    /// publisher. Any abort (including ownership failure) rolls back staging.
+    public entry fun finalize_upgrade(
+        publisher: &signer,
+        stager: address,
+        counts: vector<u16>,
+        expected_hash: vector<u8>,
+        code_object: Object<code::PackageRegistry>,
+    ) acquires StagingArea {
+        let (metadata, code) =
+            take_verified(stager, signer::address_of(publisher), counts, expected_hash);
+        object_code_deployment::upgrade(publisher, metadata, code, code_object);
+    }
+
     /// Consume the staged area after checking publisher, complete parts, exact
     /// membership and SHA3-256(BCS(PackagePreimage { metadata, code })).
     fun take_verified(
@@ -135,10 +168,13 @@ module delegated_packages::delegated_packages {
         };
         assert!(table_with_length::length(&chunks) == 0, error::invalid_state(EUNEXPECTED_CHUNKS));
         table_with_length::destroy_empty(chunks);
-        assert!(vector::length(&expected_hash) == 32 &&
-            hash::sha3_256(bcs::to_bytes(&PackagePreimage {
-                metadata: copy metadata, code: copy code,
-            })) == expected_hash, error::invalid_argument(EHASH_MISMATCH));
+        let PackagePreimage { metadata, code } = {
+            let preimage = PackagePreimage { metadata, code };
+            assert!(vector::length(&expected_hash) == 32 &&
+                hash::sha3_256(bcs::to_bytes(&preimage)) == expected_hash,
+                error::invalid_argument(EHASH_MISMATCH));
+            preimage
+        };
         (metadata, code)
     }
 
@@ -259,6 +295,83 @@ module delegated_packages::delegated_packages {
         finalize_to_account(publisher, @0xa, vector[2u16, 1u16], digest);
         assert!(!exists<StagingArea>(@0xa), 0);
         assert!(vector::length(&event::emitted_events<code::PublishPackage>()) == 1, 1);
+    }
+
+    // Independent SHA3-256 fixture for BCS: 04 6d657461 01 04 636f6465.
+    #[test(stager = @0xa)]
+    fun test_known_preimage_digest(stager: &signer) {
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", b"meta"]);
+        let (metadata, code) = take_verified(@0xa, @0xb, vector[1u16, 1u16],
+            x"438f72562b990e09cb3383e87ea342434773e84285e85ceadc7d71dd831b812f");
+        assert!(metadata == b"meta" && code == vector[b"code"], 0);
+        assert!(!exists<StagingArea>(@0xa), 1);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    fun test_delegated_object_publish(stager: &signer, publisher: &signer) {
+        let publisher_address = signer::address_of(publisher);
+        account::create_account_for_test(publisher_address);
+        let seed = bcs::to_bytes(&b"aptos_framework::object_code_deployment");
+        vector::append(&mut seed, bcs::to_bytes(&(account::get_sequence_number(publisher_address) + 1)));
+        let object_address = object::create_object_address(&publisher_address, seed);
+        let metadata = test_metadata();
+        let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
+            metadata: copy metadata, code: vector[b"code"],
+        }));
+        open_staging(stager, publisher_address);
+        stage_chunks(stager, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", metadata]);
+        finalize_to_object(publisher, @0xa, vector[1u16, 1u16], digest);
+        assert!(!exists<StagingArea>(@0xa), 0);
+        assert!(object::object_exists<code::PackageRegistry>(object_address), 1);
+        assert!(object::is_owner(object::address_to_object<code::PackageRegistry>(object_address),
+            publisher_address), 2);
+        assert!(vector::length(&event::emitted_events<code::PublishPackage>()) == 1, 3);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x10005, location = Self)]
+    fun test_object_publish_rejects_wrong_publisher(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xc);
+        finalize_to_object(publisher, @0xa, vector[1u16, 1u16], vector[]);
+    }
+
+    #[test(stager = @0xa, publisher = @0xb)]
+    #[expected_failure(abort_code = 0x10006, location = Self)]
+    fun test_object_publish_rejects_bad_digest(stager: &signer, publisher: &signer) {
+        open_staging(stager, @0xb);
+        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
+        finalize_to_object(publisher, @0xa, vector[1u16, 1u16],
+            x"0000000000000000000000000000000000000000000000000000000000000000");
+    }
+
+    // A single Move test transaction can publish only once, so verify the ownership
+    // check before the framework's transaction-level second-publication check.
+    #[test(stager = @0xa, owner = @0xb, other = @0xc)]
+    #[expected_failure(abort_code = 0x50002, location = aptos_framework::object_code_deployment)]
+    fun test_delegated_upgrade_rejects_non_owner(
+        stager: &signer, owner: &signer, other: &signer,
+    ) {
+        let owner_address = signer::address_of(owner);
+        account::create_account_for_test(owner_address);
+        let seed = bcs::to_bytes(&b"aptos_framework::object_code_deployment");
+        vector::append(&mut seed, bcs::to_bytes(&(account::get_sequence_number(owner_address) + 1)));
+        let object_address = object::create_object_address(&owner_address, seed);
+        let metadata = test_metadata();
+        let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
+            metadata: copy metadata, code: vector[b"code"],
+        }));
+        open_staging(stager, owner_address);
+        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"code"]);
+        finalize_to_object(owner, @0xa, vector[1u16, 1u16], digest);
+        let code_object = object::address_to_object<code::PackageRegistry>(object_address);
+        let metadata = test_metadata();
+        let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
+            metadata: copy metadata, code: vector[b"new code"],
+        }));
+        open_staging(stager, signer::address_of(other));
+        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"new code"]);
+        finalize_upgrade(other, @0xa, vector[1u16, 1u16], digest, code_object);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
