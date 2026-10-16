@@ -138,7 +138,7 @@ fn bench_bn254_circuit(
                 // Clone because Groth16::prove consumes the circuit
                 let proof = Groth16::<Bn254>::prove(pk, circuit.clone(), &mut thread_rng())
                     .expect("proving");
-                criterion::black_box(proof);
+                std::hint::black_box(proof);
             });
         },
     );

@@ -21,10 +21,11 @@ use blstrs::{
     G1Affine as BlstrsG1Affine, G1Projective as BlstrsG1Projective, G2Affine as BlstrsG2Affine,
     G2Projective as BlstrsG2Projective, Scalar as BlstrsFr,
 };
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ff::Field;
 use group::{prime::PrimeCurveAffine, Group};
 use serde::Serialize;
+use std::hint::black_box;
 
 // The goal of this file is
 // (i) To test how much speed is gained serializing projective group elements in `arkworks` and `blstrs` manually using a `normalize_batch()` type approach
