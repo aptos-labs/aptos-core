@@ -46,6 +46,43 @@ storage encoding the memory, with loan bookkeeping that lends nothing (`Denote.A
 def StartsAt {unit : ValidatedUnit} (start : RuntimeState) (memory : Denote.Memory unit) : Prop :=
   Denote.StorageEncodes unit memory start ∧ Denote.Admissible start []
 
+/-- Runs of a unit read no table a global or an argument does not reach: a
+run from a start whose Table storage holds, beside the tables the memory's
+values hold, tables that only other frames hold, is also a run from the
+start holding the memory's tables alone, with the same outcome and loan
+bookkeeping, whose exit encodes every memory the original exit holds. The
+behavioral predicates read a function value's runs from the latter starts,
+which a memory determines, and a call's run from the former. A property of
+the unit's semantics, to be established by induction on its runs as the
+loan renaming is (`designs/intrinsic-maps.md`, "Tables in the runtime
+semantics"); the public theorem states it as a hypothesis. -/
+structure TablesLocal {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop where
+  runs : ∀ (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId))
+    (memory : Denote.Memory unit) (start : RuntimeState) (arguments : Array RuntimeValue)
+    (exit : RuntimeState) (outcome : Outcome),
+    Denote.StorageHolds unit memory start →
+    BigStep.EvalFunction executable handle typeInstantiation start arguments exit outcome →
+    ∃ start' exit' : RuntimeState, Denote.StorageEncodes unit memory start' ∧
+      start'.storageLoans = start.storageLoans ∧ start'.nextLoan = start.nextLoan ∧
+      start'.pending = start.pending ∧
+      BigStep.EvalFunction executable handle typeInstantiation start' arguments exit' outcome ∧
+      exit'.pending = exit.pending ∧
+      ∀ (final : Denote.Memory unit) (results : Array RuntimeValue),
+        Denote.StorageHoldsReturned unit final exit results →
+        Denote.StorageEncodesReturned unit final exit' results
+
+/-- Admissibility reads the loan bookkeeping alone. -/
+theorem Denote.Admissible.ofLoans {start start' : RuntimeState} {loans : List Nat}
+    (admissible : Denote.Admissible start loans)
+    (storageLoans : start'.storageLoans = start.storageLoans)
+    (nextLoan : start'.nextLoan = start.nextLoan) : Denote.Admissible start' loans := by
+  obtain ⟨nodup, bounded, fresh⟩ := admissible
+  refine ⟨nodup, fun loan member => by rw [nextLoan, storageLoans]; exact bounded loan member, ?_⟩
+  intro loan le
+  rw [storageLoans]
+  rw [nextLoan] at le
+  exact fresh loan le
+
 /-- `aborts_of<f>(x)`: the invocation aborts from a start at `memory`. -/
 def AbortsOf {unit : ValidatedUnit} (executable : ExecutableUnit unit) (callable : RuntimeValue)
     (arguments : List RuntimeValue)
@@ -549,9 +586,9 @@ theorem ensuresOf_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit 
     fun prophecies => by
       rw [weave.tables_compose (NRow.tableFree_of_lendsEncoded capturedPlain),
         HList.tables_eq_nil prophecies supplied (NRow.tableFree_of_lendsEncoded suppliedPlain)]
-  refine ⟨coherent, start, [], _, _, exit, [], _, Encloses.of_nil globals (none false), admissible,
-    lendArguments_weave weave capturedPlain suppliedPlain captures args, runs, lent, prophesied,
-    ?_, ReturnedEncloses.of_nil encoded (by
+  refine ⟨coherent, start, [], _, _, exit, [], _, Encloses.of_nil globals.holds (none false),
+    admissible, lendArguments_weave weave capturedPlain suppliedPlain captures args, runs, lent,
+    prophesied, ?_, ReturnedEncloses.of_nil encoded.holds (by
       rw [none, ResultShape.tables_eq_nil true (.one τ) (by
         simpa [ResultShape.row, NRow.tableFree] using NTy.tableFree_of_lendsEncoded resultPlain)]
       rfl), agree⟩
@@ -575,7 +612,7 @@ theorem abortsOf_closureOf {unit : ValidatedUnit} {executable : ExecutableUnit u
       (weave.compose captures args)).aborts state failure := by
   obtain ⟨start, failure, ⟨globals, admissible⟩, runs⟩ := aborts
   rw [invocationSpec_closureOf] at runs
-  refine ⟨failure, coherent, start, [], _, Encloses.of_nil globals ?_, admissible,
+  refine ⟨failure, coherent, start, [], _, Encloses.of_nil globals.holds ?_, admissible,
     lendArguments_weave weave capturedPlain suppliedPlain captures args, runs⟩
   rw [weave.tables_compose (NRow.tableFree_of_lendsEncoded capturedPlain),
     HList.tables_eq_nil false supplied (NRow.tableFree_of_lendsEncoded suppliedPlain)]
@@ -641,7 +678,7 @@ private theorem lendArguments_lendsEncoded {row : NRow} (plain : row.lendsEncode
 function value naming it: `ensures_of` of that value at the call's
 arguments. -/
 theorem ensuresOf_of_run {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
+    (tablesLocal : TablesLocal executable) {handle : FunctionHandle}
     {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} (fullPlain : full.lendsEncoded = true)
     {shape : ResultShape} (shapePlain : shape.row.lendsEncoded = true) {args : HList full}
     {result : shape.carrier} {pre final : Memory unit}
@@ -668,32 +705,37 @@ theorem ensuresOf_of_run {unit : ValidatedUnit} {executable : ExecutableUnit uni
         | nil => exact (Option.some.inj resultsLent).symm
         | cons _ _ => exact absurd resultsLent (by simp)
   subst returned
-  refine ⟨start, exit, ⟨globals.stores, admissible⟩, ?_, encoded.stores, agree⟩
+  obtain ⟨start', exit', exact, storageLoans, nextLoan, -, ran', -, mirror⟩ :=
+    tablesLocal.runs _ _ _ _ _ _ _ globals.stores ran
+  refine ⟨start', exit', ⟨exact, admissible.ofLoans storageLoans nextLoan⟩, ?_,
+    mirror _ _ encoded.stores, agree⟩
   rw [invocationSpec_closureOf (Weave.supplying full) typeInstantiation () args,
     HList.encode_nil, Weave.composeList_supplying]
-  exact ran
+  exact ran'
 
 /-- An abort of a target that takes no reference is an abort of the function
 value naming it: `aborts_of` of that value at the call's arguments. -/
 theorem abortsOf_of_abort {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
+    (tablesLocal : TablesLocal executable) {handle : FunctionHandle}
     {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} (fullPlain : full.lendsEncoded = true)
     {shape : ResultShape} {args : HList full} {pre : Memory unit} {failure : Failure}
     (aborts : (propheticMeaning executable typeInstantiation handle full shape args).aborts pre failure) :
     AbortsOf executable (closureOf handle (Weave.supplying full).mask typeInstantiation
       (σs := .nil) ()).encode (HList.encode args) pre := by
-  obtain ⟨-, start, loans, arguments, globals, admissible, lent, ran⟩ := aborts
+  obtain ⟨-, start, loans, arguments, globals, admissible, lent, ⟨exit, ran⟩⟩ := aborts
   obtain ⟨rfl, rfl⟩ := lendArguments_lendsEncoded fullPlain lent
-  refine ⟨start, failure, ⟨globals.stores, admissible⟩, ?_⟩
+  obtain ⟨start', exit', exact, storageLoans, nextLoan, -, ran', -, -⟩ :=
+    tablesLocal.runs _ _ _ _ _ _ _ globals.stores ran
+  refine ⟨start', failure, ⟨exact, admissible.ofLoans storageLoans nextLoan⟩, ?_⟩
   rw [invocationSpec_closureOf (Weave.supplying full) typeInstantiation () args,
     HList.encode_nil, Weave.composeList_supplying]
-  exact ran
+  exact ⟨exit', ran'⟩
 
 /-- Where a target that takes and returns no reference is called, the run is
 one of the function value naming the target: the continuations may assume
 its `ensures_of` where the call returns and its `aborts_of` where it aborts. -/
 theorem wp_named {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
-    {handle : FunctionHandle}
+    (tablesLocal : TablesLocal executable) {handle : FunctionHandle}
     {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} {shape : ResultShape}
     (fullPlain : full.lendsEncoded = true) (shapePlain : shape.row.lendsEncoded = true)
     {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -711,8 +753,9 @@ theorem wp_named {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skol
       initial) :
     wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts initial :=
   ⟨fun result final execution =>
-      named.1 result final execution (ensuresOf_of_run fullPlain shapePlain execution),
-    fun error execution => named.2.1 error execution (abortsOf_of_abort fullPlain execution),
+      named.1 result final execution (ensuresOf_of_run tablesLocal fullPlain shapePlain execution),
+    fun error execution =>
+      named.2.1 error execution (abortsOf_of_abort tablesLocal fullPlain execution),
     named.2.2⟩
 
 /-- A result's values as a behavioral predicate reads a run's
@@ -802,6 +845,7 @@ holding none, whose returned references are settled, is a run of the
 function value naming it: `ensures_of` of that value at the call's entry
 values, its results' current values, and its references' final values. -/
 theorem ensuresOfMut_of_run {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
+    (tablesLocal : TablesLocal executable)
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
     (fullFlat : full.lentFlat = true) {shape : ResultShape} (shapeFlat : shape.row.lentFlat = true)
     {args : HList full} {result : shape.carrier} {pre final : Memory unit}
@@ -818,30 +862,37 @@ theorem ensuresOfMut_of_run {unit : ValidatedUnit} {executable : ExecutableUnit 
   obtain ⟨lentRow, lends, rfl⟩ := lendArguments_lentFlat fullFlat lent
   obtain ⟨-, invocation⟩ := invocationSpec_closureOf_lent (Weave.supplying full) rfl fullFlat
     typeInstantiation () args (executable := executable) (handle := handle) lends
-  refine ⟨start, loans, lentRow, prophecyRow, exit, globals.stores, admissible, lends, ?_, ?_,
-    (argumentsResolve_finals full fullFlat args loans _ _).mp resolves, encoded.stores, agree⟩
+  obtain ⟨start', exit', exact, storageLoans, nextLoan, pending, ran', pending', mirror⟩ :=
+    tablesLocal.runs _ _ _ _ _ _ _ globals.stores ran
+  refine ⟨start', loans, lentRow, prophecyRow, exit', exact, admissible.ofLoans storageLoans nextLoan,
+    lends, ?_, ?_, ?_, mirror _ _ encoded.stores, agree⟩
   · rw [invocation, HList.encode_nil, Weave.composeList_supplying]
-    exact ran
+    exact ran'
   · rw [ResultShape.readResults_lend shape shapeFlat result returnedLoans resultsLent,
       Array.toArray_toList]
+  · rw [pending, pending']
+    exact (argumentsResolve_finals full fullFlat args loans _ _).mp resolves
 
 /-- An abort of a target taking mutable references, or values holding none,
 is an abort of the function value naming it: `aborts_of` of that value at
 the call's entry values. -/
 theorem abortsOfMut_of_abort {unit : ValidatedUnit} {executable : ExecutableUnit unit}
-    [Skolems unit] {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)}
+    [Skolems unit] (tablesLocal : TablesLocal executable)
+    {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)}
     {full : NRow} (fullFlat : full.lentFlat = true) {shape : ResultShape} {args : HList full}
     {pre : Memory unit} {failure : Failure}
     (aborts : (propheticMeaning executable typeInstantiation handle full shape args).aborts pre failure) :
     AbortsOfMut executable (closureOf handle (Weave.supplying full).mask typeInstantiation
       (σs := .nil) ()).encode full.mutable (HList.entries args) pre := by
-  obtain ⟨-, start, loans, arguments, globals, admissible, lent, ran⟩ := aborts
+  obtain ⟨-, start, loans, arguments, globals, admissible, lent, ⟨exit, ran⟩⟩ := aborts
   obtain ⟨lentRow, lends, rfl⟩ := lendArguments_lentFlat fullFlat lent
   obtain ⟨-, invocation⟩ := invocationSpec_closureOf_lent (Weave.supplying full) rfl fullFlat
     typeInstantiation () args (executable := executable) (handle := handle) lends
-  refine ⟨start, loans, lentRow, failure, globals.stores, admissible, lends, ?_⟩
+  obtain ⟨start', exit', exact, storageLoans, nextLoan, -, ran', -, -⟩ :=
+    tablesLocal.runs _ _ _ _ _ _ _ globals.stores ran
+  refine ⟨start', loans, lentRow, failure, exact, admissible.ofLoans storageLoans nextLoan, lends, ?_⟩
   rw [invocation, HList.encode_nil, Weave.composeList_supplying]
-  exact ran
+  exact ⟨exit', ran'⟩
 
 /-- Where a target taking mutable references, or values holding none, and
 returning one or a value holding none is called, the run is one of the
@@ -849,6 +900,7 @@ function value naming the target: the continuations may assume its
 `ensures_of` where the call returns with its returned reference settled, and
 its `aborts_of` where it aborts. -/
 theorem wp_named_mut {unit : ValidatedUnit} {executable : ExecutableUnit unit} [Skolems unit]
+    (tablesLocal : TablesLocal executable)
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
     {shape : ResultShape} (fullFlat : full.lentFlat = true) (shapeFlat : shape.row.lentFlat = true)
     {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -868,8 +920,9 @@ theorem wp_named_mut {unit : ValidatedUnit} {executable : ExecutableUnit unit} [
       initial) :
     wp (propheticMeaning executable typeInstantiation handle full shape args) ensures aborts initial :=
   ⟨fun result final execution =>
-      named.1 result final execution (ensuresOfMut_of_run fullFlat shapeFlat execution),
-    fun error execution => named.2.1 error execution (abortsOfMut_of_abort fullFlat execution),
+      named.1 result final execution (ensuresOfMut_of_run tablesLocal fullFlat shapeFlat execution),
+    fun error execution =>
+      named.2.1 error execution (abortsOfMut_of_abort tablesLocal fullFlat execution),
     named.2.2⟩
 
 end

@@ -112,3 +112,46 @@ error: verex verification failed: the automatic verification of `wrong_payload_b
 -/
 #guard_msgs in
 verify 0x42::table_reads::wrong_payload_bound
+
+-- The read roles run in the interpreter over a table held in native storage
+-- at the slot of its owner's closed type, the one the role resolves at its
+-- frame (`designs/intrinsic-maps.md`, "Tables in the runtime semantics").
+open Lean Elab Command VerexIR VerexIR.SemanticOperations VerexE2ETests.CheckSupport in
+run_cmd do
+  let some unit := VerexSL.registeredUnit? (← getEnv) `«0x42».table_reads
+    | throwError "missing table reads module"
+  let executable ← match Validation.prepareExecution #[VerexIR.Move.semantics] unit with
+    | .ok executable => pure executable
+    | .error diagnostics => throwError "preparation failed: {repr diagnostics}"
+  let ns := unit.namespaces[0]!
+  -- The slot of `Table<u64, u64>`: the parameter type of `membership`.
+  let some (_, _, membership, declaration) := VerexSL.Contract.findFunction? unit "membership"
+    | throwError "missing membership"
+  let some parameter := declaration.signature.parameters[0]? | throwError "membership has no parameter"
+  let referent := match ns.tables.types[parameter.typeUse.typeId.index]? with
+    | some (.reference reference) => reference.referent
+    | _ => parameter.typeUse.typeId
+  let some typeId := canonicalTypeId? unit referent | throwError "the table type is open"
+  let slot := tableSlot ⟨0⟩ typeId "t"
+  let table : RuntimeValue := .nominal ⟨⟨0⟩, 0⟩ none #[.address "t"]
+  let initial : RuntimeState := { tables := {
+    contents := ⟨#[⟨slot, .vector #[.tuple #[.integer 7, .integer 70]]⟩]⟩
+    allocated := #["t"] } }
+  let run (function : String) (arguments : Array RuntimeValue) : CommandElabM Outcome := do
+    let some (namespaceIndex, _, index, _) := VerexSL.Contract.findFunction? unit function
+      | throwError "missing function {function}"
+    match Interpreter.run executable 256 ⟨⟨namespaceIndex⟩, ⟨index⟩⟩ arguments initial with
+    | .error failure => throwError "{function} failed: {repr failure}"
+    | .ok (_, outcome) => pure outcome.value
+  let check (function : String) (arguments : Array RuntimeValue) (expected : Outcome) :
+      CommandElabM Unit := do
+    let outcome ← run function arguments
+    unless outcome == expected do
+      throwError "{function}: expected {repr expected}, got {repr outcome}"
+  let _ := membership
+  check "membership" #[table, .integer 7] (.returned #[.bool true])
+  check "membership" #[table, .integer 8] (.returned #[.bool false])
+  check "lookup" #[table, .integer 7] (.returned #[.integer 70])
+  check "lookup" #[table, .integer 8] (.threw .abort #[.integer 101])
+  check "caller" #[table, .integer 7] (.returned #[.integer 70])
+

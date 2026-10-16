@@ -2958,12 +2958,12 @@ theorem preservation {unit : ValidatedUnit} {executable : ExecutableUnit unit}
     | throw_ kind arguments => trivial
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
     exact natives handle typeInstantiation initialState arguments finalState outcome native_eq
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq body_eq
-      body_step outcome_eq hole_free finalize_eq ih
+      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
+      body_eq body_step outcome_eq hole_free finalize_eq ih
     intro loans inert ns' declaration' semantic parameters results namespace_eq' declaration_eq'
       faithful signature_eq argumentsTyped stateTyped
     rw [namespace_eq, Option.some.injEq] at namespace_eq'

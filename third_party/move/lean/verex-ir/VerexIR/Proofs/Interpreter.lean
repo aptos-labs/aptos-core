@@ -105,36 +105,40 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
               | some declaration =>
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [namespace_eq, declaration_eq, arity_ne, failAt] at h
-                  · cases body_eq : declaration.body with
-                    | absent =>
+                  · cases provided_eq : BigStep.runtimeProvided unit handle declaration with
+                    | true =>
                         cases native_eq :
                             BigStep.nativeCall executable handle typeInstantiation state arguments with
                         | none =>
-                            simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq,
+                            simp [namespace_eq, declaration_eq, arity_ne, provided_eq, native_eq,
                               failAt] at h
                         | some native =>
                             obtain ⟨finalState, outcome⟩ := native
                             cases hole_eq : outcome.holeFree with
                             | false =>
-                                simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq,
+                                simp [namespace_eq, declaration_eq, arity_ne, provided_eq, native_eq,
                                   hole_eq, failAt] at h
                             | true =>
-                                simp [namespace_eq, declaration_eq, arity_ne, body_eq, native_eq,
+                                simp [namespace_eq, declaration_eq, arity_ne, provided_eq, native_eq,
                                   hole_eq] at h
                                 cases h
                                 exact BigStep.EvalFunction.native handle typeInstantiation state
                                   arguments ns declaration finalState outcome namespace_eq
-                                  declaration_eq (by simpa using arity_ne) body_eq native_eq hole_eq
+                                  declaration_eq (by simpa using arity_ne) provided_eq native_eq
+                                  hole_eq
+                    | false =>
+                    cases body_eq : declaration.body with
+                    | absent => simp [BigStep.runtimeProvided, body_eq] at provided_eq
                     | structured root =>
                         cases frame_eq : initialFrame? declaration arguments typeInstantiation with
                         | none =>
-                            simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                            simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                               failAt] at h
                         | some initialFrame =>
                             cases evaluation_eq : Internal.evalExpr fuel executable
                                 handle.namespaceId initialFrame state root with
                             | error error =>
-                                simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                                simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                                   evaluation_eq] at h
                             | ok evaluation =>
                                 have body_sound := previous.expression executable handle.namespaceId
@@ -144,16 +148,16 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                     cases unpack_eq : unpackFallthrough
                                         declaration.signature.results.size value with
                                     | none =>
-                                        simp [namespace_eq, declaration_eq, arity_ne, frame_eq,
+                                        simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq,
                                           body_eq, evaluation_eq, control_eq, unpack_eq, failAt] at h
                                     | some values =>
                                       cases hole_eq : (Outcome.returned values).holeFree with
                                       | false =>
-                                        simp [namespace_eq, declaration_eq, arity_ne, frame_eq,
+                                        simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq,
                                           body_eq, evaluation_eq, control_eq, unpack_eq, hole_eq,
                                           failAt] at h
                                       | true =>
-                                        simp [namespace_eq, declaration_eq, arity_ne, frame_eq,
+                                        simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq,
                                           body_eq, evaluation_eq, control_eq, unpack_eq,
                                           hole_eq] at h
                                         cases h
@@ -161,6 +165,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           (evaluatedState := evaluation.state)
                                           (namespace_eq := namespace_eq)
                                           (declaration_eq := declaration_eq)
+                                          (provided_eq := provided_eq)
                                           (frame_eq := frame_eq) (body_eq := body_eq)
                                           (body_step := by simpa [control_eq] using body_sound)
                                           (outcome_eq := by
@@ -170,9 +175,9 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                 | return_ values =>
                                     by_cases result_arity_ne :
                                         values.size != declaration.signature.results.size
-                                    · simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                                    · simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                                         evaluation_eq, control_eq, result_arity_ne, failAt] at h
-                                    · simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                                    · simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                                         evaluation_eq, control_eq, result_arity_ne] at h
                                       have result_arity_eq :
                                           values.size = declaration.signature.results.size := by
@@ -186,6 +191,7 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           (evaluatedState := evaluation.state)
                                           (namespace_eq := namespace_eq)
                                           (declaration_eq := declaration_eq)
+                                          (provided_eq := provided_eq)
                                           (frame_eq := frame_eq) (body_eq := body_eq)
                                           (body_step := by simpa [control_eq] using body_sound)
                                           (outcome_eq := by
@@ -193,23 +199,24 @@ private theorem soundAt : ∀ fuel, SoundAt fuel
                                           (hole_free := hole_eq)
                                           (finalize_eq := rfl)
                                 | throw_ kind thrown =>
-                                    simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                                    simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                                       evaluation_eq, control_eq] at h
                                     cases h
                                     exact BigStep.EvalFunction.body
                                       (evaluatedState := evaluation.state)
                                       (namespace_eq := namespace_eq)
                                       (declaration_eq := declaration_eq)
-                                      (frame_eq := frame_eq) (body_eq := body_eq)
+                                      (provided_eq := provided_eq)
+                                          (frame_eq := frame_eq) (body_eq := body_eq)
                                       (body_step := by simpa [control_eq] using body_sound)
                                       (outcome_eq := by simp [finishControl?])
                                       (hole_free := rfl)
                                       (finalize_eq := rfl)
                                 | break_ nest value =>
-                                    simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                                    simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                                       evaluation_eq, control_eq, failAt] at h
                                 | continue_ nest =>
-                                    simp [namespace_eq, declaration_eq, arity_ne, frame_eq, body_eq,
+                                    simp [namespace_eq, declaration_eq, arity_ne, provided_eq, frame_eq, body_eq,
                                       evaluation_eq, control_eq, failAt] at h
         expression := by
           intro unit executable namespaceId frame state exprId result h

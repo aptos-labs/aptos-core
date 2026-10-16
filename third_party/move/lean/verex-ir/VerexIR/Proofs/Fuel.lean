@@ -86,12 +86,15 @@ private theorem monoAt : ∀ fuel, MonoAt fuel
                   by_cases arity_ne : arguments.size != declaration.signature.parameters.size
                   · simp [arity_ne, failAt] at h
                   · simp only [arity_ne] at h ⊢
-                    cases body_eq : declaration.body with
-                    | absent =>
-                        simp only [body_eq, ↓reduceIte] at h ⊢
+                    cases provided_eq : BigStep.runtimeProvided unit handle declaration with
+                    | true =>
+                        simp only [provided_eq, ↓reduceIte] at h ⊢
                         exact h
+                    | false =>
+                    cases body_eq : declaration.body with
+                    | absent => simp [BigStep.runtimeProvided, body_eq] at provided_eq
                     | structured root =>
-                        simp only [body_eq, reduceCtorEq, ↓reduceIte] at h ⊢
+                        simp only [provided_eq, body_eq, reduceCtorEq, ↓reduceIte] at h ⊢
                         cases frame_eq : initialFrame? declaration arguments typeInstantiation with
                         | none => simp [frame_eq, failAt] at h
                         | some initialFrame =>

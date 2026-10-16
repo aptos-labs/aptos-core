@@ -1022,7 +1022,7 @@ private theorem completeExpr {unit : ValidatedUnit} {executable : ExecutableUnit
     exact ⟨_, rfl, rfl, rfl, rfl⟩
   case body =>
     intro handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq
+      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
       body_eq body_step outcome_eq hole_free finalize_eq ih
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := ih
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
@@ -1031,7 +1031,7 @@ private theorem completeExpr {unit : ValidatedUnit} {executable : ExecutableUnit
       | true => simp [initialFrame?, hb] at frame_eq
     refine ⟨f₀ + 1, ?_⟩
     rw [Internal.evalFunction.eq_2]
-    simp only [namespace_eq, declaration_eq, arity, body_eq, reduceCtorEq, ↓reduceIte,
+    simp only [namespace_eq, declaration_eq, arity, provided_eq, body_eq, reduceCtorEq, ↓reduceIte,
       frame_eq, e₀, bind, Except.bind, rc]
     cases control with
     | value value =>
@@ -1059,12 +1059,12 @@ private theorem completeExpr {unit : ValidatedUnit} {executable : ExecutableUnit
     | continue_ nest => simp [finishControl?] at outcome_eq
   case native =>
     intro handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free
+      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
       simp [arity_eq]
     refine ⟨1, ?_⟩
     rw [Internal.evalFunction.eq_2]
-    simp only [namespace_eq, declaration_eq, arity, body_eq, ↓reduceIte, native_eq,
+    simp only [namespace_eq, declaration_eq, arity, provided_eq, ↓reduceIte, native_eq,
       hole_free, bind, Except.bind, pure, Except.pure]
     exact ⟨_, rfl, rfl, rfl⟩
   case nil =>
@@ -1194,7 +1194,7 @@ theorem evalFunction_complete {unit : ValidatedUnit} {executable : ExecutableUni
         result.state = finalState ∧ result.outcome.value = outcome := by
   cases h with
   | body handle typeInstantiation initialState arguments ns declaration frame root finalFrame
-      evaluatedState finalState control outcome namespace_eq declaration_eq frame_eq
+      evaluatedState finalState control outcome namespace_eq declaration_eq provided_eq frame_eq
       body_eq body_step outcome_eq hole_free finalize_eq =>
     obtain ⟨f₀, r₀, e₀, rf, rs, rc⟩ := completeExpr body_step
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
@@ -1203,7 +1203,7 @@ theorem evalFunction_complete {unit : ValidatedUnit} {executable : ExecutableUni
       | true => simp [initialFrame?, hb] at frame_eq
     refine ⟨f₀ + 1, ?_⟩
     rw [Internal.evalFunction.eq_2]
-    simp only [namespace_eq, declaration_eq, arity, body_eq, reduceCtorEq, ↓reduceIte,
+    simp only [namespace_eq, declaration_eq, arity, provided_eq, body_eq, reduceCtorEq, ↓reduceIte,
       frame_eq, e₀, bind, Except.bind, rc]
     cases control with
     | value value =>
@@ -1230,12 +1230,12 @@ theorem evalFunction_complete {unit : ValidatedUnit} {executable : ExecutableUni
     | break_ nest value => simp [finishControl?] at outcome_eq
     | continue_ nest => simp [finishControl?] at outcome_eq
   | native handle typeInstantiation initialState arguments ns declaration finalState outcome
-      namespace_eq declaration_eq arity_eq body_eq native_eq hole_free =>
+      namespace_eq declaration_eq arity_eq provided_eq native_eq hole_free =>
     have arity : (arguments.size != declaration.signature.parameters.size) = false := by
       simp [arity_eq]
     refine ⟨1, ?_⟩
     rw [Internal.evalFunction.eq_2]
-    simp only [namespace_eq, declaration_eq, arity, body_eq, ↓reduceIte, native_eq,
+    simp only [namespace_eq, declaration_eq, arity, provided_eq, ↓reduceIte, native_eq,
       hole_free, bind, Except.bind, pure, Except.pure]
     exact ⟨_, rfl, rfl, rfl⟩
 

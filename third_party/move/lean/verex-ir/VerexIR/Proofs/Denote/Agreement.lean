@@ -193,16 +193,16 @@ theorem satisfies_cycle_family {unit : ValidatedUnit} (executable : ExecutableUn
     ⟨index, some (Θ, instantiation)⟩
 
 omit [Skolems unit] in
-/-- Runs of a unit keep global and Table storage encoding a typed memory: from
-stores encoding a memory, every successful run ends in stores encoding one that
+/-- Runs of a unit keep global and Table storage holding a typed memory: from
+stores holding a memory, every successful run ends in stores holding one that
 agrees with it where no runtime key reaches.  A property of the unit's
 semantics that static typing establishes (`designs/static-memory.md`); the
 public theorem states it as a hypothesis. -/
 def GlobalsPreserved {unit : ValidatedUnit} (executable : ExecutableUnit unit) : Prop :=
   ∀ handle typeInstantiation start arguments results exit memory,
-    StorageEncodes unit memory start →
+    StorageHolds unit memory start →
     (functionSpecAt executable handle typeInstantiation arguments).ok start results exit →
-    ∃ final, StorageEncodesReturned unit final exit results ∧ AgreeUnnamed unit final memory
+    ∃ final, StorageHoldsReturned unit final exit results ∧ AgreeUnnamed unit final memory
 
 end Frames
 

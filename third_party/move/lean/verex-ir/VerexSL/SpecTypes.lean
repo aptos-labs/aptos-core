@@ -179,7 +179,8 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
             intrinsic.model == "map" && intrinsic.owner == declaration.name) &&
           match (declaration.fields.toList.mapM fun field =>
               unit.tables.types[field.type.typeId.index]? : Option (List VerexIR.Ty)) with
-          | some [] | some [.address] | some [.address, .integer (.bits 64) false] => true
+          | some [] | some [.bool] | some [.address] | some [.address, .integer (.bits 64) false] =>
+              true
           | _ => false
         let declared := representFields declaration.fields
         let fields := if tableOwner then

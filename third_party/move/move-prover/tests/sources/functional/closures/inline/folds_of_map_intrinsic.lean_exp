@@ -1,6 +1,30 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_set` belongs to a map whose representation is not carried
-tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_set` belongs to a map whose representation is not carried
-tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_del` belongs to a map whose representation is not carried
-tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_del` belongs to a map whose representation is not carried
-tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:6:1: error: the intrinsic map role `map_spec_set` belongs to a map whose representation is not carried
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:67:5: error: the loop invariant `m == «spec_fold$lambda$0»(v, with_state_anchor!(3, old(m)), i)` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:72:5: error: verex verification failed: the automatic verification of `collect` failed; provide a proof: `verify collect by …` in `tests/sources/functional/closures/inline/folds_of_map_intrinsic.proof.lean` (`verify collect by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:80:5: error: the loop invariant `m == «spec_fold$lambda$1»(v, with_state_anchor!(7, old(m)), i)
+        && (∀ (_j_8 in 0 .. i),
+          !spec_aborts_add(
+            «spec_fold$lambda$1»(
+              v, with_state_anchor!(7, old(m)), _j_8
+            ), v[_j_8], 0
+          ))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:85:5: error: verex verification failed: the automatic verification of `collect_distinct` failed; provide a proof: `verify collect_distinct by …` in `tests/sources/functional/closures/inline/folds_of_map_intrinsic.proof.lean` (`verify collect_distinct by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:93:5: error: the loop invariant `mm
+        == «spec_fold$lambda$2»(v, with_state_anchor!(15, old(mm)), i)
+        && (∀ (_j_16 in 0 .. i),
+          !spec_aborts_del(
+            «spec_fold$lambda$2»(v, with_state_anchor!(15, old(mm)), _j_16),
+            v[_j_16]
+          ))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:100:5: error: verex verification failed: the automatic verification of `remove_all` failed; provide a proof: `verify remove_all by …` in `tests/sources/functional/closures/inline/folds_of_map_intrinsic.proof.lean` (`verify remove_all by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:107:5: error: the loop invariant `mm
+        == «spec_fold$lambda$2»(v, with_state_anchor!(19, old(mm)), i)
+        && (∀ (_j_20 in 0 .. i),
+          !spec_aborts_del(
+            «spec_fold$lambda$2»(v, with_state_anchor!(19, old(mm)), _j_20),
+            v[_j_20]
+          ))` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:114:5: error: verex verification failed: the automatic verification of `remove_all_must_exist` failed; provide a proof: `verify remove_all_must_exist by …` in `tests/sources/functional/closures/inline/folds_of_map_intrinsic.proof.lean` (`verify remove_all_must_exist by verex_obligations` lists its obligations)
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:128:9: error: the specification clause `ensures result == «spec_fold$lambda$3»(v, spec_new::<u64, u64>(), v.length)` is not established
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:121:5: error: the loop invariant `m == «spec_fold$lambda$0»(v, with_state_anchor!(11, old(m)), i)` is not preserved by an iteration
+tests/sources/functional/closures/inline/folds_of_map_intrinsic.move:126:5: error: verex verification failed: the automatic verification of `collect_wrong` failed; provide a proof: `verify collect_wrong by …` in `tests/sources/functional/closures/inline/folds_of_map_intrinsic.proof.lean` (`verify collect_wrong by verex_obligations` lists its obligations)

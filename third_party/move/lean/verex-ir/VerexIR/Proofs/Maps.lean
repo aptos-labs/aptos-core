@@ -629,6 +629,10 @@ structure Layout where
   handle : Bool
   /-- A table layout caching its length before its contents. -/
   length : Bool
+  /-- A table layout of an owner declared without fields, whose first field
+  is the Boolean placeholder Move's compilers give an empty struct
+  (`dummy_field`); the value keeps it as a table keeps its handle. -/
+  dummy : Bool
 
 /-- The entries a map value holds. -/
 def entriesOf (map : RuntimeValue) : Entries :=
@@ -645,16 +649,18 @@ def Layout.entryValue (layout : Layout) (entry : RuntimeValue × RuntimeValue) :
   | some declaration => .nominal declaration none #[entry.1, entry.2]
   | none => .tuple #[entry.1, entry.2]
 
-/-- The map value holding entries, at a handle for a table layout. -/
+/-- The map value holding entries, at a handle for a table layout, or at its
+placeholder for one of an owner without fields. -/
 def Layout.build (layout : Layout) (handle : RuntimeValue) (entries : Entries) : RuntimeValue :=
   .nominal layout.owner layout.variant
-    (((if layout.handle then #[handle] else #[]) ++
+    (((if layout.handle || layout.dummy then #[handle] else #[]) ++
         (if layout.length then #[RuntimeValue.integer entries.length] else #[])).push
       (.vector (entries.map layout.entryValue).toArray))
 
-/-- The handle of a map value: of a table layout, its first field. -/
+/-- The handle of a map value: of a table layout, its first field, which a
+placeholder layout keeps the same way. -/
 def Layout.handleOf (layout : Layout) (map : RuntimeValue) : RuntimeValue :=
-  if layout.handle then map.field 0 else .unit
+  if layout.handle || layout.dummy then map.field 0 else .unit
 
 @[simp] theorem Layout.field_entryValue_zero (layout : Layout) (entry : RuntimeValue × RuntimeValue) :
     (layout.entryValue entry).field 0 = entry.1 := by
@@ -800,7 +806,8 @@ theorem order_keyAt_keyAt {map other : RuntimeValue} {index position : Int}
     integer_asInt_keyAt otherKeys low high]
 
 /-- The empty map of an entries layout. -/
-def empty (layout : Layout) : RuntimeValue := layout.build .unit []
+def empty (layout : Layout) : RuntimeValue :=
+  layout.build (if layout.dummy then .bool false else .unit) []
 
 /-- The map with a key's value updated, at the map's handle. -/
 def update (layout : Layout) (discipline : Discipline) (map key value : RuntimeValue) :
@@ -1231,5 +1238,528 @@ def AbortsReplaceKey (layout : Layout) (discipline : Discipline) (map old new : 
 
 @[simp, vir_denote_norm] theorem elementsOf_vector (elements : Array RuntimeValue) :
     elementsOf (.vector elements) = elements.toList := rfl
+
+
+/-! ## Laws of the bulk operations -/
+
+theorem containsB_eq_decide_mem (entries : Entries) (probe : RuntimeValue) :
+    containsB entries probe = decide (probe ∈ entries.map Prod.fst) := by
+  apply Bool.eq_iff_iff.mpr
+  simp only [containsB_iff, decide_eq_true_eq, List.mem_map]
+  constructor
+  · rintro ⟨value, mem⟩; exact ⟨(probe, value), mem, rfl⟩
+  · rintro ⟨⟨key, value⟩, mem, rfl⟩; exact ⟨value, mem⟩
+
+theorem mem_fst_zip {α β : Type} {k : α} :
+    ∀ {l₁ : List α} {l₂ : List β}, k ∈ (l₁.zip l₂).map Prod.fst → k ∈ l₁
+  | [], _, h => by simp at h
+  | _ :: _, [], h => by simp at h
+  | a :: l₁, b :: l₂, h => by
+      simp only [List.zip_cons_cons, List.map_cons, List.mem_cons] at h
+      rcases h with h | h
+      · simp [h]
+      · exact List.mem_cons_of_mem _ (mem_fst_zip h)
+
+theorem Discipline.valid_set {discipline : Discipline} {entries : Entries}
+    (valid : discipline.Valid entries) (key value : RuntimeValue) :
+    discipline.Valid (discipline.set entries key value) := by
+  cases discipline with
+  | sequence => exact distinct_seqSet valid key value
+  | ordered rank => exact ascending_ordSet rank valid key value
+
+theorem Discipline.containsB_set (discipline : Discipline) (entries : Entries)
+    (key value probe : RuntimeValue) :
+    containsB (discipline.set entries key value) probe = (decide (key = probe) || containsB entries probe) := by
+  cases discipline <;> simp [containsB_ordSet] <;> congr
+
+theorem Discipline.length_set_bounds (discipline : Discipline) (entries : Entries)
+    (key value : RuntimeValue) :
+    entries.length ≤ (discipline.set entries key value).length ∧
+      (discipline.set entries key value).length ≤ entries.length + 1 := by
+  cases discipline with
+  | sequence => simp only [Discipline.set_sequence, length_seqSet]; split <;> omega
+  | ordered rank =>
+      simp only [Discipline.set_ordered]
+      induction entries with
+      | nil => simp [ordSet]
+      | cons entry rest ih =>
+          simp only [ordSet]
+          split <;> simp only [List.length_cons] <;> omega
+
+theorem Discipline.length_set {discipline : Discipline} {entries : Entries}
+    (valid : discipline.Valid entries) (key value : RuntimeValue) :
+    (discipline.set entries key value).length =
+      if containsB entries key then entries.length else entries.length + 1 := by
+  cases discipline with
+  | sequence => exact length_seqSet entries key value
+  | ordered rank => exact length_ordSet rank valid key value
+
+theorem Discipline.valid_foldl_set (discipline : Discipline)
+    (pairs : List (RuntimeValue × RuntimeValue)) {entries : Entries}
+    (valid : discipline.Valid entries) :
+    discipline.Valid (pairs.foldl (fun entries entry => discipline.set entries entry.1 entry.2) entries) := by
+  induction pairs generalizing entries with
+  | nil => exact valid
+  | cons pair rest ih => exact ih (Discipline.valid_set valid pair.1 pair.2)
+
+theorem Discipline.containsB_foldl_set (discipline : Discipline)
+    (pairs : List (RuntimeValue × RuntimeValue)) (entries : Entries) (probe : RuntimeValue) :
+    containsB (pairs.foldl (fun entries entry => discipline.set entries entry.1 entry.2) entries) probe =
+      (decide (probe ∈ pairs.map Prod.fst) || containsB entries probe) := by
+  induction pairs generalizing entries with
+  | nil => simp
+  | cons pair rest ih =>
+      rw [List.foldl_cons, ih, Discipline.containsB_set]
+      apply Bool.eq_iff_iff.mpr
+      simp only [Bool.or_eq_true, decide_eq_true_eq, List.map_cons, List.mem_cons]
+      constructor
+      · rintro (h | h | h)
+        · exact .inl (.inr h)
+        · exact .inl (.inl h.symm)
+        · exact .inr h
+      · rintro ((h | h) | h)
+        · exact .inr (.inl h.symm)
+        · exact .inl h
+        · exact .inr (.inr h)
+
+theorem Discipline.length_foldl_set_bounds (discipline : Discipline)
+    (pairs : List (RuntimeValue × RuntimeValue)) (entries : Entries) :
+    entries.length ≤
+        (pairs.foldl (fun entries entry => discipline.set entries entry.1 entry.2) entries).length ∧
+      (pairs.foldl (fun entries entry => discipline.set entries entry.1 entry.2) entries).length ≤
+        entries.length + pairs.length := by
+  induction pairs generalizing entries with
+  | nil => simp
+  | cons pair rest ih =>
+      rw [List.foldl_cons]
+      have step := Discipline.length_set_bounds discipline entries pair.1 pair.2
+      have := ih (discipline.set entries pair.1 pair.2)
+      simp only [List.length_cons]; omega
+
+theorem Discipline.length_foldl_set_fresh (discipline : Discipline)
+    (pairs : List (RuntimeValue × RuntimeValue)) {entries : Entries}
+    (valid : discipline.Valid entries) (nodup : (pairs.map Prod.fst).Nodup)
+    (fresh : ∀ pair ∈ pairs, containsB entries pair.1 = false) :
+    (pairs.foldl (fun entries entry => discipline.set entries entry.1 entry.2) entries).length =
+      entries.length + pairs.length := by
+  induction pairs generalizing entries with
+  | nil => simp
+  | cons pair rest ih =>
+      rw [List.foldl_cons]
+      simp only [List.map_cons, List.nodup_cons] at nodup
+      have length := Discipline.length_set valid pair.1 pair.2
+      simp only [fresh pair (List.mem_cons_self ..), Bool.false_eq_true, if_false] at length
+      rw [ih (Discipline.valid_set valid pair.1 pair.2) nodup.2 ?_, length, List.length_cons]
+      · omega
+      intro other mem
+      rw [Discipline.containsB_set]
+      simp only [Bool.or_eq_false_iff, decide_eq_false_iff_not]
+      exact ⟨fun eq => nodup.1 (by rw [eq]; exact List.mem_map_of_mem mem),
+        fresh other (List.mem_cons_of_mem _ mem)⟩
+
+/-- The keys set by a list of pairs are the keys of the pairs or of the entries. -/
+theorem mem_fst_foldl_set (discipline : Discipline) (pairs : List (RuntimeValue × RuntimeValue))
+    (entries : Entries) {key : RuntimeValue}
+    (mem : key ∈ (pairs.foldl (fun entries entry => discipline.set entries entry.1 entry.2) entries).map Prod.fst) :
+    key ∈ pairs.map Prod.fst ∨ key ∈ entries.map Prod.fst := by
+  have := Discipline.containsB_foldl_set discipline pairs entries key
+  rw [containsB_eq_decide_mem, containsB_eq_decide_mem] at this
+  simpa using (Bool.eq_iff_iff.mp this).mp (by simpa using mem)
+
+/-! ### `updateAll` -/
+
+@[vir_denote_norm, grind .] theorem valid_updateAll (layout : Layout) {discipline : Discipline}
+    {map : RuntimeValue} (valid : Valid discipline map) (keys values : RuntimeValue) :
+    Valid discipline (updateAll layout discipline map keys values) := by
+  simp only [Valid, updateAll, entriesOf_build]
+  exact Discipline.valid_foldl_set discipline _ valid
+
+/-- Setting entries keeps every entry and adds at most one per key set. -/
+theorem size_updateAll_bounds (layout : Layout) (discipline : Discipline)
+    (map keys values : RuntimeValue) :
+    size map ≤ size (updateAll layout discipline map keys values) ∧
+      size (updateAll layout discipline map keys values) ≤
+        size map + ((elementsOf keys).length : Int) := by
+  simp only [size, updateAll, entriesOf_build]
+  have := Discipline.length_foldl_set_bounds discipline ((elementsOf keys).zip (elementsOf values))
+    (entriesOf map)
+  rw [List.length_zip] at this
+  omega
+
+@[simp, vir_denote_norm] theorem elementsOf_keysOf (map : RuntimeValue) :
+    elementsOf (keysOf map) = (entriesOf map).map Prod.fst := rfl
+
+@[simp, vir_denote_norm] theorem elementsOf_valuesOf (map : RuntimeValue) :
+    elementsOf (valuesOf map) = (entriesOf map).map Prod.snd := rfl
+
+/-- The same for an appended map, by its size. -/
+theorem size_updateAll_append_bounds (layout : Layout) (discipline : Discipline)
+    (map other : RuntimeValue) :
+    size map ≤ size (updateAll layout discipline map (keysOf other) (valuesOf other)) ∧
+      size (updateAll layout discipline map (keysOf other) (valuesOf other)) ≤
+        size map + size other := by
+  have := size_updateAll_bounds layout discipline map (keysOf other) (valuesOf other)
+  simp only [elementsOf_keysOf, List.length_map] at this
+  exact this
+
+theorem hasKey_updateAll_of_fits (layout : Layout) (discipline : Discipline)
+    (map keys values probe : RuntimeValue)
+    (fits : (elementsOf keys).length ≤ (elementsOf values).length) :
+    hasKey (updateAll layout discipline map keys values) probe =
+      (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
+  simp only [hasKey, updateAll, entriesOf_build, Discipline.containsB_foldl_set,
+    List.map_fst_zip fits]
+
+@[vir_denote_norm] theorem hasKey_updateAll_add_all (layout : Layout) (discipline : Discipline)
+    (map keys values probe : RuntimeValue) (ok : ¬AbortsAddAll map keys values) :
+    hasKey (updateAll layout discipline map keys values) probe =
+      (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
+  exact hasKey_updateAll_of_fits _ _ _ _ _ _
+    (Nat.le_of_eq (Decidable.of_not_not fun h => ok (Or.inl h)))
+
+@[vir_denote_norm] theorem hasKey_updateAll_upsert_all (layout : Layout) (discipline : Discipline)
+    (map keys values probe : RuntimeValue) (ok : ¬AbortsUpsertAll keys values) :
+    hasKey (updateAll layout discipline map keys values) probe =
+      (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
+  unfold AbortsUpsertAll at ok
+  exact hasKey_updateAll_of_fits _ _ _ _ _ _ (Nat.le_of_eq (Decidable.of_not_not ok))
+
+@[vir_denote_norm] theorem hasKey_updateAll_new_from (layout : Layout) (discipline : Discipline)
+    (map keys values probe : RuntimeValue) (ok : ¬AbortsNewFrom keys values) :
+    hasKey (updateAll layout discipline map keys values) probe =
+      (decide (probe ∈ elementsOf keys) || hasKey map probe) := by
+  exact hasKey_updateAll_of_fits _ _ _ _ _ _
+    (Nat.le_of_eq (Decidable.of_not_not fun h => ok (Or.inl h)))
+
+@[vir_denote_norm] theorem hasKey_updateAll_append (layout : Layout) (discipline : Discipline)
+    (map other probe : RuntimeValue) :
+    hasKey (updateAll layout discipline map (keysOf other) (valuesOf other)) probe =
+      (hasKey other probe || hasKey map probe) := by
+  rw [hasKey_updateAll_of_fits _ _ _ _ _ _ (by simp)]
+  simp only [elementsOf_keysOf, hasKey, containsB_eq_decide_mem]
+  rfl
+
+/-- Adding entries at fresh keys adds one each. -/
+@[vir_denote_norm] theorem size_updateAll_add_all (layout : Layout) {discipline : Discipline}
+    {map : RuntimeValue} (valid : Valid discipline map) (keys values : RuntimeValue)
+    (ok : ¬AbortsAddAll map keys values) :
+    size (updateAll layout discipline map keys values) = size map + ((elementsOf keys).length : Int) := by
+  have lengths : (elementsOf keys).length = (elementsOf values).length :=
+    Decidable.of_not_not fun h => ok (Or.inl h)
+  have fresh : ∀ pair ∈ (elementsOf keys).zip (elementsOf values),
+      containsB (entriesOf map) pair.1 = false := by
+    intro pair mem
+    have inKeys : pair.1 ∈ elementsOf keys := mem_fst_zip (List.mem_map_of_mem mem)
+    have absent := fun h => ok (Or.inr (Or.inl ⟨pair.1, inKeys, h⟩))
+    cases h : hasKey map pair.1 with
+    | false => simpa [hasKey] using h
+    | true => exact absurd h absent
+  have nodup : (((elementsOf keys).zip (elementsOf values)).map Prod.fst).Nodup := by
+    rw [List.map_fst_zip (Nat.le_of_eq lengths)]
+    exact Classical.byContradiction fun h => ok (Or.inr (Or.inr h))
+  simp only [size, updateAll, entriesOf_build]
+  rw [Discipline.length_foldl_set_fresh discipline _ valid nodup fresh, List.length_zip]
+  omega
+
+/-- A map built from fresh vectors holds one entry per key. -/
+@[vir_denote_norm] theorem size_updateAll_new_from (layout : Layout) (discipline : Discipline)
+    (keys values : RuntimeValue) (ok : ¬AbortsNewFrom keys values) :
+    size (updateAll layout discipline (empty layout) keys values) = ((elementsOf keys).length : Int) := by
+  have ok' : ¬AbortsAddAll (empty layout) keys values := fun
+    | .inl h => ok (.inl h)
+    | .inr (.inl ⟨_, _, h⟩) => by simp at h
+    | .inr (.inr h) => ok (.inr h)
+  rw [size_updateAll_add_all layout (valid_empty layout discipline) keys values ok', size_empty]
+  omega
+
+/-- Appending a disjoint map adds its entries. -/
+@[vir_denote_norm] theorem size_updateAll_append_disjoint (layout : Layout) {discipline : Discipline}
+    {map other : RuntimeValue} (valid : Valid discipline map) (validOther : Valid discipline other)
+    (ok : ¬AbortsAppendDisjoint map other) :
+    size (updateAll layout discipline map (keysOf other) (valuesOf other)) = size map + size other := by
+  have ok' : ¬AbortsAddAll map (keysOf other) (valuesOf other) := fun
+    | .inl h => h (by simp)
+    | .inr (.inl ⟨key, mem, held⟩) => ok ⟨key, held, by
+        rw [elementsOf_keysOf] at mem
+        simpa [hasKey, containsB_eq_decide_mem] using mem⟩
+    | .inr (.inr h) => h (by rw [elementsOf_keysOf]; exact distinct_of_valid validOther)
+  rw [size_updateAll_add_all layout valid _ _ ok', elementsOf_keysOf, List.length_map]
+  rfl
+
+/-! ### `takeEntries`, `dropEntries`, and `replaceKey` -/
+
+@[vir_denote_norm] theorem size_takeEntries (layout : Layout) (map : RuntimeValue) (count : Int) :
+    size (takeEntries layout map count) = min (max count 0) (size map) := by
+  simp only [size, takeEntries, entriesOf_build, List.length_take]; omega
+
+@[vir_denote_norm] theorem size_dropEntries (layout : Layout) (map : RuntimeValue) (count : Int) :
+    size (dropEntries layout map count) = size map - min (max count 0) (size map) := by
+  simp only [size, dropEntries, entriesOf_build, List.length_drop]; omega
+
+@[vir_denote_norm] theorem size_replaceKey (layout : Layout) (map old new : RuntimeValue) :
+    size (replaceKey layout map old new) = size map := by
+  simp only [size, replaceKey, entriesOf_build, List.length_map]
+
+@[vir_denote_norm, grind .] theorem valid_takeEntries (layout : Layout) {discipline : Discipline}
+    {map : RuntimeValue} (valid : Valid discipline map) (count : Int) :
+    Valid discipline (takeEntries layout map count) := by
+  simp only [Valid, takeEntries, entriesOf_build]
+  cases discipline with
+  | sequence => exact List.Nodup.sublist ((List.take_sublist _ _).map Prod.fst) valid
+  | ordered rank => exact List.Pairwise.sublist (List.take_sublist _ _) valid
+
+@[vir_denote_norm, grind .] theorem valid_dropEntries (layout : Layout) {discipline : Discipline}
+    {map : RuntimeValue} (valid : Valid discipline map) (count : Int) :
+    Valid discipline (dropEntries layout map count) := by
+  simp only [Valid, dropEntries, entriesOf_build]
+  cases discipline with
+  | sequence => exact List.Nodup.sublist ((List.drop_sublist _ _).map Prod.fst) valid
+  | ordered rank => exact List.Pairwise.sublist (List.drop_sublist _ _) valid
+
+/-- A key's position within distinct entries, by its membership in a prefix. -/
+theorem mem_fst_take_iff {entries : Entries} (distinct : Distinct entries) (count : Nat)
+    (key : RuntimeValue) :
+    key ∈ (entries.take count).map Prod.fst ↔ containsB entries key = true ∧ indexOf entries key < count := by
+  constructor
+  · intro mem
+    rw [List.map_take] at mem
+    obtain ⟨index, bound, found⟩ := List.getElem_of_mem mem
+    rw [List.getElem_take, List.getElem_map] at found
+    have inRange : index < entries.length := by simp [List.length_take] at bound; omega
+    have within : index < count := by simp [List.length_take] at bound; omega
+    refine ⟨?_, ?_⟩
+    · rw [containsB_eq_decide_mem, decide_eq_true_eq, ← found]
+      exact List.mem_map_of_mem (List.getElem_mem inRange)
+    · rw [← found, indexOf_getElem distinct index inRange]; exact within
+  · rintro ⟨present, below⟩
+    obtain ⟨bound, found⟩ := getElem_indexOf entries key present
+    rw [List.map_take]
+    rw [← found]
+    exact List.mem_take_iff_getElem.mpr ⟨indexOf entries key, by simp; omega,
+      by rw [List.getElem_map]⟩
+
+theorem mem_fst_drop_iff {entries : Entries} (distinct : Distinct entries) (count : Nat)
+    (key : RuntimeValue) :
+    key ∈ (entries.drop count).map Prod.fst ↔ containsB entries key = true ∧ count ≤ indexOf entries key := by
+  constructor
+  · intro mem
+    rw [List.map_drop] at mem
+    obtain ⟨index, bound, found⟩ := List.getElem_of_mem mem
+    rw [List.getElem_drop, List.getElem_map] at found
+    have inRange : count + index < entries.length := by simp [List.length_drop] at bound; omega
+    refine ⟨?_, ?_⟩
+    · rw [containsB_eq_decide_mem, decide_eq_true_eq, ← found]
+      exact List.mem_map_of_mem (List.getElem_mem inRange)
+    · rw [← found, indexOf_getElem distinct _ inRange]; omega
+  · rintro ⟨present, above⟩
+    obtain ⟨bound, found⟩ := getElem_indexOf entries key present
+    rw [List.map_drop, ← found]
+    exact List.mem_drop_iff_getElem.mpr ⟨indexOf entries key - count, by simp; omega,
+      by rw [List.getElem_map]; congr 2; omega⟩
+
+@[vir_denote_norm] theorem hasKey_takeEntries (layout : Layout) {discipline : Discipline}
+    {map : RuntimeValue} (valid : Valid discipline map) (count : Int) (probe : RuntimeValue) :
+    hasKey (takeEntries layout map count) probe = (hasKey map probe && decide (rank map probe < count)) := by
+  simp only [hasKey, takeEntries, entriesOf_build, rank, containsB_eq_decide_mem (entriesOf map)]
+  rw [containsB_eq_decide_mem, Bool.eq_iff_iff]
+  simp only [Bool.and_eq_true, decide_eq_true_eq]
+  rw [mem_fst_take_iff (distinct_of_valid valid), containsB_eq_decide_mem, decide_eq_true_eq,
+    Int.lt_toNat]
+
+@[vir_denote_norm] theorem hasKey_dropEntries (layout : Layout) {discipline : Discipline}
+    {map : RuntimeValue} (valid : Valid discipline map) (count : Int) (probe : RuntimeValue) :
+    hasKey (dropEntries layout map count) probe = (hasKey map probe && decide (count ≤ rank map probe)) := by
+  simp only [hasKey, dropEntries, entriesOf_build, rank, containsB_eq_decide_mem (entriesOf map)]
+  rw [containsB_eq_decide_mem, Bool.eq_iff_iff]
+  simp only [Bool.and_eq_true, decide_eq_true_eq]
+  rw [mem_fst_drop_iff (distinct_of_valid valid), containsB_eq_decide_mem, decide_eq_true_eq,
+    Int.toNat_le]
+
+@[vir_denote_norm] theorem hasKey_replaceKey (layout : Layout) (map old new probe : RuntimeValue) :
+    hasKey (replaceKey layout map old new) probe =
+      if probe = new then (hasKey map old || hasKey map new)
+      else (!decide (probe = old) && hasKey map probe) := by
+  simp only [hasKey, replaceKey, entriesOf_build, containsB_eq_decide_mem, List.map_map,
+    Function.comp_def]
+  split
+  · subst probe
+    rw [Bool.eq_iff_iff]
+    simp only [Bool.or_eq_true, decide_eq_true_eq, List.mem_map]
+    constructor
+    · rintro ⟨entry, mem, found⟩
+      by_cases same : entry.1 = old
+      · exact .inl ⟨entry, mem, same⟩
+      · simp [same] at found; exact .inr ⟨entry, mem, found⟩
+    · rintro (⟨entry, mem, found⟩ | ⟨entry, mem, found⟩)
+      · exact ⟨entry, mem, by simp [found]⟩
+      · by_cases same : entry.1 = old
+        · exact ⟨entry, mem, by simp [same]⟩
+        · exact ⟨entry, mem, by by_cases h : new = old <;> simp [h, found]⟩
+  · rename_i differs
+    rw [Bool.eq_iff_iff]
+    simp only [Bool.and_eq_true, Bool.not_eq_true', decide_eq_false_iff_not, decide_eq_true_eq,
+      List.mem_map]
+    constructor
+    · rintro ⟨entry, mem, found⟩
+      by_cases same : entry.1 = old
+      · simp [same] at found; exact absurd found.symm differs
+      · simp [same] at found; exact ⟨found ▸ same, entry, mem, found⟩
+    · rintro ⟨notOld, entry, mem, found⟩
+      exact ⟨entry, mem, by simp [found, notOld]⟩
+
+/-! ### Keys read back through the bulk operations -/
+
+theorem keysRead_iff {α : Type} (read : RuntimeValue → α) (write : α → RuntimeValue)
+    (map : RuntimeValue) :
+    KeysRead read write map ↔ ∀ key ∈ (entriesOf map).map Prod.fst, write (read key) = key := by
+  simp only [KeysRead, List.forall_mem_map]
+
+@[vir_denote_side] theorem keysRead_updateAll {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (layout : Layout) (discipline : Discipline) {map : RuntimeValue}
+    (keys : KeysRead read write map) {vector : RuntimeValue}
+    (keysRead : ∀ key ∈ elementsOf vector, write (read key) = key) (values : RuntimeValue) :
+    KeysRead read write (updateAll layout discipline map vector values) := by
+  rw [keysRead_iff] at keys ⊢
+  simp only [updateAll, entriesOf_build]
+  intro key mem
+  rcases mem_fst_foldl_set discipline _ _ mem with h | h
+  · exact keysRead key (mem_fst_zip h)
+  · exact keys key h
+
+@[vir_denote_side] theorem keysRead_takeEntries {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (layout : Layout) {map : RuntimeValue}
+    (keys : KeysRead read write map) (count : Int) :
+    KeysRead read write (takeEntries layout map count) := by
+  rw [keysRead_iff] at keys ⊢
+  simp only [takeEntries, entriesOf_build, List.map_take]
+  exact fun key mem => keys key (List.take_subset _ _ mem)
+
+@[vir_denote_side] theorem keysRead_dropEntries {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (layout : Layout) {map : RuntimeValue}
+    (keys : KeysRead read write map) (count : Int) :
+    KeysRead read write (dropEntries layout map count) := by
+  rw [keysRead_iff] at keys ⊢
+  simp only [dropEntries, entriesOf_build, List.map_drop]
+  exact fun key mem => keys key (List.drop_subset _ _ mem)
+
+@[vir_denote_side] theorem keysRead_replaceKey {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (layout : Layout) {map : RuntimeValue}
+    (keys : KeysRead read write map) (old : RuntimeValue) {new : RuntimeValue}
+    (newRead : write (read new) = new) :
+    KeysRead read write (replaceKey layout map old new) := by
+  rw [keysRead_iff] at keys ⊢
+  simp only [replaceKey, entriesOf_build, List.map_map, Function.comp_def]
+  intro key mem
+  simp only [List.mem_map] at mem
+  obtain ⟨entry, entryMem, rfl⟩ := mem
+  split
+  · exact newRead
+  · exact keys entry.1 (List.mem_map_of_mem entryMem)
+
+
+/-- The keys of entries encoded one by one as a list, held after an owner's
+other fields, are read back when every encoded first field is: the
+contents of a table owner, unfolded. -/
+theorem keysRead_list_map_at {α β : Type} {read : RuntimeValue → α} {write : α → RuntimeValue}
+    (owner : StructHandle) (variant : Option String) (fields : Array RuntimeValue)
+    (encode : β → RuntimeValue) (entries : List β)
+    (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
+    KeysRead read write (.nominal owner variant (fields.push (.vector (entries.map encode).toArray))) := by
+  intro pair member
+  simp only [entriesOf, Array.back?_push, List.toList_toArray, List.map_map, List.mem_map,
+    Function.comp_def] at member
+  obtain ⟨value, _, rfl⟩ := member
+  exact roundTrip value
+
+@[vir_denote_norm, vir_denote_side] theorem keysRead_list_map {α β : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (encode : β → RuntimeValue) (entries : List β)
+    (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
+    KeysRead read write (.nominal owner variant #[.vector (entries.map encode).toArray]) :=
+  keysRead_list_map_at owner variant #[] encode entries roundTrip
+
+@[vir_denote_norm, vir_denote_side] theorem keysRead_list_map_one {α β : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (first : RuntimeValue) (encode : β → RuntimeValue) (entries : List β)
+    (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
+    KeysRead read write (.nominal owner variant #[first, .vector (entries.map encode).toArray]) :=
+  keysRead_list_map_at owner variant #[first] encode entries roundTrip
+
+@[vir_denote_norm, vir_denote_side] theorem keysRead_list_map_two {α β : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (owner : StructHandle) (variant : Option String)
+    (first second : RuntimeValue) (encode : β → RuntimeValue) (entries : List β)
+    (roundTrip : ∀ value, write (read ((encode value).field 0)) = (encode value).field 0) :
+    KeysRead read write
+      (.nominal owner variant #[first, second, .vector (entries.map encode).toArray]) :=
+  keysRead_list_map_at owner variant #[first, second] encode entries roundTrip
+
+@[vir_denote_side] theorem keysRead_updateAll_append {α : Type} {read : RuntimeValue → α}
+    {write : α → RuntimeValue} (layout : Layout) (discipline : Discipline) {map other : RuntimeValue}
+    (keys : KeysRead read write map) (otherKeys : KeysRead read write other) :
+    KeysRead read write (updateAll layout discipline map (keysOf other) (valuesOf other)) := by
+  apply keysRead_updateAll layout discipline keys _ (valuesOf other)
+  rw [keysRead_iff] at otherKeys
+  simpa only [elementsOf_keysOf] using otherKeys
+
+
+/-- A list without repetition is no longer than one holding its members. -/
+theorem length_le_of_nodup_subset {α : Type} [DecidableEq α] {l₁ l₂ : List α}
+    (nodup : l₁.Nodup) (subset : ∀ a ∈ l₁, a ∈ l₂) : l₁.length ≤ l₂.length := by
+  induction l₁ generalizing l₂ with
+  | nil => simp
+  | cons a rest ih =>
+      simp only [List.nodup_cons] at nodup
+      have mem : a ∈ l₂ := subset a (List.mem_cons_self ..)
+      have := ih nodup.2 (l₂ := l₂.erase a) fun b memb => by
+        have ne : b ≠ a := fun eq => nodup.1 (eq ▸ memb)
+        exact (List.mem_erase_of_ne ne).mpr (subset b (List.mem_cons_of_mem _ memb))
+      have erased := List.length_erase_of_mem mem
+      have positive := List.length_pos_of_mem mem
+      rw [List.length_cons]
+      omega
+
+/-- An appended map holds every entry of the appended one. -/
+theorem size_other_le_updateAll_append (layout : Layout) (discipline : Discipline)
+    (map : RuntimeValue) {other : RuntimeValue} (validOther : Valid discipline other) :
+    size other ≤ size (updateAll layout discipline map (keysOf other) (valuesOf other)) := by
+  have distinct : ((entriesOf other).map Prod.fst).Nodup := distinct_of_valid validOther
+  have subset : ∀ key ∈ (entriesOf other).map Prod.fst,
+      key ∈ (entriesOf (updateAll layout discipline map (keysOf other) (valuesOf other))).map Prod.fst := by
+    intro key mem
+    have := hasKey_updateAll_append layout discipline map other key
+    rw [hasKey, containsB_eq_decide_mem, hasKey, hasKey, containsB_eq_decide_mem] at this
+    have held : decide (key ∈ (entriesOf other).map Prod.fst) = true := decide_eq_true mem
+    rw [held, Bool.true_or] at this
+    exact decide_eq_true_eq.mp this
+  have := length_le_of_nodup_subset distinct subset
+  simp only [size, List.length_map] at this ⊢
+  omega
+
+/-- The entries a replaced key leaves valid, where replacing does not abort. -/
+@[vir_denote_norm] theorem valid_replaceKey (layout : Layout) {discipline : Discipline}
+    {map old new : RuntimeValue} (ok : ¬AbortsReplaceKey layout discipline map old new) :
+    Valid discipline (replaceKey layout map old new) :=
+  Classical.byContradiction fun invalid => ok (Or.inr invalid)
+
+/-! The abort conditions of the bulk roles at literal vectors, as their
+lists: evaluated where a specification states them of literals. A symbolic
+vector is a mapped array, which these leave as they are. -/
+
+@[vir_denote_norm] theorem AbortsNewFrom_toArray (keys values : List RuntimeValue) :
+    AbortsNewFrom (.vector keys.toArray) (.vector values.toArray) ↔
+      keys.length ≠ values.length ∨ ¬keys.Nodup := by
+  simp [AbortsNewFrom]
+
+@[vir_denote_norm] theorem AbortsUpsertAll_toArray (keys values : List RuntimeValue) :
+    AbortsUpsertAll (.vector keys.toArray) (.vector values.toArray) ↔
+      keys.length ≠ values.length := by
+  simp [AbortsUpsertAll]
+
+@[vir_denote_norm] theorem AbortsAddAll_toArray (map : RuntimeValue) (keys values : List RuntimeValue) :
+    AbortsAddAll map (.vector keys.toArray) (.vector values.toArray) ↔
+      keys.length ≠ values.length ∨ (∃ key ∈ keys, hasKey map key = true) ∨ ¬keys.Nodup := by
+  simp [AbortsAddAll]
+
+attribute [vir_denote_norm] List.nodup_cons List.nodup_nil List.mem_cons List.not_mem_nil
 
 end VerexIR.Maps

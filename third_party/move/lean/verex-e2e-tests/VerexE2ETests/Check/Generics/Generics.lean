@@ -216,7 +216,7 @@ example {unit : Validation.ValidatedUnit} (executable : Validation.ExecutableUni
     («0x42».language_generics.identity.contract executable ⟨.cons (.param 0) .nil, rfl⟩
         typeInstantiation).requires #[value] initial ↔
         SemanticOperations.FreshStorageLoanIds initial ∧ SemanticOperations.Plain value ∧
-          ∃ memory, StorageEncodes unit memory initial := by
+          ∃ memory, StorageHolds unit memory initial := by
   simp only [«0x42».language_generics.identity.contract, Contract.prophetic, Contract.ofSkolem,
     Admissible, lendArguments, NRow.subst, NTy.subst, NRow.getD, NRow.lend, NTy.lend, NTy.encode,
     NTy.codec]

@@ -1,9 +1,10 @@
 # Handoff
 
-Status 2026-10-13. Branch `wrwg/proof-files`, PR #20746 on main: proof files as
-Lean files (`proof-file-editing.md`, P1–P3) and Table owners as owned values
-(`intrinsic-maps.md`, stage 2). #20710 (Prover parity, authored proofs, the rename
-Leaner → Verex) is merged. The session notes up to 2026-10-11 are in
+Status 2026-10-13. #20746 (proof files as Lean files, `proof-file-editing.md`,
+P1–P3; Table owners as owned values, `intrinsic-maps.md`, stage 2) and #20710
+(Prover parity, authored proofs, the rename Leaner → Verex) are merged. Branch
+`wrwg/lean-tables`: tables in the runtime semantics (`intrinsic-maps.md`,
+"Tables in the runtime semantics"). The session notes up to 2026-10-11 are in
 [`historical/handoff-2026-10.md`](historical/handoff-2026-10.md).
 
 ## Where the state is
@@ -16,6 +17,19 @@ Leaner → Verex) is merged. The session notes up to 2026-10-11 are in
   heartbeats. Not in CI before merge.
 - [`perf-notes.md`](perf-notes.md): costs, open performance leads, rejected experiments.
 - [`state-labels.md`](state-labels.md), "Milestones": S1–S3b implemented, S4 open.
+
+## Session note (2026-10-13, suspended)
+
+Branch `wrwg/lean-tables`, draft PR aptos-labs/aptos-core#20755, head
+e8b4b335, CI running on it; the previous head's two e2e failures
+(`MutableResults.bump`, the `behavior_manual_facts` baseline) are fixed in
+that head. Done on the branch: tables as owned values with the runtime
+boundary and the roles' runtime semantics; V7 closed as the registry entry
+says. Awaiting user decisions: the V7 residue (`tr` disjointness, `rk`
+continuation, `app_disjoint`'s existential abort condition, the fold
+invariants of `folds_of_map_intrinsic`; the prover's rule is to consult
+before working verification failures), and whether to take the C8 ghost
+field route under "Open findings". Then V16 and V1, per "Next, in order".
 
 ## Outside the repository
 
@@ -32,8 +46,17 @@ Leaner → Verex) is merged. The session notes up to 2026-10-11 are in
 
 - 2026-10-13: a table owner's type has a hidden last field holding its contents;
   the runtime boundary erases it (`intrinsic-maps.md`, "Owned Table values").
-  Tables behind type parameters are not carried. Decision 2026-10-13: tables
-  are values in the runtime semantics too; the erasing boundary is to be removed.
+  Tables behind type parameters are not carried. Decision 2026-10-13, revised
+  the same day: the verifier represents tables as values; the runtime and the
+  big-step semantics keep native storage behind handles, since a value
+  representation is not adequate there; the agreement reconciles the two, so
+  the erasing boundary stays (`intrinsic-maps.md`, "Tables in the runtime
+  semantics"). The earlier decision to make tables runtime values and remove
+  the boundary is withdrawn. Implemented the same day: the runtime provides
+  the table roles over native storage; the call boundary holds the tables of
+  other frames, and the `TablesLocal` hypothesis joins it to the behavioral
+  predicates' encoding starts. Rejected: the native storage as a ghost slot
+  of the memory, which would have put a runtime artifact into every frame.
 - 2026-10-12: the default budget is 1000 thousand `maxHeartbeats`, about thirty
   seconds; the registry runs with it (was 25 thousand).
 - 2026-10-12: an authored proof is kept only where the automatic run fails, or
@@ -80,10 +103,13 @@ costs.
    from expansion guards over struct fields, vector elements and other
    specification results. Recovery: bound the fields and elements of typed values
    statically, or change how leaves decide inline guards.
-3. Registry gaps by size: V7 intrinsic maps (empty abstract map owners;
-   tables behind type parameters, `intrinsic-maps.md`), C8 `update`
-   of a specification variable (9), V16 natives, V1 `update_field` rendering (11
-   messages). Vector reverse preparation is the next proof lead
+3. Registry gaps by size: C8 ghost fields (9 tests; the analysis and the
+   proposed route are under "Open findings"), V16 natives, V1
+   `update_field` rendering (11 messages); tables behind type parameters
+   (`intrinsic-maps.md`, "Stages"). V7 is closed (2026-10-13): the abstract
+   map owners of the Prover's tests are placeholder layouts, and the bulk
+   roles have their laws; what the five tests still fail is listed at the
+   registry entry. Vector reverse preparation is the next proof lead
    (`perf-notes.md`).
 4. S4: `unmodified_memory_at_label::swap` needs a decision on reads of removed
    resource contents (`state-labels.md`).
@@ -111,6 +137,31 @@ costs.
 
 ## Open findings not yet in a design
 
+- C8 is ghost *fields*, not specification variables (2026-10-13 analysis).
+  Eight of its nine tests, and `loop_memory_havoc.move`'s last cases, use
+  `spec S { ghost g: T; }`: a model-only field of every value of the struct
+  or enum, fresh at pack unless initialized, carried by copy, move and
+  borrow, excluded from equality, written by `update x.g = e` in an inline
+  specification block (through a mutable reference too), read in
+  specifications. The exchange (`move-model/exchange`) exports no ghost
+  fields: the `update_target` and the reads are `select` operations naming a
+  field the exported struct lacks, which the frontend rejects at
+  `Encode.lean`'s `ghostUpdate`. Specification variables (`global gcount`)
+  already work as ghost memory. Proposed route, for a decision: (1) export
+  ghost fields (name, type, initializer) with the struct, versioned; (2) in
+  the denotation, give the owner's native type hidden trailing ghost fields,
+  as a table owner has a hidden contents field, erased at the runtime
+  boundary, nondeterministic at pack (a fresh value of the type, as the
+  Prover's `$Arbitrary_value_of`), written by `update` through the
+  reference, and ignored by `eqb` and `identityRuntime`; (3) render them in
+  VerexSL. The route touches the Rust exchange, VIR, the denotation and the
+  rendering; it was not started.
+
+- Tables (2026-10-13, `intrinsic-maps.md`, "Tables in the runtime
+  semantics", "Open"): `TablesLocal` and `GlobalsPreserved` are hypotheses to
+  prove; a role at an instantiation the type table lacks has no run
+  (`RequiredTypes` interns what a body consults, not a role's owner); the
+  MonoVM differential tests run no table program.
 - The InfoView works on Move proof files since 2026-10-12
   (`proof-file-editing.md`, P1–P3). Rust `.spec.lean` files (P4: contracts
   attached after registration, or an explicit deferral) and renderings as
