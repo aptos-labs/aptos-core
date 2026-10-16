@@ -14,6 +14,7 @@ aptos-tinfoil-sigstore = { path = "../aptos-tinfoil-sigstore" }
 base64 = "0.23"
 dcap-qvl = { path = "../../third_party/dcap-qvl", default-features = false, features = ["std", "ring", "default-x509"] }
 hex = "0.4"
+ring = "0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 sha2 = "0.10"

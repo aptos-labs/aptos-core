@@ -8,6 +8,7 @@ mod config;
 
 pub mod device;
 pub mod envelope;
+pub mod nras;
 pub mod provenance;
 pub mod tdx;
 #[cfg(any(test, feature = "testing"))]

@@ -547,7 +547,7 @@ fn decode_canonical_base64(field: &str, value: &str) -> Result<Vec<u8>, Envelope
 /// `serde_json` silently keeps the last of a repeated key, which would let a
 /// document present one value to the hash check and another to a later reader.
 /// Go's `strictjson` rejects duplicates outright; this does the same.
-fn reject_duplicate_members(bytes: &[u8]) -> Result<(), EnvelopeError> {
+pub(crate) fn reject_duplicate_members(bytes: &[u8]) -> Result<(), EnvelopeError> {
     struct DupCheck;
 
     impl<'de> serde::de::Deserialize<'de> for DupCheck {
