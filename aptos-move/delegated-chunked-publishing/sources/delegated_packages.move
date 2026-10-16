@@ -155,7 +155,7 @@ module delegated_packages::delegated_packages {
     ): (vector<u8>, vector<vector<u8>>) acquires StagingArea {
         assert!(exists<StagingArea>(stager), error::not_found(ENOT_OPEN));
         assert!(borrow_global<StagingArea>(stager).publisher == publisher,
-            error::invalid_argument(EWRONG_PUBLISHER));
+            error::permission_denied(EWRONG_PUBLISHER));
         assert!(vector::length(&counts) > 1, error::invalid_state(EMISSING_CHUNK));
         let StagingArea { publisher: _, chunks, keys: _ } = move_from<StagingArea>(stager);
         let metadata = take_part(&mut chunks, 0, *vector::borrow(&counts, 0));
@@ -215,7 +215,7 @@ module delegated_packages::delegated_packages {
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
-    #[expected_failure(abort_code = 0x10005, location = Self)]
+    #[expected_failure(abort_code = 0x50005, location = Self)]
     fun test_wrong_publisher(stager: &signer, publisher: &signer) {
         open_staging(stager, @0xc);
         finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
@@ -330,7 +330,7 @@ module delegated_packages::delegated_packages {
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
-    #[expected_failure(abort_code = 0x10005, location = Self)]
+    #[expected_failure(abort_code = 0x50005, location = Self)]
     fun test_object_publish_rejects_wrong_publisher(stager: &signer, publisher: &signer) {
         open_staging(stager, @0xc);
         finalize_to_object(publisher, @0xa, vector[1u16, 1u16], vector[]);
