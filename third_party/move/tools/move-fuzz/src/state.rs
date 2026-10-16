@@ -1,0 +1,1241 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! On-disk persistence of fuzzing state.
+//!
+//! Serde mirrors of the in-memory fuzzer structures (corpora, coverage, def-use
+//! graph, sequence database, entrypoint and build caches), the schema-version
+//! constants stamped on every saved file, and save/load helpers that write
+//! atomically via a temporary file and rename. Callers compare the loaded
+//! version against the constant here and discard state from an older schema.
+
+use crate::{
+    executor::sequence::{ResourceTag, SeedInput},
+    prep::canvas::ScriptSignature,
+};
+use anyhow::{anyhow, Context, Result};
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
+use move_core_types::{
+    account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
+    value::MoveValue,
+};
+use move_coverage::coverage_map::{ExecCoverageMap, ModuleCoverageMap};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
+};
+
+/// Schema version of the persisted auto-state (`auto_state.json`). Bump this
+/// whenever the serialized layout of [`PersistedAutoState`] changes, or when
+/// the meaning of a persisted value changes without changing its layout (for
+/// example the derivation of the synthetic [`ResourceTag`] names produced by
+/// `synthetic_struct_tag`), so that state written by an older build is detected
+/// and ignored on load instead of being misinterpreted. The current value
+/// reflects the number of such changes made so far.
+pub const AUTO_STATE_VERSION: u32 = 8;
+pub const AUTO_STATE_FILENAME: &str = "auto_state.json";
+/// Schema version of the persisted entrypoint cache (`entrypoints_cache.json`).
+/// Bump this whenever its serialized layout changes (see `AUTO_STATE_VERSION`).
+pub const ENTRYPOINT_CACHE_VERSION: u32 = 2;
+pub const ENTRYPOINT_CACHE_FILENAME: &str = "entrypoints_cache.json";
+pub const PACKAGE_BUILD_CACHE_DIR: &str = "package-cache";
+/// Schema version of the persisted package-build cache metadata
+/// (`build_cache_info.json`). Bump this whenever its layout changes.
+pub const PACKAGE_BUILD_CACHE_INFO_VERSION: u32 = 2;
+pub const PACKAGE_BUILD_CACHE_INFO_FILENAME: &str = "build_cache_info.json";
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PersistedObjectState {
+    pub object_addresses: BTreeSet<AccountAddress>,
+    pub dict_object: Vec<PersistedObjectBucket>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct PersistedObjectBucket {
+    /// The full resource type, type arguments included. This was the datatype
+    /// name alone, which merged `Object<Coin<A>>` and `Object<Coin<B>>` into one
+    /// bucket and handed addresses of one to parameters wanting the other.
+    pub struct_tag: StructTag,
+    pub addresses: BTreeSet<AccountAddress>,
+}
+
+impl PersistedObjectState {
+    pub fn merge(states: impl IntoIterator<Item = Self>) -> Self {
+        let mut merged = Self::default();
+        let mut dict_object: BTreeMap<StructTag, BTreeSet<AccountAddress>> = BTreeMap::new();
+        for state in states {
+            merged.object_addresses.extend(state.object_addresses);
+            for bucket in state.dict_object {
+                dict_object
+                    .entry(bucket.struct_tag)
+                    .or_default()
+                    .extend(bucket.addresses);
+            }
+        }
+        merged.dict_object = dict_object
+            .into_iter()
+            .map(|(struct_tag, addresses)| PersistedObjectBucket {
+                struct_tag,
+                addresses,
+            })
+            .collect();
+        merged
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedFunctionCoverage {
+    pub function: String,
+    pub counts: BTreeMap<u64, u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedModuleCoverage {
+    pub address: AccountAddress,
+    pub module: String,
+    pub functions: Vec<PersistedFunctionCoverage>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedExecCoverageMap {
+    pub exec_id: String,
+    pub modules: Vec<PersistedModuleCoverage>,
+}
+
+impl PersistedExecCoverageMap {
+    pub fn from_exec_coverage_map(coverage: &ExecCoverageMap) -> Self {
+        Self {
+            exec_id: coverage.exec_id.clone(),
+            modules: coverage
+                .module_maps
+                .iter()
+                .map(
+                    |((address, module_ident), module_map)| PersistedModuleCoverage {
+                        address: *address,
+                        module: module_ident.to_string(),
+                        functions: module_map
+                            .function_maps
+                            .iter()
+                            .map(|(function_ident, counts)| PersistedFunctionCoverage {
+                                function: function_ident.to_string(),
+                                counts: counts.clone(),
+                            })
+                            .collect(),
+                    },
+                )
+                .collect(),
+        }
+    }
+
+    pub fn into_exec_coverage_map(self) -> Result<ExecCoverageMap> {
+        let mut module_maps = BTreeMap::new();
+        for module in self.modules {
+            let module_name =
+                Identifier::new(module.module).context("invalid persisted coverage module name")?;
+            let mut function_maps = BTreeMap::new();
+            for function in module.functions {
+                let function_name = Identifier::new(function.function)
+                    .context("invalid persisted coverage function name")?;
+                function_maps.insert(function_name, function.counts);
+            }
+            module_maps.insert((module.address, module_name.clone()), ModuleCoverageMap {
+                module_addr: module.address,
+                module_name,
+                function_maps,
+            });
+        }
+        Ok(ExecCoverageMap {
+            exec_id: self.exec_id,
+            module_maps,
+        })
+    }
+}
+
+/// Value representations allowed inside persisted fuzz state.
+///
+/// Implemented only for [`PersistedMoveValue`]. [`SeedInput`] is generic over
+/// its argument representation and derives serde under this bound, so the
+/// in-memory `SeedInput<MoveValue>` is kept out of every serialization path:
+/// `MoveValue`'s `Serialize` impl drops type tags and has no `Deserialize`, so
+/// persisting it would silently lose information and collide seed identities
+/// (see `chain_instance_identity` in `crate::fuzzer`).
+pub trait PersistedValue: Serialize + serde::de::DeserializeOwned {}
+
+impl PersistedValue for PersistedMoveValue {}
+
+/// Serde-stable mirror of the [`MoveValue`] subset that can appear as a transaction
+/// argument.
+///
+/// The fuzzer itself *does* use [`MoveValue`] end to end: `Mutator::random_value` /
+/// `Mutator::mutate_value` produce it, [`SeedInput::args`] holds it, and
+/// `OneshotFuzzer::build_payload` hands it to the VM via `MoveValue::simple_serialize`.
+/// This mirror exists purely for the on-disk state (`auto_state.json`, written with
+/// `serde_json`), which [`MoveValue`] cannot be `#[derive(Deserialize)]`-persisted into:
+///
+/// 1. It has no `Deserialize` impl. `move_core_types::value` provides only
+///    `impl DeserializeSeed for &MoveTypeLayout`, i.e. a value can be decoded only by a
+///    reader that already holds its `MoveTypeLayout`. The seed records in
+///    `auto_state.json` carry no layout of their own -- entry-point signatures live in a
+///    separate `entrypoints_cache.json` ([`PersistedEntrypoint`]) -- so there is nothing
+///    to seed a decoder with at load time.
+/// 2. Its `Serialize` impl is the BCS *value* encoding, which is type-erasing:
+///    `U8(7)`, `U16(7)`, `U32(7)`, `U64(7)` and `I64(7)` all emit a bare `7`, and
+///    `U256`/`I256` both emit the same 32-byte little-endian array, so the variant cannot
+///    be recovered from the output. The derived representation here is externally tagged
+///    by variant *name*, so the state file is self-describing and is unaffected by
+///    [`MoveValue`] variant reordering (whose discriminants are pinned to bytecode
+///    versions).
+/// 3. It pins the closed domain of values the fuzzer can actually replay; anything
+///    outside it is rejected at the boundary by `TryFrom<&MoveValue>` rather than being
+///    written to disk and mis-replayed later.
+///
+/// A [`MoveValue`] of *any* shape could still be persisted as a `(MoveTypeLayout, BCS
+/// blob)` pair: `MoveTypeLayout` does derive `Serialize`/`Deserialize`, and
+/// `MoveValue::simple_serialize` / `MoveValue::simple_deserialize` are the two halves of
+/// that trip. That is the escape hatch if the value domain ever has to grow. It is not
+/// used today because it turns the state file into an opaque blob and requires threading
+/// a layout onto every seed record.
+///
+/// Two [`MoveValue`] variants are deliberately absent:
+///
+/// - [`MoveValue::Closure`]: function values are not valid transaction arguments --
+///   `aptos_vm::verifier::transaction_arg_validation::legacy_is_valid_txn_arg` maps
+///   `Type::Function { .. }` to `false` -- so a closure can never reach
+///   [`SeedInput::args`]. Function-typed *parameters* are still covered, one level up:
+///   `prep::model` selects a `prep::canvas::LambdaBinding` and the generated driver
+///   script constructs the closure in Move source via
+///   `prep::canvas::DriverStatement::Lambda`; only the script's own `BasicInput`
+///   parameters cross the transaction boundary.
+///   TODO: if entry points ever accept function values, persist them with the
+///   `(MoveTypeLayout, BCS blob)` encoding described above rather than hand-mirroring
+///   `move_core_types::function::MoveClosure` -- its `captured` field is itself
+///   `Vec<(MoveTypeLayout, MoveValue)>`, so a hand-mirror would have to recurse back into
+///   this type anyway -- and bump [`AUTO_STATE_VERSION`].
+/// - [`MoveValue::Struct`]: the only struct-shaped arguments the fuzzer emits are
+///   `String` and `Object<T>`, which `prep::canvas::BasicInput` already models as
+///   `Vector(U8..)` and `Address` respectively.
+///   TODO: modelling further allow-listed argument structs (e.g. `Option`) would need a
+///   `Struct` variant here plus an [`AUTO_STATE_VERSION`] bump.
+///
+/// Any change to this variant set or to the variant names changes the on-disk layout and
+/// must bump [`AUTO_STATE_VERSION`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PersistedMoveValue {
+    Bool(bool),
+    U8(u8),
+    I8(i8),
+    U16(u16),
+    I16(i16),
+    U32(u32),
+    I32(i32),
+    U64(u64),
+    I64(i64),
+    U128(u128),
+    I128(i128),
+    U256(move_core_types::int256::U256),
+    I256(move_core_types::int256::I256),
+    Address(AccountAddress),
+    Signer(AccountAddress),
+    Vector(Vec<PersistedMoveValue>),
+}
+
+impl TryFrom<&MoveValue> for PersistedMoveValue {
+    type Error = anyhow::Error;
+
+    /// Lossless within the supported domain: every accepted [`MoveValue`] maps to exactly
+    /// one [`PersistedMoveValue`], and `From<PersistedMoveValue> for MoveValue` maps it
+    /// back to an identical [`MoveValue`]. Values outside the domain are rejected here
+    /// rather than approximated, so an unsupported value can never be silently persisted.
+    ///
+    /// The rejecting arm names the unsupported variants explicitly instead of using `_`,
+    /// so a new upstream [`MoveValue`] variant is a compile error here and forces a
+    /// deliberate decision about persisting it.
+    fn try_from(value: &MoveValue) -> Result<Self> {
+        Ok(match value {
+            MoveValue::Bool(v) => Self::Bool(*v),
+            MoveValue::U8(v) => Self::U8(*v),
+            MoveValue::I8(v) => Self::I8(*v),
+            MoveValue::U16(v) => Self::U16(*v),
+            MoveValue::I16(v) => Self::I16(*v),
+            MoveValue::U32(v) => Self::U32(*v),
+            MoveValue::I32(v) => Self::I32(*v),
+            MoveValue::U64(v) => Self::U64(*v),
+            MoveValue::I64(v) => Self::I64(*v),
+            MoveValue::U128(v) => Self::U128(*v),
+            MoveValue::I128(v) => Self::I128(*v),
+            MoveValue::U256(v) => Self::U256(*v),
+            MoveValue::I256(v) => Self::I256(*v),
+            MoveValue::Address(v) => Self::Address(*v),
+            MoveValue::Signer(v) => Self::Signer(*v),
+            MoveValue::Vector(values) => Self::Vector(
+                values
+                    .iter()
+                    .map(Self::try_from)
+                    .collect::<Result<Vec<_>>>()?,
+            ),
+            other @ (MoveValue::Struct(_) | MoveValue::Closure(_)) => {
+                return Err(anyhow!(
+                    "unsupported MoveValue in persisted fuzz state: {other:?}"
+                ));
+            },
+        })
+    }
+}
+
+impl From<PersistedMoveValue> for MoveValue {
+    /// Total and lossless: the persisted mirror only holds variants that exist verbatim
+    /// in [`MoveValue`], so this direction cannot fail.
+    fn from(value: PersistedMoveValue) -> Self {
+        match value {
+            PersistedMoveValue::Bool(v) => MoveValue::Bool(v),
+            PersistedMoveValue::U8(v) => MoveValue::U8(v),
+            PersistedMoveValue::I8(v) => MoveValue::I8(v),
+            PersistedMoveValue::U16(v) => MoveValue::U16(v),
+            PersistedMoveValue::I16(v) => MoveValue::I16(v),
+            PersistedMoveValue::U32(v) => MoveValue::U32(v),
+            PersistedMoveValue::I32(v) => MoveValue::I32(v),
+            PersistedMoveValue::U64(v) => MoveValue::U64(v),
+            PersistedMoveValue::I64(v) => MoveValue::I64(v),
+            PersistedMoveValue::U128(v) => MoveValue::U128(v),
+            PersistedMoveValue::I128(v) => MoveValue::I128(v),
+            PersistedMoveValue::U256(v) => MoveValue::U256(v),
+            PersistedMoveValue::I256(v) => MoveValue::I256(v),
+            PersistedMoveValue::Address(v) => MoveValue::Address(v),
+            PersistedMoveValue::Signer(v) => MoveValue::Signer(v),
+            PersistedMoveValue::Vector(values) => {
+                MoveValue::Vector(values.into_iter().map(MoveValue::from).collect())
+            },
+        }
+    }
+}
+
+/// On-disk mirror of [`SeedInput`]: the same struct with arguments stored in
+/// the tagged, round-trippable [`PersistedMoveValue`] form. This is a plain
+/// alias, so the two can no longer drift out of sync. The JSON layout is
+/// unchanged (serde does not encode the Rust struct name for JSON objects),
+/// so `AUTO_STATE_VERSION` does not need a bump.
+pub type PersistedSeedInput = SeedInput<PersistedMoveValue>;
+
+impl SeedInput<PersistedMoveValue> {
+    pub fn try_from_seed(seed: &SeedInput) -> Result<Self> {
+        Ok(Self {
+            sender: seed.sender,
+            ty_args: seed.ty_args.clone(),
+            args: seed
+                .args
+                .iter()
+                .map(PersistedMoveValue::try_from)
+                .collect::<Result<Vec<_>>>()?,
+        })
+    }
+
+    /// The argument conversion itself is infallible (see
+    /// `From<PersistedMoveValue> for MoveValue`); the `Result` is kept for symmetry with
+    /// [`Self::try_from_seed`] and so that future fallible fields (identifiers, tags) can
+    /// be added without churning the ~10 call sites.
+    pub fn into_seed(self) -> Result<SeedInput> {
+        Ok(SeedInput {
+            sender: self.sender,
+            ty_args: self.ty_args,
+            args: self.args.into_iter().map(MoveValue::from).collect(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedOneshotSeedRecord {
+    pub input: PersistedSeedInput,
+    pub score: u32,
+    pub last_used_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedChainSeedRecord {
+    pub input: Vec<PersistedSeedInput>,
+    pub score: u32,
+    pub last_used_at: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedSeedNode {
+    pub id: u64,
+    pub script_index: usize,
+    pub seed: PersistedSeedInput,
+    pub succeeded: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PersistedDefUseGraph {
+    pub num_scripts: usize,
+    pub type_nodes: Vec<ResourceTag>,
+    pub defs: Vec<BTreeSet<usize>>,
+    pub uses: Vec<BTreeSet<usize>>,
+    pub initial_types: BTreeSet<usize>,
+    pub producers: BTreeMap<usize, BTreeSet<usize>>,
+    pub ever_succeeded: BTreeSet<usize>,
+    pub modification_count: usize,
+    pub seed_modification_count: usize,
+    pub seed_nodes: Vec<PersistedSeedNode>,
+    pub seed_defs: Vec<BTreeSet<usize>>,
+    pub seed_uses: Vec<BTreeSet<usize>>,
+    pub seed_producers: BTreeMap<usize, BTreeSet<usize>>,
+    pub next_seed_id: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PersistedSequenceEntry {
+    pub id: u64,
+    pub steps: Vec<usize>,
+    pub seed: Vec<PersistedSeedInput>,
+    pub produced_types: BTreeSet<ResourceTag>,
+    pub consumed_types: BTreeSet<ResourceTag>,
+    pub step_produced_types: Vec<BTreeSet<ResourceTag>>,
+    pub step_consumed_types: Vec<BTreeSet<ResourceTag>>,
+    pub all_succeeded: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PersistedSequenceDb {
+    pub entries: Vec<PersistedSequenceEntry>,
+    pub next_id: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PersistedMissingDataSignal {
+    pub script_index: usize,
+    pub hits: u64,
+    pub last_seen_iter: u64,
+    pub unresolved_tags: BTreeSet<ResourceTag>,
+}
+
+/// A fuzzer's executor state, stored as a BCS-encoded state delta.
+///
+/// This replaced a transcript of every state-changing execution, which the
+/// restore path replayed transaction by transaction. That transcript grew one
+/// entry per execution, so it had to be capped -- and a capped transcript
+/// restores a *prefix* of the campaign while the corpus, coverage, object
+/// dictionary and DUG stored beside it describe the end, i.e. a state the
+/// fuzzer was never in. A delta is proportional to the state actually touched,
+/// needs no cap, and is the live state rather than a point in its history.
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct PersistedExecutorState {
+    /// `bcs(Vec<(StateKey, Option<StateValue>)>)`, hex-encoded.
+    pub delta_bcs_hex: String,
+}
+
+impl PersistedExecutorState {
+    pub fn from_delta(delta: &[(StateKey, Option<StateValue>)]) -> Result<Self> {
+        Ok(Self {
+            delta_bcs_hex: hex::encode(
+                bcs::to_bytes(delta).context("unable to encode the executor state delta")?,
+            ),
+        })
+    }
+
+    pub fn into_delta(self) -> Result<Vec<(StateKey, Option<StateValue>)>> {
+        let bytes = hex::decode(&self.delta_bcs_hex)
+            .context("persisted executor state is not valid hex")?;
+        bcs::from_bytes(&bytes).context("unable to decode the executor state delta")
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistedOneshotFuzzer {
+    pub script_index: usize,
+    pub script_identity: String,
+    /// The fuzzer's executor state, as a delta over the provisioned baseline.
+    /// BCS-encoded, because `StateKey`/`StateValue` serialize as opaque bytes
+    /// that JSON would blow up into arrays of integers.
+    pub executor_state: PersistedExecutorState,
+    pub seedpool: Vec<PersistedOneshotSeedRecord>,
+    pub coverage: PersistedExecCoverageMap,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistedChainFuzzer {
+    pub steps: Vec<usize>,
+    pub step_identities: Vec<String>,
+    #[serde(default)]
+    pub identity_seed: Vec<PersistedSeedInput>,
+    /// See `PersistedOneshotFuzzer::executor_state`.
+    pub executor_state: PersistedExecutorState,
+    pub seedpool: Vec<PersistedChainSeedRecord>,
+    pub coverage: PersistedExecCoverageMap,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistedAutoState {
+    pub version: u32,
+    pub campaign_fingerprint: String,
+    pub entrypoint_identities: Vec<String>,
+    pub phase2_entered: bool,
+    pub bootstrap_profile_count: usize,
+    pub dug: PersistedDefUseGraph,
+    pub oneshot_fuzzers: Vec<PersistedOneshotFuzzer>,
+    pub sequence_db: PersistedSequenceDb,
+    pub chain_fuzzers: Vec<PersistedChainFuzzer>,
+    pub chain_seed_nonce: u64,
+    pub object_state: PersistedObjectState,
+    pub missing_data_signals: Vec<PersistedMissingDataSignal>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedEntrypoint {
+    pub signature: ScriptSignature,
+    #[serde(with = "hex::serde")]
+    pub code: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PersistedEntrypointCache {
+    pub version: u32,
+    pub fingerprint: String,
+    pub entrypoints: Vec<PersistedEntrypoint>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedPackageBuildCacheInfo {
+    pub version: u32,
+    pub package_name: String,
+    pub manifest_identity: String,
+    pub fingerprint: String,
+    pub root_module_names: Vec<String>,
+    pub root_script_names: Vec<String>,
+}
+
+impl PersistedEntrypointCache {
+    pub fn new(fingerprint: String, entrypoints: Vec<PersistedEntrypoint>) -> Self {
+        Self {
+            version: ENTRYPOINT_CACHE_VERSION,
+            fingerprint,
+            entrypoints,
+        }
+    }
+}
+
+impl PersistedPackageBuildCacheInfo {
+    pub fn new(
+        package_name: String,
+        manifest_identity: String,
+        fingerprint: String,
+        root_module_names: Vec<String>,
+        root_script_names: Vec<String>,
+    ) -> Self {
+        Self {
+            version: PACKAGE_BUILD_CACHE_INFO_VERSION,
+            package_name,
+            manifest_identity,
+            fingerprint,
+            root_module_names,
+            root_script_names,
+        }
+    }
+}
+
+impl PersistedAutoState {
+    pub fn new(
+        campaign_fingerprint: String,
+        entrypoint_identities: Vec<String>,
+        phase2_entered: bool,
+        bootstrap_profile_count: usize,
+        dug: PersistedDefUseGraph,
+        oneshot_fuzzers: Vec<PersistedOneshotFuzzer>,
+        sequence_db: PersistedSequenceDb,
+        chain_fuzzers: Vec<PersistedChainFuzzer>,
+        chain_seed_nonce: u64,
+        object_state: PersistedObjectState,
+        missing_data_signals: Vec<PersistedMissingDataSignal>,
+    ) -> Self {
+        Self {
+            version: AUTO_STATE_VERSION,
+            campaign_fingerprint,
+            entrypoint_identities,
+            phase2_entered,
+            bootstrap_profile_count,
+            dug,
+            oneshot_fuzzers,
+            sequence_db,
+            chain_fuzzers,
+            chain_seed_nonce,
+            object_state,
+            missing_data_signals,
+        }
+    }
+}
+
+impl PersistedDefUseGraph {
+    pub fn remap_script_indices(&mut self, old_to_new: &[usize]) -> Result<()> {
+        if self.num_scripts != old_to_new.len()
+            || self.defs.len() != self.num_scripts
+            || self.uses.len() != self.num_scripts
+        {
+            return Err(anyhow!(
+                "persisted DUG cannot be remapped because script dimensions do not match"
+            ));
+        }
+
+        let mut new_defs = vec![BTreeSet::new(); self.num_scripts];
+        let mut new_uses = vec![BTreeSet::new(); self.num_scripts];
+        for (old_idx, refs) in self.defs.iter().cloned().enumerate() {
+            new_defs[old_to_new[old_idx]] = refs;
+        }
+        for (old_idx, refs) in self.uses.iter().cloned().enumerate() {
+            new_uses[old_to_new[old_idx]] = refs;
+        }
+        self.defs = new_defs;
+        self.uses = new_uses;
+
+        self.ever_succeeded = self
+            .ever_succeeded
+            .iter()
+            .map(|old_idx| old_to_new[*old_idx])
+            .collect();
+
+        let mut new_producers = BTreeMap::new();
+        for (type_idx, scripts) in &self.producers {
+            new_producers.insert(
+                *type_idx,
+                scripts.iter().map(|old_idx| old_to_new[*old_idx]).collect(),
+            );
+        }
+        self.producers = new_producers;
+
+        for seed_node in &mut self.seed_nodes {
+            seed_node.script_index = old_to_new[seed_node.script_index];
+        }
+
+        Ok(())
+    }
+}
+
+impl PersistedSequenceDb {
+    pub fn remap_script_indices(&mut self, old_to_new: &[usize]) -> Result<()> {
+        for entry in &mut self.entries {
+            if entry
+                .steps
+                .iter()
+                .any(|old_idx| *old_idx >= old_to_new.len())
+            {
+                return Err(anyhow!(
+                    "persisted sequence entry references out-of-range script index"
+                ));
+            }
+            for step in &mut entry.steps {
+                *step = old_to_new[*step];
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn load_auto_state(path: &Path) -> Result<Option<PersistedAutoState>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes =
+        fs::read(path).with_context(|| format!("failed to read auto state {}", path.display()))?;
+    let state = serde_json::from_slice(&bytes)
+        .with_context(|| format!("failed to parse auto state {}", path.display()))?;
+    Ok(Some(state))
+}
+
+pub fn load_entrypoint_cache(path: &Path) -> Result<Option<PersistedEntrypointCache>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path)
+        .with_context(|| format!("failed to read entrypoint cache {}", path.display()))?;
+    let cache = serde_json::from_slice(&bytes)
+        .with_context(|| format!("failed to parse entrypoint cache {}", path.display()))?;
+    Ok(Some(cache))
+}
+
+pub fn load_package_build_cache_info(
+    path: &Path,
+) -> Result<Option<PersistedPackageBuildCacheInfo>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let bytes = fs::read(path)
+        .with_context(|| format!("failed to read package build cache info {}", path.display()))?;
+    let info = serde_json::from_slice(&bytes).with_context(|| {
+        format!(
+            "failed to parse package build cache info {}",
+            path.display()
+        )
+    })?;
+    Ok(Some(info))
+}
+
+pub fn save_auto_state(path: &Path, state: &PersistedAutoState) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create state directory {}", parent.display()))?;
+    }
+    let bytes = serde_json::to_vec_pretty(state).context("failed to serialize auto state")?;
+    let tmp_path = temp_path_for(path);
+    fs::write(&tmp_path, bytes)
+        .with_context(|| format!("failed to write auto state {}", tmp_path.display()))?;
+    fs::rename(&tmp_path, path)
+        .with_context(|| format!("failed to atomically install auto state {}", path.display()))?;
+    Ok(())
+}
+
+pub fn save_entrypoint_cache(path: &Path, cache: &PersistedEntrypointCache) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create entrypoint cache directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    let bytes = serde_json::to_vec_pretty(cache).context("failed to serialize entrypoint cache")?;
+    let tmp_path = temp_path_for(path);
+    fs::write(&tmp_path, bytes).with_context(|| {
+        format!(
+            "failed to write entrypoint cache temporary file {}",
+            tmp_path.display()
+        )
+    })?;
+    fs::rename(&tmp_path, path).with_context(|| {
+        format!(
+            "failed to atomically install entrypoint cache {}",
+            path.display()
+        )
+    })?;
+    Ok(())
+}
+
+pub fn save_package_build_cache_info(
+    path: &Path,
+    info: &PersistedPackageBuildCacheInfo,
+) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create package build cache directory {}",
+                parent.display()
+            )
+        })?;
+    }
+    let bytes =
+        serde_json::to_vec_pretty(info).context("failed to serialize package build cache info")?;
+    let tmp_path = temp_path_for(path);
+    fs::write(&tmp_path, bytes).with_context(|| {
+        format!(
+            "failed to write package build cache temporary file {}",
+            tmp_path.display()
+        )
+    })?;
+    fs::rename(&tmp_path, path).with_context(|| {
+        format!(
+            "failed to atomically install package build cache info {}",
+            path.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn temp_path_for(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(AUTO_STATE_FILENAME);
+    path.with_file_name(format!("{file_name}.tmp"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        load_auto_state, load_entrypoint_cache, load_package_build_cache_info, save_auto_state,
+        save_entrypoint_cache, save_package_build_cache_info, PersistedAutoState,
+        PersistedChainFuzzer, PersistedChainSeedRecord, PersistedDefUseGraph, PersistedEntrypoint,
+        PersistedEntrypointCache, PersistedExecCoverageMap, PersistedExecutorState,
+        PersistedMissingDataSignal, PersistedMoveValue, PersistedObjectBucket,
+        PersistedObjectState, PersistedOneshotFuzzer, PersistedOneshotSeedRecord,
+        PersistedPackageBuildCacheInfo, PersistedSeedInput, PersistedSequenceDb,
+        ENTRYPOINT_CACHE_VERSION, PACKAGE_BUILD_CACHE_INFO_VERSION,
+    };
+    use crate::{
+        executor::sequence::{ResourceTag, SeedInput},
+        prep::{
+            canvas::{BasicInput, ScriptSignature},
+            ident::{DatatypeIdent, FunctionIdent},
+        },
+    };
+    use anyhow::Result;
+    use move_core_types::{
+        ability::AbilitySet,
+        account_address::AccountAddress,
+        function::{ClosureMask, MoveClosure},
+        identifier::Identifier,
+        int256::{I256, U256},
+        language_storage::{ModuleId, StructTag},
+        value::{MoveStruct, MoveValue},
+    };
+    use move_coverage::coverage_map::ExecCoverageMap;
+    use std::collections::{BTreeMap, BTreeSet};
+    use tempfile::TempDir;
+
+    fn sample_coverage(exec_id: &str) -> ExecCoverageMap {
+        let mut coverage = ExecCoverageMap::new(exec_id.to_string());
+        coverage.insert(
+            AccountAddress::from_hex_literal("0x1").unwrap(),
+            Identifier::new("vault").unwrap(),
+            Identifier::new("deposit").unwrap(),
+            7,
+        );
+        coverage
+    }
+
+    /// Every supported variant survives both legs of the boundary: the in-memory
+    /// `MoveValue -> PersistedMoveValue -> MoveValue` round trip, and the `serde_json`
+    /// round trip that `auto_state.json` actually performs. The JSON leg is the reason
+    /// this mirror type exists at all -- `MoveValue` has no `Deserialize` impl (only
+    /// `DeserializeSeed for &MoveTypeLayout`) and its `Serialize` is the type-erasing BCS
+    /// value encoding, so it cannot be read back out of the state file.
+    #[test]
+    fn test_persisted_move_value_roundtrip_all_variants() -> Result<()> {
+        let values = vec![
+            MoveValue::Bool(true),
+            MoveValue::U8(u8::MAX),
+            MoveValue::I8(i8::MIN),
+            MoveValue::U16(u16::MAX),
+            MoveValue::I16(i16::MIN),
+            MoveValue::U32(u32::MAX),
+            MoveValue::I32(i32::MIN),
+            MoveValue::U64(u64::MAX),
+            MoveValue::I64(i64::MIN),
+            MoveValue::U128(u128::MAX),
+            MoveValue::I128(i128::MIN),
+            MoveValue::U256(U256::MAX),
+            MoveValue::I256(I256::MIN),
+            MoveValue::Address(AccountAddress::ONE),
+            MoveValue::Signer(AccountAddress::TWO),
+            MoveValue::Vector(vec![
+                MoveValue::U8(7),
+                MoveValue::Vector(vec![
+                    MoveValue::Bool(true),
+                    MoveValue::Address(AccountAddress::ONE),
+                ]),
+            ]),
+        ];
+        // Keeps this list in step with the variant set: `TryFrom<&MoveValue>` matches
+        // `MoveValue` exhaustively, so a new upstream variant is already a compile error
+        // there, and this assertion catches a variant added to `PersistedMoveValue`
+        // without a matching case here.
+        assert_eq!(values.len(), 16);
+
+        for value in values {
+            let persisted = PersistedMoveValue::try_from(&value)?;
+            assert_eq!(MoveValue::from(persisted.clone()), value);
+
+            let json = serde_json::to_string(&persisted)?;
+            let decoded: PersistedMoveValue = serde_json::from_str(&json)?;
+            assert_eq!(decoded, persisted);
+            assert_eq!(MoveValue::from(decoded), value);
+        }
+        Ok(())
+    }
+
+    /// `MoveValue` variants that cannot appear as a transaction argument are rejected at
+    /// the persistence boundary rather than silently dropped or approximated.
+    #[test]
+    fn test_persisted_move_value_rejects_unsupported_variants() {
+        let struct_value = MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U8(1)]));
+        assert!(PersistedMoveValue::try_from(&struct_value).is_err());
+
+        // Function values are not valid transaction arguments -- see
+        // `aptos_vm::verifier::transaction_arg_validation::legacy_is_valid_txn_arg`, which
+        // maps `Type::Function { .. }` to `false` -- so a closure can never reach
+        // `SeedInput::args`. Function-typed parameters are covered instead by building the
+        // closure inside the generated driver script
+        // (`prep::canvas::DriverStatement::Lambda`).
+        let closure_value = MoveValue::Closure(Box::new(MoveClosure {
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::new("m").unwrap()),
+            fun_id: Identifier::new("f").unwrap(),
+            ty_args: vec![],
+            mask: ClosureMask::empty(),
+            captured: vec![],
+        }));
+        assert!(PersistedMoveValue::try_from(&closure_value).is_err());
+
+        // Nested occurrences are rejected too, not just top-level ones.
+        let nested = MoveValue::Vector(vec![MoveValue::U8(1), struct_value]);
+        assert!(PersistedMoveValue::try_from(&nested).is_err());
+    }
+
+    #[test]
+    fn test_persisted_seed_input_roundtrip() -> Result<()> {
+        let seed = SeedInput {
+            sender: AccountAddress::from_hex_literal("0x44")?,
+            ty_args: vec![move_core_types::language_storage::TypeTag::Bool],
+            args: vec![MoveValue::U64(99), MoveValue::Signer(AccountAddress::ONE)],
+        };
+        let persisted = PersistedSeedInput::try_from_seed(&seed)?;
+        assert_eq!(persisted.into_seed()?, seed);
+        Ok(())
+    }
+
+    #[test]
+    fn test_persisted_seed_input_json_layout_unchanged() -> Result<()> {
+        // `PersistedSeedInput` is an alias of `SeedInput<PersistedMoveValue>`.
+        // serde does not encode the Rust struct name for JSON objects, so the
+        // on-disk layout must be identical to the standalone struct it
+        // replaced, and `auto_state.json` files written by older builds must
+        // still load without an `AUTO_STATE_VERSION` bump.
+        #[derive(serde::Serialize)]
+        struct LegacyPersistedSeedInput {
+            sender: AccountAddress,
+            ty_args: Vec<move_core_types::language_storage::TypeTag>,
+            args: Vec<PersistedMoveValue>,
+        }
+
+        let seed = SeedInput {
+            sender: AccountAddress::from_hex_literal("0x44")?,
+            ty_args: vec![move_core_types::language_storage::TypeTag::Bool],
+            args: vec![MoveValue::U64(99), MoveValue::Signer(AccountAddress::ONE)],
+        };
+        let persisted = PersistedSeedInput::try_from_seed(&seed)?;
+        let legacy = LegacyPersistedSeedInput {
+            sender: persisted.sender,
+            ty_args: persisted.ty_args.clone(),
+            args: persisted.args.clone(),
+        };
+
+        let legacy_json = serde_json::to_string(&legacy)?;
+        assert_eq!(serde_json::to_string(&persisted)?, legacy_json);
+
+        let restored: PersistedSeedInput = serde_json::from_str(&legacy_json)?;
+        assert_eq!(restored, persisted);
+        Ok(())
+    }
+
+    #[test]
+    fn test_auto_state_file_roundtrip() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let path = tmp.path().join("auto_state.json");
+        let object_struct_tag = StructTag {
+            address: AccountAddress::from_hex_literal("0xcafe")?,
+            module: Identifier::new("vault")?,
+            name: Identifier::new("Position")?,
+            type_args: vec![],
+        };
+        let state = PersistedAutoState::new(
+            "fingerprint".to_string(),
+            vec!["script-a".to_string()],
+            false,
+            3,
+            PersistedDefUseGraph {
+                num_scripts: 1,
+                type_nodes: vec![],
+                defs: vec![Default::default()],
+                uses: vec![Default::default()],
+                initial_types: Default::default(),
+                producers: Default::default(),
+                ever_succeeded: Default::default(),
+                modification_count: 0,
+                seed_modification_count: 0,
+                seed_nodes: vec![],
+                seed_defs: vec![],
+                seed_uses: vec![],
+                seed_producers: Default::default(),
+                next_seed_id: 0,
+            },
+            vec![PersistedOneshotFuzzer {
+                script_index: 0,
+                script_identity: "script-a".to_string(),
+                executor_state: PersistedExecutorState::default(),
+                seedpool: vec![PersistedOneshotSeedRecord {
+                    input: PersistedSeedInput::try_from_seed(&SeedInput {
+                        sender: AccountAddress::from_hex_literal("0x44")?,
+                        ty_args: vec![],
+                        args: vec![MoveValue::U64(7)],
+                    })?,
+                    score: 9,
+                    last_used_at: 11,
+                }],
+                coverage: PersistedExecCoverageMap::from_exec_coverage_map(&sample_coverage(
+                    "oneshot",
+                )),
+            }],
+            PersistedSequenceDb {
+                entries: vec![],
+                next_id: 0,
+            },
+            vec![PersistedChainFuzzer {
+                steps: vec![0],
+                step_identities: vec!["script-a".to_string()],
+                identity_seed: vec![PersistedSeedInput::try_from_seed(&SeedInput {
+                    sender: AccountAddress::from_hex_literal("0x44")?,
+                    ty_args: vec![],
+                    args: vec![MoveValue::Bool(false)],
+                })?],
+                executor_state: PersistedExecutorState::default(),
+                seedpool: vec![PersistedChainSeedRecord {
+                    input: vec![PersistedSeedInput::try_from_seed(&SeedInput {
+                        sender: AccountAddress::from_hex_literal("0x44")?,
+                        ty_args: vec![],
+                        args: vec![MoveValue::Bool(true)],
+                    })?],
+                    score: 5,
+                    last_used_at: 17,
+                }],
+                coverage: PersistedExecCoverageMap::from_exec_coverage_map(&sample_coverage(
+                    "chain",
+                )),
+            }],
+            7,
+            PersistedObjectState {
+                object_addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x44")?]),
+                dict_object: vec![PersistedObjectBucket {
+                    struct_tag: object_struct_tag.clone(),
+                    addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x55")?]),
+                }],
+            },
+            vec![PersistedMissingDataSignal {
+                script_index: 0,
+                hits: 4,
+                last_seen_iter: 12,
+                unresolved_tags: BTreeSet::from([ResourceTag {
+                    account: AccountAddress::from_hex_literal("0x44")?,
+                    struct_tag: StructTag {
+                        address: AccountAddress::ONE,
+                        module: Identifier::new("m")?,
+                        name: Identifier::new("State")?,
+                        type_args: vec![],
+                    },
+                }]),
+            }],
+        );
+
+        save_auto_state(&path, &state)?;
+        let loaded = load_auto_state(&path)?.expect("state exists");
+        assert_eq!(loaded.version, state.version);
+        assert_eq!(loaded.campaign_fingerprint, "fingerprint");
+        assert_eq!(loaded.entrypoint_identities, vec!["script-a".to_string()]);
+        assert_eq!(loaded.bootstrap_profile_count, 3);
+        assert_eq!(loaded.chain_seed_nonce, 7);
+        assert_eq!(loaded.oneshot_fuzzers.len(), 1);
+        assert_eq!(loaded.chain_fuzzers.len(), 1);
+        assert_eq!(loaded.oneshot_fuzzers[0].script_identity, "script-a");
+        assert!(loaded.oneshot_fuzzers[0]
+            .executor_state
+            .delta_bcs_hex
+            .is_empty());
+        assert_eq!(loaded.oneshot_fuzzers[0].seedpool[0].score, 9);
+        assert_eq!(loaded.chain_fuzzers[0].step_identities, vec![
+            "script-a".to_string()
+        ]);
+        assert!(loaded.chain_fuzzers[0]
+            .executor_state
+            .delta_bcs_hex
+            .is_empty());
+        assert_eq!(loaded.chain_fuzzers[0].seedpool[0].score, 5);
+        assert_eq!(
+            loaded.oneshot_fuzzers[0]
+                .coverage
+                .clone()
+                .into_exec_coverage_map()?
+                .module_maps
+                .len(),
+            1
+        );
+        assert_eq!(loaded.object_state.object_addresses.len(), 1);
+        assert_eq!(loaded.object_state.dict_object.len(), 1);
+        assert_eq!(
+            loaded.object_state.dict_object[0].struct_tag,
+            object_struct_tag
+        );
+        assert_eq!(loaded.missing_data_signals.len(), 1);
+        assert_eq!(loaded.missing_data_signals[0].hits, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_persisted_object_state_merge_unions_buckets() -> Result<()> {
+        let tag = |name: &str| StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("m").unwrap(),
+            name: Identifier::new(name).unwrap(),
+            type_args: vec![],
+        };
+        let ident_a = tag("A");
+        let ident_b = tag("B");
+        let merged = PersistedObjectState::merge([
+            PersistedObjectState {
+                object_addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x44")?]),
+                dict_object: vec![PersistedObjectBucket {
+                    struct_tag: ident_a.clone(),
+                    addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x44")?]),
+                }],
+            },
+            PersistedObjectState {
+                object_addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x55")?]),
+                dict_object: vec![
+                    PersistedObjectBucket {
+                        struct_tag: ident_a.clone(),
+                        addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x66")?]),
+                    },
+                    PersistedObjectBucket {
+                        struct_tag: ident_b.clone(),
+                        addresses: BTreeSet::from([AccountAddress::from_hex_literal("0x55")?]),
+                    },
+                ],
+            },
+        ]);
+        assert_eq!(
+            merged.object_addresses,
+            BTreeSet::from([
+                AccountAddress::from_hex_literal("0x44")?,
+                AccountAddress::from_hex_literal("0x55")?,
+            ])
+        );
+        assert_eq!(merged.dict_object.len(), 2);
+        assert_eq!(merged.dict_object[0].struct_tag, ident_a);
+        assert_eq!(
+            merged.dict_object[0].addresses,
+            BTreeSet::from([
+                AccountAddress::from_hex_literal("0x44")?,
+                AccountAddress::from_hex_literal("0x66")?,
+            ])
+        );
+        assert_eq!(merged.dict_object[1].struct_tag, ident_b);
+        assert_eq!(
+            merged.dict_object[1].addresses,
+            BTreeSet::from([AccountAddress::from_hex_literal("0x55")?])
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_entrypoint_cache_roundtrip() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let path = tmp.path().join("entrypoints_cache.json");
+        let cache = PersistedEntrypointCache::new("cache-fingerprint".to_string(), vec![
+            PersistedEntrypoint {
+                signature: ScriptSignature {
+                    name: "script_0".to_string(),
+                    ident: FunctionIdent::from_function_tuple(
+                        AccountAddress::ONE,
+                        Identifier::new("m")?,
+                        Identifier::new("f")?,
+                    ),
+                    generics: vec![AbilitySet::PRIMITIVES],
+                    parameters: vec![
+                        BasicInput::Address,
+                        BasicInput::Vector(Box::new(BasicInput::ObjectKnown {
+                            ident: DatatypeIdent::from_struct_tuple(
+                                AccountAddress::ONE,
+                                Identifier::new("m")?,
+                                Identifier::new("Obj")?,
+                            ),
+                            type_args: vec![],
+                        })),
+                    ],
+                },
+                code: vec![1, 2, 3, 4],
+            },
+        ]);
+
+        save_entrypoint_cache(&path, &cache)?;
+        let loaded = load_entrypoint_cache(&path)?.expect("cache exists");
+        assert_eq!(loaded.version, ENTRYPOINT_CACHE_VERSION);
+        assert_eq!(loaded.fingerprint, "cache-fingerprint");
+        assert_eq!(loaded.entrypoints, cache.entrypoints);
+        Ok(())
+    }
+
+    #[test]
+    fn test_package_build_cache_info_roundtrip() -> Result<()> {
+        let tmp = TempDir::new()?;
+        let path = tmp.path().join("build_cache_info.json");
+        let info = PersistedPackageBuildCacheInfo::new(
+            "Example".to_string(),
+            "/tmp/example/Move.toml".to_string(),
+            "fingerprint-123".to_string(),
+            vec!["Vault".to_string()],
+            vec!["setup".to_string()],
+        );
+
+        save_package_build_cache_info(&path, &info)?;
+        let loaded = load_package_build_cache_info(&path)?.expect("cache info exists");
+        assert_eq!(loaded.version, PACKAGE_BUILD_CACHE_INFO_VERSION);
+        assert_eq!(loaded.package_name, "Example");
+        assert_eq!(loaded.manifest_identity, "/tmp/example/Move.toml");
+        assert_eq!(loaded.fingerprint, "fingerprint-123");
+        assert_eq!(loaded.root_module_names, vec!["Vault".to_string()]);
+        assert_eq!(loaded.root_script_names, vec!["setup".to_string()]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_persisted_state_remaps_script_indices() -> Result<()> {
+        let mut dug = PersistedDefUseGraph {
+            num_scripts: 2,
+            type_nodes: vec![],
+            defs: vec![BTreeSet::from([0]), BTreeSet::from([1])],
+            uses: vec![BTreeSet::new(), BTreeSet::new()],
+            initial_types: BTreeSet::new(),
+            producers: BTreeMap::from([
+                (0usize, BTreeSet::from([0usize])),
+                (1, BTreeSet::from([1])),
+            ]),
+            ever_succeeded: BTreeSet::from([1usize]),
+            modification_count: 0,
+            seed_modification_count: 0,
+            seed_nodes: vec![
+                super::PersistedSeedNode {
+                    id: 0,
+                    script_index: 0,
+                    seed: PersistedSeedInput::try_from_seed(&SeedInput::new(
+                        AccountAddress::ONE,
+                        vec![],
+                        vec![],
+                    ))?,
+                    succeeded: true,
+                },
+                super::PersistedSeedNode {
+                    id: 1,
+                    script_index: 1,
+                    seed: PersistedSeedInput::try_from_seed(&SeedInput::new(
+                        AccountAddress::ONE,
+                        vec![],
+                        vec![],
+                    ))?,
+                    succeeded: true,
+                },
+            ],
+            seed_defs: vec![BTreeSet::new(), BTreeSet::new()],
+            seed_uses: vec![BTreeSet::new(), BTreeSet::new()],
+            seed_producers: BTreeMap::new(),
+            next_seed_id: 2,
+        };
+        dug.remap_script_indices(&[1, 0])?;
+        assert_eq!(dug.defs[1], BTreeSet::from([0]));
+        assert_eq!(dug.defs[0], BTreeSet::from([1]));
+        assert!(dug.ever_succeeded.contains(&0));
+        assert_eq!(dug.seed_nodes[0].script_index, 1);
+        assert_eq!(dug.seed_nodes[1].script_index, 0);
+
+        let mut seq_db = PersistedSequenceDb {
+            entries: vec![super::PersistedSequenceEntry {
+                id: 0,
+                steps: vec![0, 1, 0],
+                seed: vec![],
+                produced_types: BTreeSet::new(),
+                consumed_types: BTreeSet::new(),
+                step_produced_types: vec![],
+                step_consumed_types: vec![],
+                all_succeeded: true,
+            }],
+            next_id: 1,
+        };
+        seq_db.remap_script_indices(&[1, 0])?;
+        assert_eq!(seq_db.entries[0].steps, vec![1, 0, 1]);
+        Ok(())
+    }
+}
