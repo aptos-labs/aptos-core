@@ -103,7 +103,7 @@ fn lower_hex(s: &str, bytes: usize) -> SafeNativeResult<Vec<u8>> {
 
 fn lower_hex_bounded(s: &str, max_bytes: usize) -> SafeNativeResult<Vec<u8>> {
     if s.is_empty()
-        || s.len() % 2 != 0
+        || !s.len().is_multiple_of(2)
         || s.len() > max_bytes * 2
         || !s
             .bytes()
