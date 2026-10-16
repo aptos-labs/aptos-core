@@ -30,6 +30,7 @@ pub fn start_jwk_consensus_runtime(
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     jwk_updated_events: EventNotificationListener,
     vtxn_pool_writer: VTxnPoolState,
+    trust_observation_extra_root_certificates_pem: Vec<String>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("jwk".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
@@ -42,6 +43,7 @@ pub fn start_jwk_consensus_runtime(
         self_sender,
         jwk_consensus_network_client,
         vtxn_pool_writer,
+        trust_observation_extra_root_certificates_pem,
     );
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
     runtime.spawn(network_task.start());

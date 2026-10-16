@@ -71,6 +71,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
     // vtxn pool handle
     vtxn_pool: VTxnPoolState,
+
+    // Node-local roots used only for trust observation HTTPS requests.
+    trust_observation_extra_root_certificates_pem: Vec<String>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -82,6 +85,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self_sender: aptos_channels::Sender<Event<JWKConsensusMsg>>,
         network_sender: JWKConsensusNetworkClient<NetworkClient<JWKConsensusMsg>>,
         vtxn_pool: VTxnPoolState,
+        trust_observation_extra_root_certificates_pem: Vec<String>,
     ) -> Self {
         Self {
             my_addr,
@@ -92,6 +96,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self_sender,
             network_sender,
             vtxn_pool,
+            trust_observation_extra_root_certificates_pem,
             jwk_updated_event_txs: None,
             jwk_rpc_msg_tx: None,
             jwk_manager_close_tx: None,
@@ -323,6 +328,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     self.vtxn_pool.clone(),
                     config,
                     onchain_observed_trust,
+                    self.trust_observation_extra_root_certificates_pem.clone(),
                 );
                 tokio::spawn(manager.run(event_rx, rpc_rx, close_rx));
                 info!(

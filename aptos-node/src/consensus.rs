@@ -132,6 +132,10 @@ pub fn create_jwk_consensus_runtime(
                 reconfig_events,
                 onchain_jwk_updated_events,
                 vtxn_pool.clone(),
+                node_config
+                    .jwk_consensus
+                    .trust_observation_extra_root_certificates_pem
+                    .clone(),
             );
             Some(jwk_consensus_runtime)
         },

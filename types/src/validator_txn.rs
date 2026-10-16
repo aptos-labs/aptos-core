@@ -89,3 +89,35 @@ pub enum Topic {
     ChunkyDKG,
     TRUST_OBSERVATION(trust_observation::TargetId),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::aggregate_signature::AggregateSignature;
+
+    #[test]
+    fn observed_trust_update_is_appended_to_validator_transaction() {
+        let txn =
+            ValidatorTransaction::ObservedTrustUpdate(trust_observation::QuorumCertifiedUpdate {
+                update: trust_observation::ObservedValue {
+                    target_id: b"intel-root".to_vec(),
+                    config_version: 1,
+                    epoch: 7,
+                    version: 1,
+                    value: b"certificate".to_vec(),
+                },
+                multi_sig: AggregateSignature::empty(),
+            });
+
+        let bytes = bcs::to_bytes(&txn).unwrap();
+        assert_eq!(bytes[0], 3); // Existing validator transaction BCS tags stay unchanged.
+        assert_eq!(
+            bcs::from_bytes::<ValidatorTransaction>(&bytes).unwrap(),
+            txn
+        );
+        assert_eq!(
+            txn.type_name(),
+            "validator_transaction__observed_trust_update"
+        );
+    }
+}

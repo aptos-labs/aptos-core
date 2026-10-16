@@ -31,6 +31,7 @@ impl TrustObserver {
         target: TargetSpec,
         interval: Duration,
         observation_tx: aptos_channel::Sender<Vec<u8>, (Vec<u8>, Vec<u8>)>,
+        extra_root_certificates_pem: Vec<String>,
     ) -> Self {
         let (close_tx, close_rx) = oneshot::channel();
         let target_id = target.id.clone();
@@ -41,7 +42,7 @@ impl TrustObserver {
             loop {
                 tokio::select! {
                     _ = ticker.tick().fuse() => {
-                        match fetch_target(&target).await {
+                        match fetch_target(&target, &extra_root_certificates_pem).await {
                             Ok(value) => {
                                 let id = target.id.clone();
                                 let _ = observation_tx.push(id.clone(), (id, value));
@@ -68,7 +69,10 @@ impl TrustObserver {
     }
 }
 
-pub async fn fetch_target(target: &TargetSpec) -> Result<Vec<u8>> {
+pub async fn fetch_target(
+    target: &TargetSpec,
+    extra_root_certificates_pem: &[String],
+) -> Result<Vec<u8>> {
     let url = reqwest::Url::parse(&target.url).context("invalid trust target URL")?;
     ensure!(url.scheme() == "https", "trust target must use HTTPS");
     ensure!(url.host_str().is_some(), "trust target URL has no host");
@@ -78,10 +82,15 @@ pub async fn fetch_target(target: &TargetSpec) -> Result<Vec<u8>> {
     );
     let limit = usize::try_from(target.max_bytes.min(MAX_VALUE_BYTES as u64))?;
     ensure!(limit > 0, "trust target has zero byte limit");
-    let client = reqwest::Client::builder()
+    let mut client_builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
-        .timeout(FETCH_TIMEOUT)
-        .build()?;
+        .timeout(FETCH_TIMEOUT);
+    for pem in extra_root_certificates_pem {
+        let certificate = reqwest::Certificate::from_pem(pem.as_bytes())
+            .context("invalid extra trust observation root certificate PEM")?;
+        client_builder = client_builder.add_root_certificate(certificate);
+    }
+    let client = client_builder.build()?;
     let mut response = client.get(url).send().await?.error_for_status()?;
     if let Some(len) = response.content_length() {
         ensure!(
@@ -275,7 +284,7 @@ mod tests {
             max_bytes: 128,
             config_version: 1,
         };
-        assert!(fetch_target(&target)
+        assert!(fetch_target(&target, &[])
             .await
             .unwrap_err()
             .to_string()

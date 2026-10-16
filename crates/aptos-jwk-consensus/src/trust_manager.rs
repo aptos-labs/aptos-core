@@ -83,6 +83,7 @@ pub struct TrustObservationManager {
     vtxn_pool: VTxnPoolState,
     targets: HashMap<Vec<u8>, TargetSpec>,
     states: HashMap<Vec<u8>, TargetState>,
+    extra_root_certificates_pem: Vec<String>,
     observers: Vec<TrustObserver>,
     qc_tx: aptos_channel::Sender<Vec<u8>, QuorumCertifiedUpdate>,
     qc_rx: aptos_channel::Receiver<Vec<u8>, QuorumCertifiedUpdate>,
@@ -97,6 +98,7 @@ impl TrustObservationManager {
         vtxn_pool: VTxnPoolState,
         config: Config,
         observed: ObservedTrustData,
+        extra_root_certificates_pem: Vec<String>,
     ) -> Self {
         let (qc_tx, qc_rx) = aptos_channel::new(QueueStyle::KLAST, 100, None);
         let states = config
@@ -122,6 +124,7 @@ impl TrustObservationManager {
                 .map(|target| (target.id.clone(), target))
                 .collect(),
             states,
+            extra_root_certificates_pem,
             observers: Vec::new(),
             qc_tx,
             qc_rx,
@@ -314,6 +317,7 @@ impl TrustObservationManager {
                     target,
                     Duration::from_secs(10),
                     observation_tx.clone(),
+                    self.extra_root_certificates_pem.clone(),
                 )
             })
             .collect();

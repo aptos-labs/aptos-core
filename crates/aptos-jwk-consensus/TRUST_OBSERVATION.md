@@ -31,12 +31,19 @@ validator code support; the target configuration cannot supply executable code.
 The DER check is structural. An attestation verifier still checks the
 certificate's signature, chain, validity period, and format-specific policy.
 
+Each validator verifies the target's HTTPS certificate with its normal system
+roots. Operators can add PEM-encoded roots through the local
+`jwk_consensus.trust_observation_extra_root_certificates_pem` node setting for
+private endpoints. This setting affects only trust observation; it does not
+disable certificate or hostname verification and does not change JWK fetching.
+
 ## Commit and read path
 
 Each validator fetches and canonicalizes the configured target. When the value
 differs from the current observation, validators sign the target ID,
 configuration version, epoch, next observation version, and value. A quorum
-certificate enters a validator transaction. VM execution checks the current
+certificate enters the `ObservedTrustUpdate` validator transaction variant.
+VM execution checks the current
 configuration, epoch, version, size, voting power, and aggregate signature
 before updating `ObservedTrustData`.
 
@@ -53,3 +60,12 @@ them through governance as part of its framework upgrade before staging any
 targets. The validator, VM, and framework changes must be activated together.
 The attestation-format-specific verification functions are separate consumers
 of `get_effective_value`; this change supplies their observed trust material.
+
+## Smoke test
+
+`cargo test -p smoke-test trust_observation_consensus_smoke --lib -- --nocapture`
+starts four local validators and an HTTPS endpoint with a short-lived test CA
+generated at runtime. It checks two quorum-certified observations through the
+`ObservedTrustUpdate` transaction, then checks that governance patches affect
+the effective value without rewriting the observation and that target edits
+invalidate old state. The test does not contact an external trust source.

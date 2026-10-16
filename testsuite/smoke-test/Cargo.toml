@@ -55,6 +55,7 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-rustls = "0.24.1"
 
 [dev-dependencies]
 aptos-backup-cli = { workspace = true }
@@ -69,6 +70,7 @@ base64 = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }
+openssl = "0.10.75"
 once_cell = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
