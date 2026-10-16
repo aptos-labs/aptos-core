@@ -88,6 +88,7 @@ module aptos_framework::tinfoil_v3 {
         nonce: vector<u8>,
         claimed_repo: vector<u8>,
         quote: QuoteStage,
+        nras_eat_present: bool,
     }
 
     /// A sticky, untransferable object created by `new_verification`. The
@@ -108,6 +109,7 @@ module aptos_framework::tinfoil_v3 {
         proof_time_secs: u64,
         nonce: vector<u8>,
         claimed_repo: vector<u8>,
+        nras_eat_present: bool,
         intel_root_sha3_256: vector<u8>,
         sigstore_root_sha3_256: vector<u8>,
         quote: Option<QuoteStage>,
@@ -216,8 +218,11 @@ module aptos_framework::tinfoil_v3 {
     /// Fields returned only after Rust validates all supported FormatV2
     /// collateral: TDX quote, Intel evidence, Sigstore provenance, freshness,
     /// and the report-data join. `shape_gpus` is the signed VM shape matched
-    /// to CPU-bound device topology; the verifier relies on the measured guest
-    /// boot path for NVIDIA appraisal rather than checking NVIDIA signatures.
+    /// to CPU-bound device topology. `nvidia_gpu_verified` is false unless
+    /// NVIDIA's detached EAT is independently verified and bound to that
+    /// quote-bound device evidence. The current verifier does not establish
+    /// that binding, so a report without an EAT may pass with this flag false,
+    /// while one that supplies an EAT fails closed.
     struct VerifiedTinfoilV3Claims has copy, drop, store {
         tls_spki_sha256: vector<u8>,
         hpke_key: vector<u8>,
@@ -234,6 +239,7 @@ module aptos_framework::tinfoil_v3 {
         release_commit: vector<u8>,
         platform_measurement_id: vector<u8>,
         shape_gpus: u64,
+        nvidia_gpu_verified: bool,
     }
 
     struct VerifiedTinfoilV3Result has copy, drop, store {
@@ -327,6 +333,7 @@ module aptos_framework::tinfoil_v3 {
             proof_time_secs: 0,
             nonce: vector[],
             claimed_repo: vector[],
+            nras_eat_present: false,
             intel_root_sha3_256: vector[],
             sigstore_root_sha3_256: vector[],
             quote: option::none(),
@@ -431,7 +438,7 @@ module aptos_framework::tinfoil_v3 {
             fail_verification(verification, REASON_INVALID_PROOF);
             return
         };
-        let QuoteOutcome { nonce, claimed_repo, quote } = outcome_opt.extract();
+        let QuoteOutcome { nonce, claimed_repo, quote, nras_eat_present } = outcome_opt.extract();
         if (nonce.length() != 32 || claimed_repo.is_empty()
             || claimed_repo.length() > MAX_REPOSITORY_BYTES || !valid_quote_claims(&quote)) {
             fail_verification(verification, REASON_INVALID_PROOF);
@@ -444,6 +451,7 @@ module aptos_framework::tinfoil_v3 {
         let state = &mut Verification[verification];
         state.nonce = nonce;
         state.claimed_repo = claimed_repo;
+        state.nras_eat_present = nras_eat_present;
         state.proof_time_secs = proof_time_secs;
         state.intel_root_sha3_256 = hash::sha3_256(intel_root);
         state.sigstore_root_sha3_256 = hash::sha3_256(sigstore_root);
@@ -527,12 +535,25 @@ module aptos_framework::tinfoil_v3 {
             fail_verification(verification, REASON_INVALID_PROOF);
             return
         };
+        finalize_verified_stages(verification);
+    }
+
+    /// Publish only the evidence authenticated by every completed stage.
+    /// An optional detached NVIDIA EAT cannot yet be bound to the raw GPU
+    /// evidence inside the TDX quote, so its presence blocks publication.
+    fun finalize_verified_stages(verification: address) {
+        let state = &Verification[verification];
+        assert!(state.stage == STAGE_PLATFORM_FRESHNESS,
+            error::invalid_state(EINVALID_REQUEST));
         let quote = *state.quote.borrow();
         let code = *state.code.borrow();
         let platform = *state.platform.borrow();
-        // An NRAS EAT has no signed digest of the CPU-bound raw GPU evidence.
-        // Until a sound binding is specified, GPU-bearing reports fail closed.
-        if (code.shape_gpus > 0) {
+        // A report without a detached EAT can be accepted for its CPU quote,
+        // code provenance, and quote-bound GPU topology. It makes no claim of
+        // independent NVIDIA verification. If an EAT was supplied, do not
+        // silently ignore it: no signed binding to the quote-bound raw GPU
+        // evidence is currently available, so the report fails closed.
+        if (state.nras_eat_present) {
             fail_verification(verification, REASON_UNSUPPORTED_GPU_BINDING);
             return
         };
@@ -552,6 +573,7 @@ module aptos_framework::tinfoil_v3 {
             release_commit: code.commit,
             platform_measurement_id: platform.measurement_id,
             shape_gpus: code.shape_gpus,
+            nvidia_gpu_verified: false,
         };
         let result = VerifiedTinfoilV3Result {
             request_id: 0,
@@ -796,6 +818,13 @@ module aptos_framework::tinfoil_v3 {
     #[view]
     public fun verified_shape_gpus(verification: address): u64 {
         passed_result(verification).claims.shape_gpus
+    }
+
+    #[view]
+    /// Whether the quote-bound GPU evidence was independently verified against
+    /// NVIDIA's signed attestation. False for the current accepted report path.
+    public fun verified_nvidia_gpu_attestation(verification: address): bool {
+        passed_result(verification).claims.nvidia_gpu_verified
     }
 
     /// Governance explicitly enables or revokes a GitHub repository. This
@@ -1066,6 +1095,7 @@ module aptos_framework::tinfoil_v3 {
             release_commit: code.commit,
             platform_measurement_id: platform.measurement_id,
             shape_gpus: code.shape_gpus,
+            nvidia_gpu_verified: false,
         };
         let result = VerifiedTinfoilV3Result {
             request_id: pending.request_id,
@@ -1181,6 +1211,11 @@ module aptos_framework::tinfoil_v3 {
     /// GPU count from the signed VM shape whose TDX-bound device topology
     /// was checked. Device signatures are not independently verified on chain.
     public fun shape_gpus(self: &VerifiedTinfoilV3Claims): u64 { self.shape_gpus }
+
+    /// False for reports accepted without independently verified NVIDIA EAT.
+    public fun nvidia_gpu_verified(self: &VerifiedTinfoilV3Claims): bool {
+        self.nvidia_gpu_verified
+    }
 
     fun assert_open_stage(owner: address, stage: u8) {
         assert!(exists<State>(owner) && State[owner].pending.is_some(),
@@ -1402,6 +1437,86 @@ module aptos_framework::tinfoil_v3 {
         trust_observation::set_replacement_patch(framework, INTEL_ROOT_TARGET, b"intel root v1");
         trust_observation::set_replacement_patch(framework, SIGSTORE_ROOT_TARGET, b"sigstore root v1");
         set_repository_approved(framework, b"tinfoilsh/example", true);
+    }
+
+    #[test_only]
+    /// Start at the final stage with native-authenticated outputs represented
+    /// by test values, so the object publication policy can be tested alone.
+    fun final_stage_object_for_test(
+        creator: &signer, shape_gpus: u64, nras_eat_present: bool,
+    ): address {
+        let document = b"final-stage test fixture";
+        let address = create_verification(
+            creator, copy document, document.length(), hash::sha3_256(document), STAGE_QUOTE,
+        );
+        let state = &mut Verification[address];
+        state.stage = STAGE_PLATFORM_FRESHNESS;
+        state.proof_time_secs = timestamp::now_seconds();
+        state.nonce = filled_byte(1, 32);
+        state.claimed_repo = b"tinfoilsh/example";
+        state.nras_eat_present = nras_eat_present;
+        state.intel_root_sha3_256 = hash::sha3_256(b"intel root v1");
+        state.sigstore_root_sha3_256 = hash::sha3_256(b"sigstore root v1");
+        state.quote.fill(QuoteStage {
+            report_data: filled_byte(1, 64),
+            tls_spki_sha256: filled_byte(2, 32),
+            hpke_key: filled_byte(3, 32),
+            quote_sha256: filled_byte(4, 32),
+            mrtd: filled_byte(5, 48),
+            rtmr0: filled_byte(6, 48),
+            rtmr1: filled_byte(7, 48),
+            rtmr2: filled_byte(8, 48),
+            rtmr3: filled_byte(9, 48),
+            tcb_status: b"UpToDate",
+            ppid: filled_byte(0, 16),
+            qe_vendor_id: filled_byte(0, 16),
+            tee_tcb_svn: filled_byte(0, 16),
+            mr_seam: filled_byte(0, 48),
+            td_attributes: filled_byte(0, 8),
+            xfam: filled_byte(0, 8),
+            tcb_evaluation_data_number: 1,
+        });
+        state.code.fill(CodeStage {
+            repo: b"tinfoilsh/example",
+            tag: b"v1",
+            commit: filled_byte(97, 40),
+            subject_name: b"image",
+            digest: filled_byte(10, 32),
+            shape_cpus: 1,
+            shape_memory_mb: 1024,
+            shape_gpus,
+            shape_disks: 1,
+        });
+        state.platform.fill(PlatformStage {
+            repo: b"tinfoilsh/example",
+            tag: b"v1",
+            commit: filled_byte(97, 40),
+            subject_name: b"platform",
+            digest: filled_byte(11, 32),
+            measurement_id: b"measured-platform",
+        });
+        address
+    }
+
+    #[test(framework = @aptos_framework, creator = @0x42)]
+    fun test_optional_gpu_eat_preserves_cpu_only_claim(framework: &signer, creator: &signer) {
+        setup_roots_for_test(framework);
+        let address = final_stage_object_for_test(creator, 2, false);
+        finalize_verified_stages(address);
+        assert!(verification_status(address) == VERIFICATION_PASS, 1);
+        assert!(verified_shape_gpus(address) == 2, 2);
+        assert!(!verified_nvidia_gpu_attestation(address), 3);
+        let report = verified_report(address);
+        assert!(!report.claims().nvidia_gpu_verified(), 4);
+    }
+
+    #[test(framework = @aptos_framework, creator = @0x42)]
+    fun test_supplied_gpu_eat_cannot_be_ignored(framework: &signer, creator: &signer) {
+        setup_roots_for_test(framework);
+        let address = final_stage_object_for_test(creator, 2, true);
+        finalize_verified_stages(address);
+        assert!(verification_status(address) == VERIFICATION_FAIL, 1);
+        assert!(Verification[address].result.is_none(), 2);
     }
 
     #[test(framework = @aptos_framework, owner = @0x42)]
