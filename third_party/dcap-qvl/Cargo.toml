@@ -25,6 +25,10 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/Phala-Network/dcap-qvl"
 
+[package.metadata.cargo-machete]
+# The dependency's library crate is named `webpki` in source imports.
+ignored = ["dcap-qvl-webpki"]
+
 [features]
 _anycrypto = []
 danger-allow-tcb-override = []
@@ -45,7 +49,6 @@ ring = [
 std = [
     "serde/std",
     "scale/std",
-    "scale-info/std",
     "pem/std",
     "asn1_der/std",
     "der?/std",
@@ -69,15 +72,6 @@ default-features = false
 [dependencies.asn1_der]
 version = "0.7"
 features = ["native_types"]
-default-features = false
-
-[dependencies.base64]
-version = "0.22.1"
-features = ["alloc"]
-default-features = false
-
-[dependencies.byteorder]
-version = "1.5.0"
 default-features = false
 
 [dependencies.chrono]
@@ -111,10 +105,6 @@ version = "0.4"
 features = ["alloc"]
 default-features = false
 
-[dependencies.log]
-version = "0.4.29"
-default-features = false
-
 [dependencies.pem]
 version = "3"
 default-features = false
@@ -134,11 +124,6 @@ version = "3.7.5"
 features = ["derive"]
 default-features = false
 package = "parity-scale-codec"
-
-[dependencies.scale-info]
-version = "2.11.6"
-features = ["derive"]
-default-features = false
 
 [dependencies.serde]
 version = "1.0.228"

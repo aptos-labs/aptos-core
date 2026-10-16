@@ -8434,20 +8434,16 @@ version = "0.6.1"
 dependencies = [
  "anyhow",
  "asn1_der",
- "base64 0.22.1",
- "byteorder",
  "chrono",
  "const-oid 0.10.2",
  "dcap-qvl-webpki",
  "der 0.8.1",
  "derive_more 2.1.1",
  "hex",
- "log",
  "parity-scale-codec",
  "pem 3.0.4",
  "ring 0.17.7",
  "rustls-pki-types",
- "scale-info",
  "serde",
  "serde-human-bytes",
  "serde_json",
@@ -17990,7 +17986,6 @@ version = "2.11.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "346a3b32eba2640d17a9cb5927056b08f3de90f65b72fe09402c2ad07d684d0b"
 dependencies = [
- "bitvec",
  "cfg-if",
  "derive_more 1.0.0",
  "parity-scale-codec",
