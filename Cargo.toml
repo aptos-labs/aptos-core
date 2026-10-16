@@ -112,6 +112,8 @@ members = [
     "crates/aptos-telemetry-service",
     "crates/aptos-telemetry-service/e2e-test/test-client",
     "crates/aptos-temppath",
+    "crates/aptos-tinfoil-sigstore",
+    "crates/aptos-tinfoil-v3",
     "crates/aptos-time-service",
     "crates/aptos-token-bucket",
     "crates/aptos-transaction-filters",

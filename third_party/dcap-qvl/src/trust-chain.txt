@@ -1,0 +1,48 @@
+                         Intel Root CA
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+         PCK Cert        TCB Signing      QE Identity
+         Issuer CA        Cert Chain       Signing Cert
+              │               │               │
+              ▼               │               │
+         PCK Cert             │               │
+              │               │               │
+              │          signs│          signs│
+              │               ▼               ▼
+              │          TCB Info        QE Identity
+              │          (JSON)           (JSON)
+              │               │               │
+         signs│               │               │
+              ▼               │               │
+         QE Report            │               │
+              │               │               │
+     ┌────────┴────────┐      │               │
+     │                 │      │               │
+     │  contains       │      │               │
+     ▼                 ▼      │               │
+  QE Hash         MRSIGNER    │               │
+     ▲            ISVPRODID   │               │
+     │            ISVSVN ─────┼───────────────┘
+     │            MISCSELECT  │          policy match
+     │            ATTRIBUTES  │
+  hash of              │      │
+     │                 │      │
+     ▼                 │      ▼
+ Attestation    ◄──────┘  match against
+    Key                   ISV Report
+     │
+signs│
+     ▼
+ ISV Report ◄─────────────────┐
+ (quote body)                 │
+     │                        │
+     │ contains               │
+     ▼                        │
+  CPU SVN  ───────────────────┤
+  PCE SVN                     │ match against
+  FMSPC                       │ TCB Info
+     ▲                        │
+     │ extracted from         │
+     │                        │
+ PCK Cert ────────────────────┘

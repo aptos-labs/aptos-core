@@ -273,6 +273,13 @@ module aptos_framework::trust_observation {
         if (found) { option::some(entries[index]) } else { option::none() }
     }
 
+    #[test_only]
+    // Lets verifier unit tests apply a staged target without initializing the
+    // entire validator-set/DKG epoch transition. This is absent in production.
+    public fun activate_for_test(framework: &signer) {
+        on_new_epoch(framework);
+    }
+
     fun pending_or_current_config(): Config {
         if (config_buffer::does_exist<Config>()) {
             config_buffer::extract_v2<Config>()

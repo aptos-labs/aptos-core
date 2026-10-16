@@ -1,0 +1,12 @@
+dcap-qvl 0.6.1 (vendored)
+========================
+
+Source and README were copied from the published dcap-qvl 0.6.1 crate,
+https://crates.io/crates/dcap-qvl, by Kevin Wang and Phala Network, under the
+MIT license in this directory. The verification source is unchanged.
+
+The Cargo manifest was narrowed to the offline native verification features
+used by aptos-tinfoil-v3: std, ring, and default-x509. The unused unconditional
+wasm-bindgen-futures dependency, Python/JS/network/RustCrypto feature
+dependencies, upstream integration tests and development dependencies, and
+package-local release profile were removed. No network fetcher is built.

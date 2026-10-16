@@ -1,0 +1,17 @@
+aptos-tinfoil-v3
+=================
+
+Source in src/envelope.rs, src/tdx.rs, src/provenance.rs, src/config.rs and
+src/testdata.rs was adapted from the Apache-2.0-licensed cvm-attestation crate
+in aptos-labs/atlas-main/rust/crates/cvm-attestation. The original crate ports
+the Tinfoil attestation v3 envelope, TDX and provenance verification model
+from tinfoilsh/tinfoil-go (Apache-2.0), branch feat/v3. Its source notices and
+the Apache 2.0 license are preserved here.
+
+Changes for Aptos: trust roots and time are explicit arguments; a full offline
+v3 verifier and five independently verifiable on-chain stages were added;
+device evidence and GPU VM shapes are rejected until device signatures can be
+authenticated; signed quote and Sigstore claims are returned as bounded data.
+
+Test quote and Intel collateral in assets/testdata were copied from the
+original cvm-attestation test fixtures. They are retained solely for tests.
