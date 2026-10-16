@@ -161,6 +161,7 @@ def fake_context(
         ),
         aws_account_num="123",
         aws_region="banana-east-1",
+        forge_image_name="forge",
         forge_image_tag="forge_asdf",
         image_tag="asdf",
         upgrade_image_tag="upgrade_asdf",
@@ -631,6 +632,34 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         self.assertFixture(
             format_report(context, forge_result),
             "testFormatReport.fixture",
+        )
+
+    def testFormatReportWithInterleavedLogLines(self) -> None:
+        context = fake_context()
+        output = "\n".join(
+            [
+                "====json-report-begin===",
+                "{",
+                '  "metrics": [',
+                "[2026-09-24T15:15:05Z INFO  aptos_forge::report] Test Ok",
+                "    {",
+                '      "test_name": "two traffics test",',
+                '      "metric": "avg_tps",',
+                '      "value": 100.0',
+                "    }",
+                '{"level":"INFO","message":"All nodes caught up successfully in 0s"}',
+                "  ],",
+                '  "text": "two traffics test : committed: 100.00 txn/s\\nTest Ok"',
+                "}",
+                "====json-report-end===",
+            ]
+        )
+        with ForgeResult.with_context(context) as forge_result:
+            forge_result.set_state(ForgeState.PASS)
+            forge_result.set_output(output)
+        self.assertEqual(
+            format_report(context, forge_result),
+            "two traffics test : committed: 100.00 txn/s\nTest Ok",
         )
 
     def testSanitizeForgeNamespaceLastCharacter(self) -> None:
