@@ -46,6 +46,14 @@ on:
         options:
           - prebuilt
           - rust-ci
+      rust_runner:
+        description: "Exact org-approved hosted label; 96-core label must be confirmed first"
+        type: string
+        default: 64cpu-gh-ubuntu22-x64
+      prebuilt_image:
+        description: "Verify preinstalled Rust image instead of installing tools"
+        type: boolean
+        default: false
 
 concurrency:
   group: prebuilt-workloads-check-${{ github.event.pull_request.number || github.ref }}
@@ -120,27 +128,47 @@ jobs:
 
   hosted-rust-lints:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'rust-ci' }}
-    runs-on: 64cpu-gh-ubuntu22-x64
+    runs-on: ${{ inputs.rust_runner }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Record runner resources
+        run: |
+          lscpu
+          free -h
+          df -h "$GITHUB_WORKSPACE"
       - uses: ./.github/actions/rust-setup
+        if: ${{ !inputs.prebuilt_image }}
         with:
           ADDITIONAL_KEY: hosted-rust-lints-trial
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ inputs.prebuilt_image }}
+        with:
+          cache-key: hosted-rust-lints-image-trial
       - uses: ./.github/actions/rust-lints
 
   hosted-rust-unit-tests:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.suite == 'rust-ci' }}
-    runs-on: 64cpu-gh-ubuntu22-x64
+    runs-on: ${{ inputs.rust_runner }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Record runner resources
+        run: |
+          lscpu
+          free -h
+          df -h "$GITHUB_WORKSPACE"
       - uses: ./.github/actions/rust-setup
+        if: ${{ !inputs.prebuilt_image }}
         with:
           ADDITIONAL_KEY: hosted-rust-unit-tests-trial
+      - uses: ./.github/actions/rust-prebuilt-setup
+        if: ${{ inputs.prebuilt_image }}
+        with:
+          cache-key: hosted-rust-unit-tests-image-trial
       - uses: ./.github/actions/rust-unit-tests
