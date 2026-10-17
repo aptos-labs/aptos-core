@@ -15,8 +15,8 @@ use crate::{
     },
     native_state_committer::{new_sharded_kv_batches, InChunkPriorVersions, NativeStateCommitter},
     native_state_store::PositionWrites,
-    position_buffered_state::{
-        PositionLedgerStateWithSummary, PositionProofReader, PositionSlot, PositionStateWithSummary,
+    native_store::buffered_state::{
+        NativeProofReader, PositionLedgerStateWithSummary, PositionSlot, PositionStateWithSummary,
     },
     pruner::PrunerManager,
     schema::{
@@ -155,7 +155,7 @@ impl DbWriter for AptosDB {
                 let position = self.position.as_ref().ok_or_else(|| {
                     AptosDbError::Other("native-position subsystem is not enabled".into())
                 })?;
-                crate::position_state_sync::get_position_snapshot_receiver(
+                crate::native_store::state_sync::get_native_snapshot_receiver(
                     &position.kv_db,
                     &position.merkle_db,
                     version,
@@ -554,7 +554,7 @@ impl AptosDB {
                               version: Version,
                               updates: Vec<(HashValue, PositionSlot)>|
          -> Result<PositionStateWithSummary> {
-            let proof_reader = PositionProofReader {
+            let proof_reader = NativeProofReader {
                 merkle_db: bundle.merkle_db.clone(),
                 version: persisted_base.version(),
             };

@@ -1,46 +1,45 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Groups the native-position pruner managers, the analog of main
-//! state's `StatePruner`: the value pruner plus the regular and
-//! epoch-snapshot merkle pruners. The value pruner's target is driven
-//! from `commit_native_position`; the merkle pruners' from the position
-//! merkle batch committer.
+//! Groups a native store's pruner managers, the analog of main state's
+//! `StatePruner`: the value pruner plus the regular and epoch-snapshot
+//! merkle pruners. The value pruner's target is driven from the store's
+//! commit; the merkle pruners' from its merkle batch committer.
 
 #![forbid(unsafe_code)]
 
 use crate::{
-    position_db::PositionDb,
-    position_merkle_db::PositionMerkleDb,
-    pruner::{
-        PositionEpochSnapshotPrunerManager, PositionStateMerklePrunerManager,
-        PositionValuePrunerManager,
-    },
+    native_store::{kv_db::NativeKvDb, merkle_db::NativeMerkleDb, NativeStoreSpec, PositionStore},
+    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use std::sync::Arc;
 
-pub(crate) struct PositionPruner {
-    pub(crate) value_pruner: PositionValuePrunerManager,
-    pub(crate) state_merkle_pruner: PositionStateMerklePrunerManager,
-    pub(crate) epoch_snapshot_pruner: PositionEpochSnapshotPrunerManager,
+pub(crate) type PositionPruner = NativeStorePruner<PositionStore>;
+
+pub(crate) struct NativeStorePruner<T: NativeStoreSpec> {
+    pub(crate) value_pruner: StateKvPrunerManager<T::ValuePruner, NativeKvDb<T>>,
+    pub(crate) state_merkle_pruner:
+        StateMerklePrunerManager<T::StateMerklePruner, NativeMerkleDb<T>>,
+    pub(crate) epoch_snapshot_pruner:
+        StateMerklePrunerManager<T::EpochSnapshotPruner, NativeMerkleDb<T>>,
 }
 
-impl PositionPruner {
+impl<T: NativeStoreSpec> NativeStorePruner<T> {
     pub(crate) fn new(
-        kv_db: Arc<PositionDb>,
-        merkle_db: Arc<PositionMerkleDb>,
+        kv_db: Arc<NativeKvDb<T>>,
+        merkle_db: Arc<NativeMerkleDb<T>>,
         value_pruner_config: LedgerPrunerConfig,
         state_merkle_pruner_config: StateMerklePrunerConfig,
         epoch_snapshot_pruner_config: StateMerklePrunerConfig,
     ) -> Self {
         Self {
-            value_pruner: PositionValuePrunerManager::new(kv_db, value_pruner_config),
-            state_merkle_pruner: PositionStateMerklePrunerManager::new(
+            value_pruner: StateKvPrunerManager::new(kv_db, value_pruner_config),
+            state_merkle_pruner: StateMerklePrunerManager::new(
                 Arc::clone(&merkle_db),
                 state_merkle_pruner_config,
             ),
-            epoch_snapshot_pruner: PositionEpochSnapshotPrunerManager::new(
+            epoch_snapshot_pruner: StateMerklePrunerManager::new(
                 merkle_db,
                 epoch_snapshot_pruner_config,
             ),
@@ -51,7 +50,11 @@ impl PositionPruner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pruner::PrunerManager, schema::stale_node_index::StaleNodeIndexSchema};
+    use crate::{
+        native_store::{kv_db::PositionDb, merkle_db::PositionMerkleDb},
+        pruner::PrunerManager,
+        schema::stale_node_index::StaleNodeIndexSchema,
+    };
     use aptos_config::config::{RocksdbConfig, StorageDirPaths};
     use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_schemadb::DB;

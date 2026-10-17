@@ -34,16 +34,10 @@ mod lru_node_cache;
 pub mod native_state_committer;
 pub mod native_state_reader;
 pub mod native_state_store;
-pub mod position_buffered_state;
-pub mod position_db;
-pub(crate) mod position_merkle_batch_committer;
-pub mod position_merkle_db;
+pub(crate) mod native_store;
 pub mod position_metrics;
-pub(crate) mod position_pruner;
-pub(crate) mod position_snapshot_committer;
-pub mod position_state_store;
-pub mod position_state_sync;
 mod pruner;
+mod sharded_db_layout;
 mod sharded_jmt_merkle_db;
 mod sharded_kv_db;
 

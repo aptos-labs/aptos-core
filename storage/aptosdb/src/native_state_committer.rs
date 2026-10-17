@@ -5,7 +5,7 @@
 
 use crate::{
     native_state_store::{position_key_of, PositionWrites},
-    position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
+    native_store::kv_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_metrics::POSITION_WRITES,
     schema::{
         position_value::PositionValueSchema,
@@ -41,7 +41,7 @@ pub struct NativeStateCommitter {
 }
 
 impl NativeStateCommitter {
-    pub fn new(position_db: Arc<PositionDb>) -> Self {
+    pub(crate) fn new(position_db: Arc<PositionDb>) -> Self {
         Self { position_db }
     }
 

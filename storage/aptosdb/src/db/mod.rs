@@ -2,10 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
-    position_db::PositionDb, position_merkle_db::PositionMerkleDb, pruner::LedgerPrunerManager,
-    rocksdb_property_reporter::RocksdbPropertyReporter, state_kv_db::StateKvDb,
-    state_merkle_db::StateMerkleDb, state_store::StateStore, transaction_store::TransactionStore,
+    backup::backup_handler::BackupHandler,
+    event_store::EventStore,
+    ledger_db::LedgerDb,
+    native_store::{kv_db::PositionDb, merkle_db::PositionMerkleDb},
+    pruner::LedgerPrunerManager,
+    rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
+    transaction_store::TransactionStore,
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
