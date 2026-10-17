@@ -131,6 +131,9 @@ pub enum MoveTool {
     #[clap(alias = "deploy")]
     Publish(PublishPackage),
     Run(RunFunction),
+    StageDelegatedPackage(crate::delegated_publish::StageDelegatedPackage),
+    FinalizeDelegatedPackage(crate::delegated_publish::FinalizeDelegatedPackage),
+    CleanupDelegatedStaging(crate::delegated_publish::CleanupDelegatedStaging),
     RunScript(RunScript),
     Simulate(Simulate),
     #[clap(subcommand, hide = true)]
@@ -160,6 +163,15 @@ impl MoveTool {
             MoveTool::ClearStagingArea(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.attach_env(env).execute_serialized_success().await
+            },
+            MoveTool::StageDelegatedPackage(tool) => {
+                tool.attach_env(env).execute_serialized().await
+            },
+            MoveTool::FinalizeDelegatedPackage(tool) => {
+                tool.attach_env(env).execute_serialized().await
+            },
+            MoveTool::CleanupDelegatedStaging(tool) => {
+                tool.attach_env(env).execute_serialized().await
             },
             MoveTool::Run(tool) => tool.attach_env(env).execute_serialized().await,
             MoveTool::RunScript(tool) => tool.attach_env(env).execute_serialized().await,
@@ -2022,7 +2034,7 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
     }
 }
 
-fn build_package_options(
+pub(crate) fn build_package_options(
     move_options: &MovePackageOptions,
     included_artifacts_args: &IncludedArtifactsArgs,
     env: &MoveEnv,

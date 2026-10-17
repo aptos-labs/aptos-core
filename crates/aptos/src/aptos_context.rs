@@ -25,7 +25,8 @@ use aptos_types::{
     account_config::AccountResource,
     chain_id::ChainId,
     transaction::{
-        PersistedAuxiliaryInfo, SignedTransaction, TransactionPayload, TransactionStatus,
+        PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionPayload,
+        TransactionStatus,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -626,8 +627,9 @@ async fn submit_to_chain(
 }
 
 /// Submits transactions that don't depend on each other without waiting for one to be committed
-/// before sending the next, and waits for all of them. They get consecutive sequence numbers, so the
-/// chain executes them in order. Returns the outcome of every transaction that was submitted, in
+/// before sending the next, and waits for all of them. Sequence-number transactions get
+/// consecutive numbers; nonce-protected transactions can execute independently. Returns the
+/// outcome of every transaction that was submitted, in
 /// order; a transaction that can't be prepared, and so can't be submitted, ends the list.
 async fn submit_many_to_chain(
     options: &TransactionOptions,
@@ -639,7 +641,8 @@ async fn submit_many_to_chain(
     // Estimate gas unit price if not specified
     let (gas_unit_price, ask_to_confirm_price) = gas_unit_price_to_use(options, &client).await?;
 
-    // The transactions get the sequence numbers that follow the one of the account
+    // Nonce-protected transactions share the fetched sequence number; sequence-number
+    // transactions use it as the start of their consecutive range.
     let (account, state) = get_account_with_state(&client, sender_address).await?;
     let sequence_number = account.sequence_number;
     let expiration_time_secs = expiration_time_secs(options, &state)?;
@@ -657,6 +660,7 @@ async fn submit_many_to_chain(
         gas_unit_price,
         ask_to_confirm_price,
         max_gas: options.gas_options.max_gas,
+        replay_protection_type: options.replay_protection_type,
         prompt_options: options.prompt_options,
         explorer_network: explorer_network(options),
     };
@@ -670,14 +674,15 @@ struct GroupSettings {
     ask_to_confirm_price: bool,
     /// The max gas of every transaction, if it was given. Otherwise it is estimated for each.
     max_gas: Option<u64>,
+    replay_protection_type: ReplayProtectionType,
     prompt_options: PromptOptions,
     /// The network that links to an explorer point to, if it is known.
     explorer_network: Option<Network>,
 }
 
 /// The logic of `submit_many_to_chain`, apart from the calls to the chain: `payloads` are signed as
-/// the transactions with the sequence numbers from `sequence_number` on, all submitted at once, and
-/// waited for at once.
+/// consecutive sequence numbers in seqnum mode, or independent nonces in nonce mode. They are all
+/// submitted at once and waited for at once.
 async fn submit_group<C: GroupChain + Sync>(
     chain: &C,
     settings: &GroupSettings,
@@ -739,11 +744,36 @@ async fn submit_group<C: GroupChain + Sync>(
         estimated.iter().map(|estimate| estimate.max_gas).collect()
     };
 
-    // Sign them with consecutive sequence numbers
+    // Orderless transactions are independent: they all carry the current sequence number,
+    // but are distinguished by fresh replay-protection nonces in their signed payloads.
     let mut transactions = Vec::with_capacity(payloads.len());
+    let mut nonces = std::collections::HashSet::new();
     for (offset, (payload, max_gas)) in payloads.into_iter().zip(max_gas_amounts).enumerate() {
-        match chain.sign(payload, sequence_number + offset as u64, max_gas) {
-            Ok(transaction) => transactions.push(transaction),
+        let sequence = match settings.replay_protection_type {
+            ReplayProtectionType::Nonce => sequence_number,
+            ReplayProtectionType::Seqnum => sequence_number + offset as u64,
+        };
+        match chain.sign(payload, sequence, max_gas) {
+            Ok(transaction) => {
+                if settings.replay_protection_type == ReplayProtectionType::Nonce {
+                    match transaction.replay_protector() {
+                        ReplayProtector::Nonce(nonce) if nonces.insert(nonce) => {},
+                        ReplayProtector::Nonce(_) => {
+                            preparation_error = Some(CliError::UnexpectedError(
+                                "Duplicate orderless nonce in transaction group".into(),
+                            ));
+                            break;
+                        },
+                        ReplayProtector::SequenceNumber(_) => {
+                            preparation_error = Some(CliError::UnexpectedError(
+                                "Orderless transaction was signed without a nonce".into(),
+                            ));
+                            break;
+                        },
+                    }
+                }
+                transactions.push(transaction);
+            },
             Err(error) => {
                 preparation_error = Some(error);
                 break;
@@ -818,12 +848,16 @@ mod tests {
         signed: Vec<(u64, u64)>,
         /// The sequence numbers of the transactions that were submitted.
         submitted: Vec<u64>,
+        /// The orderless nonces of transactions that reached submit.
+        submitted_nonces: Vec<u64>,
         /// The sequence numbers of the transactions that were committed, as they were.
         committed: Vec<u64>,
     }
 
     struct FakeChain {
         private_key: Ed25519PrivateKey,
+        nonce_mode: bool,
+        duplicate_nonce: bool,
         failures: Failures,
         calls: Mutex<Calls>,
         /// A submission only completes when this many of them are in progress at the same time.
@@ -837,6 +871,8 @@ mod tests {
         fn new() -> Self {
             Self {
                 private_key: KeyGen::from_seed([0; 32]).generate_ed25519_private_key(),
+                nonce_mode: false,
+                duplicate_nonce: false,
                 failures: Failures::default(),
                 calls: Mutex::new(Calls::default()),
                 submit_barrier: None,
@@ -886,9 +922,26 @@ mod tests {
                 return Err(CliError::UnexpectedError("the signing failed".to_string()));
             }
             self.calls().signed.push((sequence_number, max_gas));
+            let payload = if self.nonce_mode {
+                let nonce = if self.duplicate_nonce {
+                    1
+                } else {
+                    index_of(&payload) as u64 + 1
+                };
+                payload.upgrade_payload_with_fn(true, Some(|| nonce))
+            } else {
+                payload
+            };
+            // SDK builders set the raw sequence to MAX for an orderless transaction;
+            // the sequence argument is only a hint supplied to the signer.
+            let raw_sequence = if self.nonce_mode {
+                u64::MAX
+            } else {
+                sequence_number
+            };
             let transaction = RawTransaction::new(
                 AccountAddress::ONE,
-                sequence_number,
+                raw_sequence,
                 payload,
                 max_gas,
                 100,
@@ -904,6 +957,9 @@ mod tests {
         async fn submit(&self, transaction: &SignedTransaction) -> CliTypedResult<()> {
             let sequence_number = transaction.sequence_number();
             self.calls().submitted.push(sequence_number);
+            if let ReplayProtector::Nonce(nonce) = transaction.replay_protector() {
+                self.calls().submitted_nonces.push(nonce);
+            }
             if let Some(barrier) = &self.submit_barrier {
                 barrier.wait().await;
             }
@@ -974,6 +1030,7 @@ mod tests {
             gas_unit_price: 100,
             ask_to_confirm_price: false,
             max_gas,
+            replay_protection_type: ReplayProtectionType::Seqnum,
             prompt_options: PromptOptions::yes(),
             explorer_network: None,
         }
@@ -1016,6 +1073,94 @@ mod tests {
         assert!(chain.calls().estimated.is_empty());
         // The transactions are the payloads, in order: the one signed with 8 is the second.
         assert_eq!(chain.calls().submitted, vec![7, 8, 9, 10]);
+    }
+
+    #[tokio::test]
+    async fn nonce_group_signs_independent_replay_protectors() {
+        let chain = FakeChain {
+            nonce_mode: true,
+            ..FakeChain::new()
+        };
+        let settings = GroupSettings {
+            replay_protection_type: ReplayProtectionType::Nonce,
+            ..settings(Some(5000))
+        };
+        let outcomes = submit_group(&chain, &settings, FIRST, payloads(4))
+            .await
+            .unwrap();
+        assert!(outcomes.iter().all(|outcome| outcome.is_ok()));
+        assert_eq!(chain.calls().signed, vec![(FIRST, 5000); 4]);
+        assert_eq!(chain.calls().submitted, vec![u64::MAX; 4]);
+        let nonces: std::collections::HashSet<u64> =
+            chain.calls().submitted_nonces.iter().copied().collect();
+        assert_eq!(nonces.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn nonce_group_estimates_each_payload_independently() {
+        let chain = FakeChain {
+            nonce_mode: true,
+            ..FakeChain::new()
+        };
+        let settings = GroupSettings {
+            replay_protection_type: ReplayProtectionType::Nonce,
+            ..settings(None)
+        };
+        let outcomes = submit_group(&chain, &settings, FIRST, payloads(3))
+            .await
+            .unwrap();
+        assert!(outcomes.iter().all(|outcome| outcome.is_ok()));
+        assert_eq!(chain.calls().estimated, vec![0, 1, 2]);
+        assert_eq!(chain.calls().signed, vec![
+            (FIRST, 2000),
+            (FIRST, 2001),
+            (FIRST, 2002)
+        ]);
+        assert_eq!(chain.calls().submitted, vec![u64::MAX; 3]);
+        assert_eq!(chain.calls().submitted_nonces.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn nonce_group_rejects_duplicate_nonce_before_sending_it() {
+        let chain = FakeChain {
+            nonce_mode: true,
+            duplicate_nonce: true,
+            ..FakeChain::new()
+        };
+        let settings = GroupSettings {
+            replay_protection_type: ReplayProtectionType::Nonce,
+            ..settings(Some(5000))
+        };
+        let outcomes = submit_group(&chain, &settings, FIRST, payloads(3))
+            .await
+            .unwrap();
+        assert_eq!(outcomes.len(), 2);
+        assert!(outcomes[0].is_ok());
+        assert!(outcomes[1]
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate orderless nonce"));
+        assert_eq!(chain.calls().submitted_nonces, vec![1]);
+    }
+
+    #[tokio::test]
+    async fn nonce_group_rejects_signer_that_forgets_replay_nonce() {
+        let chain = FakeChain::new();
+        let settings = GroupSettings {
+            replay_protection_type: ReplayProtectionType::Nonce,
+            ..settings(Some(5000))
+        };
+        let outcomes = submit_group(&chain, &settings, FIRST, payloads(3))
+            .await
+            .unwrap();
+        assert_eq!(outcomes.len(), 1);
+        assert!(outcomes[0]
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("without a nonce"));
+        assert!(chain.calls().submitted.is_empty());
     }
 
     #[tokio::test]

@@ -1,0 +1,9 @@
+[package]
+name = "DelegatedChunkedPublishing"
+version = "0.0.1"
+
+[addresses]
+delegated_packages = "_"
+
+[dependencies]
+AptosFramework = { local = "../framework/aptos-framework" }
