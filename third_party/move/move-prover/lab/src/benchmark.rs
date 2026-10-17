@@ -155,6 +155,7 @@ fn run_benchmark(
                 )
                 .to_vec(),
                 module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+                provides_cmp_model: true,
             });
     }
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually

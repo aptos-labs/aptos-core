@@ -1,0 +1,72 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/behavioral_congruence.move:68:9
+   │
+68 │         aborts_if x.n + 1 <= MAX_U64 && aborts_of<cb.f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_congruence.move:63: field_bumped
+   =         cb = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_congruence.move:64: field_bumped
+   =     at tests/sources/functional/closures/behavioral_congruence.move:67: field_bumped (spec)
+   =     at tests/sources/functional/closures/behavioral_congruence.move:68: field_bumped (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_congruence.move:66:5
+   │
+64 │           (cb.f)(Info { n: x.n + 1, id: x.id })
+   │           ------------------------------------- abort happened here with code 0x3
+65 │       }
+66 │ ╭     spec field_bumped {
+67 │ │         aborts_if x.n + 1 > MAX_U64;
+68 │ │         aborts_if x.n + 1 <= MAX_U64 && aborts_of<cb.f>(x);
+69 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/closures/behavioral_congruence.move:63: field_bumped
+   =         cb = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_congruence.move:64: field_bumped
+   =         ABORTED
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/behavioral_congruence.move:76:9
+   │
+76 │         aborts_if aborts_of<cb.f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_congruence.move:72: field_dropped_id
+   =         cb = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_congruence.move:73: field_dropped_id
+   =     at tests/sources/functional/closures/behavioral_congruence.move:76: field_dropped_id (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_congruence.move:75:5
+   │
+73 │           (cb.f)(Info { n: x.n, id: option::none() })
+   │           ------------------------------------------- abort happened here with code 0x0
+74 │       }
+75 │ ╭     spec field_dropped_id {
+76 │ │         aborts_if aborts_of<cb.f>(x);
+77 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/closures/behavioral_congruence.move:72: field_dropped_id
+   =         cb = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_congruence.move:73: field_dropped_id
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_congruence.move:94:9
+   │
+94 │         ensures _a == _b ==> (aborts_of<_cb.f>(_a) <==> aborts_of<_cb.f>(_b));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_congruence.move:92: ghost_divergent
+   =         _cb = <redacted>
+   =         _a = <redacted>
+   =         _b = <redacted>
+   =     at tests/sources/functional/closures/behavioral_congruence.move:94: ghost_divergent (spec)
