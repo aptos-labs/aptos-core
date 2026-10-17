@@ -37,6 +37,15 @@ jobs:
           HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
         run: python3 testsuite/single_node_performance_calibration.py --time-interval 60h
 
+      # A longer window than the other two. Unlike the end-to-end median, the
+      # inner median is only a threshold, so it does not feed back into block
+      # sizes. 60h yields ~9 samples, where tps_band inflates the observed
+      # min/max by 2.1x and the row can no longer detect its own drift.
+      - name: Run inner block executor calibration
+        env:
+          HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
+        run: python3 testsuite/single_node_performance_calibration.py --metric inner --time-interval 30d
+
       - name: Run move-e2e calibration
         env:
           HUMIO_READ_TOKEN: ${{ secrets.HUMIO_READ_TOKEN }}
@@ -56,6 +65,8 @@ jobs:
             Updates:
             - `testsuite/single_node_performance_values.tsv`
             - `testsuite/single_node_performance_values.changelog.md`
+            - `testsuite/single_node_performance_inner_values.tsv`
+            - `testsuite/single_node_performance_inner_values.changelog.md`
             - `aptos-move/e2e-benchmark/data/calibration_values.tsv`
             - `aptos-move/e2e-benchmark/data/calibration_values.changelog.md`
 
