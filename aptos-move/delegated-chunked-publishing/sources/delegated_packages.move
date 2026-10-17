@@ -37,6 +37,8 @@ module delegated_packages::delegated_packages {
     const EMISSING_CHUNK: u64 = 7;
     /// Staged chunks are not accounted for by the declared part counts.
     const EUNEXPECTED_CHUNKS: u64 = 8;
+    /// A stage or cleanup request names a different staging generation.
+    const EWRONG_GENERATION: u64 = 9;
 
     /// BCS encoding of this struct commits to the ordered metadata and module bytes.
     struct PackagePreimage has drop {
@@ -46,17 +48,19 @@ module delegated_packages::delegated_packages {
 
     struct StagingArea has key {
         publisher: address,
+        generation: address,
         chunks: TableWithLength<u64, vector<u8>>,
         keys: vector<u64>,
     }
 
     /// Open a staging area at the signing stager's account, binding it to `publisher`.
     /// An existing area must be explicitly cleaned up before opening another one.
-    public entry fun open_staging(stager: &signer, publisher: address) {
+    public entry fun open_staging(stager: &signer, publisher: address, generation: address) {
         let stager_address = signer::address_of(stager);
         assert!(!exists<StagingArea>(stager_address), error::already_exists(EPUBLISHER_MISMATCH));
         move_to(stager, StagingArea {
             publisher,
+            generation,
             chunks: table_with_length::new(),
             keys: vector[],
         });
@@ -66,6 +70,7 @@ module delegated_packages::delegated_packages {
     /// Identical replays are no-ops; different bytes at the same position abort.
     public entry fun stage_chunks(
         stager: &signer,
+        generation: address,
         part_indices: vector<u16>,
         chunk_indices: vector<u16>,
         chunks: vector<vector<u8>>,
@@ -76,6 +81,7 @@ module delegated_packages::delegated_packages {
         let stager_address = signer::address_of(stager);
         assert!(exists<StagingArea>(stager_address), error::not_found(ENOT_OPEN));
         let area = borrow_global_mut<StagingArea>(stager_address);
+        assert!(area.generation == generation, error::invalid_argument(EWRONG_GENERATION));
         let i = 0;
         while (i < count) {
             let key = ((*vector::borrow(&part_indices, i) as u64) << 32)
@@ -92,16 +98,28 @@ module delegated_packages::delegated_packages {
         };
     }
 
-    /// Delete only the signing stager's area and all its table entries; absent is a no-op.
-    public entry fun cleanup_staging(stager: &signer) acquires StagingArea {
+    /// Maximum number of table entries removed by one cleanup transaction. A large upload
+    /// cannot make cleanup exceed the transaction write-operation limit.
+    const MAX_CLEANUP_CHUNKS: u64 = 10;
+
+    /// Delete up to ten entries from the signing stager's area. Repeat until the resource is
+    /// gone. An absent area is a no-op; only an empty table can be destroyed.
+    public entry fun cleanup_staging(stager: &signer, generation: address) acquires StagingArea {
         let stager_address = signer::address_of(stager);
         if (!exists<StagingArea>(stager_address)) return;
-        let StagingArea { publisher: _, chunks, keys } = move_from<StagingArea>(stager_address);
-        while (!vector::is_empty(&keys)) {
-            let key = vector::pop_back(&mut keys);
-            table_with_length::remove(&mut chunks, key);
+        assert!(borrow_global<StagingArea>(stager_address).generation == generation,
+            error::invalid_argument(EWRONG_GENERATION));
+        let area = borrow_global_mut<StagingArea>(stager_address);
+        let deleted = 0;
+        while (!vector::is_empty(&area.keys) && deleted < MAX_CLEANUP_CHUNKS) {
+            let key = vector::pop_back(&mut area.keys);
+            table_with_length::remove(&mut area.chunks, key);
+            deleted = deleted + 1;
         };
-        table_with_length::destroy_empty(chunks);
+        if (vector::is_empty(&area.keys)) {
+            let StagingArea { publisher: _, generation: _, chunks, keys: _ } = move_from<StagingArea>(stager_address);
+            table_with_length::destroy_empty(chunks);
+        };
     }
 
     /// Assemble a staged package only for its designated publisher, verify its exact
@@ -157,7 +175,7 @@ module delegated_packages::delegated_packages {
         assert!(borrow_global<StagingArea>(stager).publisher == publisher,
             error::permission_denied(EWRONG_PUBLISHER));
         assert!(vector::length(&counts) > 1, error::invalid_state(EMISSING_CHUNK));
-        let StagingArea { publisher: _, chunks, keys: _ } = move_from<StagingArea>(stager);
+        let StagingArea { publisher: _, generation: _, chunks, keys: _ } = move_from<StagingArea>(stager);
         let metadata = take_part(&mut chunks, 0, *vector::borrow(&counts, 0));
         let code = vector[];
         let part = 1;
@@ -217,7 +235,7 @@ module delegated_packages::delegated_packages {
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x50005, location = Self)]
     fun test_wrong_publisher(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xc);
+        open_staging(stager, @0xc, @0xd);
         finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
     }
 
@@ -230,37 +248,37 @@ module delegated_packages::delegated_packages {
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x30007, location = Self)]
     fun test_missing_metadata_part(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
+        open_staging(stager, @0xb, @0xd);
         finalize_to_account(publisher, @0xa, vector[], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x30007, location = Self)]
     fun test_missing_module_part(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
+        open_staging(stager, @0xb, @0xd);
         finalize_to_account(publisher, @0xa, vector[1u16], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x30007, location = Self)]
     fun test_zero_count(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
+        open_staging(stager, @0xb, @0xd);
         finalize_to_account(publisher, @0xa, vector[1u16, 0u16], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x30007, location = Self)]
     fun test_missing_chunk(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 1u16], vector[b"meta", b"tail"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 1u16], vector[b"meta", b"tail"]);
         finalize_to_account(publisher, @0xa, vector[1u16, 2u16], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x30008, location = Self)]
     fun test_extra_chunk(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16, 1u16, 2u16], vector[0u16, 0u16, 0u16],
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16, 2u16], vector[0u16, 0u16, 0u16],
             vector[b"meta", b"code", b"extra"]);
         finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
     }
@@ -268,16 +286,16 @@ module delegated_packages::delegated_packages {
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_short_digest(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
         finalize_to_account(publisher, @0xa, vector[1u16, 1u16], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_bad_digest(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
         finalize_to_account(publisher, @0xa, vector[1u16, 1u16], x"0000000000000000000000000000000000000000000000000000000000000000");
     }
 
@@ -285,8 +303,8 @@ module delegated_packages::delegated_packages {
     fun test_delegated_account_publish(stager: &signer, publisher: &signer) {
         let metadata = test_metadata();
         let split = vector::length(&metadata) / 2;
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[1u16, 0u16, 0u16], vector[0u16, 1u16, 0u16],
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[1u16, 0u16, 0u16], vector[0u16, 1u16, 0u16],
             vector[b"code", vector::slice(&metadata, split, vector::length(&metadata)),
                 vector::slice(&metadata, 0, split)]);
         let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
@@ -300,8 +318,8 @@ module delegated_packages::delegated_packages {
     // Independent SHA3-256 fixture for BCS: 04 6d657461 01 04 636f6465.
     #[test(stager = @0xa)]
     fun test_known_preimage_digest(stager: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", b"meta"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", b"meta"]);
         let (metadata, code) = take_verified(@0xa, @0xb, vector[1u16, 1u16],
             x"438f72562b990e09cb3383e87ea342434773e84285e85ceadc7d71dd831b812f");
         assert!(metadata == b"meta" && code == vector[b"code"], 0);
@@ -319,8 +337,8 @@ module delegated_packages::delegated_packages {
         let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
             metadata: copy metadata, code: vector[b"code"],
         }));
-        open_staging(stager, publisher_address);
-        stage_chunks(stager, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", metadata]);
+        open_staging(stager, publisher_address, @0xd);
+        stage_chunks(stager, @0xd, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", metadata]);
         finalize_to_object(publisher, @0xa, vector[1u16, 1u16], digest);
         assert!(!exists<StagingArea>(@0xa), 0);
         assert!(object::object_exists<code::PackageRegistry>(object_address), 1);
@@ -332,15 +350,15 @@ module delegated_packages::delegated_packages {
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x50005, location = Self)]
     fun test_object_publish_rejects_wrong_publisher(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xc);
+        open_staging(stager, @0xc, @0xd);
         finalize_to_object(publisher, @0xa, vector[1u16, 1u16], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
     fun test_object_publish_rejects_bad_digest(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"meta", b"code"]);
         finalize_to_object(publisher, @0xa, vector[1u16, 1u16],
             x"0000000000000000000000000000000000000000000000000000000000000000");
     }
@@ -361,26 +379,61 @@ module delegated_packages::delegated_packages {
         let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
             metadata: copy metadata, code: vector[b"code"],
         }));
-        open_staging(stager, owner_address);
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"code"]);
+        open_staging(stager, owner_address, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"code"]);
         finalize_to_object(owner, @0xa, vector[1u16, 1u16], digest);
         let code_object = object::address_to_object<code::PackageRegistry>(object_address);
         let metadata = test_metadata();
         let digest = hash::sha3_256(bcs::to_bytes(&PackagePreimage {
             metadata: copy metadata, code: vector[b"new code"],
         }));
-        open_staging(stager, signer::address_of(other));
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"new code"]);
+        open_staging(stager, signer::address_of(other), @0xd);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"new code"]);
         finalize_upgrade(other, @0xa, vector[1u16, 1u16], digest, code_object);
+    }
+
+    #[test(stager = @0xa)]
+    #[expected_failure(abort_code = 0x10009, location = Self)]
+    fun test_staging_refuses_replacement_area(stager: &signer) {
+        open_staging(stager, @0xb, @0xd);
+        cleanup_staging(stager, @0xd);
+        open_staging(stager, @0xb, @0xe);
+        // A delayed chunk from an earlier upload must not land in the new table.
+        stage_chunks(stager, @0xd, vector[0u16], vector[0u16], vector[b"old"]);
+    }
+
+    #[test(stager = @0xa)]
+    #[expected_failure(abort_code = 0x10009, location = Self)]
+    fun test_cleanup_refuses_replacement_area(stager: &signer) {
+        open_staging(stager, @0xb, @0xd);
+        cleanup_staging(stager, @0xd);
+        open_staging(stager, @0xc, @0xe);
+        // An old cleanup loop must not remove the new area.
+        cleanup_staging(stager, @0xd);
+    }
+
+    #[test(stager = @0xa)]
+    fun test_cleanup_large_staging_area_in_bounded_steps(stager: &signer) {
+        open_staging(stager, @0xb, @0xd);
+        let i = 0u16;
+        while (i < 12) {
+            stage_chunks(stager, @0xd, vector[1u16], vector[i], vector[b"data"]);
+            i = i + 1;
+        };
+        cleanup_staging(stager, @0xd);
+        assert!(exists<StagingArea>(@0xa), 0);
+        assert!(vector::length(&borrow_global<StagingArea>(@0xa).keys) == 2, 1);
+        cleanup_staging(stager, @0xd);
+        assert!(!exists<StagingArea>(@0xa), 2);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     fun test_out_of_order_and_identical_replays(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
+        open_staging(stager, @0xb, @0xd);
         assert!(borrow_global<StagingArea>(@0xa).publisher == std::signer::address_of(publisher), 0);
-        stage_chunks(stager, vector[1u16], vector[0u16], vector[b"module"]);
-        stage_chunks(stager, vector[0u16], vector[0u16], vector[b"metadata"]);
-        stage_chunks(stager, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"metadata", b"module"]);
+        stage_chunks(stager, @0xd, vector[1u16], vector[0u16], vector[b"module"]);
+        stage_chunks(stager, @0xd, vector[0u16], vector[0u16], vector[b"metadata"]);
+        stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[b"metadata", b"module"]);
         let area = borrow_global<StagingArea>(@0xa);
         assert!(vector::length(&area.keys) == 2, 1);
         assert!(table_with_length::length(&area.chunks) == 2, 2);
@@ -393,8 +446,8 @@ module delegated_packages::delegated_packages {
 
     #[test(stager = @0xa)]
     fun test_repeated_positions_in_one_batch(stager: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[1u16, 1u16], vector[2u16, 2u16], vector[b"same", b"same"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[1u16, 1u16], vector[2u16, 2u16], vector[b"same", b"same"]);
         let area = borrow_global<StagingArea>(@0xa);
         assert!(vector::length(&area.keys) == 1, 0);
         assert!(table_with_length::length(&area.chunks) == 1, 1);
@@ -404,66 +457,66 @@ module delegated_packages::delegated_packages {
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x70002, location = Self)]
     fun test_conflicting_replay(stager: &signer, publisher: &signer) {
-        open_staging(stager, std::signer::address_of(publisher));
-        stage_chunks(stager, vector[0u16], vector[0u16], vector[b"original"]);
-        stage_chunks(stager, vector[0u16], vector[0u16], vector[b"different"]);
+        open_staging(stager, std::signer::address_of(publisher), @0xd);
+        stage_chunks(stager, @0xd, vector[0u16], vector[0u16], vector[b"original"]);
+        stage_chunks(stager, @0xd, vector[0u16], vector[0u16], vector[b"different"]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x80003, location = Self)]
     fun test_reopen_with_different_publisher(stager: &signer, publisher: &signer) {
-        open_staging(stager, std::signer::address_of(publisher));
-        open_staging(stager, @0xc);
+        open_staging(stager, std::signer::address_of(publisher), @0xd);
+        open_staging(stager, @0xc, @0xd);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x80003, location = Self)]
     fun test_reopen_with_same_publisher(stager: &signer, publisher: &signer) {
-        open_staging(stager, std::signer::address_of(publisher));
-        open_staging(stager, @0xb);
+        open_staging(stager, std::signer::address_of(publisher), @0xd);
+        open_staging(stager, @0xb, @0xd);
     }
 
     #[test(stager = @0xa)]
     #[expected_failure(abort_code = 0x60001, location = Self)]
     fun test_stage_requires_open(stager: &signer) {
-        stage_chunks(stager, vector[0u16], vector[0u16], vector[b"data"]);
+        stage_chunks(stager, @0xd, vector[0u16], vector[0u16], vector[b"data"]);
     }
 
     #[test(stager = @0xa)]
     #[expected_failure(abort_code = 0x10004, location = Self)]
     fun test_mismatched_lengths(stager: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16], vector[], vector[b"data"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16], vector[], vector[b"data"]);
     }
 
     #[test(stager = @0xa)]
     #[expected_failure(abort_code = 0x10004, location = Self)]
     fun test_mismatched_payload_length(stager: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[0u16], vector[0u16], vector[]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[0u16], vector[0u16], vector[]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     #[expected_failure(abort_code = 0x60001, location = Self)]
     fun test_publisher_cannot_stage_under_stager(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(publisher, vector[0u16], vector[0u16], vector[b"data"]);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(publisher, @0xd, vector[0u16], vector[0u16], vector[b"data"]);
     }
 
     #[test(stager = @0xa, publisher = @0xb)]
     fun test_cleanup_owned_area_and_absent_noop(stager: &signer, publisher: &signer) {
-        open_staging(stager, @0xb);
-        stage_chunks(stager, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", b"metadata"]);
-        open_staging(publisher, @0xc);
-        stage_chunks(publisher, vector[0u16], vector[3u16], vector[b"other"]);
-        cleanup_staging(publisher);
+        open_staging(stager, @0xb, @0xd);
+        stage_chunks(stager, @0xd, vector[1u16, 0u16], vector[0u16, 0u16], vector[b"code", b"metadata"]);
+        open_staging(publisher, @0xc, @0xd);
+        stage_chunks(publisher, @0xd, vector[0u16], vector[3u16], vector[b"other"]);
+        cleanup_staging(publisher, @0xd);
         assert!(!exists<StagingArea>(@0xb), 4);
         assert!(exists<StagingArea>(@0xa), 0);
         assert!(table_with_length::length(&borrow_global<StagingArea>(@0xa).chunks) == 2, 5);
-        cleanup_staging(stager);
+        cleanup_staging(stager, @0xd);
         assert!(!exists<StagingArea>(@0xa), 1);
-        cleanup_staging(stager);
-        open_staging(stager, @0xc);
+        cleanup_staging(stager, @0xd);
+        open_staging(stager, @0xc, @0xd);
         assert!(borrow_global<StagingArea>(@0xa).publisher == @0xc, 2);
         assert!(table_with_length::length(&borrow_global<StagingArea>(@0xa).chunks) == 0, 3);
     }

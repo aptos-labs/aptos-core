@@ -16,7 +16,7 @@ aptos move publish \
   --url http://127.0.0.1:8080 --assume-yes
 ```
 
-The module address is **explicit** in every delegated command; there is no network-specific default. Replace the localnet URL with an intended network only after testing its orderless feature and gas limits.
+The module address is **explicit** in every delegated command; there is no network-specific default. Verify that address belongs to a deployment of the reviewed contract before signing: the CLI checks entry names and the module address, **not** the deployed bytecode's trustworthiness. A malicious contract at a supplied address could ignore the package-hash safeguard. Replace the localnet URL with an intended network only after verifying the deployment, its orderless feature, and gas limits.
 
 ## A stages; B finalizes
 
@@ -42,7 +42,7 @@ aptos move finalize-delegated-package \
   --url http://127.0.0.1:8080 --assume-yes
 ```
 
-Both modes keep position IDs, so rerunning the **same** stage command safely skips identical chunks and submits only missing ones. Existing chunks addressed to another publisher, at unexpected positions, or with different bytes are **not** overwritten. B must pass the same `--chunk-size` used by A to verify positions. Before cleanup, check that another run is not still submitting chunks. Only A can explicitly discard A's staged area:
+Both modes keep position IDs, so rerunning the **same** stage command safely skips identical chunks and submits only missing ones. Existing chunks addressed to another publisher, at unexpected positions, or with different bytes are **not** overwritten. B must pass the same `--chunk-size` used by A to verify positions. Before cleanup, check that another run is not still submitting chunks. Only A can explicitly discard A's staged area. Cleanup is bounded to ten chunks per transaction; the CLI repeats transactions until the resource is gone, so a large upload remains recoverable. Each staging area has a random generation ID; both chunk uploads and cleanup check it on-chain, so delayed transactions cannot write into or delete a replacement staging area:
 
 ```bash
 aptos move cleanup-delegated-staging --module-address "$MODULE_ADDRESS" \
@@ -56,7 +56,7 @@ A pays the initial storage deposits. Removal of the chunks during finalization c
 
 To create a code object, A needs the code-object address **before** compiling. B provides an expected object-seed number equal to B's *current on-chain account sequence number plus one*. Derive the corresponding address with `aptos_types::object_address::create_object_code_deployment_address(B, expected_seed)` (or an equivalent SDK helper), and compile `my_module` at that address. Both commands use `--destination new-object --expected-publisher-sequence "$EXPECTED_SEED"` and `--named-addresses "my_module=$OBJECT_ADDRESS"`. Staging under A does not advance B's sequence. B's final transaction uses B's actual current account sequence (`expected_seed - 1`). This is **not a reservation**: if B sends another sequence-numbered transaction in the meantime, the finalize CLI refuses to submit and leaves A's chunks intact; A may clean up and restage for the new address.
 
-For an upgrade, compile both times with `--named-addresses "my_module=$EXISTING_CODE_OBJECT"`, stage with `--destination upgrade`, and finalize with `--destination upgrade --object-address "$EXISTING_CODE_OBJECT"`. The framework checks that B actually owns the existing object and that the upgrade is compatible. If the framework rejects it, A's staging remains (the Move transaction rolls back) for retry or explicit cleanup.
+For an upgrade, compile both times with `--named-addresses "my_module=$EXISTING_CODE_OBJECT"`, stage with `--destination upgrade --object-address "$EXISTING_CODE_OBJECT"`, and finalize with the same destination and object address. The framework checks that B actually owns the existing object and that the upgrade is compatible. If the framework rejects it, A's staging remains (the Move transaction rolls back) for retry or explicit cleanup.
 
 ## Limits and safety
 

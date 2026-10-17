@@ -54,6 +54,26 @@ pub(crate) async fn chain_orderless_enabled(options: &TransactionOptions) -> Cli
     Ok(features.is_orderless_txns_enabled())
 }
 
+/// Reject a package compiled at any address other than the intended account or code object.
+fn check_compiled_destination(code: &[Vec<u8>], destination: AccountAddress) -> CliTypedResult<()> {
+    if code.is_empty() {
+        return Err(CliError::CommandArgumentError(
+            "Package has no modules".into(),
+        ));
+    }
+    for bytes in code {
+        let module = move_binary_format::CompiledModule::deserialize(bytes)
+            .map_err(|e| CliError::MoveCompilationError(format!("Invalid compiled module: {e}")))?;
+        if module.self_id().address() != &destination {
+            return Err(CliError::CommandArgumentError(format!(
+                "Compiled module {} is not addressed to expected destination {destination}",
+                module.self_id()
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// SHA3-256 of the BCS encoding of (metadata bytes, ordered module byte vectors).
 /// This is byte-for-byte the BCS encoding of Move's two-field PackagePreimage.
 pub(crate) fn package_digest(metadata: &[u8], code: &[Vec<u8>]) -> CliTypedResult<HashValue> {
@@ -75,16 +95,20 @@ fn payload(address: AccountAddress, function: &IdentStr, args: Vec<Vec<u8>>) -> 
 pub(crate) fn open_staging(
     address: AccountAddress,
     publisher: AccountAddress,
+    generation: AccountAddress,
 ) -> TransactionPayload {
-    payload(address, ident_str!("open_staging"), vec![bcs::to_bytes(
-        &publisher,
-    )
-    .expect("address serializes")])
+    payload(address, ident_str!("open_staging"), vec![
+        bcs::to_bytes(&publisher).expect("address serializes"),
+        bcs::to_bytes(&generation).expect("address serializes"),
+    ])
 }
 
 /// A-signed explicit cleanup for a staging area, including one targeting another package.
-fn cleanup_staging(address: AccountAddress) -> TransactionPayload {
-    payload(address, ident_str!("cleanup_staging"), vec![])
+fn cleanup_staging(address: AccountAddress, generation: AccountAddress) -> TransactionPayload {
+    payload(address, ident_str!("cleanup_staging"), vec![bcs::to_bytes(
+        &generation,
+    )
+    .expect("address serializes")])
 }
 
 /// Stage only the selected chunks (possibly the missing subset of a resumed upload).
@@ -93,6 +117,7 @@ fn cleanup_staging(address: AccountAddress) -> TransactionPayload {
 /// as in the existing positional splitter. The latter adds BCS and entry-function overhead.
 pub(crate) fn stage_chunks(
     address: AccountAddress,
+    generation: AccountAddress,
     chunks: Vec<PositionedChunk>,
     chunk_size: usize,
 ) -> Vec<TransactionPayload> {
@@ -108,7 +133,7 @@ pub(crate) fn stage_chunks(
     for chunk in chunks {
         assert!(chunk.bytes.len() <= chunk_size, "chunk exceeds batch size");
         if size + chunk.bytes.len() > chunk_size {
-            result.push(stage_batch(address, &parts, &indices, &bytes));
+            result.push(stage_batch(address, generation, &parts, &indices, &bytes));
             parts.clear();
             indices.clear();
             bytes.clear();
@@ -120,18 +145,20 @@ pub(crate) fn stage_chunks(
         bytes.push(chunk.bytes);
     }
     if !bytes.is_empty() {
-        result.push(stage_batch(address, &parts, &indices, &bytes));
+        result.push(stage_batch(address, generation, &parts, &indices, &bytes));
     }
     result
 }
 
 fn stage_batch(
     address: AccountAddress,
+    generation: AccountAddress,
     parts: &[u16],
     indices: &[u16],
     bytes: &[Vec<u8>],
 ) -> TransactionPayload {
     payload(address, ident_str!("stage_chunks"), vec![
+        bcs::to_bytes(&generation).expect("address serializes"),
         bcs::to_bytes(&parts).expect("part indices serialize"),
         bcs::to_bytes(&indices).expect("chunk indices serialize"),
         bcs::to_bytes(&bytes).expect("chunk bytes serialize"),
@@ -267,12 +294,21 @@ mod tests {
     fn delegated_publish_staging_is_separate_and_positioned() {
         let module = address("0xcafe");
         let publisher = address("0xb");
-        let open = open_staging(module, publisher);
-        assert!(entry(&cleanup_staging(module), module, "cleanup_staging")
-            .args()
-            .is_empty());
+        let generation = address("0xd");
+        let open = open_staging(module, publisher, generation);
+        let cleanup = cleanup_staging(module, generation);
+        let cleanup_args = entry(&cleanup, module, "cleanup_staging").args();
+        assert_eq!(cleanup_args.len(), 1);
+        assert_eq!(
+            bcs::from_bytes::<AccountAddress>(&cleanup_args[0]).unwrap(),
+            generation
+        );
         let args = entry(&open, module, "open_staging").args();
-        assert_eq!(args.len(), 1);
+        assert_eq!(args.len(), 2);
+        assert_eq!(
+            bcs::from_bytes::<AccountAddress>(&args[1]).unwrap(),
+            generation
+        );
         assert_eq!(
             bcs::from_bytes::<AccountAddress>(&args[0]).unwrap(),
             publisher
@@ -288,15 +324,19 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![0, 1, 1 << 32, (1 << 32) | 1, (1 << 32) | 2, 2 << 32]
         );
-        let payloads = stage_chunks(module, package.chunks.clone(), 6);
+        let payloads = stage_chunks(module, generation, package.chunks.clone(), 6);
         assert_eq!(payloads.len(), 3);
         let mut staged = vec![];
         for payload in &payloads {
             let args = entry(payload, module, "stage_chunks").args();
-            assert_eq!(args.len(), 3);
-            let parts: Vec<u16> = bcs::from_bytes(&args[0]).unwrap();
-            let indices: Vec<u16> = bcs::from_bytes(&args[1]).unwrap();
-            let bytes: Vec<Vec<u8>> = bcs::from_bytes(&args[2]).unwrap();
+            assert_eq!(args.len(), 4);
+            assert_eq!(
+                bcs::from_bytes::<AccountAddress>(&args[0]).unwrap(),
+                generation
+            );
+            let parts: Vec<u16> = bcs::from_bytes(&args[1]).unwrap();
+            let indices: Vec<u16> = bcs::from_bytes(&args[2]).unwrap();
+            let bytes: Vec<Vec<u8>> = bcs::from_bytes(&args[3]).unwrap();
             assert!(bytes.iter().map(Vec::len).sum::<usize>() <= 6);
             staged.extend(
                 parts
@@ -314,16 +354,20 @@ mod tests {
                 .map(|c| (c.part, c.index, c.bytes.clone()))
                 .collect::<Vec<_>>()
         );
-        assert!(stage_chunks(module, vec![], 6).is_empty());
+        assert!(stage_chunks(module, generation, vec![], 6).is_empty());
         let staged_positions = [(0, 0), (1, 1)].into_iter().collect();
         let missing = package.missing(&staged_positions);
-        let resumed = stage_chunks(module, missing.clone(), 6);
+        let resumed = stage_chunks(module, generation, missing.clone(), 6);
         let resumed_positions: Vec<(u16, u16)> = resumed
             .iter()
             .flat_map(|payload| {
                 let args = entry(payload, module, "stage_chunks").args();
-                let parts: Vec<u16> = bcs::from_bytes(&args[0]).unwrap();
-                let indices: Vec<u16> = bcs::from_bytes(&args[1]).unwrap();
+                assert_eq!(
+                    bcs::from_bytes::<AccountAddress>(&args[0]).unwrap(),
+                    generation
+                );
+                let parts: Vec<u16> = bcs::from_bytes(&args[1]).unwrap();
+                let indices: Vec<u16> = bcs::from_bytes(&args[2]).unwrap();
                 parts.into_iter().zip(indices).collect::<Vec<_>>()
             })
             .collect();
@@ -351,11 +395,11 @@ mod tests {
                 bytes: vec![2; 1],
             },
         ];
-        let payloads = stage_chunks(module, chunks, CHUNK_SIZE_IN_BYTES);
+        let payloads = stage_chunks(module, address("0xd"), chunks, CHUNK_SIZE_IN_BYTES);
         assert_eq!(payloads.len(), 2);
         for (payload, expected) in payloads.iter().zip([CHUNK_SIZE_IN_BYTES, 1]) {
             let args = entry(payload, module, "stage_chunks").args();
-            let bytes: Vec<Vec<u8>> = bcs::from_bytes(&args[2]).unwrap();
+            let bytes: Vec<Vec<u8>> = bcs::from_bytes(&args[3]).unwrap();
             assert_eq!(bytes.iter().map(Vec::len).sum::<usize>(), expected);
         }
     }
@@ -363,7 +407,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "chunk size must be in")]
     fn delegated_publish_rejects_oversized_batch_budget() {
-        stage_chunks(address("0xcafe"), vec![], CHUNK_SIZE_IN_BYTES + 1);
+        stage_chunks(
+            address("0xcafe"),
+            address("0xd"),
+            vec![],
+            CHUNK_SIZE_IN_BYTES + 1,
+        );
     }
 
     #[test]
@@ -372,6 +421,7 @@ mod tests {
         let package = PositionalChunks::new(b"metadata".to_vec(), vec![b"code".to_vec()], 4);
         let mut area = DelegatedStagingAreaLayout {
             publisher,
+            generation: address("0xd"),
             chunks: DelegatedTableWithLengthLayout {
                 inner: DelegatedTableLayout {
                     handle: address("0xabc"),
@@ -392,6 +442,43 @@ mod tests {
         area.keys[1] = 1u64 << 32;
         area.chunks.length = 3;
         assert!(staged_positions(&area, publisher, &package).is_err());
+    }
+
+    #[test]
+    fn delegated_publish_both_signers_must_bind_same_upgrade_object() {
+        let publisher = address("0xb");
+        let object = address("0xcafe");
+        assert_eq!(
+            check_destination(DelegatedDestination::Account, None, None, publisher).unwrap(),
+            publisher
+        );
+        assert_eq!(
+            check_destination(DelegatedDestination::Upgrade, None, Some(object), publisher)
+                .unwrap(),
+            object
+        );
+        assert!(check_destination(DelegatedDestination::Upgrade, None, None, publisher).is_err());
+        assert!(
+            check_destination(DelegatedDestination::Account, None, Some(object), publisher)
+                .is_err()
+        );
+        assert!(check_destination(
+            DelegatedDestination::NewObject,
+            Some(1),
+            Some(object),
+            publisher
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn delegated_publish_cleanup_requires_progress_until_area_is_gone() {
+        let generation = address("0xd");
+        assert!(check_cleanup_progress(12, Some((generation, 2)), generation).is_ok());
+        assert!(check_cleanup_progress(2, None, generation).is_ok());
+        assert!(check_cleanup_progress(12, Some((generation, 12)), generation).is_err());
+        assert!(check_cleanup_progress(2, Some((generation, 3)), generation).is_err());
+        assert!(check_cleanup_progress(12, Some((address("0xe"), 2)), generation).is_err());
     }
 
     #[test]
@@ -475,6 +562,8 @@ pub struct StageDelegatedPackage {
     publisher: AccountAddress,
     #[clap(long, value_enum, default_value = "account")]
     destination: DelegatedDestination,
+    #[clap(long, value_parser = aptos_cli_common::load_account_arg)]
+    object_address: Option<AccountAddress>,
     /// For a new object: the publisher's current on-chain sequence number + 1.
     #[clap(long)]
     expected_publisher_sequence: Option<u64>,
@@ -539,7 +628,7 @@ async fn check_delegated_module(
     };
     let unsupported = || {
         CliError::CommandArgumentError(format!(
-        "Unsupported delegated_packages module at {address}: expected open_staging and stage_chunks entry functions"
+        "Unsupported delegated_packages module at {address}: expected the stage, cleanup and finalize entry functions"
     ))
     };
     let bytes = bytes.ok_or_else(unsupported)?;
@@ -555,7 +644,20 @@ async fn check_delegated_module(
                 .as_str()
         })
         .collect();
-    if !entries.contains("open_staging") || !entries.contains("stage_chunks") {
+    if ![
+        "open_staging",
+        "stage_chunks",
+        "cleanup_staging",
+        "finalize_to_account",
+        "finalize_to_object",
+        "finalize_upgrade",
+    ]
+    .into_iter()
+    .all(|entry| entries.contains(entry))
+    {
+        return Err(unsupported());
+    }
+    if module.self_id().address() != &address {
         return Err(unsupported());
     }
     Ok(())
@@ -564,6 +666,7 @@ async fn check_delegated_module(
 #[derive(Deserialize)]
 struct DelegatedStagingAreaLayout {
     publisher: AccountAddress,
+    generation: AccountAddress,
     chunks: DelegatedTableWithLengthLayout,
     keys: Vec<u64>,
 }
@@ -635,7 +738,7 @@ async fn read_delegated_staging(
     stager: AccountAddress,
     publisher: AccountAddress,
     package: &PositionalChunks,
-) -> CliTypedResult<Option<HashSet<(u16, u16)>>> {
+) -> CliTypedResult<Option<(AccountAddress, HashSet<(u16, u16)>)>> {
     use aptos_api_types::AptosErrorCode;
     use aptos_rest_client::error::RestError;
     use aptos_transaction_simulation_session::Session;
@@ -680,14 +783,14 @@ async fn read_delegated_staging(
             check_staged_bytes(package, part, index, &bytes)?;
             staged.insert((part, index));
         }
-        Ok(Some(staged))
+        Ok(Some((area.generation, staged)))
     } else {
         let client = options.rest_client()?;
-        let area = match client
+        let response = match client
             .get_account_resource_bcs::<DelegatedStagingAreaLayout>(stager, &name)
             .await
         {
-            Ok(response) => response.into_inner(),
+            Ok(response) => response,
             Err(RestError::Api(response))
                 if response.error.error_code == AptosErrorCode::ResourceNotFound =>
             {
@@ -695,15 +798,20 @@ async fn read_delegated_staging(
             },
             Err(error) => return Err(CliError::from(error)),
         };
+        // Read every chunk from the same ledger snapshot as A's key list. Another process may
+        // stage or clean up concurrently; never mix a current resource with older/newer items.
+        let version = response.state().version;
+        let area = response.into_inner();
         let positions = staged_positions(&area, publisher, package)?;
         let mut staged = HashSet::new();
         for (key, part, index) in positions {
             let bytes = client
-                .get_table_item_bcs::<String, Vec<u8>>(
+                .get_table_item_bcs_at_version::<String, Vec<u8>>(
                     area.chunks.inner.handle,
                     "u64",
                     "vector<u8>",
                     key.to_string(),
+                    version,
                 )
                 .await
                 .map_err(|e| {
@@ -715,7 +823,7 @@ async fn read_delegated_staging(
             check_staged_bytes(package, part, index, &bytes)?;
             staged.insert((part, index));
         }
-        Ok(Some(staged))
+        Ok(Some((area.generation, staged)))
     }
 }
 
@@ -788,9 +896,10 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
                 "--chunk-size must be between 1 and {CHUNK_SIZE_IN_BYTES}"
             )));
         }
-        validate_destination_sequence(
+        let expected_destination = check_destination(
             self.destination,
             self.expected_publisher_sequence,
+            self.object_address,
             self.publisher,
         )?;
         check_delegated_module(options, self.module_address).await?;
@@ -802,6 +911,7 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
         .map_err(|e| CliError::MoveCompilationError(format!("{e:#}")))?;
         let metadata = bcs::to_bytes(&package.extract_metadata()?)?;
         let code = package.extract_code();
+        check_compiled_destination(&code, expected_destination)?;
         let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
         let stager = options.get_public_key_and_address()?.1;
         let staged = read_delegated_staging(
@@ -812,16 +922,23 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
             &chunks,
         )
         .await?;
-        let staged_positions = staged.as_ref().cloned().unwrap_or_default();
+        let generation = staged
+            .as_ref()
+            .map(|(id, _)| *id)
+            .unwrap_or_else(|| AccountAddress::new(rand::random()));
+        let staged_positions = staged
+            .as_ref()
+            .map(|(_, positions)| positions.clone())
+            .unwrap_or_default();
         let missing = chunks.missing(&staged_positions);
-        let payloads = stage_chunks(self.module_address, missing, self.chunk_size);
+        let payloads = stage_chunks(self.module_address, generation, missing, self.chunk_size);
         let mut txn_options = options.clone();
         // Open in its own A-signed committed transaction before any chunk can be sent.
         if staged.is_none() {
             txn_options.replay_protection_type = ReplayProtectionType::Seqnum;
             committed(
                 crate::dispatch_transaction(
-                    open_staging(self.module_address, self.publisher),
+                    open_staging(self.module_address, self.publisher, generation),
                     &txn_options,
                     &self.env,
                 )
@@ -898,20 +1015,11 @@ impl aptos_cli_common::CliCommand<String> for FinalizeDelegatedPackage {
                 "--chunk-size must be between 1 and {CHUNK_SIZE_IN_BYTES}"
             )));
         }
-        if self.destination == DelegatedDestination::Upgrade && self.object_address.is_none() {
-            return Err(CliError::CommandArgumentError(
-                "--object-address is required to upgrade a code object".into(),
-            ));
-        }
-        if self.destination != DelegatedDestination::Upgrade && self.object_address.is_some() {
-            return Err(CliError::CommandArgumentError(
-                "--object-address is only for --destination upgrade".into(),
-            ));
-        }
         let publisher = options.get_public_key_and_address()?.1;
-        validate_destination_sequence(
+        let expected_destination = check_destination(
             self.destination,
             self.expected_publisher_sequence,
+            self.object_address,
             publisher,
         )?;
         if let Some(expected) = self.expected_publisher_sequence {
@@ -931,9 +1039,10 @@ impl aptos_cli_common::CliCommand<String> for FinalizeDelegatedPackage {
         .map_err(|e| CliError::MoveCompilationError(format!("{e:#}")))?;
         let metadata = bcs::to_bytes(&package.extract_metadata()?)?;
         let code = package.extract_code();
+        check_compiled_destination(&code, expected_destination)?;
         let digest = package_digest(&metadata, &code)?;
         let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
-        let staged = read_delegated_staging(
+        let (_, staged) = read_delegated_staging(
             options,
             self.module_address,
             self.stager,
@@ -982,6 +1091,31 @@ impl aptos_cli_common::CliCommand<String> for FinalizeDelegatedPackage {
     }
 }
 
+/// Require A and B to agree on the account, the exact new object seed or the upgrade object.
+fn check_destination(
+    destination: DelegatedDestination,
+    expected_sequence: Option<u64>,
+    object: Option<AccountAddress>,
+    publisher: AccountAddress,
+) -> CliTypedResult<AccountAddress> {
+    match (destination, object) {
+        (DelegatedDestination::Upgrade, Some(address)) => {
+            validate_destination_sequence(destination, expected_sequence, publisher)?;
+            Ok(address)
+        },
+        (DelegatedDestination::Upgrade, None) => Err(CliError::CommandArgumentError(
+            "--object-address is required to upgrade a code object".into(),
+        )),
+        (_, Some(_)) => Err(CliError::CommandArgumentError(
+            "--object-address is only for --destination upgrade".into(),
+        )),
+        (_, None) => Ok(
+            validate_destination_sequence(destination, expected_sequence, publisher)?
+                .unwrap_or(publisher),
+        ),
+    }
+}
+
 /// The expected object seed is the publisher's current sequence number plus one.
 fn validate_destination_sequence(
     destination: DelegatedDestination,
@@ -1019,6 +1153,20 @@ async fn publisher_sequence_number(
     }
 }
 
+/// A cleanup must remove entries or the area; otherwise repeating it cannot make progress.
+fn check_cleanup_progress(
+    before: usize,
+    after: Option<(AccountAddress, usize)>,
+    generation: AccountAddress,
+) -> CliTypedResult<()> {
+    if after.is_some_and(|(id, remaining)| id != generation || remaining >= before) {
+        return Err(CliError::UnexpectedError(
+            "Delegated cleanup did not reduce the number of staged chunks".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Discard an incomplete delegated package. Only its stager's signer can do this.
 #[derive(clap::Parser)]
 pub struct CleanupDelegatedStaging {
@@ -1048,10 +1196,78 @@ impl aptos_cli_common::CliCommand<String> for CleanupDelegatedStaging {
         check_delegated_module(&self.txn_options, self.module_address).await?;
         let mut options = self.txn_options;
         options.replay_protection_type = ReplayProtectionType::Seqnum;
-        committed(
-            crate::dispatch_transaction(cleanup_staging(self.module_address), &options, &self.env)
+        let stager = options.get_public_key_and_address()?.1;
+        let mut before = delegated_staging_key_count(&options, self.module_address, stager).await?;
+        let Some((generation, mut remaining)) = before else {
+            return Ok("No delegated staging area to clean".into());
+        };
+        while before.is_some() {
+            committed(
+                crate::dispatch_transaction(
+                    cleanup_staging(self.module_address, generation),
+                    &options,
+                    &self.env,
+                )
                 .await,
-        )?;
+            )?;
+            let after = delegated_staging_key_count(&options, self.module_address, stager).await?;
+            check_cleanup_progress(remaining, after, generation)?;
+            before = after;
+            if let Some((_, next)) = after {
+                remaining = next;
+            }
+        }
         Ok("Signing stager's delegated staging area cleaned up".into())
+    }
+}
+
+/// Read only the number of remaining chunks; cleanup is allowed for stale or unknown packages.
+async fn delegated_staging_key_count(
+    options: &TransactionOptions,
+    module: AccountAddress,
+    stager: AccountAddress,
+) -> CliTypedResult<Option<(AccountAddress, usize)>> {
+    use aptos_api_types::AptosErrorCode;
+    use aptos_rest_client::error::RestError;
+    use aptos_transaction_simulation_session::Session;
+    use aptos_types::state_store::{state_key::StateKey, TStateView};
+    use move_core_types::language_storage::StructTag;
+
+    let name = format!("{module}::delegated_packages::StagingArea");
+    if let Some(path) = &options.session {
+        let tag =
+            StructTag::from_str(&name).map_err(|e| CliError::UnexpectedError(e.to_string()))?;
+        let key = StateKey::resource(&stager, &tag)
+            .map_err(|e| CliError::UnexpectedError(e.to_string()))?;
+        let bytes = Session::load(path)?
+            .state_store()
+            .get_state_value_bytes(&key)
+            .map_err(|e| CliError::UnexpectedError(format!("Failed to read staging area: {e}")))?;
+        bytes
+            .map(|raw| {
+                bcs::from_bytes::<DelegatedStagingAreaLayout>(&raw)
+                    .map(|area| (area.generation, area.keys.len()))
+                    .map_err(|e| {
+                        CliError::UnexpectedError(format!("Invalid delegated staging area: {e}"))
+                    })
+            })
+            .transpose()
+    } else {
+        match options
+            .rest_client()?
+            .get_account_resource_bcs::<DelegatedStagingAreaLayout>(stager, &name)
+            .await
+        {
+            Ok(response) => {
+                let area = response.into_inner();
+                Ok(Some((area.generation, area.keys.len())))
+            },
+            Err(RestError::Api(response))
+                if response.error.error_code == AptosErrorCode::ResourceNotFound =>
+            {
+                Ok(None)
+            },
+            Err(error) => Err(CliError::from(error)),
+        }
     }
 }
