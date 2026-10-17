@@ -39,6 +39,9 @@ module delegated_packages::delegated_packages {
     const EUNEXPECTED_CHUNKS: u64 = 8;
     /// A stage or cleanup request names a different staging generation.
     const EWRONG_GENERATION: u64 = 9;
+    /// More chunks than one final transaction can safely remove.
+    const ETOO_MANY_CHUNKS: u64 = 10;
+    const MAX_PACKAGE_CHUNKS: u64 = 100;
 
     /// BCS encoding of this struct commits to the ordered metadata and module bytes.
     struct PackagePreimage has drop {
@@ -91,6 +94,8 @@ module delegated_packages::delegated_packages {
                 assert!(table_with_length::borrow(&area.chunks, key) == bytes,
                     error::aborted(ECHUNK_CONFLICT));
             } else {
+                assert!(vector::length(&area.keys) < MAX_PACKAGE_CHUNKS,
+                    error::invalid_argument(ETOO_MANY_CHUNKS));
                 table_with_length::add(&mut area.chunks, key, *bytes);
                 vector::push_back(&mut area.keys, key);
             };
@@ -175,6 +180,8 @@ module delegated_packages::delegated_packages {
         assert!(borrow_global<StagingArea>(stager).publisher == publisher,
             error::permission_denied(EWRONG_PUBLISHER));
         assert!(vector::length(&counts) > 1, error::invalid_state(EMISSING_CHUNK));
+        assert!(vector::length(&borrow_global<StagingArea>(stager).keys) <= MAX_PACKAGE_CHUNKS,
+            error::invalid_argument(ETOO_MANY_CHUNKS));
         let StagingArea { publisher: _, generation: _, chunks, keys: _ } = move_from<StagingArea>(stager);
         let metadata = take_part(&mut chunks, 0, *vector::borrow(&counts, 0));
         let code = vector[];
@@ -390,6 +397,17 @@ module delegated_packages::delegated_packages {
         open_staging(stager, signer::address_of(other), @0xd);
         stage_chunks(stager, @0xd, vector[0u16, 1u16], vector[0u16, 0u16], vector[metadata, b"new code"]);
         finalize_upgrade(other, @0xa, vector[1u16, 1u16], digest, code_object);
+    }
+
+    #[test(stager = @0xa)]
+    #[expected_failure(abort_code = 0x1000a, location = Self)]
+    fun test_staging_refuses_more_chunks_than_finalization_can_remove(stager: &signer) {
+        open_staging(stager, @0xb, @0xd);
+        let i = 0u16;
+        while (i <= 100) {
+            stage_chunks(stager, @0xd, vector[1u16], vector[i], vector[b"x"]);
+            i = i + 1;
+        };
     }
 
     #[test(stager = @0xa)]

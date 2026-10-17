@@ -17,6 +17,18 @@ use move_core_types::{
 use serde::Deserialize;
 use std::{collections::HashSet, str::FromStr};
 
+/// Conservative upper bound on chunks deleted by a single finalization transaction.
+const MAX_PACKAGE_CHUNKS: usize = 100;
+
+fn check_package_chunk_count(count: usize) -> CliTypedResult<()> {
+    if count > MAX_PACKAGE_CHUNKS {
+        return Err(CliError::CommandArgumentError(format!(
+            "Package needs {count} chunks, exceeding the {MAX_PACKAGE_CHUNKS}-chunk finalization limit. Increase --chunk-size before staging."
+        )));
+    }
+    Ok(())
+}
+
 /// Replay protection for the staging transactions only. Finalization chooses independently.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub(crate) enum StageMode {
@@ -472,6 +484,15 @@ mod tests {
     }
 
     #[test]
+    fn delegated_publish_rejects_unfinalizable_chunk_count_before_staging() {
+        assert!(check_package_chunk_count(100).is_ok());
+        assert!(check_package_chunk_count(101)
+            .unwrap_err()
+            .to_string()
+            .contains("Increase --chunk-size"));
+    }
+
+    #[test]
     fn delegated_publish_cleanup_requires_progress_until_area_is_gone() {
         let generation = address("0xd");
         assert!(check_cleanup_progress(12, Some((generation, 2)), generation).is_ok());
@@ -913,6 +934,7 @@ impl aptos_cli_common::CliCommand<String> for StageDelegatedPackage {
         let code = package.extract_code();
         check_compiled_destination(&code, expected_destination)?;
         let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
+        check_package_chunk_count(chunks.chunks.len())?;
         let stager = options.get_public_key_and_address()?.1;
         let staged = read_delegated_staging(
             options,
@@ -1042,6 +1064,7 @@ impl aptos_cli_common::CliCommand<String> for FinalizeDelegatedPackage {
         check_compiled_destination(&code, expected_destination)?;
         let digest = package_digest(&metadata, &code)?;
         let chunks = PositionalChunks::new(metadata, code, self.chunk_size);
+        check_package_chunk_count(chunks.chunks.len())?;
         let (_, staged) = read_delegated_staging(
             options,
             self.module_address,
