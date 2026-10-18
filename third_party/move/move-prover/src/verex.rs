@@ -249,8 +249,10 @@ fn apply_scope(
 /// the others linked as dependencies, each function within
 /// `settings.heartbeats` unless its `pragma heartbeats` says otherwise (every
 /// function automatically with `settings.ignore_proofs`), writes their
-/// VerexSL rendering to `output`, and reports its messages, one per line in
-/// the Move sources' coordinates, to `writer`. Fails when the verifier
+/// VerexSL rendering where the source's proof files find it (the verifier
+/// chooses the place: `build/` of a package, `.verex/` beside a file of no
+/// package), and reports its messages, one per line in the Move sources'
+/// coordinates, to `writer`. Fails when the verifier
 /// reports an error. Logs the time since `start_time` spent building the
 /// model, exporting it, and verifying it; the verifier reports its phases.
 pub fn verify(
@@ -259,7 +261,6 @@ pub fn verify(
     filter: Option<&str>,
     scope: &VerificationScope,
     settings: &Settings,
-    output: &Path,
     writer: &mut impl Write,
     start_time: Instant,
 ) -> Result<()> {
@@ -284,12 +285,8 @@ pub fn verify(
             dumped.to_pretty_json() + "\n",
         )?;
     }
-    if let Some(parent) = output.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
     // The paths the verifier receives are absolute but for the source, which
     // the export records relative to the current directory.
-    let output = std::path::absolute(output)?;
     let mut command = Command::new(&runner.program);
     command
         .envs(runner.env.iter().map(|(name, value)| (name, value)))
@@ -297,9 +294,7 @@ pub fn verify(
         .arg("verify")
         .arg(source)
         .arg("--export")
-        .arg(export.path())
-        .arg("--output")
-        .arg(&output);
+        .arg(export.path());
     if let Some(filter) = filter {
         command.arg("--filter").arg(filter);
     }

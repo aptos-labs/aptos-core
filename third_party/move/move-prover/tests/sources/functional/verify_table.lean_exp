@@ -1,11 +1,6 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/verify_table.move:15:5: error: `add` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:30:5: error: `add_fail` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:40:5: error: `add_fail_exists` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:49:5: error: `remove` calls the native `0x2::table::remove_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:62:5: error: `contains_and_length` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:74:5: error: `borrow` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:88:5: error: `borrow_mut` calls the native `0x2::table::borrow_box_mut`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:116:5: error: `add_R` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:128:5: error: `add_R_fail` calls the native `0x2::table::add_box`, which has neither a specification nor a prelude model; specify it
-tests/sources/functional/verify_table.move:143:5: error: `borrow_mut_R` calls the native `0x2::table::borrow_box_mut`, which has neither a specification nor a prelude model; specify it
+tests/sources/functional/verify_table.move:31:9: error: the specification clause `ensures spec_get(result, 1) == 1` is not established
+tests/sources/functional/verify_table.move:30:5: error: verex verification failed: the automatic verification of `add_fail` failed; provide a proof: `verify add_fail by …` in `tests/sources/functional/verify_table.proof.lean` (`verify add_fail by verex_obligations` lists its obligations)
+tests/sources/functional/verify_table.move:134:9: error: the specification clause `ensures spec_get(result.t, k2) == 22` is not established
+tests/sources/functional/verify_table.move:133:9: error: the specification clause `ensures spec_get(result.t, k1) == 23` is not established
+tests/sources/functional/verify_table.move:128:5: error: verex verification failed: the automatic verification of `add_R_fail` failed; provide a proof: `verify add_R_fail by …` in `tests/sources/functional/verify_table.proof.lean` (`verify add_R_fail by verex_obligations` lists its obligations)

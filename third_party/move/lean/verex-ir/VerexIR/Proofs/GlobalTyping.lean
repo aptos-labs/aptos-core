@@ -52,7 +52,7 @@ inductive Denote.NTy.TypedAs (unit : ValidatedUnit) : NTy → SemTy → Prop
         some (declaringNs, declared))
       (resolve : ResolvesAll declaringNs.tables arguments.toArray
         (declared.toList.map (·.type.typeId)) fieldTypes)
-      (typed : Denote.NRow.TypedAs unit fields fieldTypes) :
+      (typed : Denote.NRow.FieldsTypedAs unit nativeArguments fields fieldTypes) :
       Denote.NTy.TypedAs unit (.struct source nativeArguments fields) (.nominal name arguments)
   /-- An enum whose every variant's row reads as that variant's fields. -/
   | enum {source : StructHandle} {nativeArguments : NRow} {names : List String} {rows : NRows}
@@ -84,6 +84,17 @@ inductive Denote.NRow.TypedAs (unit : ValidatedUnit) : NRow → List SemTy → P
   | cons {τ : NTy} {rest : NRow} {type : SemTy} {types : List SemTy} :
       Denote.NTy.TypedAs unit τ type → Denote.NRow.TypedAs unit rest types →
         Denote.NRow.TypedAs unit (.cons τ rest) (type :: types)
+
+/-- A struct's field row reading as its declared field types: the declared
+fields in order, then a hidden contents field, if any, at the owner's key
+and value arguments. -/
+inductive Denote.NRow.FieldsTypedAs (unit : ValidatedUnit) : NRow → NRow → List SemTy → Prop
+  | nil {arguments : NRow} : Denote.NRow.FieldsTypedAs unit arguments .nil []
+  | hidden {key value : NTy} :
+      Denote.NRow.FieldsTypedAs unit (.cons key (.cons value .nil)) (.cons (.table key value) .nil) []
+  | cons {arguments : NRow} {τ : NTy} {rest : NRow} {type : SemTy} {types : List SemTy} :
+      Denote.NTy.TypedAs unit τ type → Denote.NRow.FieldsTypedAs unit arguments rest types →
+        Denote.NRow.FieldsTypedAs unit arguments (.cons τ rest) (type :: types)
 
 /-- A row of native types reading as type arguments. -/
 inductive Denote.NRow.ArgumentsTypedAs (unit : ValidatedUnit) : NRow → List SemArg → Prop
@@ -189,7 +200,7 @@ theorem Denote.NTy.typedAs_of_core {unit : ValidatedUnit} :
                     (NRow.argumentsTypedAs_of_check nativeArguments arguments typedArguments)
                     declaration_eq
                     (declaredTypes?_resolves resolved)
-                    (NRow.typedAs_of_check fields fieldTypes checked)
+                    (NRow.fieldsTypedAs_of_check nativeArguments fields fieldTypes checked)
               · cases checked
           · cases checked
       | _ => simp only [NTy.typedAsCore, Bool.false_eq_true] at checked
@@ -239,6 +250,28 @@ theorem Denote.NRow.typedAs_of_check {unit : ValidatedUnit} :
         (NRow.typedAs_of_check rest types checked.2)
   | .nil, _ :: _, checked | .cons _ _, [], checked => by
       simp only [NRow.typedAsCheck, Bool.false_eq_true] at checked
+
+theorem Denote.NRow.fieldsTypedAs_of_check {unit : ValidatedUnit} (arguments : NRow) :
+    (row : NRow) → (types : List SemTy) → NRow.fieldsCheck unit arguments row types = true →
+      NRow.FieldsTypedAs unit arguments row types
+  | .nil, [], _ => .nil
+  | .cons τ .nil, [], checked => by
+      simp only [NRow.fieldsCheck] at checked
+      split at checked
+      · next key value =>
+          simp only [beq_iff_eq] at checked
+          subst checked
+          exact .hidden
+      · cases checked
+  | .cons τ .nil, [type], checked => by
+      simp only [NRow.fieldsCheck] at checked
+      exact .cons (NTy.typedAs_of_core τ _ checked) .nil
+  | .cons τ (.cons σ rest), type :: types, checked => by
+      simp only [NRow.fieldsCheck, Bool.and_eq_true] at checked
+      exact .cons (NTy.typedAs_of_core τ _ checked.1)
+        (NRow.fieldsTypedAs_of_check arguments (.cons σ rest) types checked.2)
+  | .nil, _ :: _, checked | .cons _ (.cons _ _), [], checked | .cons _ .nil, _ :: _ :: _, checked => by
+      simp only [NRow.fieldsCheck, Bool.false_eq_true] at checked
 
 theorem Denote.NRow.argumentsTypedAs_of_check {unit : ValidatedUnit} :
     (row : NRow) → (arguments : List SemArg) → row.argumentsCheck unit arguments = true →
@@ -411,7 +444,7 @@ theorem Denote.NTy.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
       simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
       simp only [NTy.substWith, SemTy.subst]
       refine .struct name_eq ?_ (NRow.ArgumentsTypedAs.subst agree typedArguments mentioned.1)
-        declaration_eq ?_ (NRow.TypedAs.subst agree typed mentioned.2)
+        declaration_eq ?_ (NRow.FieldsTypedAs.subst agree typed mentioned.2)
       · rw [SemArg.substList_eq_map, List.length_map]; exact arity
       · rw [← SemArg.toArray_substList]; exact ResolvesAll.subst arguments resolve
   | _, _, .enum name_eq arity typedArguments nonempty names_eq variants, mentioned => by
@@ -446,6 +479,20 @@ theorem Denote.NRow.TypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool
       simp only [NRow.paramsAll, Bool.and_eq_true] at mentioned
       exact .cons (NTy.TypedAs.subst agree head mentioned.1)
         (NRow.TypedAs.subst agree tail mentioned.2)
+
+theorem Denote.NRow.FieldsTypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
+    {types : Nat → NTy} {arguments : Array SemArg}
+    (agree : ArgumentsAgree unit allowed types arguments) :
+    {nativeArguments row : NRow} → {semTypes : List SemTy} →
+      NRow.FieldsTypedAs unit nativeArguments row semTypes → row.paramsAll allowed = true →
+      NRow.FieldsTypedAs unit (nativeArguments.substWith types) (row.substWith types)
+        (semTypes.map (·.subst arguments))
+  | _, _, _, .nil, _ => .nil
+  | _, _, _, .hidden, _ => .hidden
+  | _, _, _, .cons head tail, mentioned => by
+      simp only [NRow.paramsAll, Bool.and_eq_true] at mentioned
+      exact .cons (NTy.TypedAs.subst agree head mentioned.1)
+        (NRow.FieldsTypedAs.subst agree tail mentioned.2)
 
 theorem Denote.NRow.ArgumentsTypedAs.subst {unit : ValidatedUnit} {allowed : Nat → Bool}
     {types : Nat → NTy} {arguments : Array SemArg}
@@ -690,6 +737,7 @@ def Denote.NTy.closureFree : NTy → Bool
   | .struct _ _ fields => Denote.NRow.closureFree fields
   | .enum _ _ _ rows _ => Denote.NRows.closureFree rows
   | .vector element => Denote.NTy.closureFree element
+  | .table key value => Denote.NTy.closureFree key && Denote.NTy.closureFree value
   | .ref referent => Denote.NTy.closureFree referent
   | .unit | .bool | .int _ _ | .address | .signer | .string | .bytes | .param _ => true
 
@@ -791,78 +839,122 @@ theorem holdsAt_val (pointerWidth : Option Nat) {width : Nat} {signed : Bool}
   simp only [IntegerValueFits] at fits
   simp [StaticTyping.holdsAt, StaticTyping.targetWidth, fits]
 
+/-- A type that reads as a semantic type is no map's contents. -/
+theorem Denote.NTy.TypedAs.not_table {unit : ValidatedUnit} {τ : NTy} {type : SemTy}
+    (typed : τ.TypedAs unit type) : τ.isTable = false := by
+  cases typed with
+  | scalar scalar => cases τ <;> simp_all [NTy.scalarType?, NTy.isTable]
+  | _ => rfl
+
+/-- A scalar type holds no map contents. -/
+theorem Denote.NTy.tableFree_of_scalarType {τ : NTy} {type : SemTy}
+    (scalar : τ.scalarType? = some type) : τ.tableFree = true := by
+  cases τ <;> simp_all [NTy.scalarType?, NTy.tableFree]
+
 section
 variable {unit : Validation.ValidatedUnit} [Skolems unit]
 
 mutual
-/-- A native value's encoding inhabits the semantic type its type reads as,
-where the type is closed, holds no reference, and states no function type. -/
-theorem Denote.NTy.TypedAs.encode {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
+/-- A native value's physical value inhabits the semantic type its type reads
+as, where the type is closed, holds no reference, and states no function
+type. -/
+theorem Denote.NTy.TypedAs.erase {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
     {τ : NTy} → {type : SemTy} → τ.TypedAs unit type → τ.paramFree = true →
       τ.refFree = true → τ.closureFree = true → (value : τ.carrier) →
-      HasType unit loans (τ.encode value) type
-  | _, _, .scalar scalar, _, _, _, value => NTy.encode_hasType _ scalar value
-  | _, _, .unit, _, _, _, _ => .unit
+      HasType unit loans (τ.erase value) type
+  | _, _, .scalar scalar, _, _, _, value => by
+      rw [NTy.erase_eq_encode _ (NTy.tableFree_of_scalarType scalar)]
+      exact NTy.encode_hasType _ scalar value
+  | _, _, .unit, _, _, _, _ => by
+      simp only [NTy.erase, NTy.encode_unit]
+      exact .unit
   | _, _, .tuple typed, closed, plain, closureFree, values => by
       simp only [NTy.paramFree, NTy.refFree, NTy.closureFree] at closed plain closureFree
-      rw [NTy.encode_tuple]
-      exact .tuple _ _ (by simpa using NRow.TypedAs.encode typed closed plain closureFree values)
+      simp only [NTy.erase]
+      exact .tuple _ _ (by simpa using NRow.TypedAs.erase typed closed plain closureFree values)
   | _, _, .vector typed, closed, plain, closureFree, values => by
       simp only [NTy.paramFree, NTy.refFree, NTy.closureFree] at closed plain closureFree
-      rw [NTy.encode_vector]
+      simp only [NTy.erase]
       refine .vector _ _ none trivial (HasTypeEach.of_forall _ fun value member => ?_)
       simp only [Array.toList_map, List.mem_map] at member
       obtain ⟨element, -, rfl⟩ := member
-      exact NTy.TypedAs.encode typed closed plain closureFree element
+      exact NTy.TypedAs.erase typed closed plain closureFree element
   | _, _, .struct name_eq _ _ declaration_eq resolve typed, closed, plain, closureFree, values => by
       simp only [NTy.paramFree, Bool.and_eq_true] at closed
       simp only [NTy.refFree, NTy.closureFree] at plain closureFree
-      rw [NTy.encode_struct]
+      simp only [NTy.erase]
       exact .nominal _ none _ _ _ _ _ _ name_eq declaration_eq resolve
-        (by simpa using NRow.TypedAs.encode typed closed.2 plain closureFree values)
+        (by simpa using NRow.FieldsTypedAs.erase typed closed.2 plain closureFree values)
   | _, _, .enum name_eq _ _ _ _ variants, closed, plain, closureFree, value => by
       simp only [NTy.paramFree, Bool.and_eq_true] at closed
       simp only [NTy.refFree, NTy.closureFree] at plain closureFree
-      exact NRows.VariantsTypedAs.encode name_eq variants closed.2 plain closureFree _ value
+      simp only [NTy.erase]
+      exact NRows.VariantsTypedAs.erase name_eq variants closed.2 plain closureFree value
   | _, _, .ref _, _, plain, _, _ => by simp [NTy.refFree] at plain
   | _, _, .param _, closed, _, _, _ => by simp [NTy.paramFree] at closed
   | _, _, .function _ _ _, _, _, closureFree, _ => by simp [NTy.closureFree] at closureFree
 
-/-- A row of native values encodes as values of the row's semantic types. -/
-theorem Denote.NRow.TypedAs.encode {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
+/-- A row of native values' physical values inhabit the row's semantic types. -/
+theorem Denote.NRow.TypedAs.erase {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
     {row : NRow} → {types : List SemTy} → row.TypedAs unit types → row.paramFree = true →
       row.refFree = true → row.closureFree = true → (values : HList row) →
-      HasTypes unit loans (HList.encode values) types
-  | _, _, .nil, _, _, _, _ => .nil
+      HasTypes unit loans (HList.erase row values) types
+  | _, _, .nil, _, _, _, _ => by
+      simp only [HList.erase]
+      exact .nil
   | _, _, .cons head tail, closed, plain, closureFree, values => by
       simp only [NRow.paramFree, Bool.and_eq_true] at closed
       simp only [NRow.refFree, NRow.closureFree, Bool.and_eq_true] at plain closureFree
-      exact .cons (NTy.TypedAs.encode head closed.1 plain.1 closureFree.1 values.1)
-        (NRow.TypedAs.encode tail closed.2 plain.2 closureFree.2 values.2)
+      simp only [HList.erase]
+      exact .cons (NTy.TypedAs.erase head closed.1 plain.1 closureFree.1 values.1)
+        (NRow.TypedAs.erase tail closed.2 plain.2 closureFree.2 values.2)
 
-/-- An enum's value encodes as a value of its nominal type, its variant's
+/-- A struct's physical fields inhabit its declared field types: a hidden
+contents field is dropped. -/
+theorem Denote.NRow.FieldsTypedAs.erase {unit : ValidatedUnit} [Skolems unit] {loans : LoanTypes} :
+    {arguments row : NRow} → {types : List SemTy} → NRow.FieldsTypedAs unit arguments row types →
+      row.paramFree = true → row.refFree = true → row.closureFree = true → (values : HList row) →
+      HasTypes unit loans (HList.eraseFields row values) types
+  | _, _, _, .nil, _, _, _, _ => by
+      simp only [HList.eraseFields]
+      exact .nil
+  | _, _, _, .hidden, _, _, _, _ => by
+      simp only [HList.eraseFields, NTy.isTable, ite_true]
+      exact .nil
+  | _, _, _, .cons (rest := rest) head tail, closed, plain, closureFree, values => by
+      simp only [NRow.paramFree, Bool.and_eq_true] at closed
+      simp only [NRow.refFree, NRow.closureFree, Bool.and_eq_true] at plain closureFree
+      cases rest with
+      | nil =>
+          cases tail
+          simp only [HList.eraseFields, head.not_table, Bool.false_eq_true, ite_false]
+          exact .cons (NTy.TypedAs.erase head closed.1 plain.1 closureFree.1 values.1) .nil
+      | cons σ rest =>
+          simp only [HList.eraseFields]
+          exact .cons (NTy.TypedAs.erase head closed.1 plain.1 closureFree.1 values.1)
+            (NRow.FieldsTypedAs.erase tail closed.2 plain.2 closureFree.2 values.2)
+
+/-- An enum value's physical value inhabits its nominal type, its variant's
 fields at that variant's declared types. -/
-theorem Denote.NRows.VariantsTypedAs.encode {unit : ValidatedUnit} [Skolems unit]
-    {loans : LoanTypes} {source : StructHandle} {nativeArguments : NRow} {name : QualifiedName}
+theorem Denote.NRows.VariantsTypedAs.erase {unit : ValidatedUnit} [Skolems unit]
+    {loans : LoanTypes} {source : StructHandle} {name : QualifiedName}
     {arguments : List SemArg} (name_eq : SemanticOperations.structName? unit source = some name) :
     {names : List String} → {rows : NRows} →
       NRows.VariantsTypedAs unit source arguments names rows → rows.paramFree = true →
-      rows.refFree = true → rows.closureFree = true → (distinct : names.Nodup) →
-      (value : variantCarrier names rows) →
-      HasType unit loans (NTy.encode (.enum source nativeArguments names rows distinct) value)
-        (.nominal name arguments)
-  | _, _, .nil, _, _, _, _, value => nomatch value
-  | _, _, .cons declaration_eq resolve typed _, closed, plain, closureFree, _, .inl values => by
+      rows.refFree = true → rows.closureFree = true → (value : variantCarrier names rows) →
+      HasType unit loans (variantCarrier.erase source names rows value) (.nominal name arguments)
+  | _, _, .nil, _, _, _, value => nomatch value
+  | _, _, .cons declaration_eq resolve typed _, closed, plain, closureFree, .inl values => by
       simp only [NRows.paramFree, Bool.and_eq_true] at closed
       simp only [NRows.refFree, NRows.closureFree, Bool.and_eq_true] at plain closureFree
-      rw [NTy.encode_enum_inl]
+      simp only [variantCarrier.erase]
       exact .nominal _ _ _ _ _ _ _ _ name_eq declaration_eq resolve
-        (by simpa using NRow.TypedAs.encode typed closed.1 plain.1 closureFree.1 values)
-  | _, _, .cons _ _ _ later, closed, plain, closureFree, distinct, .inr value => by
+        (by simpa using NRow.TypedAs.erase typed closed.1 plain.1 closureFree.1 values)
+  | _, _, .cons _ _ _ later, closed, plain, closureFree, .inr value => by
       simp only [NRows.paramFree, Bool.and_eq_true] at closed
       simp only [NRows.refFree, NRows.closureFree, Bool.and_eq_true] at plain closureFree
-      rw [NTy.encode_enum_inr]
-      exact NRows.VariantsTypedAs.encode name_eq later closed.2 plain.2 closureFree.2 _ value
+      simp only [variantCarrier.erase]
+      exact NRows.VariantsTypedAs.erase name_eq later closed.2 plain.2 closureFree.2 value
 end
 
 end

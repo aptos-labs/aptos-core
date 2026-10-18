@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "verify_vector.move"
+verex proofs where
+
 -- Swapping with the final entry and removing it is an update followed by truncation.
 theorem swap_erase_last {α : Type} (xs : Array α) (i : Nat) (within : i < xs.size) :
     (xs.swapIfInBounds i (xs.size - 1)).eraseIdxIfInBounds (xs.size - 1) =

@@ -201,6 +201,11 @@ pub struct RocksdbConfigs {
     pub index_db_config: RocksdbConfig,
     #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
+    /// Attach native-position storage on open: the position KV and JMT DBs
+    /// and the resident index. The on-chain `TRADING_NATIVE` and
+    /// `NATIVE_POSITION` features gate the writes themselves.
+    #[serde(default)]
+    pub enable_trading_native: bool,
     pub high_priority_background_threads: i32,
     pub low_priority_background_threads: i32,
     /// The size of the single block cache shared by all the DB instances in `AptosDB`.
@@ -235,6 +240,7 @@ impl Default for RocksdbConfigs {
                 ..Default::default()
             },
             enable_storage_sharding: true,
+            enable_trading_native: false,
             high_priority_background_threads: 4,
             low_priority_background_threads: 4,
             shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,

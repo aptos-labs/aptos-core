@@ -166,6 +166,39 @@ def Proofs.Denote.StorageEncodesReturned (unit : Validation.ValidatedUnit)
     (results : Array RuntimeValue) : Prop :=
   Proofs.Denote.StorageEncodes unit memory (state.resolveReturned results)
 
+/-- A run's exit, its returned loans resolved at the row supplied: stores
+encoding the final memory, and the tables the results and the arguments'
+prophecies hold in native storage. -/
+def Proofs.Denote.ReturnedEncloses (unit : Validation.ValidatedUnit) [Proofs.Denote.Skolems unit]
+    (memory : Proofs.Denote.Memory unit) (state : RuntimeState) (results : Array RuntimeValue)
+    (tables : List (Proofs.Denote.NTy × String × RuntimeValue)) : Prop :=
+  Proofs.Denote.Encloses unit memory (state.resolveReturned results) tables
+
+theorem Proofs.Denote.ReturnedEncloses.stores {unit : Validation.ValidatedUnit}
+    [Proofs.Denote.Skolems unit] {memory : Proofs.Denote.Memory unit} {state : RuntimeState}
+    {results : Array RuntimeValue} {tables : List (Proofs.Denote.NTy × String × RuntimeValue)}
+    (held : Proofs.Denote.ReturnedEncloses unit memory state results tables) :
+    Proofs.Denote.StorageEncodesReturned unit memory state results :=
+  Proofs.Denote.Encloses.stores held
+
+theorem Proofs.Denote.ReturnedEncloses.of_nil {unit : Validation.ValidatedUnit}
+    [Proofs.Denote.Skolems unit] {memory : Proofs.Denote.Memory unit} {state : RuntimeState}
+    {results : Array RuntimeValue}
+    (stores : Proofs.Denote.StorageEncodesReturned unit memory state results)
+    {tables : List (Proofs.Denote.NTy × String × RuntimeValue)} (nil : tables = []) :
+    Proofs.Denote.ReturnedEncloses unit memory state results tables :=
+  Proofs.Denote.Encloses.of_nil stores nil
+
+theorem Proofs.Denote.ReturnedEncloses.instantiate {unit : Validation.ValidatedUnit}
+    (θ : Proofs.Denote.TypeArgs) (Θ : Proofs.Denote.Skolems unit) (memory : Proofs.Denote.Memory unit)
+    (state : RuntimeState) (results : Array RuntimeValue)
+    (tables : List (Proofs.Denote.NTy × String × RuntimeValue)) :
+    @Proofs.Denote.ReturnedEncloses unit (Proofs.Denote.Skolems.instantiate θ Θ) memory state results
+        tables ↔
+      @Proofs.Denote.ReturnedEncloses unit Θ memory state results
+        (tables.map (Proofs.Denote.tableSubst θ)) :=
+  Proofs.Denote.Encloses.instantiate θ Θ memory (state.resolveReturned results) tables
+
 theorem RuntimeState.resolveReturned_plain (results : Array RuntimeValue)
     (plain : ∀ result ∈ results, Plain result) (state : RuntimeState) :
     state.resolveReturned results = state := by

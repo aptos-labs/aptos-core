@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "simple_vector_client.move"
+verex proofs where
+
 -- Keep literal list spines computational while preparing vector obligations.
 -- These hints belong to this fixture; each theorem is kernel checked.
 @[vir_denote_norm] theorem literal_nil_append {α : Type} (xs : List α) :

@@ -1342,7 +1342,7 @@ impl TransactionsApi {
                     ));
                 },
             },
-            TransactionPayload::EncryptedPayload(payload) => {
+            TransactionPayload::EncryptedPayload(_) => {
                 if !self.context.node_config.api.allow_encrypted_txns_submission {
                     return Err(SubmitTransactionError::bad_request_with_code(
                         "Encrypted Transaction submission is not allowed yet",
@@ -1351,40 +1351,15 @@ impl TransactionsApi {
                     ));
                 }
 
-                if !payload.is_encrypted() {
-                    return Err(SubmitTransactionError::bad_request_with_code(
-                        "Encrypted transaction must be in encrypted state",
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    ));
-                }
-
-                if payload.extra_config().is_multisig() {
-                    return Err(SubmitTransactionError::bad_request_with_code(
-                        "Encrypted transactions do not support multisig",
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    ));
-                }
-
-                let signer_auth_keys = signed_transaction
-                    .authenticator()
-                    .all_signer_auth_keys(signed_transaction.sender())
-                    .ok_or_else(|| {
+                signed_transaction
+                    .verify_encrypted_payload_for_submission()
+                    .map_err(|error| {
                         SubmitTransactionError::bad_request_with_code(
-                            "Encrypted transactions are not supported with this authenticator type",
+                            error.context("Encrypted transaction payload could not be verified"),
                             AptosErrorCode::InvalidInput,
                             ledger_info,
                         )
                     })?;
-
-                if let Err(e) = payload.verify(signed_transaction.sender(), signer_auth_keys) {
-                    return Err(SubmitTransactionError::bad_request_with_code(
-                        e.context("Encrypted transaction payload could not be verified"),
-                        AptosErrorCode::InvalidInput,
-                        ledger_info,
-                    ));
-                }
             },
         }
         Ok(())

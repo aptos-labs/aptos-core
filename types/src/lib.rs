@@ -69,6 +69,7 @@ pub mod bytes;
 pub mod delayed_fields;
 pub mod keyless;
 pub mod lazy_bls;
+pub mod lazy_crypto;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

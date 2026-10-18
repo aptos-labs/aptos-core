@@ -51,6 +51,25 @@ verex module 0x1::later where
         self.assertNotIn("::later", result)
         self.assertNotIn("spec selected where\n    pragma verify = false", result)
 
+    def test_items_stay_inside_the_module(self):
+        source = """import VerexSL
+verex module 0x1::example where
+  fun selected() -> Unit := ()
+  spec selected where
+    aborts_if false
+  fun other() -> Unit := assert!(false, 1)
+
+verex sources at "/root"
+  "example.move" 1
+"""
+        result = isolate_target.isolate(source.splitlines(), "example", "selected", [],
+                                        ["  verify selected by", "    trivial"])
+        module, _, trailer = result.partition("verex sources at")
+        self.assertIn("  verify selected by\n    trivial", module)
+        self.assertIn("  spec other where\n    pragma verify = false", module)
+        self.assertNotIn("spec other", trailer)
+        self.assertNotIn("verify selected", trailer)
+
 
 if __name__ == "__main__":
     unittest.main()

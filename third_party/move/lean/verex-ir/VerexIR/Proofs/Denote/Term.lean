@@ -691,6 +691,7 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       (sharing : closureShared unit handle weave.mask = shared)
       (closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true)
       (faithful : closureFaithful unit handle #[] = true)
+      (plain : captured.tableFree = true)
       (captures : Args unit ρ Γ captured) :
       Term unit ρ Γ (.function supplied shared results)
   /-- A closure with type arguments: the weave of the target's own
@@ -702,6 +703,7 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
       (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
       (sharing : closureShared unit handle weave.mask = shared)
       (below : closureSignatureBelow unit handle = true)
+      (plain : captured.tableFree = true)
       (captures : Args unit ρ Γ (NRow.subst θ.1 captured)) :
       Term unit ρ Γ (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
   /-- An invocation of a function value on evaluated arguments, after the
@@ -913,28 +915,31 @@ mutual
 /-- The runtime value of a native value whose outermost mutable references
 are lent under loans taken in order.  A reference passes its current value,
 or with `prophecies` its prophecy, under its loan; a tuple lends its
-components; any other value is its encoding.  Returns the unused loans. -/
+components; any other value is its physical value (`NTy.erase`): the runtime
+keeps a map's contents in native storage, not in the value.  Returns the
+unused loans. -/
 def NTy.lend : (τ : NTy) → Bool → τ.carrier → List Nat → Option (RuntimeValue × List Nat)
   | .ref σ, prophecies, value, loan :: loans =>
-      some (.borrow loan (σ.encode (if prophecies then value.2 else value.1)), loans)
+      some (.borrow loan (σ.erase (if prophecies then value.2 else value.1)), loans)
   | .ref _, _, _, [] => none
   | .tuple elements, prophecies, values, loans =>
       (NRow.lend elements prophecies values loans).map fun lent => (.tuple lent.1.toArray, lent.2)
-  | .unit, _, value, loans => some (NTy.encode .unit value, loans)
-  | .bool, _, value, loans => some (NTy.encode .bool value, loans)
-  | .int width signed, _, value, loans => some (NTy.encode (.int width signed) value, loans)
-  | .address, _, value, loans => some (NTy.encode .address value, loans)
-  | .signer, _, value, loans => some (NTy.encode .signer value, loans)
-  | .string, _, value, loans => some (NTy.encode .string value, loans)
-  | .bytes, _, value, loans => some (NTy.encode .bytes value, loans)
+  | .unit, _, value, loans => some (NTy.erase .unit value, loans)
+  | .bool, _, value, loans => some (NTy.erase .bool value, loans)
+  | .int width signed, _, value, loans => some (NTy.erase (.int width signed) value, loans)
+  | .address, _, value, loans => some (NTy.erase .address value, loans)
+  | .signer, _, value, loans => some (NTy.erase .signer value, loans)
+  | .string, _, value, loans => some (NTy.erase .string value, loans)
+  | .bytes, _, value, loans => some (NTy.erase .bytes value, loans)
   | .struct source arguments fields, _, value, loans =>
-      some (NTy.encode (.struct source arguments fields) value, loans)
+      some (NTy.erase (.struct source arguments fields) value, loans)
   | .enum source arguments names rows distinct, _, value, loans =>
-      some (NTy.encode (.enum source arguments names rows distinct) value, loans)
-  | .vector element, _, value, loans => some (NTy.encode (.vector element) value, loans)
-  | .param index, _, value, loans => some (NTy.encode (.param index) value, loans)
+      some (NTy.erase (.enum source arguments names rows distinct) value, loans)
+  | .vector element, _, value, loans => some (NTy.erase (.vector element) value, loans)
+  | .table key value, _, entries, loans => some (NTy.erase (.table key value) entries, loans)
+  | .param index, _, value, loans => some (NTy.erase (.param index) value, loans)
   | .function parameters shared results, _, value, loans =>
-      some (NTy.encode (.function parameters shared results) value, loans)
+      some (NTy.erase (.function parameters shared results) value, loans)
 
 /-- The runtime values of a row lent under loans taken in order. -/
 def NRow.lend : (row : NRow) → Bool → HList row → List Nat →
@@ -975,9 +980,9 @@ def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array Runtime
       (match exportedRaw? loan exports with
         | some exported =>
             VerexIR.SemanticOperations.resolveReturnedBorrows returned exported =
-              σ.encode values.1.2
+              σ.erase values.1.2
         | none => ∃ entry ∈ returned.toList,
-            (loan, σ.encode values.1.2) ∈
+            (loan, σ.erase values.1.2) ∈
               (VerexIR.SemanticOperations.outermostBorrows entry).toList) ∧
       argumentsResolve rest values.2 loans returned exports
   | .cons (.ref _) _, _, [], _, _ => False
@@ -1002,6 +1007,8 @@ def argumentsResolve : (σs : NRow) → HList σs → List Nat → Array Runtime
   | .cons (.enum _ _ _ _ _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.vector _) rest, values, loans, returned, exports =>
+      argumentsResolve rest values.2 loans returned exports
+  | .cons (.table _ _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
   | .cons (.param _) rest, values, loans, returned, exports =>
       argumentsResolve rest values.2 loans returned exports
@@ -1037,28 +1044,33 @@ def propheticRun {unit : VerexIR.Validation.ValidatedUnit}
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans arguments results exit returnedLoans prophecyRow,
-      StorageEncodes unit initial start ∧ Admissible start loans ∧
+      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      StorageEncodesReturned unit final exit prophecyRow ∧ AgreeUnnamed unit final initial
+      ReturnedEncloses unit final exit prophecyRow
+        (HList.tables true σs args ++ shape.tables true result) ∧
+      AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans arguments,
-      StorageEncodes unit initial start ∧ Admissible start loans ∧
+      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).aborts start error
   undefined := fun initial =>
     ∃ start loans arguments results exit,
-      StorageEncodes unit initial start ∧ Admissible start loans ∧
+      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
       lendArguments σs args loans = some arguments ∧
       (functionSpecAt executable handle typeInstantiation arguments).ok start results exit ∧
       ¬∃ result, ∃ returnedLoans, ∃ resolved : HList σs,
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some arguments ∧
-        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending)
+        TableMemory.TablesIn unit (HList.tables false σs resolved) start.tables ∧
+        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending) ∧
+        TableMemory.TablesIn unit (HList.tables true σs resolved ++ shape.tables true result)
+          (exit.resolveReturned results).tables
 
 /-- The prophetic meaning of a callee at a frame: its run, where the frame
 agrees with the runtime type instantiation on the types the callee reads
@@ -1097,14 +1109,15 @@ def closureOf (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array 
   ⟨handle, mask, typeInstantiation, (HList.encode captures).toArray,
     fun capture member => rowCodec_plain _ captures capture (by simpa [HList.encode] using member)⟩
 
-/-- A frame's values of a row encode as runtime values of the row's
-resolution, which admit it. -/
-theorem HList.admits_resolved (row : NRow) (values : HList row) :
+/-- A frame's values of a row without map contents encode as runtime values
+of the row's resolution, which admit them: their encodings are their physical
+values. -/
+theorem HList.admits_resolved (row : NRow) (plain : row.tableFree = true) (values : HList row) :
     NRow.admits unit row.resolved (HList.encode values) = true := by
-  have encoded := HList.encode_toRuntime row values
-  simp only [HList.encode] at encoded ⊢
-  rw [← encoded]
-  exact NRow.admits_encode unit row.resolved (HList.toRuntime row values)
+  rw [← HList.encode_toRuntime row values,
+    ← @HList.erase_eq_encode (Carriers.runtime unit) row.resolved (NRow.resolved_tableFree row plain)
+      (HList.toRuntime row values)]
+  exact NRow.admits_erase unit row.resolved (HList.toRuntime row values)
 
 /-- A closure of a target without type parameters, at its own rows
 (`closureRows?`), is typed there: its captures are typed by their
@@ -1114,7 +1127,7 @@ theorem closureOf_typed {handle : FunctionHandle} {mask : Nat} {captured supplie
     (rows : closureRows? unit handle mask = some (captured, supplied, results))
     (sharing : closureShared unit handle mask = shared)
     (closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true)
-    (faithful : closureFaithful unit handle #[] = true)
+    (faithful : closureFaithful unit handle #[] = true) (plain : captured.tableFree = true)
     (captures : HList captured) :
     Carriers.closureTyped supplied shared results (closureOf handle mask #[] captures) := by
   simp only [Bool.and_eq_true] at closed
@@ -1129,7 +1142,7 @@ theorem closureOf_typed {handle : FunctionHandle} {mask : Nat} {captured supplie
   simp only [closureRowsIn?, rows, sharing, faithful, Option.map_some,
     NRow.substWith_paramFree _ _ capturedFree, NRow.substWith_paramFree _ _ suppliedFree,
     NRow.substWith_paramFree _ _ resultsFree, beq_self_eq_true, Bool.true_and]
-  have admitted := HList.admits_resolved captured captures
+  have admitted := HList.admits_resolved captured plain captures
   rwa [NRow.resolved_paramFree captured capturedFree] at admitted
 
 omit [Skolems unit] in
@@ -1197,7 +1210,7 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier where
   ok := fun initial result final =>
     ∃ start loans supplied arguments results exit returnedLoans prophecyRow,
-      StorageEncodes unit initial start ∧ Admissible start loans ∧
+      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1206,10 +1219,12 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
       shape.lend false result returnedLoans = some results ∧
       shape.lend true result returnedLoans = some prophecyRow ∧
       argumentsResolve σs args loans prophecyRow (exportsAfter start.pending exit.pending) ∧
-      StorageEncodesReturned unit final exit prophecyRow ∧ AgreeUnnamed unit final initial
+      ReturnedEncloses unit final exit prophecyRow
+        (HList.tables true σs args ++ shape.tables true result) ∧
+      AgreeUnnamed unit final initial
   aborts := fun initial error =>
     ∃ start loans supplied arguments,
-      StorageEncodes unit initial start ∧ Admissible start loans ∧
+      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1217,7 +1232,7 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
         start error
   undefined := fun initial =>
     ∃ start loans supplied arguments results exit,
-      StorageEncodes unit initial start ∧ Admissible start loans ∧
+      Encloses unit initial start (HList.tables false σs args) ∧ Admissible start loans ∧
       lendArguments σs args loans = some supplied ∧
       ClosureMask.compose closure.mask closure.captures.toList supplied.toList =
         some arguments ∧
@@ -1227,7 +1242,10 @@ def closureMeaning {unit : VerexIR.Validation.ValidatedUnit}
         shape.lend false result returnedLoans = some results ∧
         shape.lend true result returnedLoans = some results ∧
         lendArguments σs resolved loans = some supplied ∧
-        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending)
+        TableMemory.TablesIn unit (HList.tables false σs resolved) start.tables ∧
+        argumentsResolve σs resolved loans results (exportsAfter start.pending exit.pending) ∧
+        TableMemory.TablesIn unit (HList.tables true σs resolved ++ shape.tables true result)
+          (exit.resolveReturned results).tables
 
 omit [Skolems unit] in
 /-- The type instantiation of a callee's frame, computed from the caller's
@@ -1448,7 +1466,7 @@ theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Ar
     (shape : ResultShape) {handle : FunctionHandle} {shared : List Bool}
     (rows : closureRows? unit handle weave.mask = some (captured, supplied, shape.row))
     (sharing : closureShared unit handle weave.mask = shared)
-    (below : closureSignatureBelow unit handle = true)
+    (below : closureSignatureBelow unit handle = true) (plain : captured.tableFree = true)
     (frame : @ClosureFrame unit (Skolems.instantiate θ ‹_›) handle
       (frameInstantiation unit handle outer typeArgs))
     (captures : HList (NRow.subst θ.1 captured)) :
@@ -1465,7 +1483,8 @@ theorem closureOfGeneric_typed (outer : Array (TypeId × TypeId)) (typeArgs : Ar
   unfold NTy.admits
   rw [atFrame]
   simp only [frame.2, sharing, beq_self_eq_true, Bool.true_and]
-  exact HList.admits_resolved (NRow.subst θ.1 captured) captures
+  exact HList.admits_resolved (NRow.subst θ.1 captured) (NRow.tableFree_subst θ captured plain)
+    captures
 
 /-- The outcome of a variant mismatch: the profile's throw, or none. -/
 def mismatchOutcome {α : Type} : Option Failure → Comp unit α
@@ -1552,13 +1571,13 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
             (HList.toSkolem θ _ values))) fun result =>
           Spec.pure (.value ((shape.subst θ.1).toBody (ResultShape.ofSkolem θ shape result)) env)
   | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
-      captures, env =>
+      plain captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
         Spec.pure (.value (typedClosure supplied shared results
           (closureOf handle weave.mask #[] values)
-          (closureOf_typed rows sharing closed faithful values)) env)
+          (closureOf_typed rows sharing closed faithful plain values)) env)
   | _, _, .closureGeneric (supplied := supplied) handle weave typeArgs θ shape shared rows sharing
-      below captures, env =>
+      below plain captures, env =>
       Flow.bind (captures.denote meanings env) fun values env =>
         Spec.given (@ClosureFrame unit (Skolems.instantiate θ ‹_›) handle
             (frameInstantiation unit handle meanings.typeInstantiation typeArgs)) fun frame =>
@@ -1566,7 +1585,7 @@ def Term.denote {unit : VerexIR.Validation.ValidatedUnit}
               (closureOfGeneric unit meanings.typeInstantiation typeArgs θ weave shape handle
                 values)
               (closureOfGeneric_typed meanings.typeInstantiation typeArgs θ weave shape rows
-                sharing below frame values)) env)
+                sharing below plain frame values)) env)
   | _, _, .invoke shape function arguments, env =>
       Flow.bind (function.denote meanings env) fun closure env =>
         Flow.bind (arguments.denote meanings env) fun values env =>
@@ -2344,6 +2363,7 @@ def describeValue : {τ : NTy} → τ.groundCarrier → String
   | .struct _ _ _, _ => "{..}"
   | .enum _ _ _ _ _, _ => "variant{..}"
   | .vector _, value => s!"[{value.values.size} elements]"
+  | .table _ _, value => s!"[{value.length} entries]"
   | .ref _, _ => "&mut(..)"
   | .param index, _ => s!"T{index}"
   | .function _ _ _, value => s!"closure of function {value.val.function.functionId.index}"
@@ -2405,10 +2425,10 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .loop site body => s!"loop@{site} {body.describe}"
   | _, _, .call _ handle _ arguments =>
       s!"call {handle.namespaceId.index}:{handle.functionId.index}({arguments.describe})"
-  | _, _, .closure handle weave _ _ _ _ _ _ captures =>
+  | _, _, .closure handle weave _ _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index} mask {weave.mask}\
         ({captures.describe})"
-  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ captures =>
+  | _, _, .closureGeneric handle weave typeArgs _ _ _ _ _ _ _ captures =>
       s!"closure {handle.namespaceId.index}:{handle.functionId.index}<{typeArgs.size} types> \
         mask {weave.mask}({captures.describe})"
   | _, _, .invoke _ function arguments =>

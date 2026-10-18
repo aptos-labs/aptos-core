@@ -10,7 +10,6 @@ import VerexIR.Proofs.Denote.SimpAll
 import VerexIR.Proofs.Maps
 import VerexIR.Proofs.Denote.MapCoverage
 import VerexIR.Proofs.Denote.VectorOperations
-import VerexIR.Proofs.Denote.StoredValueInvariants
 import VerexIR.Proofs.Denote.BitLift
 import VerexIR.Proofs.Denote.LemmaSteps
 import VerexIR.Proofs.Denote.LoopUnroll
@@ -111,6 +110,9 @@ inductive Provenance where
   /-- A path of a loop unrolled by `pragma unroll = bound` that iterates
   further. -/
   | unrollBound (bound : Nat)
+  /-- The data invariant of a value a write stores in memory
+  (`MemoryInvariants`). -/
+  | storedWrite
   deriving BEq
 
 def Provenance.describe : Provenance → String
@@ -125,73 +127,7 @@ def Provenance.describe : Provenance → String
   | .callReturned => "a module invariant where a call returns"
   | .lemmaRequirement => "the requirement of an applied lemma"
   | .unrollBound bound => s!"the bound `pragma unroll = {bound}` of a loop"
-
-/-- What an obligation located at an authored clause says: a loop's
-invariant is owed at entry and after each iteration, any other clause by the
-function. -/
-private def clauseFailure (origin : Option Provenance) (snippet : String) : MessageData :=
-  match origin with
-  | some .loopEntry => m!"the loop invariant `{snippet}` is not established at entry"
-  | some .loopIteration => m!"the loop invariant `{snippet}` is not preserved by an iteration"
-  | some .assertion => m!"the assertion `{snippet}` does not hold"
-  | some .mutationEnd => m!"the data invariant `{snippet}` does not hold where a mutation ends"
-  | some .construction =>
-      m!"the data invariant `{snippet}` does not hold where a value is constructed"
-  | some .memoryWritten =>
-      m!"the module invariant `{snippet}` does not hold after a write of memory it reads"
-  | some .callReturned =>
-      m!"the module invariant `{snippet}` does not hold after a call that writes memory it reads"
-  | some .lemmaRequirement => m!"the requirement of the lemma applied at `{snippet}` does not hold"
-  | some (.precondition callee) =>
-      m!"the precondition `{snippet}` of `{callee}` does not hold at this call"
-  | _ => m!"the specification clause `{snippet}` is not established"
-
-/-- Report a verification condition that was not established, at every
-authored clause its `Obligation` markers — those in it and the `clauses` its
-closing stripped — locate not yet reported with the same message, or, with
-no marker, as `origin` or a residual obligation with its goal. Returns the
-reports so far. -/
-def reportObligation (goal : MVarId) (origin : Option Provenance)
-    (clauses : Array ObligationRange) (reported : Array (ObligationRange × String)) :
-    TacticM (Array (ObligationRange × String)) := do
-  let fileMap ← getFileMap
-  let fileName ← getFileName
-  goal.withContext do
-    let target ← instantiateMVars (← goal.getType)
-    let ranges := (clauses ++ obligationRanges target).toList.eraseDups.filter
-      fun range => range.startByte < range.endByte
-    if ranges.isEmpty then
-      match origin with
-      | some origin => logError m!"{origin.describe} is not established"
-      | none => logError m!"verification failed with a residual obligation:\n{(← Lean.Meta.ppGoal goal)}"
-    let mut reported := reported
-    for range in ranges do
-      -- A clause of another module's file is reported in that file.
-      let source? ← if range.file == fileName then pure (some fileMap.source) else
-        try some <$> IO.FS.readFile range.file catch _ => pure none
-      let snippet := match source? with
-        | some source => Substring.Raw.toString ⟨source, ⟨range.startByte⟩, ⟨range.endByte⟩⟩
-        | none => s!"{range.file}:{range.startByte}"
-      let message := clauseFailure origin snippet
-      let key := (range, ← message.toString)
-      if reported.contains key then continue
-      reported := reported.push key
-      match source? with
-      | some _ =>
-          if range.file == fileName then
-            logErrorAt (Syntax.atom (.synthetic ⟨range.startByte⟩ ⟨range.endByte⟩) snippet) message
-          else
-            let foreign := FileMap.ofString (source?.getD "")
-            logMessage {
-              fileName := range.file
-              pos := foreign.toPosition ⟨range.startByte⟩
-              endPos := some (foreign.toPosition ⟨range.endByte⟩)
-              severity := .error
-              data := ← addMessageContext message }
-      | none => logError message
-    if verex.certifyDebug.get (← getOptions) && !(ranges.isEmpty && origin.isNone) then
-      logError m!"residual obligation:\n{(← Lean.Meta.ppGoal goal)}"
-    return reported
+  | .storedWrite => "the data invariant of a value written to memory"
 
 register_option verex.solverDebug : Bool := {
   defValue := false
@@ -2471,7 +2407,7 @@ private def normalizeContext (target : Bool) : TacticM Unit := withMainContext d
   -- transparency: plain `assumption` would unfold the arithmetic of every
   -- hypothesis it compares against.
   let stx ← `(tactic| simp only
-    [VerexIR.Proofs.Obligation_iff, Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow,
+    [VerexIR.Proofs.Obligation_eq, Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow,
     Nat.reduceSub, Int.tmod_eq_emod_of_nonneg, Int.tdiv_eq_ediv_of_nonneg, vir_denote_norm, dif_pos,
     dif_neg, if_pos, if_neg, Prod.fst, Prod.snd])
   let goal ← getMainGoal
@@ -2862,7 +2798,7 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
 
 /-- The keys of a map held as the vector of entries of a single-variant enum,
 encoded, are the encodings of their first fields. -/
-theorem keysRead_encode_enum [Carriers] {α : Type} {read : RuntimeValue → α}
+@[vir_denote_side] theorem keysRead_encode_enum [Carriers] {α : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (source : StructHandle) (arguments : NRow) (name : String)
     (entry : StructHandle) (entryArguments : NRow) (key : NTy) (rest : NRow)
     (distinct : [name].Nodup)
@@ -2883,7 +2819,7 @@ theorem keysRead_encode_enum [Carriers] {α : Type} {read : RuntimeValue → α}
   | inr empty => exact empty.elim
 
 /-- The same for a map held as the vector of entries of a struct. -/
-theorem keysRead_encode_struct [Carriers] {α : Type} {read : RuntimeValue → α}
+@[vir_denote_side] theorem keysRead_encode_struct [Carriers] {α : Type} {read : RuntimeValue → α}
     {write : α → RuntimeValue} (source : StructHandle) (arguments : NRow) (entry : StructHandle)
     (entryArguments : NRow) (key : NTy) (rest : NRow)
     (value : HList (.cons (NTy.vector (NTy.struct entry entryArguments (.cons key rest))) .nil))
@@ -2917,8 +2853,8 @@ private def integerKeysProof? (goal : MVarId) (map : Lean.Expr) : TacticM (Optio
     let proof ← goal.withContext (mkFreshExprMVar (← mkAppM ``VerexIR.Maps.KeysRead
       #[mkConst ``VerexIR.RuntimeValue.asInt, mkConst ``VerexIR.RuntimeValue.integer, map]))
     setGoals [proof.mvarId!]
-    evalTactic (← `(tactic| simp only [VerexIR.Maps.keysRead_map, keysRead_encode_enum,
-      keysRead_encode_struct, vir_denote, vir_denote_norm, vir_denote_eval]))
+    evalTactic (← `(tactic| simp only [vir_denote_side, vir_denote, vir_denote_norm,
+      vir_denote_eval]))
     if (← getGoals).isEmpty then some <$> instantiateMVars proof else pure none
   catch _ => pure none
   finally setGoals saved
@@ -3023,7 +2959,7 @@ elab "verex_map_positions" : tactic => focusGoal do
       return !decl.isImplementationDetail && reads (← instantiateMVars decl.type)
   unless read do return
   -- The facts the positions are decided by, out of their obligations.
-  evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at *))
+  evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at *))
   if (← getGoals).isEmpty then return
   -- A constructor equality can make these reads computational. Use only
   -- literal construction equations here, before generating rank/order facts;
@@ -3077,8 +3013,7 @@ elab "verex_map_positions" : tactic => focusGoal do
       | omega
       | assumption
       | (simp (disch := omega) only [VerexIR.Maps.hasKey_keyAt]; done)
-      | (simp only [VerexIR.Maps.keysRead_map, keysRead_encode_enum, keysRead_encode_struct,
-        vir_denote, vir_denote_norm, vir_denote_eval]; done))
+      | (simp only [vir_denote_side, vir_denote, vir_denote_norm, vir_denote_eval]; done))
     only [VerexIR.Maps.integer_asInt_keyAt, VerexIR.Maps.bool_asBool_keyAt,
       VerexIR.Maps.address_asString_keyAt, VerexIR.Maps.order_keyAt_integer,
       VerexIR.Maps.order_integer_keyAt, VerexIR.Maps.order_keyAt_keyAt,
@@ -3151,7 +3086,7 @@ elab "verex_ground_arithmetic" : tactic => focusGoal do
       rules := rules.push id
     else rules := rules.push id
   replaceMainGoal [goal]
-  simpMainAt (← `(tactic| simp only [VerexIR.Proofs.Obligation_iff])) rules #[] true
+  simpMainAt (← `(tactic| simp only [VerexIR.Proofs.Obligation_eq])) rules #[] true
   evalTactic (← `(tactic| all_goals verex_decide))
 
 /-- Identify the elements two lookups of one position found: from
@@ -4078,7 +4013,7 @@ macro_rules
   first
   | verex_timed "c-assumption" verex_assumption
   | verex_timed "c-witness" verex_cheap_witness
-  | ((try simp only [VerexIR.Proofs.Obligation_iff, Nat.reduceAdd, Int.reducePow,
+  | ((try simp only [VerexIR.Proofs.Obligation_eq, Nat.reduceAdd, Int.reducePow,
       Int.reduceSub, Nat.reducePow, Nat.reduceSub])
      first
      | done
@@ -4322,7 +4257,7 @@ a hypothesis fixes (`a[i] = v`) is read through the lookup the leaves state
 (`a[i]? = some v`). -/
 private def simpByContext (goal : MVarId) (targets : Array FVarId) (simplifyTarget : Bool)
     (failIfUnchanged : Bool) : TacticM (Option MVarId) := goal.withContext do
-  let stx ← `(tactic| simp only [VerexIR.Proofs.Obligation_iff, Nat.reduceAdd, Int.reducePow,
+  let stx ← `(tactic| simp only [VerexIR.Proofs.Obligation_eq, Nat.reduceAdd, Int.reducePow,
     Int.reduceSub, Nat.reducePow, Nat.reduceSub, vir_denote_norm])
   let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
   let mut hypotheses : SimpTheorems := {}
@@ -5021,7 +4956,7 @@ macro "verex_pipeline" : tactic => `(tactic| verex_focus ( (
   try verex_split_search
   all_goals verex_reduce_projections
   all_goals verex_timed "pipe-simp" (verex_bounded
-    (try simp (disch := omega) only [VerexIR.Proofs.Obligation_iff,
+    (try simp (disch := omega) only [VerexIR.Proofs.Obligation_eq,
       Nat.reduceAdd, Int.reducePow, Int.reduceSub, Nat.reducePow, Nat.reduceSub,
       Int.tmod_eq_emod_of_nonneg, Int.tdiv_eq_ediv_of_nonneg, vir_denote_norm] at *))
   all_goals first
@@ -5051,9 +4986,11 @@ macro "verex_pipeline" : tactic => `(tactic| verex_focus ( (
           verex_timed "pipe-split-goal"
             (verex_inheriting (all_goals verex_split_goal))
           verex_timed "pipe-round" verex_saturate_round
-          -- Last, products and congruence, which `omega` reads as atoms.
+          -- Last, products and congruence, which `omega` reads as atoms, and
+          -- operations whose inputs saturation fixed to literals.
           all_goals (first
             | verex_timed "pipe-bounds-omega" (verex_bounds; omega)
+            | verex_timed "pipe-ground" verex_ground_arithmetic
             | verex_timed "pipe-bv" verex_bv
             | verex_timed "pipe-quotient" verex_quotient
             | verex_timed "pipe-grind" verex_grind)))))))
@@ -5451,46 +5388,6 @@ private partial def storedInvariantsProof? (memory : Lean.Expr) (fuel : Nat := 8
       return some proof
   return none
 
-/-- A successful Table observation inherits the invariant of the entry in
-that observation's memory. Its presence premise selects a stored entry;
-the registration/layout premises are closed computations, not assumptions. -/
-private def storedTableRead? (present : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let_expr Eq _ lookup found := ← instantiateMVars (← inferType present) | return none
-  unless found.isConstOf ``Bool.true &&
-      lookup.isAppOfArity ``VerexIR.Proofs.Denote.SnapshotValue.Value.hasKey 2 do return none
-  let observed := lookup.getArg! 0
-  unless observed.isAppOfArity ``VerexIR.Proofs.Denote.SnapshotValue.observe 4 do return none
-  let memory := observed.getArg! 1
-  let type := observed.getArg! 2
-  unless type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 do return none
-  let arguments := type.getArg! 1
-  unless arguments.isAppOfArity ``VerexIR.Proofs.Denote.NRow.cons 2 do return none
-  let rest := arguments.getArg! 1
-  unless rest.isAppOfArity ``VerexIR.Proofs.Denote.NRow.cons 2 &&
-      (rest.getArg! 1).isConstOf ``VerexIR.Proofs.Denote.NRow.nil do return none
-  let some holds ← storedInvariantsProof? memory | return none
-  let saved ← saveState
-  try
-    let law := mkConst ``VerexIR.Proofs.Denote.DataInvariant.table_get_raw
-    let (binders, _, _) ← forallMetaTelescope (← inferType law)
-    unless binders.size == 14 do throwError "unexpected Table invariant law signature"
-    for (index, value) in #[(4, holds), (5, type.getArg! 0), (6, arguments.getArg! 0),
-        (7, rest.getArg! 0), (8, type.getArg! 2), (9, observed.getArg! 3),
-        (10, lookup.getArg! 1), (13, present)] do
-      unless ← isDefEq (← inferType binders[index]!) (← inferType value) do
-        throwError "Table invariant argument does not match"
-      unless ← isDefEq binders[index]! value do throwError "Table invariant argument is unresolved"
-    for index in #[11, 12] do
-      let binder ← instantiateMVars binders[index]!
-      if binder.isMVar then
-        binder.mvarId!.assign (← mkDecideProof (← instantiateMVars (← inferType binder)))
-    let proof ← instantiateMVars (mkAppN law binders)
-    if proof.hasExprMVar then throwError "Table invariant left an unresolved key or predicate"
-    return some proof
-  catch _ =>
-    saved.restore
-    return none
-
 /-- Establish the data invariants of stored resources (`MemoryInvariants`)
 of a memory the leaf's writes made from one the context has them of:
 through each write, which owes the value written its own invariant. A goal
@@ -5530,32 +5427,27 @@ elab "verex_memory_invariants" : tactic => focusGoal do
   evalTactic (← `(tactic| all_goals (try simp only
     [vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd])))
 
-/-- Where a leaf's stored values come from: whether it observes a Table, and
-whether it states the stored invariants of a memory it reads. A leaf with
-neither reads no stored value. -/
-private def storedValueSources (goal : MVarId) : MetaM (Bool × Bool) := goal.withContext do
-  (← getLCtx).foldlM (init := (false, false)) fun (tables, invariants) declaration => do
-    if declaration.isImplementationDetail then return (tables, invariants)
+/-- Whether a goal states the stored invariants of a memory a write made. -/
+private def writesStoredInvariants (goal : MVarId) : MetaM Bool := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  return target.isAppOfArity ``VerexIR.Proofs.Denote.MemoryInvariants 3 &&
+    (target.getArg! 2).isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 5
+
+/-- Whether a leaf states the stored invariants of a memory it reads. -/
+private def readsStoredInvariants (goal : MVarId) : MetaM Bool := goal.withContext do
+  (← getLCtx).foldlM (init := false) fun invariants declaration => do
+    if declaration.isImplementationDetail then return invariants
     let type ← instantiateMVars declaration.type
-    return (tables || (type.find? (·.isConstOf ``SnapshotValue.Value.hasKey)).isSome,
-      invariants || (type.find? (·.isConstOf ``VerexIR.Proofs.Denote.MemoryInvariants)).isSome)
+    return invariants || (type.find? (·.isConstOf ``VerexIR.Proofs.Denote.MemoryInvariants)).isSome
 
 /-- The data invariant of each stored value the leaf reads, from the stored
 invariants of the memory it reads (`MemoryInvariants.read`). -/
 elab "verex_stored_reads" : tactic => focusGoal do
   let goal ← getMainGoal
-  let (tables, invariants) ← storedValueSources goal
-  unless tables || invariants do throwError "the leaf reads no stored value with stored invariants"
+  unless ← readsStoredInvariants goal do
+    throwError "the leaf reads no stored value with stored invariants"
   let (ctx, simprocs) ← normalization
   let facts ← goal.withContext do
-    let mut lookups : Array (Lean.Expr × Lean.Expr) := #[]
-    if tables then
-      for declaration in ← getLCtx do
-        if declaration.isImplementationDetail then continue
-        for (proof, type) in ← typedConjuncts declaration.toExpr do
-          let some (_, lhs, _) := type.eq? | continue
-          if lhs.isAppOfArity ``SnapshotValue.Value.getValue 2 then
-            lookups := lookups.push (proof, type)
     let mut facts : Array Lean.Expr := #[]
     let normalized (fact : Lean.Expr) : MetaM Lean.Expr := do
       let (result, _) ← Simp.main (← inferType fact) ctx
@@ -5564,27 +5456,6 @@ elab "verex_stored_reads" : tactic => focusGoal do
     for declaration in ← getLCtx do
       if declaration.isImplementationDetail then continue
       let type ← instantiateMVars declaration.type
-      if tables && (type.find? (·.isConstOf ``SnapshotValue.Value.hasKey)).isSome then
-        let tableFacts ← (← typedConjuncts declaration.toExpr).filterMapM
-          fun (proof, _) => storedTableRead? proof
-        for fact in tableFacts do
-          let factType ← inferType fact
-          let raw := factType.appArg!
-          let mut fact := fact
-          -- Use the read's exact summary before expanding the invariant.
-          -- Congruence retains this lookup's memory, key and resolved type.
-          if raw.isAppOfArity ``SnapshotValue.Value.physical 1 then
-            let lookup := raw.appArg!
-            for (equality, equation) in lookups do
-              let some (_, lhs, _) := equation.eq? | continue
-              unless lhs == lookup do continue
-              let predicate ← withLocalDeclD `entry (mkConst ``SnapshotValue.Value) fun entry =>
-                mkLambdaFVars #[entry] (mkApp factType.appFn!
-                  (mkApp (mkConst ``SnapshotValue.Value.physical) entry))
-              fact ← mkEqMP (← mkCongrArg predicate equality) fact
-              break
-          facts := facts.push (← normalized fact)
-      unless invariants do continue
       let_expr Eq _ read held := type | continue
       unless held.isAppOfArity ``Option.some 2 && read.getAppNumArgs == 2 do continue
       let memory := read.appFn!.appFn!
@@ -5746,15 +5617,84 @@ elab "verex_call_observations" : tactic => focusGoal do
     all_goals first
     | verex_arithmetic_only
     | (simp (disch := verex_arithmetic_only)
-          [*, VerexIR.Proofs.Obligation_iff, VerexIR.packResults_single]
+          [*, VerexIR.Proofs.Obligation_eq, VerexIR.packResults_single]
        all_goals verex_arithmetic_only
        done)
-    | (simp_all only [VerexIR.Proofs.Obligation_iff, VerexIR.packResults_single, vir_denote_norm]
+    | (simp_all only [VerexIR.Proofs.Obligation_eq, VerexIR.packResults_single, vir_denote_norm]
        all_goals verex_omega)
     done)))
 
 /-- Decide one leaf. -/
 syntax "verex_leaf" : tactic
+
+/-- What an obligation located at an authored clause says: a loop's
+invariant is owed at entry and after each iteration, any other clause by the
+function. -/
+private def clauseFailure (origin : Option Provenance) (snippet : String) : MessageData :=
+  match origin with
+  | some .loopEntry => m!"the loop invariant `{snippet}` is not established at entry"
+  | some .loopIteration => m!"the loop invariant `{snippet}` is not preserved by an iteration"
+  | some .assertion => m!"the assertion `{snippet}` does not hold"
+  | some .mutationEnd => m!"the data invariant `{snippet}` does not hold where a mutation ends"
+  | some .construction =>
+      m!"the data invariant `{snippet}` does not hold where a value is constructed"
+  | some .memoryWritten =>
+      m!"the module invariant `{snippet}` does not hold after a write of memory it reads"
+  | some .callReturned =>
+      m!"the module invariant `{snippet}` does not hold after a call that writes memory it reads"
+  | some .lemmaRequirement => m!"the requirement of the lemma applied at `{snippet}` does not hold"
+  | some (.precondition callee) =>
+      m!"the precondition `{snippet}` of `{callee}` does not hold at this call"
+  | some .storedWrite =>
+      m!"the data invariant `{snippet}` does not hold for a value written to memory"
+  | _ => m!"the specification clause `{snippet}` is not established"
+
+/-- Report a verification condition that was not established, at every
+authored clause its `Obligation` markers — those in it and the `clauses` its
+closing stripped — locate not yet reported with the same message, or, with
+no marker, as `origin` or a residual obligation with its goal. Returns the
+reports so far. -/
+def reportObligation (goal : MVarId) (origin : Option Provenance)
+    (clauses : Array ObligationRange) (reported : Array (ObligationRange × String)) :
+    TacticM (Array (ObligationRange × String)) := do
+  let fileMap ← getFileMap
+  let fileName ← getFileName
+  goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    let ranges := (clauses ++ obligationRanges target).toList.eraseDups.filter
+      fun range => range.startByte < range.endByte
+    if ranges.isEmpty then
+      match origin with
+      | some origin => logError m!"{origin.describe} is not established"
+      | none => logError m!"verification failed with a residual obligation:\n{(← Lean.Meta.ppGoal goal)}"
+    let mut reported := reported
+    for range in ranges do
+      -- A clause of another module's file is reported in that file.
+      let source? ← if range.file == fileName then pure (some fileMap.source) else
+        try some <$> IO.FS.readFile range.file catch _ => pure none
+      let snippet := match source? with
+        | some source => Substring.Raw.toString ⟨source, ⟨range.startByte⟩, ⟨range.endByte⟩⟩
+        | none => s!"{range.file}:{range.startByte}"
+      let message := clauseFailure origin snippet
+      let key := (range, ← message.toString)
+      if reported.contains key then continue
+      reported := reported.push key
+      match source? with
+      | some _ =>
+          if range.file == fileName then
+            logErrorAt (Syntax.atom (.synthetic ⟨range.startByte⟩ ⟨range.endByte⟩) snippet) message
+          else
+            let foreign := FileMap.ofString (source?.getD "")
+            logMessage {
+              fileName := range.file
+              pos := foreign.toPosition ⟨range.startByte⟩
+              endPos := some (foreign.toPosition ⟨range.endByte⟩)
+              severity := .error
+              data := ← addMessageContext message }
+      | none => logError message
+    if verex.certifyDebug.get (← getOptions) && !(ranges.isEmpty && origin.isNone) then
+      logError m!"residual obligation:\n{(← Lean.Meta.ppGoal goal)}"
+    return reported
 
 /-- Expose known memory and decoded values before decoding constructed replacements.
 Do not expand decoders here: their range checks need the bounds obtained
@@ -5793,7 +5733,7 @@ elab "verex_cyclic_read_observations" : tactic => focusGoal do
   unless applies do throwError "no self-referential observation"
   evalTactic (← `(tactic| (
     try verex_decide_residual
-    all_goals (try simp only [VerexIR.Proofs.Obligation_iff])
+    all_goals (try simp only [VerexIR.Proofs.Obligation_eq])
     all_goals (try verex_simp_all)
     all_goals (
       simp only [Option.ne_none_iff_exists', Option.isSome_iff_exists] at *
@@ -5822,8 +5762,7 @@ elab "verex_decoded_reads" : tactic => focusGoal do
     all_goals first
       | (verex_decoded_read_values
          verex_bounds
-         try simp (disch := (simp only [IntegerValueFits_unsigned_succ,
-           IntegerValueFits_signed_succ]; omega)) only [vir_denote_norm, dif_pos] at *
+         try simp (disch := (simp only [vir_denote_side]; omega)) only [vir_denote_norm, dif_pos] at *
          try verex_simp_all only [vir_denote_norm]
          all_goals first | done | omega)
       | (simp [vir_denote_norm] at *
@@ -5831,24 +5770,6 @@ elab "verex_decoded_reads" : tactic => focusGoal do
     )
     done)))
 
-/-- Compare physical and logical views through their allocation identities.
-Read summaries may spell a computed key through a named integer; normalize
-those equalities before congruence, keeping each snapshot's memory intact. -/
-elab "verex_snapshot_identity" : tactic => focusGoal do
-  let goal ← getMainGoal
-  let applies ← goal.withContext do
-    let type ← instantiateMVars (← goal.getType)
-    pure (type.find? fun e => e.isConstOf ``VerexIR.Proofs.Denote.SnapshotValue.Value.SameIdentity ||
-      e.isConstOf ``VerexIR.Proofs.Denote.SnapshotValue.Value.identity).isSome
-  unless applies do throwError "no snapshot identity goal"
-  evalTactic (← `(tactic| verex_budgeted (
-    verex_split_hypotheses
-    all_goals verex_subst_vars
-    all_goals verex_reduce_projections
-    all_goals simp_all only [VerexIR.Proofs.Denote.SnapshotValue.Value.SameIdentity,
-      VerexIR.Proofs.Obligation_iff, vir_denote_norm]
-    all_goals first | assumption | grind
-    done)))
 
 /-- Decide one leaf whose recursive specification functions are unfolded. -/
 syntax "verex_leaf_unfolded" : tactic
@@ -5863,7 +5784,6 @@ macro_rules
        -- A goal a hypothesis states, before unfolding or splitting.
        | verex_timed "assumption" verex_assumption
        | verex_timed "Boolean observations" verex_boolean_observations
-       | verex_timed "snapshot identity" verex_snapshot_identity
        | (try verex_timed "unfold specs" verex_unfold_specs
           verex_leaf_unfolded))))
 
@@ -6056,6 +5976,7 @@ private partial def spelledNTy (τ : Lean.Expr) : Bool :=
   | some ``VerexIR.Proofs.Denote.NTy.enum, #[_, arguments, _, rows, _] =>
       spelledNRow arguments && spelledNRows rows
   | some ``VerexIR.Proofs.Denote.NTy.vector, #[element] => spelledNTy element
+  | some ``VerexIR.Proofs.Denote.NTy.table, #[key, value] => spelledNTy key && spelledNTy value
   | some ``VerexIR.Proofs.Denote.NTy.ref, #[referent] => spelledNTy referent
   | _, _ => false
 
@@ -6104,6 +6025,8 @@ private partial def substituteNTy (θ : Lean.Expr) (τ : Lean.Expr) : Option Lea
         (← substituteNRows θ (← args[3]?)) (← args[4]?))
   | some ``VerexIR.Proofs.Denote.NTy.vector | some ``VerexIR.Proofs.Denote.NTy.ref =>
       pure (mkApp τ.getAppFn (← substituteNTy θ (← args[0]?)))
+  | some ``VerexIR.Proofs.Denote.NTy.table =>
+      pure (mkApp2 τ.getAppFn (← substituteNTy θ (← args[0]?)) (← substituteNTy θ (← args[1]?)))
   | _ => if spelledNTy τ then some τ else none
 
 private partial def substituteNRow (θ : Lean.Expr) (row : Lean.Expr) : Option Lean.Expr := do
@@ -6453,6 +6376,68 @@ simproc ↓ [vir_denote, vir_denote_norm] encodeTransport
     let proof ← mkExpectedTypeHint proof (← mkEq e encoded)
     return .visit { expr := encoded, proof? := some proof }
 
+/-- The carriers of the runtime family and of the families induced from a
+frame, spelled through their frames (`Skolems.toCarriers`), as a contract
+spells a frame's carriers: the runtime family's carriers as the runtime
+frame's, an induced family's as the induced frame's. `none` where the
+spelling is already canonical. -/
+private partial def canonicalCarriers? (inst : Lean.Expr) : Option Lean.Expr :=
+  match_expr inst with
+  | VerexIR.Proofs.Denote.Carriers.runtime unit =>
+    some (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit
+      (mkApp (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) unit))
+  | VerexIR.Proofs.Denote.Carriers.instantiate θ outer =>
+    let outer := (canonicalCarriers? outer).getD outer
+    match_expr outer with
+    | VerexIR.Proofs.Denote.Skolems.toCarriers unit frame =>
+      some (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit
+        (mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate) unit θ frame))
+    | _ => none
+  | _ => none
+
+/-- Spell the family of a value's encoding, erasure, or tables canonically
+(`canonicalCarriers?`): the simplifier does not visit an instance argument,
+and a table's encoding stays folded, so a value a callee's contract states
+and the same value the memory holds, whose resource types spell the
+runtime family, would otherwise differ in it. -/
+def canonicalCarriersStep : Lean.Meta.Simp.Simproc := fun e => do
+  unless e.getAppFn.isConst do return .continue
+  let args := e.getAppArgs
+  let some inst := args[0]? | return .continue
+  let some canonical := canonicalCarriers? inst | return .continue
+  return .visit { expr := mkAppN e.getAppFn (args.set! 0 canonical) }
+
+simproc_decl canonicalEncodeCarriers (@VerexIR.Proofs.Denote.NTy.encode ?carriers _ _) :=
+  canonicalCarriersStep
+simproc_decl canonicalEraseCarriers (@VerexIR.Proofs.Denote.NTy.erase ?carriers _ _) :=
+  canonicalCarriersStep
+simproc_decl canonicalTablesCarriers (@VerexIR.Proofs.Denote.NTy.tables ?carriers _ _ _) :=
+  canonicalCarriersStep
+simproc_decl canonicalRowEncodeCarriers (@VerexIR.Proofs.Denote.HList.encode ?carriers _ _) :=
+  canonicalCarriersStep
+simproc_decl canonicalRowEraseCarriers (@VerexIR.Proofs.Denote.HList.erase ?carriers _ _) :=
+  canonicalCarriersStep
+simproc_decl canonicalRowTablesCarriers (@VerexIR.Proofs.Denote.HList.tables ?carriers _ _ _) :=
+  canonicalCarriersStep
+attribute [vir_denote, vir_denote_norm] canonicalEncodeCarriers canonicalEraseCarriers
+  canonicalTablesCarriers canonicalRowEncodeCarriers canonicalRowEraseCarriers
+  canonicalRowTablesCarriers
+
+/-- A value of a type holding no map contents erases to its encoding
+(`NTy.erase_eq_encode`): a physical value a run lends or a behavior reads
+is the encoding a clause speaks about. -/
+simproc ↓ [vir_denote, vir_denote_norm] eraseTableFree (@VerexIR.Proofs.Denote.NTy.erase ?carriers _ _) :=
+  fun e => do
+    let_expr VerexIR.Proofs.Denote.NTy.erase inst τ value := e | return .continue
+    if τ.hasFVar || τ.hasMVar then return .continue
+    let free := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.tableFree) τ
+    unless (← whnfD free).isConstOf ``Bool.true do return .continue
+    let plain ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+      (← mkEq free (mkConst ``Bool.true))
+    let proof := mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.erase_eq_encode) inst τ plain value
+    let encoded := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.encode) inst τ value
+    return .visit { expr := encoded, proof? := some proof }
+
 /-- A callee's value in the caller's view holds the variant it holds at the
 callee's family (`variantName_ofSkolem`). -/
 simproc ↓ [vir_denote, vir_denote_norm] variantNameTransport
@@ -6768,6 +6753,9 @@ attribute [vir_denote, vir_denote_norm] VerexIR.Proofs.Denote.NTy.subst
   VerexIR.Proofs.Denote.NRow.getD
 attribute [vir_denote_norm high] VerexIR.Proofs.Denote.NTy.substWith_type_runtime
 -- A callee's value in the caller's view reduces constructor by constructor.
+-- A transported entry list of scalar keys and values is the list itself.
+attribute [vir_denote_norm] Prod.eta List.map_id' List.map_id
+
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.NTy.ofSkolem_unit
   VerexIR.Proofs.Denote.NTy.ofSkolem_bool VerexIR.Proofs.Denote.NTy.ofSkolem_int
   VerexIR.Proofs.Denote.NTy.ofSkolem_address VerexIR.Proofs.Denote.NTy.ofSkolem_signer
@@ -6905,7 +6893,10 @@ attribute [vir_denote_norm] VerexIR.Proofs.wp_pure
   Int.toNat_natCast VerexIR.Proofs.Denote.vectorLength_val
   VerexIR.Proofs.Denote.NTy.encode_vector VerexIR.Proofs.Denote.NTy.eqb_vector_decide
   VerexIR.Proofs.Denote.NTy.refFree VerexIR.Proofs.Denote.NRow.refFree
-  VerexIR.Proofs.Denote.NRows.refFree Option.isSome_some Option.isSome_none Option.isSome_map
+  VerexIR.Proofs.Denote.NRows.refFree VerexIR.Proofs.Denote.NTy.lendsEncoded
+  VerexIR.Proofs.Denote.NRow.lendsEncoded VerexIR.Proofs.Denote.NTy.tableFree
+  VerexIR.Proofs.Denote.NRow.tableFree VerexIR.Proofs.Denote.NRows.tableFree
+  Option.isSome_some Option.isSome_none Option.isSome_map
   VerexIR.GlobalKey.mk.injEq VerexIR.StorageKey.address.injEq Option.map_eq_none_iff
   VerexIR.StructHandle.mk.injEq VerexIR.Proofs.Contract.typed VerexIR.Proofs.Denote.hlistCodec
   VerexIR.Proofs.Denote.resultCodec VerexIR.Proofs.Denote.NTy.encode_bool
@@ -6963,6 +6954,45 @@ attribute [vir_denote_norm] VerexIR.RuntimeValue.order_integer Int.compare_eq_lt
 attribute [vir_denote_norm] Int.reduceToNat Nat.reduceLeDiff Nat.reduceLT Int.reduceLT
   Int.reduceLE
 
+/-- A bitwise operation on integer literals, evaluated: a value a program
+computes from literals, as `3 & 7`, is a literal to the observations of
+what holds it. The kernel decides the equation by evaluation. -/
+private def bitwiseLiteralStep (operation : Int → Int → Int) : Lean.Meta.Simp.Simproc := fun e => do
+  let args := e.getAppArgs
+  let (some left, some right) := (args[0]?.bind Lean.Expr.int?, args[1]?.bind Lean.Expr.int?)
+    | return .continue
+  let result := mkIntLit (operation left right)
+  let proof ← mkExpectedTypeHint (← mkEqRefl e) (← mkEq e result)
+  return .done { expr := result, proof? := some proof }
+
+simproc_decl reduceBitwiseAnd (VerexIR.Proofs.IntegerArithmetic.bitwiseAnd _ _) :=
+  bitwiseLiteralStep VerexIR.Proofs.IntegerArithmetic.bitwiseAnd
+simproc_decl reduceBitwiseOr (VerexIR.Proofs.IntegerArithmetic.bitwiseOr _ _) :=
+  bitwiseLiteralStep VerexIR.Proofs.IntegerArithmetic.bitwiseOr
+simproc_decl reduceBitwiseXor (VerexIR.Proofs.IntegerArithmetic.bitwiseXor _ _) :=
+  bitwiseLiteralStep VerexIR.Proofs.IntegerArithmetic.bitwiseXor
+/-- A lifted bitwise operation (`BitOp.eval`) on integer literals, evaluated
+as its operation. -/
+simproc_decl reduceBitOpEval (VerexIR.Proofs.Denote.BitOp.eval _ _ _) := fun e => do
+  let args := e.getAppArgs
+  let some op := args[0]? | return .continue
+  let operation : Option VerexIR.Proofs.Denote.BitOp :=
+    if op.isConstOf ``VerexIR.Proofs.Denote.BitOp.and then some .and
+    else if op.isConstOf ``VerexIR.Proofs.Denote.BitOp.or then some .or
+    else if op.isConstOf ``VerexIR.Proofs.Denote.BitOp.xor then some .xor
+    else none
+  let some operation := operation | return .continue
+  let (some left, some right) := (args[1]?.bind Lean.Expr.int?, args[2]?.bind Lean.Expr.int?)
+    | return .continue
+  let result := mkIntLit (operation.eval left right)
+  let proof ← mkExpectedTypeHint (← mkEqRefl e) (← mkEq e result)
+  return .done { expr := result, proof? := some proof }
+attribute [vir_denote_norm, vir_denote_eval] reduceBitwiseAnd reduceBitwiseOr reduceBitwiseXor
+  reduceBitOpEval
+-- Concatenated vector literals, as a specification builds a key with
+-- `concat(vec(1), vec(2))`, are the literal of the concatenation.
+attribute [vir_denote_norm] List.append_toArray List.cons_append List.nil_append
+
 attribute [vir_denote_eval] reduceCtorEq Nat.reduceAdd Nat.reduceSub Nat.reduceDiv Nat.reducePow
   Nat.reduceLT Nat.reduceEqDiff Int.reduceAdd Int.reduceSub Int.reducePow Int.reduceLT Int.reduceLE
   Int.reduceNatCast' Int.reduceToNat String.reduceBEq String.reduceEq String.reduceBNe
@@ -7013,6 +7043,41 @@ def normalizeAround (normalization : Simp.Context × Simp.SimprocsArray)
         replaceMainGoal [← applySimpResultToTarget goal target result]
   catch _ =>
     saved.restore
+
+/-- The newest hypothesis of the main goal named `name` up to macro scopes,
+as a cut introduced it: its name and type. -/
+def cutHypothesis? (name : Name) : TacticM (Option (Name × Lean.Expr)) := do
+  let some goal := (← getGoals).head? | return none
+  goal.withContext do
+    let some decl := (← getLCtx).findDeclRev? fun decl =>
+        if decl.userName.eraseMacroScopes == name then some decl else none
+      | return none
+    return some (decl.userName, ← instantiateMVars decl.type)
+
+/-- Normalize a cut's hypothesis again in each goal where the substitutions
+after the cut rewrote it, so that it is normal over the values they fix, as
+the goal is normalized over them. -/
+def renormalizeCut (normalization : Simp.Context × Simp.SimprocsArray)
+    (cut : Option (Name × Lean.Expr)) : TacticM Unit := do
+  let some (name, normal) := cut | return
+  let (ctx, simprocs) := normalization
+  let mut goals := #[]
+  for goal in ← getGoals do
+    let rewritten? ← goal.withContext do
+      let some decl := (← getLCtx).findFromUserName? name | return none
+      if (← instantiateMVars decl.type) == normal then return none
+      return some decl.fvarId
+    let some hypothesis := rewritten? | goals := goals.push goal; continue
+    let saved ← saveState
+    try
+      match ← simpGoal goal ctx simprocs (simplifyTarget := false)
+          (fvarIdsToSimp := #[hypothesis]) with
+      | (none, _) => pure ()
+      | (some (_, next), _) => goals := goals.push next
+    catch _ =>
+      saved.restore
+      goals := goals.push goal
+  setGoals goals.toList
 
 /-- Normalize a hypothesis that instantiates a normalized predicate at
 fresh variables, as `verex_normalize` would. The predicate's
@@ -7414,8 +7479,7 @@ private partial def nativeOf? (carriers : Option Lean.Expr) (τ value : Lean.Exp
       let fits := mkApp3 (mkConst ``VerexIR.IntegerValueFits) width signed integer
       let certificate ← mkFreshExprSyntheticOpaqueMVar fits
       let certified ← closesBy certificate.mvarId! (← `(tactic|
-        (simp only [VerexIR.Proofs.Denote.IntegerValueFits_unsigned_succ,
-          VerexIR.Proofs.Denote.IntegerValueFits_signed_succ]; omega)))
+        (simp only [vir_denote_side]; omega)))
       unless certified do return none
       return some (mkApp4 (mkConst ``SpecInt.mk) width signed integer
         (← instantiateMVars certificate))
@@ -7667,14 +7731,14 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
         if view.lent.isSome then
           -- An invocation lending mutable references, at their entry and
           -- final values.
-          let capturedFree ← free (mkApp (mkConst ``NRow.refFree) captured)
+          let capturedFree ← free (mkApp (mkConst ``NRow.lendsEncoded) captured)
           let flat ← free (mkApp (mkConst ``NRow.lentFlat) supplied)
           if let some run := view.run? then
             let some result ← shapeResult? carriers shape run.results | continue
             some <$> mkAppAtFrame ``VerexIR.Proofs.ensuresOfMut_closureOf_verified
                 (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
               #[weave, capturedFree, flat,
-                ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape])),
+                ← free (mkApp (mkConst ``NRow.lendsEncoded) (← mkAppM ``ResultShape.row #[shape])),
                 closure.getArg! 4, coherent, closure.appArg!, natives, result, verified, stated]
           else
             some <$> mkAppAtFrame ``VerexIR.Proofs.abortsOfMut_closureOf_verified
@@ -7686,9 +7750,9 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
           let some [] := literalElements? (type.getArg! 4) | continue
           some <$> mkAppAtFrame ``VerexIR.Proofs.ensuresOf_closureOf_verified_shape
               (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
-            #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
-              ← free (mkApp (mkConst ``NRow.refFree) supplied),
-              ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape])),
+            #[weave, ← free (mkApp (mkConst ``NRow.lendsEncoded) captured),
+              ← free (mkApp (mkConst ``NRow.lendsEncoded) supplied),
+              ← free (mkApp (mkConst ``NRow.lendsEncoded) (← mkAppM ``ResultShape.row #[shape])),
               closure.getArg! 4, coherent, closure.appArg!, natives, mkConst ``Unit.unit,
               verified, stated]
         else if ensures then
@@ -7698,14 +7762,15 @@ private def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
           let some native ← nativeOf? (some carriers) τ result | continue
           some <$> mkAppAtFrame ``VerexIR.Proofs.ensuresOf_closureOf_verified
               (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
-            #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
-              ← free (mkApp (mkConst ``NRow.refFree) supplied), ← free (mkApp (mkConst ``NTy.refFree) τ),
+            #[weave, ← free (mkApp (mkConst ``NRow.lendsEncoded) captured),
+              ← free (mkApp (mkConst ``NRow.lendsEncoded) supplied),
+              ← free (mkApp (mkConst ``NTy.lendsEncoded) τ),
               closure.getArg! 4, coherent, closure.appArg!, natives, native, verified, stated]
         else
           some <$> mkAppAtFrame ``VerexIR.Proofs.abortsOf_closureOf_verified
               (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
-            #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
-              ← free (mkApp (mkConst ``NRow.refFree) supplied), closure.getArg! 4, coherent,
+            #[weave, ← free (mkApp (mkConst ``NRow.lendsEncoded) captured),
+              ← free (mkApp (mkConst ``NRow.lendsEncoded) supplied), closure.getArg! 4, coherent,
               closure.appArg!, natives, verified, stated]
       catch ex =>
         if verex.solverDebug.get (← getOptions) then
@@ -7894,10 +7959,10 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
       let typed ← mkFreshExprMVar (← mkAppM ``VerexIR.Proofs.MemoryTyped
         #[ensuresType.getArg! 0, ensuresType.getArg! 5])
       unless ← proveMemoryTyped facts typed.mvarId! do continue
-      let refFree := mkApp (mkConst ``NRow.refFree) row
-      unless ← isDefEq refFree (mkConst ``Bool.true) do continue
+      let plain := mkApp (mkConst ``NRow.lendsEncoded) row
+      unless ← isDefEq plain (mkConst ``Bool.true) do continue
       let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
-        (← mkEq refFree (mkConst ``Bool.true))
+        (← mkEq plain (mkConst ``Bool.true))
       let kept := mkAppN (← frameFactProof fact) #[free, action.getArg! 6, ensuresType.getArg! 4,
         ensuresType.getArg! 5, ensuresType.getArg! 6, ← instantiateMVars typed, ensures.toExpr]
       try check kept catch error =>
@@ -8004,8 +8069,7 @@ private def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :
       -- A closure read from a resource gets its field frame from that value's
       -- stored invariant. Recover it before recording the invocation's final
       -- memory, so the call can use the frame just as a parameter call does.
-      let (tables, invariants) ← storedValueSources goal
-      let goal ← if !(tables || invariants) then pure goal else do
+      let goal ← if !(← readsStoredInvariants goal) then pure goal else do
         let saved ← saveState
         try
           setGoals [goal]
@@ -8144,17 +8208,17 @@ private def literalClosureKeepsMemory? (goal : MVarId)
       goal.withContext (whnfR target) else pure target
   unless target.isAppOfArity ``VerexIR.Proofs.FramedAt 6 do return none
   if verex.solverDebug.get (← getOptions) then logInfo "frame: inspecting closure"
-  let references ← goal.withContext do
-    let refFree := mkApp (mkConst ``NRow.refFree) (target.getArg! 3)
-    if ← isDefEq refFree (mkConst ``Bool.false) then
+  let held ← goal.withContext do
+    let plain := mkApp (mkConst ``NRow.lendsEncoded) (target.getArg! 3)
+    if ← isDefEq plain (mkConst ``Bool.false) then
       some <$> mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.false))
-        (← mkEq refFree (mkConst ``Bool.false))
+        (← mkEq plain (mkConst ``Bool.false))
     else pure none
-  if let some references := references then
+  if let some held := held then
     goal.assign (← goal.withContext do
-      mkAppOptM ``VerexIR.Proofs.FramedAt.of_refFree_false
+      mkAppOptM ``VerexIR.Proofs.FramedAt.of_lendsEncoded_false
         #[target.getArg! 0, target.getArg! 1, target.getArg! 2, target.getArg! 3,
-          target.getArg! 4, target.getArg! 5, references])
+          target.getArg! 4, target.getArg! 5, held])
     return some []
   -- A frame a hypothesis states of the same function value, within it.
   if verex.solverDebug.get (← getOptions) then logInfo "frame: checking stated frames"
@@ -8218,9 +8282,10 @@ private def literalClosureKeepsMemory? (goal : MVarId)
       throwError "the closure and its target theorem use different type families"
     let rule ← mkAppAtFrame ``VerexIR.Proofs.FramedAt.ofVerified
         (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
-      #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
-        ← free (mkApp (mkConst ``NRow.refFree) supplied),
-        ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[← whnfD meaning.appArg!])),
+      #[weave, ← free (mkApp (mkConst ``NRow.lendsEncoded) captured),
+        ← free (mkApp (mkConst ``NRow.lendsEncoded) supplied),
+        ← free (mkApp (mkConst ``NRow.lendsEncoded)
+          (← mkAppM ``ResultShape.row #[← whnfD meaning.appArg!])),
         closure.getArg! 4, coherent, closure.appArg!, ← instantiateMVars (mkAppN theoremProof theoremArguments)]
     let rule := mkApp rule (target.getArg! 4)
     -- The natives the target's theorem assumes, the caller assumes too.
@@ -8270,9 +8335,9 @@ private def literalClosureKeepsMemory? (goal : MVarId)
   try
     let shape ← whnfD (← mkAppM ``Function.result #[compiled])
     let rule ← mkAppAtFrame ``VerexIR.Proofs.FramedAt.ofBody (target.getArg! 0) (target.getArg! 1) (target.getArg! 2)
-      #[weave, ← free (mkApp (mkConst ``NRow.refFree) captured),
-        ← free (mkApp (mkConst ``NRow.refFree) supplied),
-        ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape])),
+      #[weave, ← free (mkApp (mkConst ``NRow.lendsEncoded) captured),
+        ← free (mkApp (mkConst ``NRow.lendsEncoded) supplied),
+        ← free (mkApp (mkConst ``NRow.lendsEncoded) (← mkAppM ``ResultShape.row #[shape])),
         closure.getArg! 4, coherent, closure.appArg!]
     let rule := mkApp rule (target.getArg! 4)
     let .forallE _ keptType _ _ ← whnfR (← inferType rule) | throwError "no body premise"
@@ -8573,11 +8638,11 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
     mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq statement (mkConst ``Bool.true))
   let coherent ← mkAppM ``coherent_runtime
     #[type.getArg! 0, handle]
-  let capturedFree ← free (mkApp (mkConst ``NRow.refFree) captured)
-  -- The supplied row: free of references, or lending mutable ones.
+  let capturedFree ← free (mkApp (mkConst ``NRow.lendsEncoded) captured)
+  -- The supplied row: lending as its encodings, or lending mutable references.
   let suppliedFree ← match view.lent with
     | some _ => free (mkApp (mkConst ``NRow.lentFlat) supplied)
-    | none => free (mkApp (mkConst ``NRow.refFree) supplied)
+    | none => free (mkApp (mkConst ``NRow.lendsEncoded) supplied)
   if let some run := view.run? then
     let unitShape := shape.isConstOf ``ResultShape.none
     unless unitShape || shape.isAppOfArity ``ResultShape.one 1 do
@@ -8588,7 +8653,7 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
       let .fvar resultVar := result | throwError m!"result not a variable {result}"
       pure (some resultVar)
     let .fvar finalVar := run.post | throwError "final not a variable"
-    let shapeFree ← free (mkApp (mkConst ``NRow.refFree) (← mkAppM ``ResultShape.row #[shape]))
+    let shapeFree ← free (mkApp (mkConst ``NRow.lendsEncoded) (← mkAppM ``ResultShape.row #[shape]))
     let run ← if view.lent.isSome then
         mkAppAtFrame ``VerexIR.Proofs.ensuresOfMut_closureOf
           (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
@@ -8603,7 +8668,7 @@ private def denotedRun (goal : MVarId) (callees : Array (Lean.Expr × String × 
       else
         mkAppAtFrame ``VerexIR.Proofs.ensuresOf_closureOf
           (type.getArg! 0) (type.getArg! 1) (closure.getArg! 1)
-          #[weave, capturedFree, suppliedFree, ← free (mkApp (mkConst ``NTy.refFree) shape.appArg!),
+          #[weave, capturedFree, suppliedFree, ← free (mkApp (mkConst ``NTy.lendsEncoded) shape.appArg!),
             closure.getArg! 4, coherent, closure.appArg!, natives, result, stated]
     let runType ← inferType run
     let goal ← goal.replaceLocalDeclDefEq hypothesis
@@ -9124,6 +9189,7 @@ private def Provenance.leafName : Provenance → String
   | .memoryWritten | .callReturned => "module_invariant"
   | .lemmaRequirement => "lemma_requires"
   | .unrollBound _ => "unroll"
+  | .storedWrite => "stored_invariant"
 where
   /-- The last segment of a qualified name, as an identifier. -/
   identifierPart (name : String) : String :=
@@ -9324,8 +9390,10 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
         VerexIR.Proofs.Denote.assumptionOf_none, VerexIR.Proofs.Denote.assumptionOf_same,
         ↓reduceIte, Nat.reduceEqDiff] at $holdsIdent:ident))
       evalTactic (← `(tactic| try verex_normalize at $holdsIdent:ident))
+      let cut ← cutHypothesis? `assumptionHolds
       evalTactic (← `(tactic| all_goals verex_split_hypotheses))
       evalTactic (← `(tactic| all_goals verex_subst_vars))
+      renormalizeCut normalization cut
       pending := pending ++ (← getGoals).toArray.map fun g => (g, provenance, clauses)
       stageCost := stageCost.push ("assume", (← IO.getNumHeartbeats) - stageStart)
       continue
@@ -9348,10 +9416,12 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       | [holds, continues] =>
           setGoals [continues]
           evalTactic (← `(tactic| intro invariantHolds))
-          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at invariantHolds))
+          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at invariantHolds))
           evalTactic (← `(tactic| try verex_normalize at invariantHolds))
+          let cut ← cutHypothesis? `invariantHolds
           evalTactic (← `(tactic| all_goals verex_split_hypotheses))
           evalTactic (← `(tactic| all_goals verex_subst_vars))
+          renormalizeCut normalization cut
           pending := pending ++ (← getGoals).toArray.map fun g => (g, provenance, clauses)
           setGoals [holds]
           evalTactic (← `(tactic| try verex_normalize))
@@ -9529,7 +9599,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           let (_, continued) ← (← getMainGoal).intro `assertionHolds
           let holdsIdent := mkIdent `assertionHolds
           replaceMainGoal [continued]
-          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at $holdsIdent:ident))
+          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at $holdsIdent:ident))
           evalTactic (← `(tactic| try verex_normalize at $holdsIdent:ident))
           -- The lemmas a proof step applies give their conclusions.
           unless (← getGoals).isEmpty do
@@ -9543,9 +9613,11 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           unless (← getGoals).isEmpty do
             -- The continuation is normalized where it is applied, as after
             -- a step; the row and state it is applied to are normal.
+            let cut ← cutHypothesis? `assertionHolds
             normalizeAround normalization #[arguments[5]!, arguments[8]!]
             evalTactic (← `(tactic| all_goals verex_split_hypotheses))
             evalTactic (← `(tactic| all_goals verex_subst_vars))
+            renormalizeCut normalization cut
             -- A split step continues once per case, each normalized under
             -- its case.
             let before ← getGoals
@@ -9586,12 +9658,14 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       | [holds, continues] =>
           setGoals [continues]
           evalTactic (← `(tactic| intro invariantHolds))
-          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at invariantHolds))
+          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at invariantHolds))
           evalTactic (← `(tactic| try verex_normalize at invariantHolds))
           unless (← getGoals).isEmpty do
+            let cut ← cutHypothesis? `invariantHolds
             normalizeAround normalization #[arguments[5]!, arguments[8]!]
             evalTactic (← `(tactic| all_goals verex_split_hypotheses))
             evalTactic (← `(tactic| all_goals verex_subst_vars))
+            renormalizeCut normalization cut
             pending := pending ++ (← getGoals).toArray.map fun g => (g, provenance, clauses)
           setGoals [holds]
           evalTactic (← `(tactic| try verex_normalize))
@@ -9620,12 +9694,14 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       | [holds, continues] =>
           setGoals [continues]
           evalTactic (← `(tactic| intro invariantHolds))
-          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at invariantHolds))
+          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at invariantHolds))
           evalTactic (← `(tactic| try verex_normalize at invariantHolds))
           unless (← getGoals).isEmpty do
+            let cut ← cutHypothesis? `invariantHolds
             normalizeAround normalization #[entry, initial]
             evalTactic (← `(tactic| all_goals verex_split_hypotheses))
             evalTactic (← `(tactic| all_goals verex_subst_vars))
+            renormalizeCut normalization cut
             pending := pending ++ (← getGoals).toArray.map fun g => (g, provenance, clauses)
           setGoals [holds]
           evalTactic (← `(tactic| try verex_normalize))
@@ -9750,7 +9826,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
           pending := pending ++ (← getGoals).toArray.map fun g =>
             (g, some (Provenance.precondition calleeName), required)
           setGoals [continues]
-          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at calleeRequires))
+          evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at calleeRequires))
           -- A precondition that does not hold closes what follows.
           if (← getGoals).isEmpty then
             stageCost := stageCost.push ("call", (← IO.getNumHeartbeats) - stageStart)
@@ -9855,6 +9931,18 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
       pending := pending ++ (← getGoals).toArray.map fun g => (g, some .loopIteration, #[])
       stageCost := stageCost.push ("recursive", (← IO.getNumHeartbeats) - stageStart)
       continue
+    -- The stored invariants a write owes: the invariant of each value
+    -- written, one leaf per clause.
+    if ← writesStoredInvariants goal then
+      let saved ← saveState
+      setGoals [goal]
+      let applied ← tryCatch (do evalTactic (← `(tactic| verex_memory_invariants)); pure true)
+        fun _ => pure false
+      if applied then
+        pending := pending ++ (← getGoals).toArray.map fun g => (g, some .storedWrite, #[])
+        stageCost := stageCost.push ("stored invariants", (← IO.getNumHeartbeats) - stageStart)
+        continue
+      saved.restore
     -- A literal closure's run is read once for all conjuncts of a
     -- conjunction, before it splits: each conjunct would read it again.
     if (← goal.withContext (instantiateMVars (← goal.getType))).isAppOfArity ``And 2 then
@@ -10140,7 +10228,7 @@ macro "verex_prepare" : tactic => `(tactic| verex_focus (
   all_goals (
     (try verex_unname)
     (try verex_prepare_leaf)
-    all_goals (try simp only [VerexIR.Proofs.Obligation_iff]))))
+    all_goals (try simp only [VerexIR.Proofs.Obligation_eq]))))
 
 /-- Decide a leaf by bounded deciders over its context as it stands, its
 hypotheses split and its premises introduced: assumption, `omega`, ground
@@ -10227,7 +10315,7 @@ elab "verex_lemma_holds " h:ident : tactic => focusGoal do
   let some decl := (← goal.withContext getLCtx).findFromUserName? h.getId
     | throwError m!"no hypothesis `{h.getId}`"
   replaceMainGoal [← replaceByLemmaFacts goal decl.fvarId]
-  evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_iff] at $h:ident))
+  evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at $h:ident))
   evalTactic (← `(tactic| try verex_normalize at $h:ident))
   evalTactic (← `(tactic| verex_split_hypotheses))
   let before ← getGoals

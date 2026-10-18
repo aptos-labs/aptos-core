@@ -43,6 +43,16 @@ def skipVerify (options : Lean.Options) : Bool :=
   | some (.ofBool skip) => skip
   | _ => !Lean.internal.cmdlineSnapshots.get options
 
+/-- Report a message about another file at the item or command of this file
+that raised it, its position in the text: what a document shows. The
+source-verification driver, which reports each message in its own file, turns
+it off. -/
+register_option verex.relocateMessages : Bool := {
+  defValue := true
+  descr := "report a message about another file at the item or command that raised it, its \
+    position in the text"
+}
+
 register_option verex.stageLog : String := {
   defValue := ""
   descr := "path of a file the verifier appends a timestamped line to at every stage of a \

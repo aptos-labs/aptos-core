@@ -652,8 +652,9 @@ mutual
                 | notCarried "the type of a type argument"
               let θ := NRow.ofList θ
               unless θ.refFree do notCarried "a reference type argument"
-              let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
-                  some ⟨θ, inhabitable⟩ else none
+              unless θ.tableFree do notCarried "a type argument holding a map's contents"
+              let some (θ : TypeArgs) := if arguments : θ.typeArguments = true then
+                  some ⟨θ, arguments⟩ else none
                 | notCarried "a type argument without values"
               let arguments ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel arguments.toList
                 (NRow.subst θ.1 parameters)
@@ -687,11 +688,13 @@ mutual
                 if closed : (captured.paramFree && supplied.paramFree && results.paramFree) = true
                 then
                 if faithful : closureFaithful unit handle #[] = true then
+                if plain : captured.tableFree = true then
                   let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
                     captures.toList captured
                   let value : Term unit ρ Γ (.function supplied shared results) :=
-                    .closure handle weave results shared rows sharing closed faithful captures
+                    .closure handle weave results shared rows sharing closed faithful plain captures
                   .ok (.at τ (← Compiled.at? τ (.at (.function supplied shared results) value)))
+                else notCarried "a captured value holding a map's contents"
                 else notCarried "a closure whose empty instantiation is not faithful to its target"
                 else notCarried "a closure without type arguments over type parameters"
                 else notCarried "a closure whose shared parameters are not its target's"
@@ -705,8 +708,9 @@ mutual
                 | notCarried "the type of a type argument"
               let θ := NRow.ofList θ
               unless θ.refFree do notCarried "a reference type argument"
-              let some (θ : TypeArgs) := if inhabitable : θ.inhabitable = true then
-                  some ⟨θ, inhabitable⟩ else none
+              unless θ.tableFree do notCarried "a type argument holding a map's contents"
+              let some (θ : TypeArgs) := if arguments : θ.typeArguments = true then
+                  some ⟨θ, arguments⟩ else none
                 | notCarried "a type argument without values"
               let shape ← match target.signature.results.toList with
                 | [] => .ok ResultShape.none
@@ -721,15 +725,17 @@ mutual
               then
                 if sharing : closureShared unit handle weave.mask = shared then
                 if below : closureSignatureBelow unit handle = true then
+                if plain : captured.tableFree = true then
                   let captures ← compileArgs unit loanFacts ρ Γ ns namespaceId fuel
                     captures.toList (NRow.subst θ.1 captured)
                   let value : Term unit ρ Γ
                       (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row) :=
                     .closureGeneric handle weave typeArgs.toArray θ shape shared rows sharing below
-                      captures
+                      plain captures
                   .ok (.at τ (← Compiled.at? τ
                     (.at (.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row)
                       value)))
+                else notCarried "a captured value holding a map's contents"
                 else notCarried "a closure target whose signature names foreign type parameters"
                 else notCarried "a closure whose shared parameters are not its target's"
               else notCarried "a closure whose rows are not its target's"

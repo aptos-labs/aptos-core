@@ -31,7 +31,12 @@ fn prove_lean_proof() {
     )]);
     std::fs::write(
         pkg.path().join("sources/lean_proof.proof.lean"),
-        "verify square_of_sum by
+        "import VerexMove.Proofs
+
+verex proofs for \"lean_proof.move\"
+verex proofs where
+
+verify square_of_sum by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   case aborts_if_1_3 =>

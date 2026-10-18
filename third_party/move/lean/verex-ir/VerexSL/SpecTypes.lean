@@ -43,7 +43,14 @@ inductive FieldRep where
   | parameter (index : Nat)
   /-- A nested twin, by its generated Lean name. -/
   | nominal (twin : Name) (arguments : Array FieldRep)
+  /-- The hidden contents field of a table owner: its entries, each a key and
+  a value (`designs/intrinsic-maps.md`, "Owned Table values"). -/
+  | table (key value : FieldRep)
   deriving Repr, BEq, Inhabited
+
+/-- The name of a table owner's hidden contents field in its twin: no Move
+field is spelled with a space. -/
+def tableContentsField : String := "table contents"
 
 /-- One represented enum variant and its payload row. -/
 structure VariantInfo where
@@ -165,7 +172,19 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
             (fun nested => emitted.contains nested ∨ nested == qualified)
             field.type.typeId (unit.namespaces[namespaceIndex]?.bind (·.profile))
           some (name.name, rep)
-        let fields := representFields declaration.fields
+        -- A table owner's twin carries its hidden contents field, as its
+        -- native type does (`structNTy`).
+        let tableOwner := declaration.variants.isEmpty && declaration.generics.size == 2 &&
+          (unit.namespaces[namespaceIndex]?).any (fun ns => ns.intrinsics.any fun intrinsic =>
+            intrinsic.model == "map" && intrinsic.owner == declaration.name) &&
+          match (declaration.fields.toList.mapM fun field =>
+              unit.tables.types[field.type.typeId.index]? : Option (List VerexIR.Ty)) with
+          | some [] | some [.address] | some [.address, .integer (.bits 64) false] => true
+          | _ => false
+        let declared := representFields declaration.fields
+        let fields := if tableOwner then
+            declared.push (tableContentsField, .table (.parameter 0) (.parameter 1))
+          else declared
         let variants := declaration.variants.filterMap fun variant => do
           let name ← nameOf? unit variant.name
           let fields := representFields variant.fields
@@ -180,7 +199,7 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
           | some (.nominal nested _) =>
               (nameOf? unit nested).any emitted.contains
           | _ => true
-        if ready && fields.size == declaration.fields.size &&
+        if ready && declared.size == declaration.fields.size &&
             variants.size == declaration.variants.size then
           ordered := ordered.push {
             name := qualified.name, qualified
@@ -193,11 +212,14 @@ def twinInfos (segments : Array String) (unit : ValidatedUnit) :
 
 /-! ## Command generation -/
 
-/-- Elaborate a generated theorem with its proof checked before the command
-returns: a failure is an error at this site, never a `sorry` reported at the
-module's end. -/
-private def elabTheorem (command : TSyntax `command) : CommandElabM Unit := do
+/-- Elaborate a generated declaration before the command returns: a
+theorem's failure is an error at this site, never a `sorry` reported at the
+module's end, and a definition is in the environment the bridges added
+afterwards (`addDecl`) are checked in. -/
+private def elabSync (command : TSyntax `command) : CommandElabM Unit := do
   elabCommand (← `(command| set_option Elab.async false in $command))
+
+private def elabTheorem (command : TSyntax `command) : CommandElabM Unit := elabSync command
 
 private def natLit (value : Nat) : Term :=
   Syntax.mkNatLit value
@@ -231,6 +253,8 @@ partial def FieldRep.typeSyntax (parameters : Array Ident := #[]) :
       let arguments ← arguments.mapM (FieldRep.typeSyntax parameters)
       if arguments.isEmpty then return rootIdent twin
       ``($(rootIdent twin) $arguments*)
+  | .table key value => do
+      ``(List ($(← key.typeSyntax parameters) × $(← value.typeSyntax parameters)))
 
 /-- Whether this representation depends on the surrounding declaration's
 type parameters. -/
@@ -238,6 +262,7 @@ partial def FieldRep.mentionsParameter : FieldRep → Bool
   | .parameter _ => true
   | .vector element _ => element.mentionsParameter
   | .nominal _ arguments => arguments.any mentionsParameter
+  | .table key value => key.mentionsParameter || value.mentionsParameter
   | _ => false
 
 /-- Number of surrounding carrier slots needed to interpret a
@@ -247,6 +272,7 @@ partial def FieldRep.parameterCount : FieldRep → Nat
   | .vector element _ => element.parameterCount
   | .nominal _ arguments =>
       arguments.foldl (fun count argument => max count argument.parameterCount) 0
+  | .table key value => max key.parameterCount value.parameterCount
   | _ => 0
 
 /-- Substitute the represented arguments of a nominal use into one of the
@@ -255,6 +281,7 @@ partial def FieldRep.instantiate (arguments : Array FieldRep) : FieldRep → Fie
   | .parameter index => arguments[index]?.getD (.parameter index)
   | .vector element bounded => .vector (element.instantiate arguments) bounded
   | .nominal twin nested => .nominal twin (nested.map (instantiate arguments))
+  | .table key value => .table (key.instantiate arguments) (value.instantiate arguments)
   | rep => rep
 
 /-- Meta-level native type of a represented field. -/
@@ -280,6 +307,8 @@ partial def FieldRep.leanType (rep : FieldRep) (carrier? : Option Lean.Expr) :
   | .nominal twin arguments =>
       arguments.foldlM (init := mkConst twin) fun type argument =>
         return mkApp type (← argument.leanType carrier?)
+  | .table key value =>
+      mkAppM ``List #[← mkAppM ``Prod #[← key.leanType carrier?, ← value.leanType carrier?]]
 
 /-- Meta-level codec of a represented field. -/
 partial def FieldRep.codec (rep : FieldRep) (codecs? : Option Lean.Expr) :
@@ -303,6 +332,8 @@ partial def FieldRep.codec (rep : FieldRep) (codecs? : Option Lean.Expr) :
   | .nominal twin arguments => do
       let argumentCodecs ← arguments.mapM (·.codec codecs?)
       mkAppM (twin ++ `codec) argumentCodecs
+  | .table key value =>
+      mkAppM ``VerexIR.Proofs.Denote.Codec.entries #[← key.codec codecs?, ← value.codec codecs?]
 
 /-- Codec syntax of a represented value. -/
 partial def FieldRep.codecSyntax (codecs : Array Term := #[]) :
@@ -329,6 +360,8 @@ partial def FieldRep.codecSyntax (codecs : Array Term := #[]) :
   | .nominal twin arguments => do
       let arguments ← arguments.mapM (FieldRep.codecSyntax codecs)
       ``($(rootIdent (twin ++ `codec)) $arguments*)
+  | .table key value => do
+      ``(VerexIR.Proofs.Denote.Codec.entries $(← key.codecSyntax codecs) $(← value.codecSyntax codecs))
 
 /-- Term syntax of one field's erasure, from its projection. -/
 def FieldRep.eraseSyntax (rep : FieldRep) (projected : Term)
@@ -342,7 +375,7 @@ def FieldRep.eraseSyntax (rep : FieldRep) (projected : Term)
   | .signer => ``(VerexIR.RuntimeValue.signer $projected)
   | .bytes => ``(VerexIR.RuntimeValue.bytes $projected)
   | .unit => ``(VerexIR.RuntimeValue.unit)
-  | .vector _ _ => do
+  | .vector _ _ | .table _ _ => do
       let codec ← rep.codecSyntax codecs
       ``(VerexIR.Proofs.Codec.encode $codec $projected)
   | .parameter index => do
@@ -370,6 +403,9 @@ def FieldRep.decodeSyntax (codecs : Array Term := #[]) :
   | .vector element bounded => do
       let codec ← (FieldRep.vector element bounded).codecSyntax codecs
       ``(VerexIR.Proofs.Codec.decode? $codec)
+  | .table key value => do
+      let codec ← (FieldRep.table key value).codecSyntax codecs
+      ``(VerexIR.Proofs.Codec.decode? $codec)
   | .parameter index => do
       let some codec := codecs[index]?
         | throwError "a generic twin field has no decoder codec {index}"
@@ -387,6 +423,7 @@ private def FieldRep.defaultSyntax (parameters : Array Ident := #[]) :
   | .bytes => ``(#[])
   | .unit => ``(())
   | .vector _ bounded => if bounded then ``(default) else ``(#[])
+  | .table _ _ => ``([])
   | .parameter index => do
       let some parameterType := parameters[index]?
         | throwError "a generic twin default has no type parameter {index}"
@@ -416,7 +453,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let twinType ← `(term| $twin:ident $typeParameters*)
   let fieldIds := info.fields.map fun (name, _) => mkIdent (Name.mkSimple name)
   let fieldTypes ← info.fields.mapM fun (_, rep) => rep.typeSyntax typeParameters
-  elabCommand (← `(@[verex_twin] structure $twin:ident $typeBinders* where
+  elabSync (← `(@[verex_twin] structure $twin:ident $typeBinders* where
     $[( $fieldIds:ident : $fieldTypes:term)]*))
 
   let value := mkIdent `value
@@ -424,7 +461,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let erasures ← info.fields.mapM fun (name, rep) => do
     rep.eraseSyntax
       (← ``($(rootIdent (info.twin ++ Name.mkSimple name)) $value)) codecTerms
-  elabCommand (← `(def $eraseName:ident $implicitTypeBinders* $codecBinders*
+  elabSync (← `(def $eraseName:ident $implicitTypeBinders* $codecBinders*
       ($value:ident : $twinType) : VerexIR.RuntimeValue :=
     VerexIR.RuntimeValue.nominal
       ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
@@ -440,7 +477,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
     let decoder ← info.fields[index]!.2.decodeSyntax codecTerms
     chain ← ``(Option.bind ($decoder $(operands[index]!))
       fun $(decodedIds[index]!):ident => $chain)
-  elabCommand (← `(def $decodeName:ident $implicitTypeBinders* $codecBinders* :
+  elabSync (← `(def $decodeName:ident $implicitTypeBinders* $codecBinders* :
       VerexIR.RuntimeValue → Option $twinType
     | VerexIR.RuntimeValue.nominal
         ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
@@ -480,7 +517,7 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
     rep.eraseSyntax fieldVars[index]! codecTerms
 
   let codecName := rootIdent (info.twin ++ `codec)
-  elabCommand (← `(def $codecName:ident $implicitTypeBinders* $codecBinders* :
+  elabSync (← `(def $codecName:ident $implicitTypeBinders* $codecBinders* :
       VerexIR.Proofs.Codec $twinType VerexIR.RuntimeValue where
     encode := $eraseName $codecIds*
     decode? := $decodeName $codecIds*
@@ -505,10 +542,10 @@ private def emitGenericStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let defaults ← info.fields.mapM fun (_, rep) =>
     rep.defaultSyntax typeParameters
   let inhabitedName := rootIdent (info.twin ++ `instInhabited)
-  elabCommand (← `(instance $inhabitedName:ident
+  elabSync (← `(instance $inhabitedName:ident
       $implicitTypeBinders* $inhabitedBinders* :
       Inhabited $twinType := ⟨⟨$defaults,*⟩⟩))
-  elabCommand (← `(attribute [irreducible] $decodeName:ident))
+  elabSync (← `(attribute [irreducible] $decodeName:ident))
 
 /-- Emit one plain struct twin's declarations: the tagged structure, `erase`, `decode?`,
 their roundtrips, and `Inhabited`. -/
@@ -519,14 +556,14 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
   let twin := rootIdent info.twin
   let fieldIds := info.fields.map fun (name, _) => mkIdent (Name.mkSimple name)
   let fieldTypes ← info.fields.mapM fun (_, rep) => rep.typeSyntax
-  elabCommand (← `(@[verex_twin] structure $twin:ident where
+  elabSync (← `(@[verex_twin] structure $twin:ident where
     $[($fieldIds:ident : $fieldTypes:term)]*))
   -- erase
   let eraseName := rootIdent (info.twin ++ `erase)
   let value := mkIdent `value
   let erasures ← info.fields.mapM fun (name, rep) => do
     rep.eraseSyntax (← ``($(rootIdent (info.twin ++ Name.mkSimple name)) $value))
-  elabCommand (← `(def $eraseName:ident ($value:ident : $twin) :
+  elabSync (← `(def $eraseName:ident ($value:ident : $twin) :
       VerexIR.RuntimeValue :=
     VerexIR.RuntimeValue.nominal
       ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩ none
@@ -540,7 +577,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
     let decoder ← info.fields[index]!.2.decodeSyntax
     chain ← ``(Option.bind ($decoder $(operands[index]!))
       fun $(fieldIds[index]!):ident => $chain)
-  elabCommand (← `(def $decodeName:ident :
+  elabSync (← `(def $decodeName:ident :
       VerexIR.RuntimeValue → Option $twin
     | VerexIR.RuntimeValue.nominal
         ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
@@ -569,7 +606,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
       ($value:ident : $twin) :
       $decodeName $literal = some $value :=
     $roundtripName $value))
-  elabCommand (← `(attribute [vir_denote_norm] $roundtripName:ident
+  elabSync (← `(attribute [vir_denote_norm] $roundtripName:ident
     $literalRoundtripName:ident))
   /- The decoder belongs to the simp phase, not to reduction.  Symbolic
   execution that unfolds it splits the range test of every certified
@@ -577,9 +614,9 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
   refuted later: a `SpecInt` nested inside a twin never becomes a range
   hypothesis.  Sealed, the decoder stays folded until the closing executes
   it against the range facts the contract carries. -/
-  elabCommand (← `(attribute [irreducible] $decodeName:ident))
+  elabSync (← `(attribute [irreducible] $decodeName:ident))
   let codecName := rootIdent (info.twin ++ `codec)
-  elabCommand (← `(def $codecName:ident :
+  elabSync (← `(def $codecName:ident :
       VerexIR.Proofs.Codec $twin VerexIR.RuntimeValue where
     encode := $eraseName
     decode? := $decodeName
@@ -602,7 +639,7 @@ private def emitStructTwin (info : TwinInfo) : CommandElabM Unit := do
           #[$literalErasures,*] := rfl))
   -- Inhabited
   let defaults ← info.fields.mapM fun (_, rep) => rep.defaultSyntax
-  elabCommand (← `(instance : Inhabited $twin := ⟨⟨$defaults,*⟩⟩))
+  elabSync (← `(instance : Inhabited $twin := ⟨⟨$defaults,*⟩⟩))
 
 /-- A constructor applied to the supplied terms, usable both as a pattern
 and as an expression. -/
@@ -637,7 +674,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       `(bracketedBinder| ($(mkIdent (Name.mkSimple field)):ident : $(← rep.typeSyntax typeParameters)))
     constructors := constructors.push
       (← `(Lean.Parser.Command.ctor| | $constructor:ident $[$binders]*))
-  elabCommand (← `(@[verex_twin] inductive $twin:ident $typeBinders* where
+  elabSync (← `(@[verex_twin] inductive $twin:ident $typeBinders* where
     $[$constructors:ctor]*))
 
   let value := mkIdent `value
@@ -655,7 +692,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       (some $(quote variant.name)) #[$erasures,*])
     eraseArms := eraseArms.push
       (← `(Lean.Parser.Term.matchAltExpr| | $pattern:term => $runtime))
-  elabCommand (← `(def $eraseName:ident $implicitTypeBinders* $codecBinders*
+  elabSync (← `(def $eraseName:ident $implicitTypeBinders* $codecBinders*
       ($value:ident : $twinType) :
       VerexIR.RuntimeValue :=
     match $value:ident with $eraseArms:matchAlt*))
@@ -698,7 +735,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       | _ => none)
     variantChain ← ``(if $variantName:ident == $(quote variant.name) then
       $row else $variantChain)
-  elabCommand (← `(def $decodeName:ident $implicitTypeBinders* $codecBinders* :
+  elabSync (← `(def $decodeName:ident $implicitTypeBinders* $codecBinders* :
       VerexIR.RuntimeValue → Option $twinType
     | VerexIR.RuntimeValue.nominal
         ⟨⟨$(natLit info.namespaceIndex)⟩, $(natLit info.structIndex)⟩
@@ -754,9 +791,9 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
       $decodeName $codecIds* $runtime = some $constructed := by
         simp [$decodeName:ident]))
 
-  elabCommand (← `(attribute [irreducible] $decodeName:ident))
+  elabSync (← `(attribute [irreducible] $decodeName:ident))
   let codecName := rootIdent (info.twin ++ `codec)
-  elabCommand (← `(def $codecName:ident $implicitTypeBinders* $codecBinders* :
+  elabSync (← `(def $codecName:ident $implicitTypeBinders* $codecBinders* :
       VerexIR.Proofs.Codec $twinType VerexIR.RuntimeValue where
     encode := $eraseName $codecIds*
     decode? := $decodeName $codecIds*
@@ -775,7 +812,7 @@ private def emitEnumTwin (info : TwinInfo) : CommandElabM Unit := do
   let inhabitedBinders ← typeParameters.mapM fun parameterType =>
     `(bracketedBinder| [Inhabited $parameterType])
   let inhabitedName := rootIdent (info.twin ++ `instInhabited)
-  elabCommand (← `(instance $inhabitedName:ident $implicitTypeBinders* $inhabitedBinders* :
+  elabSync (← `(instance $inhabitedName:ident $implicitTypeBinders* $inhabitedBinders* :
     Inhabited $twinType := ⟨$default⟩))
 
 /-- Emit one twin's declarations. -/

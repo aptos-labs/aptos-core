@@ -109,10 +109,11 @@ MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite
 ```
 
 A function the automatic verification leaves open is proved in a proof
-file beside its Move file; the failure message names the file.
-`verex_obligations` splits the function's goal into its obligations, each
-named by the clause it owes, which `verex_decide` and `verex_prepare`, or
-any Lean tactics, then prove:
+file beside its Move file; the failure message names the file. The file's
+header establishes the context of its module, and `verex_obligations`
+splits the function's goal into its obligations, each named by the clause it
+owes, which `verex_decide` and `verex_prepare`, or any Lean tactics, then
+prove:
 
 ```move
 spec square_of_sum {
@@ -124,6 +125,11 @@ spec square_of_sum {
 
 ```lean
 -- proofs.proof.lean, beside proofs.move
+import VerexMove.Proofs
+
+verex proofs for "proofs.move"
+verex proofs where
+
 verify square_of_sum by
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
@@ -133,5 +139,7 @@ verify square_of_sum by
 The Move Prover reads `verify = manual` as true and ignores `heartbeats`.
 In the editor, `verify` items are skipped (`verex.skip_verify`, on by
 default in the language server only); `verify! f`, marked by the code action "Verify `f` here",
-runs.
+runs. A proof file opens with its goals in the InfoView once its Move file
+has been verified: the header loads the rendering that verification wrote
+(`.verex/` beside the file, `build/` of a package).
 Details: [`designs/source-verification.md`](designs/source-verification.md).

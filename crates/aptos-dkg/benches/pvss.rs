@@ -20,13 +20,13 @@ use aptos_dkg::pvss::{
 };
 use ark_bls12_381::Bls12_381;
 use criterion::{
-    black_box, criterion_group, criterion_main,
+    criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
     BenchmarkGroup, Criterion, Throughput,
 };
 use more_asserts::assert_le;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
-use std::collections::HashSet;
+use std::{collections::HashSet, hint::black_box};
 
 // const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";

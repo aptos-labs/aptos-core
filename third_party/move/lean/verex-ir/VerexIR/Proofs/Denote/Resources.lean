@@ -47,35 +47,46 @@ theorem resourceOf_kind {namespaceId : NamespaceId} {typeId : TypeId}
   simp only [bind, Option.bind] at named
   repeat (first | simp only at named | split at named | cases named) <;> try rfl
 
-/-- Only a closed resource type names a runtime storage key. Open generic
-entries remain templates for frame instantiation (`resourceOf`), but do not
-encode independent runtime slots before that instantiation. -/
+/-- Only a closed resource type holding no reference names a runtime storage
+key. Open generic entries remain templates for frame instantiation
+(`resourceOf`), but do not encode independent runtime slots before that
+instantiation. -/
 def runtimeResourceOf (unit : ValidatedUnit) (namespaceId : NamespaceId) (typeId : TypeId) :
     Option ResourceType := do
   let resource ← resourceOf unit namespaceId typeId
-  guard resource.type.paramFree
+  guard (resource.type.paramFree && resource.type.refFree)
   some resource
+
+theorem runtimeResourceOf_sound {namespaceId : NamespaceId} {typeId : TypeId}
+    {resource : ResourceType} (named : runtimeResourceOf unit namespaceId typeId = some resource) :
+    resourceOf unit namespaceId typeId = some resource ∧ resource.type.paramFree = true ∧
+      resource.type.refFree = true := by
+  unfold runtimeResourceOf at named
+  obtain ⟨found, source, named⟩ := Option.bind_eq_some_iff.mp named
+  by_cases closed : (found.type.paramFree && found.type.refFree) = true
+  · simp [guard, closed] at named
+    cases named
+    exact ⟨source, Bool.and_eq_true_iff.mp closed⟩
+  · simp [guard, closed, failure] at named
 
 theorem runtimeResourceOf_kind {namespaceId : NamespaceId} {typeId : TypeId}
     {resource : ResourceType} (named : runtimeResourceOf unit namespaceId typeId = some resource) :
-    resource.kind = .value := by
-  unfold runtimeResourceOf at named
-  obtain ⟨found, source, named⟩ := Option.bind_eq_some_iff.mp named
-  have ordinary := resourceOf_kind source
-  by_cases closed : found.type.paramFree = true
-  · simp [guard, closed] at named
-    cases named
-    exact ordinary
-  · simp [guard, closed, failure] at named
+    resource.kind = .value :=
+  resourceOf_kind (runtimeResourceOf_sound named).1
+
+theorem runtimeResourceOf_refFree {namespaceId : NamespaceId} {typeId : TypeId}
+    {resource : ResourceType} (named : runtimeResourceOf unit namespaceId typeId = some resource) :
+    resource.type.refFree = true :=
+  (runtimeResourceOf_sound named).2.2
 
 /-- Runtime global memory holding exactly what a typed memory holds: under
-every key, the encoding of the value at the resource type its type
+every key, the physical value of the value at the resource type its type
 identifier denotes, and nothing under a key that denotes none.  Its entries
 are in key order, so the memory determines it. -/
 def Encodes (unit : ValidatedUnit) (memory : Memory unit) (globals : GlobalMap) : Prop :=
   globals.Sorted ∧ ∀ namespaceId typeId key, globals.lookup ⟨namespaceId, typeId, key⟩ =
     match runtimeResourceOf unit namespaceId typeId with
-    | some resource => (memory resource key).map (resource.encode (unit := unit))
+    | some resource => (memory resource key).map (resource.erase (unit := unit))
     | none => none
 
 /-- A memory's runtime encoding is unique. -/
@@ -84,12 +95,97 @@ theorem Encodes.unique {unit : ValidatedUnit} {memory : Memory unit} {left right
   GlobalMap.ext encodes.1 encodes'.1 fun ⟨namespaceId, typeId, key⟩ => by
     rw [encodes.2, encodes'.2]
 
+/-- A table some value stored in a memory holds. -/
+def MemoryTable (unit : ValidatedUnit) (memory : Memory unit)
+    (table : NTy × String × RuntimeValue) : Prop :=
+  ∃ namespaceId typeId resource key value,
+    runtimeResourceOf unit namespaceId typeId = some resource ∧
+    memory resource key = some value ∧ table ∈ resource.tables (unit := unit) value
+
+/-- Native table storage holding exactly the tables the values of a typed
+memory hold, each at the slot of its owner's type and handle (`tableSlot?`),
+in slot order, and the allocation history at its resource. The memory
+determines it. -/
+structure TablesEncode (unit : ValidatedUnit) (memory : Memory unit)
+    (storage : NativeTableStorage) : Prop where
+  sorted : storage.contents.Sorted
+  held : ∀ table, MemoryTable unit memory table →
+    ∃ key, tableSlot? unit table.1 table.2.1 = some key ∧
+      storage.contents.lookup key = some table.2.2
+  stored : ∀ slot ∈ storage.contents.entries, ∃ table, MemoryTable unit memory table ∧
+    tableSlot? unit table.1 table.2.1 = some slot.key ∧ slot.value = table.2.2
+  allocated : ∀ key, memory TableMemory.allocationResource key =
+    if key = .unit then some (TableMemory.encodeAllocated storage.allocated) else none
+
+/-- A key some slot of a store publishes is a stored slot. -/
+theorem _root_.VerexIR.GlobalMap.mem_of_lookup {globals : GlobalMap} {key : GlobalKey}
+    {value : RuntimeValue} (found : globals.lookup key = some value) :
+    (⟨key, value⟩ : GlobalSlot) ∈ globals.entries := by
+  unfold GlobalMap.lookup at found
+  obtain ⟨slot, slotFound, slotValue⟩ := Option.map_eq_some_iff.mp found
+  have member := Array.mem_of_find?_eq_some slotFound
+  have keyed := Array.find?_some slotFound
+  simp only [decide_eq_true_eq] at keyed
+  cases slot
+  cases keyed
+  cases slotValue
+  exact member
+
+theorem TablesEncode.unique {memory : Memory unit} {left right : NativeTableStorage}
+    (leftEncodes : TablesEncode unit memory left) (rightEncodes : TablesEncode unit memory right) :
+    left = right := by
+  have lookups : ∀ key value, left.contents.lookup key = some value →
+      right.contents.lookup key = some value := by
+    intro key value found
+    obtain ⟨table, held, slotted, stored⟩ :=
+      leftEncodes.stored ⟨key, value⟩ (GlobalMap.mem_of_lookup found)
+    obtain ⟨key', slotted', found'⟩ := rightEncodes.held table held
+    simp only at slotted stored
+    rw [slotted] at slotted'
+    cases slotted'
+    rw [found', stored]
+  have lookups' : ∀ key value, right.contents.lookup key = some value →
+      left.contents.lookup key = some value := by
+    intro key value found
+    obtain ⟨table, held, slotted, stored⟩ :=
+      rightEncodes.stored ⟨key, value⟩ (GlobalMap.mem_of_lookup found)
+    obtain ⟨key', slotted', found'⟩ := leftEncodes.held table held
+    simp only at slotted stored
+    rw [slotted] at slotted'
+    cases slotted'
+    rw [found', stored]
+  have contents : left.contents = right.contents :=
+    GlobalMap.ext leftEncodes.sorted rightEncodes.sorted fun key => by
+      cases foundLeft : left.contents.lookup key with
+      | some value => exact (lookups key value foundLeft).symm
+      | none =>
+          cases foundRight : right.contents.lookup key with
+          | some value => rw [lookups' key value foundRight] at foundLeft; cases foundLeft
+          | none => rfl
+  have allocated := TableMemory.encodeAllocated_injective left.allocated right.allocated
+    (Option.some.inj (by
+      simpa using (leftEncodes.allocated .unit).symm.trans (rightEncodes.allocated .unit)))
+  cases left
+  cases right
+  cases contents
+  cases allocated
+  rfl
+
+/-- Stored table entries hold no loan at an observation boundary. -/
+theorem TablesEncode.plain {memory : Memory unit} {storage : NativeTableStorage}
+    (encodes : TablesEncode unit memory storage) :
+    ∀ slot ∈ storage.contents.entries, SemanticOperations.Plain slot.value := by
+  intro slot member
+  obtain ⟨table, ⟨_, _, resource, _, value, _, _, held⟩, _, stored⟩ := encodes.stored slot member
+  rw [stored]
+  exact resource.tables_plain value table held
+
 /-- The observable runtime stores encode one typed memory. Loan registries
 remain separate; Table allocation history is observable even after destruction. -/
 structure StorageEncodes (unit : ValidatedUnit) (memory : Memory unit)
     (state : RuntimeState) : Prop where
   globals : Encodes unit memory state.globals
-  tables : TableMemory.EncodesStorage unit memory state.tables
+  tables : TablesEncode unit memory state.tables
 
 /-- A memory determines both observable stores, independently of loan IDs. -/
 theorem StorageEncodes.unique {memory : Memory unit} {left right : RuntimeState}
@@ -99,10 +195,37 @@ theorem StorageEncodes.unique {memory : Memory unit} {left right : RuntimeState}
   ⟨leftEncodes.globals.unique rightEncodes.globals,
    leftEncodes.tables.unique rightEncodes.tables⟩
 
+/-- A run's start: stores encoding the memory, and the tables the arguments
+hold, at the frame, in native storage. -/
+structure Encloses (unit : ValidatedUnit) [Skolems unit] (memory : Memory unit)
+    (state : RuntimeState) (tables : List (NTy × String × RuntimeValue)) : Prop where
+  stores : StorageEncodes unit memory state
+  held : TableMemory.TablesIn unit tables state.tables
+
+/-- Stores encoding a memory enclose no table. -/
+theorem Encloses.of_nil [Skolems unit] {memory : Memory unit} {state : RuntimeState}
+    (stores : StorageEncodes unit memory state) {tables : List (NTy × String × RuntimeValue)}
+    (nil : tables = []) : Encloses unit memory state tables :=
+  ⟨stores, nil ▸ TableMemory.TablesIn.nil state.tables⟩
+
+/-- A start enclosing tables read at an induced frame encloses them read at
+the caller's frame, their owners at the type arguments. -/
+theorem Encloses.instantiate (θ : TypeArgs) (Θ : Skolems unit) (memory : Memory unit)
+    (state : RuntimeState) (tables : List (NTy × String × RuntimeValue)) :
+    @Encloses unit (Skolems.instantiate θ Θ) memory state tables ↔
+      @Encloses unit Θ memory state (tables.map (tableSubst θ)) :=
+  ⟨fun held => @Encloses.mk unit Θ memory state _
+      (@Encloses.stores unit (Skolems.instantiate θ Θ) memory state tables held)
+      ((@TableMemory.TablesIn.instantiate unit θ Θ tables state.tables).mp
+        (@Encloses.held unit (Skolems.instantiate θ Θ) memory state tables held)),
+   fun held => @Encloses.mk unit (Skolems.instantiate θ Θ) memory state tables
+      (@Encloses.stores unit Θ memory state _ held)
+      ((@TableMemory.TablesIn.instantiate unit θ Θ tables state.tables).mpr
+        (@Encloses.held unit Θ memory state _ held))⟩
+
 /-- A resource type neither runtime store nor the allocation history names. -/
 def Unnamed (unit : ValidatedUnit) (resource : ResourceType) : Prop :=
   (∀ namespaceId typeId, runtimeResourceOf unit namespaceId typeId ≠ some resource) ∧
-  (∀ namespaceId typeId, TableMemory.runtimeResourceOf unit namespaceId typeId ≠ some resource) ∧
   resource ≠ TableMemory.allocationResource
 
 /-- Two memories that agree on every resource type no runtime key names. -/
@@ -185,6 +308,7 @@ def NTy.paramsBelow (bound : Nat) : NTy → Bool
   | .enum _ arguments _ rows _ =>
       NRow.paramsBelow bound arguments && NRows.paramsBelow bound rows
   | .vector element => NTy.paramsBelow bound element
+  | .table key value => NTy.paramsBelow bound key && NTy.paramsBelow bound value
   | .ref referent => NTy.paramsBelow bound referent
   | .function parameters _ results =>
       NRow.paramsBelow bound parameters && NRow.paramsBelow bound results
@@ -335,5 +459,64 @@ theorem coherent_runtime (unit : ValidatedUnit) (handle : FunctionHandle) :
     rfl
   · rw [instantiatedTypeId_empty, ntyOf_paramNode found]
     rfl
+
+/-! ## Data invariants of stored values
+
+The declaration predicate states the authored invariant of a nominal value at
+its resolved type arguments. The arguments matter even for phantom
+parameters: two values with identical physical encodings can have different
+invariants. Traversal follows the native type: fields, variants' payloads,
+vector elements, and the entries of a map's contents. The predicate reads no
+memory. -/
+
+namespace DataInvariant
+
+def elements : RuntimeValue → List RuntimeValue
+  | .vector values => values.toList
+  | _ => []
+
+mutual
+def value (declared : StructHandle → NRow → RuntimeValue → Prop) : NTy → RuntimeValue → Prop
+  | .struct source arguments fields, raw =>
+      declared source arguments raw ∧ row declared fields raw 0
+  | .enum source arguments names rows _, raw =>
+      declared source arguments raw ∧ variant declared names rows raw
+  | .tuple fields, raw => row declared fields raw 0
+  | .vector element, raw => ∀ held ∈ elements raw, value declared element held
+  -- A map's contents: each entry's key and value.
+  | .table key element, raw => ∀ entry ∈ elements raw,
+      value declared key (entry.field 0) ∧ value declared element (entry.field 1)
+  | .ref element, raw => value declared element (raw.field 0) ∧ value declared element (raw.field 1)
+  | _, _ => True
+
+def row (declared : StructHandle → NRow → RuntimeValue → Prop) : NRow → RuntimeValue → Nat → Prop
+  | .nil, _, _ => True
+  | .cons type rest, raw, index =>
+      value declared type (raw.field index) ∧ row declared rest raw (index + 1)
+
+def variant (declared : StructHandle → NRow → RuntimeValue → Prop) :
+    List String → NRows → RuntimeValue → Prop
+  | name :: names, .cons fields rest, raw =>
+      (raw.variant? = some name → row declared fields raw 0) ∧
+        variant declared names rest raw
+  | _, _, _ => True
+end
+
+/-- Primitive integer elements carry no declared nominal invariant. Resolve
+this before traversing a potentially large stored vector expression. -/
+@[vir_denote_norm↓] theorem integer_vector
+    (declared : StructHandle → NRow → RuntimeValue → Prop) (width : Nat) (signed : Bool)
+    (raw : RuntimeValue) : value declared (.vector (.int width signed)) raw := by
+  intro held member
+  trivial
+
+/-- Nested primitive vectors likewise need no nominal-invariant traversal. -/
+@[vir_denote_norm↓] theorem integer_vector_vector
+    (declared : StructHandle → NRow → RuntimeValue → Prop) (width : Nat) (signed : Bool)
+    (raw : RuntimeValue) : value declared (.vector (.vector (.int width signed))) raw := by
+  intro held member
+  exact integer_vector declared width signed held
+
+end DataInvariant
 
 end VerexIR.Proofs.Denote
