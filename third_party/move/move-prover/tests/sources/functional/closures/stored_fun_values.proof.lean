@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "stored_fun_values.move"
+verex proofs where
+
 open VerexIR.Proofs.Denote
 
 -- A frame can change a resource with a trivial invariant while preserving

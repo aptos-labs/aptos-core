@@ -117,6 +117,11 @@ struct StorageOpt {
 
     #[clap(long)]
     enable_indexer_grpc: bool,
+
+    /// Attach native-position storage on open. Pair with the
+    /// `native-position-set` / `native-position-delete` workloads.
+    #[clap(long)]
+    enable_trading_native: bool,
 }
 
 impl StorageOpt {
@@ -124,6 +129,7 @@ impl StorageOpt {
         StorageTestConfig {
             pruner_config: self.pruner_opt.pruner_config(),
             enable_indexer_grpc: self.enable_indexer_grpc,
+            enable_trading_native: self.enable_trading_native,
         }
     }
 }
@@ -141,6 +147,16 @@ pub struct PipelineOpt {
     /// Allows to see individual throughput of each stage, avoiding resource contention.
     #[clap(long)]
     split_stages: bool,
+
+    /// Derive the executor's on-chain config from the DB's `Features`, as a
+    /// node does. Required to exercise TransactionInfoV1 / the position root.
+    #[clap(long)]
+    onchain_config_from_features: bool,
+
+    /// After each block commits, check the in-memory position index against
+    /// a replay of the committed write sets and log a few entries.
+    #[clap(long)]
+    verify_positions_each_block: bool,
     /// Skip commit stage - i.e. create executed blocks in memory, but never commit them.
     /// Useful when commit is the bottleneck, to see throughput of the rest of the pipeline.
     #[clap(long)]
@@ -186,6 +202,9 @@ impl PipelineOpt {
             num_sig_verify_threads: self.num_sig_verify_threads,
             print_transactions: false,
             wait_for_indexer_grpc: enable_indexer_grpc,
+            onchain_config_from_features: self.onchain_config_from_features,
+            verify_positions_each_block: self.verify_positions_each_block,
+            ..Default::default()
         }
     }
 }

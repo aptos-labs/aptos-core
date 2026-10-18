@@ -1,3 +1,11 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import VerexMove.Proofs
+
+verex proofs for "math_fixed64.move"
+verex proofs where
+
 -- `math128::sqrt` returns r with r² ≤ y < (r + 1)², facts `omega` does not
 -- combine: the root of a nonzero u128 is between 1 and 2^64 - 1, so the
 -- scaled root is a nonzero divisor, and the quotient of one Newton step

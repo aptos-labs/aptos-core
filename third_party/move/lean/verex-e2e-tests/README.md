@@ -67,9 +67,12 @@ under `Check/` is VerexSL; the frontend paths keep their own directories.
 `verex-move verify` and `verex-rust verify` do
 ([`designs/source-verification.md`](../designs/source-verification.md)): every
 `.move` and `.rs` file there, a Rust file with the `.spec.lean` items beside
-it, is rendered as VerexSL and elaborated, and its messages, in the
-coordinates of the Move, Rust, or specification file, are the baseline
-`<name>.exp` — none when the source verifies.
+it and a Move file with its proof file, is rendered as VerexSL and
+elaborated, and its messages, in the coordinates of the Move, Rust,
+specification, or proof file, are the baseline `<name>.exp` — none when the
+source verifies. A Move file's rendering goes to `.verex/` beside it, where
+its proof file's header finds it; the proof file is then elaborated on its
+own, as the editor elaborates it, and its messages are `<name>.proof.exp`.
 
 The `VEREX_E2E_SUITE` environment variable selects one suite: `move`, `rust`,
 `verify`, `check`, `monovm`, or `monodiff`. The `monovm` suite is the linked MonoVM smoke check: it calls the

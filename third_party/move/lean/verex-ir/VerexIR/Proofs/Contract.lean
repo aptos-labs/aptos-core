@@ -132,6 +132,13 @@ closing attempt rewrites with this once the goal is down to arithmetic. -/
 theorem Obligation_iff {file : String} {startByte endByte : Nat} {p : Prop} :
     Obligation file startByte endByte p ↔ p := .rfl
 
+/-- The same as an equation, proved as a rewrite rather than by reflexivity:
+a `simp` set names it without deriving an auxiliary theorem for it, which a
+discharger's discarded state would lose, and rewrites with it as it does
+with the equivalence, not definitionally. -/
+theorem Obligation_eq {file : String} {startByte endByte : Nat} {p : Prop} :
+    Obligation file startByte endByte p = p := propext Obligation_iff
+
 /-- A lemma instance an `apply` step owes outside a quantifier: its premise.
 Where the step holds, the lemma's theorem gives the conclusion. -/
 def LemmaApplication (owes _gives : Prop) : Prop := owes

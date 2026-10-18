@@ -8,7 +8,6 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }
-atty = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 colored = { workspace = true }

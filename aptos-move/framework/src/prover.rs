@@ -255,14 +255,12 @@ impl ProverOptions {
             options.setup_logging()
         }
         if lean {
-            let output = package_path.join("build").join("verex-verify.lean");
             return move_prover::verex::verify(
                 &model,
                 package_path,
                 filter.as_deref(),
                 &options.prover.verify_scope,
                 &settings,
-                &output,
                 writer,
                 now,
             );

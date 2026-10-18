@@ -126,13 +126,18 @@ loopHypothesis✝ :
                     env.snd.snd.snd.fst.elim False fun result =>
                       env.snd.snd.snd.snd.fst.elim False fun i =>
                         env.snd.snd.snd.snd.snd.fst.elim False fun n =>
-                          VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5763 5769
-                              (i.val ≤ n.val) ∧
-                            VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5786 5799
-                                (n.val = ↑v.values.size) ∧
-                              VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5816 5834
-                                  (↑result.values.size = i.val) ∧
-                                VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 5851 5909
+                          VerexIR.Proofs.Obligation
+                              "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                              5763 5769 (i.val ≤ n.val) ∧
+                            VerexIR.Proofs.Obligation
+                                "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                5786 5799 (n.val = ↑v.values.size) ∧
+                              VerexIR.Proofs.Obligation
+                                  "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                  5816 5834 (↑result.values.size = i.val) ∧
+                                VerexIR.Proofs.Obligation
+                                  "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                  5851 5909
                                   (∀ (j : Int),
                                     0 ≤ j →
                                       j < i.val →
@@ -298,13 +303,18 @@ loopHypothesis✝ :
                       env.snd.snd.snd.fst.elim False fun result =>
                         env.snd.snd.snd.snd.fst.elim False fun i =>
                           env.snd.snd.snd.snd.snd.fst.elim False fun n =>
-                            VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6636 6642
-                                (i.val ≤ n.val) ∧
-                              VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6659 6672
-                                  (n.val = ↑v.values.size) ∧
-                                VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6689 6707
-                                    (↑result.values.size = i.val) ∧
-                                  VerexIR.Proofs.Obligation "result_of_attached_state_ok.lean" 6724 6777
+                            VerexIR.Proofs.Obligation
+                                "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                6636 6642 (i.val ≤ n.val) ∧
+                              VerexIR.Proofs.Obligation
+                                  "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                  6659 6672 (n.val = ↑v.values.size) ∧
+                                VerexIR.Proofs.Obligation
+                                    "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                    6689 6707 (↑result.values.size = i.val) ∧
+                                  VerexIR.Proofs.Obligation
+                                    "tests/sources/functional/closures/inline/.verex/result_of_attached_state_ok.move.lean"
+                                    6724 6777
                                     (∀ (j : Int),
                                       0 ≤ j →
                                         j < i.val →

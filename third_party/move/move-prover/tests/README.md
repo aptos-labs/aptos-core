@@ -96,9 +96,11 @@ skipped). Its messages differ from Boogie's, so its baselines are `.lean_exp` fi
   verifies but needs more raises its own budget with `pragma heartbeats = N;` in its spec block.
   `MVP_TEST_FLAGS=--heartbeats=N` runs with another default budget.
 - A function the automatic verification does not prove, e.g. where Boogie relies on a Move `proof` block or on
-  nonlinear arithmetic, is proved in a VerexSL proof file beside the test, `foo.proof.lean` for `foo.move`. The
-  failure message names the file, and `verify f by skip` there shows the obligations left. Only a file declaring a
-  single module can have one.
+  nonlinear arithmetic, is proved in a proof file beside the test, `foo.proof.lean` for `foo.move`, whose header
+  names the test (`verex proofs for "foo.move"`). The failure message names the file, and `verify f by
+  verex_obligations` there shows the obligations left. Only a file declaring a single module can have one. A run
+  writes the test's rendering to `.verex/foo.move.lean`, from which the proof file opens in the editor, in the
+  Lake workspace of `tests/sources`.
 - The run uses every core, and each verifier process takes up to about 2 GB of memory.
 
 ## Debugging Long Running Tests

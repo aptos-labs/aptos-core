@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexMove.Frontend
+import VerexMove.Proofs
 import VerexSL.SourceVerify
 
 /-!
@@ -10,9 +11,9 @@ import VerexSL.SourceVerify
 A Move file or package is exported through compiler-v2, its modules rendered
 as VerexSL in dependency order and verified, and every message reported in the Move file's
 coordinates. Its specifications are the Move `spec` blocks it declares; the
-proofs its functions need beyond the automatic verification are VerexSL
-items — `verify f by …` and the lemmas they use — in the proof file beside
-the Move file, `foo.proof.lean` for `foo.move`.
+proofs its functions need beyond the automatic verification are in the proof
+file beside the Move file, `foo.proof.lean` for `foo.move`
+(`VerexMove.Proofs`): `verify f by …` items and the lemmas they use.
 -/
 
 namespace VerexMove.SourceVerify
@@ -21,9 +22,17 @@ open VerexSL.SourceVerify
 open VerexMove.Frontend.Xast (Module)
 open VerexMove.Frontend.Effects (Package)
 
-/-- The proof file of a Move source file. -/
-def proofFile (source : System.FilePath) : System.FilePath :=
-  source.withExtension "proof.lean"
+open VerexMove.Proofs (proofFile fileRendering packageRendering)
+
+/-- Where verifying a Move file or a package directory writes its rendering:
+where a proof file's header finds it. -/
+def renderingOf (source : System.FilePath) : IO System.FilePath := do
+  if ← source.isDir then return packageRendering source else fileRendering source
+
+/-- Import what verifying a Move source elaborates: `VerexSL` and the header
+of its proof files. -/
+def importEnvironment : IO Lean.Environment :=
+  importLibraries #[`VerexMove.Proofs]
 
 /-- The namespace of the unit that a module was encoded to. -/
 private def namespaceOf? (unit : VerexIR.Validation.ValidatedUnit) (module : Module) :
@@ -67,7 +76,7 @@ def companions (package : Package) (unit : VerexIR.Validation.ValidatedUnit) :
     let some namespaceId := namespaceOf? unit module
       | throw <| IO.userError s!"{path}: the module `{module.name}` has no namespace"
     let text ← if ← path.pathExists then some <$> IO.FS.readFile path else pure none
-    found := found.push { path, namespaceId, text }
+    found := found.push { path, namespaceId, text, role := .proofs }
   return found
 
 /-- The declarations the export of a target module left out, as errors at

@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "proofs.move"
+verex proofs where
+
 -- The expansion of the square proves the result; the abort conditions need
 -- the square's sign where the deciders do not establish them.
 verify square_of_sum by

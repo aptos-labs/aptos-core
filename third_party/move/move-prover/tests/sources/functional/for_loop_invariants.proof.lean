@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "for_loop_invariants.move"
+verex proofs where
+
 -- Triangular sums use Move integer division (truncating toward zero).
 -- Nonnegative loop indices let us use Euclidean division identities.
 theorem triangular_nonneg (i : Int) (lo : 0 ≤ i) : 0 ≤ i * (i - 1) := by

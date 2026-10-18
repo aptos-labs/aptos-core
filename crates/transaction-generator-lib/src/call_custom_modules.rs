@@ -41,6 +41,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
         &mut self,
         _package: &Package,
         _publisher: &LocalAccount,
+        _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
         _rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
@@ -223,6 +224,7 @@ impl CustomModulesDelegationGeneratorCreator {
             requests_initialize.append(&mut workload.initialize_package(
                 package,
                 publisher,
+                root_account,
                 &init_txn_factory,
                 &mut rng,
             ));

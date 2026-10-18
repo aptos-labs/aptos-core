@@ -11,7 +11,6 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_store::{StatePruner, StateStore},
-    trading_native::ENABLE_TRADING_NATIVE,
     transaction_store::TransactionStore,
 };
 #[cfg(any(test, feature = "db-debugger"))]
@@ -128,6 +127,7 @@ impl AptosDB {
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
     ) -> Result<Self> {
+        let enable_trading_native = rocksdb_configs.enable_trading_native;
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
             "Do not set prune_window when opening readonly.",
@@ -183,7 +183,7 @@ impl AptosDB {
             hot_state_config,
         );
 
-        if ENABLE_TRADING_NATIVE {
+        if enable_trading_native {
             myself.init_native_position(
                 db_paths,
                 rocksdb_configs.state_kv_db_config,

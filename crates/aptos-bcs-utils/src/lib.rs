@@ -3,6 +3,10 @@
 
 use anyhow::bail;
 
+mod bounded_vec;
+
+pub use bounded_vec::BoundedVec;
+
 pub fn serialize_uleb128(buffer: &mut Vec<u8>, mut val: u64) -> anyhow::Result<()> {
     loop {
         let cur = val & 0x7F;

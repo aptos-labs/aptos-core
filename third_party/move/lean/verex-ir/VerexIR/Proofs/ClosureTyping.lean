@@ -227,6 +227,10 @@ theorem NTy.paramFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
   | .vector element, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed element mentioned]
+  | .table key value, mentioned => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
+      simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed key mentioned.1,
+        NTy.paramFree_substWith closed value mentioned.2, Bool.and_self]
   | .ref referent, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NTy.paramFree, NTy.paramFree_substWith closed referent mentioned]
@@ -289,6 +293,11 @@ theorem NTy.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.refFree] at free
       simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain element mentioned free]
+  | .table key value, mentioned, free => by
+      simp only [NTy.paramsAll, Bool.and_eq_true] at mentioned
+      simp only [NTy.refFree, Bool.and_eq_true] at free
+      simp only [NTy.substWith, NTy.refFree, NTy.refFree_substWith plain key mentioned.1 free.1,
+        NTy.refFree_substWith plain value mentioned.2 free.2, Bool.and_self]
 
 theorem NRow.refFree_substWith {allowed : Nat → Bool} {types : Nat → NTy}
     (plain : ∀ index, allowed index = true → (types index).refFree = true) :
@@ -713,7 +722,7 @@ theorem admits_struct {unit : ValidatedUnit} {source : StructHandle} {arguments 
     {value : RuntimeValue}
     (admitted : NTy.admits unit (.struct source arguments fields) value = true) :
     ∃ values, value = .nominal source none values ∧
-      NRow.admits unit fields values.toList = true := by
+      NRow.admitsFields unit fields values.toList = true := by
   cases value with
   | nominal actual variant values =>
       cases variant with
@@ -802,7 +811,7 @@ theorem NTy.hasType_of_admits {unit : ValidatedUnit} (agree : TypesAgree unit)
       match value, shape with
       | .nominal _ none values, ⟨_, rfl, admitted⟩ =>
           .nominal _ none _ _ _ _ _ _ name_eq declaration_eq resolve
-            (NRow.hasTypes_of_admits agree values.toList fields admitted typed closed plain)
+            (NRow.hasTypes_of_admitsFields agree values.toList fields admitted typed closed plain)
   | value, .enum source arguments names rows distinct, _, admitted,
       .enum name_eq _ _ _ _ variants, closed, plain =>
       have shape := admits_enum admitted
@@ -852,6 +861,41 @@ theorem NRow.hasTypes_of_admits {unit : ValidatedUnit} (agree : TypesAgree unit)
       simp [NRow.admits] at admitted
 termination_by values => sizeOf values
 
+/-- In a unit whose readings agree, runtime values a closed struct's field row
+holding no reference admits as its fields inhabit the declared field types. -/
+theorem NRow.hasTypes_of_admitsFields {unit : ValidatedUnit} (agree : TypesAgree unit)
+    {loans : LoanTypes} :
+    (values : List RuntimeValue) → (row : NRow) → {arguments : NRow} → {types : List SemTy} →
+      NRow.admitsFields unit row values = true → NRow.FieldsTypedAs unit arguments row types →
+      row.paramFree = true → row.refFree = true → HasTypes unit loans values types
+  | [], .nil, _, _, _, .nil, _, _ => .nil
+  | [], .cons τ .nil, _, _, admitted, typed, _, _ => by
+      simp only [NRow.admitsFields] at admitted
+      cases typed with
+      | hidden => exact .nil
+      | cons head _ => simp [head.not_table] at admitted
+  | [value], .cons τ .nil, _, _, admitted, typed, closed, plain => by
+      simp only [NRow.admitsFields, Bool.and_eq_true, Bool.not_eq_true'] at admitted
+      cases typed with
+      | hidden => simp [NTy.isTable] at admitted
+      | cons head tail =>
+          cases tail
+          simp only [NRow.paramFree, Bool.and_eq_true] at closed
+          simp only [NRow.refFree, Bool.and_eq_true] at plain
+          exact .cons (NTy.hasType_of_admits agree value τ admitted.2 head closed.1 plain.1) .nil
+  | value :: values, .cons τ (.cons σ rest), _, _, admitted, .cons head tail, closed, plain => by
+      simp only [NRow.admitsFields, Bool.and_eq_true] at admitted
+      simp only [NRow.paramFree, Bool.and_eq_true] at closed
+      simp only [NRow.refFree, Bool.and_eq_true] at plain
+      exact .cons (NTy.hasType_of_admits agree value τ admitted.1 head closed.1 plain.1)
+        (NRow.hasTypes_of_admitsFields agree values (.cons σ rest) admitted.2 tail
+          (by simp only [NRow.paramFree, Bool.and_eq_true]; exact closed.2)
+          (by simp only [NRow.refFree, Bool.and_eq_true]; exact plain.2))
+  | _ :: _ :: _, .cons _ .nil, _, _, admitted, _, _, _
+  | [], .cons _ (.cons _ _), _, _, admitted, _, _, _
+  | _ :: _, .nil, _, _, admitted, _, _, _ => by simp [NRow.admitsFields] at admitted
+termination_by values => sizeOf values
+
 /-- In a unit whose readings agree, runtime values each admitted at a closed
 type holding no reference inhabit the type it reads as. -/
 theorem NTy.hasTypeEach_of_admits {unit : ValidatedUnit} (agree : TypesAgree unit)
@@ -875,9 +919,10 @@ theorem Skolems.admits_carrier {unit : ValidatedUnit} [Θ : Skolems unit]
     NTy.admits unit (.function parameters.resolved shared results.resolved)
       closure.val.encode = true := by
   have admitted : NTy.admits unit (Θ.resolve (.function parameters shared results))
-      (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ closure)) = true :=
-    NTy.admits_encode unit _ _
-  rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq] at admitted
+      (@NTy.erase (Carriers.runtime unit) _ (Θ.toRuntime _ closure)) = true :=
+    NTy.admits_erase unit _ _
+  rw [@NTy.erase_eq_encode (Carriers.runtime unit) _ (Θ.resolve_tableFree (by simp [NTy.tableFree])),
+    Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq] at admitted
   simpa only [NTy.substWith, NRow.resolved_eq_substWith, Skolems.type] using admitted
 
 /-- A scalar row reads only as its scalar types. -/
@@ -897,7 +942,7 @@ invocation takes it. -/
 theorem ClosureTypedAt.ofCarrier {unit : ValidatedUnit} [Skolems unit] (agree : TypesAgree unit)
     {parameters results : NRow} {shared : List Bool}
     (closure : (NTy.function parameters shared results).carrier)
-    (resultsFree : results.refFree = true) (parametersScalar : ScalarAt unit parameters)
+    (resultsFree : results.lendsEncoded = true) (parametersScalar : ScalarAt unit parameters)
     (resultsScalar : ScalarAt unit results) :
     ClosureTypedAt unit parameters results closure.val := by
   intro _ _
@@ -941,9 +986,9 @@ theorem memoryTyped (unit : ValidatedUnit) (resources : ResourcesTyped unit)
         resources _ _ _ named
       refine ⟨ns, type, namespace_eq, resolves, encoded ▸ ?_⟩
       rcases closures with closureFree | agree
-      · exact @NTy.TypedAs.encode unit (Skolems.runtime unit) _ _ _ typed closed plain
+      · exact @NTy.TypedAs.erase unit (Skolems.runtime unit) _ _ _ typed closed plain
           closureFree value
-      · exact NTy.hasType_of_admits agree _ _ (NTy.admits_encode unit _ value) typed closed plain
+      · exact NTy.hasType_of_admits agree _ _ (NTy.admits_erase unit _ value) typed closed plain
   · cases found
 
 end VerexIR.Proofs

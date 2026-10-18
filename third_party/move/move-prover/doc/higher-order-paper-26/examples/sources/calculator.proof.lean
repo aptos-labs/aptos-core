@@ -1,6 +1,11 @@
 -- Copyright © Aptos Foundation
 -- SPDX-License-Identifier: Apache-2.0
 
+import VerexMove.Proofs
+
+verex proofs for "calculator.move"
+verex proofs where
+
 open VerexIR.Proofs.Denote
 
 -- Compare stored closures by their captures and masks, then preserve the

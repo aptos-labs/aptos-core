@@ -79,7 +79,6 @@ use std::{
     time::Duration,
 };
 use tempfile::TempDir;
-use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -471,7 +470,7 @@ impl CliTestFramework {
         let source_path = self.move_dir().join(rel_path);
         write_to_file(
             source_path.as_path(),
-            &source_path.as_display().to_string(),
+            &source_path.display().to_string(),
             content.as_bytes(),
         )
         .unwrap();
